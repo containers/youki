@@ -72,10 +72,6 @@ $ docker logs youki
     ```sh
     $ cargo build
     ```
-1. Run dockerd.
-    ```sh
-    $ dockerd
-    ```
 1. Run the following command to add youki to the runtime (on another tab)
     ```sh
     $ sudo RUST_BACKTRACE=full YOUKI_LOG_LEVEL=debug YOUKI_MODE=/var/lib/docker/containers/ dockerd --experimental --add-runtime="youki=$(pwd)/target/x86_64-unknown-linux-gnu/debug/youki"
