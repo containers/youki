@@ -1,5 +1,5 @@
 <h1 align="center">youki</h1>
-<h3 align="center">Rust experimental implementation of the oci-runtime</h3>
+<h3 align="center">Experimental implementation of the oci-runtime in Rust</h3>
 
 <p align="center">
 <a href="LICENSE">
@@ -15,12 +15,21 @@ I think Rust is one of the best languages to implement oci-runtime, so I'm havin
 ## Try and play
 We prepared [devcontainer](https://code.visualstudio.com/docs/remote/containers) as a development environment.
 The following explanation assumes that devcontainer is used.
+If you use devcontainer for the first time, please refer to [this page](https://code.visualstudio.com/docs/remote/containers).  
 At this stage, it sometimes fails to start the container, but don't worry about it, just retry.
 The first time it starts up will take a while, so have a cup of coffee and wait ;)
 
 ### Requires
 - vscode
 - docker
+
+### Start devcontainer
+This commands should be run runs in your local terminal.
+```
+$ git clone git@github.com:utam0k/youki.git
+$ code .
+```
+And use [devcontainer](https://code.visualstudio.com/docs/remote/containers) in your vscode.
 
 ### youki with Docker
 Run the following command in a terminal inside devcontainer.
