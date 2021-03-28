@@ -16,6 +16,7 @@ I think Rust is one of the best languages to implement oci-runtime, so I'm havin
 We prepared [devcontainer](https://code.visualstudio.com/docs/remote/containers) as a development environment.
 The following explanation assumes that devcontainer is used.
 If you use devcontainer for the first time, please refer to [this page](https://code.visualstudio.com/docs/remote/containers).  
+If you want to try running it locally, see [here](#to-run-locally).
 At this stage, it sometimes fails to start the container, but don't worry about it, just retry.
 The first time it starts up will take a while, so have a cup of coffee and wait ;)
 
@@ -64,6 +65,22 @@ If you run the following command in a different terminal, you will see the `Hell
 $ docker logs youki
 ```
 
+### To run locally
+
+1. Install rust. (See [here](https://www.rust-lang.org/tools/install))
+1. Run cargo build. You will need gcc for this.
+    ```sh
+    $ cargo build
+    ```
+1. Run dockerd.
+    ```sh
+    $ dockerd
+    ```
+1. Run the following command to add youki to the runtime (on another tab)
+    ```sh
+    $ sudo RUST_BACKTRACE=full YOUKI_LOG_LEVEL=debug YOUKI_MODE=/var/lib/docker/containers/ dockerd --experimental --add-runtime="youki=$(pwd)/target/x86_64-unknown-linux-gnu/debug/youki"
+    ```
+1. Let's run [this example](#youki-with-docker)
 
 ## Features
 - [x] somehow works
