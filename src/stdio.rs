@@ -39,7 +39,6 @@ pub fn connect_stdio(
     stdout: &FileDescriptor,
     stderr: &FileDescriptor,
 ) -> Result<()> {
-    std::thread::sleep(std::time::Duration::from_millis(10));
     dup2(stdin.as_raw_fd(), STDIN)?;
     dup2(stdout.as_raw_fd(), STDOUT)?;
     // FIXME: Rarely does it fail.
