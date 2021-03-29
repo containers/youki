@@ -7,47 +7,61 @@
 </a>
 </p>
 
-## Overview
+# Overview
 youki is an implementation of [runtime-spec](https://github.com/opencontainers/runtime-spec) in Rust, referring to [runc](https://github.com/opencontainers/runc).
 This project is in the experimental stage at this point.
 I think Rust is one of the best languages to implement oci-runtime, so I'm having fun experimenting with it.
 
-## Try and play
+# Building
+Two types of building are available: devcontainer or local.
+You can choose whichever you like, but the local one will only work on Linux.
+
+## Local
+### Requires
+- Rust(See [here](https://www.rust-lang.org/tools/install))
+- Docker
+
+### Building
+```sh
+$ git clone git@github.com:utam0k/youki.git
+$ cargo build
+$ RUST_BACKTRACE=full YOUKI_LOG_LEVEL=debug YOUKI_MODE=/var/lib/docker/containers/ dockerd --experimental --add-runtime="youki=$(pwd)/target/x86_64-unknown-linux-gnu/debug/youki"
+```
+
+## Devcontainer
 We prepared [devcontainer](https://code.visualstudio.com/docs/remote/containers) as a development environment.
-The following explanation assumes that devcontainer is used.
 If you use devcontainer for the first time, please refer to [this page](https://code.visualstudio.com/docs/remote/containers).  
-If you want to try running it locally, see [here](#to-run-locally).
-At this stage, it sometimes fails to start the container, but don't worry about it, just retry.
+The following explanation assumes that devcontainer is used.
 The first time it starts up will take a while, so have a cup of coffee and wait ;)
 
 ### Requires
-- vscode
-- docker
+- VSCode
+- Docker
 
-### Start devcontainer
+### Bulding
 This commands should be run runs in your local terminal.
-```
+```sh
 $ git clone git@github.com:utam0k/youki.git
 $ code .
 ```
-And use [devcontainer](https://code.visualstudio.com/docs/remote/containers) in your vscode.
-
-### youki with Docker
-Run the following command in a terminal inside devcontainer.
+And use [devcontainer](https://code.visualstudio.com/docs/remote/containers) in your vscode.  
 `dockerd` is already running when you start devcontainer.
-See `.devcontainer/scripts/init.sh` for details.
+You can get more information about the startup process by referring to `.devcontainer/scripts/init.sh`.
+
+# Usage
+## youki with Docker
 ```
 $ docker run -it --rm --runtime youki hello-world
 $ docker run -it --rm --runtime youki busybox
 ```
 
-### Integration test
+## Integration test
 ```
 $ /workspaces/youki/.devcontainer/scripts/setup_test.sh # only the first time
 $ /workspaces/youki/.devcontainer/scripts/test.sh
 ```
 
-### HelloWorld with youki
+## HelloWorld with youki
 Do `Hello, World` using the log function of Youki.
 If you want to explore youki, please use it.  
 Try adding the following code to the line in `src/main.rs` after initializing the logger of the main function and try to `cargo build` in your terminal.
@@ -65,28 +79,15 @@ If you run the following command in a different terminal, you will see the `Hell
 $ docker logs youki
 ```
 
-### To run locally
-
-1. Install rust. (See [here](https://www.rust-lang.org/tools/install))
-1. Run cargo build. You will need gcc for this.
-    ```sh
-    $ cargo build
-    ```
-1. Run the following command to add youki to the runtime (on another tab)
-    ```sh
-    $ sudo RUST_BACKTRACE=full YOUKI_LOG_LEVEL=debug YOUKI_MODE=/var/lib/docker/containers/ dockerd --experimental --add-runtime="youki=$(pwd)/target/x86_64-unknown-linux-gnu/debug/youki"
-    ```
-1. Let's run [this example](#youki-with-docker)
-
-## Features
+# Features
 - [x] somehow works
 - [x] run with docker
 - [x] namespace
-- [ ] rlimit
+- [ ] rlimits
 - [ ] cgroup
-- [ ] hook
+- [ ] hooks
 
-## Contribution
+# Contribution
 This project welcomes your PR and issues.
 For example, refactoring, adding features, correcting English, etc.
 If you need any help, you can contact me on [Twitter](https://twitter.com/utam0k).
