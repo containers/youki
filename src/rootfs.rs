@@ -99,10 +99,11 @@ pub async fn prepare_rootfs(spec: &Spec, rootfs: &PathBuf, bind_devices: bool) -
         None::<&str>,
     )?;
 
-    for m in &spec.mounts {
+    future::try_join_all(spec.mounts.iter().map(|m| { async move {
         let (flags, data) = parse_mount(m);
         if m.typ == "cgroup" {
             log::warn!("A feature of cgoup is unimplemented.");
+            Ok(())
             // skip
         } else if m.destination == PathBuf::from("/dev") {
             mount_from(
@@ -111,11 +112,12 @@ pub async fn prepare_rootfs(spec: &Spec, rootfs: &PathBuf, bind_devices: bool) -
                 flags & !MsFlags::MS_RDONLY,
                 &data,
                 &linux.mount_label,
-            )?;
+            )
         } else {
-            mount_from(m, rootfs, flags, &data, &linux.mount_label)?;
+            mount_from(m, rootfs, flags, &data, &linux.mount_label)
         }
     }
+    })).await?;
 
     let olddir = getcwd()?;
     chdir(rootfs)?;
@@ -132,8 +134,7 @@ pub async fn prepare_rootfs(spec: &Spec, rootfs: &PathBuf, bind_devices: bool) -
 fn setup_ptmx(rootfs: &PathBuf) -> Result<()> {
     if let Err(e) = remove_file(rootfs.join("dev/ptmx")) {
         if e.kind() != ::std::io::ErrorKind::NotFound {
-            let msg = "could not delete /dev/ptmx".to_string();
-            panic!(msg);
+            bail!("could not delete /dev/ptmx")
         }
     }
     symlink("pts/ptmx", rootfs.join("dev/ptmx"))?;
@@ -253,7 +254,6 @@ fn mount_from(m: &Mount, rootfs: &PathBuf, flags: MsFlags, data: &str, label: &s
             Path::new(&dest)
         };
         create_dir_all(&dir).unwrap();
-        // make sure file exists so we can bind over it
         if src.is_file() {
             OpenOptions::new()
                 .create(true)
@@ -270,13 +270,10 @@ fn mount_from(m: &Mount, rootfs: &PathBuf, flags: MsFlags, data: &str, label: &s
     if let Err(::nix::Error::Sys(errno)) = mount(Some(&*src), dest, Some(&*m.typ), flags, Some(&*d))
     {
         if errno != Errno::EINVAL {
-            let chain = format!("mount of {} failed", m.destination.display());
-            panic!(chain);
+            bail!("mount of {} failed", m.destination.display());
         }
-        // try again without mount label
         mount(Some(&*src), dest, Some(&*m.typ), flags, Some(data))?;
     }
-    // remount bind mounts if they have other flags (like MsFlags::MS_RDONLY)
     if flags.contains(MsFlags::MS_BIND)
         && flags.intersects(
             !(MsFlags::MS_REC

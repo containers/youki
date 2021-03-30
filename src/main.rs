@@ -67,7 +67,6 @@ impl SubCommand {
 fn main() -> Result<()> {
     let opts = Opts::parse();
     youki::logger::init(opts.subcmd.get_container_id().as_str(), opts.log)?;
-    log::debug!("Hello, world");
 
     let root_path = PathBuf::from(&opts.root);
     fs::create_dir_all(&root_path)?;
