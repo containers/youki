@@ -30,7 +30,8 @@ $ RUST_BACKTRACE=full YOUKI_LOG_LEVEL=debug YOUKI_MODE=/var/lib/docker/container
 
 ## Devcontainer
 We prepared [devcontainer](https://code.visualstudio.com/docs/remote/containers) as a development environment.
-If you use devcontainer for the first time, please refer to [this page](https://code.visualstudio.com/docs/remote/containers).  
+If you use devcontainer for the first time, please refer to [this page](https://code.visualstudio.com/docs/remote/containers).
+
 The following explanation assumes that devcontainer is used.
 The first time it starts up will take a while, so have a cup of coffee and wait ;)
 
@@ -42,9 +43,10 @@ The first time it starts up will take a while, so have a cup of coffee and wait 
 This commands should be run runs in your local terminal.
 ```sh
 $ git clone git@github.com:utam0k/youki.git
-$ code .
+$ code youki
 ```
-And use [devcontainer](https://code.visualstudio.com/docs/remote/containers) in your vscode.  
+And use [devcontainer](https://code.visualstudio.com/docs/remote/containers) in your vscode.
+
 `dockerd` is already running when you start devcontainer.
 You can get more information about the startup process by referring to `.devcontainer/scripts/init.sh`.
 
@@ -63,7 +65,8 @@ $ /workspaces/youki/.devcontainer/scripts/test.sh
 
 ## HelloWorld with youki
 Do `Hello, World` using the log function of Youki.
-If you want to explore youki, please use it.  
+If you want to explore youki, please use it.
+
 Try adding the following code to the line in `src/main.rs` after initializing the logger of the main function and try to `cargo build` in your terminal.
 ```
 log::debug!("Hello, World");
