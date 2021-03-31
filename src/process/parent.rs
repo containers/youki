@@ -24,8 +24,7 @@ impl ParentProcess {
 
     pub fn wait_for_child_ready(&mut self) -> Result<i32> {
         let mut events = Events::with_capacity(128);
-        self.poll
-            .poll(&mut events, Some(Duration::from_millis(1000)))?;
+        self.poll.poll(&mut events, Some(Duration::from_secs(5)))?;
         for event in events.iter() {
             if let PARENT = event.token() {
                 let mut buf = [0; 1];
