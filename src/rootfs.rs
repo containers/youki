@@ -2,13 +2,16 @@ use std::fs::OpenOptions;
 use std::fs::{canonicalize, create_dir_all, remove_file};
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use anyhow::{bail, Result};
-use futures::future;
+use futures::future::{self, try_join_all};
+use futures::stream::{self, StreamExt};
+use futures::task::SpawnExt;
 use nix::errno::Errno;
 use nix::fcntl::{open, OFlag};
-use nix::mount::MsFlags;
-use nix::mount::*;
+use nix::mount::mount as nix_mount;
+use nix::mount::{umount2, MntFlags, MsFlags};
 use nix::sys::stat::{mknod, umask};
 use nix::sys::stat::{Mode, SFlag};
 use nix::unistd::{chdir, chown, close, fchdir, getcwd, pivot_root};
@@ -76,7 +79,11 @@ fn default_devices() -> Vec<LinuxDevice> {
     ]
 }
 
-pub async fn prepare_rootfs(spec: &Spec, rootfs: &PathBuf, bind_devices: bool) -> Result<()> {
+pub async fn prepare_rootfs(
+    spec: Arc<Spec>,
+    rootfs: Arc<PathBuf>,
+    bind_devices: bool,
+) -> Result<()> {
     let mut flags = MsFlags::MS_REC;
     match spec.linux {
         Some(ref linux) => match linux.rootfs_propagation.as_ref() {
@@ -87,51 +94,78 @@ pub async fn prepare_rootfs(spec: &Spec, rootfs: &PathBuf, bind_devices: bool) -
         },
         None => flags |= MsFlags::MS_SLAVE,
     };
-    let linux = spec.linux.as_ref().unwrap();
-    mount(None::<&str>, "/", None::<&str>, flags, None::<&str>)?;
+    nix_mount(None::<&str>, "/", None::<&str>, flags, None::<&str>)?;
 
     log::debug!("mount root fs {:?}", rootfs);
-    mount(
-        Some(rootfs),
-        rootfs,
+    nix_mount(
+        Some(rootfs.as_ref()),
+        rootfs.as_ref(),
         None::<&str>,
         MsFlags::MS_BIND | MsFlags::MS_REC,
         None::<&str>,
     )?;
 
-    future::try_join_all(spec.mounts.iter().map(|m| { async move {
-        let (flags, data) = parse_mount(m);
+    let pool = futures::executor::ThreadPool::new()?;
+    let can_parall = spec.mounts.clone().into_iter().filter(|m| m.typ != "tmpfs");
+    let cannot_parall = spec.mounts.iter().filter(|m| m.typ == "tmpfs");
+
+    for m in cannot_parall {
+        let (flags, data) = parse_mount(&m);
+        let ml = &spec.linux.as_ref().unwrap().mount_label;
         if m.typ == "cgroup" {
-            log::warn!("A feature of cgoup is unimplemented.");
-            Ok(())
             // skip
+            log::warn!("A feature of cgoup is unimplemented.");
         } else if m.destination == PathBuf::from("/dev") {
-            mount_from(
-                m,
-                rootfs,
-                flags & !MsFlags::MS_RDONLY,
-                &data,
-                &linux.mount_label,
-            )
+            mount_to_container(&m, rootfs.as_ref(), flags & !MsFlags::MS_RDONLY, &data, &ml)?;
         } else {
-            mount_from(m, rootfs, flags, &data, &linux.mount_label)
+            mount_to_container(&m, rootfs.as_ref(), flags, &data, &ml)?;
         }
     }
-    })).await?;
+
+    try_join_all(
+        stream::iter(can_parall)
+            .map(|m| {
+                let spec = Arc::clone(&spec);
+                let rootfs = Arc::clone(&rootfs);
+                pool.spawn_with_handle(async move {
+                    let (flags, data) = parse_mount(&m);
+                    let ml = &spec.linux.as_ref().unwrap().mount_label;
+                    if m.typ == "cgroup" {
+                        // skip
+                        log::warn!("A feature of cgoup is unimplemented.");
+                        Ok(())
+                    } else if m.destination == PathBuf::from("/dev") {
+                        mount_to_container(
+                            &m,
+                            rootfs.as_ref(),
+                            flags & !MsFlags::MS_RDONLY,
+                            &data,
+                            &ml,
+                        )
+                    } else {
+                        mount_to_container(&m, rootfs.as_ref(), flags, &data, &ml)
+                    }
+                })
+                .unwrap()
+            })
+            .collect::<Vec<_>>()
+            .await,
+    )
+    .await?;
 
     let olddir = getcwd()?;
-    chdir(rootfs)?;
+    chdir(rootfs.as_ref())?;
 
-    setup_default_symlinks(rootfs)?;
-    create_devices(&linux.devices, bind_devices).await?;
-    setup_ptmx(rootfs)?;
+    setup_default_symlinks(&rootfs.as_ref())?;
+    create_devices(&spec.linux.as_ref().unwrap().devices, bind_devices).await?;
+    setup_ptmx(rootfs.as_ref())?;
 
     chdir(&olddir)?;
 
     Ok(())
 }
 
-fn setup_ptmx(rootfs: &PathBuf) -> Result<()> {
+fn setup_ptmx(rootfs: &Path) -> Result<()> {
     if let Err(e) = remove_file(rootfs.join("dev/ptmx")) {
         if e.kind() != ::std::io::ErrorKind::NotFound {
             bail!("could not delete /dev/ptmx")
@@ -188,7 +222,7 @@ async fn bind_dev(dev: &LinuxDevice) -> Result<()> {
         Mode::from_bits_truncate(0o644),
     )?;
     close(fd)?;
-    mount(
+    nix_mount(
         Some(&*dev.path),
         &dev.path[1..],
         None::<&str>,
@@ -227,17 +261,22 @@ fn to_sflag(t: LinuxDeviceType) -> Result<SFlag> {
     })
 }
 
-fn mount_from(m: &Mount, rootfs: &PathBuf, flags: MsFlags, data: &str, label: &str) -> Result<()> {
-    let d;
-    if !label.is_empty() && m.typ != "proc" && m.typ != "sysfs" {
+fn mount_to_container(
+    m: &Mount,
+    rootfs: &PathBuf,
+    flags: MsFlags,
+    data: &str,
+    label: &str,
+) -> Result<()> {
+    let d = if !label.is_empty() && m.typ != "proc" && m.typ != "sysfs" {
         if data.is_empty() {
-            d = format! {"context=\"{}\"", label};
+            format!("context=\"{}\"", label)
         } else {
-            d = format! {"{},context=\"{}\"", data, label};
+            format!("{},context=\"{}\"", data, label)
         }
     } else {
-        d = data.to_string();
-    }
+        data.to_string()
+    };
 
     let dest_for_host = format!(
         "{}{}",
@@ -267,12 +306,13 @@ fn mount_from(m: &Mount, rootfs: &PathBuf, flags: MsFlags, data: &str, label: &s
         PathBuf::from(&m.source)
     };
 
-    if let Err(::nix::Error::Sys(errno)) = mount(Some(&*src), dest, Some(&*m.typ), flags, Some(&*d))
+    if let Err(::nix::Error::Sys(errno)) =
+        nix_mount(Some(&*src), dest, Some(&*m.typ), flags, Some(&*d))
     {
         if errno != Errno::EINVAL {
             bail!("mount of {} failed", m.destination.display());
         }
-        mount(Some(&*src), dest, Some(&*m.typ), flags, Some(data))?;
+        nix_mount(Some(&*src), dest, Some(&*m.typ), flags, Some(data))?;
     }
     if flags.contains(MsFlags::MS_BIND)
         && flags.intersects(
@@ -284,7 +324,7 @@ fn mount_from(m: &Mount, rootfs: &PathBuf, flags: MsFlags, data: &str, label: &s
                 | MsFlags::MS_SLAVE),
         )
     {
-        mount(
+        nix_mount(
             Some(&*dest),
             &*dest,
             None::<&str>,

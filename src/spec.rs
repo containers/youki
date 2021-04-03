@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Platform {
     #[serde(default)]
     pub os: String,
@@ -13,7 +13,7 @@ pub struct Platform {
     pub arch: String,
 }
 
-#[derive(Default, PartialEq, Serialize, Deserialize, Debug)]
+#[derive(Default, PartialEq, Serialize, Deserialize, Debug, Clone)]
 pub struct Box {
     #[serde(default)]
     pub height: u64,
@@ -21,7 +21,7 @@ pub struct Box {
     pub width: u64,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct User {
     #[serde(default)]
@@ -34,7 +34,7 @@ pub struct User {
     pub username: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Process {
     #[serde(default)]
@@ -55,7 +55,7 @@ pub struct Process {
     pub selinux_label: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Root {
     #[serde(default)]
     pub path: PathBuf,
@@ -63,7 +63,7 @@ pub struct Root {
     pub readonly: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Mount {
     #[serde(default)]
     pub destination: PathBuf,
@@ -103,7 +103,7 @@ impl Default for LinuxDeviceType {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LinuxDeviceCgroup {
     #[serde(default)]
     pub allow: bool,
@@ -115,7 +115,7 @@ pub struct LinuxDeviceCgroup {
     pub access: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LinuxMemory {
     pub limit: Option<i64>,
     pub reservation: Option<i64>,
@@ -126,7 +126,7 @@ pub struct LinuxMemory {
     pub swappiness: Option<u64>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct LinuxCPU {
     pub shares: Option<u64>,
@@ -140,13 +140,13 @@ pub struct LinuxCPU {
     pub mems: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LinuxPids {
     #[serde(default)]
     pub limit: i64,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct LinuxWeightDevice {
     #[serde(default)]
@@ -157,7 +157,7 @@ pub struct LinuxWeightDevice {
     pub leaf_weight: Option<u16>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LinuxThrottleDevice {
     #[serde(default)]
     pub major: i64,
@@ -167,7 +167,7 @@ pub struct LinuxThrottleDevice {
     pub rate: u64,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct LinuxBlockIO {
     pub blkio_weight: Option<u16>,
@@ -184,7 +184,7 @@ pub struct LinuxBlockIO {
     pub blkio_throttle_write_iops_device: Vec<LinuxThrottleDevice>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct LinuxHugepageLimit {
     #[serde(default)]
@@ -193,7 +193,7 @@ pub struct LinuxHugepageLimit {
     pub limit: i64,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LinuxInterfacePriority {
     #[serde(default)]
     pub name: String,
@@ -201,7 +201,7 @@ pub struct LinuxInterfacePriority {
     pub priority: u32,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct LinuxNetwork {
     #[serde(rename = "classID")]
@@ -210,7 +210,7 @@ pub struct LinuxNetwork {
     pub priorities: Vec<LinuxInterfacePriority>,
 }
 
-#[derive(Default, Serialize, Deserialize, Debug)]
+#[derive(Default, Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct LinuxResources {
     #[serde(default)]
@@ -240,7 +240,7 @@ pub enum LinuxNamespaceType {
     Network = 0x40000000,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LinuxNamespace {
     #[serde(rename = "type")]
     pub typ: LinuxNamespaceType,
@@ -248,7 +248,7 @@ pub struct LinuxNamespace {
     pub path: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct LinuxDevice {
     #[serde(default)]
@@ -311,7 +311,7 @@ pub enum LinuxSeccompOperator {
     ScmpCmpMaskedEq = 7,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Linux {
     #[serde(default)]
@@ -337,7 +337,7 @@ pub struct Linux {
     pub mount_label: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Spec {
     #[serde(default, rename = "ociVersion")]
     pub version: String,

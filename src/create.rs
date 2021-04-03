@@ -73,8 +73,8 @@ impl Create {
         let process = run_container(
             self.pid_file.as_ref(),
             &mut notify_socket,
-            &rootfs,
-            &spec,
+            rootfs,
+            spec,
             csocketfd,
             container,
         )?;
@@ -88,8 +88,8 @@ impl Create {
 fn run_container<P: AsRef<Path>>(
     pid_file: Option<P>,
     notify_socket: &mut NotifyListener,
-    rootfs: &PathBuf,
-    spec: &spec::Spec,
+    rootfs: PathBuf,
+    spec: spec::Spec,
     csocketfd: Option<FileDescriptor>,
     container: Container,
 ) -> Result<Process> {
@@ -116,6 +116,8 @@ fn run_container<P: AsRef<Path>>(
     )? {
         Process::Parent(parent) => Ok(Process::Parent(parent)),
         Process::Child(child) => {
+            sched::unshare(cf & !sched::CloneFlags::CLONE_NEWUSER)?;
+
             if let Some(csocketfd) = csocketfd {
                 tty::ready(csocketfd)?;
             }
@@ -128,23 +130,28 @@ fn run_container<P: AsRef<Path>>(
                 }
             }
 
-            sched::unshare(cf & !sched::CloneFlags::CLONE_NEWUSER)?;
-
             match fork::fork_init(child)? {
                 Process::Child(child) => Ok(Process::Child(child)),
                 Process::Init(mut init) => {
+                    let spec_args: &Vec<String> = &spec.process.args.clone();
+
+                    let clone_spec = std::sync::Arc::new(spec);
+                    let clone_rootfs = std::sync::Arc::new(rootfs.clone());
+
                     futures::executor::block_on(rootfs::prepare_rootfs(
-                        spec,
-                        rootfs,
+                        clone_spec,
+                        clone_rootfs,
                         cf.contains(sched::CloneFlags::CLONE_NEWUSER),
                     ))?;
-                    rootfs::pivot_rootfs(&*rootfs)?;
+
+                    rootfs::pivot_rootfs(&rootfs)?;
 
                     init.ready()?;
 
                     notify_socket.wait_for_container_start()?;
 
-                    utils::do_exec(&spec.process.args[0], &spec.process.args)?;
+                    // utils::do_exec(&spec.process.args[0], &spec.process.args)?;
+                    utils::do_exec(&spec_args[0], spec_args)?;
                     container.update_status(ContainerStatus::Stopped)?.save()?;
 
                     Ok(Process::Init(init))
