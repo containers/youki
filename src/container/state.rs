@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::fs;
-use std::{fs::File, path::PathBuf};
+use std::{fs::File, path::Path};
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -74,7 +74,7 @@ impl State {
         }
     }
 
-    pub fn save(&self, container_root: &PathBuf) -> Result<()> {
+    pub fn save(&self, container_root: &Path) -> Result<()> {
         let state_file_path = container_root.join(STATE_FILE_PATH);
         let file = fs::OpenOptions::new()
             .read(true)
@@ -88,7 +88,7 @@ impl State {
         Ok(())
     }
 
-    pub fn load(container_root: &PathBuf) -> Result<Self> {
+    pub fn load(container_root: &Path) -> Result<Self> {
         let state_file_path = container_root.join(STATE_FILE_PATH);
         let file = File::open(state_file_path)?;
         let state: Self = serde_json::from_reader(&file)?;

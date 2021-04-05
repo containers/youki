@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use nix::unistd::Pid;
@@ -19,7 +19,7 @@ impl Container {
         status: ContainerStatus,
         pid: Option<i32>,
         bundle: &str,
-        container_root: &PathBuf,
+        container_root: &Path,
     ) -> Result<Self> {
         let container_root = fs::canonicalize(container_root)?;
         let state = State::new(container_id, status, pid, bundle);

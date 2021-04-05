@@ -77,7 +77,7 @@ pub struct Mount {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct LinuxIDMapping {
+pub struct LinuxIdMapping {
     #[serde(default, rename = "hostID")]
     pub host_id: u32,
     #[serde(default, rename = "containerID")]
@@ -128,7 +128,7 @@ pub struct LinuxMemory {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct LinuxCPU {
+pub struct LinuxCpu {
     pub shares: Option<u64>,
     pub quota: Option<i64>,
     pub period: Option<u64>,
@@ -169,7 +169,7 @@ pub struct LinuxThrottleDevice {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct LinuxBlockIO {
+pub struct LinuxBlockIo {
     pub blkio_weight: Option<u16>,
     pub blkio_leaf_weight: Option<u16>,
     #[serde(default)]
@@ -219,10 +219,11 @@ pub struct LinuxResources {
     pub disable_oom_killer: bool,
     pub oom_score_adj: Option<i32>,
     pub memory: Option<LinuxMemory>,
-    pub cpu: Option<LinuxCPU>,
+    #[serde(rename = "LinuxCPU")]
+    pub cpu: Option<LinuxCpu>,
     pub pids: Option<LinuxPids>,
     #[serde(rename = "blockIO")]
-    pub block_io: Option<LinuxBlockIO>,
+    pub block_io: Option<LinuxBlockIo>,
     #[serde(default)]
     pub hugepage_limits: Vec<LinuxHugepageLimit>,
     pub network: Option<LinuxNetwork>,
@@ -314,10 +315,10 @@ pub enum LinuxSeccompOperator {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Linux {
-    #[serde(default)]
-    pub uid_mappings: Vec<LinuxIDMapping>,
-    #[serde(default)]
-    pub gid_mappings: Vec<LinuxIDMapping>,
+    #[serde(default, rename = "LinuxIDMapping")]
+    pub uid_mappings: Vec<LinuxIdMapping>,
+    #[serde(default, rename = "LinuxIDMapping")]
+    pub gid_mappings: Vec<LinuxIdMapping>,
     #[serde(default)]
     pub sysctl: HashMap<String, String>,
     pub resources: Option<LinuxResources>,

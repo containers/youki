@@ -1,6 +1,6 @@
 use std::os::unix::fs::symlink;
 use std::os::unix::io::AsRawFd;
-use std::path::PathBuf;
+use std::path::Path;
 
 use anyhow::{bail, Result};
 use nix::errno::Errno;
@@ -37,7 +37,7 @@ pub fn ready(console_fd: FileDescriptor) -> Result<()> {
 }
 
 pub fn load_console_sockets(
-    container_dir: &PathBuf,
+    container_dir: &Path,
     console_socket: &str,
 ) -> Result<(FileDescriptor, FileDescriptor)> {
     let csocket = "console-stdout";

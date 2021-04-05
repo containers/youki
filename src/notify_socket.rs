@@ -1,7 +1,7 @@
 use std::io::prelude::*;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::net::{UnixListener, UnixStream};
-use std::path::PathBuf;
+use std::path::Path;
 
 use anyhow::Result;
 use nix::unistd::close;
@@ -13,7 +13,7 @@ pub struct NotifyListener {
 }
 
 impl NotifyListener {
-    pub fn new(root: &PathBuf) -> Result<Self> {
+    pub fn new(root: &Path) -> Result<Self> {
         let _notify_file_path = root.join(NOTIFY_FILE);
         let stream = UnixListener::bind("notify.sock")?;
         Ok(Self { socket: stream })
@@ -40,7 +40,7 @@ impl NotifyListener {
 pub struct NotifySocket {}
 
 impl NotifySocket {
-    pub fn new(_root: &PathBuf) -> Result<Self> {
+    pub fn new(_root: &Path) -> Result<Self> {
         Ok(Self {})
     }
 

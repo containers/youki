@@ -175,7 +175,7 @@ fn setup_ptmx(rootfs: &Path) -> Result<()> {
     Ok(())
 }
 
-fn setup_default_symlinks(rootfs: &PathBuf) -> Result<()> {
+fn setup_default_symlinks(rootfs: &Path) -> Result<()> {
     if Path::new("/proc/kcore").exists() {
         symlink("/proc/kcore", "dev/kcore")?;
     }
@@ -263,7 +263,7 @@ fn to_sflag(t: LinuxDeviceType) -> Result<SFlag> {
 
 fn mount_to_container(
     m: &Mount,
-    rootfs: &PathBuf,
+    rootfs: &Path,
     flags: MsFlags,
     data: &str,
     label: &str,
