@@ -1,0 +1,64 @@
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - run: rustup component add clippy
+      - uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --all-features
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+      - name: Print Rust Version
+        run: |
+          rustc -Vv
+          cargo -Vv
+      - uses: actions/setup-go@v2
+        with:
+          go-version: "1.11.0"
+      - name: Build runtime-tools
+        run: |
+          mkdir -p $(go env GOPATH)/src/github.com/opencontainers
+          cd $(go env GOPATH)/src/github.com/opencontainers
+          git clone https://github.com/opencontainers/runtime-tools
+          cd runtime-tools
+          make runtimetest validation-executables
+      - name: Run intetgration test
+        run: |
+          expect_err_num=107
+          act_err_num=0
+          cd $(go env GOPATH)/src/github.com/opencontainers/runtime-tools
+          IFS=$'\n' errors=($(sudo RUNTIME=$GITHUB_WORKSPACE/target/x86_64-unknown-linux-gnu/debug/youki ./validation/default/default.t | grep "not ok"))
+          if [ ${#errors[@]} -eq 0 ]; then
+              echo -e "Passed all tess."
+          else
+              for err in "${errors[@]}"; do
+              act_err_num=$((++act_err_num))
+                  echo $err
+              done
+          fi
+          if [ ${act_err_num} -gt ${expect_err_num} ]; then
+              echo "The number of failures was not as expected, it was ${act_err_num}."
+              exit 1
+          else
+              echo "The number of erros was $((act_err_num - expect_err_num)) less than expected."
+              exit 0
+          fi
+
