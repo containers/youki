@@ -1,7 +1,23 @@
 use std::ffi::CString;
+use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use nix::unistd;
+
+pub trait PathBufExt {
+    fn as_in_container(&self) -> Result<PathBuf>;
+}
+
+impl PathBufExt for PathBuf {
+    fn as_in_container(&self) -> Result<PathBuf> {
+        if self.is_relative() {
+            bail!("Relative path cannnot be converted to the path in the container.")
+        } else {
+            let path_string = self.to_string_lossy().into_owned();
+            Ok(PathBuf::from(path_string[1..].to_string()))
+        }
+    }
+}
 
 pub fn do_exec(path: &str, args: &[String]) -> Result<()> {
     let p = CString::new(path.to_string()).unwrap();

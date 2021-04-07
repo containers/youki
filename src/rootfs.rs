@@ -19,11 +19,12 @@ use nix::unistd::{Gid, Uid};
 use nix::NixPath;
 
 use crate::spec::{LinuxDevice, LinuxDeviceType, Mount, Spec};
+use crate::utils::PathBufExt;
 
 fn default_devices() -> Vec<LinuxDevice> {
     vec![
         LinuxDevice {
-            path: "/dev/null".to_string(),
+            path: PathBuf::from("/dev/null"),
             typ: LinuxDeviceType::C,
             major: 1,
             minor: 3,
@@ -32,7 +33,7 @@ fn default_devices() -> Vec<LinuxDevice> {
             gid: None,
         },
         LinuxDevice {
-            path: "/dev/zero".to_string(),
+            path: PathBuf::from("/dev/zero"),
             typ: LinuxDeviceType::C,
             major: 1,
             minor: 5,
@@ -41,7 +42,7 @@ fn default_devices() -> Vec<LinuxDevice> {
             gid: None,
         },
         LinuxDevice {
-            path: "/dev/full".to_string(),
+            path: PathBuf::from("/dev/full"),
             typ: LinuxDeviceType::C,
             major: 1,
             minor: 7,
@@ -50,7 +51,7 @@ fn default_devices() -> Vec<LinuxDevice> {
             gid: None,
         },
         LinuxDevice {
-            path: "/dev/tty".to_string(),
+            path: PathBuf::from("/dev/tty"),
             typ: LinuxDeviceType::C,
             major: 5,
             minor: 0,
@@ -59,7 +60,7 @@ fn default_devices() -> Vec<LinuxDevice> {
             gid: None,
         },
         LinuxDevice {
-            path: "/dev/urandom".to_string(),
+            path: PathBuf::from("/dev/urandom"),
             typ: LinuxDeviceType::C,
             major: 1,
             minor: 9,
@@ -68,7 +69,7 @@ fn default_devices() -> Vec<LinuxDevice> {
             gid: None,
         },
         LinuxDevice {
-            path: "/dev/random".to_string(),
+            path: PathBuf::from("/dev/random"),
             typ: LinuxDeviceType::C,
             major: 1,
             minor: 8,
@@ -196,16 +197,16 @@ async fn create_devices(devices: &[LinuxDevice], bind: bool) -> Result<()> {
     let old_mode = umask(Mode::from_bits_truncate(0o000));
     if bind {
         future::try_join_all(default_devices().iter().chain(devices).map(|dev| {
-            if !dev.path.starts_with("/dev") || dev.path.contains("..") {
-                panic!("{} is not a valid device path", dev.path);
+            if !dev.path.starts_with("/dev") {
+                panic!("{} is not a valid device path", dev.path.display());
             }
             bind_dev(dev)
         }))
         .await?;
     } else {
         future::try_join_all(default_devices().iter().chain(devices).map(|dev| {
-            if !dev.path.starts_with("/dev") || dev.path.contains("..") {
-                panic!("{} is not a valid device path", dev.path);
+            if !dev.path.starts_with("/dev") {
+                panic!("{} is not a valid device path", dev.path.display());
             }
             mknod_dev(dev)
         }))
@@ -217,14 +218,14 @@ async fn create_devices(devices: &[LinuxDevice], bind: bool) -> Result<()> {
 
 async fn bind_dev(dev: &LinuxDevice) -> Result<()> {
     let fd = open(
-        &dev.path[1..],
+        &dev.path.as_in_container()?,
         OFlag::O_RDWR | OFlag::O_CREAT,
         Mode::from_bits_truncate(0o644),
     )?;
     close(fd)?;
     nix_mount(
-        Some(&*dev.path),
-        &dev.path[1..],
+        Some(&*dev.path.as_in_container()?),
+        &dev.path,
         None::<&str>,
         MsFlags::MS_BIND,
         None::<&str>,
@@ -239,13 +240,13 @@ async fn mknod_dev(dev: &LinuxDevice) -> Result<()> {
 
     let f = to_sflag(dev.typ)?;
     mknod(
-        &dev.path[1..],
+        &dev.path.as_in_container()?,
         f,
         Mode::from_bits_truncate(dev.file_mode.unwrap_or(0)),
         makedev(dev.major, dev.minor),
     )?;
     chown(
-        &dev.path[1..],
+        &dev.path.as_in_container()?,
         dev.uid.map(Uid::from_raw),
         dev.gid.map(Gid::from_raw),
     )?;

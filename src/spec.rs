@@ -253,7 +253,7 @@ pub struct LinuxNamespace {
 #[serde(rename_all = "camelCase")]
 pub struct LinuxDevice {
     #[serde(default)]
-    pub path: String,
+    pub path: PathBuf,
     #[serde(rename = "type")]
     pub typ: LinuxDeviceType,
     #[serde(default)]
