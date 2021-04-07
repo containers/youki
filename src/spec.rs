@@ -1,8 +1,9 @@
+use nix::sys::stat::SFlag;
 use std::collections::HashMap;
 use std::fs::File;
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -100,6 +101,17 @@ pub enum LinuxDeviceType {
 impl Default for LinuxDeviceType {
     fn default() -> LinuxDeviceType {
         LinuxDeviceType::A
+    }
+}
+
+impl LinuxDeviceType {
+    pub fn to_sflag(&self) -> Result<SFlag> {
+        Ok(match self {
+            Self::B => SFlag::S_IFBLK,
+            Self::C | LinuxDeviceType::U => SFlag::S_IFCHR,
+            Self::P => SFlag::S_IFIFO,
+            Self::A => bail!("type a is not allowed for linux device"),
+        })
     }
 }
 

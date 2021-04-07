@@ -12,73 +12,14 @@ use nix::errno::Errno;
 use nix::fcntl::{open, OFlag};
 use nix::mount::mount as nix_mount;
 use nix::mount::{umount2, MntFlags, MsFlags};
+use nix::sys::stat::Mode;
 use nix::sys::stat::{mknod, umask};
-use nix::sys::stat::{Mode, SFlag};
 use nix::unistd::{chdir, chown, close, fchdir, getcwd, pivot_root};
 use nix::unistd::{Gid, Uid};
 use nix::NixPath;
 
 use crate::spec::{LinuxDevice, LinuxDeviceType, Mount, Spec};
 use crate::utils::PathBufExt;
-
-fn default_devices() -> Vec<LinuxDevice> {
-    vec![
-        LinuxDevice {
-            path: PathBuf::from("/dev/null"),
-            typ: LinuxDeviceType::C,
-            major: 1,
-            minor: 3,
-            file_mode: Some(0o066),
-            uid: None,
-            gid: None,
-        },
-        LinuxDevice {
-            path: PathBuf::from("/dev/zero"),
-            typ: LinuxDeviceType::C,
-            major: 1,
-            minor: 5,
-            file_mode: Some(0o066),
-            uid: None,
-            gid: None,
-        },
-        LinuxDevice {
-            path: PathBuf::from("/dev/full"),
-            typ: LinuxDeviceType::C,
-            major: 1,
-            minor: 7,
-            file_mode: Some(0o066),
-            uid: None,
-            gid: None,
-        },
-        LinuxDevice {
-            path: PathBuf::from("/dev/tty"),
-            typ: LinuxDeviceType::C,
-            major: 5,
-            minor: 0,
-            file_mode: Some(0o066),
-            uid: None,
-            gid: None,
-        },
-        LinuxDevice {
-            path: PathBuf::from("/dev/urandom"),
-            typ: LinuxDeviceType::C,
-            major: 1,
-            minor: 9,
-            file_mode: Some(0o066),
-            uid: None,
-            gid: None,
-        },
-        LinuxDevice {
-            path: PathBuf::from("/dev/random"),
-            typ: LinuxDeviceType::C,
-            major: 1,
-            minor: 8,
-            file_mode: Some(0o066),
-            uid: None,
-            gid: None,
-        },
-    ]
-}
 
 pub async fn prepare_rootfs(
     spec: Arc<Spec>,
@@ -193,6 +134,65 @@ fn setup_default_symlinks(rootfs: &Path) -> Result<()> {
     Ok(())
 }
 
+fn default_devices() -> [LinuxDevice; 6] {
+    [
+        LinuxDevice {
+            path: PathBuf::from("/dev/null"),
+            typ: LinuxDeviceType::C,
+            major: 1,
+            minor: 3,
+            file_mode: Some(0o066),
+            uid: None,
+            gid: None,
+        },
+        LinuxDevice {
+            path: PathBuf::from("/dev/zero"),
+            typ: LinuxDeviceType::C,
+            major: 1,
+            minor: 5,
+            file_mode: Some(0o066),
+            uid: None,
+            gid: None,
+        },
+        LinuxDevice {
+            path: PathBuf::from("/dev/full"),
+            typ: LinuxDeviceType::C,
+            major: 1,
+            minor: 7,
+            file_mode: Some(0o066),
+            uid: None,
+            gid: None,
+        },
+        LinuxDevice {
+            path: PathBuf::from("/dev/tty"),
+            typ: LinuxDeviceType::C,
+            major: 5,
+            minor: 0,
+            file_mode: Some(0o066),
+            uid: None,
+            gid: None,
+        },
+        LinuxDevice {
+            path: PathBuf::from("/dev/urandom"),
+            typ: LinuxDeviceType::C,
+            major: 1,
+            minor: 9,
+            file_mode: Some(0o066),
+            uid: None,
+            gid: None,
+        },
+        LinuxDevice {
+            path: PathBuf::from("/dev/random"),
+            typ: LinuxDeviceType::C,
+            major: 1,
+            minor: 8,
+            file_mode: Some(0o066),
+            uid: None,
+            gid: None,
+        },
+    ]
+}
+
 async fn create_devices(devices: &[LinuxDevice], bind: bool) -> Result<()> {
     let old_mode = umask(Mode::from_bits_truncate(0o000));
     if bind {
@@ -238,10 +238,9 @@ async fn mknod_dev(dev: &LinuxDevice) -> Result<()> {
         (minor & 0xff) | ((major & 0xfff) << 8) | ((minor & !0xff) << 12) | ((major & !0xfff) << 32)
     }
 
-    let f = to_sflag(dev.typ)?;
     mknod(
         &dev.path.as_in_container()?,
-        f,
+        dev.typ.to_sflag()?,
         Mode::from_bits_truncate(dev.file_mode.unwrap_or(0)),
         makedev(dev.major, dev.minor),
     )?;
@@ -251,15 +250,6 @@ async fn mknod_dev(dev: &LinuxDevice) -> Result<()> {
         dev.gid.map(Gid::from_raw),
     )?;
     Ok(())
-}
-
-fn to_sflag(t: LinuxDeviceType) -> Result<SFlag> {
-    Ok(match t {
-        LinuxDeviceType::B => SFlag::S_IFBLK,
-        LinuxDeviceType::C | LinuxDeviceType::U => SFlag::S_IFCHR,
-        LinuxDeviceType::P => SFlag::S_IFIFO,
-        LinuxDeviceType::A => bail!("type a is not allowed for linux device"),
-    })
 }
 
 fn mount_to_container(
