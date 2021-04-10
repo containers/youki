@@ -10,6 +10,7 @@ use nix::sys::stat;
 use nix::unistd;
 use nix::unistd::{Gid, Uid};
 
+use crate::cgroups;
 use crate::container::{Container, ContainerStatus};
 use crate::notify_socket::NotifyListener;
 use crate::process::{fork, Process};
@@ -108,11 +109,14 @@ fn run_container<P: AsRef<Path>>(
         }
     }
 
+    let cmanager = cgroups::Manager::new(linux.cgroups_path.clone());
+
     match fork::fork_first(
         pid_file,
         cf.contains(sched::CloneFlags::CLONE_NEWUSER),
         linux,
         &container,
+        cmanager,
     )? {
         Process::Parent(parent) => Ok(Process::Parent(parent)),
         Process::Child(child) => {

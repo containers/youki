@@ -1,11 +1,12 @@
 use std::ffi::CString;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Result};
 use nix::unistd;
 
 pub trait PathBufExt {
     fn as_in_container(&self) -> Result<PathBuf>;
+    fn join_absolute_path(&self, p: &Path) -> Result<PathBuf>;
 }
 
 impl PathBufExt for PathBuf {
@@ -16,6 +17,16 @@ impl PathBufExt for PathBuf {
             let path_string = self.to_string_lossy().into_owned();
             Ok(PathBuf::from(path_string[1..].to_string()))
         }
+    }
+
+    fn join_absolute_path(&self, p: &Path) -> Result<PathBuf> {
+        if !p.is_absolute() && !p.as_os_str().is_empty() {
+            bail!(
+                "connnot join {:?} because it is not the absolute path.",
+                p.display()
+            )
+        }
+        Ok(PathBuf::from(format!("{}{}", self.display(), p.display())))
     }
 }
 
