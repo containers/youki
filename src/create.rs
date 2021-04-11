@@ -43,6 +43,7 @@ impl Create {
         unistd::chdir(&self.bundle)?;
 
         let spec = spec::Spec::load("config.json")?;
+        fs::copy("config.json", container_dir.join("config.json"))?;
 
         let container_dir = fs::canonicalize(container_dir)?;
         unistd::chdir(&*container_dir)?;
@@ -109,14 +110,14 @@ fn run_container<P: AsRef<Path>>(
         }
     }
 
-    let cmanager = cgroups::Manager::new(linux.cgroups_path.clone());
+    let cmanager = cgroups::Manager::new(linux.cgroups_path.clone())?;
 
     match fork::fork_first(
         pid_file,
         cf.contains(sched::CloneFlags::CLONE_NEWUSER),
         linux,
         &container,
-        cmanager,
+        &cmanager,
     )? {
         Process::Parent(parent) => Ok(Process::Parent(parent)),
         Process::Child(child) => {
@@ -134,7 +135,7 @@ fn run_container<P: AsRef<Path>>(
                 }
             }
 
-            match fork::fork_init(child)? {
+            match fork::fork_init(child, &cmanager)? {
                 Process::Child(child) => Ok(Process::Child(child)),
                 Process::Init(mut init) => {
                     let spec_args: &Vec<String> = &spec.process.args.clone();

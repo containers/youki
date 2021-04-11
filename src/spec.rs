@@ -113,6 +113,16 @@ impl LinuxDeviceType {
             Self::A => bail!("type a is not allowed for linux device"),
         })
     }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::B => "b",
+            Self::C => "c",
+            Self::U => "u",
+            Self::P => "p",
+            Self::A => "a",
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -275,6 +285,18 @@ pub struct LinuxDevice {
     pub file_mode: Option<u32>,
     pub uid: Option<u32>,
     pub gid: Option<u32>,
+}
+
+impl From<&LinuxDevice> for LinuxDeviceCgroup {
+    fn from(linux_device: &LinuxDevice) -> LinuxDeviceCgroup {
+        LinuxDeviceCgroup {
+            allow: true,
+            typ: linux_device.typ,
+            major: Some(linux_device.major as i64),
+            minor: Some(linux_device.minor as i64),
+            access: "rwm".to_string(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]

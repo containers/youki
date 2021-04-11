@@ -5,9 +5,11 @@ use anyhow::{bail, Result};
 use clap::Clap;
 use nix::sys::signal as nix_signal;
 
+use youki::cgroups;
 use youki::container::{Container, ContainerStatus};
 use youki::create;
 use youki::signal;
+use youki::spec;
 use youki::start;
 
 #[derive(Clap, Debug)]
@@ -110,6 +112,9 @@ fn main() -> Result<()> {
             if container.can_delete() {
                 if container.root.exists() {
                     fs::remove_dir_all(&container.root)?;
+                    let spec = spec::Spec::load("config.json")?;
+                    let cmanager = cgroups::Manager::new(spec.linux.unwrap().cgroups_path)?;
+                    cmanager.remove()?;
                 }
                 std::process::exit(0)
             } else {

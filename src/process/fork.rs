@@ -24,7 +24,7 @@ pub fn fork_first<P: AsRef<Path>>(
     userns: bool,
     linux: &spec::Linux,
     container: &Container,
-    cmanager: cgroups::Manager,
+    cmanager: &cgroups::Manager,
 ) -> Result<Process> {
     let ccond = Cond::new()?;
 
@@ -54,7 +54,7 @@ pub fn fork_first<P: AsRef<Path>>(
             unistd::ForkResult::Parent { child } => {
                 ccond.wait()?;
 
-                cmanager.apply(child)?;
+                cmanager.apply(&linux.resources.as_ref().unwrap(), child)?;
 
                 let init_pid = parent.wait_for_child_ready()?;
                 container
@@ -71,7 +71,7 @@ pub fn fork_first<P: AsRef<Path>>(
     }
 }
 
-pub fn fork_init(mut child_process: ChildProcess) -> Result<Process> {
+pub fn fork_init(mut child_process: ChildProcess, cmanager: &cgroups::Manager) -> Result<Process> {
     let sender_for_child = child_process.setup_uds()?;
     unsafe {
         match unistd::fork()? {
@@ -82,6 +82,7 @@ pub fn fork_init(mut child_process: ChildProcess) -> Result<Process> {
 
                 match waitpid(child, None)? {
                     WaitStatus::Exited(pid, status) => {
+                        // cmanager.remove()?;
                         log::debug!("exited pid: {:?}, status: {:?}", pid, status);
                         exit(status);
                     }
