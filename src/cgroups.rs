@@ -34,15 +34,25 @@ impl Manager {
     }
 
     pub fn apply(&self, linux_resources: &LinuxResources, pid: Pid) -> Result<()> {
-        for cgroup in Process::myself()?.cgroups()?.iter() {
-            eprintln!("c: {:?}", cgroup)
-        }
+        let cgroup = Process::myself()?
+            .cgroups()?
+            .into_iter()
+            .filter(|c| c.controllers.contains(&"devices".to_string()))
+            .collect::<Vec<_>>()
+            .pop()
+            .unwrap();
 
-        let p = self
-            .mount_info
-            .mount_point
-            // .join_absolute_path(&PathBuf::from("/user.slice"))?
-            .join_absolute_path(&self.cgroup_path)?;
+        let p = if cgroup.pathname.is_empty() {
+            self.mount_info
+                .mount_point
+                .join_absolute_path(&self.cgroup_path)?
+        } else {
+            self.mount_info
+                .mount_point
+                .join_absolute_path(Path::new(&cgroup.pathname))?
+                .join_absolute_path(&self.cgroup_path)?
+        };
+
         create_dir_all(&p)?;
         for d in &linux_resources.devices {
             Self::apply_device(d, &p)?;
