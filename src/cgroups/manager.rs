@@ -10,6 +10,7 @@ use nix::unistd::Pid;
 use procfs::process::{MountInfo, Process};
 
 use crate::{
+    cgroups::ControllerType,
     rootfs::default_devices,
     spec::{LinuxDeviceCgroup, LinuxDeviceType, LinuxResources},
     utils::PathBufExt,
@@ -25,7 +26,10 @@ impl Manager {
         let mut mount: Vec<MountInfo> = Process::myself()?
             .mountinfo()?
             .into_iter()
-            .filter(|m| m.fs_type == "cgroup" && m.mount_point.ends_with("devices"))
+            .filter(|m| {
+                m.fs_type == "cgroup"
+                    && m.mount_point.ends_with(ControllerType::Devices.to_string())
+            })
             .collect();
         Ok(Manager {
             cgroup_path,
@@ -37,7 +41,7 @@ impl Manager {
         let cgroup = Process::myself()?
             .cgroups()?
             .into_iter()
-            .filter(|c| c.controllers.contains(&"devices".to_string()))
+            .filter(|c| c.controllers.contains(&ControllerType::Devices.to_string()))
             .collect::<Vec<_>>()
             .pop()
             .unwrap();
