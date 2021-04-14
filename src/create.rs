@@ -135,7 +135,7 @@ fn run_container<P: AsRef<Path>>(
                 }
             }
 
-            match fork::fork_init(child, &cmanager)? {
+            match fork::fork_init(child)? {
                 Process::Child(child) => Ok(Process::Child(child)),
                 Process::Init(mut init) => {
                     let spec_args: &Vec<String> = &spec.process.args.clone();

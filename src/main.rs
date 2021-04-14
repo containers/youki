@@ -5,7 +5,7 @@ use anyhow::{bail, Result};
 use clap::Clap;
 use nix::sys::signal as nix_signal;
 
-use youki::cgroups;
+use youki::cgroups::Manager;
 use youki::container::{Container, ContainerStatus};
 use youki::create;
 use youki::signal;
@@ -68,12 +68,15 @@ impl SubCommand {
 
 fn main() -> Result<()> {
     let opts = Opts::parse();
+
+    // debug mode for developer
     if matches!(opts.subcmd, SubCommand::Create(_)) {
-        #[cfg(debug_assertions)]
-        std::env::set_var("YOUKI_MODE", "/var/lib/docker/containers/");
-        #[cfg(debug_assertions)]
-        std::env::set_var("YOUKI_LOG_LEVEL", "debug");
+        // #[cfg(debug_assertions)]
+        // std::env::set_var("YOUKI_MODE", "/var/lib/docker/containers/");
+        // #[cfg(debug_assertions)]
+        // std::env::set_var("YOUKI_LOG_LEVEL", "debug");
     }
+
     youki::logger::init(opts.subcmd.get_container_id().as_str(), opts.log)?;
 
     let root_path = PathBuf::from(&opts.root);
@@ -113,7 +116,7 @@ fn main() -> Result<()> {
                 if container.root.exists() {
                     fs::remove_dir_all(&container.root)?;
                     let spec = spec::Spec::load("config.json")?;
-                    let cmanager = cgroups::Manager::new(spec.linux.unwrap().cgroups_path)?;
+                    let cmanager = Manager::new(spec.linux.unwrap().cgroups_path)?;
                     cmanager.remove()?;
                 }
                 std::process::exit(0)

@@ -12,7 +12,7 @@ use nix::sched;
 use nix::sys::wait::{waitpid, WaitStatus};
 use nix::unistd;
 
-use crate::cgroups;
+use crate::cgroups::Manager;
 use crate::container::ContainerStatus;
 use crate::process::{child, init, parent, Process};
 use crate::spec;
@@ -24,7 +24,7 @@ pub fn fork_first<P: AsRef<Path>>(
     userns: bool,
     linux: &spec::Linux,
     container: &Container,
-    cmanager: &cgroups::Manager,
+    cmanager: &Manager,
 ) -> Result<Process> {
     let ccond = Cond::new()?;
 
@@ -71,7 +71,7 @@ pub fn fork_first<P: AsRef<Path>>(
     }
 }
 
-pub fn fork_init(mut child_process: ChildProcess, cmanager: &cgroups::Manager) -> Result<Process> {
+pub fn fork_init(mut child_process: ChildProcess) -> Result<Process> {
     let sender_for_child = child_process.setup_uds()?;
     unsafe {
         match unistd::fork()? {
