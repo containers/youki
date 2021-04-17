@@ -113,6 +113,16 @@ impl LinuxDeviceType {
             Self::A => bail!("type a is not allowed for linux device"),
         })
     }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::B => "b",
+            Self::C => "c",
+            Self::U => "u",
+            Self::P => "p",
+            Self::A => "a",
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -277,6 +287,18 @@ pub struct LinuxDevice {
     pub gid: Option<u32>,
 }
 
+impl From<&LinuxDevice> for LinuxDeviceCgroup {
+    fn from(linux_device: &LinuxDevice) -> LinuxDeviceCgroup {
+        LinuxDeviceCgroup {
+            allow: true,
+            typ: linux_device.typ,
+            major: Some(linux_device.major as i64),
+            minor: Some(linux_device.minor as i64),
+            access: "rwm".to_string(),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 #[repr(u32)]
@@ -335,7 +357,7 @@ pub struct Linux {
     pub sysctl: HashMap<String, String>,
     pub resources: Option<LinuxResources>,
     #[serde(default)]
-    pub cgroups_path: String,
+    pub cgroups_path: PathBuf,
     #[serde(default)]
     pub namespaces: Vec<LinuxNamespace>,
     #[serde(default)]

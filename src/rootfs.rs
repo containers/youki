@@ -134,8 +134,8 @@ fn setup_default_symlinks(rootfs: &Path) -> Result<()> {
     Ok(())
 }
 
-fn default_devices() -> [LinuxDevice; 6] {
-    [
+pub fn default_devices() -> Vec<LinuxDevice> {
+    vec![
         LinuxDevice {
             path: PathBuf::from("/dev/null"),
             typ: LinuxDeviceType::C,

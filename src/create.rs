@@ -10,6 +10,7 @@ use nix::sys::stat;
 use nix::unistd;
 use nix::unistd::{Gid, Uid};
 
+use crate::cgroups;
 use crate::container::{Container, ContainerStatus};
 use crate::notify_socket::NotifyListener;
 use crate::process::{fork, Process};
@@ -42,6 +43,7 @@ impl Create {
         unistd::chdir(&self.bundle)?;
 
         let spec = spec::Spec::load("config.json")?;
+        fs::copy("config.json", container_dir.join("config.json"))?;
 
         let container_dir = fs::canonicalize(container_dir)?;
         unistd::chdir(&*container_dir)?;
@@ -108,11 +110,14 @@ fn run_container<P: AsRef<Path>>(
         }
     }
 
+    let cmanager = cgroups::Manager::new(linux.cgroups_path.clone())?;
+
     match fork::fork_first(
         pid_file,
         cf.contains(sched::CloneFlags::CLONE_NEWUSER),
         linux,
         &container,
+        &cmanager,
     )? {
         Process::Parent(parent) => Ok(Process::Parent(parent)),
         Process::Child(child) => {

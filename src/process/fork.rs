@@ -12,6 +12,7 @@ use nix::sched;
 use nix::sys::wait::{waitpid, WaitStatus};
 use nix::unistd;
 
+use crate::cgroups::Manager;
 use crate::container::ContainerStatus;
 use crate::process::{child, init, parent, Process};
 use crate::spec;
@@ -23,6 +24,7 @@ pub fn fork_first<P: AsRef<Path>>(
     userns: bool,
     linux: &spec::Linux,
     container: &Container,
+    cmanager: &Manager,
 ) -> Result<Process> {
     let ccond = Cond::new()?;
 
@@ -52,6 +54,8 @@ pub fn fork_first<P: AsRef<Path>>(
             unistd::ForkResult::Parent { child } => {
                 ccond.wait()?;
 
+                cmanager.apply(&linux.resources.as_ref().unwrap(), child)?;
+
                 let init_pid = parent.wait_for_child_ready()?;
                 container
                     .update_status(ContainerStatus::Created)?
@@ -78,6 +82,7 @@ pub fn fork_init(mut child_process: ChildProcess) -> Result<Process> {
 
                 match waitpid(child, None)? {
                     WaitStatus::Exited(pid, status) => {
+                        // cmanager.remove()?;
                         log::debug!("exited pid: {:?}, status: {:?}", pid, status);
                         exit(status);
                     }
