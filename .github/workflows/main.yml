@@ -45,6 +45,9 @@ jobs:
           expect_err_num=107
           act_err_num=0
           cd $(go env GOPATH)/src/github.com/opencontainers/runtime-tools
+          if [ 0 -ne $(sudo RUNTIME=$GITHUB_WORKSPACE/target/x86_64-unknown-linux-gnu/debug/youki ./validation/linux_cgroups_devices/linux_cgroups_devices.t | grep "not ok" | wc -l) ]; then
+            exit 1
+          fi
           IFS=$'\n' errors=($(sudo RUNTIME=$GITHUB_WORKSPACE/target/x86_64-unknown-linux-gnu/debug/youki ./validation/default/default.t | grep "not ok"))
           if [ ${#errors[@]} -eq 0 ]; then
               echo -e "Passed all tess."
@@ -61,4 +64,3 @@ jobs:
               echo "The number of erros was $((act_err_num - expect_err_num)) less than expected."
               exit 0
           fi
-

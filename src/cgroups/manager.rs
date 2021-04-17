@@ -59,7 +59,7 @@ impl Manager {
             .mount_info
             .mount_point
             .join_absolute_path(&self.cgroup_path)?;
-        println!("remove_dir: {:?}", p.display());
+        log::debug!("remove cgroup {:?}", p.display());
         remove_dir(&p)?;
 
         Ok(())

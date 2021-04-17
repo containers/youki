@@ -23,15 +23,15 @@ impl Controller for Devices {
             Self::apply_device(d, cgroup_root)?;
         }
 
-        for d in default_devices().iter() {
-            Self::apply_device(&d.into(), &cgroup_root)?;
-        }
-
-        for d in Self::default_allow_devices().iter() {
+        for d in [
+            default_devices().iter().map(|d| d.into()).collect(),
+            Self::default_allow_devices(),
+        ]
+        .concat()
+        {
             Self::apply_device(&d, &cgroup_root)?;
         }
 
-        eprintln!("set cgroup.procs");
         OpenOptions::new()
             .create(false)
             .write(true)
@@ -44,7 +44,7 @@ impl Controller for Devices {
 
 impl Devices {
     fn apply_device(device: &LinuxDeviceCgroup, cgroup_root: &Path) -> Result<()> {
-        let device_deny = if device.allow {
+        let path = if device.allow {
             cgroup_root.join("devices.allow")
         } else {
             cgroup_root.join("devices.deny")
@@ -60,12 +60,12 @@ impl Devices {
             .unwrap_or_else(|| "*".to_string());
         let val = format! {"{} {}:{} {}", device.typ.as_str(), &major, &minor, &device.access};
 
-        eprintln!("device: {:?} val: {:?}", device_deny.display(), val);
+        log::debug!("write {:?} to {:?}", val, path.display());
         OpenOptions::new()
             .create(false)
             .write(true)
             .truncate(false)
-            .open(device_deny)?
+            .open(path)?
             .write_all(val.as_bytes())?;
         Ok(())
     }
