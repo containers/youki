@@ -7,6 +7,8 @@ edition = "2018"
 [dependencies]
 clap = "3.0.0-beta.2"
 nix = "0.19.1"
+procfs = "0.9.1"
+caps = "0.5.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 prctl = "1.0.0"
@@ -16,5 +18,4 @@ anyhow = "1.0"
 mio = { version = "0.7", features = ["os-ext", "os-poll"] }
 chrono = "0.4"
 once_cell = "1.6.0"
-procfs = "0.9.1"
 futures = { version = "0.3", features = ["thread-pool"] }

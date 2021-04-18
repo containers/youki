@@ -10,6 +10,7 @@ use nix::sys::stat;
 use nix::unistd;
 use nix::unistd::{Gid, Uid};
 
+use crate::capabilities;
 use crate::cgroups;
 use crate::container::{Container, ContainerStatus};
 use crate::notify_socket::NotifyListener;
@@ -44,6 +45,7 @@ impl Create {
 
         let spec = spec::Spec::load("config.json")?;
         fs::copy("config.json", container_dir.join("config.json"))?;
+        log::debug!("spec: {:?}", spec);
 
         let container_dir = fs::canonicalize(container_dir)?;
         unistd::chdir(&*container_dir)?;
@@ -121,6 +123,8 @@ fn run_container<P: AsRef<Path>>(
     )? {
         Process::Parent(parent) => Ok(Process::Parent(parent)),
         Process::Child(child) => {
+            setid(Uid::from_raw(0), Gid::from_raw(0))?;
+
             sched::unshare(cf & !sched::CloneFlags::CLONE_NEWUSER)?;
 
             if let Some(csocketfd) = csocketfd {
@@ -140,6 +144,7 @@ fn run_container<P: AsRef<Path>>(
                 Process::Init(mut init) => {
                     let spec_args: &Vec<String> = &spec.process.args.clone();
 
+                    let proc = spec.process.clone();
                     let clone_spec = std::sync::Arc::new(spec);
                     let clone_rootfs = std::sync::Arc::new(rootfs.clone());
 
@@ -155,7 +160,13 @@ fn run_container<P: AsRef<Path>>(
 
                     notify_socket.wait_for_container_start()?;
 
-                    // utils::do_exec(&spec.process.args[0], &spec.process.args)?;
+                    setid(Uid::from_raw(proc.user.uid), Gid::from_raw(proc.user.gid))?;
+                    capabilities::reset_effective()?;
+                    if let Some(caps) = &proc.capabilities {
+                        let _ = prctl::set_no_new_privileges(true);
+                        capabilities::drop_privileges(&caps)?;
+                    }
+
                     utils::do_exec(&spec_args[0], spec_args)?;
                     container.update_status(ContainerStatus::Stopped)?.save()?;
 
@@ -174,6 +185,10 @@ fn setid(uid: Uid, gid: Gid) -> Result<()> {
     };
     unistd::setresgid(gid, gid, gid)?;
     unistd::setresuid(uid, uid, uid)?;
+
+    if uid != Uid::from_raw(0) {
+        capabilities::reset_effective()?;
+    }
     if let Err(e) = prctl::set_keep_capabilities(false) {
         bail!("set keep capabilities returned {}", e);
     };

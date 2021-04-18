@@ -42,7 +42,7 @@ jobs:
           make runtimetest validation-executables
       - name: Run intetgration test
         run: |
-          expect_err_num=107
+          expect_err_num=8
           act_err_num=0
           cd $(go env GOPATH)/src/github.com/opencontainers/runtime-tools
           if [ 0 -ne $(sudo RUNTIME=$GITHUB_WORKSPACE/target/x86_64-unknown-linux-gnu/debug/youki ./validation/linux_cgroups_devices/linux_cgroups_devices.t | grep "not ok" | wc -l) ]; then

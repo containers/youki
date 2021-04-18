@@ -9,7 +9,7 @@ GREEN='\033[0;32m'
 NC='\033[0m' # No Color
 
 COLUMNS=$(tput cols) 
-expect_err_num=116
+expect_err_num=8
 act_err_num=0
 
 for case in "${test_cases[@]}"; do

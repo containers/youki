@@ -35,7 +35,7 @@ pub struct User {
     pub username: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Process {
     #[serde(default)]
@@ -54,6 +54,160 @@ pub struct Process {
     pub apparmor_profile: String,
     #[serde(default)]
     pub selinux_label: String,
+    #[serde(default, deserialize_with = "deserialize_caps")]
+    pub capabilities: Option<LinuxCapabilities>,
+}
+
+use caps::Capability;
+#[derive(Debug, Clone)]
+pub struct LinuxCapabilityType {
+    pub cap: Capability,
+}
+
+impl<'de> Deserialize<'de> for LinuxCapabilityType {
+    fn deserialize<D>(desirializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        let r: serde_json::Value = serde::Deserialize::deserialize(desirializer)?;
+        match r {
+            serde_json::Value::String(type_string) => {
+                let cap = match type_string.as_str() {
+                    "CAP_CHOWN" => Capability::CAP_CHOWN,
+                    "CAP_DAC_OVERRIDE" => Capability::CAP_DAC_OVERRIDE,
+                    "CAP_DAC_READ_SEARCH" => Capability::CAP_DAC_READ_SEARCH,
+                    "CAP_FOWNER" => Capability::CAP_FOWNER,
+                    "CAP_FSETID" => Capability::CAP_FSETID,
+                    "CAP_KILL" => Capability::CAP_KILL,
+                    "CAP_SETGID" => Capability::CAP_SETGID,
+                    "CAP_SETUID" => Capability::CAP_SETUID,
+                    "CAP_SETPCAP" => Capability::CAP_SETPCAP,
+                    "CAP_LINUX_IMMUTABLE" => Capability::CAP_LINUX_IMMUTABLE,
+                    "CAP_NET_BIND_SERVICE" => Capability::CAP_NET_BIND_SERVICE,
+                    "CAP_NET_BROADCAST" => Capability::CAP_NET_BROADCAST,
+                    "CAP_NET_ADMIN" => Capability::CAP_NET_ADMIN,
+                    "CAP_NET_RAW" => Capability::CAP_NET_RAW,
+                    "CAP_IPC_LOCK" => Capability::CAP_IPC_LOCK,
+                    "CAP_IPC_OWNER" => Capability::CAP_IPC_OWNER,
+                    "CAP_SYS_MODULE" => Capability::CAP_SYS_MODULE,
+                    "CAP_SYS_RAWIO" => Capability::CAP_SYS_RAWIO,
+                    "CAP_SYS_CHROOT" => Capability::CAP_SYS_CHROOT,
+                    "CAP_SYS_PTRACE" => Capability::CAP_SYS_PTRACE,
+                    "CAP_SYS_PACCT" => Capability::CAP_SYS_PACCT,
+                    "CAP_SYS_ADMIN" => Capability::CAP_SYS_ADMIN,
+                    "CAP_SYS_BOOT" => Capability::CAP_SYS_BOOT,
+                    "CAP_SYS_NICE" => Capability::CAP_SYS_NICE,
+                    "CAP_SYS_RESOURCE" => Capability::CAP_SYS_RESOURCE,
+                    "CAP_SYS_TIME" => Capability::CAP_SYS_TIME,
+                    "CAP_SYS_TTYCONFIG" => Capability::CAP_SYS_TTY_CONFIG,
+                    "CAP_SYSLOG" => Capability::CAP_SYSLOG,
+                    "CAP_MKNOD" => Capability::CAP_MKNOD,
+                    "CAP_LEASE" => Capability::CAP_LEASE,
+                    "CAP_AUDIT_WRITE" => Capability::CAP_AUDIT_WRITE,
+                    "CAP_AUDIT_CONTROL" => Capability::CAP_AUDIT_CONTROL,
+                    "CAP_AUDIT_READ" => Capability::CAP_AUDIT_READ,
+                    "CAP_SETFCAP" => Capability::CAP_SETFCAP,
+                    "CAP_MAC_OVERRIDE" => Capability::CAP_MAC_OVERRIDE,
+                    "CAP_MAC_ADMIN" => Capability::CAP_MAC_ADMIN,
+                    "CAP_WAKE_ALARM" => Capability::CAP_WAKE_ALARM,
+                    "CAP_BLOCK_SUSPEND" => Capability::CAP_BLOCK_SUSPEND,
+                    unknown_cap => {
+                        return Err(serde::de::Error::custom(format!(
+                            "{:?} is unexpected type in capabilites",
+                            unknown_cap
+                        )))
+                    }
+                };
+                Ok(LinuxCapabilityType { cap })
+            }
+            _ => Err(serde::de::Error::custom("Unexpected type in capabilites")),
+        }
+    }
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct LinuxCapabilities {
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub bounding: Vec<LinuxCapabilityType>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub effective: Vec<LinuxCapabilityType>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub inheritable: Vec<LinuxCapabilityType>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub permitted: Vec<LinuxCapabilityType>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub ambient: Vec<LinuxCapabilityType>,
+}
+
+fn deserialize_caps<'de, D>(desirializer: D) -> Result<Option<LinuxCapabilities>, D::Error>
+where
+    D: serde::de::Deserializer<'de>,
+{
+    let r: serde_json::Value = serde::Deserialize::deserialize(desirializer)?;
+    match r {
+        serde_json::Value::Null => Ok(None),
+        serde_json::Value::Array(a) => {
+            let caps = cap_from_array::<D>(&a)?;
+            let capabilities = LinuxCapabilities {
+                bounding: caps.clone(),
+                effective: caps.clone(),
+                inheritable: caps.clone(),
+                permitted: caps.clone(),
+                ambient: caps,
+            };
+
+            Ok(Some(capabilities))
+        }
+        serde_json::Value::Object(o) => {
+            let capabilities = LinuxCapabilities {
+                bounding: cap_from_object::<D>(&o, "bounding")?,
+                effective: cap_from_object::<D>(&o, "effective")?,
+                inheritable: cap_from_object::<D>(&o, "inheritable")?,
+                permitted: cap_from_object::<D>(&o, "permitted")?,
+                ambient: cap_from_object::<D>(&o, "ambient")?,
+            };
+
+            Ok(Some(capabilities))
+        }
+        _ => Err(serde::de::Error::custom("Unexpected value in capabilites")),
+    }
+}
+
+fn cap_from_object<'de, D>(
+    o: &serde_json::Map<String, serde_json::Value>,
+    key: &str,
+) -> Result<Vec<LinuxCapabilityType>, D::Error>
+where
+    D: serde::de::Deserializer<'de>,
+{
+    if let Some(v) = o.get(key) {
+        match *v {
+            serde_json::Value::Null => Ok(Vec::new()),
+            serde_json::Value::Array(ref a) => cap_from_array::<D>(a),
+            _ => Err(serde::de::Error::custom(
+                "Unexpected value in capability set",
+            )),
+        }
+    } else {
+        Ok(Vec::new())
+    }
+}
+
+fn cap_from_array<'de, D>(a: &[serde_json::Value]) -> Result<Vec<LinuxCapabilityType>, D::Error>
+where
+    D: serde::de::Deserializer<'de>,
+{
+    let mut caps = Vec::new();
+    for c in a {
+        match LinuxCapabilityType::deserialize(c) {
+            Ok(val) => caps.push(val),
+            Err(_) => {
+                let msg = format!("Capability '{}' is not valid", c);
+                return Err(serde::de::Error::custom(msg));
+            }
+        }
+    }
+    Ok(caps)
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -372,7 +526,7 @@ pub struct Linux {
     pub mount_label: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct Spec {
     #[serde(default, rename = "ociVersion")]
     pub version: String,

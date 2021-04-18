@@ -70,12 +70,12 @@ fn main() -> Result<()> {
     let opts = Opts::parse();
 
     // debug mode for developer
-    if matches!(opts.subcmd, SubCommand::Create(_)) {
-        // #[cfg(debug_assertions)]
-        // std::env::set_var("YOUKI_MODE", "/var/lib/docker/containers/");
-        // #[cfg(debug_assertions)]
-        // std::env::set_var("YOUKI_LOG_LEVEL", "debug");
-    }
+    // if matches!(opts.subcmd, SubCommand::Create(_)) {
+    //     #[cfg(debug_assertions)]
+    //     std::env::set_var("YOUKI_MODE", "/var/lib/docker/containers/");
+    //     #[cfg(debug_assertions)]
+    //     std::env::set_var("YOUKI_LOG_LEVEL", "debug");
+    // }
 
     youki::logger::init(opts.subcmd.get_container_id().as_str(), opts.log)?;
 
