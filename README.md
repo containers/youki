@@ -86,8 +86,22 @@ $ docker logs youki
 - [x] somehow works
 - [x] run with docker
 - [x] namespace
+- [x] capabilities
+- [ ] cgroups v1
+    - [x] devices
+    - [ ] cpu
+    - [ ] cpuacct
+    - [ ] cpuset
+    - [ ] memory
+    - [ ] freezer
+    - [ ] net_cls
+    - [ ] blkio
+    - [ ] perf_event
+    - [ ] net_prio
+    - [ ] hugetlb
+    - [ ] pids
+    - [ ] rdma
 - [ ] rlimits
-- [ ] cgroup
 - [ ] hooks
 
 # Contribution
