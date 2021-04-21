@@ -39,14 +39,13 @@ pub fn init(container_id: &str, log_file: Option<PathBuf>) -> Result<()> {
             log::set_logger(logger)
                 .map(|()| log::set_max_level(level_filter))
                 .unwrap();
-            Some(
-                OpenOptions::new()
-                    .create(true)
-                    .write(true)
-                    .truncate(false)
-                    .open(log_file_path)
-                    .expect("fail opening log file "),
-            )
+            OpenOptions::new()
+                .create(true)
+                .write(true)
+                .truncate(false)
+                .open(log_file_path)
+                .map_err(|e| eprintln!("{:?}", e))
+                .ok()
         } else if let Some(log_file_path) = log_file {
             Some(
                 OpenOptions::new()
