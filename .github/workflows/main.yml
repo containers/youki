@@ -7,7 +7,7 @@ on:
       - main
 
 jobs:
-  check:
+  tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -16,7 +16,11 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           args: --all-features
-  test:
+      - name: Build
+        run: cargo build
+      - name: Run tests
+        run: cargo test
+  integration_tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -26,10 +30,6 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: build
-      - name: Print Rust Version
-        run: |
-          rustc -Vv
-          cargo -Vv
       - uses: actions/setup-go@v2
         with:
           go-version: "1.11.0"
@@ -40,7 +40,7 @@ jobs:
           git clone https://github.com/opencontainers/runtime-tools
           cd runtime-tools
           make runtimetest validation-executables
-      - name: Run intetgration test
+      - name: Run intetgration tests
         run: |
           expect_err_num=8
           act_err_num=0

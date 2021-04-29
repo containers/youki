@@ -57,3 +57,28 @@ pub fn set_name(_name: &str) -> Result<()> {
     // }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_join_absolute_path() {
+        assert_eq!(
+            PathBuf::from("sample/a/")
+                .join_absolute_path(&PathBuf::from("/b"))
+                .unwrap(),
+            PathBuf::from("sample/a/b")
+        );
+    }
+
+    #[test]
+    fn test_join_absolute_path_error() {
+        assert_eq!(
+            PathBuf::from("sample/a/")
+                .join_absolute_path(&PathBuf::from("b/c"))
+                .is_err(),
+            true
+        );
+    }
+}
