@@ -13,6 +13,26 @@ use crate::{
     spec::{LinuxDeviceCgroup, LinuxDeviceType, LinuxResources},
 };
 
+impl ToString for LinuxDeviceCgroup {
+    fn to_string(&self) -> String {
+        let major = self
+            .major
+            .map(|mj| mj.to_string())
+            .unwrap_or_else(|| "*".to_string());
+        let minor = self
+            .minor
+            .map(|mi| mi.to_string())
+            .unwrap_or_else(|| "*".to_string());
+        format!(
+            "{} {}:{} {}",
+            self.typ.as_str(),
+            &major,
+            &minor,
+            &self.access
+        )
+    }
+}
+
 pub struct Devices {}
 
 impl Controller for Devices {
@@ -50,23 +70,12 @@ impl Devices {
             cgroup_root.join("devices.deny")
         };
 
-        let major = device
-            .major
-            .map(|mj| mj.to_string())
-            .unwrap_or_else(|| "*".to_string());
-        let minor = device
-            .minor
-            .map(|mi| mi.to_string())
-            .unwrap_or_else(|| "*".to_string());
-        let val = format! {"{} {}:{} {}", device.typ.as_str(), &major, &minor, &device.access};
-
-        log::debug!("write {:?} to {:?}", val, path.display());
         OpenOptions::new()
             .create(false)
             .write(true)
             .truncate(false)
             .open(path)?
-            .write_all(val.as_bytes())?;
+            .write_all(device.to_string().as_bytes())?;
         Ok(())
     }
 
@@ -118,5 +127,30 @@ impl Devices {
                 access: "rwm".to_string(),
             },
         ]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_linux_device_cgroup_to_string() {
+        let ldc = LinuxDeviceCgroup {
+            allow: true,
+            typ: LinuxDeviceType::A,
+            major: None,
+            minor: None,
+            access: "rwm".into(),
+        };
+        assert_eq!(ldc.to_string(), "a *:* rwm");
+        let ldc = LinuxDeviceCgroup {
+            allow: true,
+            typ: LinuxDeviceType::A,
+            major: Some(1),
+            minor: Some(9),
+            access: "rwm".into(),
+        };
+        assert_eq!(ldc.to_string(), "a 1:9 rwm");
     }
 }
