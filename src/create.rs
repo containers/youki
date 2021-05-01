@@ -10,7 +10,6 @@ use nix::sys::stat;
 use nix::unistd;
 use nix::unistd::{Gid, Uid};
 
-use crate::capabilities;
 use crate::cgroups;
 use crate::container::{Container, ContainerStatus};
 use crate::notify_socket::NotifyListener;
@@ -20,6 +19,7 @@ use crate::spec;
 use crate::stdio::FileDescriptor;
 use crate::tty;
 use crate::utils;
+use crate::{capabilities, command::Command};
 
 #[derive(Clap, Debug)]
 pub struct Create {
@@ -33,7 +33,7 @@ pub struct Create {
 }
 
 impl Create {
-    pub fn exec(&self, root_path: PathBuf) -> Result<()> {
+    pub fn exec(&self, root_path: PathBuf, command: impl Command) -> Result<()> {
         let container_dir = root_path.join(&self.container_id);
         if !container_dir.exists() {
             fs::create_dir(&container_dir).unwrap();
@@ -81,6 +81,7 @@ impl Create {
             spec,
             csocketfd,
             container,
+            command,
         )?;
         if let Process::Parent(_) = process {
             process::exit(0);
@@ -96,6 +97,7 @@ fn run_container<P: AsRef<Path>>(
     spec: spec::Spec,
     csocketfd: Option<FileDescriptor>,
     container: Container,
+    command: impl Command,
 ) -> Result<Process> {
     prctl::set_dumpable(false).unwrap();
     let linux = spec.linux.as_ref().unwrap();
@@ -154,7 +156,7 @@ fn run_container<P: AsRef<Path>>(
                         cf.contains(sched::CloneFlags::CLONE_NEWUSER),
                     ))?;
 
-                    rootfs::pivot_rootfs(&rootfs)?;
+                    command.pivot_rootfs(&rootfs)?;
 
                     init.ready()?;
 

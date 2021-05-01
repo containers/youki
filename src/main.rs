@@ -5,12 +5,12 @@ use anyhow::{bail, Result};
 use clap::Clap;
 use nix::sys::signal as nix_signal;
 
-use youki::cgroups::Manager;
 use youki::container::{Container, ContainerStatus};
 use youki::create;
 use youki::signal;
 use youki::spec;
 use youki::start;
+use youki::{cgroups::Manager, command::linux::LinuxCommand};
 
 #[derive(Clap, Debug)]
 #[clap(version = "1.0", author = "utam0k <k0ma@utam0k.jp>")]
@@ -85,7 +85,7 @@ fn main() -> Result<()> {
     fs::create_dir_all(&root_path)?;
 
     match opts.subcmd {
-        SubCommand::Create(create) => create.exec(root_path),
+        SubCommand::Create(create) => create.exec(root_path, LinuxCommand),
         SubCommand::Start(start) => start.exec(root_path),
         SubCommand::Kill(kill) => {
             let root_path = fs::canonicalize(root_path)?;

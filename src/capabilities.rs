@@ -22,9 +22,7 @@ pub fn drop_privileges(cs: &LinuxCapabilities) -> Result<()> {
     log::debug!("dropping bounding capabilities to {:?}", cs.bounding);
     for c in all.difference(&to_set(&cs.bounding)) {
         match c {
-            Capability::CAP_PERFMON | Capability::CAP_CHECKPOINT_RESTORE | Capability::CAP_BPF => {
-                continue
-            }
+            Capability::CAP_PERFMON | Capability::CAP_CHECKPOINT_RESTORE | Capability::CAP_BPF => continue,
             _ => caps::drop(None, CapSet::Bounding, *c)?,
         }
     }
