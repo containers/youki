@@ -421,8 +421,7 @@ pub enum LinuxNamespaceType {
 pub struct LinuxNamespace {
     #[serde(rename = "type")]
     pub typ: LinuxNamespaceType,
-    #[serde(default)]
-    pub path: String,
+    pub path: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

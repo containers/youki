@@ -1,13 +1,20 @@
 use std::path::Path;
 
-use anyhow::Result;
-use nix::fcntl::open;
-use nix::fcntl::OFlag;
-use nix::mount::{umount2, MntFlags};
-use nix::sys::stat::Mode;
+use anyhow::{bail, Result};
 use nix::unistd::{fchdir, pivot_root};
+use nix::{fcntl::open, sched::CloneFlags};
+use nix::{
+    fcntl::OFlag,
+    unistd::{Gid, Uid},
+};
+use nix::{
+    mount::{umount2, MntFlags},
+    unistd,
+};
+use nix::{sched::unshare, sys::stat::Mode};
 
 use super::Command;
+use crate::capabilities;
 
 pub struct LinuxCommand;
 
@@ -19,6 +26,32 @@ impl Command for LinuxCommand {
 
         umount2("/", MntFlags::MNT_DETACH)?;
         fchdir(newroot)?;
+        Ok(())
+    }
+
+    fn set_ns(&self, rawfd: i32, nstype: CloneFlags) -> Result<()> {
+        nix::sched::setns(rawfd, nstype)?;
+        Ok(())
+    }
+
+    fn set_id(&self, uid: Uid, gid: Gid) -> Result<()> {
+        if let Err(e) = prctl::set_keep_capabilities(true) {
+            bail!("set keep capabilities returned {}", e);
+        };
+        unistd::setresgid(gid, gid, gid)?;
+        unistd::setresuid(uid, uid, uid)?;
+
+        if uid != Uid::from_raw(0) {
+            capabilities::reset_effective()?;
+        }
+        if let Err(e) = prctl::set_keep_capabilities(false) {
+            bail!("set keep capabilities returned {}", e);
+        };
+        Ok(())
+    }
+
+    fn unshare(&self, flags: CloneFlags) -> Result<()> {
+        unshare(flags)?;
         Ok(())
     }
 }
