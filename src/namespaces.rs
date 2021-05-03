@@ -27,7 +27,7 @@ impl From<Vec<LinuxNamespace>> for Namespaces {
             },
         );
         let command: Box<dyn Command> = if cfg!(test) {
-            Box::new(TestHelperCommand)
+            Box::new(TestHelperCommand::default())
         } else {
             Box::new(LinuxCommand)
         };
@@ -68,7 +68,7 @@ impl Namespaces {
     }
 
     pub fn apply_unshare(&self, without: CloneFlags) -> Result<()> {
-        sched::unshare(self.clone_flags & !without)?;
+        self.command.unshare(self.clone_flags & !without)?;
         Ok(())
     }
 }
@@ -76,13 +76,61 @@ impl Namespaces {
 mod tests {
     use super::*;
 
+    #[allow(dead_code)]
+    fn gen_sample_linux_namespaces() -> Vec<LinuxNamespace> {
+        vec![
+            LinuxNamespace {
+                typ: LinuxNamespaceType::Mount,
+                path: Some("/dev/null".to_string()),
+            },
+            LinuxNamespace {
+                typ: LinuxNamespaceType::Network,
+                path: Some("/dev/null".to_string()),
+            },
+            LinuxNamespace {
+                typ: LinuxNamespaceType::Pid,
+                path: None,
+            },
+            LinuxNamespace {
+                typ: LinuxNamespaceType::User,
+                path: None,
+            },
+            LinuxNamespace {
+                typ: LinuxNamespaceType::Ipc,
+                path: None,
+            },
+        ]
+    }
+
     #[test]
     fn test_namespaces_set_ns() {
-        let namespaces: Namespaces = vec![LinuxNamespace {
-            typ: LinuxNamespaceType::Mount,
-            path: None,
-        }]
-        .into();
-        assert_eq!(namespaces.apply_setns().is_ok(), true)
+        let sample_linux_namespaces = gen_sample_linux_namespaces();
+        let namespaces: Namespaces = sample_linux_namespaces.into();
+        let test_command: &TestHelperCommand = namespaces.command.as_any().downcast_ref().unwrap();
+        assert!(namespaces.apply_setns().is_ok());
+
+        let mut setns_args: Vec<_> = test_command
+            .get_setns_args()
+            .into_iter()
+            .map(|(_fd, cf)| cf)
+            .collect();
+        setns_args.sort();
+        let mut expect = vec![CloneFlags::CLONE_NEWNS, CloneFlags::CLONE_NEWNET];
+        expect.sort();
+        assert_eq!(setns_args, expect);
+    }
+
+    #[test]
+    fn test_namespaces_unshare() {
+        let sample_linux_namespaces = gen_sample_linux_namespaces();
+        let namespaces: Namespaces = sample_linux_namespaces.into();
+        assert!(namespaces.apply_unshare(CloneFlags::CLONE_NEWIPC).is_ok());
+
+        let test_command: &TestHelperCommand = namespaces.command.as_any().downcast_ref().unwrap();
+        let mut unshare_args = test_command.get_unshare_args();
+        unshare_args.sort();
+        let mut expect = vec![CloneFlags::CLONE_NEWUSER | CloneFlags::CLONE_NEWPID];
+        expect.sort();
+        assert_eq!(unshare_args, expect)
     }
 }

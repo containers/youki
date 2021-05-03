@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{any::Any, path::Path};
 
 use anyhow::{bail, Result};
 use nix::unistd::{fchdir, pivot_root};
@@ -16,9 +16,14 @@ use nix::{sched::unshare, sys::stat::Mode};
 use super::Command;
 use crate::capabilities;
 
+#[derive(Clone)]
 pub struct LinuxCommand;
 
 impl Command for LinuxCommand {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
     fn pivot_rootfs(&self, path: &Path) -> Result<()> {
         let newroot = open(path, OFlag::O_DIRECTORY | OFlag::O_RDONLY, Mode::empty())?;
 
