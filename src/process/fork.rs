@@ -21,7 +21,7 @@ use crate::{cond::Cond, container::Container};
 
 pub fn fork_first<P: AsRef<Path>>(
     pid_file: Option<P>,
-    userns: bool,
+    is_userns: bool,
     linux: &spec::Linux,
     container: &Container,
     cmanager: &Manager,
@@ -43,7 +43,7 @@ pub fn fork_first<P: AsRef<Path>>(
                     }
                 }
 
-                if userns {
+                if is_userns {
                     sched::unshare(sched::CloneFlags::CLONE_NEWUSER)?;
                 }
 
