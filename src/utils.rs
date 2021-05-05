@@ -30,8 +30,8 @@ impl PathBufExt for PathBuf {
     }
 }
 
-pub fn do_exec(path: &str, args: &[String]) -> Result<()> {
-    let p = CString::new(path.to_string()).unwrap();
+pub fn do_exec(path: impl AsRef<Path>, args: &[String]) -> Result<()> {
+    let p = CString::new(path.as_ref().to_string_lossy().to_string())?;
     let a: Vec<CString> = args
         .iter()
         .map(|s| CString::new(s.to_string()).unwrap_or_default())

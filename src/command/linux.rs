@@ -1,6 +1,7 @@
 use std::{any::Any, path::Path};
 
 use anyhow::{bail, Result};
+use caps::{errors::CapsError, CapSet, CapsHashSet};
 use nix::unistd::{fchdir, pivot_root};
 use nix::{fcntl::open, sched::CloneFlags};
 use nix::{
@@ -47,7 +48,7 @@ impl Command for LinuxCommand {
         unistd::setresuid(uid, uid, uid)?;
 
         if uid != Uid::from_raw(0) {
-            capabilities::reset_effective()?;
+            capabilities::reset_effective(self)?;
         }
         if let Err(e) = prctl::set_keep_capabilities(false) {
             bail!("set keep capabilities returned {}", e);
@@ -58,5 +59,9 @@ impl Command for LinuxCommand {
     fn unshare(&self, flags: CloneFlags) -> Result<()> {
         unshare(flags)?;
         Ok(())
+    }
+
+    fn set_capability(&self, cset: CapSet, value: &CapsHashSet) -> Result<(), CapsError> {
+        caps::set(None, cset, value)
     }
 }

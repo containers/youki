@@ -1,8 +1,11 @@
-mod child;
 pub mod fork;
-mod init;
 pub mod message;
+
+mod child;
+mod init;
 mod parent;
+
+pub use init::InitProcess;
 
 pub enum Process {
     Parent(parent::ParentProcess),

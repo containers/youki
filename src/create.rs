@@ -130,31 +130,9 @@ fn run_container<P: AsRef<Path>>(
                 Process::Child(child) => Ok(Process::Child(child)),
                 Process::Init(mut init) => {
                     let spec_args: &Vec<String> = &spec.process.args.clone();
-
-                    let proc = spec.process.clone();
-                    let clone_spec = std::sync::Arc::new(spec);
-                    let clone_rootfs = std::sync::Arc::new(rootfs.clone());
-
-                    futures::executor::block_on(rootfs::prepare_rootfs(
-                        clone_spec,
-                        clone_rootfs,
-                        namespaces
-                            .clone_flags
-                            .contains(sched::CloneFlags::CLONE_NEWUSER),
-                    ))?;
-
-                    command.pivot_rootfs(&rootfs)?;
-
+                    init_process(spec, command, rootfs, namespaces)?;
                     init.ready()?;
-
                     notify_socket.wait_for_container_start()?;
-
-                    command.set_id(Uid::from_raw(proc.user.uid), Gid::from_raw(proc.user.gid))?;
-                    capabilities::reset_effective()?;
-                    if let Some(caps) = &proc.capabilities {
-                        let _ = prctl::set_no_new_privileges(true);
-                        capabilities::drop_privileges(&caps)?;
-                    }
 
                     utils::do_exec(&spec_args[0], spec_args)?;
                     container.update_status(ContainerStatus::Stopped)?.save()?;
@@ -166,4 +144,33 @@ fn run_container<P: AsRef<Path>>(
         }
         _ => unreachable!(),
     }
+}
+
+fn init_process(
+    spec: spec::Spec,
+    command: impl Command,
+    rootfs: PathBuf,
+    namespaces: Namespaces,
+) -> Result<()> {
+    let proc = spec.process.clone();
+    let clone_spec = std::sync::Arc::new(spec);
+    let clone_rootfs = std::sync::Arc::new(rootfs.clone());
+
+    futures::executor::block_on(rootfs::prepare_rootfs(
+        clone_spec,
+        clone_rootfs,
+        namespaces
+            .clone_flags
+            .contains(sched::CloneFlags::CLONE_NEWUSER),
+    ))?;
+
+    command.pivot_rootfs(&rootfs)?;
+
+    command.set_id(Uid::from_raw(proc.user.uid), Gid::from_raw(proc.user.gid))?;
+    capabilities::reset_effective(&command)?;
+    if let Some(caps) = &proc.capabilities {
+        let _ = prctl::set_no_new_privileges(true);
+        capabilities::drop_privileges(&caps, &command)?;
+    }
+    Ok(())
 }

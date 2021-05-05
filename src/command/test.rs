@@ -1,5 +1,6 @@
 use std::{any::Any, cell::RefCell};
 
+use caps::{errors::CapsError, CapSet, CapsHashSet};
 use nix::sched::CloneFlags;
 
 use super::Command;
@@ -41,6 +42,10 @@ impl Command for TestHelperCommand {
     fn unshare(&self, flags: CloneFlags) -> anyhow::Result<()> {
         self.unshare_args.borrow_mut().push(flags);
         Ok(())
+    }
+
+    fn set_capability(&self, _cset: CapSet, _value: &CapsHashSet) -> Result<(), CapsError> {
+        todo!()
     }
 }
 
