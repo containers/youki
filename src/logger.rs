@@ -46,17 +46,15 @@ pub fn init(container_id: &str, log_file: Option<PathBuf>) -> Result<()> {
                 .open(log_file_path)
                 .map_err(|e| eprintln!("{:?}", e))
                 .ok()
-        } else if let Some(log_file_path) = log_file {
-            Some(
+        } else {
+            log_file.map(|log_file_path| {
                 OpenOptions::new()
                     .create(true)
                     .write(true)
                     .truncate(false)
                     .open(log_file_path)
-                    .expect("fail opening log file "),
-            )
-        } else {
-            None
+                    .expect("fail opening log file ")
+            })
         }
     });
     Ok(())
