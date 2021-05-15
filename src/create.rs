@@ -130,11 +130,12 @@ fn run_container<P: AsRef<Path>>(
                 Process::Child(child) => Ok(Process::Child(child)),
                 Process::Init(mut init) => {
                     let spec_args: &Vec<String> = &spec.process.args.clone();
+                    let envs: &Vec<String> = &spec.process.env.clone();
                     init_process(spec, command, rootfs, namespaces)?;
                     init.ready()?;
                     notify_socket.wait_for_container_start()?;
 
-                    utils::do_exec(&spec_args[0], spec_args)?;
+                    utils::do_exec(&spec_args[0], spec_args, envs)?;
                     container.update_status(ContainerStatus::Stopped)?.save()?;
 
                     Ok(Process::Init(init))

@@ -2,7 +2,7 @@ use std::ffi::CString;
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Result};
-use nix::unistd;
+use nix::{env::clearenv, errno::Errno, unistd};
 
 pub trait PathBufExt {
     fn as_in_container(&self) -> Result<PathBuf>;
@@ -30,31 +30,37 @@ impl PathBufExt for PathBuf {
     }
 }
 
-pub fn do_exec(path: impl AsRef<Path>, args: &[String]) -> Result<()> {
+pub fn do_exec(path: impl AsRef<Path>, args: &[String], envs: &[String]) -> Result<()> {
     let p = CString::new(path.as_ref().to_string_lossy().to_string())?;
     let a: Vec<CString> = args
         .iter()
         .map(|s| CString::new(s.to_string()).unwrap_or_default())
         .collect();
+    let envs: Vec<CString> = envs
+        .iter()
+        .map(|s| CString::new(s.to_string()).unwrap_or_default())
+        .collect();
+
+    unsafe {
+        clearenv()?;
+    }
+    for e in envs {
+        putenv(&e)?
+    }
 
     unistd::execvp(&p, &a)?;
     Ok(())
 }
 
+#[inline]
+fn putenv(string: &CString) -> nix::Result<()> {
+    let ptr = string.clone().into_raw();
+    let res = unsafe { libc::putenv(ptr as *mut libc::c_char) };
+    Errno::result(res).map(drop)
+}
+
 // TODO implement
 pub fn set_name(_name: &str) -> Result<()> {
-    // prctl::set_name(name).expect("set name failed.");
-    // unsafe {
-    //     let init = std::ffi::CString::new(name).expect("invalid process name");
-    //     // let len = std::ffi::CStr::from_ptr(*ARGV).to_bytes().len();
-    //     let len = std::ffi::CStr::from_ptr(0 as *mut i8).to_bytes().len();
-    //     // after fork, ARGV points to the thread's local
-    //     // copy of arg0.
-    //     // libc::strncpy(*ARGV, init.as_ptr(), len);
-    //     libc::strncpy(0 as *mut i8, init.as_ptr(), len);
-    //     // no need to set the final character to 0 since
-    //     // the initial string was already null-terminated.
-    // }
     Ok(())
 }
 
