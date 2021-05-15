@@ -7,12 +7,11 @@
 </a>
 </p>
 
-# Overview
 youki is an implementation of [runtime-spec](https://github.com/opencontainers/runtime-spec) in Rust, referring to [runc](https://github.com/opencontainers/runc).
 This project is in the experimental stage at this point.
 I think Rust is one of the best languages to implement oci-runtime, so I'm having fun experimenting with it.
 
-# Building
+# Build
 Two types of building are available: devcontainer or local.
 You can choose whichever you like, but the local one will only work on Linux.
 
@@ -21,7 +20,7 @@ You can choose whichever you like, but the local one will only work on Linux.
 - Rust(See [here](https://www.rust-lang.org/tools/install))
 - Docker
 
-### Building
+### Build
 ```sh
 $ git clone git@github.com:utam0k/youki.git
 $ cargo build
@@ -39,7 +38,7 @@ The first time it starts up will take a while, so have a cup of coffee and wait 
 - VSCode
 - Docker
 
-### Bulding
+### Build
 This commands should be run runs in your local terminal.
 ```sh
 $ git clone git@github.com:utam0k/youki.git
