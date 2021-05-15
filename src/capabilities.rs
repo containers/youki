@@ -42,3 +42,20 @@ pub fn drop_privileges(cs: &LinuxCapabilities, command: &impl Command) -> Result
     }
     Ok(())
 }
+
+mod tests {
+    use super::*;
+    use crate::command::test::TestHelperCommand;
+
+    #[test]
+    fn test_reset_effective() {
+        let test_command = TestHelperCommand::default();
+        assert!(reset_effective(&test_command).is_ok());
+        let set_capability_args: Vec<_> = test_command
+            .get_set_capability_args()
+            .into_iter()
+            .map(|(_capset, caps)| caps)
+            .collect();
+        assert_eq!(set_capability_args, vec![caps::all()]);
+    }
+}

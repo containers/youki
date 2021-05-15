@@ -9,6 +9,7 @@ use super::Command;
 pub struct TestHelperCommand {
     set_ns_args: RefCell<Vec<(i32, CloneFlags)>>,
     unshare_args: RefCell<Vec<CloneFlags>>,
+    set_capability_args: RefCell<Vec<(CapSet, CapsHashSet)>>,
 }
 
 impl Default for TestHelperCommand {
@@ -16,6 +17,7 @@ impl Default for TestHelperCommand {
         TestHelperCommand {
             set_ns_args: RefCell::new(vec![]),
             unshare_args: RefCell::new(vec![]),
+            set_capability_args: RefCell::new(vec![]),
         }
     }
 }
@@ -44,8 +46,10 @@ impl Command for TestHelperCommand {
         Ok(())
     }
 
-    fn set_capability(&self, _cset: CapSet, _value: &CapsHashSet) -> Result<(), CapsError> {
-        todo!()
+    fn set_capability(&self, cset: CapSet, value: &CapsHashSet) -> Result<(), CapsError> {
+        let args = (cset, value.clone());
+        self.set_capability_args.borrow_mut().push(args);
+        Ok(())
     }
 }
 
@@ -56,5 +60,9 @@ impl TestHelperCommand {
 
     pub fn get_unshare_args(&self) -> Vec<CloneFlags> {
         self.unshare_args.borrow_mut().clone()
+    }
+
+    pub fn get_set_capability_args(&self) -> Vec<(CapSet, CapsHashSet)> {
+        self.set_capability_args.borrow_mut().clone()
     }
 }
