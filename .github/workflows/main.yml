@@ -48,19 +48,6 @@ jobs:
           if [ 0 -ne $(sudo RUNTIME=$GITHUB_WORKSPACE/target/x86_64-unknown-linux-gnu/debug/youki ./validation/linux_cgroups_devices/linux_cgroups_devices.t | grep "not ok" | wc -l) ]; then
             exit 1
           fi
-          IFS=$'\n' errors=($(sudo RUNTIME=$GITHUB_WORKSPACE/target/x86_64-unknown-linux-gnu/debug/youki ./validation/default/default.t | grep "not ok"))
-          if [ ${#errors[@]} -eq 0 ]; then
-              echo -e "Passed all tess."
-          else
-              for err in "${errors[@]}"; do
-              act_err_num=$((++act_err_num))
-                  echo $err
-              done
-          fi
-          if [ ${act_err_num} -gt ${expect_err_num} ]; then
-              echo "The number of failures was not as expected, it was ${act_err_num}."
-              exit 1
-          else
-              echo "The number of erros was $((act_err_num - expect_err_num)) less than expected."
-              exit 0
+          if [ 0 -ne $(sudo RUNTIME=$GITHUB_WORKSPACE/target/x86_64-unknown-linux-gnu/debug/youki ./validation/default/default.t | grep "not ok" | wc -l) ]; then
+            exit 1
           fi
