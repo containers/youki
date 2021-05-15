@@ -5,9 +5,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::{bail, Result};
-use futures::future::{self, try_join_all};
-use futures::stream::{self, StreamExt};
-use futures::task::SpawnExt;
 use nix::errno::Errno;
 use nix::fcntl::{open, OFlag};
 use nix::mount::mount as nix_mount;
@@ -46,11 +43,7 @@ pub async fn prepare_rootfs(
         None::<&str>,
     )?;
 
-    let pool = futures::executor::ThreadPool::new()?;
-    let can_parall = spec.mounts.clone().into_iter().filter(|m| m.typ != "tmpfs");
-    let cannot_parall = spec.mounts.iter().filter(|m| m.typ == "tmpfs");
-
-    for m in cannot_parall {
+    for m in spec.mounts.iter() {
         let (flags, data) = parse_mount(&m);
         let ml = &spec.linux.as_ref().unwrap().mount_label;
         if m.typ == "cgroup" {
@@ -63,42 +56,11 @@ pub async fn prepare_rootfs(
         }
     }
 
-    try_join_all(
-        stream::iter(can_parall)
-            .map(|m| {
-                let spec = Arc::clone(&spec);
-                let rootfs = Arc::clone(&rootfs);
-                pool.spawn_with_handle(async move {
-                    let (flags, data) = parse_mount(&m);
-                    let ml = &spec.linux.as_ref().unwrap().mount_label;
-                    if m.typ == "cgroup" {
-                        // skip
-                        log::warn!("A feature of cgoup is unimplemented.");
-                        Ok(())
-                    } else if m.destination == PathBuf::from("/dev") {
-                        mount_to_container(
-                            &m,
-                            rootfs.as_ref(),
-                            flags & !MsFlags::MS_RDONLY,
-                            &data,
-                            &ml,
-                        )
-                    } else {
-                        mount_to_container(&m, rootfs.as_ref(), flags, &data, &ml)
-                    }
-                })
-                .unwrap()
-            })
-            .collect::<Vec<_>>()
-            .await,
-    )
-    .await?;
-
     let olddir = getcwd()?;
     chdir(rootfs.as_ref())?;
 
     setup_default_symlinks(&rootfs.as_ref())?;
-    create_devices(&spec.linux.as_ref().unwrap().devices, bind_devices).await?;
+    create_devices(&spec.linux.as_ref().unwrap().devices, bind_devices)?;
     setup_ptmx(rootfs.as_ref())?;
 
     chdir(&olddir)?;
@@ -192,30 +154,36 @@ pub fn default_devices() -> Vec<LinuxDevice> {
     ]
 }
 
-async fn create_devices(devices: &[LinuxDevice], bind: bool) -> Result<()> {
+fn create_devices(devices: &[LinuxDevice], bind: bool) -> Result<()> {
     let old_mode = umask(Mode::from_bits_truncate(0o000));
     if bind {
-        future::try_join_all(default_devices().iter().chain(devices).map(|dev| {
-            if !dev.path.starts_with("/dev") {
-                panic!("{} is not a valid device path", dev.path.display());
-            }
-            bind_dev(dev)
-        }))
-        .await?;
+        let _ = default_devices()
+            .iter()
+            .chain(devices)
+            .map(|dev| {
+                if !dev.path.starts_with("/dev") {
+                    panic!("{} is not a valid device path", dev.path.display());
+                }
+                bind_dev(dev)
+            })
+            .collect::<Result<Vec<_>>>()?;
     } else {
-        future::try_join_all(default_devices().iter().chain(devices).map(|dev| {
-            if !dev.path.starts_with("/dev") {
-                panic!("{} is not a valid device path", dev.path.display());
-            }
-            mknod_dev(dev)
-        }))
-        .await?;
+        default_devices()
+            .iter()
+            .chain(devices)
+            .map(|dev| {
+                if !dev.path.starts_with("/dev") {
+                    panic!("{} is not a valid device path", dev.path.display());
+                }
+                mknod_dev(dev)
+            })
+            .collect::<Result<Vec<_>>>()?;
     }
     umask(old_mode);
     Ok(())
 }
 
-async fn bind_dev(dev: &LinuxDevice) -> Result<()> {
+fn bind_dev(dev: &LinuxDevice) -> Result<()> {
     let fd = open(
         &dev.path.as_in_container()?,
         OFlag::O_RDWR | OFlag::O_CREAT,
@@ -232,7 +200,7 @@ async fn bind_dev(dev: &LinuxDevice) -> Result<()> {
     Ok(())
 }
 
-async fn mknod_dev(dev: &LinuxDevice) -> Result<()> {
+fn mknod_dev(dev: &LinuxDevice) -> Result<()> {
     fn makedev(major: u64, minor: u64) -> u64 {
         (minor & 0xff) | ((major & 0xfff) << 8) | ((minor & !0xff) << 12) | ((major & !0xfff) << 32)
     }
