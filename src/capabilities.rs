@@ -43,6 +43,7 @@ pub fn drop_privileges(cs: &LinuxCapabilities, command: &impl Command) -> Result
     Ok(())
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::command::test::TestHelperCommand;

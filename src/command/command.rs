@@ -14,4 +14,5 @@ pub trait Command {
     fn set_id(&self, uid: Uid, gid: Gid) -> Result<()>;
     fn unshare(&self, flags: CloneFlags) -> Result<()>;
     fn set_capability(&self, cset: CapSet, value: &CapsHashSet) -> Result<(), CapsError>;
+    fn set_hostname(&self, hostname: &str) -> Result<()>;
 }

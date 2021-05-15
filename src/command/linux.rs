@@ -2,7 +2,7 @@ use std::{any::Any, path::Path};
 
 use anyhow::{bail, Result};
 use caps::{errors::CapsError, CapSet, CapsHashSet};
-use nix::unistd::{fchdir, pivot_root};
+use nix::unistd::{fchdir, pivot_root, sethostname};
 use nix::{fcntl::open, sched::CloneFlags};
 use nix::{
     fcntl::OFlag,
@@ -63,5 +63,12 @@ impl Command for LinuxCommand {
 
     fn set_capability(&self, cset: CapSet, value: &CapsHashSet) -> Result<(), CapsError> {
         caps::set(None, cset, value)
+    }
+
+    fn set_hostname(&self, hostname: &str) -> Result<()> {
+        if let Err(e) = sethostname(hostname) {
+            bail!("Failed to set {} as hostname. {:?}", hostname, e)
+        }
+        Ok(())
     }
 }

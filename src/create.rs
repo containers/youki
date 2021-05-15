@@ -157,6 +157,8 @@ fn init_process(
     let clone_spec = std::sync::Arc::new(spec);
     let clone_rootfs = std::sync::Arc::new(rootfs.clone());
 
+    command.set_hostname(&clone_spec.hostname.as_str())?;
+
     futures::executor::block_on(rootfs::prepare_rootfs(
         clone_spec,
         clone_rootfs,

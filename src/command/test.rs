@@ -51,6 +51,10 @@ impl Command for TestHelperCommand {
         self.set_capability_args.borrow_mut().push(args);
         Ok(())
     }
+
+    fn set_hostname(&self, _hostname: &str) -> anyhow::Result<()> {
+        todo!()
+    }
 }
 
 impl TestHelperCommand {
