@@ -158,6 +158,9 @@ fn init_process(
     let clone_rootfs = std::sync::Arc::new(rootfs.clone());
 
     command.set_hostname(&clone_spec.hostname.as_str())?;
+    if clone_spec.process.no_new_privileges {
+        let _ = prctl::set_no_new_privileges(true);
+    }
 
     futures::executor::block_on(rootfs::prepare_rootfs(
         clone_spec,
@@ -172,7 +175,6 @@ fn init_process(
     command.set_id(Uid::from_raw(proc.user.uid), Gid::from_raw(proc.user.gid))?;
     capabilities::reset_effective(&command)?;
     if let Some(caps) = &proc.capabilities {
-        let _ = prctl::set_no_new_privileges(true);
         capabilities::drop_privileges(&caps, &command)?;
     }
     Ok(())
