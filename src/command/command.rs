@@ -7,6 +7,8 @@ use nix::{
     unistd::{Gid, Uid},
 };
 
+use crate::spec::LinuxRlimit;
+
 pub trait Command {
     fn as_any(&self) -> &dyn Any;
     fn pivot_rootfs(&self, path: &Path) -> Result<()>;
@@ -15,4 +17,5 @@ pub trait Command {
     fn unshare(&self, flags: CloneFlags) -> Result<()>;
     fn set_capability(&self, cset: CapSet, value: &CapsHashSet) -> Result<(), CapsError>;
     fn set_hostname(&self, hostname: &str) -> Result<()>;
+    fn set_rlimit(&self, rlimit: &LinuxRlimit) -> Result<()>;
 }

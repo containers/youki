@@ -56,6 +56,38 @@ pub struct Process {
     pub selinux_label: String,
     #[serde(default, deserialize_with = "deserialize_caps")]
     pub capabilities: Option<LinuxCapabilities>,
+    #[serde(default)]
+    pub rlimits: Vec<LinuxRlimit>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct LinuxRlimit {
+    #[serde(rename = "type")]
+    pub typ: LinuxRlimitType,
+    #[serde(default)]
+    pub hard: u64,
+    #[serde(default)]
+    pub soft: u64,
+}
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum LinuxRlimitType {
+    RlimitCpu,
+    RlimitFsize,
+    RlimitData,
+    RlimitStack,
+    RlimitCore,
+    RlimitRss,
+    RlimitNproc,
+    RlimitNofile,
+    RlimitMemlock,
+    RlimitAs,
+    RlimitLocks,
+    RlimitSigpending,
+    RlimitMsgqueue,
+    RlimitNice,
+    RlimitRtprio,
+    RlimitRttime,
 }
 
 use caps::Capability;

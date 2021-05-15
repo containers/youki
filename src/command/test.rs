@@ -55,6 +55,10 @@ impl Command for TestHelperCommand {
     fn set_hostname(&self, _hostname: &str) -> anyhow::Result<()> {
         todo!()
     }
+
+    fn set_rlimit(&self, _rlimit: &crate::spec::LinuxRlimit) -> anyhow::Result<()> {
+        todo!()
+    }
 }
 
 impl TestHelperCommand {

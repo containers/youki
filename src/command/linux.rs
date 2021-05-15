@@ -2,7 +2,10 @@ use std::{any::Any, path::Path};
 
 use anyhow::{bail, Result};
 use caps::{errors::CapsError, CapSet, CapsHashSet};
-use nix::unistd::{fchdir, pivot_root, sethostname};
+use nix::{
+    errno::Errno,
+    unistd::{fchdir, pivot_root, sethostname},
+};
 use nix::{fcntl::open, sched::CloneFlags};
 use nix::{
     fcntl::OFlag,
@@ -68,6 +71,18 @@ impl Command for LinuxCommand {
     fn set_hostname(&self, hostname: &str) -> Result<()> {
         if let Err(e) = sethostname(hostname) {
             bail!("Failed to set {} as hostname. {:?}", hostname, e)
+        }
+        Ok(())
+    }
+
+    fn set_rlimit(&self, rlimit: &crate::spec::LinuxRlimit) -> Result<()> {
+        let rlim = &libc::rlimit {
+            rlim_cur: rlimit.soft,
+            rlim_max: rlimit.hard,
+        };
+        let res = unsafe { libc::setrlimit(rlimit.typ as u32, rlim) };
+        if let Err(e) = Errno::result(res).map(drop) {
+            bail!("Failed to set {:?}. {:?}", rlimit.typ, e)
         }
         Ok(())
     }

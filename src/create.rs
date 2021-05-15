@@ -115,6 +115,9 @@ fn run_container<P: AsRef<Path>>(
     )? {
         Process::Parent(parent) => Ok(Process::Parent(parent)),
         Process::Child(child) => {
+            for rlimit in spec.process.rlimits.iter() {
+                command.set_rlimit(rlimit)?
+            }
             command.set_id(Uid::from_raw(0), Gid::from_raw(0))?;
 
             let without = sched::CloneFlags::CLONE_NEWUSER;

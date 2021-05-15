@@ -101,7 +101,7 @@ $ docker logs youki
     - [ ] hugetlb
     - [ ] pids
     - [ ] rdma
-- [ ] rlimits
+- [x] rlimits
 - [ ] hooks
 
 # Contribution
