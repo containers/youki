@@ -1,11 +1,6 @@
-<h1 align="center">youki</h1>
-<h3 align="center">Experimental implementation of the oci-runtime in Rust</h3>
+# youki: A container runtime in Rust
 
-<p align="center">
-<a href="LICENSE">
-<img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT">
-</a>
-</p>
+![youki logo](docs/youki.png)
 
 youki is an implementation of [runtime-spec](https://github.com/opencontainers/runtime-spec) in Rust, referring to [runc](https://github.com/opencontainers/runc).
 This project is in the experimental stage at this point.
