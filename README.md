@@ -3,7 +3,6 @@
 ![youki logo](docs/youki.png)
 
 youki is an implementation of [runtime-spec](https://github.com/opencontainers/runtime-spec) in Rust, referring to [runc](https://github.com/opencontainers/runc).
-This project is in the experimental stage at this point.
 
 # Motivation
 Here is why we are writing a new container runtime in Rust.
@@ -11,81 +10,49 @@ Here is why we are writing a new container runtime in Rust.
 - The development of [railcar](https://github.com/oracle/railcar) has been suspended. This project was very nice but is no longer being developed. This project is inspired by it.
 - We have fun implementing this. In fact, this may be the most important.
 
-# How to build
-Two types of building are available: devcontainer or local.
-You can choose whichever you like, but the local one will only work on Linux.
+# Status of youki
+youki is not at the practical stage yet. However, it is getting closer to practical use, running with docker and passing all the default tests provided by [opencontainers/runtime-rools](https://github.com/opencontainers/runtime-tools).
+![youki demo](docs/demo.gif)
 
-## Local
-### Requires
+# Getting Started
+Local build is only supported on linux.
+For other platforms, please use the devcontainer that we prepared.
+## Requires
 - Rust(See [here](https://www.rust-lang.org/tools/install))
 - Docker
 
-### Build
+## Building
 ```sh
 $ git clone git@github.com:utam0k/youki.git
+$ cd youki
 $ cargo build
-$ RUST_BACKTRACE=full YOUKI_LOG_LEVEL=debug YOUKI_MODE=/var/lib/docker/containers/ dockerd --experimental --add-runtime="youki=$(pwd)/target/x86_64-unknown-linux-gnu/debug/youki"
 ```
 
-## Devcontainer
-We prepared [devcontainer](https://code.visualstudio.com/docs/remote/containers) as a development environment.
-If you use devcontainer for the first time, please refer to [this page](https://code.visualstudio.com/docs/remote/containers).
-
-The following explanation assumes that devcontainer is used.
-The first time it starts up will take a while, so have a cup of coffee and wait ;)
-
-### Requires
-- VSCode
-- Docker
-
-### Build
-This commands should be run runs in your local terminal.
-```sh
-$ git clone git@github.com:utam0k/youki.git
-$ code youki
+## Usage
+Starting the docker daemon.
 ```
-And use [devcontainer](https://code.visualstudio.com/docs/remote/containers) in your vscode.
-
-`dockerd` is already running when you start devcontainer.
-You can get more information about the startup process by referring to `.devcontainer/scripts/init.sh`.
-
-# Usage
-## youki with Docker
+$ dockerd --experimental --add-runtime="youki=$(pwd)/target/x86_64-unknown-linux-gnu/debug/youki"
 ```
-$ docker run -it --rm --runtime youki hello-world
+
+You can use youki in a different terminal to start the container.
+```
 $ docker run -it --rm --runtime youki busybox
 ```
 
-## Integration test
-```
-$ /workspaces/youki/.devcontainer/scripts/setup_test.sh # only the first time
-$ /workspaces/youki/.devcontainer/scripts/test.sh
-```
+### Integration test
+You can use [opencontainers/runtime-rools](https://github.com/opencontainers/runtime-tools) to do integration testing used in CI.
+See it's documentation for details.
 
-## HelloWorld with youki
-Do `Hello, World` using the log function of Youki.
-If you want to explore youki, please use it.
-
-Try adding the following code to the line in `src/main.rs` after initializing the logger of the main function and try to `cargo build` in your terminal.
-```
-log::debug!("Hello, World");
-```
-
-When you run busybox, sh will start and stop.
-```
-$ docker run -it --rm --runtime youki --name youki busybox
-```
-
-If you run the following command in a different terminal, you will see the `Hello, World` that you added above.
-```
-$ docker logs youki
-```
+# Design and implementation of youki
+TBD
 
 # Features
-- [x] somehow works
 - [x] run with docker
+- [x] pivot root
+- [x] mount devices
 - [x] namespace
 - [x] capabilities
+- [x] rlimits
 - [ ] cgroups v1
     - [x] devices
     - [ ] cpu
@@ -100,7 +67,6 @@ $ docker logs youki
     - [ ] hugetlb
     - [ ] pids
     - [ ] rdma
-- [x] rlimits
 - [ ] hooks
 
 # Contribution
