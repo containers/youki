@@ -4,9 +4,14 @@
 
 youki is an implementation of [runtime-spec](https://github.com/opencontainers/runtime-spec) in Rust, referring to [runc](https://github.com/opencontainers/runc).
 This project is in the experimental stage at this point.
-I think Rust is one of the best languages to implement oci-runtime, so I'm having fun experimenting with it.
 
-# Build
+# Motivation
+Here is why we are writing a new container runtime in Rust.
+- Rust is one of the best languages to implement oci-runtime. Many container tools are written in Go. It's all very nice products. However, the container runtime requires the use of system calls, which requires a bit of special handling when implemented in Go. This is too tricky(e.g. *namespaces(7)*, *fork(2)*); with Rust, it's not that tricky and you can use system calls. Also, unlike C, Rust provides the benefit of memory management.
+- The development of [railcar](https://github.com/oracle/railcar) has been suspended. This project was very nice but is no longer being developed. This project is inspired by it.
+- We have fun implementing this. In fact, this may be the most important.
+
+# How to build
 Two types of building are available: devcontainer or local.
 You can choose whichever you like, but the local one will only work on Linux.
 
