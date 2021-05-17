@@ -1,6 +1,7 @@
 # youki: A container runtime in Rust
 
-![youki logo](docs/youki.png)
+![logo](docs/youki.png)
+> rusty container
 
 youki is an implementation of [runtime-spec](https://github.com/opencontainers/runtime-spec) in Rust, referring to [runc](https://github.com/opencontainers/runc).
 
