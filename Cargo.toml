@@ -19,3 +19,4 @@ mio = { version = "0.7", features = ["os-ext", "os-poll"] }
 chrono = "0.4"
 once_cell = "1.6.0"
 futures = { version = "0.3", features = ["thread-pool"] }
+regex = "1.5"
