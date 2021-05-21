@@ -1,2 +1,6 @@
 /target
 .vagrant/
+
+tags
+tags.lock
+tags.temp
