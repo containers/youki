@@ -43,6 +43,8 @@ impl Controller for Memory {
         }
 
         if linux_resources.disable_oom_killer {
+            Self::set_u64(0, &cgroup_root.join(CGROUP_MEMORY_OOM_CONTROL))?;
+        } else {
             Self::set_u64(1, &cgroup_root.join(CGROUP_MEMORY_OOM_CONTROL))?;
         }
 
