@@ -118,7 +118,7 @@ impl Memory {
         Ok(val)
     }
 
-    fn get_memory_limit(cgroup_root: &Path) -> Result<u64> {
+    fn get_memory_limit(cgroup_root: &Path) -> Result<i64> {
         let path = cgroup_root.join(CGROUP_MEMORY_LIMIT);
         let mut contents = String::new();
         OpenOptions::new()
@@ -130,10 +130,10 @@ impl Memory {
         contents = contents.trim().to_string();
 
         if contents == "max" {
-            return Ok(u64::MAX);
+            return Ok(i64::MAX);
         }
 
-        let val = contents.parse::<u64>()?;
+        let val = contents.parse::<i64>()?;
         Ok(val)
     }
 
@@ -215,18 +215,17 @@ impl Memory {
         // see:
         // https://github.com/opencontainers/runc/blob/master/libcontainer/cgroups/fs/memory.go#L89
         if limit != 0 && swap != 0 {
-            let current_limit =
-                Self::get_memory_limit(cgroup_root).expect("Should load current memory limit");
+            let current_limit = Self::get_memory_limit(cgroup_root)?;
 
-            if swap == -1 || current_limit < swap as u64 {
-                Self::set_swap(swap, cgroup_root).expect("should set swap");
-                Self::set_memory(limit, cgroup_root).expect("should set mem");
+            if swap == -1 || current_limit < swap {
+                Self::set_swap(swap, cgroup_root)?;
+                Self::set_memory(limit, cgroup_root)?;
                 return Ok(());
             }
         }
 
-        Self::set_memory(limit, cgroup_root).expect("should set mem");
-        Self::set_swap(swap, cgroup_root).expect("should set swap");
+        Self::set_memory(limit, cgroup_root)?;
+        Self::set_swap(swap, cgroup_root)?;
 
         Ok(())
     }
