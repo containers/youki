@@ -33,50 +33,50 @@ impl Controller for Memory {
         );
         create_dir_all(&cgroup_root)?;
 
-        let memory = linux_resources.memory.as_ref().unwrap();
-        let reservation = memory.reservation.unwrap_or(0);
+        if let Some(memory) = &linux_resources.memory {
+            let reservation = memory.reservation.unwrap_or(0);
 
-        Self::set_memory_and_swap(&memory, cgroup_root)?;
+            Self::set_memory_and_swap(&memory, cgroup_root)?;
 
-        if reservation != 0 {
-            Self::set_i64(reservation, &cgroup_root.join(CGROUP_MEMORY_RESERVATION))?;
-        }
-
-        if linux_resources.disable_oom_killer {
-            Self::set_u64(0, &cgroup_root.join(CGROUP_MEMORY_OOM_CONTROL))?;
-        } else {
-            Self::set_u64(1, &cgroup_root.join(CGROUP_MEMORY_OOM_CONTROL))?;
-        }
-
-        if let Some(swappiness) = memory.swappiness {
-            if swappiness <= 100 {
-                Self::set_u64(swappiness, &cgroup_root.join(CGROUP_MEMORY_SWAPPINESS))?;
-            } else {
-                // invalid swappiness value
-                return Err(anyhow!(
-                    "Invalid swappiness value: {}. Valid range is 0-100",
-                    swappiness
-                ));
+            if reservation != 0 {
+                Self::set_i64(reservation, &cgroup_root.join(CGROUP_MEMORY_RESERVATION))?;
             }
-        }
 
-        // NOTE: Seems as though kernel and kernelTCP are both deprecated
-        // neither are implemented by runc. Tests pass without this, but
-        // kept in per the spec.
-        if let Some(kmem) = memory.kernel {
-            Self::set_i64(kmem, &cgroup_root.join(CGROUP_KERNEL_MEMORY_LIMIT))?;
-        }
-        if let Some(tcp_mem) = memory.kernel_tcp {
-            Self::set_i64(tcp_mem, &cgroup_root.join(CGROUP_KERNEL_TCP_MEMORY_LIMIT))?;
-        }
+            if linux_resources.disable_oom_killer {
+                Self::set_u64(0, &cgroup_root.join(CGROUP_MEMORY_OOM_CONTROL))?;
+            } else {
+                Self::set_u64(1, &cgroup_root.join(CGROUP_MEMORY_OOM_CONTROL))?;
+            }
 
-        OpenOptions::new()
-            .create(false)
-            .write(true)
-            .truncate(false)
-            .open(cgroup_root.join("cgroup.procs"))?
-            .write_all(pid.to_string().as_bytes())?;
+            if let Some(swappiness) = memory.swappiness {
+                if swappiness <= 100 {
+                    Self::set_u64(swappiness, &cgroup_root.join(CGROUP_MEMORY_SWAPPINESS))?;
+                } else {
+                    // invalid swappiness value
+                    return Err(anyhow!(
+                        "Invalid swappiness value: {}. Valid range is 0-100",
+                        swappiness
+                    ));
+                }
+            }
 
+            // NOTE: Seems as though kernel and kernelTCP are both deprecated
+            // neither are implemented by runc. Tests pass without this, but
+            // kept in per the spec.
+            if let Some(kmem) = memory.kernel {
+                Self::set_i64(kmem, &cgroup_root.join(CGROUP_KERNEL_MEMORY_LIMIT))?;
+            }
+            if let Some(tcp_mem) = memory.kernel_tcp {
+                Self::set_i64(tcp_mem, &cgroup_root.join(CGROUP_KERNEL_TCP_MEMORY_LIMIT))?;
+            }
+
+            OpenOptions::new()
+                .create(false)
+                .write(true)
+                .truncate(false)
+                .open(cgroup_root.join("cgroup.procs"))?
+                .write_all(pid.to_string().as_bytes())?;
+        }
         Ok(())
     }
 }
