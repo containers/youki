@@ -26,6 +26,10 @@ pub struct Memory {}
 
 impl Controller for Memory {
     fn apply(linux_resources: &LinuxResources, cgroup_root: &Path, pid: Pid) -> Result<()> {
+        log::info!(
+            "Memory controller path: {}",
+            cgroup_root.to_str().unwrap_or("")
+        );
         create_dir_all(&cgroup_root)?;
         let memory = linux_resources.memory.as_ref().unwrap();
         let reservation = memory.reservation.unwrap_or(0);
@@ -187,17 +191,18 @@ impl Memory {
         // see:
         // https://github.com/opencontainers/runc/blob/master/libcontainer/cgroups/fs/memory.go#L89
         if limit != 0 && swap != 0 {
-            let current_limit = Self::get_memory_limit(cgroup_root)?;
+            let current_limit =
+                Self::get_memory_limit(cgroup_root).expect("Should load current memory limit");
 
             if swap == -1 || current_limit < swap {
-                Self::set_swap(swap, cgroup_root)?;
-                Self::set_memory(limit, cgroup_root)?;
+                Self::set_swap(swap, cgroup_root).expect("should set swap");
+                Self::set_memory(limit, cgroup_root).expect("should set mem");
                 return Ok(());
             }
         }
 
-        Self::set_memory(limit, cgroup_root)?;
-        Self::set_swap(swap, cgroup_root)?;
+        Self::set_memory(limit, cgroup_root).expect("should set mem");
+        Self::set_swap(swap, cgroup_root).expect("should set swap");
 
         Ok(())
     }
