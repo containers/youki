@@ -31,6 +31,7 @@ impl Controller for Memory {
             cgroup_root.to_str().unwrap_or("")
         );
         create_dir_all(&cgroup_root)?;
+
         let memory = linux_resources.memory.as_ref().unwrap();
         let reservation = memory.reservation.unwrap_or(0);
 
@@ -83,6 +84,12 @@ impl Memory {
             .open(path)?
             .read_to_string(&mut contents)?;
 
+        contents = contents.trim().to_string();
+
+        if contents == "max" {
+            return Ok(u64::MAX);
+        }
+
         let val = contents.parse::<u64>()?;
         Ok(val)
     }
@@ -96,11 +103,17 @@ impl Memory {
             .open(path)?
             .read_to_string(&mut contents)?;
 
+        contents = contents.trim().to_string();
+
+        if contents == "max" {
+            return Ok(u64::MAX);
+        }
+
         let val = contents.parse::<u64>()?;
         Ok(val)
     }
 
-    fn get_memory_limit(cgroup_root: &Path) -> Result<i64> {
+    fn get_memory_limit(cgroup_root: &Path) -> Result<u64> {
         let path = cgroup_root.join(CGROUP_MEMORY_LIMIT);
         let mut contents = String::new();
         OpenOptions::new()
@@ -109,7 +122,13 @@ impl Memory {
             .open(path)?
             .read_to_string(&mut contents)?;
 
-        let val = contents.parse::<i64>()?;
+        contents = contents.trim().to_string();
+
+        if contents == "max" {
+            return Ok(u64::MAX);
+        }
+
+        let val = contents.parse::<u64>()?;
         Ok(val)
     }
 
@@ -176,7 +195,7 @@ impl Memory {
     }
 
     fn set_memory_and_swap(resource: &LinuxMemory, cgroup_root: &Path) -> Result<()> {
-        let limit = resource.limit.unwrap_or(0);
+        let limit = resource.limit.unwrap_or(-1);
         let mut swap = resource.swap.unwrap_or(0);
 
         if limit == -1 && swap == 0 {
@@ -194,7 +213,7 @@ impl Memory {
             let current_limit =
                 Self::get_memory_limit(cgroup_root).expect("Should load current memory limit");
 
-            if swap == -1 || current_limit < swap {
+            if swap == -1 || current_limit < swap as u64 {
                 Self::set_swap(swap, cgroup_root).expect("should set swap");
                 Self::set_memory(limit, cgroup_root).expect("should set mem");
                 return Ok(());
