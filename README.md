@@ -59,31 +59,22 @@ See it's documentation for details.
 
 # Design and implementation of youki
 
-TBD
+TBD(WIP on [#14](https://github.com/utam0k/youki/issues/14))
 
 # Features
 
 - [x] run with docker
+- [ ] run with podman
 - [x] pivot root
 - [x] mount devices
-- [x] namespace
+- [x] namespaces
 - [x] capabilities
 - [x] rlimits
-- [ ] cgroups v1
-  - [x] devices
-  - [ ] cpu
-  - [ ] cpuacct
-  - [ ] cpuset
-  - [ ] memory
-  - [ ] freezer
-  - [ ] net_cls
-  - [ ] blkio
-  - [ ] perf_event
-  - [ ] net_prio
-  - [ ] hugetlb
-  - [ ] pids
-  - [ ] rdma
-- [ ] hooks
+- [ ] cgroups v1(WIP on [#9](https://github.com/utam0k/youki/issues/9))
+- [ ] cgroups v2
+- [ ] seccomp
+- [ ] hooks(WIP on [#13](https://github.com/utam0k/youki/issues/13))
+- [ ] rootless
 
 # Contribution
 
