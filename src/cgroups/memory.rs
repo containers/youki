@@ -18,6 +18,7 @@ const CGROUP_MEMORY_USAGE: &str = "memory.usage_in_bytes";
 const CGROUP_MEMORY_MAX_USAGE: &str = "memory.max_usage_in_bytes";
 const CGROUP_MEMORY_SWAPPINESS: &str = "memory.swappiness";
 const CGROUP_MEMORY_RESERVATION: &str = "memory.soft_limit_in_bytes";
+const CGROUP_MEMORY_OOM_CONTROL: &str = "memory.oom_control";
 
 const CGROUP_KERNEL_MEMORY_LIMIT: &str = "memory.kmem.limit_in_bytes";
 const CGROUP_KERNEL_TCP_MEMORY_LIMIT: &str = "memory.kmem.tcp.limit_in_bytes";
@@ -39,6 +40,10 @@ impl Controller for Memory {
 
         if reservation != 0 {
             Self::set_i64(reservation, &cgroup_root.join(CGROUP_MEMORY_RESERVATION))?;
+        }
+
+        if linux_resources.disable_oom_killer {
+            Self::set_u64(1, &cgroup_root.join(CGROUP_MEMORY_OOM_CONTROL))?;
         }
 
         if let Some(swappiness) = memory.swappiness {
