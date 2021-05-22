@@ -206,7 +206,7 @@ impl Memory {
 
         // According to runc we need to change the write sequence of
         // limit and swap so it won't fail, because the new and old
-        // values don't fit in the kernel's validation
+        // values don't fit the kernel's validation
         // see:
         // https://github.com/opencontainers/runc/blob/master/libcontainer/cgroups/fs/memory.go#L89
         if limit != 0 && swap != 0 {
