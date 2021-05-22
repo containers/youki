@@ -49,7 +49,7 @@ $ cargo build
 Starting the docker daemon.
 
 ```
-$ dockerd --experimental --add-runtime="youki=$(pwd)/target/x86_64-unknown-linux-gnu/debug/youki"
+$ dockerd --add-runtime="youki=$(pwd)/target/x86_64-unknown-linux-gnu/debug/youki"
 ```
 
 You can use youki in a different terminal to start the container.
