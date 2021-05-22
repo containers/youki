@@ -51,3 +51,6 @@ jobs:
           if [ 0 -ne $(sudo RUNTIME=$GITHUB_WORKSPACE/target/x86_64-unknown-linux-gnu/debug/youki ./validation/default/default.t | grep "not ok" | wc -l) ]; then
             exit 1
           fi
+          if [ 0 -ne $(sudo RUNTIME=$GITHUB_WORKSPACE/target/x86_64-unknown-linux-gnu/debug/youki ./validation/linux_cgroups_hugetlb/linux_cgroups_hugetlb.t | grep "not ok" | wc -l) ]; then
+            exit 1
+          fi
