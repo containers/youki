@@ -4,8 +4,13 @@
 
 > rusty container
 
-youki (pronounced as /joʊki/ or yoh-key) is an implementation of [runtime-spec](https://github.com/opencontainers/runtime-spec) in Rust, referring to [runc](https://github.com/opencontainers/runc).
+youki is an implementation of [runtime-spec](https://github.com/opencontainers/runtime-spec) in Rust, referring to [runc](https://github.com/opencontainers/runc).
+
+# About the name
+
+youki is pronounced as /joʊki/ or yoh-key.
 youki is named after a Japanese word 'youki', which means 'a container'. In Japanese language, youki also means 'cheerful', 'merry', or 'hilarious'.
+
 
 # Motivation
 
