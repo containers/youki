@@ -3,13 +3,13 @@ use std::{fs::remove_dir, path::Path};
 
 use anyhow::Result;
 use nix::unistd::Pid;
-use procfs::process::{Process};
+use procfs::process::Process;
 
 use crate::{cgroups::ControllerType, spec::LinuxResources, utils::PathBufExt};
 
 use super::{devices::Devices, hugetlb::Hugetlb, Controller};
 
-const CONTROLLERS: &'static [ControllerType] = &[ControllerType::Devices, ControllerType::HugeTlb];
+const CONTROLLERS: &[ControllerType] = &[ControllerType::Devices, ControllerType::HugeTlb];
 pub struct Manager {
     subsystems: HashMap<String, PathBuf>,
 }
@@ -17,13 +17,14 @@ pub struct Manager {
 impl Manager {
     pub fn new(cgroup_path: PathBuf) -> Result<Self> {
         let mut subsystems = HashMap::<String, PathBuf>::new();
-        for subsystem in CONTROLLERS.into_iter().map(|c|c.to_string()) {
-            subsystems.insert(subsystem.to_owned(),Self::get_subsystem_path(&cgroup_path, &subsystem)?);
+        for subsystem in CONTROLLERS.iter().map(|c| c.to_string()) {
+            subsystems.insert(
+                subsystem.to_owned(),
+                Self::get_subsystem_path(&cgroup_path, &subsystem)?,
+            );
         }
 
-        Ok(Manager {
-            subsystems,
-        })
+        Ok(Manager { subsystems })
     }
 
     pub fn apply(&self, linux_resources: &LinuxResources, pid: Pid) -> Result<()> {
@@ -53,15 +54,12 @@ impl Manager {
         let mount = Process::myself()?
             .mountinfo()?
             .into_iter()
-            .filter(|m| {
-                m.fs_type == "cgroup"
-                    && m.mount_point.ends_with(subsystem)
-            })
+            .filter(|m| m.fs_type == "cgroup" && m.mount_point.ends_with(subsystem))
             .collect::<Vec<_>>()
             .pop()
             .unwrap();
 
-            let cgroup = Process::myself()?
+        let cgroup = Process::myself()?
             .cgroups()?
             .into_iter()
             .filter(|c| c.controllers.contains(&subsystem.to_owned()))
@@ -69,16 +67,14 @@ impl Manager {
             .pop()
             .unwrap();
 
-            let p = if cgroup_path.to_string_lossy().into_owned().is_empty() {
-                    mount
-                    .mount_point
-                    .join_absolute_path(Path::new(&cgroup.pathname))?
-            } else {
-                    mount
-                    .mount_point
-                    .join_absolute_path(&cgroup_path)?
-            };
+        let p = if cgroup_path.to_string_lossy().into_owned().is_empty() {
+            mount
+                .mount_point
+                .join_absolute_path(Path::new(&cgroup.pathname))?
+        } else {
+            mount.mount_point.join_absolute_path(&cgroup_path)?
+        };
 
-            Ok(p)
+        Ok(p)
     }
 }
