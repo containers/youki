@@ -7,9 +7,13 @@ use procfs::process::Process;
 
 use crate::{cgroups::ControllerType, spec::LinuxResources, utils::PathBufExt};
 
-use super::{devices::Devices, hugetlb::Hugetlb, Controller};
+use super::{devices::Devices, hugetlb::Hugetlb, pids::Pids, Controller};
 
-const CONTROLLERS: &[ControllerType] = &[ControllerType::Devices, ControllerType::HugeTlb];
+const CONTROLLERS: &[ControllerType] = &[
+    ControllerType::Devices,
+    ControllerType::HugeTlb,
+    ControllerType::Pids,
+];
 pub struct Manager {
     subsystems: HashMap<String, PathBuf>,
 }
@@ -32,6 +36,7 @@ impl Manager {
             match subsys.0.as_str() {
                 "devices" => Devices::apply(linux_resources, &subsys.1, pid)?,
                 "hugetlb" => Hugetlb::apply(linux_resources, &subsys.1, pid)?,
+                "pids" => Pids::apply(linux_resources, &subsys.1, pid)?,
                 _ => continue,
             }
         }
