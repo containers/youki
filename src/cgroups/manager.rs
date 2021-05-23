@@ -7,13 +7,14 @@ use procfs::process::Process;
 
 use crate::{cgroups::ControllerType, spec::LinuxResources, utils::PathBufExt};
 
-use super::{devices::Devices, hugetlb::Hugetlb, memory::Memory, pids::Pids, Controller};
+use super::{devices::Devices, hugetlb::Hugetlb, memory::Memory, pids::Pids, blkio::Blkio, Controller};
 
 const CONTROLLERS: &[ControllerType] = &[
     ControllerType::Devices,
     ControllerType::HugeTlb,
     ControllerType::Memory,
     ControllerType::Pids,
+    ControllerType::Blkio,
 ];
 
 pub struct Manager {
@@ -40,6 +41,7 @@ impl Manager {
                 "hugetlb" => Hugetlb::apply(linux_resources, &subsys.1, pid)?,
                 "memory" => Memory::apply(linux_resources, &subsys.1, pid)?,
                 "pids" => Pids::apply(linux_resources, &subsys.1, pid)?,
+                "blkio" => Blkio::apply(linux_resources, &subsys.1, pid)?,
                 _ => continue,
             }
         }

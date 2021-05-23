@@ -5,6 +5,7 @@ pub enum ControllerType {
     HugeTlb,
     Pids,
     Memory,
+    Blkio,
 }
 
 impl ToString for ControllerType {
@@ -14,6 +15,7 @@ impl ToString for ControllerType {
             Self::HugeTlb => "hugetlb".into(),
             Self::Pids => "pids".into(),
             Self::Memory => "memory".into(),
+            Self::Blkio => "blkio".into(),
         }
     }
 }
