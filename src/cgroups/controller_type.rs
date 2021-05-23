@@ -3,6 +3,7 @@ use std::string::ToString;
 pub enum ControllerType {
     Devices,
     HugeTlb,
+    Pids,
 }
 
 impl ToString for ControllerType {
@@ -10,6 +11,7 @@ impl ToString for ControllerType {
         match self {
             Self::Devices => "devices".into(),
             Self::HugeTlb => "hugetlb".into(),
+            Self::Pids => "pids".into(),
         }
     }
 }
