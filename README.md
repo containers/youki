@@ -20,7 +20,7 @@ Here is why I am rewriting a new container runtime in Rust.
 
 # Status of youki
 
-youki is not at the practical stage yet. However, it is getting closer to practical use, running with docker and passing all the default tests provided by [opencontainers/runtime-rools](https://github.com/opencontainers/runtime-tools).
+youki is not at the practical stage yet. However, it is getting closer to practical use, running with docker and passing all the default tests provided by [opencontainers/runtime-tools](https://github.com/opencontainers/runtime-tools).
 ![youki demo](docs/demo.gif)
 
 # Getting Started
