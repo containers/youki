@@ -382,13 +382,13 @@ pub struct LinuxBlockIo {
     pub blkio_leaf_weight: Option<u16>,
     #[serde(default)]
     pub blkio_weight_device: Vec<LinuxWeightDevice>,
-    #[serde(default)]
+    #[serde(default, rename = "throttleReadBpsDevice")]
     pub blkio_throttle_read_bps_device: Vec<LinuxThrottleDevice>,
-    #[serde(default)]
+    #[serde(default, rename = "throttleWriteBpsDevice")]
     pub blkio_throttle_write_bps_device: Vec<LinuxThrottleDevice>,
-    #[serde(default, rename = "blkioThrottleReadIOPSDevice")]
+    #[serde(default, rename = "throttleReadIOPSDevice")]
     pub blkio_throttle_read_iops_device: Vec<LinuxThrottleDevice>,
-    #[serde(default, rename = "blkioThrottleWriteIOPSDevice")]
+    #[serde(default, rename = "throttleWriteIOPSDevice")]
     pub blkio_throttle_write_iops_device: Vec<LinuxThrottleDevice>,
 }
 

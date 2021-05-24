@@ -2,6 +2,7 @@ mod controller;
 mod controller_type;
 mod devices;
 mod hugetlb;
+mod blkio;
 mod manager;
 mod memory;
 mod pids;
