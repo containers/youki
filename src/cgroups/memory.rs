@@ -27,10 +27,7 @@ pub struct Memory {}
 
 impl Controller for Memory {
     fn apply(linux_resources: &LinuxResources, cgroup_root: &Path, pid: Pid) -> Result<()> {
-        log::info!(
-            "Memory controller path: {}",
-            cgroup_root.to_str().unwrap_or("")
-        );
+        log::debug!("Apply Memory cgroup config");
         create_dir_all(&cgroup_root)?;
 
         if let Some(memory) = &linux_resources.memory {

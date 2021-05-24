@@ -6,6 +6,8 @@ pub enum ControllerType {
     Pids,
     Memory,
     Blkio,
+    NetworkPriority,
+    NetworkClassifier,
 }
 
 impl ToString for ControllerType {
@@ -16,6 +18,8 @@ impl ToString for ControllerType {
             Self::Pids => "pids".into(),
             Self::Memory => "memory".into(),
             Self::Blkio => "blkio".into(),
+            Self::NetworkPriority => "net_prio".into(),
+            Self::NetworkClassifier => "net_cls".into(),
         }
     }
 }

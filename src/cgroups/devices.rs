@@ -37,6 +37,7 @@ pub struct Devices {}
 
 impl Controller for Devices {
     fn apply(linux_resources: &LinuxResources, cgroup_root: &Path, pid: Pid) -> Result<()> {
+        log::debug!("Apply Devices cgroup config");
         create_dir_all(&cgroup_root)?;
 
         for d in &linux_resources.devices {

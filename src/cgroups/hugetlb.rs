@@ -1,14 +1,26 @@
-use std::{fs::{self, OpenOptions}, io::Write, path::Path};
+use std::{
+    fs::{self, OpenOptions},
+    io::Write,
+    path::Path,
+};
 
-use regex::Regex;
 use anyhow::anyhow;
+use regex::Regex;
 
-use crate::{cgroups::Controller, spec::{ LinuxHugepageLimit, LinuxResources}};
+use crate::{
+    cgroups::Controller,
+    spec::{LinuxHugepageLimit, LinuxResources},
+};
 
 pub struct Hugetlb {}
 
 impl Controller for Hugetlb {
-    fn apply(linux_resources: &LinuxResources, cgroup_root: &std::path::Path, pid: nix::unistd::Pid) -> anyhow::Result<()> {
+    fn apply(
+        linux_resources: &LinuxResources,
+        cgroup_root: &std::path::Path,
+        pid: nix::unistd::Pid,
+    ) -> anyhow::Result<()> {
+        log::debug!("Apply Hugetlb cgroup config");
         fs::create_dir_all(cgroup_root)?;
 
         for hugetlb in &linux_resources.hugepage_limits {
@@ -32,18 +44,21 @@ impl Hugetlb {
         match caps {
             None => return Err(anyhow!("page size must be in the format [0-9]+[KMG]B")),
             Some(caps) => {
-                let page_size:u64 = caps["pagesize"].parse()?;
+                let page_size: u64 = caps["pagesize"].parse()?;
                 if !Self::is_power_of_two(page_size) {
-                    return Err(anyhow!("page size must be in the format of 2^(integer)"))
+                    return Err(anyhow!("page size must be in the format of 2^(integer)"));
                 }
             }
         }
 
-        Self::write_file(&root_path.join(format!("hugetlb.{}.limit_in_bytes", hugetlb.page_size)), &hugetlb.limit.to_string())?;
+        Self::write_file(
+            &root_path.join(format!("hugetlb.{}.limit_in_bytes", hugetlb.page_size)),
+            &hugetlb.limit.to_string(),
+        )?;
         Ok(())
     }
 
-    fn write_file(file_path: &Path, data: &str) -> anyhow::Result<()> {       
+    fn write_file(file_path: &Path, data: &str) -> anyhow::Result<()> {
         fs::OpenOptions::new()
             .create(false)
             .write(true)
@@ -55,7 +70,7 @@ impl Hugetlb {
     }
 
     fn is_power_of_two(number: u64) -> bool {
-        (number != 0) && (number & (number -1)) == 0
+        (number != 0) && (number & (number - 1)) == 0
     }
 }
 
@@ -91,16 +106,17 @@ mod tests {
         let hugetlb = LinuxHugepageLimit {
             page_size: "2MB".to_owned(),
             limit: 16384,
-
         };
         Hugetlb::apply(&tmp, &hugetlb).expect("apply hugetlb");
-        let content = std::fs::read_to_string(tmp.join(page_file_name)).expect("Read hugetlb file content");
+        let content =
+            std::fs::read_to_string(tmp.join(page_file_name)).expect("Read hugetlb file content");
         assert_eq!(hugetlb.limit.to_string(), content);
     }
 
     #[test]
     fn test_set_hugetlb_with_invalid_page_size() {
-        let tmp = create_temp_dir("test_set_hugetlb_with_invalid_page_size").expect("create temp directory for test");
+        let tmp = create_temp_dir("test_set_hugetlb_with_invalid_page_size")
+            .expect("create temp directory for test");
 
         let hugetlb = LinuxHugepageLimit {
             page_size: "3MB".to_owned(),
@@ -108,6 +124,9 @@ mod tests {
         };
 
         let result = Hugetlb::apply(&tmp, &hugetlb);
-        assert!(result.is_err(), "page size that is not a power of two should be an error");
+        assert!(
+            result.is_err(),
+            "page size that is not a power of two should be an error"
+        );
     }
 }
