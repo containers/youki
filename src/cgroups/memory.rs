@@ -156,24 +156,21 @@ impl Memory {
             Ok(_) => Ok(()),
             Err(e) => {
                 // we need to look into the raw OS error for an EBUSY status
-                if let Some(code) = e.raw_os_error() {
-                    // the nix crate has a handy enum for these, lets use that
-                    let errno = Errno::from_i32(code);
-                    // if the error is EBUSY
-                    if let Errno::EBUSY = errno {
-                        let usage = Self::get_memory_usage(cgroup_root)?;
-                        let max_usage = Self::get_memory_max_usage(cgroup_root)?;
-                        Err(anyhow!(
-                            "unable to set memory limit to {} (current usage: {}, peak usage: {})",
-                            val,
-                            usage,
-                            max_usage,
-                        ))
-                    } else {
-                        Err(anyhow!(e))
-                    }
-                } else {
-                    Err(anyhow!(e))
+                match e.raw_os_error() {
+                    Some(code) => match Errno::from_i32(code) {
+                        Errno::EBUSY => {
+                            let usage = Self::get_memory_usage(cgroup_root)?;
+                            let max_usage = Self::get_memory_max_usage(cgroup_root)?;
+                            Err(anyhow!(
+                                    "unable to set memory limit to {} (current usage: {}, peak usage: {})",
+                                    val,
+                                    usage,
+                                    max_usage,
+                            ))
+                        }
+                        _ => Err(anyhow!(e)),
+                    },
+                    None => Err(anyhow!(e)),
                 }
             }
         }
