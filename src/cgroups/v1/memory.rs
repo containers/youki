@@ -7,9 +7,7 @@ use std::{
 use anyhow::{Result, *};
 use nix::{errno::Errno, unistd::Pid};
 
-use crate::{
-    cgroups::Controller,
-};
+use crate::{cgroups::v1::Controller};
 use oci_spec::{LinuxMemory, LinuxResources};
 
 const CGROUP_MEMORY_SWAP_LIMIT: &str = "memory.memsw.limit_in_bytes";

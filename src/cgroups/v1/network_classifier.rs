@@ -7,9 +7,7 @@ use std::{
 use anyhow::Result;
 use nix::unistd::Pid;
 
-use crate::{
-    cgroups::Controller,
-};
+use crate::{cgroups::v1::Controller,};
 use oci_spec::{LinuxNetwork, LinuxResources};
 
 pub struct NetworkClassifier {}

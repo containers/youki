@@ -10,7 +10,7 @@ use super::{
     network_classifier::NetworkClassifier, network_priority::NetworkPriority, pids::Pids,
     Controller,
 };
-use crate::{cgroups::ControllerType, utils::PathBufExt};
+use crate::{cgroups::v1::ControllerType, utils::PathBufExt};
 use oci_spec::LinuxResources;
 
 const CONTROLLERS: &[ControllerType] = &[

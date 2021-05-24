@@ -12,7 +12,7 @@ use nix::sched;
 use nix::sys::wait::{waitpid, WaitStatus};
 use nix::unistd;
 
-use crate::cgroups::Manager;
+use crate::cgroups::v1::Manager;
 use crate::container::ContainerStatus;
 use crate::process::{child, init, parent, Process};
 use crate::utils;

@@ -8,7 +8,7 @@ use anyhow::anyhow;
 use regex::Regex;
 
 use crate::{
-    cgroups::Controller,
+    cgroups::v1::Controller,
 };
 use oci_spec::{LinuxHugepageLimit, LinuxResources};
 

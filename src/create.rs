@@ -104,8 +104,7 @@ fn run_container<P: AsRef<Path>>(
     let namespaces: Namespaces = linux.namespaces.clone().into();
 
     let cgroups_path = utils::get_cgroup_path(&linux.cgroups_path, container.id());
-
-    let cmanager = cgroups::Manager::new(&cgroups_path)?;
+    let cmanager = cgroups::v1::Manager::new(&cgroups_path)?;
 
     match fork::fork_first(
         pid_file,

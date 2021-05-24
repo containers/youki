@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::{
-    cgroups::Controller,
+    cgroups::v1::Controller,
 };
 use oci_spec::{LinuxBlockIo, LinuxResources};
 
