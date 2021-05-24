@@ -8,6 +8,7 @@ pub enum ControllerType {
     Blkio,
     NetworkPriority,
     NetworkClassifier,
+    Cpu,
 }
 
 impl ToString for ControllerType {
@@ -15,6 +16,7 @@ impl ToString for ControllerType {
         match self {
             Self::Devices => "devices".into(),
             Self::HugeTlb => "hugetlb".into(),
+            Self::Cpu => "cpu".into(),
             Self::Pids => "pids".into(),
             Self::Memory => "memory".into(),
             Self::Blkio => "blkio".into(),

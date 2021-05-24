@@ -21,6 +21,7 @@ const CONTROLLERS: &[ControllerType] = &[
     ControllerType::Blkio,
     ControllerType::NetworkPriority,
     ControllerType::NetworkClassifier,
+    ControllerType::Cpu,
 ];
 
 pub struct Manager {
@@ -47,6 +48,7 @@ impl Manager {
                 "hugetlb" => Hugetlb::apply(linux_resources, &subsys.1, pid)?,
                 "memory" => Memory::apply(linux_resources, &subsys.1, pid)?,
                 "pids" => Pids::apply(linux_resources, &subsys.1, pid)?,
+                "cpu" => Cpu::apply(linux_resources, &subsys.1, pid)?,
                 "blkio" => Blkio::apply(linux_resources, &subsys.1, pid)?,
                 "net_prio" => NetworkPriority::apply(linux_resources, &subsys.1, pid)?,
                 "net_cls" => NetworkClassifier::apply(linux_resources, &subsys.1, pid)?,

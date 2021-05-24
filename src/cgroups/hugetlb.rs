@@ -20,7 +20,6 @@ impl Controller for Hugetlb {
         cgroup_root: &std::path::Path,
         pid: nix::unistd::Pid,
     ) -> anyhow::Result<()> {
-        log::debug!("Apply Hugetlb cgroup config");
         fs::create_dir_all(cgroup_root)?;
 
         for hugetlb in &linux_resources.hugepage_limits {

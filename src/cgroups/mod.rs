@@ -1,5 +1,6 @@
 mod controller;
 mod controller_type;
+mod cpu;
 mod devices;
 mod hugetlb;
 mod blkio;
