@@ -1,8 +1,6 @@
 # youki: A container runtime in Rust
 
-![logo](docs/youki.png)
-
-> rusty container
+<img src="docs/youki.png" width="230" height="230">
 
 youki is an implementation of [runtime-spec](https://github.com/opencontainers/runtime-spec) in Rust, referring to [runc](https://github.com/opencontainers/runc).
 
@@ -10,7 +8,6 @@ youki is an implementation of [runtime-spec](https://github.com/opencontainers/r
 
 youki is pronounced as /joʊki/ or yoh-key.
 youki is named after a Japanese word 'youki', which means 'a container'. In Japanese language, youki also means 'cheerful', 'merry', or 'hilarious'.
-
 
 # Motivation
 
