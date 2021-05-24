@@ -62,17 +62,13 @@ impl Manager {
         let mount = Process::myself()?
             .mountinfo()?
             .into_iter()
-            .filter(|m| m.fs_type == "cgroup" && m.mount_point.ends_with(subsystem))
-            .collect::<Vec<_>>()
-            .pop()
+            .find(|m| m.fs_type == "cgroup" && m.mount_point.ends_with(subsystem))
             .unwrap();
 
         let cgroup = Process::myself()?
             .cgroups()?
             .into_iter()
-            .filter(|c| c.controllers.contains(&subsystem.to_owned()))
-            .collect::<Vec<_>>()
-            .pop()
+            .find(|c| c.controllers.contains(&subsystem.to_owned()))
             .unwrap();
 
         let p = if cgroup_path.to_string_lossy().into_owned().is_empty() {
