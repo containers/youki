@@ -7,13 +7,15 @@ use procfs::process::Process;
 
 use crate::{cgroups::ControllerType, spec::LinuxResources, utils::PathBufExt};
 
-use super::{devices::Devices, hugetlb::Hugetlb, pids::Pids, Controller};
+use super::{devices::Devices, hugetlb::Hugetlb, memory::Memory, pids::Pids, Controller};
 
 const CONTROLLERS: &[ControllerType] = &[
     ControllerType::Devices,
     ControllerType::HugeTlb,
+    ControllerType::Memory,
     ControllerType::Pids,
 ];
+
 pub struct Manager {
     subsystems: HashMap<String, PathBuf>,
 }
@@ -36,6 +38,7 @@ impl Manager {
             match subsys.0.as_str() {
                 "devices" => Devices::apply(linux_resources, &subsys.1, pid)?,
                 "hugetlb" => Hugetlb::apply(linux_resources, &subsys.1, pid)?,
+                "memory" => Memory::apply(linux_resources, &subsys.1, pid)?,
                 "pids" => Pids::apply(linux_resources, &subsys.1, pid)?,
                 _ => continue,
             }
@@ -59,17 +62,13 @@ impl Manager {
         let mount = Process::myself()?
             .mountinfo()?
             .into_iter()
-            .filter(|m| m.fs_type == "cgroup" && m.mount_point.ends_with(subsystem))
-            .collect::<Vec<_>>()
-            .pop()
+            .find(|m| m.fs_type == "cgroup" && m.mount_point.ends_with(subsystem))
             .unwrap();
 
         let cgroup = Process::myself()?
             .cgroups()?
             .into_iter()
-            .filter(|c| c.controllers.contains(&subsystem.to_owned()))
-            .collect::<Vec<_>>()
-            .pop()
+            .find(|c| c.controllers.contains(&subsystem.to_owned()))
             .unwrap();
 
         let p = if cgroup_path.to_string_lossy().into_owned().is_empty() {
