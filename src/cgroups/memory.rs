@@ -36,21 +36,21 @@ impl Controller for Memory {
         if let Some(memory) = &linux_resources.memory {
             let reservation = memory.reservation.unwrap_or(0);
 
-            Self::set_memory_and_swap(&memory, cgroup_root)?;
+            Self::apply(&memory, cgroup_root)?;
 
             if reservation != 0 {
-                Self::set_i64(reservation, &cgroup_root.join(CGROUP_MEMORY_RESERVATION))?;
+                Self::set(reservation, &cgroup_root.join(CGROUP_MEMORY_RESERVATION))?;
             }
 
             if linux_resources.disable_oom_killer {
-                Self::set_u64(0, &cgroup_root.join(CGROUP_MEMORY_OOM_CONTROL))?;
+                Self::set(0, &cgroup_root.join(CGROUP_MEMORY_OOM_CONTROL))?;
             } else {
-                Self::set_u64(1, &cgroup_root.join(CGROUP_MEMORY_OOM_CONTROL))?;
+                Self::set(1, &cgroup_root.join(CGROUP_MEMORY_OOM_CONTROL))?;
             }
 
             if let Some(swappiness) = memory.swappiness {
                 if swappiness <= 100 {
-                    Self::set_u64(swappiness, &cgroup_root.join(CGROUP_MEMORY_SWAPPINESS))?;
+                    Self::set(swappiness, &cgroup_root.join(CGROUP_MEMORY_SWAPPINESS))?;
                 } else {
                     // invalid swappiness value
                     return Err(anyhow!(
@@ -64,10 +64,10 @@ impl Controller for Memory {
             // neither are implemented by runc. Tests pass without this, but
             // kept in per the spec.
             if let Some(kmem) = memory.kernel {
-                Self::set_i64(kmem, &cgroup_root.join(CGROUP_KERNEL_MEMORY_LIMIT))?;
+                Self::set(kmem, &cgroup_root.join(CGROUP_KERNEL_MEMORY_LIMIT))?;
             }
             if let Some(tcp_mem) = memory.kernel_tcp {
-                Self::set_i64(tcp_mem, &cgroup_root.join(CGROUP_KERNEL_TCP_MEMORY_LIMIT))?;
+                Self::set(tcp_mem, &cgroup_root.join(CGROUP_KERNEL_TCP_MEMORY_LIMIT))?;
             }
 
             OpenOptions::new()
@@ -139,17 +139,7 @@ impl Memory {
         Ok(val)
     }
 
-    fn set_i64(val: i64, path: &Path) -> std::io::Result<()> {
-        OpenOptions::new()
-            .create(false)
-            .write(true)
-            .truncate(true)
-            .open(path)?
-            .write_all(val.to_string().as_bytes())?;
-        Ok(())
-    }
-
-    fn set_u64(val: u64, path: &Path) -> std::io::Result<()> {
+    fn set<T: ToString>(val: T, path: &Path) -> std::io::Result<()> {
         OpenOptions::new()
             .create(false)
             .write(true)
@@ -162,7 +152,7 @@ impl Memory {
     fn set_memory(val: i64, cgroup_root: &Path) -> Result<()> {
         let path = cgroup_root.join(CGROUP_MEMORY_LIMIT);
 
-        match Self::set_i64(val, &path) {
+        match Self::set(val, &path) {
             Ok(_) => Ok(()),
             Err(e) => {
                 // we need to look into the raw OS error for an EBUSY status
@@ -196,39 +186,59 @@ impl Memory {
 
         let path = cgroup_root.join(CGROUP_MEMORY_SWAP_LIMIT);
 
-        Self::set_i64(val, &path)?;
+        Self::set(val, &path)?;
 
         Ok(())
     }
 
-    fn set_memory_and_swap(resource: &LinuxMemory, cgroup_root: &Path) -> Result<()> {
-        let limit = resource.limit.unwrap_or(-1);
-        let mut swap = resource.swap.unwrap_or(0);
-
-        if limit == -1 && swap == 0 {
-            if cgroup_root.join(CGROUP_MEMORY_SWAP_LIMIT).exists() {
-                swap = -1;
-            }
-        }
-
+    fn set_memory_and_swap(
+        limit: i64,
+        swap: i64,
+        is_updated: bool,
+        cgroup_root: &Path,
+    ) -> Result<()> {
         // According to runc we need to change the write sequence of
         // limit and swap so it won't fail, because the new and old
         // values don't fit the kernel's validation
         // see:
-        // https://github.com/opencontainers/runc/blob/master/libcontainer/cgroups/fs/memory.go#L89
-        if limit != 0 && swap != 0 {
-            let current_limit = Self::get_memory_limit(cgroup_root)?;
-
-            if swap == -1 || current_limit < swap {
-                Self::set_swap(swap, cgroup_root)?;
-                Self::set_memory(limit, cgroup_root)?;
-                return Ok(());
-            }
+        // https://github.com/opencontainers/runc/blob/3f6594675675d4e88901c782462f56497260b1d2/libcontainer/cgroups/fs/memory.go#L89
+        if is_updated {
+            Self::set_swap(swap, cgroup_root)?;
+            Self::set_memory(limit, cgroup_root)?;
         }
-
         Self::set_memory(limit, cgroup_root)?;
         Self::set_swap(swap, cgroup_root)?;
+        Ok(())
+    }
 
+    fn apply(resource: &LinuxMemory, cgroup_root: &Path) -> Result<()> {
+        match resource.limit {
+            Some(limit) => {
+                let current_limit = Self::get_memory_limit(cgroup_root)?;
+                match resource.swap {
+                    Some(swap) => {
+                        let is_updated = swap == -1 || current_limit < swap;
+                        Self::set_memory_and_swap(limit, swap, is_updated, cgroup_root)?;
+                    }
+                    None => {
+                        if limit == -1 {
+                            Self::set_memory_and_swap(limit, -1, true, cgroup_root)?;
+                        } else {
+                            let is_updated = current_limit < 0;
+                            Self::set_memory_and_swap(limit, 0, is_updated, cgroup_root)?;
+                        }
+                    }
+                }
+            }
+            None => match resource.swap {
+                Some(swap) => {
+                    Self::set_memory_and_swap(0, swap, false, cgroup_root)?;
+                }
+                None => {
+                    Self::set_memory_and_swap(0, 0, false, cgroup_root)?;
+                }
+            },
+        }
         Ok(())
     }
 }
@@ -298,7 +308,7 @@ mod tests {
                 kernel_tcp: None,
                 swappiness: None,
             };
-            Memory::set_memory_and_swap(linux_memory, &tmp).expect("Set memory and swap");
+            Memory::apply(linux_memory, &tmp).expect("Set memory and swap");
 
             let limit_content =
                 std::fs::read_to_string(tmp.join(CGROUP_MEMORY_LIMIT)).expect("Read to string");
@@ -322,7 +332,7 @@ mod tests {
                 kernel_tcp: None,
                 swappiness: None,
             };
-            Memory::set_memory_and_swap(linux_memory, &tmp).expect("Set memory and swap");
+            Memory::apply(linux_memory, &tmp).expect("Set memory and swap");
 
             let limit_content =
                 std::fs::read_to_string(tmp.join(CGROUP_MEMORY_LIMIT)).expect("Read to string");
