@@ -10,6 +10,7 @@ pub trait CgroupManager {
     fn apply(&self, linux_resources: &LinuxResources, pid: Pid) -> Result<()>;
 }
 
+#[derive(Debug)]
 pub enum Cgroup {
     V1,
     V2,

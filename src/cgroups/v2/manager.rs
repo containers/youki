@@ -17,7 +17,7 @@ pub struct Manager {
 }
 
 impl Manager {
-    fn new(root_path: PathBuf) -> Result<Self> {
+    pub fn new(root_path: PathBuf) -> Result<Self> {
         Ok(Self {
             root_path,
         })

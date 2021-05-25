@@ -3,7 +3,7 @@ mod controller_type;
 mod devices;
 mod hugetlb;
 mod blkio;
-mod manager;
+pub mod manager;
 mod memory;
 mod pids;
 mod network_classifier;
