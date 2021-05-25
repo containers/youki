@@ -1,11 +1,11 @@
-use std::io::Write;
 use std::{
-    fs::{create_dir_all, OpenOptions},
     path::Path,
 };
 
 use anyhow::Result;
+use async_trait::async_trait;
 use nix::unistd::Pid;
+use smol::{fs::{OpenOptions, create_dir_all}, io::AsyncWriteExt};
 
 use crate::{
     cgroups::Controller,
@@ -35,13 +35,14 @@ impl ToString for LinuxDeviceCgroup {
 
 pub struct Devices {}
 
+#[async_trait]
 impl Controller for Devices {
-    fn apply(linux_resources: &LinuxResources, cgroup_root: &Path, pid: Pid) -> Result<()> {
+    async fn apply(linux_resources: &LinuxResources, cgroup_root: &Path, pid: Pid) -> Result<()> {
         log::debug!("Apply Devices cgroup config");
-        create_dir_all(&cgroup_root)?;
+        create_dir_all(&cgroup_root).await?;
 
         for d in &linux_resources.devices {
-            Self::apply_device(d, cgroup_root)?;
+            Self::apply_device(d, cgroup_root).await?;
         }
 
         for d in [
@@ -50,21 +51,21 @@ impl Controller for Devices {
         ]
         .concat()
         {
-            Self::apply_device(&d, &cgroup_root)?;
+            Self::apply_device(&d, &cgroup_root).await?;
         }
 
         OpenOptions::new()
             .create(false)
             .write(true)
             .truncate(false)
-            .open(cgroup_root.join("cgroup.procs"))?
-            .write_all(pid.to_string().as_bytes())?;
+            .open(cgroup_root.join("cgroup.procs")).await?
+            .write_all(pid.to_string().as_bytes()).await?;
         Ok(())
     }
 }
 
 impl Devices {
-    fn apply_device(device: &LinuxDeviceCgroup, cgroup_root: &Path) -> Result<()> {
+    async fn apply_device(device: &LinuxDeviceCgroup, cgroup_root: &Path) -> Result<()> {
         let path = if device.allow {
             cgroup_root.join("devices.allow")
         } else {
@@ -75,8 +76,8 @@ impl Devices {
             .create(false)
             .write(true)
             .truncate(false)
-            .open(path)?
-            .write_all(device.to_string().as_bytes())?;
+            .open(path).await?
+            .write_all(device.to_string().as_bytes()).await?;
         Ok(())
     }
 

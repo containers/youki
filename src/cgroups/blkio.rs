@@ -1,8 +1,8 @@
-use std::{
-    fs::{self, OpenOptions},
-    io::Write,
-    path::Path,
-};
+use std::path::Path;
+
+
+use async_trait::async_trait;
+use smol::{fs::{OpenOptions, create_dir_all}, io::AsyncWriteExt};
 
 use crate::{
     cgroups::Controller,
@@ -16,8 +16,9 @@ const CGROUP_BLKIO_THROTTLE_WRITE_IOPS: &str = "blkio.throttle.write_iops_device
 
 pub struct Blkio {}
 
+#[async_trait]
 impl Controller for Blkio {
-    fn apply(
+    async fn apply(
         linux_resources: &LinuxResources,
         cgroup_root: &Path,
         pid: nix::unistd::Pid,
@@ -25,8 +26,8 @@ impl Controller for Blkio {
         match &linux_resources.block_io {
             None => return Ok(()),
             Some(block_io) => {
-                fs::create_dir_all(cgroup_root)?;
-                Self::apply(cgroup_root, block_io)?;
+                create_dir_all(cgroup_root).await?;
+                Self::apply(cgroup_root, block_io).await?;
             }
         }
 
@@ -34,53 +35,53 @@ impl Controller for Blkio {
             .create(false)
             .write(true)
             .truncate(false)
-            .open(cgroup_root.join("cgroup.procs"))?
-            .write_all(pid.to_string().as_bytes())?;
+            .open(cgroup_root.join("cgroup.procs")).await?
+            .write_all(pid.to_string().as_bytes()).await?;
 
         Ok(())
     }
 }
 
 impl Blkio {
-    fn apply(root_path: &Path, blkio: &LinuxBlockIo) -> anyhow::Result<()> {
+    async fn apply(root_path: &Path, blkio: &LinuxBlockIo) -> anyhow::Result<()> {
         for trbd in &blkio.blkio_throttle_read_bps_device {
             Self::write_file(
                 &root_path.join(CGROUP_BLKIO_THROTTLE_READ_BPS),
                 &format!("{}:{} {}", trbd.major, trbd.minor, trbd.rate),
-            )?;
+            ).await?;
         }
 
         for twbd in &blkio.blkio_throttle_write_bps_device {
             Self::write_file(
                 &root_path.join(CGROUP_BLKIO_THROTTLE_WRITE_BPS),
                 &format!("{}:{} {}", twbd.major, twbd.minor, twbd.rate),
-            )?;
+            ).await?;
         }
 
         for trid in &blkio.blkio_throttle_read_iops_device {
             Self::write_file(
                 &root_path.join(CGROUP_BLKIO_THROTTLE_READ_IOPS),
                 &format!("{}:{} {}", trid.major, trid.minor, trid.rate),
-            )?;
+            ).await?;
         }
 
         for twid in &blkio.blkio_throttle_write_iops_device {
             Self::write_file(
                 &root_path.join(CGROUP_BLKIO_THROTTLE_WRITE_IOPS),
                 &format!("{}:{} {}", twid.major, twid.minor, twid.rate),
-            )?;
+            ).await?;
         }
 
         Ok(())
     }
 
-    fn write_file(file_path: &Path, data: &str) -> anyhow::Result<()> {
-        fs::OpenOptions::new()
+    async fn write_file(file_path: &Path, data: &str) -> anyhow::Result<()> {
+        OpenOptions::new()
             .create(false)
             .write(true)
             .truncate(false)
-            .open(file_path)?
-            .write_all(data.as_bytes())?;
+            .open(file_path).await?
+            .write_all(data.as_bytes()).await?;
 
         Ok(())
     }

@@ -1,11 +1,11 @@
-use std::io::Write;
 use std::{
-    fs::{create_dir_all, OpenOptions},
     path::Path,
 };
 
 use anyhow::Result;
+use async_trait::async_trait;
 use nix::unistd::Pid;
+use smol::{fs::{OpenOptions, create_dir_all}, io::AsyncWriteExt};
 
 use crate::{
     cgroups::Controller,
@@ -14,20 +14,21 @@ use crate::{
 
 pub struct NetworkClassifier {}
 
+#[async_trait]
 impl Controller for NetworkClassifier {
-    fn apply(linux_resources: &LinuxResources, cgroup_root: &Path, pid: Pid) -> Result<()> {
+    async fn apply(linux_resources: &LinuxResources, cgroup_root: &Path, pid: Pid) -> Result<()> {
         log::debug!("Apply NetworkClassifier cgroup config");
-        create_dir_all(&cgroup_root)?;
+        create_dir_all(&cgroup_root).await?;
 
         if let Some(network) = linux_resources.network.as_ref() {
-            Self::apply(cgroup_root, network)?;
+            Self::apply(cgroup_root, network).await?;
 
             OpenOptions::new()
                 .create(false)
                 .write(true)
                 .truncate(true)
-                .open(cgroup_root.join("cgroup.procs"))?
-                .write_all(pid.to_string().as_bytes())?;
+                .open(cgroup_root.join("cgroup.procs")).await?
+                .write_all(pid.to_string().as_bytes()).await?;
         }
 
         Ok(())
@@ -35,21 +36,21 @@ impl Controller for NetworkClassifier {
 }
 
 impl NetworkClassifier {
-    fn apply(root_path: &Path, network: &LinuxNetwork) -> Result<()> {
+    async fn apply(root_path: &Path, network: &LinuxNetwork) -> Result<()> {
         if let Some(class_id) = network.class_id {
-            Self::write_file(&root_path.join("net_cls.classid"), &class_id.to_string())?;
+            Self::write_file(&root_path.join("net_cls.classid"), &class_id.to_string()).await?;
         }
 
         Ok(())
     }
 
-    fn write_file(file_path: &Path, data: &str) -> Result<()> {
+    async fn write_file(file_path: &Path, data: &str) -> Result<()> {
         OpenOptions::new()
             .create(false)
             .write(true)
             .truncate(true)
-            .open(file_path)?
-            .write_all(data.as_bytes())?;
+            .open(file_path).await?
+            .write_all(data.as_bytes()).await?;
 
         Ok(())
     }

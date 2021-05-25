@@ -1,11 +1,9 @@
-use std::{
-    fs::{self, OpenOptions},
-    io::Write,
-    path::Path,
-};
+use std::path::Path;
 
 use anyhow::anyhow;
+use async_trait::async_trait;
 use regex::Regex;
+use smol::{fs::{OpenOptions, create_dir_all}, io::AsyncWriteExt};
 
 use crate::{
     cgroups::Controller,
@@ -14,31 +12,32 @@ use crate::{
 
 pub struct Hugetlb {}
 
+#[async_trait]
 impl Controller for Hugetlb {
-    fn apply(
+    async fn apply(
         linux_resources: &LinuxResources,
         cgroup_root: &std::path::Path,
         pid: nix::unistd::Pid,
     ) -> anyhow::Result<()> {
         log::debug!("Apply Hugetlb cgroup config");
-        fs::create_dir_all(cgroup_root)?;
+        create_dir_all(cgroup_root).await?;
 
         for hugetlb in &linux_resources.hugepage_limits {
-            Self::apply(cgroup_root, hugetlb)?
+            Self::apply(cgroup_root, hugetlb).await?
         }
 
         OpenOptions::new()
             .create(false)
             .write(true)
             .truncate(false)
-            .open(cgroup_root.join("cgroup.procs"))?
-            .write_all(pid.to_string().as_bytes())?;
+            .open(cgroup_root.join("cgroup.procs")).await?
+            .write_all(pid.to_string().as_bytes()).await?;
         Ok(())
     }
 }
 
 impl Hugetlb {
-    fn apply(root_path: &Path, hugetlb: &LinuxHugepageLimit) -> anyhow::Result<()> {
+    async fn apply(root_path: &Path, hugetlb: &LinuxHugepageLimit) -> anyhow::Result<()> {
         let re = Regex::new(r"(?P<pagesize>[0-9]+)[KMG]B")?;
         let caps = re.captures(&hugetlb.page_size);
         match caps {
@@ -54,17 +53,17 @@ impl Hugetlb {
         Self::write_file(
             &root_path.join(format!("hugetlb.{}.limit_in_bytes", hugetlb.page_size)),
             &hugetlb.limit.to_string(),
-        )?;
+        ).await?;
         Ok(())
     }
 
-    fn write_file(file_path: &Path, data: &str) -> anyhow::Result<()> {
-        fs::OpenOptions::new()
+    async fn write_file(file_path: &Path, data: &str) -> anyhow::Result<()> {
+        OpenOptions::new()
             .create(false)
             .write(true)
             .truncate(true)
-            .open(file_path)?
-            .write_all(data.as_bytes())?;
+            .open(file_path).await?
+            .write_all(data.as_bytes()).await?;
 
         Ok(())
     }
@@ -80,6 +79,7 @@ mod tests {
 
     use super::*;
     use crate::spec::LinuxHugepageLimit;
+    use std::io::Write;
 
     fn set_fixture(temp_dir: &std::path::Path, filename: &str, val: &str) -> anyhow::Result<()> {
         std::fs::OpenOptions::new()

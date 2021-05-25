@@ -1,10 +1,8 @@
-use std::{
-    fs::{self, OpenOptions},
-    io::Write,
-    path::Path,
-};
+use std::path::Path;
 
 use anyhow::Result;
+use async_trait::async_trait;
+use smol::{fs::{OpenOptions, create_dir_all}, io::AsyncWriteExt};
 
 use crate::{
     cgroups::Controller,
@@ -13,47 +11,48 @@ use crate::{
 
 pub struct Pids {}
 
+#[async_trait]
 impl Controller for Pids {
-    fn apply(
+    async fn apply(
         linux_resources: &LinuxResources,
         cgroup_root: &std::path::Path,
         pid: nix::unistd::Pid,
     ) -> anyhow::Result<()> {
-        fs::create_dir_all(cgroup_root)?;
+        create_dir_all(cgroup_root).await?;
 
         for pids in &linux_resources.pids {
-            Self::apply(cgroup_root, pids)?
+            Self::apply(cgroup_root, pids).await?
         }
 
         OpenOptions::new()
             .create(false)
             .write(true)
             .truncate(false)
-            .open(cgroup_root.join("cgroup.procs"))?
-            .write_all(pid.to_string().as_bytes())?;
+            .open(cgroup_root.join("cgroup.procs")).await?
+            .write_all(pid.to_string().as_bytes()).await?;
         Ok(())
     }
 }
 
 impl Pids {
-    fn apply(root_path: &Path, pids: &LinuxPids) -> Result<()> {
+    async fn apply(root_path: &Path, pids: &LinuxPids) -> Result<()> {
         let limit = if pids.limit > 0 {
             pids.limit.to_string()
         } else {
             "max".to_string()
         };
 
-        Self::write_file(&root_path.join("pids.max"), &limit)?;
+        Self::write_file(&root_path.join("pids.max"), &limit).await?;
         Ok(())
     }
 
-    fn write_file(file_path: &Path, data: &str) -> Result<()> {
-        fs::OpenOptions::new()
+    async fn write_file(file_path: &Path, data: &str) -> Result<()> {
+        OpenOptions::new()
             .create(false)
             .write(true)
             .truncate(true)
-            .open(file_path)?
-            .write_all(data.as_bytes())?;
+            .open(file_path).await?
+            .write_all(data.as_bytes()).await?;
 
         Ok(())
     }
@@ -63,6 +62,7 @@ impl Pids {
 mod tests {
     use super::*;
     use crate::spec::LinuxPids;
+    use std::io::Write;
 
     fn set_fixture(temp_dir: &std::path::Path, filename: &str, val: &str) -> Result<()> {
         std::fs::OpenOptions::new()
