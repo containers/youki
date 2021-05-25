@@ -1,5 +1,6 @@
 use std::{collections::HashMap, path::PathBuf};
 use std::{fs::remove_dir, path::Path};
+use futures::future::join_all;
 
 use anyhow::Result;
 use nix::unistd::Pid;
@@ -41,20 +42,25 @@ impl Manager {
     }
 
     pub fn apply(&self, linux_resources: &LinuxResources, pid: Pid) -> Result<()> {
-        for subsys in &self.subsystems {
-            match subsys.0.as_str() {
-                "devices" => Devices::apply(linux_resources, &subsys.1, pid)?,
-                "hugetlb" => Hugetlb::apply(linux_resources, &subsys.1, pid)?,
-                "memory" => Memory::apply(linux_resources, &subsys.1, pid)?,
-                "pids" => Pids::apply(linux_resources, &subsys.1, pid)?,
-                "blkio" => Blkio::apply(linux_resources, &subsys.1, pid)?,
-                "net_prio" => NetworkPriority::apply(linux_resources, &subsys.1, pid)?,
-                "net_cls" => NetworkClassifier::apply(linux_resources, &subsys.1, pid)?,
-                _ => continue,
+        smol::block_on(async {
+            let futures = Vec::with_capacity(7);
+            for subsys in &self.subsystems {
+                futures.push(match subsys.0.as_str() {
+                    "devices" => Devices::apply(linux_resources, &subsys.1, pid),
+                    "hugetlb" => Hugetlb::apply(linux_resources, &subsys.1, pid),
+                    "memory" => Memory::apply(linux_resources, &subsys.1, pid),
+                    "pids" => Pids::apply(linux_resources, &subsys.1, pid),
+                    "blkio" => Blkio::apply(linux_resources, &subsys.1, pid),
+                    "net_prio" => NetworkPriority::apply(linux_resources, &subsys.1, pid),
+                    "net_cls" => NetworkClassifier::apply(linux_resources, &subsys.1, pid),
+                    _ => continue,
+                });
             }
-        }
 
-        Ok(())
+            join_all(futures);
+
+            Ok(())
+        })
     }
 
     pub fn remove(&self) -> Result<()> {
