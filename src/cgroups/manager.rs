@@ -69,10 +69,22 @@ impl Manager {
     }
 
     fn get_subsystem_path(cgroup_path: &Path, subsystem: &str) -> anyhow::Result<PathBuf> {
+        log::debug!("Get path for subsystem: {}", subsystem);
         let mount = Process::myself()?
             .mountinfo()?
             .into_iter()
-            .find(|m| m.fs_type == "cgroup" && m.mount_point.ends_with(subsystem))
+            .find(|m| {
+                if m.fs_type == "cgroup" {
+                    // Some systems mount net_prio and net_cls in the same directory
+                    // other systems mount them in their own diretories. This
+                    // should handle both cases.
+                    if subsystem == "net_cls" || subsystem == "net_prio" {
+                        return m.mount_point.ends_with("net_cls,net_prio")
+                            || m.mount_point.ends_with("net_prio,net_cls");
+                    }
+                }
+                m.mount_point.ends_with(subsystem)
+            })
             .unwrap();
 
         let cgroup = Process::myself()?
