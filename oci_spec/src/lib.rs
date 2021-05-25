@@ -363,9 +363,9 @@ pub struct LinuxCpu {
     pub realtime_runtime: Option<i64>,
     pub realtime_period: Option<u64>,
     #[serde(default)]
-    pub cpus: String,
+    pub cpus: Option<String>,
     #[serde(default)]
-    pub mems: String,
+    pub mems: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
