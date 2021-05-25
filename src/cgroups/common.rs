@@ -2,6 +2,13 @@ use std::{fs, io::Write, path::Path};
 use nix::sys::statfs;
 
 use anyhow::{Result, anyhow};
+use nix::unistd::Pid;
+
+use oci_spec::LinuxResources;
+
+pub trait CgroupManager {
+    fn apply(&self, linux_resources: &LinuxResources, pid: Pid) -> Result<()>;
+}
 
 pub enum Cgroup {
     V1,

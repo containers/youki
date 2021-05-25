@@ -4,7 +4,7 @@ use anyhow::{Result, anyhow};
 use nix::unistd::Pid;
 use oci_spec::LinuxResources;
 
-use crate::{cgroups::v2::controller::Controller, cgroups::{types::CgroupManager, v2::controller_type::ControllerType}};
+use crate::{cgroups::v2::controller::Controller, cgroups::{common::CgroupManager, v2::controller_type::ControllerType}};
 use super::{cpu::Cpu, cpuset::CpuSet, memory::Memory};
 
 const CGROUP2_MAGIC_NUMBER:u32  = 0x63677270;

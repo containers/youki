@@ -2,8 +2,9 @@ use std::{path::Path};
 use anyhow::Result;
 
 use oci_spec::{LinuxCpu, LinuxResources};
+use crate::{cgroups::common};
 
-use super::{controller::Controller, common };
+use super::{controller::Controller };
 
 const CGROUP_CPUSET_CPUS: &str = "cpuset.cpus";
 const CGROUP_CPUSET_MEMS: &str = "cpuset.mems";
