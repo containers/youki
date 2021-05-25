@@ -10,7 +10,7 @@ use super::{
     network_classifier::NetworkClassifier, network_priority::NetworkPriority, pids::Pids,
     Controller,
 };
-use crate::{cgroups::v1::ControllerType, utils::PathBufExt};
+use crate::{cgroups::v1::ControllerType, cgroups::common::CgroupManager, utils::PathBufExt};
 use oci_spec::LinuxResources;
 
 const CONTROLLERS: &[ControllerType] = &[
@@ -102,5 +102,22 @@ impl Manager {
         };
 
         Ok(p)
+    }
+}
+
+impl CgroupManager for Manager {
+    fn apply(&self, linux_resources: &LinuxResources, pid: Pid) -> Result<()> {
+        for subsys in &self.subsystems {
+            match subsys.0.as_str() {
+                "devices" => Devices::apply(linux_resources, &subsys.1, pid)?,
+                "hugetlb" => Hugetlb::apply(linux_resources, &subsys.1, pid)?,
+                "memory" => Memory::apply(linux_resources, &subsys.1, pid)?,
+                "pids" => Pids::apply(linux_resources, &subsys.1, pid)?,
+                "blkio" => Blkio::apply(linux_resources, &subsys.1, pid)?,
+                _ => continue,
+            }
+        }
+
+        Ok(())
     }
 }

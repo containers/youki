@@ -23,22 +23,6 @@ impl Manager {
         })
     }
 
-    pub fn apply(&self, cgroup_path: &Path, linux_resources: &LinuxResources, pid: Pid) -> Result<()> {
-        let full_cgroup_path = self.root_path.join(cgroup_path);
-        self.create_unified_cgroup(&full_cgroup_path, pid)?;
-
-        for controller in ControllerTypes {
-            match controller {
-                &ControllerType::Cpu => Cpu::apply(linux_resources, &full_cgroup_path)?,
-                &ControllerType::CpuSet => CpuSet::apply(linux_resources, &full_cgroup_path)?,
-                &ControllerType::Memory => Memory::apply(linux_resources, &full_cgroup_path)?,
-                _ => continue,
-            }
-        }
-
-        Ok(())
-    }
-
     pub fn remove(&self, cgroup_path: &Path) -> Result<()> {
         let full_path = self.root_path.join(cgroup_path);
         fs::remove_dir_all(full_path)?;
@@ -81,6 +65,23 @@ impl Manager {
 
     fn get_required_controllers(&self, cgroup_path: &Path, resources: &LinuxResources) -> Result<Vec<ControllerType>> {
         todo!();
+    }
+}
+
+impl CgroupManager for Manager {
+    fn apply(&self, linux_resources: &LinuxResources, pid: Pid) -> Result<()> {
+        self.create_unified_cgroup(&self.root_path, pid)?;
+
+        for controller in ControllerTypes {
+            match controller {
+                &ControllerType::Cpu => Cpu::apply(linux_resources, &self.root_path)?,
+                &ControllerType::CpuSet => CpuSet::apply(linux_resources, &self.root_path)?,
+                &ControllerType::Memory => Memory::apply(linux_resources, &self.root_path)?,
+                _ => continue,
+            }
+        }
+
+        Ok(())
     }
 }
 
