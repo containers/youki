@@ -103,14 +103,16 @@ mod tests {
         let tmp = create_temp_dir("test_set_hugetlb").expect("create temp directory for test");
         set_fixture(&tmp, page_file_name, "0").expect("Set fixture for 2 MB page size");
 
-        let hugetlb = LinuxHugepageLimit {
-            page_size: "2MB".to_owned(),
-            limit: 16384,
-        };
-        Hugetlb::apply(&tmp, &hugetlb).expect("apply hugetlb");
-        let content =
-            std::fs::read_to_string(tmp.join(page_file_name)).expect("Read hugetlb file content");
-        assert_eq!(hugetlb.limit.to_string(), content);
+        smol::block_on(async {
+            let hugetlb = LinuxHugepageLimit {
+                page_size: "2MB".to_owned(),
+                limit: 16384,
+            };
+            Hugetlb::apply(&tmp, &hugetlb).await.expect("apply hugetlb");
+            let content =
+                std::fs::read_to_string(tmp.join(page_file_name)).expect("Read hugetlb file content");
+            assert_eq!(hugetlb.limit.to_string(), content);
+        });
     }
 
     #[test]
@@ -118,15 +120,17 @@ mod tests {
         let tmp = create_temp_dir("test_set_hugetlb_with_invalid_page_size")
             .expect("create temp directory for test");
 
-        let hugetlb = LinuxHugepageLimit {
-            page_size: "3MB".to_owned(),
-            limit: 16384,
-        };
+        smol::block_on(async {
+            let hugetlb = LinuxHugepageLimit {
+                page_size: "3MB".to_owned(),
+                limit: 16384,
+            };
 
-        let result = Hugetlb::apply(&tmp, &hugetlb);
-        assert!(
-            result.is_err(),
-            "page size that is not a power of two should be an error"
-        );
+            let result = Hugetlb::apply(&tmp, &hugetlb).await;
+            assert!(
+                result.is_err(),
+                "page size that is not a power of two should be an error"
+            );
+        });
     }
 }

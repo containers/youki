@@ -93,6 +93,7 @@ mod tests {
 
     use super::*;
     use crate::spec::{LinuxBlockIo, LinuxThrottleDevice};
+    use std::io::Write;
 
     struct BlockIoBuilder {
         block_io: LinuxBlockIo,
@@ -173,19 +174,21 @@ mod tests {
         let (test_root, throttle) =
             setup("test_set_blkio_read_bps", CGROUP_BLKIO_THROTTLE_READ_BPS);
 
-        let blkio = BlockIoBuilder::new()
-            .with_read_bps(vec![LinuxThrottleDevice {
-                major: 8,
-                minor: 0,
-                rate: 102400,
-            }])
-            .build();
+        smol::block_on(async {
+            let blkio = BlockIoBuilder::new()
+                .with_read_bps(vec![LinuxThrottleDevice {
+                    major: 8,
+                    minor: 0,
+                    rate: 102400,
+                }])
+                .build();
 
-        Blkio::apply(&test_root, &blkio).expect("apply blkio");
-        let content = fs::read_to_string(throttle)
-            .expect(&format!("read {} content", CGROUP_BLKIO_THROTTLE_READ_BPS));
+            Blkio::apply(&test_root, &blkio).await.expect("apply blkio");
+            let content = std::fs::read_to_string(throttle)
+                .expect(&format!("read {} content", CGROUP_BLKIO_THROTTLE_READ_BPS));
 
-        assert_eq!("8:0 102400", content);
+            assert_eq!("8:0 102400", content);
+        });
     }
 
     #[test]
@@ -193,19 +196,21 @@ mod tests {
         let (test_root, throttle) =
             setup("test_set_blkio_write_bps", CGROUP_BLKIO_THROTTLE_WRITE_BPS);
 
-        let blkio = BlockIoBuilder::new()
-            .with_write_bps(vec![LinuxThrottleDevice {
-                major: 8,
-                minor: 0,
-                rate: 102400,
-            }])
-            .build();
+        smol::block_on(async {
+            let blkio = BlockIoBuilder::new()
+                .with_write_bps(vec![LinuxThrottleDevice {
+                    major: 8,
+                    minor: 0,
+                    rate: 102400,
+                }])
+                .build();
 
-        Blkio::apply(&test_root, &blkio).expect("apply blkio");
-        let content = fs::read_to_string(throttle)
-            .expect(&format!("read {} content", CGROUP_BLKIO_THROTTLE_WRITE_BPS));
+            Blkio::apply(&test_root, &blkio).await.expect("apply blkio");
+            let content = std::fs::read_to_string(throttle)
+                .expect(&format!("read {} content", CGROUP_BLKIO_THROTTLE_WRITE_BPS));
 
-        assert_eq!("8:0 102400", content);
+            assert_eq!("8:0 102400", content);
+        });
     }
 
     #[test]
@@ -213,19 +218,21 @@ mod tests {
         let (test_root, throttle) =
             setup("test_set_blkio_read_iops", CGROUP_BLKIO_THROTTLE_READ_IOPS);
 
-        let blkio = BlockIoBuilder::new()
-            .with_read_iops(vec![LinuxThrottleDevice {
-                major: 8,
-                minor: 0,
-                rate: 102400,
-            }])
-            .build();
+        smol::block_on(async {
+            let blkio = BlockIoBuilder::new()
+                .with_read_iops(vec![LinuxThrottleDevice {
+                    major: 8,
+                    minor: 0,
+                    rate: 102400,
+                }])
+                .build();
 
-        Blkio::apply(&test_root, &blkio).expect("apply blkio");
-        let content = fs::read_to_string(throttle)
-            .expect(&format!("read {} content", CGROUP_BLKIO_THROTTLE_READ_IOPS));
+            Blkio::apply(&test_root, &blkio).await.expect("apply blkio");
+            let content = std::fs::read_to_string(throttle)
+                .expect(&format!("read {} content", CGROUP_BLKIO_THROTTLE_READ_IOPS));
 
-        assert_eq!("8:0 102400", content);
+            assert_eq!("8:0 102400", content);
+        });
     }
 
     #[test]
@@ -235,20 +242,22 @@ mod tests {
             CGROUP_BLKIO_THROTTLE_WRITE_IOPS,
         );
 
-        let blkio = BlockIoBuilder::new()
-            .with_write_iops(vec![LinuxThrottleDevice {
-                major: 8,
-                minor: 0,
-                rate: 102400,
-            }])
-            .build();
+        smol::block_on(async {
+            let blkio = BlockIoBuilder::new()
+                .with_write_iops(vec![LinuxThrottleDevice {
+                    major: 8,
+                    minor: 0,
+                    rate: 102400,
+                }])
+                .build();
 
-        Blkio::apply(&test_root, &blkio).expect("apply blkio");
-        let content = fs::read_to_string(throttle).expect(&format!(
-            "read {} content",
-            CGROUP_BLKIO_THROTTLE_WRITE_IOPS
-        ));
+            Blkio::apply(&test_root, &blkio).await.expect("apply blkio");
+            let content = std::fs::read_to_string(throttle).expect(&format!(
+                "read {} content",
+                CGROUP_BLKIO_THROTTLE_WRITE_IOPS
+            ));
 
-        assert_eq!("8:0 102400", content);
+            assert_eq!("8:0 102400", content);
+        });
     }
 }

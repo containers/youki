@@ -150,7 +150,7 @@ impl Memory {
     async fn set_memory(val: i64, cgroup_root: &Path) -> Result<()> {
         let path = cgroup_root.join(CGROUP_MEMORY_LIMIT);
 
-        match Self::set(val, &path) {
+        match Self::set(val, &path).await {
             Ok(_) => Ok(()),
             Err(e) => {
                 // we need to look into the raw OS error for an EBUSY status
@@ -241,6 +241,7 @@ impl Memory {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
     use crate::spec::LinuxMemory;
 
     fn set_fixture(temp_dir: &std::path::Path, filename: &str, val: &str) -> Result<()> {
@@ -266,10 +267,13 @@ mod tests {
         set_fixture(&tmp, CGROUP_MEMORY_USAGE, "0").expect("Set fixure for memory usage");
         set_fixture(&tmp, CGROUP_MEMORY_MAX_USAGE, "0").expect("Set fixure for max memory usage");
         set_fixture(&tmp, CGROUP_MEMORY_LIMIT, "0").expect("Set fixure for memory limit");
-        Memory::set_memory(limit, &tmp).expect("Set memory limit");
-        let content =
-            std::fs::read_to_string(tmp.join(CGROUP_MEMORY_LIMIT)).expect("Read to string");
-        assert_eq!(limit.to_string(), content)
+
+        smol::block_on(async {
+            Memory::set_memory(limit, &tmp).await.expect("Set memory limit");
+            let content =
+                std::fs::read_to_string(tmp.join(CGROUP_MEMORY_LIMIT)).expect("Read to string");
+            assert_eq!(limit.to_string(), content)
+        });
     }
 
     #[test]
@@ -277,10 +281,13 @@ mod tests {
         let limit = 512;
         let tmp = create_temp_dir("test_set_swap").expect("create temp directory for test");
         set_fixture(&tmp, CGROUP_MEMORY_SWAP_LIMIT, "0").expect("Set fixure for swap limit");
-        Memory::set_swap(limit, &tmp).expect("Set swap limit");
-        let content =
-            std::fs::read_to_string(tmp.join(CGROUP_MEMORY_SWAP_LIMIT)).expect("Read to string");
-        assert_eq!(limit.to_string(), content)
+
+        smol::block_on(async {
+            Memory::set_swap(limit, &tmp).await.expect("Set swap limit");
+            let content =
+                std::fs::read_to_string(tmp.join(CGROUP_MEMORY_SWAP_LIMIT)).expect("Read to string");
+            assert_eq!(limit.to_string(), content)
+        });
     }
 
     #[test]
@@ -303,16 +310,18 @@ mod tests {
                 kernel_tcp: None,
                 swappiness: None,
             };
-            Memory::apply(linux_memory, &tmp).expect("Set memory and swap");
+            smol::block_on(async {
+                Memory::apply(linux_memory, &tmp).await.expect("Set memory and swap");
 
-            let limit_content =
-                std::fs::read_to_string(tmp.join(CGROUP_MEMORY_LIMIT)).expect("Read to string");
-            assert_eq!(limit.to_string(), limit_content);
+                let limit_content =
+                    std::fs::read_to_string(tmp.join(CGROUP_MEMORY_LIMIT)).expect("Read to string");
+                assert_eq!(limit.to_string(), limit_content);
 
-            let swap_content = std::fs::read_to_string(tmp.join(CGROUP_MEMORY_SWAP_LIMIT))
-                .expect("Read to string");
-            // swap should be set to -1 also
-            assert_eq!(limit.to_string(), swap_content);
+                let swap_content = std::fs::read_to_string(tmp.join(CGROUP_MEMORY_SWAP_LIMIT))
+                    .expect("Read to string");
+                // swap should be set to -1 also
+                assert_eq!(limit.to_string(), swap_content);
+            });
         }
 
         // test setting swap and memory to arbitrary values
@@ -327,15 +336,17 @@ mod tests {
                 kernel_tcp: None,
                 swappiness: None,
             };
-            Memory::apply(linux_memory, &tmp).expect("Set memory and swap");
+            smol::block_on(async {
+                Memory::apply(linux_memory, &tmp).await.expect("Set memory and swap");
 
-            let limit_content =
-                std::fs::read_to_string(tmp.join(CGROUP_MEMORY_LIMIT)).expect("Read to string");
-            assert_eq!(limit.to_string(), limit_content);
+                let limit_content =
+                    std::fs::read_to_string(tmp.join(CGROUP_MEMORY_LIMIT)).expect("Read to string");
+                assert_eq!(limit.to_string(), limit_content);
 
-            let swap_content = std::fs::read_to_string(tmp.join(CGROUP_MEMORY_SWAP_LIMIT))
-                .expect("Read to string");
-            assert_eq!(swap.to_string(), swap_content);
+                let swap_content = std::fs::read_to_string(tmp.join(CGROUP_MEMORY_SWAP_LIMIT))
+                    .expect("Read to string");
+                assert_eq!(swap.to_string(), swap_content);
+            });
         }
     }
 }

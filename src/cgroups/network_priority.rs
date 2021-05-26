@@ -62,6 +62,7 @@ impl NetworkPriority {
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
+    use std::io::Write;
 
     use super::*;
 
@@ -86,30 +87,33 @@ mod tests {
         let tmp = create_temp_dir("test_apply_network_priorites")
             .expect("create temp directory for test");
         set_fixture(&tmp, "net_prio.ifpriomap", "").expect("set fixture for priority map");
-        let priorities = vec![
-            LinuxInterfacePriority {
-                name: "a".to_owned(),
-                priority: 1,
-            },
-            LinuxInterfacePriority {
-                name: "b".to_owned(),
-                priority: 2,
-            },
-        ];
-        let priorities_string = priorities
-            .clone()
-            .iter()
-            .map(|p| p.to_string())
-            .collect::<String>();
-        let network = LinuxNetwork {
-            class_id: None,
-            priorities,
-        };
 
-        NetworkPriority::apply(&tmp, &network).expect("apply network priorities");
+        smol::block_on(async {
+            let priorities = vec![
+                LinuxInterfacePriority {
+                    name: "a".to_owned(),
+                    priority: 1,
+                },
+                LinuxInterfacePriority {
+                    name: "b".to_owned(),
+                    priority: 2,
+                },
+            ];
+            let priorities_string = priorities
+                .clone()
+                .iter()
+                .map(|p| p.to_string())
+                .collect::<String>();
+            let network = LinuxNetwork {
+                class_id: None,
+                priorities,
+            };
 
-        let content =
-            std::fs::read_to_string(tmp.join("net_prio.ifpriomap")).expect("Read classID contents");
-        assert_eq!(priorities_string.trim(), content);
+            NetworkPriority::apply(&tmp, &network).await.expect("apply network priorities");
+
+            let content =
+                std::fs::read_to_string(tmp.join("net_prio.ifpriomap")).expect("Read classID contents");
+            assert_eq!(priorities_string.trim(), content);
+        });
     }
 }

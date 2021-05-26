@@ -86,12 +86,14 @@ mod tests {
         let tmp = create_temp_dir("test_set_pids").expect("create temp directory for test");
         set_fixture(&tmp, pids_file_name, "1000").expect("Set fixture for 1000 pids");
 
-        let pids = LinuxPids { limit: 1000 };
+        smol::block_on(async {
+            let pids = LinuxPids { limit: 1000 };
 
-        Pids::apply(&tmp, &pids).expect("apply pids");
-        let content =
-            std::fs::read_to_string(tmp.join(pids_file_name)).expect("Read pids contents");
-        assert_eq!(pids.limit.to_string(), content);
+            Pids::apply(&tmp, &pids).await.expect("apply pids");
+            let content =
+                std::fs::read_to_string(tmp.join(pids_file_name)).expect("Read pids contents");
+            assert_eq!(pids.limit.to_string(), content);
+        });
     }
 
     #[test]
@@ -100,12 +102,15 @@ mod tests {
         let tmp = create_temp_dir("test_set_pids_max").expect("create temp directory for test");
         set_fixture(&tmp, pids_file_name, "0").expect("set fixture for 0 pids");
 
-        let pids = LinuxPids { limit: 0 };
 
-        Pids::apply(&tmp, &pids).expect("apply pids");
+        smol::block_on(async {
+            let pids = LinuxPids { limit: 0 };
 
-        let content =
-            std::fs::read_to_string(tmp.join(pids_file_name)).expect("Read pids contents");
-        assert_eq!("max".to_string(), content);
+            Pids::apply(&tmp, &pids).await.expect("apply pids");
+
+            let content =
+                std::fs::read_to_string(tmp.join(pids_file_name)).expect("Read pids contents");
+            assert_eq!("max".to_string(), content);
+        });
     }
 }
