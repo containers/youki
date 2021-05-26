@@ -97,11 +97,7 @@ mod tests {
                 priority: 2,
             },
         ];
-        let priorities_string = priorities
-            .clone()
-            .iter()
-            .map(|p| p.to_string())
-            .collect::<String>();
+        let priorities_string = priorities.iter().map(|p| p.to_string()).collect::<String>();
         let network = LinuxNetwork {
             class_id: None,
             priorities,
