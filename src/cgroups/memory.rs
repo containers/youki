@@ -147,6 +147,9 @@ impl Memory {
     }
 
     fn set_memory(val: i64, cgroup_root: &Path) -> Result<()> {
+        if val == 0 {
+            return Ok(());
+        }
         let path = cgroup_root.join(CGROUP_MEMORY_LIMIT);
 
         match Self::set(val, &path) {
@@ -158,16 +161,16 @@ impl Memory {
                         Errno::EBUSY => {
                             let usage = Self::get_memory_usage(cgroup_root)?;
                             let max_usage = Self::get_memory_max_usage(cgroup_root)?;
-                            Err(anyhow!(
+                            bail!(
                                     "unable to set memory limit to {} (current usage: {}, peak usage: {})",
                                     val,
                                     usage,
                                     max_usage,
-                            ))
+                            )
                         }
-                        _ => Err(anyhow!(e)),
+                        _ => bail!(e),
                     },
-                    None => Err(anyhow!(e)),
+                    None => bail!(e),
                 }
             }
         }
@@ -225,12 +228,8 @@ impl Memory {
                 }
             }
             None => match resource.swap {
-                Some(swap) => {
-                    Self::set_memory_and_swap(0, swap, false, cgroup_root)?;
-                }
-                None => {
-                    Self::set_memory_and_swap(0, 0, false, cgroup_root)?;
-                }
+                Some(swap) => Self::set_memory_and_swap(0, swap, false, cgroup_root)?,
+                None => Self::set_memory_and_swap(0, 0, false, cgroup_root)?,
             },
         }
         Ok(())
