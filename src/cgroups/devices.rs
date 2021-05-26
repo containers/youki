@@ -54,12 +54,14 @@ impl Controller for Devices {
             Self::apply_device(&d, &cgroup_root).await?;
         }
 
-        OpenOptions::new()
+        let mut file = OpenOptions::new()
             .create(false)
             .write(true)
             .truncate(false)
-            .open(cgroup_root.join("cgroup.procs")).await?
-            .write_all(pid.to_string().as_bytes()).await?;
+            .open(cgroup_root.join("cgroup.procs")).await?;
+
+        file.write_all(pid.to_string().as_bytes()).await?;
+        file.sync_data().await?;
         Ok(())
     }
 }
@@ -72,12 +74,14 @@ impl Devices {
             cgroup_root.join("devices.deny")
         };
 
-        OpenOptions::new()
+        let mut file = OpenOptions::new()
             .create(false)
             .write(true)
             .truncate(false)
-            .open(path).await?
-            .write_all(device.to_string().as_bytes()).await?;
+            .open(path).await?;
+        
+        file.write_all(device.to_string().as_bytes()).await?;
+        file.sync_data().await?;
         Ok(())
     }
 

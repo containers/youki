@@ -31,12 +31,14 @@ impl Controller for Blkio {
             }
         }
 
-        OpenOptions::new()
+        let mut file = OpenOptions::new()
             .create(false)
             .write(true)
             .truncate(false)
-            .open(cgroup_root.join("cgroup.procs")).await?
-            .write_all(pid.to_string().as_bytes()).await?;
+            .open(cgroup_root.join("cgroup.procs")).await?;
+
+        file.write_all(pid.to_string().as_bytes()).await?;
+        file.sync_data().await?;
 
         Ok(())
     }
@@ -76,12 +78,14 @@ impl Blkio {
     }
 
     async fn write_file(file_path: &Path, data: &str) -> anyhow::Result<()> {
-        OpenOptions::new()
+        let mut file = OpenOptions::new()
             .create(false)
             .write(true)
             .truncate(false)
-            .open(file_path).await?
-            .write_all(data.as_bytes()).await?;
+            .open(file_path).await?;
+
+        file.write_all(data.as_bytes()).await?;
+        file.sync_data().await?;
 
         Ok(())
     }
@@ -154,12 +158,14 @@ mod tests {
     ) -> anyhow::Result<PathBuf> {
         let full_path = temp_dir.join(filename);
 
-        std::fs::OpenOptions::new()
+        let mut file = std::fs::OpenOptions::new()
             .create(true)
             .write(true)
             .truncate(true)
-            .open(&full_path)?
-            .write_all(val.as_bytes())?;
+            .open(&full_path)?;
+            
+        file.write_all(val.as_bytes())?;
+        file.sync_data()?;
 
         Ok(full_path)
     }

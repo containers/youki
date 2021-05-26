@@ -68,12 +68,14 @@ impl Controller for Memory {
                 Self::set(tcp_mem, &cgroup_root.join(CGROUP_KERNEL_TCP_MEMORY_LIMIT)).await?;
             }
 
-            OpenOptions::new()
+            let mut file = OpenOptions::new()
                 .create(false)
                 .write(true)
                 .truncate(false)
-                .open(cgroup_root.join("cgroup.procs")).await?
-                .write_all(pid.to_string().as_bytes()).await?;
+                .open(cgroup_root.join("cgroup.procs")).await?;
+
+            file.write_all(pid.to_string().as_bytes()).await?;
+            file.sync_all().await?;
         }
         Ok(())
     }
@@ -138,12 +140,13 @@ impl Memory {
     }
 
     async fn set<T: ToString>(val: T, path: &Path) -> std::io::Result<()> {
-        OpenOptions::new()
+        let mut file = OpenOptions::new()
             .create(false)
             .write(true)
             .truncate(true)
-            .open(path).await?
-            .write_all(val.to_string().as_bytes()).await?;
+            .open(path).await?;
+        file.write_all(val.to_string().as_bytes()).await?;
+        file.sync_all().await?;
         Ok(())
     }
 
@@ -245,12 +248,13 @@ mod tests {
     use crate::spec::LinuxMemory;
 
     fn set_fixture(temp_dir: &std::path::Path, filename: &str, val: &str) -> Result<()> {
-        std::fs::OpenOptions::new()
+        let mut file = std::fs::OpenOptions::new()
             .create(true)
             .write(true)
             .truncate(true)
-            .open(temp_dir.join(filename))?
-            .write_all(val.as_bytes())?;
+            .open(temp_dir.join(filename))?;
+        file.write_all(val.as_bytes())?;
+        file.sync_all()?;
 
         Ok(())
     }
@@ -300,17 +304,16 @@ mod tests {
         set_fixture(&tmp, CGROUP_MEMORY_SWAP_LIMIT, "0").expect("Set fixure for swap limit");
 
         // test unlimited memory with no set swap
-        {
-            let limit = -1;
-            let linux_memory = &LinuxMemory {
-                limit: Some(limit),
-                swap: None, // Some(0) gives the same outcome
-                reservation: None,
-                kernel: None,
-                kernel_tcp: None,
-                swappiness: None,
-            };
             smol::block_on(async {
+                let limit = -1;
+                let linux_memory = &LinuxMemory {
+                    limit: Some(limit),
+                    swap: None, // Some(0) gives the same outcome
+                    reservation: None,
+                    kernel: None,
+                    kernel_tcp: None,
+                    swappiness: None,
+                };
                 Memory::apply(linux_memory, &tmp).await.expect("Set memory and swap");
 
                 let limit_content =
@@ -322,10 +325,9 @@ mod tests {
                 // swap should be set to -1 also
                 assert_eq!(limit.to_string(), swap_content);
             });
-        }
 
         // test setting swap and memory to arbitrary values
-        {
+        smol::block_on(async {
             let limit = 1024 * 1024 * 1024;
             let swap = 1024;
             let linux_memory = &LinuxMemory {
@@ -347,6 +349,6 @@ mod tests {
                     .expect("Read to string");
                 assert_eq!(swap.to_string(), swap_content);
             });
-        }
+        });
     }
 }
