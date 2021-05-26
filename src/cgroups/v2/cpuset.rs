@@ -24,12 +24,12 @@ impl Controller for CpuSet {
 
 impl CpuSet {
     fn apply(path: &Path, cpuset: &LinuxCpu) -> Result<()> {
-        if cpuset.cpus.is_some() {
-            common::write_cgroup_file(&path.join(CGROUP_CPUSET_CPUS), cpuset.cpus.as_ref().unwrap())?;
+        if let Some(cpus) = &cpuset.cpus {
+            common::write_cgroup_file_truncate(&path.join(CGROUP_CPUSET_CPUS), cpus)?;
         }
 
-        if cpuset.mems.is_some() {
-            common::write_cgroup_file(&path.join(CGROUP_CPUSET_MEMS), cpuset.mems.as_ref().unwrap())?;
+        if let Some(mems) = &cpuset.mems {
+            common::write_cgroup_file_truncate(&path.join(CGROUP_CPUSET_MEMS), mems)?;
         }
 
         Ok(())
