@@ -61,8 +61,6 @@ impl Pids {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
-
     use super::*;
     use crate::spec::LinuxPids;
 
@@ -77,7 +75,7 @@ mod tests {
         Ok(())
     }
 
-    fn create_temp_dir(test_name: &str) -> Result<PathBuf> {
+    fn create_temp_dir(test_name: &str) -> Result<std::path::PathBuf> {
         std::fs::create_dir_all(std::env::temp_dir().join(test_name))?;
         Ok(std::env::temp_dir().join(test_name))
     }
@@ -85,7 +83,7 @@ mod tests {
     #[test]
     fn test_set_pids() {
         let pids_file_name = "pids.max";
-        let tmp = create_temp_dir("pids").expect("create temp directory for test");
+        let tmp = create_temp_dir("test_set_pids").expect("create temp directory for test");
         set_fixture(&tmp, pids_file_name, "1000").expect("Set fixture for 1000 pids");
 
         let pids = LinuxPids { limit: 1000 };
@@ -99,7 +97,7 @@ mod tests {
     #[test]
     fn test_set_pids_max() {
         let pids_file_name = "pids.max";
-        let tmp = create_temp_dir("pids").expect("create temp directory for test");
+        let tmp = create_temp_dir("test_set_pids_max").expect("create temp directory for test");
         set_fixture(&tmp, pids_file_name, "0").expect("set fixture for 0 pids");
 
         let pids = LinuxPids { limit: 0 };

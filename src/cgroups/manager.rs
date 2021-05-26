@@ -7,7 +7,11 @@ use procfs::process::Process;
 
 use crate::{cgroups::ControllerType, spec::LinuxResources, utils::PathBufExt};
 
-use super::{devices::Devices, hugetlb::Hugetlb, memory::Memory, pids::Pids, blkio::Blkio, Controller};
+use super::{
+    blkio::Blkio, devices::Devices, hugetlb::Hugetlb, memory::Memory,
+    network_classifier::NetworkClassifier, network_priority::NetworkPriority, pids::Pids,
+    Controller,
+};
 
 const CONTROLLERS: &[ControllerType] = &[
     ControllerType::Devices,
@@ -15,6 +19,8 @@ const CONTROLLERS: &[ControllerType] = &[
     ControllerType::Memory,
     ControllerType::Pids,
     ControllerType::Blkio,
+    ControllerType::NetworkPriority,
+    ControllerType::NetworkClassifier,
 ];
 
 pub struct Manager {
@@ -42,6 +48,8 @@ impl Manager {
                 "memory" => Memory::apply(linux_resources, &subsys.1, pid)?,
                 "pids" => Pids::apply(linux_resources, &subsys.1, pid)?,
                 "blkio" => Blkio::apply(linux_resources, &subsys.1, pid)?,
+                "net_prio" => NetworkPriority::apply(linux_resources, &subsys.1, pid)?,
+                "net_cls" => NetworkClassifier::apply(linux_resources, &subsys.1, pid)?,
                 _ => continue,
             }
         }
@@ -61,10 +69,22 @@ impl Manager {
     }
 
     fn get_subsystem_path(cgroup_path: &Path, subsystem: &str) -> anyhow::Result<PathBuf> {
+        log::debug!("Get path for subsystem: {}", subsystem);
         let mount = Process::myself()?
             .mountinfo()?
             .into_iter()
-            .find(|m| m.fs_type == "cgroup" && m.mount_point.ends_with(subsystem))
+            .find(|m| {
+                if m.fs_type == "cgroup" {
+                    // Some systems mount net_prio and net_cls in the same directory
+                    // other systems mount them in their own diretories. This
+                    // should handle both cases.
+                    if subsystem == "net_cls" || subsystem == "net_prio" {
+                        return m.mount_point.ends_with("net_cls,net_prio")
+                            || m.mount_point.ends_with("net_prio,net_cls");
+                    }
+                }
+                m.mount_point.ends_with(subsystem)
+            })
             .unwrap();
 
         let cgroup = Process::myself()?
