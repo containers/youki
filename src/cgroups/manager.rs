@@ -43,21 +43,40 @@ impl Manager {
 
     pub fn apply(&self, linux_resources: &LinuxResources, pid: Pid) -> Result<()> {
         smol::block_on(async {
-            let futures = Vec::with_capacity(7);
-            for subsys in &self.subsystems {
-                futures.push(match subsys.0.as_str() {
-                    "devices" => Devices::apply(linux_resources, &subsys.1, pid),
-                    "hugetlb" => Hugetlb::apply(linux_resources, &subsys.1, pid),
-                    "memory" => Memory::apply(linux_resources, &subsys.1, pid),
-                    "pids" => Pids::apply(linux_resources, &subsys.1, pid),
-                    "blkio" => Blkio::apply(linux_resources, &subsys.1, pid),
-                    "net_prio" => NetworkPriority::apply(linux_resources, &subsys.1, pid),
-                    "net_cls" => NetworkClassifier::apply(linux_resources, &subsys.1, pid),
-                    _ => continue,
-                });
-            }
+            // let futures = Vec::with_capacity(7);
+            // for subsys in &self.subsystems {
+            //     futures.push(match subsys.0.as_str() {
+            //         "devices" => Devices::apply(linux_resources, &subsys.1, pid),
+            //         "hugetlb" => Hugetlb::apply(linux_resources, &subsys.1, pid),
+            //         "memory" => Memory::apply(linux_resources, &subsys.1, pid),
+            //         "pids" => Pids::apply(linux_resources, &subsys.1, pid),
+            //         "blkio" => Blkio::apply(linux_resources, &subsys.1, pid),
+            //         "net_prio" => NetworkPriority::apply(linux_resources, &subsys.1, pid),
+            //         "net_cls" => NetworkClassifier::apply(linux_resources, &subsys.1, pid),
+            //         _ => continue,
+            //     });
+            // }
 
-            join_all(futures);
+            let futures = self.subsystems.iter()
+                .filter_map(|entry| {
+                    let key = entry.0.as_str();
+                    let value = entry.1;
+                    match key {
+                        "devices" => Some(Devices::apply(linux_resources, value, pid)),
+                        "hugetlb" => Some(Hugetlb::apply(linux_resources, value, pid)),
+                        "memory" => Some(Memory::apply(linux_resources, value, pid)),
+                        "pids" => Some(Pids::apply(linux_resources, value, pid)),
+                        "blkio" => Some(Blkio::apply(linux_resources, value, pid)),
+                        "net_prio" => Some(NetworkPriority::apply(linux_resources, value, pid)),
+                        "net_cls" => Some(NetworkClassifier::apply(linux_resources, value, pid)),
+                        _ => None,
+                    }
+                }).collect::<Vec<_>>();
+
+            join_all(futures).await.iter()
+                .for_each(|result| {
+                    result.as_ref().expect("Cgroup controller future returned a failure");
+                });
 
             Ok(())
         })
@@ -84,14 +103,20 @@ impl Manager {
                     // Some systems mount net_prio and net_cls in the same directory
                     // other systems mount them in their own diretories. This
                     // should handle both cases.
-                    if subsystem == "net_cls" || subsystem == "net_prio" {
+                    if subsystem == "net_cls" {
                         return m.mount_point.ends_with("net_cls,net_prio")
-                            || m.mount_point.ends_with("net_prio,net_cls");
+                            || m.mount_point.ends_with("net_prio,net_cls")
+                            || m.mount_point.ends_with("net_cls");
+                    } else if subsystem == "net_prio" {
+                        return m.mount_point.ends_with("net_cls,net_prio")
+                            || m.mount_point.ends_with("net_prio,net_cls")
+                            || m.mount_point.ends_with("net_prio");
                     }
+                    return m.mount_point.ends_with(subsystem);
                 }
-                m.mount_point.ends_with(subsystem)
+                return false;
             })
-            .unwrap();
+            .expect("Failed to find mount point for subsystem");
 
         let cgroup = Process::myself()?
             .cgroups()?

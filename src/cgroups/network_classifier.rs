@@ -59,6 +59,7 @@ impl NetworkClassifier {
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
+    use std::io::Write;
 
     use super::*;
 
@@ -84,16 +85,18 @@ mod tests {
             .expect("create temp directory for test");
         set_fixture(&tmp, "net_cls.classid", "0").expect("set fixture for classID");
 
-        let id = 0x100001;
-        let network = LinuxNetwork {
-            class_id: Some(id),
-            priorities: vec![],
-        };
+        smol::block_on(async {
+            let id = 0x100001;
+            let network = LinuxNetwork {
+                class_id: Some(id),
+                priorities: vec![],
+            };
 
-        NetworkClassifier::apply(&tmp, &network).expect("apply network classID");
+            NetworkClassifier::apply(&tmp, &network).await.expect("apply network classID");
 
-        let content =
-            std::fs::read_to_string(tmp.join("net_cls.classid")).expect("Read classID contents");
-        assert_eq!(id.to_string(), content);
+            let content =
+                std::fs::read_to_string(tmp.join("net_cls.classid")).expect("Read classID contents");
+            assert_eq!(id.to_string(), content);
+        });
     }
 }
