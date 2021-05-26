@@ -43,20 +43,6 @@ impl Manager {
 
     pub fn apply(&self, linux_resources: &LinuxResources, pid: Pid) -> Result<()> {
         smol::block_on(async {
-            // let futures = Vec::with_capacity(7);
-            // for subsys in &self.subsystems {
-            //     futures.push(match subsys.0.as_str() {
-            //         "devices" => Devices::apply(linux_resources, &subsys.1, pid),
-            //         "hugetlb" => Hugetlb::apply(linux_resources, &subsys.1, pid),
-            //         "memory" => Memory::apply(linux_resources, &subsys.1, pid),
-            //         "pids" => Pids::apply(linux_resources, &subsys.1, pid),
-            //         "blkio" => Blkio::apply(linux_resources, &subsys.1, pid),
-            //         "net_prio" => NetworkPriority::apply(linux_resources, &subsys.1, pid),
-            //         "net_cls" => NetworkClassifier::apply(linux_resources, &subsys.1, pid),
-            //         _ => continue,
-            //     });
-            // }
-
             let futures = self.subsystems.iter()
                 .filter_map(|entry| {
                     let key = entry.0.as_str();

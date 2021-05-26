@@ -24,12 +24,14 @@ impl Controller for Pids {
             Self::apply(cgroup_root, pids).await?
         }
 
-        OpenOptions::new()
+        let mut file = OpenOptions::new()
             .create(false)
             .write(true)
             .truncate(false)
-            .open(cgroup_root.join("cgroup.procs")).await?
-            .write_all(pid.to_string().as_bytes()).await?;
+            .open(cgroup_root.join("cgroup.procs")).await?;
+        
+        file.write_all(pid.to_string().as_bytes()).await?;
+        file.sync_data().await?;
         Ok(())
     }
 }
@@ -47,12 +49,14 @@ impl Pids {
     }
 
     async fn write_file(file_path: &Path, data: &str) -> Result<()> {
-        OpenOptions::new()
+        let mut file = OpenOptions::new()
             .create(false)
             .write(true)
             .truncate(true)
-            .open(file_path).await?
-            .write_all(data.as_bytes()).await?;
+            .open(file_path).await?;
+        
+        file.write_all(data.as_bytes()).await?;
+        file.sync_data().await?;
 
         Ok(())
     }
@@ -65,12 +69,14 @@ mod tests {
     use std::io::Write;
 
     fn set_fixture(temp_dir: &std::path::Path, filename: &str, val: &str) -> Result<()> {
-        std::fs::OpenOptions::new()
+        let mut file = std::fs::OpenOptions::new()
             .create(true)
             .write(true)
             .truncate(true)
-            .open(temp_dir.join(filename))?
-            .write_all(val.as_bytes())?;
+            .open(temp_dir.join(filename))?;
+
+        file.write_all(val.as_bytes())?;
+        file.sync_data()?;
 
         Ok(())
     }
