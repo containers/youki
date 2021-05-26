@@ -274,7 +274,8 @@ mod tests {
     fn pass_set_memory_if_limit_is_zero() {
         let sample_val = "1024";
         let limit = 0;
-        let tmp = create_temp_dir("test_set_memory").expect("create temp directory for test");
+        let tmp = create_temp_dir("pass_set_memory_if_limit_is_zero")
+            .expect("create temp directory for test");
         set_fixture(&tmp, CGROUP_MEMORY_LIMIT, sample_val).expect("Set fixure for memory limit");
         Memory::set_memory(limit, &tmp).expect("Set memory limit");
         let content =
