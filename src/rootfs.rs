@@ -2,7 +2,6 @@ use std::fs::OpenOptions;
 use std::fs::{canonicalize, create_dir_all, remove_file};
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 use anyhow::{bail, Result};
 use nix::errno::Errno;
@@ -17,11 +16,7 @@ use nix::unistd::{Gid, Uid};
 use crate::spec::{LinuxDevice, LinuxDeviceType, Mount, Spec};
 use crate::utils::PathBufExt;
 
-pub async fn prepare_rootfs(
-    spec: Arc<Spec>,
-    rootfs: Arc<PathBuf>,
-    bind_devices: bool,
-) -> Result<()> {
+pub fn prepare_rootfs(spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<()> {
     let mut flags = MsFlags::MS_REC;
     match spec.linux {
         Some(ref linux) => match linux.rootfs_propagation.as_ref() {
@@ -35,9 +30,9 @@ pub async fn prepare_rootfs(
     nix_mount(None::<&str>, "/", None::<&str>, flags, None::<&str>)?;
 
     log::debug!("mount root fs {:?}", rootfs);
-    nix_mount(
-        Some(rootfs.as_ref()),
-        rootfs.as_ref(),
+    nix_mount::<Path, Path, str, str>(
+        Some(&rootfs),
+        &rootfs,
         None::<&str>,
         MsFlags::MS_BIND | MsFlags::MS_REC,
         None::<&str>,
@@ -50,18 +45,18 @@ pub async fn prepare_rootfs(
             // skip
             log::warn!("A feature of cgoup is unimplemented.");
         } else if m.destination == PathBuf::from("/dev") {
-            mount_to_container(&m, rootfs.as_ref(), flags & !MsFlags::MS_RDONLY, &data, &ml)?;
+            mount_to_container(&m, rootfs, flags & !MsFlags::MS_RDONLY, &data, &ml)?;
         } else {
-            mount_to_container(&m, rootfs.as_ref(), flags, &data, &ml)?;
+            mount_to_container(&m, rootfs, flags, &data, &ml)?;
         }
     }
 
     let olddir = getcwd()?;
-    chdir(rootfs.as_ref())?;
+    chdir(rootfs)?;
 
-    setup_default_symlinks(&rootfs.as_ref())?;
+    setup_default_symlinks(rootfs)?;
     create_devices(&spec.linux.as_ref().unwrap().devices, bind_devices)?;
-    setup_ptmx(rootfs.as_ref())?;
+    setup_ptmx(rootfs)?;
 
     chdir(&olddir)?;
 
