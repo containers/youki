@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -eu
 
 root=$(pwd)
 cd integration_test/src/github.com/opencontainers/runtime-tools
