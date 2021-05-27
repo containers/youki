@@ -1,25 +1,29 @@
-use std::{fs::{self, OpenOptions}, io::Write, path::{Path, PathBuf}};
+use std::{fs::{self}, path::{Path, PathBuf}, os::unix::fs::PermissionsExt };
+
 use anyhow::{Result, anyhow};
 
 use nix::unistd::Pid;
 use oci_spec::LinuxResources;
 
-use crate::{cgroups::v2::controller::Controller, cgroups::{common::CgroupManager, v2::controller_type::ControllerType}};
+use crate::{cgroups::v2::controller::Controller, cgroups::{common::{CgroupManager, self}, v2::controller_type::ControllerType}, utils::PathBufExt};
 use super::{cpu::Cpu, cpuset::CpuSet, memory::Memory};
 
-const CGROUP2_MAGIC_NUMBER:u32  = 0x63677270;
+const CGROUP_PROCS: &str = "cgroup.procs";
 const CGROUP_CONTROLLERS: &str = "cgroup.controllers";
+const CGROUP_SUBTREE_CONTROL: &str = "cgroup.subtree_control";
 
-const ControllerTypes: &[ControllerType] = &[ControllerType::Cpu, ControllerType::CpuSet, ControllerType::Memory];
+const CONTROLLER_TYPES: &[ControllerType] = &[ControllerType::Cpu, ControllerType::CpuSet, ControllerType::Memory];
 
 pub struct Manager {
    root_path: PathBuf,
+   cgroup_path: PathBuf,
 }
 
 impl Manager {
-    pub fn new(root_path: PathBuf) -> Result<Self> {
+    pub fn new(root_path: PathBuf, cgroup_path: PathBuf) -> Result<Self> {
         Ok(Self {
             root_path,
+            cgroup_path,
         })
     }
 
@@ -30,21 +34,37 @@ impl Manager {
         Ok(())
     }
 
-    fn create_unified_cgroup(&self, cgroup_path: &Path, pid: Pid) -> Result<()> {
-        fs::create_dir_all(cgroup_path)?;
+    fn create_unified_cgroup(&self, cgroup_path: &Path, pid: Pid) -> Result<PathBuf> {
+        let full_path = self.root_path.join_absolute_path(cgroup_path)?;  
+        let controllers: Vec<String> = self.get_available_controllers(
+        common::DEFAULT_CGROUP_ROOT)?.into_iter().map(|c|format!("{}{}","+", c.to_string())).collect();
 
-        OpenOptions::new()
-        .write(true)
-        .open(cgroup_path)?
-        .write_all(pid.to_string().as_bytes())?;
+        let mut current_path = self.root_path.clone();
+        let mut components = cgroup_path.components().skip(1).peekable();
+        while let Some(component) = components.next() {
+            current_path = current_path.join(component);
+            if !current_path.exists() {
+                fs::create_dir(&current_path)?;
+                fs::metadata(&current_path)?.permissions().set_mode(0o755);
+            }
 
-        Ok(())
+            // last component cannot have subtree_control enabled due to internal process constraint
+            // if this were set, writing to the cgroups.procs file will fail with Erno 16 (device or resource busy)
+            if components.peek().is_some() {
+                for controller in &controllers {
+                    common::write_cgroup_file(&current_path.join(CGROUP_SUBTREE_CONTROL), controller)?;
+                }
+            }
+        }
+
+        common::write_cgroup_file(&full_path.join(CGROUP_PROCS), &pid.to_string())?;       
+        Ok(full_path)
     }
 
-    fn get_available_controllers(&self, cgroup_path: &Path) -> Result<Vec<ControllerType>> {
+    fn get_available_controllers<P: AsRef<Path>>(&self, cgroup_path: P) -> Result<Vec<ControllerType>> {
         let controllers_path = self.root_path.join(cgroup_path).join(CGROUP_CONTROLLERS);
-        if controllers_path.exists() {
-            return Err(anyhow!(""));
+        if !controllers_path.exists() {
+            return Err(anyhow!("cannot get available controllers. {:?} does not exist", controllers_path));
         }
         
         let mut controllers = Vec::new();
@@ -62,21 +82,17 @@ impl Manager {
 
         Ok(controllers)
     }
-
-    fn get_required_controllers(&self, cgroup_path: &Path, resources: &LinuxResources) -> Result<Vec<ControllerType>> {
-        todo!();
-    }
 }
 
 impl CgroupManager for Manager {
     fn apply(&self, linux_resources: &LinuxResources, pid: Pid) -> Result<()> {
-        self.create_unified_cgroup(&self.root_path, pid)?;
+        let cgroup_path = self.create_unified_cgroup(&self.cgroup_path, pid)?;
 
-        for controller in ControllerTypes {
+        for controller in CONTROLLER_TYPES {
             match controller {
-                &ControllerType::Cpu => Cpu::apply(linux_resources, &self.root_path)?,
-                &ControllerType::CpuSet => CpuSet::apply(linux_resources, &self.root_path)?,
-                &ControllerType::Memory => Memory::apply(linux_resources, &self.root_path)?,
+                ControllerType::Cpu => Cpu::apply(linux_resources, &self.root_path)?,
+                ControllerType::CpuSet => CpuSet::apply(linux_resources, &cgroup_path)?,
+                ControllerType::Memory => Memory::apply(linux_resources, &self.root_path)?,
                 _ => continue,
             }
         }

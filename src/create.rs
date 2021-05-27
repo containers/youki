@@ -191,7 +191,7 @@ fn create_cgroup_manager(path: &Path) -> Result<Box<dyn CgroupManager>> {
 
     let manager: Box<dyn CgroupManager> = match cgroup_version {
         common::Cgroup::V1 => Box::new(v1::manager::Manager::new(path)?),
-        common::Cgroup::V2 => Box::new(v2::manager::Manager::new(path.to_path_buf())?),
+        common::Cgroup::V2 => Box::new(v2::manager::Manager::new(PathBuf::from(common::DEFAULT_CGROUP_ROOT), path.to_path_buf())?),
     };
 
     Ok(manager)
