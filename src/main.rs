@@ -1,6 +1,6 @@
 //! # Youki
 //! Container Runtime written in Rust, inspired by [railcar](https://github.com/oracle/railcar)
-//! This crate provides a container runtime which can be used by Docker to run containers.
+//! This crate provides a container runtime which can be used by a high-level container runtime to run containers.
 
 use std::fs;
 use std::path::PathBuf;
@@ -78,7 +78,7 @@ impl SubCommand {
     }
 }
 
-/// This is the entry point in the container runtime. The binary is run by docker,
+/// This is the entry point in the container runtime. The binary is run by a high-level container runtime,
 /// with various flags passed. This parses the flags, creates and manages appropriate resources.
 fn main() -> Result<()> {
     let opts = Opts::parse();
