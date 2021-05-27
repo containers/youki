@@ -1,5 +1,5 @@
 use std::{path::Path};
-use anyhow::Result;
+use anyhow::{Result};
 
 use oci_spec::{LinuxCpu, LinuxResources};
 use crate::{cgroups::common};
@@ -13,9 +13,8 @@ pub struct CpuSet {}
 
 impl Controller for CpuSet {
     fn apply(linux_resources: &LinuxResources, cgroup_path: &Path) -> Result<()> {
-        match &linux_resources.cpu {
-            None => return Ok(()),
-            Some(cpu) => Self::apply(cgroup_path, &cpu)?,
+        if let Some(cpuset) = &linux_resources.cpu {
+            Self::apply(cgroup_path, cpuset)?;
         }
 
         Ok(())
@@ -25,11 +24,11 @@ impl Controller for CpuSet {
 impl CpuSet {
     fn apply(path: &Path, cpuset: &LinuxCpu) -> Result<()> {
         if let Some(cpus) = &cpuset.cpus {
-            common::write_cgroup_file_truncate(&path.join(CGROUP_CPUSET_CPUS), cpus)?;
+            common::write_cgroup_file(&path.join(CGROUP_CPUSET_CPUS), cpus)?;
         }
 
         if let Some(mems) = &cpuset.mems {
-            common::write_cgroup_file_truncate(&path.join(CGROUP_CPUSET_MEMS), mems)?;
+            common::write_cgroup_file(&path.join(CGROUP_CPUSET_MEMS), mems)?;
         }
 
         Ok(())

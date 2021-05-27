@@ -9,17 +9,16 @@ pub struct Memory {}
 
 impl Controller for Memory {
     fn apply(linux_resources: &LinuxResources, cgroup_path: &Path) -> Result<()> {
-        match &linux_resources.memory {
-            None => return Ok(()),
-            Some(memory) => Self::apply(cgroup_path, memory)?,
+        if let Some(memory) = &linux_resources.memory {
+            Self::apply(cgroup_path, memory)?;
         }
-
+        
         Ok(())
     }
 }
 
 impl Memory {
-    fn apply(path: &Path, memory: &LinuxMemory) -> Result<()> {
-        todo!();
+    fn apply(_: &Path, _: &LinuxMemory) -> Result<()> {
+        Ok(())
     }
 }
