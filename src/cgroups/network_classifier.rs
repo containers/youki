@@ -9,8 +9,8 @@ use nix::unistd::Pid;
 
 use crate::{
     cgroups::Controller,
-    spec::{LinuxNetwork, LinuxResources},
 };
+use oci_spec::{LinuxNetwork, LinuxResources};
 
 pub struct NetworkClassifier {}
 

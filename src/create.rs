@@ -14,7 +14,7 @@ use crate::namespaces::Namespaces;
 use crate::notify_socket::NotifyListener;
 use crate::process::{fork, Process};
 use crate::rootfs;
-use crate::spec;
+use oci_spec;
 use crate::stdio::FileDescriptor;
 use crate::tty;
 use crate::utils;
@@ -42,7 +42,7 @@ impl Create {
 
         unistd::chdir(&self.bundle)?;
 
-        let spec = spec::Spec::load("config.json")?;
+        let spec = oci_spec::Spec::load("config.json")?;
         fs::copy("config.json", container_dir.join("config.json"))?;
         log::debug!("spec: {:?}", spec);
 
@@ -93,7 +93,7 @@ fn run_container<P: AsRef<Path>>(
     pid_file: Option<P>,
     notify_socket: &mut NotifyListener,
     rootfs: PathBuf,
-    spec: spec::Spec,
+    spec: oci_spec::Spec,
     csocketfd: Option<FileDescriptor>,
     container: Container,
     command: impl Command,
@@ -151,7 +151,7 @@ fn run_container<P: AsRef<Path>>(
 }
 
 fn init_process(
-    spec: spec::Spec,
+    spec: oci_spec::Spec,
     command: impl Command,
     rootfs: PathBuf,
     namespaces: Namespaces,

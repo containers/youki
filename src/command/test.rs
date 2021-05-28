@@ -2,6 +2,7 @@ use std::{any::Any, cell::RefCell};
 
 use caps::{errors::CapsError, CapSet, CapsHashSet};
 use nix::sched::CloneFlags;
+use oci_spec::LinuxRlimit;
 
 use super::Command;
 
@@ -56,7 +57,7 @@ impl Command for TestHelperCommand {
         todo!()
     }
 
-    fn set_rlimit(&self, _rlimit: &crate::spec::LinuxRlimit) -> anyhow::Result<()> {
+    fn set_rlimit(&self, _rlimit: &LinuxRlimit) -> anyhow::Result<()> {
         todo!()
     }
 }

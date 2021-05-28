@@ -6,8 +6,8 @@ use std::{
 
 use crate::{
     cgroups::Controller,
-    spec::{LinuxBlockIo, LinuxResources},
 };
+use oci_spec::{LinuxBlockIo, LinuxResources};
 
 const CGROUP_BLKIO_THROTTLE_READ_BPS: &str = "blkio.throttle.read_bps_device";
 const CGROUP_BLKIO_THROTTLE_WRITE_BPS: &str = "blkio.throttle.write_bps_device";
@@ -91,7 +91,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use crate::spec::{LinuxBlockIo, LinuxThrottleDevice};
+    use oci_spec::{LinuxBlockIo, LinuxThrottleDevice};
 
     struct BlockIoBuilder {
         block_io: LinuxBlockIo,

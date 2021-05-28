@@ -10,28 +10,8 @@ use nix::unistd::Pid;
 use crate::{
     cgroups::Controller,
     rootfs::default_devices,
-    spec::{LinuxDeviceCgroup, LinuxDeviceType, LinuxResources},
 };
-
-impl ToString for LinuxDeviceCgroup {
-    fn to_string(&self) -> String {
-        let major = self
-            .major
-            .map(|mj| mj.to_string())
-            .unwrap_or_else(|| "*".to_string());
-        let minor = self
-            .minor
-            .map(|mi| mi.to_string())
-            .unwrap_or_else(|| "*".to_string());
-        format!(
-            "{} {}:{} {}",
-            self.typ.as_str(),
-            &major,
-            &minor,
-            &self.access
-        )
-    }
-}
+use oci_spec::{LinuxDeviceCgroup, LinuxDeviceType, LinuxResources};
 
 pub struct Devices {}
 

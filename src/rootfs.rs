@@ -14,7 +14,7 @@ use nix::sys::stat::{mknod, umask};
 use nix::unistd::{chdir, chown, close, getcwd};
 use nix::unistd::{Gid, Uid};
 
-use crate::spec::{LinuxDevice, LinuxDeviceType, Mount, Spec};
+use oci_spec::{LinuxDevice, LinuxDeviceType, Mount, Spec};
 use crate::utils::PathBufExt;
 
 pub async fn prepare_rootfs(

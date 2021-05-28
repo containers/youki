@@ -7,7 +7,7 @@ use nix::{
     unistd::{Gid, Uid},
 };
 
-use crate::spec::LinuxRlimit;
+use oci_spec::LinuxRlimit;
 
 pub trait Command {
     fn as_any(&self) -> &dyn Any;

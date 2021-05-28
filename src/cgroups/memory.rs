@@ -9,8 +9,8 @@ use nix::{errno::Errno, unistd::Pid};
 
 use crate::{
     cgroups::Controller,
-    spec::{LinuxMemory, LinuxResources},
 };
+use oci_spec::{LinuxMemory, LinuxResources};
 
 const CGROUP_MEMORY_SWAP_LIMIT: &str = "memory.memsw.limit_in_bytes";
 const CGROUP_MEMORY_LIMIT: &str = "memory.limit_in_bytes";
@@ -240,7 +240,7 @@ impl Memory {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::spec::LinuxMemory;
+    use oci_spec::LinuxMemory;
 
     fn set_fixture(temp_dir: &std::path::Path, filename: &str, val: &str) -> Result<()> {
         std::fs::OpenOptions::new()

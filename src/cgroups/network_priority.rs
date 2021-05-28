@@ -7,16 +7,8 @@ use std::{
 use anyhow::Result;
 use nix::unistd::Pid;
 
-use crate::{
-    cgroups::Controller,
-    spec::{LinuxInterfacePriority, LinuxNetwork, LinuxResources},
-};
-
-impl ToString for LinuxInterfacePriority {
-    fn to_string(&self) -> String {
-        format!("{} {}\n", self.name, self.priority)
-    }
-}
+use crate::cgroups::Controller;
+use oci_spec::{LinuxNetwork, LinuxResources};
 
 pub struct NetworkPriority {}
 
@@ -65,6 +57,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
+    use oci_spec::LinuxInterfacePriority;
 
     fn set_fixture(temp_dir: &std::path::Path, filename: &str, val: &str) -> Result<()> {
         std::fs::OpenOptions::new()

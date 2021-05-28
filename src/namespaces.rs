@@ -8,8 +8,8 @@ use nix::{
 
 use crate::{
     command::{linux::LinuxCommand, test::TestHelperCommand, Command},
-    spec::{LinuxNamespace, LinuxNamespaceType},
 };
+use oci_spec::{LinuxNamespace, LinuxNamespaceType};
 
 pub struct Namespaces {
     spaces: Vec<LinuxNamespace>,

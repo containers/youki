@@ -323,6 +323,26 @@ pub struct LinuxDeviceCgroup {
     pub access: String,
 }
 
+impl ToString for LinuxDeviceCgroup {
+    fn to_string(&self) -> String {
+        let major = self
+            .major
+            .map(|mj| mj.to_string())
+            .unwrap_or_else(|| "*".to_string());
+        let minor = self
+            .minor
+            .map(|mi| mi.to_string())
+            .unwrap_or_else(|| "*".to_string());
+        format!(
+            "{} {}:{} {}",
+            self.typ.as_str(),
+            &major,
+            &minor,
+            &self.access
+        )
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LinuxMemory {
     pub limit: Option<i64>,
@@ -407,6 +427,12 @@ pub struct LinuxInterfacePriority {
     pub name: String,
     #[serde(default)]
     pub priority: u32,
+}
+
+impl ToString for LinuxInterfacePriority {
+    fn to_string(&self) -> String {
+        format!("{} {}\n", self.name, self.priority)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
