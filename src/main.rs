@@ -12,7 +12,6 @@ use nix::sys::signal as nix_signal;
 use youki::container::{Container, ContainerStatus};
 use youki::create;
 use youki::signal;
-use youki::spec;
 use youki::start;
 use youki::{cgroups::Manager, command::linux::LinuxCommand};
 
@@ -142,10 +141,12 @@ fn main() -> Result<()> {
                 if container.root.exists() {
                     // remove the directory storing container state
                     fs::remove_dir_all(&container.root)?;
-                    let spec = spec::Spec::load("config.json")?;
+                  
+                    let spec = oci_spec::Spec::load("config.json")?;
                     // remove the cgroup created for the container
                     // check https://man7.org/linux/man-pages/man7/cgroups.7.html
                     // creating and removing cgroups section for more information on cgroups
+                  
                     let cmanager = Manager::new(spec.linux.unwrap().cgroups_path)?;
                     cmanager.remove()?;
                 }

@@ -5,8 +5,8 @@ use anyhow::Result;
 use nix::unistd::Pid;
 use procfs::process::Process;
 
-use crate::{cgroups::ControllerType, spec::LinuxResources, utils::PathBufExt};
-
+use crate::{cgroups::ControllerType,  utils::PathBufExt};
+use oci_spec::LinuxResources;
 use super::{
     blkio::Blkio, devices::Devices, hugetlb::Hugetlb, memory::Memory,
     network_classifier::NetworkClassifier, network_priority::NetworkPriority, pids::Pids,

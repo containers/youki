@@ -9,8 +9,8 @@ use regex::Regex;
 
 use crate::{
     cgroups::Controller,
-    spec::{LinuxHugepageLimit, LinuxResources},
 };
+use oci_spec::{LinuxHugepageLimit, LinuxResources};
 
 pub struct Hugetlb {}
 
@@ -79,7 +79,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use crate::spec::LinuxHugepageLimit;
+    use oci_spec::LinuxHugepageLimit;
 
     fn set_fixture(temp_dir: &std::path::Path, filename: &str, val: &str) -> anyhow::Result<()> {
         std::fs::OpenOptions::new()

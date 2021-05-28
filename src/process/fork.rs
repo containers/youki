@@ -15,14 +15,14 @@ use nix::unistd;
 use crate::cgroups::Manager;
 use crate::container::ContainerStatus;
 use crate::process::{child, init, parent, Process};
-use crate::spec;
+use oci_spec;
 use crate::utils;
 use crate::{cond::Cond, container::Container};
 
 pub fn fork_first<P: AsRef<Path>>(
     pid_file: Option<P>,
     is_userns: bool,
-    linux: &spec::Linux,
+    linux: &oci_spec::Linux,
     container: &Container,
     cmanager: &Manager,
 ) -> Result<Process> {

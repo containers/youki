@@ -1,10 +1,10 @@
 use crate::{
     command::Command,
-    spec::{LinuxCapabilities, LinuxCapabilityType},
 };
 use caps::*;
 
 use anyhow::Result;
+use oci_spec::{LinuxCapabilities, LinuxCapabilityType};
 
 fn to_set(caps: &[LinuxCapabilityType]) -> CapsHashSet {
     let mut capabilities = CapsHashSet::new();

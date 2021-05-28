@@ -8,8 +8,8 @@ use anyhow::Result;
 
 use crate::{
     cgroups::Controller,
-    spec::{LinuxPids, LinuxResources},
 };
+use oci_spec::{LinuxPids, LinuxResources};
 
 pub struct Pids {}
 
@@ -62,7 +62,7 @@ impl Pids {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::spec::LinuxPids;
+    use oci_spec::LinuxPids;
 
     fn set_fixture(temp_dir: &std::path::Path, filename: &str, val: &str) -> Result<()> {
         std::fs::OpenOptions::new()

@@ -17,6 +17,8 @@ use nix::{
 };
 use nix::{sched::unshare, sys::stat::Mode};
 
+use oci_spec::LinuxRlimit;
+
 use super::Command;
 use crate::capabilities;
 
@@ -75,7 +77,7 @@ impl Command for LinuxCommand {
         Ok(())
     }
 
-    fn set_rlimit(&self, rlimit: &crate::spec::LinuxRlimit) -> Result<()> {
+    fn set_rlimit(&self, rlimit: &LinuxRlimit) -> Result<()> {
         let rlim = &libc::rlimit {
             rlim_cur: rlimit.soft,
             rlim_max: rlimit.hard,
