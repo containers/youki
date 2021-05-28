@@ -74,15 +74,45 @@ impl Cpu {
 
 #[cfg(test)]
 mod tests {
-    use std::{env::temp_dir, path::PathBuf};
+    use super::Cpu;
+    use crate::{
+        cgroups::Controller,
+        spec::{LinuxCpu, LinuxResources},
+    };
+    use std::{env::temp_dir, error::Error, path::PathBuf};
 
-    use super::*;
+    type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
-    fn create_temp_dir(test_name: &str) -> Result<PathBuf> {
+    fn create_temp_dir(test_name: &str) -> self::Result<PathBuf> {
         std::fs::create_dir_all(temp_dir().join(test_name))?;
         Ok(temp_dir().join(test_name))
     }
 
     #[test]
-    fn test_cpu_apply() {}
+    fn test_cpu_apply_cpu() {
+        let test_root =
+            create_temp_dir("test_cpu_apply").expect("Failed to create test temporary directory.");
+
+        Cpu::apply_cpu(
+            &LinuxCpu {
+                shares: None,
+                quota: None,
+                period: None,
+                realtime_runtime: None,
+                realtime_period: None,
+                cpus: "0-4".into(),
+                mems: "0".into(),
+            },
+            &test_root,
+        )
+        .expect("Failed to apply the CPU cgroup settings");
+
+        let content = std::fs::read_to_string(&test_root)
+            .unwrap_or_else(|e| panic!("Failed to read from {:?}: {}", &test_root.as_os_str(), e));
+
+        assert_eq!(content, "");
+    }
+
+    #[test]
+    fn test_cpu_apply_scheduler() {}
 }
