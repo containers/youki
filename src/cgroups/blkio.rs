@@ -140,7 +140,7 @@ mod tests {
     fn setup(testname: &str, throttle_type: &str) -> (PathBuf, PathBuf) {
         let tmp = create_temp_dir(testname).expect("create temp directory for test");
         let throttle_file = set_fixture(&tmp, throttle_type, "")
-            .expect(&format!("set fixture for {}", throttle_type));
+            .unwrap_or_else(|_| panic!("set fixture for {}", throttle_type));
 
         (tmp, throttle_file)
     }
@@ -182,7 +182,7 @@ mod tests {
 
         Blkio::apply(&test_root, &blkio).expect("apply blkio");
         let content = fs::read_to_string(throttle)
-            .expect(&format!("read {} content", CGROUP_BLKIO_THROTTLE_READ_BPS));
+            .unwrap_or_else(|_| panic!("read {} content", CGROUP_BLKIO_THROTTLE_READ_BPS));
 
         assert_eq!("8:0 102400", content);
     }
@@ -202,7 +202,7 @@ mod tests {
 
         Blkio::apply(&test_root, &blkio).expect("apply blkio");
         let content = fs::read_to_string(throttle)
-            .expect(&format!("read {} content", CGROUP_BLKIO_THROTTLE_WRITE_BPS));
+            .unwrap_or_else(|_| panic!("read {} content", CGROUP_BLKIO_THROTTLE_WRITE_BPS));
 
         assert_eq!("8:0 102400", content);
     }
@@ -222,7 +222,7 @@ mod tests {
 
         Blkio::apply(&test_root, &blkio).expect("apply blkio");
         let content = fs::read_to_string(throttle)
-            .expect(&format!("read {} content", CGROUP_BLKIO_THROTTLE_READ_IOPS));
+            .unwrap_or_else(|_| panic!("read {} content", CGROUP_BLKIO_THROTTLE_READ_IOPS));
 
         assert_eq!("8:0 102400", content);
     }
@@ -243,10 +243,8 @@ mod tests {
             .build();
 
         Blkio::apply(&test_root, &blkio).expect("apply blkio");
-        let content = fs::read_to_string(throttle).expect(&format!(
-            "read {} content",
-            CGROUP_BLKIO_THROTTLE_WRITE_IOPS
-        ));
+        let content = fs::read_to_string(throttle)
+            .unwrap_or_else(|_| panic!("read {} content", CGROUP_BLKIO_THROTTLE_WRITE_IOPS));
 
         assert_eq!("8:0 102400", content);
     }

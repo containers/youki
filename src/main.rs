@@ -1,3 +1,7 @@
+//! # Youki
+//! Container Runtime written in Rust, inspired by [railcar](https://github.com/oracle/railcar)
+//! This crate provides a container runtime which can be used by a high-level container runtime to run containers.
+
 use std::fs;
 use std::path::PathBuf;
 
@@ -11,15 +15,20 @@ use youki::signal;
 use youki::start;
 use youki::{cgroups::Manager, command::linux::LinuxCommand};
 
+/// High-level commandline option definition
+/// This takes global options as well as individual commands as specified in [OCI runtime-spec](https://github.com/opencontainers/runtime-spec/blob/master/runtime.md)
+/// Also check [runc commandline documentation](https://github.com/opencontainers/runc/blob/master/man/runc.8.md) for more explanation
 #[derive(Clap, Debug)]
 #[clap(version = "1.0", author = "utam0k <k0ma@utam0k.jp>")]
 struct Opts {
+    /// root directory to store container state
     #[clap(short, long, default_value = "/run/youki")]
     root: PathBuf,
     #[clap(short, long)]
     log: Option<PathBuf>,
     #[clap(long)]
     log_format: Option<String>,
+    /// command to actually manage container
     #[clap(subcommand)]
     subcmd: SubCommand,
 }
@@ -39,6 +48,9 @@ pub struct Delete {
 pub struct StateArgs {
     pub container_id: String,
 }
+
+/// Subcommands accepted by Youki, confirming with [OCI runtime-spec](https://github.com/opencontainers/runtime-spec/blob/master/runtime.md)
+/// Also for a short information, check [runc commandline documentation](https://github.com/opencontainers/runc/blob/master/man/runc.8.md)
 #[derive(Clap, Debug)]
 enum SubCommand {
     #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
@@ -65,6 +77,8 @@ impl SubCommand {
     }
 }
 
+/// This is the entry point in the container runtime. The binary is run by a high-level container runtime,
+/// with various flags passed. This parses the flags, creates and manages appropriate resources.
 fn main() -> Result<()> {
     let opts = Opts::parse();
 
@@ -87,11 +101,17 @@ fn main() -> Result<()> {
         SubCommand::Create(create) => create.exec(root_path, LinuxCommand),
         SubCommand::Start(start) => start.exec(root_path),
         SubCommand::Kill(kill) => {
+            // resolves relative paths, symbolic links etc. and get complete path
             let root_path = fs::canonicalize(root_path)?;
+            // state of container is stored in a directory named as container id inside
+            // root directory given in commandline options
             let container_root = root_path.join(&kill.container_id);
             if !container_root.exists() {
                 bail!("{} doesn't exists.", kill.container_id)
             }
+
+            // load container state from json file, and check status of the container
+            // it might be possible that kill is invoked on a already stopped container etc.
             let container = Container::load(container_root)?.refresh_status()?;
             if container.can_kill() {
                 let sig = signal::from_str(kill.signal.as_str())?;
@@ -108,15 +128,25 @@ fn main() -> Result<()> {
             }
         }
         SubCommand::Delete(delete) => {
+            // state of container is stored in a directory named as container id inside
+            // root directory given in commandline options
             let container_root = root_path.join(&delete.container_id);
             if !container_root.exists() {
                 bail!("{} doesn't exists.", delete.container_id)
             }
+            // load container state from json file, and check status of the container
+            // it might be possible that delete is invoked on a running container.
             let container = Container::load(container_root)?.refresh_status()?;
             if container.can_delete() {
                 if container.root.exists() {
+                    // remove the directory storing container state
                     fs::remove_dir_all(&container.root)?;
+                  
                     let spec = oci_spec::Spec::load("config.json")?;
+                    // remove the cgroup created for the container
+                    // check https://man7.org/linux/man-pages/man7/cgroups.7.html
+                    // creating and removing cgroups section for more information on cgroups
+                  
                     let cmanager = Manager::new(spec.linux.unwrap().cgroups_path)?;
                     cmanager.remove()?;
                 }
