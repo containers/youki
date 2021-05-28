@@ -1017,6 +1017,7 @@ dependencies = [
  "log",
  "mio",
  "nix 0.19.1",
+ "oci_spec",
  "once_cell",
  "prctl",
  "procfs",

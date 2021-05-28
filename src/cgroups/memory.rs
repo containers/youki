@@ -162,7 +162,7 @@ impl Memory {
                         Errno::EBUSY => {
                             let usage = Self::get_memory_usage(cgroup_root).await?;
                             let max_usage = Self::get_memory_max_usage(cgroup_root).await?;
-                            Err(anyhow!(
+                            bail!(
                                     "unable to set memory limit to {} (current usage: {}, peak usage: {})",
                                     val,
                                     usage,
@@ -245,7 +245,7 @@ impl Memory {
 mod tests {
     use super::*;
     use std::io::Write;
-    use crate::spec::LinuxMemory;
+    use oci_spec::LinuxMemory;
 
     fn set_fixture(temp_dir: &std::path::Path, filename: &str, val: &str) -> Result<()> {
         let mut file = std::fs::OpenOptions::new()
