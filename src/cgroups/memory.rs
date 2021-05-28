@@ -1,11 +1,11 @@
-use std::io::{prelude::*, Write};
 use std::{
-    fs::{create_dir_all, OpenOptions},
     path::Path,
 };
 
 use anyhow::{Result, *};
+use async_trait::async_trait;
 use nix::{errno::Errno, unistd::Pid};
+use smol::{fs::{OpenOptions, create_dir_all}, io::{AsyncReadExt, AsyncWriteExt}};
 
 use crate::{
     cgroups::Controller,
@@ -25,29 +25,30 @@ const CGROUP_KERNEL_TCP_MEMORY_LIMIT: &str = "memory.kmem.tcp.limit_in_bytes";
 
 pub struct Memory {}
 
+#[async_trait]
 impl Controller for Memory {
-    fn apply(linux_resources: &LinuxResources, cgroup_root: &Path, pid: Pid) -> Result<()> {
+    async fn apply(linux_resources: &LinuxResources, cgroup_root: &Path, pid: Pid) -> Result<()> {
         log::debug!("Apply Memory cgroup config");
-        create_dir_all(&cgroup_root)?;
+        create_dir_all(&cgroup_root).await?;
 
         if let Some(memory) = &linux_resources.memory {
             let reservation = memory.reservation.unwrap_or(0);
 
-            Self::apply(&memory, cgroup_root)?;
+            Self::apply(&memory, cgroup_root).await?;
 
             if reservation != 0 {
-                Self::set(reservation, &cgroup_root.join(CGROUP_MEMORY_RESERVATION))?;
+                Self::set(reservation, &cgroup_root.join(CGROUP_MEMORY_RESERVATION)).await?;
             }
 
             if linux_resources.disable_oom_killer {
-                Self::set(0, &cgroup_root.join(CGROUP_MEMORY_OOM_CONTROL))?;
+                Self::set(0 as i64, &cgroup_root.join(CGROUP_MEMORY_OOM_CONTROL)).await?;
             } else {
-                Self::set(1, &cgroup_root.join(CGROUP_MEMORY_OOM_CONTROL))?;
+                Self::set(1 as i64, &cgroup_root.join(CGROUP_MEMORY_OOM_CONTROL)).await?;
             }
 
             if let Some(swappiness) = memory.swappiness {
                 if swappiness <= 100 {
-                    Self::set(swappiness, &cgroup_root.join(CGROUP_MEMORY_SWAPPINESS))?;
+                    Self::set(swappiness, &cgroup_root.join(CGROUP_MEMORY_SWAPPINESS)).await?;
                 } else {
                     // invalid swappiness value
                     return Err(anyhow!(
@@ -61,10 +62,10 @@ impl Controller for Memory {
             // neither are implemented by runc. Tests pass without this, but
             // kept in per the spec.
             if let Some(kmem) = memory.kernel {
-                Self::set(kmem, &cgroup_root.join(CGROUP_KERNEL_MEMORY_LIMIT))?;
+                Self::set(kmem, &cgroup_root.join(CGROUP_KERNEL_MEMORY_LIMIT)).await?;
             }
             if let Some(tcp_mem) = memory.kernel_tcp {
-                Self::set(tcp_mem, &cgroup_root.join(CGROUP_KERNEL_TCP_MEMORY_LIMIT))?;
+                Self::set(tcp_mem, &cgroup_root.join(CGROUP_KERNEL_TCP_MEMORY_LIMIT)).await?;
             }
 
             let mut file = OpenOptions::new()
@@ -81,14 +82,14 @@ impl Controller for Memory {
 }
 
 impl Memory {
-    fn get_memory_usage(cgroup_root: &Path) -> Result<u64> {
+    async fn get_memory_usage(cgroup_root: &Path) -> Result<u64> {
         let path = cgroup_root.join(CGROUP_MEMORY_USAGE);
         let mut contents = String::new();
         OpenOptions::new()
             .create(false)
             .read(true)
-            .open(path)?
-            .read_to_string(&mut contents)?;
+            .open(path).await?
+            .read_to_string(&mut contents).await?;
 
         contents = contents.trim().to_string();
 
@@ -100,14 +101,14 @@ impl Memory {
         Ok(val)
     }
 
-    fn get_memory_max_usage(cgroup_root: &Path) -> Result<u64> {
+    async fn get_memory_max_usage(cgroup_root: &Path) -> Result<u64> {
         let path = cgroup_root.join(CGROUP_MEMORY_MAX_USAGE);
         let mut contents = String::new();
         OpenOptions::new()
             .create(false)
             .read(true)
-            .open(path)?
-            .read_to_string(&mut contents)?;
+            .open(path).await?
+            .read_to_string(&mut contents).await?;
 
         contents = contents.trim().to_string();
 
@@ -119,14 +120,14 @@ impl Memory {
         Ok(val)
     }
 
-    fn get_memory_limit(cgroup_root: &Path) -> Result<i64> {
+    async fn get_memory_limit(cgroup_root: &Path) -> Result<i64> {
         let path = cgroup_root.join(CGROUP_MEMORY_LIMIT);
         let mut contents = String::new();
         OpenOptions::new()
             .create(false)
             .read(true)
-            .open(path)?
-            .read_to_string(&mut contents)?;
+            .open(path).await?
+            .read_to_string(&mut contents).await?;
 
         contents = contents.trim().to_string();
 
@@ -149,10 +150,7 @@ impl Memory {
         Ok(())
     }
 
-    fn set_memory(val: i64, cgroup_root: &Path) -> Result<()> {
-        if val == 0 {
-            return Ok(());
-        }
+    async fn set_memory(val: i64, cgroup_root: &Path) -> Result<()> {
         let path = cgroup_root.join(CGROUP_MEMORY_LIMIT);
 
         match Self::set(val, &path).await {
@@ -162,9 +160,9 @@ impl Memory {
                 match e.raw_os_error() {
                     Some(code) => match Errno::from_i32(code) {
                         Errno::EBUSY => {
-                            let usage = Self::get_memory_usage(cgroup_root)?;
-                            let max_usage = Self::get_memory_max_usage(cgroup_root)?;
-                            bail!(
+                            let usage = Self::get_memory_usage(cgroup_root).await?;
+                            let max_usage = Self::get_memory_max_usage(cgroup_root).await?;
+                            Err(anyhow!(
                                     "unable to set memory limit to {} (current usage: {}, peak usage: {})",
                                     val,
                                     usage,
@@ -179,19 +177,19 @@ impl Memory {
         }
     }
 
-    fn set_swap(val: i64, cgroup_root: &Path) -> Result<()> {
+    async fn set_swap(val: i64, cgroup_root: &Path) -> Result<()> {
         if val == 0 {
             return Ok(());
         }
 
         let path = cgroup_root.join(CGROUP_MEMORY_SWAP_LIMIT);
 
-        Self::set(val, &path)?;
+        Self::set(val, &path).await?;
 
         Ok(())
     }
 
-    fn set_memory_and_swap(
+    async fn set_memory_and_swap(
         limit: i64,
         swap: i64,
         is_updated: bool,
@@ -203,36 +201,40 @@ impl Memory {
         // see:
         // https://github.com/opencontainers/runc/blob/3f6594675675d4e88901c782462f56497260b1d2/libcontainer/cgroups/fs/memory.go#L89
         if is_updated {
-            Self::set_swap(swap, cgroup_root)?;
-            Self::set_memory(limit, cgroup_root)?;
+            Self::set_swap(swap, cgroup_root).await?;
+            Self::set_memory(limit, cgroup_root).await?;
         }
-        Self::set_memory(limit, cgroup_root)?;
-        Self::set_swap(swap, cgroup_root)?;
+        Self::set_memory(limit, cgroup_root).await?;
+        Self::set_swap(swap, cgroup_root).await?;
         Ok(())
     }
 
-    fn apply(resource: &LinuxMemory, cgroup_root: &Path) -> Result<()> {
+    async fn apply(resource: &LinuxMemory, cgroup_root: &Path) -> Result<()> {
         match resource.limit {
             Some(limit) => {
-                let current_limit = Self::get_memory_limit(cgroup_root)?;
+                let current_limit = Self::get_memory_limit(cgroup_root).await?;
                 match resource.swap {
                     Some(swap) => {
                         let is_updated = swap == -1 || current_limit < swap;
-                        Self::set_memory_and_swap(limit, swap, is_updated, cgroup_root)?;
+                        Self::set_memory_and_swap(limit, swap, is_updated, cgroup_root).await?;
                     }
                     None => {
                         if limit == -1 {
-                            Self::set_memory_and_swap(limit, -1, true, cgroup_root)?;
+                            Self::set_memory_and_swap(limit, -1, true, cgroup_root).await?;
                         } else {
                             let is_updated = current_limit < 0;
-                            Self::set_memory_and_swap(limit, 0, is_updated, cgroup_root)?;
+                            Self::set_memory_and_swap(limit, 0, is_updated, cgroup_root).await?;
                         }
                     }
                 }
             }
             None => match resource.swap {
-                Some(swap) => Self::set_memory_and_swap(0, swap, false, cgroup_root)?,
-                None => Self::set_memory_and_swap(0, 0, false, cgroup_root)?,
+                Some(swap) => {
+                    Self::set_memory_and_swap(0, swap, false, cgroup_root).await?;
+                }
+                None => {
+                    Self::set_memory_and_swap(0, 0, false, cgroup_root).await?;
+                }
             },
         }
         Ok(())
@@ -242,8 +244,8 @@ impl Memory {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use oci_spec::LinuxMemory;
     use std::io::Write;
+    use crate::spec::LinuxMemory;
 
     fn set_fixture(temp_dir: &std::path::Path, filename: &str, val: &str) -> Result<()> {
         let mut file = std::fs::OpenOptions::new()
@@ -276,19 +278,6 @@ mod tests {
                 std::fs::read_to_string(tmp.join(CGROUP_MEMORY_LIMIT)).expect("Read to string");
             assert_eq!(limit.to_string(), content)
         });
-    }
-
-    #[test]
-    fn pass_set_memory_if_limit_is_zero() {
-        let sample_val = "1024";
-        let limit = 0;
-        let tmp = create_temp_dir("pass_set_memory_if_limit_is_zero")
-            .expect("create temp directory for test");
-        set_fixture(&tmp, CGROUP_MEMORY_LIMIT, sample_val).expect("Set fixure for memory limit");
-        Memory::set_memory(limit, &tmp).expect("Set memory limit");
-        let content =
-            std::fs::read_to_string(tmp.join(CGROUP_MEMORY_LIMIT)).expect("Read to string");
-        assert_eq!(content, sample_val)
     }
 
     #[test]

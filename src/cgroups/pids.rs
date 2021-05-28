@@ -65,7 +65,7 @@ impl Pids {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use oci_spec::LinuxPids;
+    use crate::spec::LinuxPids;
     use std::io::Write;
 
     fn set_fixture(temp_dir: &std::path::Path, filename: &str, val: &str) -> Result<()> {

@@ -96,7 +96,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use oci_spec::{LinuxBlockIo, LinuxThrottleDevice};
+    use crate::spec::{LinuxBlockIo, LinuxThrottleDevice};
     use std::io::Write;
 
     struct BlockIoBuilder {

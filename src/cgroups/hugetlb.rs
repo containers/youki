@@ -82,7 +82,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use oci_spec::LinuxHugepageLimit;
+    use crate::spec::LinuxHugepageLimit;
     use std::io::Write;
 
     fn set_fixture(temp_dir: &std::path::Path, filename: &str, val: &str) -> anyhow::Result<()> {
