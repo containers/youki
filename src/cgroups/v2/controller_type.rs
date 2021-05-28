@@ -1,7 +1,7 @@
 pub enum ControllerType {
     Cpu,
     CpuSet,
-    IO,
+    Io,
     Memory,
     HugeTlb,
     Pids,
@@ -12,7 +12,7 @@ impl ToString for ControllerType {
         match self {
             Self::Cpu => "cpu".into(),
             Self::CpuSet => "cpuset".into(),
-            Self::IO => "io".into(),
+            Self::Io => "io".into(),
             Self::Memory => "memory".into(),
             Self::HugeTlb => "hugetlb".into(),
             Self::Pids => "pids".into(),

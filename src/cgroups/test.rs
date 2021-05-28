@@ -3,7 +3,7 @@
 use std::{io::Write, path::{Path, PathBuf}};
 use anyhow::Result;
 
-use crate::spec::LinuxCpu;
+use oci_spec::LinuxCpu;
 
 
 pub fn set_fixture(temp_dir: &Path, filename: &str, val: &str) -> Result<PathBuf> {
