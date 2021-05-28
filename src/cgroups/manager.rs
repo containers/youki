@@ -6,7 +6,7 @@ use nix::unistd::Pid;
 use procfs::process::Process;
 
 use super::{
-    blkio::Blkio, devices::Devices, hugetlb::Hugetlb, memory::Memory,
+    blkio::Blkio, cpu::Cpu, devices::Devices, hugetlb::Hugetlb, memory::Memory,
     network_classifier::NetworkClassifier, network_priority::NetworkPriority, pids::Pids,
     Controller,
 };
