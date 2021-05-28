@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::PathBuf};
 use std::{fs::remove_dir, path::Path};
-use futures::future::join_all;
+use futures::future::try_join_all;
 
 use anyhow::Result;
 use nix::unistd::Pid;
@@ -43,7 +43,7 @@ impl Manager {
 
     pub fn apply(&self, linux_resources: &LinuxResources, pid: Pid) -> Result<()> {
         smol::block_on(async {
-            let futures = self.subsystems.iter()
+            try_join_all(self.subsystems.iter()
                 .filter_map(|entry| {
                     let key = entry.0.as_str();
                     let value = entry.1;
@@ -57,12 +57,8 @@ impl Manager {
                         "net_cls" => Some(NetworkClassifier::apply(linux_resources, value, pid)),
                         _ => None,
                     }
-                }).collect::<Vec<_>>();
-
-            join_all(futures).await.iter()
-                .for_each(|result| {
-                    result.as_ref().expect("Cgroup controller future returned a failure");
-                });
+                }).collect::<Vec<_>>()
+            ).await?;
 
             Ok(())
         })
