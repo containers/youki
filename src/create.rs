@@ -157,21 +157,19 @@ fn init_process(
     namespaces: Namespaces,
 ) -> Result<()> {
     let proc = spec.process.clone();
-    let clone_spec = std::sync::Arc::new(spec);
-    let clone_rootfs = std::sync::Arc::new(rootfs.clone());
 
-    command.set_hostname(&clone_spec.hostname.as_str())?;
-    if clone_spec.process.no_new_privileges {
+    command.set_hostname(&spec.hostname.as_str())?;
+    if spec.process.no_new_privileges {
         let _ = prctl::set_no_new_privileges(true);
     }
 
-    futures::executor::block_on(rootfs::prepare_rootfs(
-        clone_spec,
-        clone_rootfs,
+    rootfs::prepare_rootfs(
+        &spec,
+        &rootfs,
         namespaces
             .clone_flags
             .contains(sched::CloneFlags::CLONE_NEWUSER),
-    ))?;
+    )?;
 
     command.pivot_rootfs(&rootfs)?;
 
