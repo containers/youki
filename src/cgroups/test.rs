@@ -68,6 +68,16 @@ impl LinuxCpuBuilder {
         self
     }
 
+    pub fn with_cpus(mut self, cpus: String) -> Self {
+        self.resource.cpus = Some(cpus);
+        self
+    }
+
+    pub fn with_mems(mut self, mems: String) -> Self {
+        self.resource.mems = Some(mems);
+        self
+    }
+
     pub fn build(self) -> LinuxCpu {
         self.resource
     }
