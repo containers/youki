@@ -57,8 +57,12 @@ $ docker run -it --rm --runtime youki busybox
 
 ### Integration test
 
-You can use [opencontainers/runtime-rools](https://github.com/opencontainers/runtime-tools) to do integration testing used in CI.
-See it's documentation for details.
+Go and node-tap are required to run integration test. See the [opencontainers/runtime-tools]((https://github.com/opencontainers/runtime-tools) README for details.
+
+```
+$ git submodule update --init --recursive
+$ ./integration_test.sh
+```
 
 # Design and implementation of youki
 

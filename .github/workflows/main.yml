@@ -24,6 +24,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+        with:
+          submodules: recursive
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
@@ -33,22 +35,5 @@ jobs:
       - uses: actions/setup-go@v2
         with:
           go-version: "1.11.0"
-      - name: Build runtime-tools
-        run: |
-          mkdir -p $(go env GOPATH)/src/github.com/opencontainers
-          cd $(go env GOPATH)/src/github.com/opencontainers
-          git clone https://github.com/opencontainers/runtime-tools
-          cd runtime-tools
-          make runtimetest validation-executables
       - name: Run intetgration tests
-        run: |
-          expect_err_num=8
-          act_err_num=0
-          cd $(go env GOPATH)/src/github.com/opencontainers/runtime-tools
-          test_cases=("default/default.t" "linux_cgroups_devices/linux_cgroups_devices.t" "linux_cgroups_hugetlb/linux_cgroups_hugetlb.t" "linux_cgroups_pids/linux_cgroups_pids.t", "linux_cgroups_memory/linux_cgroups_memory.t", "linux_cgroups_network/linux_cgroups_network.t")
-          for case in "${test_cases[@]}"; do
-            title="Running $case"
-            if [ 0 -ne $(sudo RUST_BACKTRACE=1 RUNTIME=$GITHUB_WORKSPACE/target/x86_64-unknown-linux-gnu/debug/youki ./validation/$case | grep "not ok" | wc -l) ]; then
-              exit 1
-            fi
-          done
+        run: ./integration_test.sh
