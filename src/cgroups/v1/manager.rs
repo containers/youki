@@ -28,12 +28,12 @@ pub struct Manager {
 }
 
 impl Manager {
-    pub fn new(cgroup_path: &Path) -> Result<Self> {
+    pub fn new(cgroup_path: PathBuf) -> Result<Self> {
         let mut subsystems = HashMap::<String, PathBuf>::new();
         for subsystem in CONTROLLERS.iter().map(|c| c.to_string()) {
             subsystems.insert(
                 subsystem.to_owned(),
-                Self::get_subsystem_path(cgroup_path, &subsystem)?,
+                Self::get_subsystem_path(&cgroup_path, &subsystem)?,
             );
         }
 

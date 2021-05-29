@@ -141,7 +141,7 @@ fn main() -> Result<()> {
                     // remove the cgroup created for the container
                     // check https://man7.org/linux/man-pages/man7/cgroups.7.html
                     // creating and removing cgroups section for more information on cgroups
-                    let cmanager = Manager::new(&cgroups_path)?;
+                    let cmanager = Manager::new(cgroups_path.into())?;
                     cmanager.remove()?;
                 }
                 std::process::exit(0)

@@ -8,9 +8,7 @@ use nix::sched;
 use nix::unistd;
 use nix::unistd::{Gid, Uid};
 
-use crate::cgroups::common::{CgroupManager, self};
-use crate::cgroups::v1;
-use crate::cgroups::v2;
+use crate::cgroups;
 use crate::container::{Container, ContainerStatus};
 use crate::namespaces::Namespaces;
 use crate::notify_socket::NotifyListener;
@@ -20,7 +18,6 @@ use crate::stdio::FileDescriptor;
 use crate::tty;
 use crate::utils;
 use crate::{capabilities, command::Command};
-
 #[derive(Clap, Debug)]
 pub struct Create {
     #[clap(short, long)]
@@ -106,7 +103,7 @@ fn run_container<P: AsRef<Path>>(
     let namespaces: Namespaces = linux.namespaces.clone().into();
 
     let cgroups_path = utils::get_cgroup_path(&linux.cgroups_path, container.id());
-    let cmanager = create_cgroup_manager(&cgroups_path)?;
+    let cmanager = cgroups::common::create_cgroup_manager(&cgroups_path)?;
 
     match fork::fork_first(
         pid_file,
@@ -185,14 +182,3 @@ fn init_process(
     Ok(())
 }
 
-fn create_cgroup_manager(path: &Path) -> Result<Box<dyn CgroupManager>> {
-    let cgroup_version= common::detect_cgroup_version(path)?;
-    log::debug!("cgroup manager {:?} will be used", cgroup_version);
-
-    let manager: Box<dyn CgroupManager> = match cgroup_version {
-        common::Cgroup::V1 => Box::new(v1::manager::Manager::new(path)?),
-        common::Cgroup::V2 => Box::new(v2::manager::Manager::new(PathBuf::from(common::DEFAULT_CGROUP_ROOT), path.to_path_buf())?),
-    };
-
-    Ok(manager)
-}
