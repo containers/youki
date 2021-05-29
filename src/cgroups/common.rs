@@ -14,6 +14,7 @@ pub const DEFAULT_CGROUP_ROOT: &str = "/sys/fs/cgroup";
 
 pub trait CgroupManager {
     fn apply(&self, linux_resources: &LinuxResources, pid: Pid) -> Result<()>;
+    fn remove(&self) -> Result<()>;
 }
 
 #[derive(Debug)]

@@ -13,8 +13,11 @@ use youki::container::{Container, ContainerStatus};
 use youki::create;
 use youki::signal;
 use youki::start;
+
 use youki::utils;
-use youki::{cgroups::v1::Manager, command::linux::LinuxCommand};
+use youki::cgroups;
+use youki::command::linux::LinuxCommand;
+
 
 /// High-level commandline option definition
 /// This takes global options as well as individual commands as specified in [OCI runtime-spec](https://github.com/opencontainers/runtime-spec/blob/master/runtime.md)
@@ -141,7 +144,7 @@ fn main() -> Result<()> {
                     // remove the cgroup created for the container
                     // check https://man7.org/linux/man-pages/man7/cgroups.7.html
                     // creating and removing cgroups section for more information on cgroups
-                    let cmanager = Manager::new(cgroups_path.into())?;
+                    let cmanager = cgroups::common::create_cgroup_manager(cgroups_path)?;
                     cmanager.remove()?;
                 }
                 std::process::exit(0)

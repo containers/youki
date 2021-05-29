@@ -40,34 +40,6 @@ impl Manager {
         Ok(Manager { subsystems })
     }
 
-    pub fn apply(&self, linux_resources: &LinuxResources, pid: Pid) -> Result<()> {
-        for subsys in &self.subsystems {
-            match subsys.0.as_str() {
-                "devices" => Devices::apply(linux_resources, &subsys.1, pid)?,
-                "hugetlb" => Hugetlb::apply(linux_resources, &subsys.1, pid)?,
-                "memory" => Memory::apply(linux_resources, &subsys.1, pid)?,
-                "pids" => Pids::apply(linux_resources, &subsys.1, pid)?,
-                "blkio" => Blkio::apply(linux_resources, &subsys.1, pid)?,
-                "net_prio" => NetworkPriority::apply(linux_resources, &subsys.1, pid)?,
-                "net_cls" => NetworkClassifier::apply(linux_resources, &subsys.1, pid)?,
-                _ => continue,
-            }
-        }
-
-        Ok(())
-    }
-
-    pub fn remove(&self) -> Result<()> {
-        for cgroup_path in &self.subsystems {
-            if cgroup_path.1.exists() {
-                log::debug!("remove cgroup {:?}", cgroup_path.1);
-                remove_dir(&cgroup_path.1)?;
-            }
-        }
-
-        Ok(())
-    }
-
     fn get_subsystem_path(cgroup_path: &Path, subsystem: &str) -> anyhow::Result<PathBuf> {
         log::debug!("Get path for subsystem: {}", subsystem);
         let mount = Process::myself()?
@@ -115,6 +87,17 @@ impl CgroupManager for Manager {
                 "pids" => Pids::apply(linux_resources, &subsys.1, pid)?,
                 "blkio" => Blkio::apply(linux_resources, &subsys.1, pid)?,
                 _ => continue,
+            }
+        }
+
+        Ok(())
+    }
+
+    fn remove(&self) -> Result<()> {
+        for cgroup_path in &self.subsystems {
+            if cgroup_path.1.exists() {
+                log::debug!("remove cgroup {:?}", cgroup_path.1);
+                remove_dir(&cgroup_path.1)?;
             }
         }
 

@@ -45,13 +45,6 @@ impl Manager {
         })
     }
 
-    pub fn remove(&self, cgroup_path: &Path) -> Result<()> {
-        let full_path = self.root_path.join(cgroup_path);
-        fs::remove_dir_all(full_path)?;
-
-        Ok(())
-    }
-
     fn create_unified_cgroup(&self, cgroup_path: &Path, pid: Pid) -> Result<PathBuf> {
         let full_path = self.root_path.join_absolute_path(cgroup_path)?;
         let controllers: Vec<String> = self
@@ -131,4 +124,12 @@ impl CgroupManager for Manager {
 
         Ok(())
     }
+
+    fn remove(&self) -> Result<()> {
+        let full_path = self.root_path.join_absolute_path(&self.cgroup_path)?;
+        log::debug!("remove cgroup {:?}", full_path);
+        fs::remove_dir_all(full_path)?;
+
+        Ok(())
+    }    
 }
