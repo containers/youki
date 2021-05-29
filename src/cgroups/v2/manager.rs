@@ -98,7 +98,7 @@ impl Manager {
                 "hugetlb" => controllers.push(ControllerType::HugeTlb),
                 "io" => controllers.push(ControllerType::Io),
                 "memory" => controllers.push(ControllerType::Memory),
-                "pids" => controllers.push(ControllerType::Pids),          
+                "pids" => controllers.push(ControllerType::Pids),
                 _ => continue,
             }
         }
@@ -131,5 +131,5 @@ impl CgroupManager for Manager {
         fs::remove_dir_all(full_path)?;
 
         Ok(())
-    }    
+    }
 }

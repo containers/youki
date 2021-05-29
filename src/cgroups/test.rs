@@ -1,10 +1,12 @@
 #![cfg(test)]
 
-use std::{io::Write, path::{Path, PathBuf}};
 use anyhow::Result;
+use std::{
+    io::Write,
+    path::{Path, PathBuf},
+};
 
 use oci_spec::LinuxCpu;
-
 
 pub fn set_fixture(temp_dir: &Path, filename: &str, val: &str) -> Result<PathBuf> {
     let full_path = temp_dir.join(filename);
@@ -39,7 +41,7 @@ impl LinuxCpuBuilder {
                 realtime_period: None,
                 cpus: None,
                 mems: None,
-            }
+            },
         }
     }
 

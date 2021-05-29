@@ -4,9 +4,7 @@ use std::{
     path::Path,
 };
 
-use crate::{
-    cgroups::v1::Controller,
-};
+use crate::cgroups::v1::Controller;
 use oci_spec::{LinuxBlockIo, LinuxResources};
 
 const CGROUP_BLKIO_THROTTLE_READ_BPS: &str = "blkio.throttle.read_bps_device";

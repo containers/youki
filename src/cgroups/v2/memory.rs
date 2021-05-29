@@ -1,5 +1,5 @@
-use std::path::Path;
 use anyhow::Result;
+use std::path::Path;
 
 use oci_spec::{LinuxMemory, LinuxResources};
 
@@ -12,7 +12,7 @@ impl Controller for Memory {
         if let Some(memory) = &linux_resources.memory {
             Self::apply(cgroup_path, memory)?;
         }
-        
+
         Ok(())
     }
 }

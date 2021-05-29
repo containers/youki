@@ -9,6 +9,7 @@ use anyhow::{bail, Result};
 use clap::Clap;
 use nix::sys::signal as nix_signal;
 
+use youki::command::linux::LinuxCommand;
 use youki::container::{Container, ContainerStatus};
 use youki::create;
 use youki::signal;
@@ -16,7 +17,6 @@ use youki::start;
 
 use youki::utils;
 use youki::cgroups;
-use youki::command::linux::LinuxCommand;
 
 
 /// High-level commandline option definition

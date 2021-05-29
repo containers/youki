@@ -1,14 +1,18 @@
-use std::{fmt::{Debug, Display}, fs, io::Write, path::{Path, PathBuf}};
 use nix::sys::statfs;
+use std::{
+    fmt::{Debug, Display},
+    fs,
+    io::Write,
+    path::{Path, PathBuf},
+};
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use nix::unistd::Pid;
-use procfs::process::Process;
 use oci_spec::LinuxResources;
+use procfs::process::Process;
 
 use crate::cgroups::v1;
 use crate::cgroups::v2;
-
 
 pub const DEFAULT_CGROUP_ROOT: &str = "/sys/fs/cgroup";
 
@@ -36,22 +40,22 @@ impl Display for Cgroup {
 
 pub fn write_cgroup_file_truncate(path: &Path, data: &str) -> Result<()> {
     fs::OpenOptions::new()
-    .create(false)
-    .write(true)
-    .truncate(true)
-    .open(path)?
-    .write_all(data.as_bytes())?;
+        .create(false)
+        .write(true)
+        .truncate(true)
+        .open(path)?
+        .write_all(data.as_bytes())?;
 
     Ok(())
 }
 
 pub fn write_cgroup_file(path: &Path, data: &str) -> Result<()> {
     fs::OpenOptions::new()
-    .create(false)
-    .write(true)
-    .truncate(false)
-    .open(path)?
-    .write_all(data.as_bytes())?;
+        .create(false)
+        .write(true)
+        .truncate(false)
+        .open(path)?
+        .write_all(data.as_bytes())?;
 
     Ok(())
 }
@@ -61,7 +65,7 @@ pub fn detect_cgroup_version<P: AsRef<Path> + Debug>(path: P) -> Result<Option<C
     let cgroup_version = match statfs.filesystem_type() {
         statfs::CGROUP_SUPER_MAGIC => Some(Cgroup::V1),
         statfs::CGROUP2_SUPER_MAGIC => Some(Cgroup::V2),
-        _ => None
+        _ => None,
     };
 
     Ok(cgroup_version)
@@ -75,7 +79,10 @@ pub fn create_cgroup_manager<P: Into<PathBuf>>(cgroup_path: P) -> Result<Box<dyn
             log::info!("cgroup manager {} will be used", cgroup_version);
             let manager: Box<dyn CgroupManager> = match cgroup_version {
                 Cgroup::V1 => Box::new(v1::manager::Manager::new(cgroup_path.into())?),
-                Cgroup::V2 => Box::new(v2::manager::Manager::new(root_cgroup_path, cgroup_path.into())?),
+                Cgroup::V2 => Box::new(v2::manager::Manager::new(
+                    root_cgroup_path,
+                    cgroup_path.into(),
+                )?),
             };
 
             return Ok(manager);
@@ -84,24 +91,27 @@ pub fn create_cgroup_manager<P: Into<PathBuf>>(cgroup_path: P) -> Result<Box<dyn
 
     // try to find it from the mountinfo
     let mount = Process::myself()?
-    .mountinfo()?
-    .into_iter()
-    .find(|m| m.fs_type == "cgroup2");
+        .mountinfo()?
+        .into_iter()
+        .find(|m| m.fs_type == "cgroup2");
 
     if let Some(cgroup2) = mount {
         log::info!("cgroup manager V2 will be used");
-        return Ok(Box::new(v2::manager::Manager::new(cgroup2.mount_point, cgroup_path.into())?));
+        return Ok(Box::new(v2::manager::Manager::new(
+            cgroup2.mount_point,
+            cgroup_path.into(),
+        )?));
     }
 
     let mount = Process::myself()?
-    .mountinfo()?
-    .into_iter()
-    .find(|m| m.fs_type == "cgroup");
+        .mountinfo()?
+        .into_iter()
+        .find(|m| m.fs_type == "cgroup");
 
     if let Some(_) = mount {
         log::info!("cgroup manager V1 will be used");
         return Ok(Box::new(v1::manager::Manager::new(cgroup_path.into())?));
     }
-    
+
     Err(anyhow!("could not find cgroup filesystem"))
 }

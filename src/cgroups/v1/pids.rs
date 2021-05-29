@@ -6,7 +6,7 @@ use std::{
 
 use anyhow::Result;
 
-use crate::{cgroups::v1::Controller};
+use crate::cgroups::v1::Controller;
 use oci_spec::{LinuxPids, LinuxResources};
 
 pub struct Pids {}

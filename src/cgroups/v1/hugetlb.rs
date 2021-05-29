@@ -7,9 +7,7 @@ use std::{
 use anyhow::anyhow;
 use regex::Regex;
 
-use crate::{
-    cgroups::v1::Controller,
-};
+use crate::cgroups::v1::Controller;
 use oci_spec::{LinuxHugepageLimit, LinuxResources};
 
 pub struct Hugetlb {}

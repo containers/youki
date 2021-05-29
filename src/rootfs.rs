@@ -13,8 +13,8 @@ use nix::sys::stat::{mknod, umask};
 use nix::unistd::{chdir, chown, close, getcwd};
 use nix::unistd::{Gid, Uid};
 
-use oci_spec::{LinuxDevice, LinuxDeviceType, Mount, Spec};
 use crate::utils::PathBufExt;
+use oci_spec::{LinuxDevice, LinuxDeviceType, Mount, Spec};
 
 pub fn prepare_rootfs(spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<()> {
     let mut flags = MsFlags::MS_REC;
