@@ -73,23 +73,33 @@ pub fn detect_cgroup_version<P: AsRef<Path> + Debug>(path: P) -> Result<Option<C
 
 pub fn create_cgroup_manager<P: Into<PathBuf>>(cgroup_path: P) -> Result<Box<dyn CgroupManager>> {
     // first try the usual cgroup fs location
-    let root_cgroup_path = PathBuf::from(DEFAULT_CGROUP_ROOT);
-    if root_cgroup_path.exists() {
-        if let Some(cgroup_version) = detect_cgroup_version(&root_cgroup_path)? {
-            log::info!("cgroup manager {} will be used", cgroup_version);
-            let manager: Box<dyn CgroupManager> = match cgroup_version {
-                Cgroup::V1 => Box::new(v1::manager::Manager::new(cgroup_path.into())?),
-                Cgroup::V2 => Box::new(v2::manager::Manager::new(
-                    root_cgroup_path,
-                    cgroup_path.into(),
-                )?),
-            };
+    // let root_cgroup_path = PathBuf::from(DEFAULT_CGROUP_ROOT);
+    // if root_cgroup_path.exists() {
+    //     if let Some(cgroup_version) = detect_cgroup_version(&root_cgroup_path)? {
+    //         log::info!("cgroup manager {} will be used", cgroup_version);
+    //         let manager: Box<dyn CgroupManager> = match cgroup_version {
+    //             Cgroup::V1 => Box::new(v1::manager::Manager::new(cgroup_path.into())?),
+    //             Cgroup::V2 => Box::new(v2::manager::Manager::new(
+    //                 root_cgroup_path,
+    //                 cgroup_path.into(),
+    //             )?),
+    //         };
 
-            return Ok(manager);
-        }
-    }
+    //         return Ok(manager);
+    //     }
+    // }
 
     // try to find it from the mountinfo
+    let mount = Process::myself()?
+        .mountinfo()?
+        .into_iter()
+        .find(|m| m.fs_type == "cgroup");
+
+    if let Some(_) = mount {
+        log::info!("cgroup manager V1 will be used");
+        return Ok(Box::new(v1::manager::Manager::new(cgroup_path.into())?));
+    }
+
     let mount = Process::myself()?
         .mountinfo()?
         .into_iter()
@@ -101,16 +111,6 @@ pub fn create_cgroup_manager<P: Into<PathBuf>>(cgroup_path: P) -> Result<Box<dyn
             cgroup2.mount_point,
             cgroup_path.into(),
         )?));
-    }
-
-    let mount = Process::myself()?
-        .mountinfo()?
-        .into_iter()
-        .find(|m| m.fs_type == "cgroup");
-
-    if let Some(_) = mount {
-        log::info!("cgroup manager V1 will be used");
-        return Ok(Box::new(v1::manager::Manager::new(cgroup_path.into())?));
     }
 
     Err(anyhow!("could not find cgroup filesystem"))
