@@ -32,6 +32,8 @@ pub struct Create {
 
 impl Create {
     pub fn exec(&self, root_path: PathBuf, command: impl Command) -> Result<()> {
+        let bundle_canonicalized = fs::canonicalize(&self.bundle)
+            .unwrap_or_else(|_| panic!("failed to canonicalied {:?}", &self.bundle));
         let container_dir = root_path.join(&self.container_id);
         if !container_dir.exists() {
             fs::create_dir(&container_dir).unwrap();
@@ -53,7 +55,7 @@ impl Create {
             &self.container_id,
             ContainerStatus::Creating,
             None,
-            self.bundle.to_str().unwrap(),
+            bundle_canonicalized.to_str().unwrap(),
             &container_dir,
         )?;
         container.save()?;

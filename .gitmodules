@@ -1,3 +1,5 @@
 [submodule "integration_test/src/github.com/opencontainers/runtime-tools"]
 	path = integration_test/src/github.com/opencontainers/runtime-tools
 	url = https://github.com/opencontainers/runtime-tools.git
+	ignore = dirty
+
