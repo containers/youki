@@ -65,33 +65,13 @@ enum SubCommand {
     State(StateArgs),
 }
 
-impl SubCommand {
-    fn get_container_id(&self) -> &String {
-        match &self {
-            SubCommand::Create(create) => &create.container_id,
-            SubCommand::Start(start) => &start.container_id,
-            SubCommand::Delete(delete) => &delete.container_id,
-            SubCommand::Kill(kill) => &kill.container_id,
-            SubCommand::State(state_args) => &state_args.container_id,
-        }
-    }
-}
-
 /// This is the entry point in the container runtime. The binary is run by a high-level container runtime,
 /// with various flags passed. This parses the flags, creates and manages appropriate resources.
 fn main() -> Result<()> {
     let opts = Opts::parse();
 
-    // debug mode for developer
-    if matches!(opts.subcmd, SubCommand::Create(_)) {
-        #[cfg(debug_assertions)]
-        std::env::set_var("YOUKI_MODE", "/var/lib/docker/containers/");
-        #[cfg(debug_assertions)]
-        std::env::set_var("YOUKI_LOG_LEVEL", "debug");
-    }
-
-    if let Err(e) = youki::logger::init(opts.subcmd.get_container_id().as_str(), opts.log) {
-        log::warn!("log init failed: {:?}", e);
+    if let Err(e) = youki::logger::init(opts.log) {
+        eprintln!("log init failed: {:?}", e);
     }
 
     let root_path = PathBuf::from(&opts.root);
