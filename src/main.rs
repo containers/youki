@@ -13,6 +13,7 @@ use youki::container::{Container, ContainerStatus};
 use youki::create;
 use youki::signal;
 use youki::start;
+use youki::utils;
 use youki::{cgroups::Manager, command::linux::LinuxCommand};
 
 /// High-level commandline option definition
@@ -120,14 +121,18 @@ fn main() -> Result<()> {
             if container.can_delete() {
                 if container.root.exists() {
                     // remove the directory storing container state
+                    log::debug!("remove dir {:?}", container.root);
                     fs::remove_dir_all(&container.root)?;
-                  
+
                     let spec = oci_spec::Spec::load("config.json")?;
+
+                    let cgroups_path =
+                        utils::get_cgroup_path(&spec.linux.unwrap().cgroups_path, container.id());
+
                     // remove the cgroup created for the container
                     // check https://man7.org/linux/man-pages/man7/cgroups.7.html
                     // creating and removing cgroups section for more information on cgroups
-                  
-                    let cmanager = Manager::new(spec.linux.unwrap().cgroups_path)?;
+                    let cmanager = Manager::new(&cgroups_path)?;
                     cmanager.remove()?;
                 }
                 std::process::exit(0)

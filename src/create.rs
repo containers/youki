@@ -14,7 +14,6 @@ use crate::namespaces::Namespaces;
 use crate::notify_socket::NotifyListener;
 use crate::process::{fork, Process};
 use crate::rootfs;
-use oci_spec;
 use crate::stdio::FileDescriptor;
 use crate::tty;
 use crate::utils;
@@ -102,7 +101,9 @@ fn run_container<P: AsRef<Path>>(
     let linux = spec.linux.as_ref().unwrap();
     let namespaces: Namespaces = linux.namespaces.clone().into();
 
-    let cmanager = cgroups::Manager::new(linux.cgroups_path.clone())?;
+    let cgroups_path = utils::get_cgroup_path(&linux.cgroups_path, container.id());
+
+    let cmanager = cgroups::Manager::new(&cgroups_path)?;
 
     match fork::fork_first(
         pid_file,

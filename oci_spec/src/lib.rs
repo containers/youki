@@ -568,7 +568,7 @@ pub struct Linux {
     pub sysctl: HashMap<String, String>,
     pub resources: Option<LinuxResources>,
     #[serde(default)]
-    pub cgroups_path: PathBuf,
+    pub cgroups_path: Option<PathBuf>,
     #[serde(default)]
     pub namespaces: Vec<LinuxNamespace>,
     #[serde(default)]
