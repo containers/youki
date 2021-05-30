@@ -64,6 +64,8 @@ $ ./youki state tutorial_container // Run it within 5 seconds to see the running
 $ ./youki delete tutorial_container // Run it after the container is finished running.
 ```
 
+Change the command to be executed in config.json and try something other than `sleep 5`.
+
 ## Usage
 
 Starting the docker daemon.
@@ -111,3 +113,9 @@ TBD(WIP on [#14](https://github.com/utam0k/youki/issues/14))
 This project welcomes your PR and issues.
 For example, refactoring, adding features, correcting English, etc.
 If you need any help, you can contact me on [Twitter](https://twitter.com/utam0k).
+
+Thanks to all the people who already contributed!
+
+<a href="https://github.com/utam0k/youki/graphs/contributors">
+  <img src="https://contributors-img.web.app/image?repo=utam0k/youki" />
+</a>
