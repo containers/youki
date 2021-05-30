@@ -9,4 +9,5 @@ for case in "${test_cases[@]}"; do
   if [ 0 -ne $(sudo RUST_BACKTRACE=1 RUNTIME=$root/target/x86_64-unknown-linux-gnu/debug/youki $root/integration_test/src/github.com/opencontainers/runtime-tools/validation/$case | grep "not ok" | wc -l) ]; then
       exit 1
   fi
+  sleep 1
 done

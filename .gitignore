@@ -1,6 +1,10 @@
+youki
+/tutorial
+
 /target
 .vagrant/
 
 tags
 tags.lock
 tags.temp
+
