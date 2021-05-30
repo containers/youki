@@ -3,7 +3,7 @@
 //! This crate provides a container runtime which can be used by a high-level container runtime to run containers.
 
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Result};
 use clap::Clap;
@@ -109,6 +109,7 @@ fn main() -> Result<()> {
             }
         }
         SubCommand::Delete(delete) => {
+            log::debug!("start deleting {}", delete.container_id);
             // state of container is stored in a directory named as container id inside
             // root directory given in commandline options
             let container_root = root_path.join(&delete.container_id);
@@ -117,14 +118,22 @@ fn main() -> Result<()> {
             }
             // load container state from json file, and check status of the container
             // it might be possible that delete is invoked on a running container.
+            log::debug!("load the container from {:?}", container_root);
             let container = Container::load(container_root)?.refresh_status()?;
             if container.can_delete() {
                 if container.root.exists() {
+                    nix::unistd::chdir(&PathBuf::from(&container.state.bundle))?;
+                    let config_absolute_path = &PathBuf::from(&container.state.bundle)
+                        .join(Path::new("config.json"))
+                        .to_string_lossy()
+                        .to_string();
+                    log::debug!("load spec from {:?}", config_absolute_path);
+                    let spec = oci_spec::Spec::load(config_absolute_path)?;
+                    log::debug!("spec: {:?}", spec);
+
                     // remove the directory storing container state
                     log::debug!("remove dir {:?}", container.root);
                     fs::remove_dir_all(&container.root)?;
-
-                    let spec = oci_spec::Spec::load("config.json")?;
 
                     let cgroups_path =
                         utils::get_cgroup_path(&spec.linux.unwrap().cgroups_path, container.id());
