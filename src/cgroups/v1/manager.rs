@@ -88,6 +88,8 @@ impl CgroupManager for Manager {
                 "memory" => Memory::apply(linux_resources, &subsys.1, pid)?,
                 "pids" => Pids::apply(linux_resources, &subsys.1, pid)?,
                 "blkio" => Blkio::apply(linux_resources, &subsys.1, pid)?,
+                "net_prio" => NetworkPriority::apply(linux_resources, &subsys.1, pid)?,
+                "net_cls" => NetworkClassifier::apply(linux_resources, &subsys.1, pid)?,
                 _ => continue,
             }
         }
