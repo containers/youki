@@ -6,7 +6,7 @@ use oci_spec::LinuxResources;
 pub struct Pids {}
 
 impl Controller for Pids {
-    fn apply(linux_resources: &LinuxResources, cgroup_path: &std::path::Path) -> Result<()> {
+    fn apply(_: &LinuxResources, _: &std::path::Path) -> Result<()> {
         Ok(())
     }
 }

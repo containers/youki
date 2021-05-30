@@ -6,7 +6,7 @@ use oci_spec::LinuxResources;
 pub struct HugeTlb {}
 
 impl Controller for HugeTlb {
-    fn apply(linux_resources: &LinuxResources, cgroup_path: &std::path::Path) -> Result<()> {
+    fn apply(_: &LinuxResources, _: &std::path::Path) -> Result<()> {
         Ok(())
     }
 }
