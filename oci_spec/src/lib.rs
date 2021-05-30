@@ -603,6 +603,7 @@ impl Spec {
     pub fn load(path: &str) -> Result<Self> {
         let file = File::open(path)?;
         let mut spec: Spec = serde_json::from_reader(&file)?;
+        // FIME: It is fail if the caller isn't in the correct directory.
         spec.root.path = std::fs::canonicalize(spec.root.path)?;
         Ok(spec)
     }
