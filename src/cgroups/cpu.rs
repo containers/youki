@@ -1,10 +1,8 @@
 //!
 //! Reference: https://github.com/opencontainers/runtime-spec/blob/master/config-linux.md#cpu
 
-use crate::{
-    cgroups::Controller,
-    spec::{LinuxCpu, LinuxResources},
-};
+use crate::cgroups::Controller;
+use oci_spec::{LinuxCpu, LinuxResources};
 
 use anyhow::Result;
 use nix::unistd::Pid;
