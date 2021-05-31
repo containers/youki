@@ -7,10 +7,7 @@ use std::{
 use anyhow::Result;
 use nix::unistd::Pid;
 
-use crate::{
-    cgroups::Controller,
-    rootfs::default_devices,
-};
+use crate::{cgroups::v1::Controller, rootfs::default_devices};
 use oci_spec::{LinuxDeviceCgroup, LinuxDeviceType, LinuxResources};
 
 pub struct Devices {}

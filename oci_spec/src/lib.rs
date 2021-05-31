@@ -363,9 +363,9 @@ pub struct LinuxCpu {
     pub realtime_runtime: Option<i64>,
     pub realtime_period: Option<u64>,
     #[serde(default)]
-    pub cpus: String,
+    pub cpus: Option<String>,
     #[serde(default)]
-    pub mems: String,
+    pub mems: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -453,7 +453,6 @@ pub struct LinuxResources {
     pub disable_oom_killer: bool,
     pub oom_score_adj: Option<i32>,
     pub memory: Option<LinuxMemory>,
-    #[serde(rename = "LinuxCPU")]
     pub cpu: Option<LinuxCpu>,
     pub pids: Option<LinuxPids>,
     #[serde(rename = "blockIO")]

@@ -18,7 +18,7 @@ use crate::stdio::FileDescriptor;
 use crate::tty;
 use crate::utils;
 use crate::{capabilities, command::Command};
-
+use oci_spec;
 #[derive(Clap, Debug)]
 pub struct Create {
     #[clap(short, long)]
@@ -104,8 +104,7 @@ fn run_container<P: AsRef<Path>>(
     let namespaces: Namespaces = linux.namespaces.clone().into();
 
     let cgroups_path = utils::get_cgroup_path(&linux.cgroups_path, container.id());
-
-    let cmanager = cgroups::Manager::new(&cgroups_path)?;
+    let cmanager = cgroups::common::create_cgroup_manager(&cgroups_path)?;
 
     match fork::fork_first(
         pid_file,
@@ -114,7 +113,7 @@ fn run_container<P: AsRef<Path>>(
             .contains(sched::CloneFlags::CLONE_NEWUSER),
         linux,
         &container,
-        &cmanager,
+        cmanager,
     )? {
         Process::Parent(parent) => Ok(Process::Parent(parent)),
         Process::Child(child) => {

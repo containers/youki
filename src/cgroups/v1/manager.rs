@@ -3,6 +3,7 @@ use std::{fs::remove_dir, path::Path};
 
 use anyhow::Result;
 use nix::unistd::Pid;
+
 use procfs::process::Process;
 
 use super::{
@@ -10,7 +11,8 @@ use super::{
     network_classifier::NetworkClassifier, network_priority::NetworkPriority, pids::Pids,
     Controller,
 };
-use crate::{cgroups::ControllerType, utils::PathBufExt};
+
+use crate::{cgroups::v1::ControllerType, cgroups::common::CgroupManager, utils::PathBufExt};
 use oci_spec::LinuxResources;
 
 const CONTROLLERS: &[ControllerType] = &[
@@ -28,44 +30,16 @@ pub struct Manager {
 }
 
 impl Manager {
-    pub fn new(cgroup_path: &Path) -> Result<Self> {
+    pub fn new(cgroup_path: PathBuf) -> Result<Self> {
         let mut subsystems = HashMap::<String, PathBuf>::new();
         for subsystem in CONTROLLERS.iter().map(|c| c.to_string()) {
             subsystems.insert(
                 subsystem.to_owned(),
-                Self::get_subsystem_path(cgroup_path, &subsystem)?,
+                Self::get_subsystem_path(&cgroup_path, &subsystem)?,
             );
         }
 
         Ok(Manager { subsystems })
-    }
-
-    pub fn apply(&self, linux_resources: &LinuxResources, pid: Pid) -> Result<()> {
-        for subsys in &self.subsystems {
-            match subsys.0.as_str() {
-                "devices" => Devices::apply(linux_resources, &subsys.1, pid)?,
-                "hugetlb" => Hugetlb::apply(linux_resources, &subsys.1, pid)?,
-                "memory" => Memory::apply(linux_resources, &subsys.1, pid)?,
-                "pids" => Pids::apply(linux_resources, &subsys.1, pid)?,
-                "blkio" => Blkio::apply(linux_resources, &subsys.1, pid)?,
-                "net_prio" => NetworkPriority::apply(linux_resources, &subsys.1, pid)?,
-                "net_cls" => NetworkClassifier::apply(linux_resources, &subsys.1, pid)?,
-                _ => continue,
-            }
-        }
-
-        Ok(())
-    }
-
-    pub fn remove(&self) -> Result<()> {
-        for cgroup_path in &self.subsystems {
-            if cgroup_path.1.exists() {
-                log::debug!("remove cgroup {:?}", cgroup_path.1);
-                remove_dir(&cgroup_path.1)?;
-            }
-        }
-
-        Ok(())
     }
 
     fn get_subsystem_path(cgroup_path: &Path, subsystem: &str) -> anyhow::Result<PathBuf> {
@@ -102,5 +76,35 @@ impl Manager {
         };
 
         Ok(p)
+    }
+}
+
+impl CgroupManager for Manager {
+    fn apply(&self, linux_resources: &LinuxResources, pid: Pid) -> Result<()> {
+        for subsys in &self.subsystems {
+            match subsys.0.as_str() {
+                "devices" => Devices::apply(linux_resources, &subsys.1, pid)?,
+                "hugetlb" => Hugetlb::apply(linux_resources, &subsys.1, pid)?,
+                "memory" => Memory::apply(linux_resources, &subsys.1, pid)?,
+                "pids" => Pids::apply(linux_resources, &subsys.1, pid)?,
+                "blkio" => Blkio::apply(linux_resources, &subsys.1, pid)?,
+                "net_prio" => NetworkPriority::apply(linux_resources, &subsys.1, pid)?,
+                "net_cls" => NetworkClassifier::apply(linux_resources, &subsys.1, pid)?,
+                _ => continue,
+            }
+        }
+
+        Ok(())
+    }
+
+    fn remove(&self) -> Result<()> {
+        for cgroup_path in &self.subsystems {
+            if cgroup_path.1.exists() {
+                log::debug!("remove cgroup {:?}", cgroup_path.1);
+                remove_dir(&cgroup_path.1)?;
+            }
+        }
+
+        Ok(())
     }
 }
