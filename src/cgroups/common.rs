@@ -6,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{bail, Result};
 use nix::unistd::Pid;
 use oci_spec::LinuxResources;
 use procfs::process::Process;
@@ -74,30 +74,28 @@ pub fn create_cgroup_manager<P: Into<PathBuf>>(cgroup_path: P) -> Result<Box<dyn
     match (cgroup_mount, cgroup2_mount) {
         (Some(_), None) => {
             log::info!("cgroup manager V1 will be used");
-            return Ok(Box::new(v1::manager::Manager::new(cgroup_path.into())?));
+            Ok(Box::new(v1::manager::Manager::new(cgroup_path.into())?))
         }
         (None, Some(cgroup2)) => {
             log::info!("cgroup manager V2 will be used");
-            return Ok(Box::new(v2::manager::Manager::new(
+            Ok(Box::new(v2::manager::Manager::new(
                 cgroup2.mount_point,
                 cgroup_path.into(),
-            )?));
+            )?))
         }
         (Some(_), Some(cgroup2)) => {
             let cgroup_override = env::var("YOUKI_PREFER_CGROUPV2");
             match cgroup_override {
                 Ok(v) if v == "true" => {
                     log::info!("cgroup manager V2 will be used");
-                    return Ok(Box::new(v2::manager::Manager::new(
+                    Ok(Box::new(v2::manager::Manager::new(
                         cgroup2.mount_point,
                         cgroup_path.into(),
-                    )?));
+                    )?))
                 }
-                _ => {
-                    return Ok(Box::new(v1::manager::Manager::new(cgroup_path.into())?))
-                }
+                _ => Ok(Box::new(v1::manager::Manager::new(cgroup_path.into())?)),
             }
         }
-        _ => return Err(anyhow!("could not find cgroup filesystem")),
+        _ => bail!("could not find cgroup filesystem"),
     }
 }

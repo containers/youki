@@ -17,7 +17,6 @@ use crate::container::ContainerStatus;
 use crate::process::{child, init, parent, Process};
 use crate::utils;
 use crate::{cond::Cond, container::Container};
-use oci_spec;
 
 pub fn fork_first<P: AsRef<Path>>(
     pid_file: Option<P>,
