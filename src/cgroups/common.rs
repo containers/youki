@@ -38,18 +38,8 @@ impl Display for Cgroup {
     }
 }
 
-pub fn write_cgroup_file_truncate(path: &Path, data: &str) -> Result<()> {
-    fs::OpenOptions::new()
-        .create(false)
-        .write(true)
-        .truncate(true)
-        .open(path)?
-        .write_all(data.as_bytes())?;
-
-    Ok(())
-}
-
-pub fn write_cgroup_file(path: &Path, data: &str) -> Result<()> {
+#[inline]
+pub fn write_cgroup_file<P: AsRef<Path>>(path: P, data: &str) -> Result<()> {
     fs::OpenOptions::new()
         .create(false)
         .write(true)
@@ -94,7 +84,7 @@ pub fn create_cgroup_manager<P: Into<PathBuf>>(cgroup_path: P) -> Result<Box<dyn
                     )?))
                 }
                 _ => Ok(Box::new(v1::manager::Manager::new(cgroup_path.into())?)),
-            }
+            } 
         }
         _ => bail!("could not find cgroup filesystem"),
     }

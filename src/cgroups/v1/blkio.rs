@@ -1,10 +1,9 @@
 use std::{
-    fs::{self, OpenOptions},
-    io::Write,
+    fs::{self},
     path::Path,
 };
 
-use crate::cgroups::v1::Controller;
+use crate::cgroups::{common, v1::Controller};
 use oci_spec::{LinuxBlockIo, LinuxResources};
 
 const CGROUP_BLKIO_THROTTLE_READ_BPS: &str = "blkio.throttle.read_bps_device";
@@ -20,21 +19,14 @@ impl Controller for Blkio {
         cgroup_root: &Path,
         pid: nix::unistd::Pid,
     ) -> anyhow::Result<()> {
-        match &linux_resources.block_io {
-            None => return Ok(()),
-            Some(block_io) => {
-                fs::create_dir_all(cgroup_root)?;
-                Self::apply(cgroup_root, block_io)?;
-            }
+        log::debug!("Apply blkio cgroup config");
+        fs::create_dir_all(cgroup_root)?;
+
+        if let Some(blkio) = &linux_resources.block_io {
+            Self::apply(cgroup_root, blkio)?;
         }
 
-        OpenOptions::new()
-            .create(false)
-            .write(true)
-            .truncate(false)
-            .open(cgroup_root.join("cgroup.procs"))?
-            .write_all(pid.to_string().as_bytes())?;
-
+        common::write_cgroup_file(&cgroup_root.join("cgroup.procs"), &pid.to_string())?;
         Ok(())
     }
 }
@@ -42,28 +34,28 @@ impl Controller for Blkio {
 impl Blkio {
     fn apply(root_path: &Path, blkio: &LinuxBlockIo) -> anyhow::Result<()> {
         for trbd in &blkio.blkio_throttle_read_bps_device {
-            Self::write_file(
+            common::write_cgroup_file(
                 &root_path.join(CGROUP_BLKIO_THROTTLE_READ_BPS),
                 &format!("{}:{} {}", trbd.major, trbd.minor, trbd.rate),
             )?;
         }
 
         for twbd in &blkio.blkio_throttle_write_bps_device {
-            Self::write_file(
+            common::write_cgroup_file(
                 &root_path.join(CGROUP_BLKIO_THROTTLE_WRITE_BPS),
                 &format!("{}:{} {}", twbd.major, twbd.minor, twbd.rate),
             )?;
         }
 
         for trid in &blkio.blkio_throttle_read_iops_device {
-            Self::write_file(
+            common::write_cgroup_file(
                 &root_path.join(CGROUP_BLKIO_THROTTLE_READ_IOPS),
                 &format!("{}:{} {}", trid.major, trid.minor, trid.rate),
             )?;
         }
 
         for twid in &blkio.blkio_throttle_write_iops_device {
-            Self::write_file(
+            common::write_cgroup_file(
                 &root_path.join(CGROUP_BLKIO_THROTTLE_WRITE_IOPS),
                 &format!("{}:{} {}", twid.major, twid.minor, twid.rate),
             )?;
@@ -71,22 +63,11 @@ impl Blkio {
 
         Ok(())
     }
-
-    fn write_file(file_path: &Path, data: &str) -> anyhow::Result<()> {
-        fs::OpenOptions::new()
-            .create(false)
-            .write(true)
-            .truncate(false)
-            .open(file_path)?
-            .write_all(data.as_bytes())?;
-
-        Ok(())
-    }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
+    use std::{io::Write, path::PathBuf};
 
     use super::*;
     use oci_spec::{LinuxBlockIo, LinuxThrottleDevice};

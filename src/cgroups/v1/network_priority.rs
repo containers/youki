@@ -1,12 +1,9 @@
-use std::io::Write;
-use std::{
-    fs::{create_dir_all, OpenOptions},
-    path::Path,
-};
+use std::{fs::create_dir_all, path::Path};
 
 use anyhow::Result;
 use nix::unistd::Pid;
 
+use crate::cgroups::common;
 use crate::cgroups::v1::Controller;
 use oci_spec::{LinuxNetwork, LinuxResources};
 
@@ -19,15 +16,9 @@ impl Controller for NetworkPriority {
 
         if let Some(network) = linux_resources.network.as_ref() {
             Self::apply(cgroup_root, network)?;
-
-            OpenOptions::new()
-                .create(false)
-                .write(true)
-                .truncate(true)
-                .open(cgroup_root.join("cgroup.procs"))?
-                .write_all(pid.to_string().as_bytes())?;
         }
 
+        common::write_cgroup_file(cgroup_root.join("cgroup.procs"), &pid.to_string())?;
         Ok(())
     }
 }
@@ -35,18 +26,7 @@ impl Controller for NetworkPriority {
 impl NetworkPriority {
     fn apply(root_path: &Path, network: &LinuxNetwork) -> Result<()> {
         let priorities: String = network.priorities.iter().map(|p| p.to_string()).collect();
-        Self::write_file(&root_path.join("net_prio.ifpriomap"), &priorities.trim())?;
-
-        Ok(())
-    }
-
-    fn write_file(file_path: &Path, data: &str) -> Result<()> {
-        OpenOptions::new()
-            .create(false)
-            .write(true)
-            .truncate(true)
-            .open(file_path)?
-            .write_all(data.as_bytes())?;
+        common::write_cgroup_file(&root_path.join("net_prio.ifpriomap"), &priorities.trim())?;
 
         Ok(())
     }
@@ -54,7 +34,7 @@ impl NetworkPriority {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
+    use std::{io::Write, path::PathBuf};
 
     use super::*;
     use oci_spec::LinuxInterfacePriority;

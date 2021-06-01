@@ -12,7 +12,7 @@ use super::{
     Controller,
 };
 
-use crate::{cgroups::v1::ControllerType, cgroups::common::CgroupManager, utils::PathBufExt};
+use crate::{cgroups::common::CgroupManager, cgroups::v1::ControllerType, utils::PathBufExt};
 use oci_spec::LinuxResources;
 
 const CONTROLLERS: &[ControllerType] = &[
