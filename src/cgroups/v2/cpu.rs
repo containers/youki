@@ -71,11 +71,11 @@ impl Cpu {
     }
 
     fn is_realtime_requested(cpu: &LinuxCpu) -> bool {
-        if let Some(_) = cpu.realtime_period {
+        if cpu.realtime_period.is_some() {
             return true;
         }
 
-        if let Some(_) = cpu.realtime_runtime {
+        if cpu.realtime_runtime.is_some() {
             return true;
         }
 
@@ -92,7 +92,7 @@ mod tests {
     fn setup(testname: &str, cgroup_file: &str) -> (PathBuf, PathBuf) {
         let tmp = create_temp_dir(testname).expect("create temp directory for test");
         let cgroup_file = set_fixture(&tmp, cgroup_file, "")
-            .expect(&format!("set test fixture for {}", cgroup_file));
+            .unwrap_or_else(|_| panic!("set test fixture for {}", cgroup_file));
 
         (tmp, cgroup_file)
     }
@@ -102,15 +102,15 @@ mod tests {
         // arrange
         let (tmp, weight) = setup("test_set_shares", CGROUP_CPU_WEIGHT);
         let _ = set_fixture(&tmp, CGROUP_CPU_MAX, "")
-            .expect(&format!("set test fixture for {}", CGROUP_CPU_MAX));
+            .unwrap_or_else(|_| panic!("set test fixture for {}", CGROUP_CPU_MAX));
         let cpu = LinuxCpuBuilder::new().with_shares(22000).build();
 
         // act
         Cpu::apply(&tmp, &cpu).expect("apply cpu");
 
         // assert
-        let content =
-            fs::read_to_string(weight).expect(&format!("read {} file content", CGROUP_CPU_WEIGHT));
+        let content = fs::read_to_string(weight)
+            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_WEIGHT));
         assert_eq!(content, 840.to_string());
     }
 
@@ -125,8 +125,8 @@ mod tests {
         Cpu::apply(&tmp, &cpu).expect("apply cpu");
 
         // assert
-        let content =
-            fs::read_to_string(max).expect(&format!("read {} file content", CGROUP_CPU_MAX));
+        let content = fs::read_to_string(max)
+            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_MAX));
         assert_eq!(content, format!("{} {}", QUOTA, DEFAULT_PERIOD))
     }
 
@@ -140,8 +140,8 @@ mod tests {
         Cpu::apply(&tmp, &cpu).expect("apply cpu");
 
         // assert
-        let content =
-            fs::read_to_string(max).expect(&format!("read {} file content", CGROUP_CPU_MAX));
+        let content = fs::read_to_string(max)
+            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_MAX));
         assert_eq!(
             content,
             format!("{} {}", UNRESTRICTED_QUOTA, DEFAULT_PERIOD)
@@ -159,8 +159,8 @@ mod tests {
         Cpu::apply(&tmp, &cpu).expect("apply cpu");
 
         // assert
-        let content =
-            fs::read_to_string(max).expect(&format!("read {} file content", CGROUP_CPU_MAX));
+        let content = fs::read_to_string(max)
+            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_MAX));
         assert_eq!(content, format!("{} {}", UNRESTRICTED_QUOTA, PERIOD))
     }
 
@@ -174,8 +174,8 @@ mod tests {
         Cpu::apply(&tmp, &cpu).expect("apply cpu");
 
         // assert
-        let content =
-            fs::read_to_string(max).expect(&format!("read {} file content", CGROUP_CPU_MAX));
+        let content = fs::read_to_string(max)
+            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_MAX));
         assert_eq!(
             content,
             format!("{} {}", UNRESTRICTED_QUOTA, DEFAULT_PERIOD)
@@ -197,8 +197,8 @@ mod tests {
         Cpu::apply(&tmp, &cpu).expect("apply cpu");
 
         // assert
-        let content =
-            fs::read_to_string(max).expect(&format!("read {} file content", CGROUP_CPU_MAX));
+        let content = fs::read_to_string(max)
+            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_MAX));
         assert_eq!(content, format!("{} {}", QUOTA, PERIOD));
     }
 

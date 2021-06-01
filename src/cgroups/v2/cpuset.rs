@@ -45,7 +45,7 @@ mod tests {
     fn setup(testname: &str, cgroup_file: &str) -> (PathBuf, PathBuf) {
         let tmp = create_temp_dir(testname).expect("create temp directory for test");
         let cgroup_file = set_fixture(&tmp, cgroup_file, "")
-            .expect(&format!("set test fixture for {}", cgroup_file));
+            .unwrap_or_else(|_| panic!("set test fixture for {}", cgroup_file));
 
         (tmp, cgroup_file)
     }
@@ -60,8 +60,8 @@ mod tests {
         CpuSet::apply(&tmp, &cpuset).expect("apply cpuset");
 
         // assert
-        let content =
-            fs::read_to_string(&cpus).expect(&format!("read {} file content", CGROUP_CPUSET_CPUS));
+        let content = fs::read_to_string(&cpus)
+            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPUSET_CPUS));
         assert_eq!(content, "1-3");
     }
 
@@ -75,8 +75,8 @@ mod tests {
         CpuSet::apply(&tmp, &cpuset).expect("apply cpuset");
 
         // assert
-        let content =
-            fs::read_to_string(&mems).expect(&format!("read {} file content", CGROUP_CPUSET_MEMS));
+        let content = fs::read_to_string(&mems)
+            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPUSET_MEMS));
         assert_eq!(content, "1-3");
     }
 }
