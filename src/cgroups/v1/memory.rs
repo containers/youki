@@ -7,6 +7,7 @@ use std::{
 use anyhow::{Result, *};
 use nix::{errno::Errno, unistd::Pid};
 
+use crate::cgroups::common;
 use crate::cgroups::v1::Controller;
 use oci_spec::{LinuxMemory, LinuxResources};
 
@@ -64,14 +65,9 @@ impl Controller for Memory {
             if let Some(tcp_mem) = memory.kernel_tcp {
                 Self::set(tcp_mem, &cgroup_root.join(CGROUP_KERNEL_TCP_MEMORY_LIMIT))?;
             }
-
-            OpenOptions::new()
-                .create(false)
-                .write(true)
-                .truncate(false)
-                .open(cgroup_root.join("cgroup.procs"))?
-                .write_all(pid.to_string().as_bytes())?;
         }
+
+        common::write_cgroup_file(cgroup_root.join("cgroup.procs"), &pid.to_string())?;
         Ok(())
     }
 }
@@ -180,7 +176,6 @@ impl Memory {
         }
 
         let path = cgroup_root.join(CGROUP_MEMORY_SWAP_LIMIT);
-
         Self::set(val, &path)?;
 
         Ok(())

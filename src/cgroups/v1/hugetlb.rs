@@ -1,13 +1,9 @@
-use std::{
-    fs::{self, OpenOptions},
-    io::Write,
-    path::Path,
-};
+use std::{fs, path::Path};
 
 use anyhow::anyhow;
 use regex::Regex;
 
-use crate::cgroups::v1::Controller;
+use crate::cgroups::{common, v1::Controller};
 use oci_spec::{LinuxHugepageLimit, LinuxResources};
 
 pub struct Hugetlb {}
@@ -25,12 +21,7 @@ impl Controller for Hugetlb {
             Self::apply(cgroup_root, hugetlb)?
         }
 
-        OpenOptions::new()
-            .create(false)
-            .write(true)
-            .truncate(false)
-            .open(cgroup_root.join("cgroup.procs"))?
-            .write_all(pid.to_string().as_bytes())?;
+        common::write_cgroup_file(cgroup_root.join("cgroup.procs"), &pid.to_string())?;
         Ok(())
     }
 }
@@ -49,21 +40,10 @@ impl Hugetlb {
             }
         }
 
-        Self::write_file(
+        common::write_cgroup_file(
             &root_path.join(format!("hugetlb.{}.limit_in_bytes", hugetlb.page_size)),
             &hugetlb.limit.to_string(),
         )?;
-        Ok(())
-    }
-
-    fn write_file(file_path: &Path, data: &str) -> anyhow::Result<()> {
-        fs::OpenOptions::new()
-            .create(false)
-            .write(true)
-            .truncate(true)
-            .open(file_path)?
-            .write_all(data.as_bytes())?;
-
         Ok(())
     }
 
@@ -74,7 +54,7 @@ impl Hugetlb {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
+    use std::{io::Write, path::PathBuf};
 
     use super::*;
     use oci_spec::LinuxHugepageLimit;
