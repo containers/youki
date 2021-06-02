@@ -37,18 +37,10 @@ impl CpuSet {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, path::PathBuf};
+    use std::fs;
 
     use super::*;
-    use crate::cgroups::test::{create_temp_dir, set_fixture, LinuxCpuBuilder};
-
-    fn setup(testname: &str, cgroup_file: &str) -> (PathBuf, PathBuf) {
-        let tmp = create_temp_dir(testname).expect("create temp directory for test");
-        let cgroup_file = set_fixture(&tmp, cgroup_file, "")
-            .unwrap_or_else(|_| panic!("set test fixture for {}", cgroup_file));
-
-        (tmp, cgroup_file)
-    }
+    use crate::cgroups::test::{setup, LinuxCpuBuilder};
 
     #[test]
     fn test_set_cpus() {
