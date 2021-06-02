@@ -5,7 +5,7 @@ use std::{
 use anyhow::Result;
 use async_trait::async_trait;
 use nix::unistd::Pid;
-use smol::{fs::{File, OpenOptions, create_dir_all}, io::AsyncWriteExt};
+use smol::{fs::{OpenOptions, create_dir_all}, io::AsyncWriteExt};
 
 use crate::{
     cgroups::Controller,
@@ -21,23 +21,14 @@ impl Controller for Devices {
         log::debug!("Apply Devices cgroup config");
         create_dir_all(&cgroup_root).await?;
         
-        let mut allowed = OpenOptions::new()
-            .create(false)
-            .write(true)
-            .truncate(false)
-            .open(cgroup_root.join("devices.allow")).await?;
-
-        let mut denied = OpenOptions::new()
-            .create(false)
-            .write(true)
-            .truncate(false)
-            .open(cgroup_root.join("devices.deny")).await?;
+        let mut allowed: Vec<String> = Vec::new();
+        let mut denied: Vec<String> = Vec::new();
 
         for d in &linux_resources.devices {
             if d.allow {
-                Self::apply_device(d, &mut allowed).await?;
+                allowed.push(d.to_string())
             } else {
-                Self::apply_device(d, &mut denied).await?;
+                denied.push(d.to_string())
             } 
         }
 
@@ -48,14 +39,14 @@ impl Controller for Devices {
         .concat()
         {
             if d.allow {
-                Self::apply_device(&d, &mut allowed).await?;
+                allowed.push(d.to_string())
             } else {
-                Self::apply_device(&d, &mut denied).await?;
+                denied.push(d.to_string())
             } 
         }
 
-        allowed.sync_data().await?;
-        denied.sync_data().await?;
+        Self::write_file(&allowed.join("\n"), &cgroup_root.join("devices.allow")).await?;
+        Self::write_file(&denied.join("\n"), &cgroup_root.join("devices.deny")).await?;
 
         let mut file = OpenOptions::new()
             .create(false)
@@ -70,8 +61,14 @@ impl Controller for Devices {
 }
 
 impl Devices {
-    async fn apply_device(device: &LinuxDeviceCgroup, file: &mut File) -> Result<()> {
-        file.write_all(device.to_string().as_bytes()).await?;
+    async fn write_file(data: &str, path: &Path) -> Result<()> {
+        let mut file = OpenOptions::new()
+            .create(false)
+            .write(true)
+            .truncate(false)
+            .open(path).await?;
+        
+        file.write_all(data.as_bytes()).await?;
         file.sync_data().await?;
         Ok(())
     }
