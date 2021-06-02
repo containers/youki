@@ -67,9 +67,8 @@ impl Blkio {
 
 #[cfg(test)]
 mod tests {
-    use std::{io::Write, path::PathBuf};
-
     use super::*;
+    use crate::cgroups::test::setup;
     use oci_spec::{LinuxBlockIo, LinuxThrottleDevice};
 
     struct BlockIoBuilder {
@@ -116,40 +115,9 @@ mod tests {
         }
     }
 
-    fn setup(testname: &str, throttle_type: &str) -> (PathBuf, PathBuf) {
-        let tmp = create_temp_dir(testname).expect("create temp directory for test");
-        let throttle_file = set_fixture(&tmp, throttle_type, "")
-            .unwrap_or_else(|_| panic!("set fixture for {}", throttle_type));
-
-        (tmp, throttle_file)
-    }
-
-    fn set_fixture(
-        temp_dir: &std::path::Path,
-        filename: &str,
-        val: &str,
-    ) -> anyhow::Result<PathBuf> {
-        let full_path = temp_dir.join(filename);
-
-        std::fs::OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(true)
-            .open(&full_path)?
-            .write_all(val.as_bytes())?;
-
-        Ok(full_path)
-    }
-
-    fn create_temp_dir(test_name: &str) -> anyhow::Result<PathBuf> {
-        std::fs::create_dir_all(std::env::temp_dir().join(test_name))?;
-        Ok(std::env::temp_dir().join(test_name))
-    }
-
     #[test]
     fn test_set_blkio_read_bps() {
-        let (test_root, throttle) =
-            setup("test_set_blkio_read_bps", CGROUP_BLKIO_THROTTLE_READ_BPS);
+        let (tmp, throttle) = setup("test_set_blkio_read_bps", CGROUP_BLKIO_THROTTLE_READ_BPS);
 
         let blkio = BlockIoBuilder::new()
             .with_read_bps(vec![LinuxThrottleDevice {
@@ -159,7 +127,7 @@ mod tests {
             }])
             .build();
 
-        Blkio::apply(&test_root, &blkio).expect("apply blkio");
+        Blkio::apply(&tmp, &blkio).expect("apply blkio");
         let content = fs::read_to_string(throttle)
             .unwrap_or_else(|_| panic!("read {} content", CGROUP_BLKIO_THROTTLE_READ_BPS));
 
@@ -168,8 +136,7 @@ mod tests {
 
     #[test]
     fn test_set_blkio_write_bps() {
-        let (test_root, throttle) =
-            setup("test_set_blkio_write_bps", CGROUP_BLKIO_THROTTLE_WRITE_BPS);
+        let (tmp, throttle) = setup("test_set_blkio_write_bps", CGROUP_BLKIO_THROTTLE_WRITE_BPS);
 
         let blkio = BlockIoBuilder::new()
             .with_write_bps(vec![LinuxThrottleDevice {
@@ -179,7 +146,7 @@ mod tests {
             }])
             .build();
 
-        Blkio::apply(&test_root, &blkio).expect("apply blkio");
+        Blkio::apply(&tmp, &blkio).expect("apply blkio");
         let content = fs::read_to_string(throttle)
             .unwrap_or_else(|_| panic!("read {} content", CGROUP_BLKIO_THROTTLE_WRITE_BPS));
 
@@ -188,8 +155,7 @@ mod tests {
 
     #[test]
     fn test_set_blkio_read_iops() {
-        let (test_root, throttle) =
-            setup("test_set_blkio_read_iops", CGROUP_BLKIO_THROTTLE_READ_IOPS);
+        let (tmp, throttle) = setup("test_set_blkio_read_iops", CGROUP_BLKIO_THROTTLE_READ_IOPS);
 
         let blkio = BlockIoBuilder::new()
             .with_read_iops(vec![LinuxThrottleDevice {
@@ -199,7 +165,7 @@ mod tests {
             }])
             .build();
 
-        Blkio::apply(&test_root, &blkio).expect("apply blkio");
+        Blkio::apply(&tmp, &blkio).expect("apply blkio");
         let content = fs::read_to_string(throttle)
             .unwrap_or_else(|_| panic!("read {} content", CGROUP_BLKIO_THROTTLE_READ_IOPS));
 
@@ -208,7 +174,7 @@ mod tests {
 
     #[test]
     fn test_set_blkio_write_iops() {
-        let (test_root, throttle) = setup(
+        let (tmp, throttle) = setup(
             "test_set_blkio_write_iops",
             CGROUP_BLKIO_THROTTLE_WRITE_IOPS,
         );
@@ -221,7 +187,7 @@ mod tests {
             }])
             .build();
 
-        Blkio::apply(&test_root, &blkio).expect("apply blkio");
+        Blkio::apply(&tmp, &blkio).expect("apply blkio");
         let content = fs::read_to_string(throttle)
             .unwrap_or_else(|_| panic!("read {} content", CGROUP_BLKIO_THROTTLE_WRITE_IOPS));
 
