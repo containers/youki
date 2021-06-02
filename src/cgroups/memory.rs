@@ -144,7 +144,7 @@ impl Memory {
             .create(false)
             .write(true)
             .truncate(true)
-            .open(path).await?;
+            .open(path).await.expect(&format!("Open: {}", path.to_str().unwrap()));
         file.write_all(val.to_string().as_bytes()).await?;
         file.sync_all().await?;
         Ok(())
