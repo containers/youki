@@ -171,8 +171,7 @@ fn run_container<P: AsRef<Path>>(
 
             // fork second time, which will later create container
             match fork::fork_init(child)? {
-                // This should be unreachable  as fork_init only returns Process::Init ?
-                Process::Child(child) => Ok(Process::Child(child)),
+                Process::Child(child) => unreachable!(),
                 // This is actually the child process after fork
                 Process::Init(mut init) => {
                     // setup args and env vars as in the spec
