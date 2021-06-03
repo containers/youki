@@ -54,7 +54,11 @@ $ mkdir tutorial
 $ cd tutorial
 $ mkdir rootfs
 $ docker export $(docker create busybox) | tar -C rootfs -xvf -
-$ # Prepare a configuration file for the container that will run `sleep 5`.
+```
+
+Prepare a configuration file for the container that will run `sleep 5`.
+
+```sh
 $ curl https://gist.githubusercontent.com/utam0k/8ab419996633066eaf53ac9c66d962e7/raw/e81548f591f26ec03d85ce38b0443144573b4cf6/config.json -o config.json
 $ cd ../
 $ ./youki create -b tutorial tutorial_container
