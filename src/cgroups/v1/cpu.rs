@@ -64,3 +64,92 @@ impl Cpu {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cgroups::test::{set_fixture, setup, LinuxCpuBuilder};
+    use std::fs;
+
+    #[test]
+    fn test_set_shares() {
+        // arrange
+        let (tmp, shares) = setup("test_set_shares", CGROUP_CPU_SHARES);
+        let _ = set_fixture(&tmp, CGROUP_CPU_SHARES, "")
+            .unwrap_or_else(|_| panic!("set test fixture for {}", CGROUP_CPU_SHARES));
+        let cpu = LinuxCpuBuilder::new().with_shares(2048).build();
+
+        // act
+        Cpu::apply(&tmp, &cpu).expect("apply cpu");
+
+        // assert
+        let content = fs::read_to_string(shares)
+            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_SHARES));
+        assert_eq!(content, 2048.to_string());
+    }
+
+    #[test]
+    fn test_set_quota() {
+        // arrange
+        const QUOTA: i64 = 200000;
+        let (tmp, max) = setup("test_set_quota", CGROUP_CPU_QUOTA);
+        let cpu = LinuxCpuBuilder::new().with_quota(QUOTA).build();
+
+        // act
+        Cpu::apply(&tmp, &cpu).expect("apply cpu");
+
+        // assert
+        let content = fs::read_to_string(max)
+            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_QUOTA));
+        assert_eq!(content, QUOTA.to_string());
+    }
+
+    #[test]
+    fn test_set_period() {
+        // arrange
+        const PERIOD: u64 = 100000;
+        let (tmp, max) = setup("test_set_period", CGROUP_CPU_PERIOD);
+        let cpu = LinuxCpuBuilder::new().with_period(PERIOD).build();
+
+        // act
+        Cpu::apply(&tmp, &cpu).expect("apply cpu");
+
+        // assert
+        let content = fs::read_to_string(max)
+            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_PERIOD));
+        assert_eq!(content, PERIOD.to_string());
+    }
+
+    #[test]
+    fn test_set_rt_runtime() {
+         // arrange
+         const RUNTIME: i64 = 100000;
+         let (tmp, max) = setup("test_set_rt_runtime", CGROUP_CPU_RT_RUNTIME);
+         let cpu = LinuxCpuBuilder::new().with_realtime_runtime(RUNTIME).build();
+ 
+         // act
+         Cpu::apply(&tmp, &cpu).expect("apply cpu");
+ 
+         // assert
+         let content = fs::read_to_string(max)
+             .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_RT_RUNTIME));
+         assert_eq!(content, RUNTIME.to_string());
+    }
+
+    #[test]
+    fn test_set_rt_period() {
+         // arrange
+         const PERIOD: u64 = 100000;
+         let (tmp, max) = setup("test_set_rt_period", CGROUP_CPU_RT_PERIOD);
+         let cpu = LinuxCpuBuilder::new().with_realtime_period(PERIOD).build();
+ 
+         // act
+         Cpu::apply(&tmp, &cpu).expect("apply cpu");
+ 
+         // assert
+         let content = fs::read_to_string(max)
+             .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_RT_PERIOD));
+         assert_eq!(content, PERIOD.to_string());
+    }
+
+}
