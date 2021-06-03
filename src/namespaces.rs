@@ -6,9 +6,7 @@ use nix::{
     unistd::{self, Gid, Uid},
 };
 
-use crate::{
-    command::{linux::LinuxCommand, test::TestHelperCommand, Command},
-};
+use crate::command::{linux::LinuxCommand, test::TestHelperCommand, Command};
 use oci_spec::{LinuxNamespace, LinuxNamespaceType};
 
 pub struct Namespaces {

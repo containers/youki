@@ -1,16 +1,10 @@
-use std::io::Write;
-use std::{
-    fs::{create_dir_all, OpenOptions},
-    path::Path,
-};
+use std::{fs::create_dir_all, path::Path};
 
 use anyhow::Result;
 use nix::unistd::Pid;
 
-use crate::{
-    cgroups::Controller,
-    rootfs::default_devices,
-};
+use crate::cgroups::common;
+use crate::{cgroups::v1::Controller, rootfs::default_devices};
 use oci_spec::{LinuxDeviceCgroup, LinuxDeviceType, LinuxResources};
 
 pub struct Devices {}
@@ -33,12 +27,7 @@ impl Controller for Devices {
             Self::apply_device(&d, &cgroup_root)?;
         }
 
-        OpenOptions::new()
-            .create(false)
-            .write(true)
-            .truncate(false)
-            .open(cgroup_root.join("cgroup.procs"))?
-            .write_all(pid.to_string().as_bytes())?;
+        common::write_cgroup_file(cgroup_root.join("cgroup.procs"), &pid.to_string())?;
         Ok(())
     }
 }
@@ -51,12 +40,7 @@ impl Devices {
             cgroup_root.join("devices.deny")
         };
 
-        OpenOptions::new()
-            .create(false)
-            .write(true)
-            .truncate(false)
-            .open(path)?
-            .write_all(device.to_string().as_bytes())?;
+        common::write_cgroup_file(path, &device.to_string())?;
         Ok(())
     }
 

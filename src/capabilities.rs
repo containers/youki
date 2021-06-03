@@ -1,6 +1,4 @@
-use crate::{
-    command::Command,
-};
+use crate::command::Command;
 use caps::*;
 
 use anyhow::Result;

@@ -7,9 +7,8 @@ use std::{
 use anyhow::{Result, *};
 use nix::{errno::Errno, unistd::Pid};
 
-use crate::{
-    cgroups::Controller,
-};
+use crate::cgroups::common;
+use crate::cgroups::v1::Controller;
 use oci_spec::{LinuxMemory, LinuxResources};
 
 const CGROUP_MEMORY_SWAP_LIMIT: &str = "memory.memsw.limit_in_bytes";
@@ -66,14 +65,9 @@ impl Controller for Memory {
             if let Some(tcp_mem) = memory.kernel_tcp {
                 Self::set(tcp_mem, &cgroup_root.join(CGROUP_KERNEL_TCP_MEMORY_LIMIT))?;
             }
-
-            OpenOptions::new()
-                .create(false)
-                .write(true)
-                .truncate(false)
-                .open(cgroup_root.join("cgroup.procs"))?
-                .write_all(pid.to_string().as_bytes())?;
         }
+
+        common::write_cgroup_file(cgroup_root.join("cgroup.procs"), &pid.to_string())?;
         Ok(())
     }
 }
@@ -182,7 +176,6 @@ impl Memory {
         }
 
         let path = cgroup_root.join(CGROUP_MEMORY_SWAP_LIMIT);
-
         Self::set(val, &path)?;
 
         Ok(())
@@ -239,23 +232,8 @@ impl Memory {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cgroups::test::{create_temp_dir, set_fixture};
     use oci_spec::LinuxMemory;
-
-    fn set_fixture(temp_dir: &std::path::Path, filename: &str, val: &str) -> Result<()> {
-        std::fs::OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(true)
-            .open(temp_dir.join(filename))?
-            .write_all(val.as_bytes())?;
-
-        Ok(())
-    }
-
-    fn create_temp_dir(test_name: &str) -> Result<std::path::PathBuf> {
-        std::fs::create_dir_all(std::env::temp_dir().join(test_name))?;
-        Ok(std::env::temp_dir().join(test_name))
-    }
 
     #[test]
     fn test_set_memory() {

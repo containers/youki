@@ -38,8 +38,33 @@ For other platforms, please use the devcontainer that we prepared.
 ```sh
 $ git clone git@github.com:utam0k/youki.git
 $ cd youki
-$ cargo build
+$ ./build.sh
+$ ./youki -h // you can get information about youki command
 ```
+
+## Tutorial
+Let's try to run a container that executes `sleep 5` using youki.
+Maybe this tutorial is need permission as root.
+
+```sh
+$ git clone git@github.com:utam0k/youki.git
+$ cd youki
+$ ./build.sh
+$ mkdir tutorial
+$ cd tutorial
+$ mkdir rootfs
+$ docker export $(docker create busybox) | tar -C rootfs -xvf -
+// Prepare a configuration file for the container that will run `sleep 5`.
+$ curl https://gist.githubusercontent.com/utam0k/8ab419996633066eaf53ac9c66d962e7/raw/e81548f591f26ec03d85ce38b0443144573b4cf6/config.json -o config.json
+$ cd ../
+$ ./youki create -b tutorial tutorial_container
+$ ./youki state tutorial_container // You can see the state the container is in as it is being generate.
+$ ./youki start tutorial_container
+$ ./youki state tutorial_container // Run it within 5 seconds to see the running container.
+$ ./youki delete tutorial_container // Run it after the container is finished running.
+```
+
+Change the command to be executed in config.json and try something other than `sleep 5`.
 
 ## Usage
 
@@ -88,3 +113,9 @@ TBD(WIP on [#14](https://github.com/utam0k/youki/issues/14))
 This project welcomes your PR and issues.
 For example, refactoring, adding features, correcting English, etc.
 If you need any help, you can contact me on [Twitter](https://twitter.com/utam0k).
+
+Thanks to all the people who already contributed!
+
+<a href="https://github.com/utam0k/youki/graphs/contributors">
+  <img src="https://contributors-img.web.app/image?repo=utam0k/youki" />
+</a>

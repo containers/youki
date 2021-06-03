@@ -12,10 +12,9 @@ use nix::sched;
 use nix::sys::wait::{waitpid, WaitStatus};
 use nix::unistd;
 
-use crate::cgroups::Manager;
+use crate::cgroups::common::CgroupManager;
 use crate::container::ContainerStatus;
 use crate::process::{child, init, parent, Process};
-use oci_spec;
 use crate::utils;
 use crate::{cond::Cond, container::Container};
 
@@ -24,7 +23,7 @@ pub fn fork_first<P: AsRef<Path>>(
     is_userns: bool,
     linux: &oci_spec::Linux,
     container: &Container,
-    cmanager: &Manager,
+    cmanager: Box<dyn CgroupManager>,
 ) -> Result<Process> {
     let ccond = Cond::new()?;
 

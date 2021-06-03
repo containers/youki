@@ -3,17 +3,21 @@
 //! This crate provides a container runtime which can be used by a high-level container runtime to run containers.
 
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Result};
 use clap::Clap;
 use nix::sys::signal as nix_signal;
 
+use youki::command::linux::LinuxCommand;
 use youki::container::{Container, ContainerStatus};
 use youki::create;
 use youki::signal;
 use youki::start;
-use youki::{cgroups::Manager, command::linux::LinuxCommand};
+
+use youki::utils;
+use youki::cgroups;
+
 
 /// High-level commandline option definition
 /// This takes global options as well as individual commands as specified in [OCI runtime-spec](https://github.com/opencontainers/runtime-spec/blob/master/runtime.md)
@@ -65,33 +69,13 @@ enum SubCommand {
     State(StateArgs),
 }
 
-impl SubCommand {
-    fn get_container_id(&self) -> &String {
-        match &self {
-            SubCommand::Create(create) => &create.container_id,
-            SubCommand::Start(start) => &start.container_id,
-            SubCommand::Delete(delete) => &delete.container_id,
-            SubCommand::Kill(kill) => &kill.container_id,
-            SubCommand::State(state_args) => &state_args.container_id,
-        }
-    }
-}
-
 /// This is the entry point in the container runtime. The binary is run by a high-level container runtime,
 /// with various flags passed. This parses the flags, creates and manages appropriate resources.
 fn main() -> Result<()> {
     let opts = Opts::parse();
 
-    // debug mode for developer
-    if matches!(opts.subcmd, SubCommand::Create(_)) {
-        #[cfg(debug_assertions)]
-        std::env::set_var("YOUKI_MODE", "/var/lib/docker/containers/");
-        #[cfg(debug_assertions)]
-        std::env::set_var("YOUKI_LOG_LEVEL", "debug");
-    }
-
-    if let Err(e) = youki::logger::init(opts.subcmd.get_container_id().as_str(), opts.log) {
-        log::warn!("log init failed: {:?}", e);
+    if let Err(e) = youki::logger::init(opts.log) {
+        eprintln!("log init failed: {:?}", e);
     }
 
     let root_path = PathBuf::from(&opts.root);
@@ -128,6 +112,7 @@ fn main() -> Result<()> {
             }
         }
         SubCommand::Delete(delete) => {
+            log::debug!("start deleting {}", delete.container_id);
             // state of container is stored in a directory named as container id inside
             // root directory given in commandline options
             let container_root = root_path.join(&delete.container_id);
@@ -136,18 +121,30 @@ fn main() -> Result<()> {
             }
             // load container state from json file, and check status of the container
             // it might be possible that delete is invoked on a running container.
+            log::debug!("load the container from {:?}", container_root);
             let container = Container::load(container_root)?.refresh_status()?;
             if container.can_delete() {
                 if container.root.exists() {
+                    nix::unistd::chdir(&PathBuf::from(&container.state.bundle))?;
+                    let config_absolute_path = &PathBuf::from(&container.state.bundle)
+                        .join(Path::new("config.json"))
+                        .to_string_lossy()
+                        .to_string();
+                    log::debug!("load spec from {:?}", config_absolute_path);
+                    let spec = oci_spec::Spec::load(config_absolute_path)?;
+                    log::debug!("spec: {:?}", spec);
+
                     // remove the directory storing container state
+                    log::debug!("remove dir {:?}", container.root);
                     fs::remove_dir_all(&container.root)?;
-                  
-                    let spec = oci_spec::Spec::load("config.json")?;
+
+                    let cgroups_path =
+                        utils::get_cgroup_path(&spec.linux.unwrap().cgroups_path, container.id());
+
                     // remove the cgroup created for the container
                     // check https://man7.org/linux/man-pages/man7/cgroups.7.html
                     // creating and removing cgroups section for more information on cgroups
-                  
-                    let cmanager = Manager::new(spec.linux.unwrap().cgroups_path)?;
+                    let cmanager = cgroups::common::create_cgroup_manager(cgroups_path)?;
                     cmanager.remove()?;
                 }
                 std::process::exit(0)

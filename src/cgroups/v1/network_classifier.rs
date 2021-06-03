@@ -1,15 +1,10 @@
-use std::io::Write;
-use std::{
-    fs::{create_dir_all, OpenOptions},
-    path::Path,
-};
+use std::{fs::create_dir_all, path::Path};
 
 use anyhow::Result;
 use nix::unistd::Pid;
 
-use crate::{
-    cgroups::Controller,
-};
+use crate::cgroups::common;
+use crate::cgroups::v1::Controller;
 use oci_spec::{LinuxNetwork, LinuxResources};
 
 pub struct NetworkClassifier {}
@@ -21,15 +16,9 @@ impl Controller for NetworkClassifier {
 
         if let Some(network) = linux_resources.network.as_ref() {
             Self::apply(cgroup_root, network)?;
-
-            OpenOptions::new()
-                .create(false)
-                .write(true)
-                .truncate(true)
-                .open(cgroup_root.join("cgroup.procs"))?
-                .write_all(pid.to_string().as_bytes())?;
         }
 
+        common::write_cgroup_file(cgroup_root.join("cgroup.procs"), &pid.to_string())?;
         Ok(())
     }
 }
@@ -37,19 +26,8 @@ impl Controller for NetworkClassifier {
 impl NetworkClassifier {
     fn apply(root_path: &Path, network: &LinuxNetwork) -> Result<()> {
         if let Some(class_id) = network.class_id {
-            Self::write_file(&root_path.join("net_cls.classid"), &class_id.to_string())?;
+            common::write_cgroup_file(&root_path.join("net_cls.classid"), &class_id.to_string())?;
         }
-
-        Ok(())
-    }
-
-    fn write_file(file_path: &Path, data: &str) -> Result<()> {
-        OpenOptions::new()
-            .create(false)
-            .write(true)
-            .truncate(true)
-            .open(file_path)?
-            .write_all(data.as_bytes())?;
 
         Ok(())
     }
@@ -57,25 +35,9 @@ impl NetworkClassifier {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
+    use crate::cgroups::test::{create_temp_dir, set_fixture};
 
     use super::*;
-
-    fn set_fixture(temp_dir: &std::path::Path, filename: &str, val: &str) -> Result<()> {
-        std::fs::OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(true)
-            .open(temp_dir.join(filename))?
-            .write_all(val.as_bytes())?;
-
-        Ok(())
-    }
-
-    fn create_temp_dir(test_name: &str) -> Result<PathBuf> {
-        std::fs::create_dir_all(std::env::temp_dir().join(test_name))?;
-        Ok(std::env::temp_dir().join(test_name))
-    }
 
     #[test]
     fn test_apply_network_classifier() {

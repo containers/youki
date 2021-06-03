@@ -1,14 +1,11 @@
 use std::{
-    fs::{self, OpenOptions},
-    io::Write,
+    fs::{self},
     path::Path,
 };
 
 use anyhow::Result;
 
-use crate::{
-    cgroups::Controller,
-};
+use crate::cgroups::{common, v1::Controller};
 use oci_spec::{LinuxPids, LinuxResources};
 
 pub struct Pids {}
@@ -19,18 +16,14 @@ impl Controller for Pids {
         cgroup_root: &std::path::Path,
         pid: nix::unistd::Pid,
     ) -> anyhow::Result<()> {
+        log::debug!("Apply pids cgroup config");
         fs::create_dir_all(cgroup_root)?;
 
-        for pids in &linux_resources.pids {
-            Self::apply(cgroup_root, pids)?
+        if let Some(pids) = &linux_resources.pids {
+            Self::apply(cgroup_root, pids)?;
         }
 
-        OpenOptions::new()
-            .create(false)
-            .write(true)
-            .truncate(false)
-            .open(cgroup_root.join("cgroup.procs"))?
-            .write_all(pid.to_string().as_bytes())?;
+        common::write_cgroup_file(cgroup_root.join("cgroup.procs"), &pid.to_string())?;
         Ok(())
     }
 }
@@ -43,42 +36,17 @@ impl Pids {
             "max".to_string()
         };
 
-        Self::write_file(&root_path.join("pids.max"), &limit)?;
-        Ok(())
-    }
-
-    fn write_file(file_path: &Path, data: &str) -> Result<()> {
-        fs::OpenOptions::new()
-            .create(false)
-            .write(true)
-            .truncate(true)
-            .open(file_path)?
-            .write_all(data.as_bytes())?;
-
+        common::write_cgroup_file(&root_path.join("pids.max"), &limit)?;
         Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::cgroups::test::{create_temp_dir, set_fixture};
+
     use super::*;
     use oci_spec::LinuxPids;
-
-    fn set_fixture(temp_dir: &std::path::Path, filename: &str, val: &str) -> Result<()> {
-        std::fs::OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(true)
-            .open(temp_dir.join(filename))?
-            .write_all(val.as_bytes())?;
-
-        Ok(())
-    }
-
-    fn create_temp_dir(test_name: &str) -> Result<std::path::PathBuf> {
-        std::fs::create_dir_all(std::env::temp_dir().join(test_name))?;
-        Ok(std::env::temp_dir().join(test_name))
-    }
 
     #[test]
     fn test_set_pids() {

@@ -15,7 +15,6 @@ use crate::namespaces::Namespaces;
 use crate::notify_socket::NotifyListener;
 use crate::process::{fork, Process};
 use crate::rootfs;
-use oci_spec;
 use crate::stdio::FileDescriptor;
 use crate::tty;
 use crate::utils;
@@ -50,6 +49,8 @@ impl Create {
     pub fn exec(&self, root_path: PathBuf, command: impl Command) -> Result<()> {
         // create a directory for the container to store state etc.
         // if already present, return error
+        let bundle_canonicalized = fs::canonicalize(&self.bundle)
+            .unwrap_or_else(|_| panic!("failed to canonicalied {:?}", &self.bundle));
         let container_dir = root_path.join(&self.container_id);
         if !container_dir.exists() {
             fs::create_dir(&container_dir).unwrap();
@@ -75,7 +76,7 @@ impl Create {
             &self.container_id,
             ContainerStatus::Creating,
             None,
-            self.bundle.to_str().unwrap(),
+            bundle_canonicalized.to_str().unwrap(),
             &container_dir,
         )?;
         container.save()?;
@@ -134,7 +135,8 @@ fn run_container<P: AsRef<Path>>(
     let linux = spec.linux.as_ref().unwrap();
     let namespaces: Namespaces = linux.namespaces.clone().into();
 
-    let cmanager = cgroups::Manager::new(linux.cgroups_path.clone())?;
+    let cgroups_path = utils::get_cgroup_path(&linux.cgroups_path, container.id());
+    let cmanager = cgroups::common::create_cgroup_manager(&cgroups_path)?;
 
     // first fork, which creates process, which will later create actual container process
     match fork::fork_first(
@@ -144,7 +146,7 @@ fn run_container<P: AsRef<Path>>(
             .contains(sched::CloneFlags::CLONE_NEWUSER),
         linux,
         &container,
-        &cmanager,
+        cmanager,
     )? {
         // In the parent process, which called run_container
         Process::Parent(parent) => Ok(Process::Parent(parent)),

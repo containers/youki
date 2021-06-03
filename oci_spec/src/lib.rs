@@ -363,9 +363,9 @@ pub struct LinuxCpu {
     pub realtime_runtime: Option<i64>,
     pub realtime_period: Option<u64>,
     #[serde(default)]
-    pub cpus: String,
+    pub cpus: Option<String>,
     #[serde(default)]
-    pub mems: String,
+    pub mems: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -453,7 +453,6 @@ pub struct LinuxResources {
     pub disable_oom_killer: bool,
     pub oom_score_adj: Option<i32>,
     pub memory: Option<LinuxMemory>,
-    #[serde(rename = "LinuxCPU")]
     pub cpu: Option<LinuxCpu>,
     pub pids: Option<LinuxPids>,
     #[serde(rename = "blockIO")]
@@ -568,7 +567,7 @@ pub struct Linux {
     pub sysctl: HashMap<String, String>,
     pub resources: Option<LinuxResources>,
     #[serde(default)]
-    pub cgroups_path: PathBuf,
+    pub cgroups_path: Option<PathBuf>,
     #[serde(default)]
     pub namespaces: Vec<LinuxNamespace>,
     #[serde(default)]
@@ -603,6 +602,7 @@ impl Spec {
     pub fn load(path: &str) -> Result<Self> {
         let file = File::open(path)?;
         let mut spec: Spec = serde_json::from_reader(&file)?;
+        // FIME: It is fail if the caller isn't in the correct directory.
         spec.root.path = std::fs::canonicalize(spec.root.path)?;
         Ok(spec)
     }
