@@ -89,6 +89,9 @@ $ git submodule update --init --recursive
 $ ./integration_test.sh
 ```
 
+# Community
+We also have an active [Discord](https://discord.gg/h7R3HgWUct) if you'd like to come and chat with us.
+
 # Design and implementation of youki
 
 TBD(WIP on [#14](https://github.com/utam0k/youki/issues/14))
