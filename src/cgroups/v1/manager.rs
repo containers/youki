@@ -7,7 +7,7 @@ use nix::unistd::Pid;
 use procfs::process::Process;
 
 use super::{
-    blkio::Blkio, cpu::Cpu, devices::Devices, hugetlb::Hugetlb, memory::Memory,
+    blkio::Blkio, cpu::Cpu, cpuset::CpuSet, devices::Devices, hugetlb::Hugetlb, memory::Memory,
     network_classifier::NetworkClassifier, network_priority::NetworkPriority, pids::Pids,
     Controller, ControllerType,
 };
@@ -17,6 +17,7 @@ use oci_spec::LinuxResources;
 
 const CONTROLLERS: &[ControllerType] = &[
     ControllerType::Cpu,
+    ControllerType::CpuSet,
     ControllerType::Devices,
     ControllerType::HugeTlb,
     ControllerType::Memory,
@@ -89,6 +90,7 @@ impl CgroupManager for Manager {
         for subsys in &self.subsystems {
             match subsys.0.as_str() {
                 "cpu" => Cpu::apply(linux_resources, &subsys.1, pid)?,
+                "cpuset" => CpuSet::apply(linux_resources, &subsys.1, pid)?,
                 "devices" => Devices::apply(linux_resources, &subsys.1, pid)?,
                 "hugetlb" => Hugetlb::apply(linux_resources, &subsys.1, pid)?,
                 "memory" => Memory::apply(linux_resources, &subsys.1, pid)?,
@@ -96,7 +98,7 @@ impl CgroupManager for Manager {
                 "blkio" => Blkio::apply(linux_resources, &subsys.1, pid)?,
                 "net_prio" => NetworkPriority::apply(linux_resources, &subsys.1, pid)?,
                 "net_cls" => NetworkClassifier::apply(linux_resources, &subsys.1, pid)?,
-                _ => continue,
+                _ => unreachable!("every subsystem should have an associated controller"),
             }
         }
 
