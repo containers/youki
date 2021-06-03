@@ -40,3 +40,41 @@ impl CpuSet {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use super::*;
+    use crate::cgroups::test::{setup, LinuxCpuBuilder};
+
+    #[test]
+    fn test_set_cpus() {
+        // arrange
+        let (tmp, cpus) = setup("test_set_cpus", CGROUP_CPUSET_CPUS);
+        let cpuset = LinuxCpuBuilder::new().with_cpus("1-3".to_owned()).build();
+
+        // act
+        CpuSet::apply(&tmp, &cpuset).expect("apply cpuset");
+
+        // assert
+        let content = fs::read_to_string(&cpus)
+            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPUSET_CPUS));
+        assert_eq!(content, "1-3");
+    }
+
+    #[test]
+    fn test_set_mems() {
+        // arrange
+        let (tmp, mems) = setup("test_set_mems", CGROUP_CPUSET_MEMS);
+        let cpuset = LinuxCpuBuilder::new().with_mems("1-3".to_owned()).build();
+
+        // act
+        CpuSet::apply(&tmp, &cpuset).expect("apply cpuset");
+
+        // assert
+        let content = fs::read_to_string(&mems)
+            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPUSET_MEMS));
+        assert_eq!(content, "1-3");
+    }
+}
