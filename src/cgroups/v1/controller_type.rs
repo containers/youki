@@ -1,6 +1,7 @@
 use std::string::ToString;
 
 pub enum ControllerType {
+    Cpu,
     Devices,
     HugeTlb,
     Pids,
@@ -13,6 +14,7 @@ pub enum ControllerType {
 impl ToString for ControllerType {
     fn to_string(&self) -> String {
         match self {
+            Self::Cpu => "cpu".into(),
             Self::Devices => "devices".into(),
             Self::HugeTlb => "hugetlb".into(),
             Self::Pids => "pids".into(),

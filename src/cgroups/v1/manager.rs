@@ -7,15 +7,16 @@ use nix::unistd::Pid;
 use procfs::process::Process;
 
 use super::{
-    blkio::Blkio, devices::Devices, hugetlb::Hugetlb, memory::Memory,
+    blkio::Blkio, cpu::Cpu, devices::Devices, hugetlb::Hugetlb, memory::Memory,
     network_classifier::NetworkClassifier, network_priority::NetworkPriority, pids::Pids,
-    Controller,
+    Controller, ControllerType,
 };
 
-use crate::{cgroups::common::CgroupManager, cgroups::v1::ControllerType, utils::PathBufExt};
+use crate::{cgroups::common::CgroupManager, utils::PathBufExt};
 use oci_spec::LinuxResources;
 
 const CONTROLLERS: &[ControllerType] = &[
+    ControllerType::Cpu,
     ControllerType::Devices,
     ControllerType::HugeTlb,
     ControllerType::Memory,
@@ -56,6 +57,10 @@ impl Manager {
                         return m.mount_point.ends_with("net_cls,net_prio")
                             || m.mount_point.ends_with("net_prio,net_cls");
                     }
+
+                    if subsystem == "cpu" {
+                        return m.mount_point.ends_with("cpu,cpuacct");
+                    }
                 }
                 m.mount_point.ends_with(subsystem)
             })
@@ -83,6 +88,7 @@ impl CgroupManager for Manager {
     fn apply(&self, linux_resources: &LinuxResources, pid: Pid) -> Result<()> {
         for subsys in &self.subsystems {
             match subsys.0.as_str() {
+                "cpu" => Cpu::apply(linux_resources, &subsys.1, pid)?,
                 "devices" => Devices::apply(linux_resources, &subsys.1, pid)?,
                 "hugetlb" => Hugetlb::apply(linux_resources, &subsys.1, pid)?,
                 "memory" => Memory::apply(linux_resources, &subsys.1, pid)?,
