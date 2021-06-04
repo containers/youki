@@ -3,7 +3,10 @@ use std::{fs, path::Path};
 use anyhow::anyhow;
 use regex::Regex;
 
-use crate::cgroups::{common, v1::Controller};
+use crate::cgroups::{
+    common::{self, CGROUP_PROCS},
+    v1::Controller,
+};
 use oci_spec::{LinuxHugepageLimit, LinuxResources};
 
 pub struct Hugetlb {}
@@ -21,7 +24,7 @@ impl Controller for Hugetlb {
             Self::apply(cgroup_root, hugetlb)?
         }
 
-        common::write_cgroup_file(cgroup_root.join("cgroup.procs"), &pid.to_string())?;
+        common::write_cgroup_file(cgroup_root.join(CGROUP_PROCS), pid)?;
         Ok(())
     }
 }
@@ -42,7 +45,7 @@ impl Hugetlb {
 
         common::write_cgroup_file(
             &root_path.join(format!("hugetlb.{}.limit_in_bytes", hugetlb.page_size)),
-            &hugetlb.limit.to_string(),
+            &hugetlb.limit,
         )?;
         Ok(())
     }

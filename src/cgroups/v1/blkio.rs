@@ -3,7 +3,10 @@ use std::{
     path::Path,
 };
 
-use crate::cgroups::{common, v1::Controller};
+use crate::cgroups::{
+    common::{self, CGROUP_PROCS},
+    v1::Controller,
+};
 use oci_spec::{LinuxBlockIo, LinuxResources};
 
 const CGROUP_BLKIO_THROTTLE_READ_BPS: &str = "blkio.throttle.read_bps_device";
@@ -26,7 +29,7 @@ impl Controller for Blkio {
             Self::apply(cgroup_root, blkio)?;
         }
 
-        common::write_cgroup_file(&cgroup_root.join("cgroup.procs"), &pid.to_string())?;
+        common::write_cgroup_file(cgroup_root.join(CGROUP_PROCS), pid)?;
         Ok(())
     }
 }
@@ -34,28 +37,28 @@ impl Controller for Blkio {
 impl Blkio {
     fn apply(root_path: &Path, blkio: &LinuxBlockIo) -> anyhow::Result<()> {
         for trbd in &blkio.blkio_throttle_read_bps_device {
-            common::write_cgroup_file(
+            common::write_cgroup_file_str(
                 &root_path.join(CGROUP_BLKIO_THROTTLE_READ_BPS),
                 &format!("{}:{} {}", trbd.major, trbd.minor, trbd.rate),
             )?;
         }
 
         for twbd in &blkio.blkio_throttle_write_bps_device {
-            common::write_cgroup_file(
+            common::write_cgroup_file_str(
                 &root_path.join(CGROUP_BLKIO_THROTTLE_WRITE_BPS),
                 &format!("{}:{} {}", twbd.major, twbd.minor, twbd.rate),
             )?;
         }
 
         for trid in &blkio.blkio_throttle_read_iops_device {
-            common::write_cgroup_file(
+            common::write_cgroup_file_str(
                 &root_path.join(CGROUP_BLKIO_THROTTLE_READ_IOPS),
                 &format!("{}:{} {}", trid.major, trid.minor, trid.rate),
             )?;
         }
 
         for twid in &blkio.blkio_throttle_write_iops_device {
-            common::write_cgroup_file(
+            common::write_cgroup_file_str(
                 &root_path.join(CGROUP_BLKIO_THROTTLE_WRITE_IOPS),
                 &format!("{}:{} {}", twid.major, twid.minor, twid.rate),
             )?;

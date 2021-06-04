@@ -24,7 +24,7 @@ impl Controller for Cpu {
             Self::apply(cgroup_root, cpu)?;
         }
 
-        common::write_cgroup_file_(cgroup_root.join(CGROUP_PROCS), pid)?;
+        common::write_cgroup_file(cgroup_root.join(CGROUP_PROCS), pid)?;
         Ok(())
     }
 }
@@ -33,31 +33,31 @@ impl Cpu {
     fn apply(root_path: &Path, cpu: &LinuxCpu) -> Result<()> {
         if let Some(cpu_shares) = cpu.shares {
             if cpu_shares != 0 {
-                common::write_cgroup_file_(root_path.join(CGROUP_CPU_SHARES), cpu_shares)?;
+                common::write_cgroup_file(root_path.join(CGROUP_CPU_SHARES), cpu_shares)?;
             }
         }
 
         if let Some(cpu_period) = cpu.period {
             if cpu_period != 0 {
-                common::write_cgroup_file_(root_path.join(CGROUP_CPU_PERIOD), cpu_period)?;
+                common::write_cgroup_file(root_path.join(CGROUP_CPU_PERIOD), cpu_period)?;
             }
         }
 
         if let Some(cpu_quota) = cpu.quota {
             if cpu_quota != 0 {
-                common::write_cgroup_file_(root_path.join(CGROUP_CPU_QUOTA), cpu_quota)?;
+                common::write_cgroup_file(root_path.join(CGROUP_CPU_QUOTA), cpu_quota)?;
             }
         }
 
         if let Some(rt_runtime) = cpu.realtime_runtime {
             if rt_runtime != 0 {
-                common::write_cgroup_file_(root_path.join(CGROUP_CPU_RT_RUNTIME), rt_runtime)?;
+                common::write_cgroup_file(root_path.join(CGROUP_CPU_RT_RUNTIME), rt_runtime)?;
             }
         }
 
         if let Some(rt_period) = cpu.realtime_period {
             if rt_period != 0 {
-                common::write_cgroup_file_(root_path.join(CGROUP_CPU_RT_PERIOD), rt_period)?;
+                common::write_cgroup_file(root_path.join(CGROUP_CPU_RT_PERIOD), rt_period)?;
             }
         }
 
@@ -122,34 +122,35 @@ mod tests {
 
     #[test]
     fn test_set_rt_runtime() {
-         // arrange
-         const RUNTIME: i64 = 100000;
-         let (tmp, max) = setup("test_set_rt_runtime", CGROUP_CPU_RT_RUNTIME);
-         let cpu = LinuxCpuBuilder::new().with_realtime_runtime(RUNTIME).build();
- 
-         // act
-         Cpu::apply(&tmp, &cpu).expect("apply cpu");
- 
-         // assert
-         let content = fs::read_to_string(max)
-             .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_RT_RUNTIME));
-         assert_eq!(content, RUNTIME.to_string());
+        // arrange
+        const RUNTIME: i64 = 100000;
+        let (tmp, max) = setup("test_set_rt_runtime", CGROUP_CPU_RT_RUNTIME);
+        let cpu = LinuxCpuBuilder::new()
+            .with_realtime_runtime(RUNTIME)
+            .build();
+
+        // act
+        Cpu::apply(&tmp, &cpu).expect("apply cpu");
+
+        // assert
+        let content = fs::read_to_string(max)
+            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_RT_RUNTIME));
+        assert_eq!(content, RUNTIME.to_string());
     }
 
     #[test]
     fn test_set_rt_period() {
-         // arrange
-         const PERIOD: u64 = 100000;
-         let (tmp, max) = setup("test_set_rt_period", CGROUP_CPU_RT_PERIOD);
-         let cpu = LinuxCpuBuilder::new().with_realtime_period(PERIOD).build();
- 
-         // act
-         Cpu::apply(&tmp, &cpu).expect("apply cpu");
- 
-         // assert
-         let content = fs::read_to_string(max)
-             .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_RT_PERIOD));
-         assert_eq!(content, PERIOD.to_string());
-    }
+        // arrange
+        const PERIOD: u64 = 100000;
+        let (tmp, max) = setup("test_set_rt_period", CGROUP_CPU_RT_PERIOD);
+        let cpu = LinuxCpuBuilder::new().with_realtime_period(PERIOD).build();
 
+        // act
+        Cpu::apply(&tmp, &cpu).expect("apply cpu");
+
+        // assert
+        let content = fs::read_to_string(max)
+            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_RT_PERIOD));
+        assert_eq!(content, PERIOD.to_string());
+    }
 }

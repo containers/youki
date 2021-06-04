@@ -7,7 +7,7 @@ use std::{
 use anyhow::{Result, *};
 use nix::{errno::Errno, unistd::Pid};
 
-use crate::cgroups::common;
+use crate::cgroups::common::{self, CGROUP_PROCS};
 use crate::cgroups::v1::Controller;
 use oci_spec::{LinuxMemory, LinuxResources};
 
@@ -35,18 +35,24 @@ impl Controller for Memory {
             Self::apply(&memory, cgroup_root)?;
 
             if reservation != 0 {
-                Self::set(reservation, &cgroup_root.join(CGROUP_MEMORY_RESERVATION))?;
+                common::write_cgroup_file(
+                    cgroup_root.join(CGROUP_MEMORY_RESERVATION),
+                    reservation,
+                )?;
             }
 
             if linux_resources.disable_oom_killer {
-                Self::set(0, &cgroup_root.join(CGROUP_MEMORY_OOM_CONTROL))?;
+                common::write_cgroup_file(cgroup_root.join(CGROUP_MEMORY_OOM_CONTROL), 0)?;
             } else {
-                Self::set(1, &cgroup_root.join(CGROUP_MEMORY_OOM_CONTROL))?;
+                common::write_cgroup_file(cgroup_root.join(CGROUP_MEMORY_OOM_CONTROL), 1)?;
             }
 
             if let Some(swappiness) = memory.swappiness {
                 if swappiness <= 100 {
-                    Self::set(swappiness, &cgroup_root.join(CGROUP_MEMORY_SWAPPINESS))?;
+                    common::write_cgroup_file(
+                        cgroup_root.join(CGROUP_MEMORY_SWAPPINESS),
+                        swappiness,
+                    )?;
                 } else {
                     // invalid swappiness value
                     return Err(anyhow!(
@@ -60,14 +66,17 @@ impl Controller for Memory {
             // neither are implemented by runc. Tests pass without this, but
             // kept in per the spec.
             if let Some(kmem) = memory.kernel {
-                Self::set(kmem, &cgroup_root.join(CGROUP_KERNEL_MEMORY_LIMIT))?;
+                common::write_cgroup_file(cgroup_root.join(CGROUP_KERNEL_MEMORY_LIMIT), kmem)?;
             }
             if let Some(tcp_mem) = memory.kernel_tcp {
-                Self::set(tcp_mem, &cgroup_root.join(CGROUP_KERNEL_TCP_MEMORY_LIMIT))?;
+                common::write_cgroup_file(
+                    cgroup_root.join(CGROUP_KERNEL_TCP_MEMORY_LIMIT),
+                    tcp_mem,
+                )?;
             }
         }
 
-        common::write_cgroup_file(cgroup_root.join("cgroup.procs"), &pid.to_string())?;
+        common::write_cgroup_file(cgroup_root.join(CGROUP_PROCS), pid)?;
         Ok(())
     }
 }
@@ -170,14 +179,12 @@ impl Memory {
         }
     }
 
-    fn set_swap(val: i64, cgroup_root: &Path) -> Result<()> {
-        if val == 0 {
+    fn set_swap(swap: i64, cgroup_root: &Path) -> Result<()> {
+        if swap == 0 {
             return Ok(());
         }
 
-        let path = cgroup_root.join(CGROUP_MEMORY_SWAP_LIMIT);
-        Self::set(val, &path)?;
-
+        common::write_cgroup_file(cgroup_root.join(CGROUP_MEMORY_SWAP_LIMIT), swap)?;
         Ok(())
     }
 

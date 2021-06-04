@@ -22,7 +22,7 @@ impl Controller for CpuSet {
             Self::apply(cgroup_root, cpuset)?;
         }
 
-        common::write_cgroup_file_(cgroup_root.join(CGROUP_PROCS), pid)?;
+        common::write_cgroup_file(cgroup_root.join(CGROUP_PROCS), pid)?;
         Ok(())
     }
 }
@@ -30,11 +30,11 @@ impl Controller for CpuSet {
 impl CpuSet {
     fn apply(root_path: &Path, cpuset: &LinuxCpu) -> Result<()> {
         if let Some(cpus) = &cpuset.cpus {
-            common::write_cgroup_file(root_path.join(CGROUP_CPUSET_CPUS), cpus)?;
+            common::write_cgroup_file_str(root_path.join(CGROUP_CPUSET_CPUS), cpus)?;
         }
 
         if let Some(mems) = &cpuset.mems {
-            common::write_cgroup_file(root_path.join(CGROUP_CPUSET_MEMS), mems)?;
+            common::write_cgroup_file_str(root_path.join(CGROUP_CPUSET_MEMS), mems)?;
         }
 
         Ok(())

@@ -3,7 +3,7 @@ use std::{fs::create_dir_all, path::Path};
 use anyhow::Result;
 use nix::unistd::Pid;
 
-use crate::cgroups::common;
+use crate::cgroups::common::{self, CGROUP_PROCS};
 use crate::{cgroups::v1::Controller, rootfs::default_devices};
 use oci_spec::{LinuxDeviceCgroup, LinuxDeviceType, LinuxResources};
 
@@ -27,7 +27,7 @@ impl Controller for Devices {
             Self::apply_device(&d, &cgroup_root)?;
         }
 
-        common::write_cgroup_file(cgroup_root.join("cgroup.procs"), &pid.to_string())?;
+        common::write_cgroup_file(cgroup_root.join(CGROUP_PROCS), pid)?;
         Ok(())
     }
 }
@@ -40,7 +40,7 @@ impl Devices {
             cgroup_root.join("devices.deny")
         };
 
-        common::write_cgroup_file(path, &device.to_string())?;
+        common::write_cgroup_file_str(path, &device.to_string())?;
         Ok(())
     }
 

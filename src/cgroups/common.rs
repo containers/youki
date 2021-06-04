@@ -40,7 +40,7 @@ impl Display for Cgroup {
 }
 
 #[inline]
-pub fn write_cgroup_file<P: AsRef<Path>>(path: P, data: &str) -> Result<()> {
+pub fn write_cgroup_file_str<P: AsRef<Path>>(path: P, data: &str) -> Result<()> {
     fs::OpenOptions::new()
         .create(false)
         .write(true)
@@ -52,7 +52,7 @@ pub fn write_cgroup_file<P: AsRef<Path>>(path: P, data: &str) -> Result<()> {
 }
 
 #[inline]
-pub fn write_cgroup_file_<P: AsRef<Path>, T: ToString>(path: P, data: T) -> Result<()> {
+pub fn write_cgroup_file<P: AsRef<Path>, T: ToString>(path: P, data: T) -> Result<()> {
     fs::OpenOptions::new()
         .create(false)
         .write(true)
@@ -96,7 +96,10 @@ pub fn create_cgroup_manager<P: Into<PathBuf>>(cgroup_path: P) -> Result<Box<dyn
                         cgroup_path.into(),
                     )?))
                 }
-                _ => Ok(Box::new(v1::manager::Manager::new(cgroup_path.into())?)),
+                _ => {
+                    log::info!("cgroup manager V1 will be used");
+                    Ok(Box::new(v1::manager::Manager::new(cgroup_path.into())?))
+                }
             }
         }
         _ => bail!("could not find cgroup filesystem"),
