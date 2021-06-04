@@ -36,7 +36,7 @@ For other platforms, please use the devcontainer that we prepared.
 ## Building
 
 ```sh
-$ git clone git@github.com:utam0k/youki.git
+$ git clone git@github.com:containers/youki.git
 $ cd youki
 $ ./build.sh
 $ ./youki -h # you can get information about youki command
@@ -47,7 +47,7 @@ Let's try to run a container that executes `sleep 5` using youki.
 Maybe this tutorial is need permission as root.
 
 ```sh
-$ git clone git@github.com:utam0k/youki.git
+$ git clone git@github.com:containers/youki.git
 $ cd youki
 $ ./build.sh
 $ mkdir tutorial
@@ -98,7 +98,7 @@ We also have an active [Discord](https://discord.gg/h7R3HgWUct) if you'd like to
 
 # Design and implementation of youki
 
-TBD(WIP on [#14](https://github.com/utam0k/youki/issues/14))
+TBD(WIP on [#14](https://github.com/containers/youki/issues/14))
 
 # Features
 
@@ -109,10 +109,10 @@ TBD(WIP on [#14](https://github.com/utam0k/youki/issues/14))
 - [x] namespaces
 - [x] capabilities
 - [x] rlimits
-- [ ] cgroups v1(WIP on [#9](https://github.com/utam0k/youki/issues/9))
+- [ ] cgroups v1(WIP on [#9](https://github.com/containers/youki/issues/9))
 - [ ] cgroups v2
 - [ ] seccomp
-- [ ] hooks(WIP on [#13](https://github.com/utam0k/youki/issues/13))
+- [ ] hooks(WIP on [#13](https://github.com/containers/youki/issues/13))
 - [ ] rootless
 
 # Contribution
@@ -123,6 +123,6 @@ If you need any help, you can contact me on [Twitter](https://twitter.com/utam0k
 
 Thanks to all the people who already contributed!
 
-<a href="https://github.com/utam0k/youki/graphs/contributors">
-  <img src="https://contributors-img.web.app/image?repo=utam0k/youki" />
+<a href="https://github.com/containers/youki/graphs/contributors">
+  <img src="https://contributors-img.web.app/image?repo=containers/youki" />
 </a>
