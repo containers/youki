@@ -1,12 +1,12 @@
 use std::{fs, path::Path};
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use nix::unistd::Pid;
 use oci_spec::{LinuxCpu, LinuxResources};
 
 use crate::cgroups::common::{self, CGROUP_PROCS};
 
-use super::Controller;
+use super::{Controller, ControllerType};
 
 const CGROUP_CPUSET_CPUS: &str = "cpuset.cpus";
 const CGROUP_CPUSET_MEMS: &str = "cpuset.mems";
@@ -14,27 +14,55 @@ const CGROUP_CPUSET_MEMS: &str = "cpuset.mems";
 pub struct CpuSet {}
 
 impl Controller for CpuSet {
-    fn apply(linux_resources: &LinuxResources, cgroup_root: &Path, pid: Pid) -> Result<()> {
+    fn apply(linux_resources: &LinuxResources, cgroup_path: &Path, pid: Pid) -> Result<()> {
         log::debug!("Apply CpuSet cgroup config");
-        fs::create_dir_all(cgroup_root)?;
+        fs::create_dir_all(cgroup_path)?;
 
         if let Some(cpuset) = &linux_resources.cpu {
-            Self::apply(cgroup_root, cpuset)?;
+            Self::apply(cgroup_path, cpuset)?;
         }
 
-        common::write_cgroup_file(cgroup_root.join(CGROUP_PROCS), pid)?;
+        Self::ensure_not_empty(cgroup_path, CGROUP_CPUSET_CPUS)?;
+        Self::ensure_not_empty(cgroup_path, CGROUP_CPUSET_MEMS)?;
+
+        common::write_cgroup_file(cgroup_path.join(CGROUP_PROCS), pid)?;
         Ok(())
     }
 }
 
 impl CpuSet {
-    fn apply(root_path: &Path, cpuset: &LinuxCpu) -> Result<()> {
+    fn apply(cgroup_path: &Path, cpuset: &LinuxCpu) -> Result<()> {
         if let Some(cpus) = &cpuset.cpus {
-            common::write_cgroup_file_str(root_path.join(CGROUP_CPUSET_CPUS), cpus)?;
-        }
+            common::write_cgroup_file_str(cgroup_path.join(CGROUP_CPUSET_CPUS), cpus)?;
+        } 
 
         if let Some(mems) = &cpuset.mems {
-            common::write_cgroup_file_str(root_path.join(CGROUP_CPUSET_MEMS), mems)?;
+            common::write_cgroup_file_str(cgroup_path.join(CGROUP_CPUSET_MEMS), mems)?;
+        } 
+
+        Ok(())
+    }
+
+    // if a task is moved into the cgroup and a value has not been set for cpus and mems
+    // Errno 28 (no space left on device) will be returned. Therefore we set the value from the parent if required.
+    fn ensure_not_empty(cgroup_path: &Path, interface_file: &str) -> Result<()> {
+        let mut current = common::get_cgroupv1_mount_path(&ControllerType::CpuSet.to_string())?;
+        let relative_cgroup_path = cgroup_path.strip_prefix(&current)?;
+
+        for component in relative_cgroup_path.components() {
+            let parent_value = fs::read_to_string(current.join(interface_file))?;
+            if parent_value.trim().is_empty() {
+                bail!("cpuset parent value is empty")
+            }
+
+            current.push(component);
+            let child_path = current.join(interface_file);
+            let child_value = fs::read_to_string(&child_path)?;
+            // the file can contain a newline character. Need to trim it away,
+            // otherwise it is not considered empty and value will not be written
+            if child_value.trim().is_empty() {
+                common::write_cgroup_file_str(&child_path, &parent_value)?;
+            }
         }
 
         Ok(())

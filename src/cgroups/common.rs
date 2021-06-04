@@ -6,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use nix::unistd::Pid;
 use oci_spec::LinuxResources;
 use procfs::process::Process;
@@ -61,6 +61,15 @@ pub fn write_cgroup_file<P: AsRef<Path>, T: ToString>(path: P, data: T) -> Resul
         .write_all(data.to_string().as_bytes())?;
 
     Ok(())
+}
+
+pub fn get_cgroupv1_mount_path(subsystem: &str) -> Result<PathBuf> {
+    Process::myself()?
+        .mountinfo()?
+        .into_iter()
+        .find(|m| m.fs_type == "cgroup" && m.mount_point.ends_with(subsystem))
+        .map(|m| m.mount_point)
+        .ok_or_else(|| anyhow!("could not find mountpoint for {}", subsystem))
 }
 
 pub fn create_cgroup_manager<P: Into<PathBuf>>(cgroup_path: P) -> Result<Box<dyn CgroupManager>> {
