@@ -1,5 +1,6 @@
+use std::fs;
+use std::path::Path;
 use std::{collections::HashMap, path::PathBuf};
-use std::{fs::remove_dir, path::Path};
 
 use anyhow::Result;
 use nix::unistd::Pid;
@@ -12,6 +13,8 @@ use super::{
     Controller, ControllerType,
 };
 
+use crate::cgroups::common::CGROUP_PROCS;
+use crate::utils;
 use crate::{cgroups::common::CgroupManager, utils::PathBufExt};
 use oci_spec::LinuxResources;
 
@@ -109,7 +112,15 @@ impl CgroupManager for Manager {
         for cgroup_path in &self.subsystems {
             if cgroup_path.1.exists() {
                 log::debug!("remove cgroup {:?}", cgroup_path.1);
-                remove_dir(&cgroup_path.1)?;
+                let procs_path = cgroup_path.1.join(CGROUP_PROCS);
+                let procs = fs::read_to_string(&procs_path)?;
+
+                for line in procs.lines() {
+                    let pid: i32 = line.parse()?;
+                    let _ = nix::sys::signal::kill(Pid::from_raw(pid), nix::sys::signal::SIGKILL);
+                }
+
+                utils::delete_with_retry(cgroup_path.1)?;
             }
         }
 

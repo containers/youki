@@ -1,5 +1,7 @@
 use std::ffi::CString;
+use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use anyhow::{bail, Result};
 use nix::{env::clearenv, errno::Errno, unistd};
@@ -70,6 +72,24 @@ pub fn get_cgroup_path(cgroups_path: &Option<PathBuf>, container_id: &str) -> Pa
         Some(cpath) => cpath.clone(),
         None => PathBuf::from(format!("/youki/{}", container_id)),
     }
+}
+
+pub fn delete_with_retry<P: AsRef<Path>>(path: P) -> Result<()> {
+    let mut attempts = 0;
+    let mut delay = Duration::from_millis(10);
+    let path = path.as_ref();
+
+    while attempts < 5 {
+        if fs::remove_dir(path).is_ok() {
+            return Ok(());
+        }
+
+        std::thread::sleep(delay);
+        attempts += attempts;
+        delay *= attempts;
+    }
+
+    bail!("could not delete {:?}", path)
 }
 
 #[cfg(test)]
