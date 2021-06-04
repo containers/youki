@@ -20,8 +20,7 @@ use crate::tty;
 use crate::utils;
 use crate::{capabilities, command::Command};
 
-
-/// This is the main structure which stores various commandline options given by 
+/// This is the main structure which stores various commandline options given by
 /// high-level container runtime
 #[derive(Clap, Debug)]
 pub struct Create {
@@ -41,7 +40,7 @@ pub struct Create {
 
 // One thing to note is that in the end, container is just another process in Linux
 // it has specific/different control group, namespace, using which program executing in it
-// can be given impression that is is running on a complete system, but on the system which 
+// can be given impression that is is running on a complete system, but on the system which
 // it is running, it is just another process, and has attributes such as pid, file descriptors, etc.
 // associated with it like any other process.
 impl Create {
@@ -66,7 +65,8 @@ impl Create {
         fs::copy("config.json", container_dir.join("config.json"))?;
         log::debug!("spec: {:?}", spec);
 
-        // convert path to absolute path
+        // convert path to absolute path, as relative path will be evaluated
+        // relative to where youki command is executed, and will be difficult to manipulate
         let container_dir = fs::canonicalize(container_dir)?;
         unistd::chdir(&*container_dir)?;
 
@@ -82,10 +82,8 @@ impl Create {
         container.save()?;
 
         let mut notify_socket: NotifyListener = NotifyListener::new(&container_dir)?;
-        
         // convert path of root file system of the container to absolute path
         let rootfs = fs::canonicalize(&spec.root.path)?;
-        
         // if socket file path is given in commandline options,
         // get file descriptors of console and console socket
         let (csocketfd, _consolefd) = {
@@ -126,11 +124,10 @@ fn run_container<P: AsRef<Path>>(
     container: Container,
     command: impl Command,
 ) -> Result<Process> {
-
     // disable core dump for the process, check https://man7.org/linux/man-pages/man2/prctl.2.html for more information
     prctl::set_dumpable(false).unwrap();
 
-    // get Linux specific section of OCI spec, 
+    // get Linux specific section of OCI spec,
     // refer https://github.com/opencontainers/runtime-spec/blob/master/config-linux.md for more information
     let linux = spec.linux.as_ref().unwrap();
     let namespaces: Namespaces = linux.namespaces.clone().into();
@@ -171,7 +168,7 @@ fn run_container<P: AsRef<Path>>(
 
             // fork second time, which will later create container
             match fork::fork_init(child)? {
-                Process::Child(child) => unreachable!(),
+                Process::Child(_child) => unreachable!(),
                 // This is actually the child process after fork
                 Process::Init(mut init) => {
                     // setup args and env vars as in the spec
