@@ -47,10 +47,12 @@ impl Manager {
     fn create_unified_cgroup(&self, cgroup_path: &Path, pid: Pid) -> Result<PathBuf> {
         let full_path = self.root_path.join_absolute_path(cgroup_path)?;
         let controllers: Vec<String> = self
-            .get_available_controllers(common::DEFAULT_CGROUP_ROOT)?
+            .get_available_controllers(&self.root_path)?
             .into_iter()
             .map(|c| format!("{}{}", "+", c.to_string()))
             .collect();
+
+        Self::write_controllers(&self.root_path, &controllers)?;
 
         let mut current_path = self.root_path.clone();
         let mut components = cgroup_path.components().skip(1).peekable();
@@ -64,12 +66,7 @@ impl Manager {
             // last component cannot have subtree_control enabled due to internal process constraint
             // if this were set, writing to the cgroups.procs file will fail with Erno 16 (device or resource busy)
             if components.peek().is_some() {
-                for controller in &controllers {
-                    common::write_cgroup_file_str(
-                        &current_path.join(CGROUP_SUBTREE_CONTROL),
-                        controller,
-                    )?;
-                }
+                Self::write_controllers(&current_path, &controllers)?;
             }
         }
 
@@ -103,6 +100,14 @@ impl Manager {
         }
 
         Ok(controllers)
+    }
+
+    fn write_controllers(path: &Path, controllers: &Vec<String>) -> Result<()> {
+        for controller in controllers {
+            common::write_cgroup_file_str(path.join(CGROUP_SUBTREE_CONTROL), controller)?;
+        }
+
+        Ok(())
     }
 }
 
