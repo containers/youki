@@ -11,6 +11,7 @@ These are references to various documentations and specifications, which can be 
 - [Unix Sockets man page](https://man7.org/linux/man-pages/man7/unix.7.html) : Useful to understand sockets
 - [prctl man page](https://man7.org/linux/man-pages/man2/prctl.2.html) : Process control man pages
 - [OCI Linux spec](https://github.com/opencontainers/runtime-spec/blob/master/config-linux.md) : Linux specific section of OCI Spec
+- [pipe2 man page](https://man7.org/linux/man-pages/man2/pipe.2.html) : definition and usage of pipe2
 
 ---
 
@@ -59,6 +60,21 @@ One thing to note is that in the end, container is just another process in Linux
 
 When given create command, Youki will load the specification, configuration, sockets etc.
 forks the process into parent an child (C1), forks the child process again (C2), applies the limits, namespaces etc to the child of child (C2)process ,and runs the command/program in the C2. After the command / program is finished the C2 returns. The C1 is waiting for the C2 to exit, after which it also exits.
+
+### Process
+
+This handles creation of process and thus the container process. The hierarchy is :
+main youki process -> intermediate child process(C1) -> Init Process (C2)
+
+where -> indicate fork.
+
+The main youki process sets up the pipe and forks the child process and waits on it to send message and pid of init process using pipe. The child process sets up another pipe for init process, and forks the init process. The init process then notifies the child process that it is ready, which in turn notifies the main youki process that init process is forked and its pid.
+
+- [mio Token definition](https://docs.rs/mio/0.7.11/mio/struct.Token.html)
+- [oom-score-adj](https://dev.to/rrampage/surviving-the-linux-oom-killer-2ki9)
+- [unshare man page](https://man7.org/linux/man-pages/man1/unshare.1.html)
+- [user-namespace man page](https://man7.org/linux/man-pages/man7/user_namespaces.7.html)
+- [wait man page](https://man7.org/linux/man-pages/man3/wait.3p.html)
 
 [oci runtime specification]: https://github.com/opencontainers/runtime-spec/blob/master/runtime.md
 [runc man pages]: (https://github.com/opencontainers/runc/blob/master/man/runc.8.md)

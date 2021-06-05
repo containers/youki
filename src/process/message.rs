@@ -1,3 +1,4 @@
+/// Used as wrapper for messages to be sent between child and parent processes
 #[derive(Debug)]
 pub enum Message {
     ChildReady = 0x00,
