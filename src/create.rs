@@ -51,6 +51,8 @@ impl Create {
         let bundle_canonicalized = fs::canonicalize(&self.bundle)
             .unwrap_or_else(|_| panic!("failed to canonicalied {:?}", &self.bundle));
         let container_dir = root_path.join(&self.container_id);
+        log::debug!("container directory will be {:?}", container_dir);
+
         if !container_dir.exists() {
             fs::create_dir(&container_dir).unwrap();
         } else {
