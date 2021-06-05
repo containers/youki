@@ -86,9 +86,9 @@ impl ChildProcess {
             .as_mut()
             .expect("Complete the setup of uds in advance.");
 
-        // Create collection with capacity to store up to 128 events
+        // Create collection with capacity to store up to MAX_EVENTS events
         let mut events = Events::with_capacity(MAX_EVENTS);
-        // poll the receiving end of pipe created for 1 seconds for an event
+        // poll the receiving end of pipe created for WAIT_FOR_INIT duration an event
         poll.poll(&mut events, Some(WAIT_FOR_INIT))?;
         for event in events.iter() {
             // check if the event token in PARENT
@@ -106,7 +106,7 @@ impl ChildProcess {
                 unreachable!()
             }
         }
-        // should not reach here, as there should be a ready event from init within 1 second
+        // should not reach here, as there should be a ready event from init within WAIT_FOR_INIT duration
         unreachable!(
             "No message received from init process within {} seconds",
             WAIT_FOR_INIT.as_secs()

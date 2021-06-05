@@ -35,10 +35,10 @@ impl ParentProcess {
     /// Waits for associated child process to send ready message
     /// and return the pid of init process which is forked by child process
     pub fn wait_for_child_ready(&mut self) -> Result<i32> {
-        // Create collection with capacity to store up to 128 events
+        // Create collection with capacity to store up to MAX_EVENTS events
         let mut events = Events::with_capacity(MAX_EVENTS);
 
-        // poll the receiving end of pipe created for 5 seconds for an event
+        // poll the receiving end of pipe created for WAIT_FOR_CHILD duration for an event
         self.poll.poll(&mut events, Some(WAIT_FOR_CHILD))?;
         for event in events.iter() {
             // check if the event token in PARENT
@@ -63,7 +63,7 @@ impl ParentProcess {
                 unreachable!()
             }
         }
-        // should not reach here, as there should be a ready event from child within 5 seconds
+        // should not reach here, as there should be a ready event from child within WAIT_FOR_CHILD duration
         unreachable!(
             "No message received from child process within {} seconds",
             WAIT_FOR_CHILD.as_secs()
