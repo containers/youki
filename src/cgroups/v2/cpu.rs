@@ -33,7 +33,7 @@ impl Cpu {
             shares = Self::convert_shares_to_cgroup2(shares);
             if shares != 0 {
                 // will result in Erno 34 (numerical result out of range) otherwise
-                common::write_cgroup_file(&path.join(CGROUP_CPU_WEIGHT), &shares.to_string())?;
+                common::write_cgroup_file(path.join(CGROUP_CPU_WEIGHT), shares)?;
             }
         }
 
@@ -57,7 +57,7 @@ impl Cpu {
         // 250000 250000 -> 1 CPU worth of runtime every 250ms
         // 10000 50000 -> 20% of one CPU every 50ms
         let max = quota_string + " " + &period_string;
-        common::write_cgroup_file(&path.join(CGROUP_CPU_MAX), &max)?;
+        common::write_cgroup_file_str(path.join(CGROUP_CPU_MAX), &max)?;
 
         Ok(())
     }

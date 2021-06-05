@@ -1,5 +1,6 @@
+use std::fs;
+use std::path::Path;
 use std::{collections::HashMap, path::PathBuf};
-use std::{fs::remove_dir, path::Path};
 
 use anyhow::Result;
 use nix::unistd::Pid;
@@ -7,15 +8,19 @@ use nix::unistd::Pid;
 use procfs::process::Process;
 
 use super::{
-    blkio::Blkio, devices::Devices, hugetlb::Hugetlb, memory::Memory,
+    blkio::Blkio, cpu::Cpu, cpuset::CpuSet, devices::Devices, hugetlb::Hugetlb, memory::Memory,
     network_classifier::NetworkClassifier, network_priority::NetworkPriority, pids::Pids,
-    Controller,
+    Controller, ControllerType,
 };
 
-use crate::{cgroups::common::CgroupManager, cgroups::v1::ControllerType, utils::PathBufExt};
+use crate::cgroups::common::CGROUP_PROCS;
+use crate::utils;
+use crate::{cgroups::common::CgroupManager, utils::PathBufExt};
 use oci_spec::LinuxResources;
 
 const CONTROLLERS: &[ControllerType] = &[
+    ControllerType::Cpu,
+    ControllerType::CpuSet,
     ControllerType::Devices,
     ControllerType::HugeTlb,
     ControllerType::Memory,
@@ -56,6 +61,10 @@ impl Manager {
                         return m.mount_point.ends_with("net_cls,net_prio")
                             || m.mount_point.ends_with("net_prio,net_cls");
                     }
+
+                    if subsystem == "cpu" {
+                        return m.mount_point.ends_with("cpu,cpuacct");
+                    }
                 }
                 m.mount_point.ends_with(subsystem)
             })
@@ -83,6 +92,8 @@ impl CgroupManager for Manager {
     fn apply(&self, linux_resources: &LinuxResources, pid: Pid) -> Result<()> {
         for subsys in &self.subsystems {
             match subsys.0.as_str() {
+                "cpu" => Cpu::apply(linux_resources, &subsys.1, pid)?,
+                "cpuset" => CpuSet::apply(linux_resources, &subsys.1, pid)?,
                 "devices" => Devices::apply(linux_resources, &subsys.1, pid)?,
                 "hugetlb" => Hugetlb::apply(linux_resources, &subsys.1, pid)?,
                 "memory" => Memory::apply(linux_resources, &subsys.1, pid)?,
@@ -90,7 +101,7 @@ impl CgroupManager for Manager {
                 "blkio" => Blkio::apply(linux_resources, &subsys.1, pid)?,
                 "net_prio" => NetworkPriority::apply(linux_resources, &subsys.1, pid)?,
                 "net_cls" => NetworkClassifier::apply(linux_resources, &subsys.1, pid)?,
-                _ => continue,
+                _ => unreachable!("every subsystem should have an associated controller"),
             }
         }
 
@@ -101,7 +112,15 @@ impl CgroupManager for Manager {
         for cgroup_path in &self.subsystems {
             if cgroup_path.1.exists() {
                 log::debug!("remove cgroup {:?}", cgroup_path.1);
-                remove_dir(&cgroup_path.1)?;
+                let procs_path = cgroup_path.1.join(CGROUP_PROCS);
+                let procs = fs::read_to_string(&procs_path)?;
+
+                for line in procs.lines() {
+                    let pid: i32 = line.parse()?;
+                    let _ = nix::sys::signal::kill(Pid::from_raw(pid), nix::sys::signal::SIGKILL);
+                }
+
+                utils::delete_with_retry(cgroup_path.1)?;
             }
         }
 

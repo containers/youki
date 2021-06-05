@@ -13,13 +13,12 @@ use super::{cpu::Cpu, cpuset::CpuSet, hugetlb::HugeTlb, io::Io, memory::Memory, 
 use crate::{
     cgroups::v2::controller::Controller,
     cgroups::{
-        common::{self, CgroupManager},
+        common::{self, CgroupManager, CGROUP_PROCS},
         v2::controller_type::ControllerType,
     },
     utils::PathBufExt,
 };
 
-const CGROUP_PROCS: &str = "cgroup.procs";
 const CGROUP_CONTROLLERS: &str = "cgroup.controllers";
 const CGROUP_SUBTREE_CONTROL: &str = "cgroup.subtree_control";
 
@@ -66,7 +65,7 @@ impl Manager {
             // if this were set, writing to the cgroups.procs file will fail with Erno 16 (device or resource busy)
             if components.peek().is_some() {
                 for controller in &controllers {
-                    common::write_cgroup_file(
+                    common::write_cgroup_file_str(
                         &current_path.join(CGROUP_SUBTREE_CONTROL),
                         controller,
                     )?;
@@ -74,7 +73,7 @@ impl Manager {
             }
         }
 
-        common::write_cgroup_file(&full_path.join(CGROUP_PROCS), &pid.to_string())?;
+        common::write_cgroup_file(&full_path.join(CGROUP_PROCS), pid)?;
         Ok(full_path)
     }
 

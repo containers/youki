@@ -6,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use nix::unistd::Pid;
 use oci_spec::LinuxResources;
 use procfs::process::Process;
@@ -14,6 +14,7 @@ use procfs::process::Process;
 use crate::cgroups::v1;
 use crate::cgroups::v2;
 
+pub const CGROUP_PROCS: &str = "cgroup.procs";
 pub const DEFAULT_CGROUP_ROOT: &str = "/sys/fs/cgroup";
 
 pub trait CgroupManager {
@@ -39,7 +40,7 @@ impl Display for Cgroup {
 }
 
 #[inline]
-pub fn write_cgroup_file<P: AsRef<Path>>(path: P, data: &str) -> Result<()> {
+pub fn write_cgroup_file_str<P: AsRef<Path>>(path: P, data: &str) -> Result<()> {
     fs::OpenOptions::new()
         .create(false)
         .write(true)
@@ -48,6 +49,27 @@ pub fn write_cgroup_file<P: AsRef<Path>>(path: P, data: &str) -> Result<()> {
         .write_all(data.as_bytes())?;
 
     Ok(())
+}
+
+#[inline]
+pub fn write_cgroup_file<P: AsRef<Path>, T: ToString>(path: P, data: T) -> Result<()> {
+    fs::OpenOptions::new()
+        .create(false)
+        .write(true)
+        .truncate(false)
+        .open(path)?
+        .write_all(data.to_string().as_bytes())?;
+
+    Ok(())
+}
+
+pub fn get_cgroupv1_mount_path(subsystem: &str) -> Result<PathBuf> {
+    Process::myself()?
+        .mountinfo()?
+        .into_iter()
+        .find(|m| m.fs_type == "cgroup" && m.mount_point.ends_with(subsystem))
+        .map(|m| m.mount_point)
+        .ok_or_else(|| anyhow!("could not find mountpoint for {}", subsystem))
 }
 
 pub fn create_cgroup_manager<P: Into<PathBuf>>(cgroup_path: P) -> Result<Box<dyn CgroupManager>> {
@@ -83,8 +105,11 @@ pub fn create_cgroup_manager<P: Into<PathBuf>>(cgroup_path: P) -> Result<Box<dyn
                         cgroup_path.into(),
                     )?))
                 }
-                _ => Ok(Box::new(v1::manager::Manager::new(cgroup_path.into())?)),
-            } 
+                _ => {
+                    log::info!("cgroup manager V1 will be used");
+                    Ok(Box::new(v1::manager::Manager::new(cgroup_path.into())?))
+                }
+            }
         }
         _ => bail!("could not find cgroup filesystem"),
     }

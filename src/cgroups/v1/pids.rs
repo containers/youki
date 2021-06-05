@@ -5,7 +5,10 @@ use std::{
 
 use anyhow::Result;
 
-use crate::cgroups::{common, v1::Controller};
+use crate::cgroups::{
+    common::{self, CGROUP_PROCS},
+    v1::Controller,
+};
 use oci_spec::{LinuxPids, LinuxResources};
 
 pub struct Pids {}
@@ -23,7 +26,7 @@ impl Controller for Pids {
             Self::apply(cgroup_root, pids)?;
         }
 
-        common::write_cgroup_file(cgroup_root.join("cgroup.procs"), &pid.to_string())?;
+        common::write_cgroup_file(cgroup_root.join(CGROUP_PROCS), pid)?;
         Ok(())
     }
 }
@@ -36,7 +39,7 @@ impl Pids {
             "max".to_string()
         };
 
-        common::write_cgroup_file(&root_path.join("pids.max"), &limit)?;
+        common::write_cgroup_file_str(&root_path.join("pids.max"), &limit)?;
         Ok(())
     }
 }

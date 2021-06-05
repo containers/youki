@@ -4,6 +4,7 @@ use anyhow::Result;
 use nix::unistd::Pid;
 
 use crate::cgroups::common;
+use crate::cgroups::common::CGROUP_PROCS;
 use crate::cgroups::v1::Controller;
 use oci_spec::{LinuxNetwork, LinuxResources};
 
@@ -18,7 +19,7 @@ impl Controller for NetworkClassifier {
             Self::apply(cgroup_root, network)?;
         }
 
-        common::write_cgroup_file(cgroup_root.join("cgroup.procs"), &pid.to_string())?;
+        common::write_cgroup_file(cgroup_root.join(CGROUP_PROCS), pid)?;
         Ok(())
     }
 }
@@ -26,7 +27,7 @@ impl Controller for NetworkClassifier {
 impl NetworkClassifier {
     fn apply(root_path: &Path, network: &LinuxNetwork) -> Result<()> {
         if let Some(class_id) = network.class_id {
-            common::write_cgroup_file(&root_path.join("net_cls.classid"), &class_id.to_string())?;
+            common::write_cgroup_file(root_path.join("net_cls.classid"), class_id)?;
         }
 
         Ok(())
