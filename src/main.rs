@@ -15,9 +15,8 @@ use youki::create;
 use youki::signal;
 use youki::start;
 
-use youki::utils;
 use youki::cgroups;
-
+use youki::utils;
 
 /// High-level commandline option definition
 /// This takes global options as well as individual commands as specified in [OCI runtime-spec](https://github.com/opencontainers/runtime-spec/blob/master/runtime.md)

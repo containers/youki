@@ -607,3 +607,95 @@ impl Spec {
         Ok(spec)
     }
 }
+
+#[cfg(feature = "proptests")]
+use quickcheck::{Arbitrary, Gen};
+
+#[cfg(feature = "proptests")]
+fn some_none_generator_util<T: Arbitrary>(g: &mut Gen) -> Option<T> {
+    let choice = g.choose(&[true, false]).unwrap();
+    match choice {
+        false => None,
+        true => Some(T::arbitrary(g)),
+    }
+}
+
+#[cfg(feature = "proptests")]
+impl Arbitrary for LinuxDeviceCgroup {
+    fn arbitrary(g: &mut Gen) -> LinuxDeviceCgroup {
+        let typ_choices = ["b", "c", "u", "p", "a"];
+
+        let typ_chosen = g.choose(&typ_choices).unwrap();
+
+        let typ = match typ_chosen.to_string().as_str() {
+            "b" => LinuxDeviceType::B,
+            "c" => LinuxDeviceType::C,
+            "u" => LinuxDeviceType::U,
+            "p" => LinuxDeviceType::P,
+            "a" => LinuxDeviceType::A,
+            _ => LinuxDeviceType::A,
+        };
+
+        let access_choices = ["rwm", "m"];
+        LinuxDeviceCgroup {
+            allow: bool::arbitrary(g),
+            typ,
+            major: some_none_generator_util::<i64>(g),
+            minor: some_none_generator_util::<i64>(g),
+            access: g.choose(&access_choices).unwrap().to_string(),
+        }
+    }
+}
+
+#[cfg(feature = "proptests")]
+impl Arbitrary for LinuxMemory {
+    fn arbitrary(g: &mut Gen) -> LinuxMemory {
+        LinuxMemory {
+            kernel: some_none_generator_util::<i64>(g),
+            kernel_tcp: some_none_generator_util::<i64>(g),
+            limit: some_none_generator_util::<i64>(g),
+            reservation: some_none_generator_util::<i64>(g),
+            swap: some_none_generator_util::<i64>(g),
+            swappiness: some_none_generator_util::<u64>(g),
+        }
+    }
+}
+
+#[cfg(feature = "proptests")]
+impl Arbitrary for LinuxHugepageLimit {
+    fn arbitrary(g: &mut Gen) -> LinuxHugepageLimit {
+        let unit_choice = ["KB", "MB", "GB"];
+        let unit = g.choose(&unit_choice).unwrap();
+        let page_size = u64::arbitrary(g).to_string() + unit;
+
+        LinuxHugepageLimit {
+            page_size,
+            limit: i64::arbitrary(g),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_linux_device_cgroup_to_string() {
+        let ldc = LinuxDeviceCgroup {
+            allow: true,
+            typ: LinuxDeviceType::A,
+            major: None,
+            minor: None,
+            access: "rwm".into(),
+        };
+        assert_eq!(ldc.to_string(), "a *:* rwm");
+        let ldc = LinuxDeviceCgroup {
+            allow: true,
+            typ: LinuxDeviceType::A,
+            major: Some(1),
+            minor: Some(9),
+            access: "rwm".into(),
+        };
+        assert_eq!(ldc.to_string(), "a 1:9 rwm");
+    }
+}

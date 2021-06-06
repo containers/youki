@@ -1,3 +1,7 @@
+#[cfg(test)]
+#[macro_use]
+extern crate quickcheck;
+
 pub mod capabilities;
 pub mod cgroups;
 pub mod command;
