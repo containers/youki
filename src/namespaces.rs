@@ -3,7 +3,8 @@
 //! Process (processes in a namespace have two PIDs, one for the global PID,
 //! which is used by the main system and the second one is for the child within the process tree),
 //! Interprocess Communication (Control or communication between processes),
-//! Network, User, UTS (hostname and domain information, processes will think they're running on servers with different names),
+//! Network (which network devices can be seen by the processes in the namespace), User (User configs), 
+//! UTS (hostname and domain information, processes will think they're running on servers with different names),
 //! Cgroup (Resource limits, execution priority etc.)
 
 use anyhow::Result;
