@@ -3,6 +3,7 @@ mod controller;
 mod controller_type;
 mod cpu;
 mod cpuset;
+mod cpuacct;
 mod devices;
 mod hugetlb;
 pub mod manager;
