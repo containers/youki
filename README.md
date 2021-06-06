@@ -1,6 +1,8 @@
 # youki: A container runtime in Rust
 
-<img src="docs/youki.png" width="230" height="230">
+<p align="center">
+  <img src="docs/youki.png" width="230" height="230">
+</p>
 
 youki is an implementation of [runtime-spec](https://github.com/opencontainers/runtime-spec) in Rust, referring to [runc](https://github.com/opencontainers/runc).
 
@@ -97,6 +99,41 @@ $ ./integration_test.sh
 
 # Community
 We also have an active [Discord](https://discord.gg/h7R3HgWUct) if you'd like to come and chat with us.
+
+
+# Folder Structure
+```bash
+.
+├── docs  - Documentation
+├── integration_test - Integration tests
+├── oci_spec - Open Container Initiative Specification
+│   └── src
+│       └── lib.rs
+├── README.md
+├── src
+│   ├── capabilities.rs
+│   ├── cgroups - [control groups](https://en.wikipedia.org/wiki/Cgroups) is a Linux kernel feature that limits, accounts for, and isolates the resource usage (CPU, memory, disk I/O, network, etc.) of a collection of processes.
+│   │   ├── v1
+│   │   └── v2
+│   ├── command
+│   ├── cond.rs
+│   ├── container - Container Management (Container component, status...)
+│   ├── create.rs
+│   ├── lib.rs
+│   ├── logger.rs
+│   ├── main.rs
+│   ├── namespaces.rs
+│   ├── notify_socket.rs
+│   ├── process - Process management (fork, process status, init)
+│   ├── rootfs.rs
+│   ├── signal.rs
+│   ├── start.rs
+│   ├── stdio.rs
+│   ├── tty.rs
+│   └── utils.rs
+└── youki
+
+```
 
 # Design and implementation of youki
 
