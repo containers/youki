@@ -112,7 +112,7 @@ We also have an active [Discord](https://discord.gg/h7R3HgWUct) if you'd like to
 ├── README.md
 ├── src
 │   ├── capabilities.rs
-│   ├── cgroups - [control groups](https://en.wikipedia.org/wiki/Cgroups) is a Linux kernel feature that limits, accounts for, and isolates the resource usage (CPU, memory, disk I/O, network, etc.) of a collection of processes.
+│   ├── cgroups - 'control groups' is a Linux kernel feature that limits, accounts for, and isolates the resource usage (CPU, memory, disk I/O, network, etc.) of a collection of processes.
 │   │   ├── v1
 │   │   └── v2
 │   ├── command
@@ -134,6 +134,9 @@ We also have an active [Discord](https://discord.gg/h7R3HgWUct) if you'd like to
 └── youki
 
 ```
+Resources:
+- [Open Container Initiative](https://opencontainers.org/about/overview)
+- [Control Groups](https://en.wikipedia.org/wiki/Cgroups)
 
 # Design and implementation of youki
 
