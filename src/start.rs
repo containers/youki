@@ -16,12 +16,12 @@ impl Start {
     pub fn exec(&self, root_path: PathBuf) -> Result<()> {
         let container_root = root_path.join(&self.container_id);
         if !container_root.exists() {
-            bail!("{} doesn't exists.", self.container_id)
+            bail!("{} doesn't exist.", self.container_id)
         }
         let container = Container::load(container_root)?.refresh_status()?;
         if !container.can_start() {
             let err_msg = format!(
-                "{} counld not be started because it was {:?}",
+                "{} could not be started because it was {:?}",
                 container.id(),
                 container.status()
             );

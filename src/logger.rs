@@ -31,7 +31,7 @@ pub fn init(log_file: Option<PathBuf>) -> Result<()> {
                 .write(true)
                 .truncate(false)
                 .open(log_file_path)
-                .expect("fail opening log file ")
+                .expect("failed opening log file ")
         })
     });
     Ok(())
@@ -85,7 +85,7 @@ impl Log for YoukiLogger {
         if let Some(mut log_file) = LOG_FILE.get().unwrap().as_ref() {
             log_file.flush().expect("Failed to flush");
         } else {
-            stderr().flush().expect("Faild to flush");
+            stderr().flush().expect("Failed to flush");
         }
     }
 }
