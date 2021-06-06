@@ -1,3 +1,5 @@
+//! Container management
+
 #[allow(clippy::module_inception)]
 mod container;
 mod state;
