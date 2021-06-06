@@ -1,6 +1,6 @@
 use std::env;
-use std::process::{Command, Stdio};
 use std::path::PathBuf;
+use std::process::{Command, Stdio};
 
 #[test]
 fn main() {
