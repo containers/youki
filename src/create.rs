@@ -1,4 +1,4 @@
-//! This handles the creation of a new container
+//! Handles the creation of a new container
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process;

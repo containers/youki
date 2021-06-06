@@ -1,3 +1,5 @@
+//! Default Youki Logger
+
 use std::env;
 use std::io::{stderr, Write};
 use std::path::PathBuf;

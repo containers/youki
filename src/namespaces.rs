@@ -1,3 +1,11 @@
+//! Namespaces provide isolation of resources for processes at a kernel level.
+//! The namespaces are: Mount (filesystem),
+//! Process (processes in a namespace have two PIDs, one for the global PID,
+//! which is used by the main system and the second one is for the child within the process tree),
+//! Interprocess Communication (Control or communication between processes),
+//! Network, User, UTS (hostname and domain information, processes will think they're running on servers with different names),
+//! Cgroup (Resource limits, execution priority etc.)
+
 use anyhow::Result;
 use nix::{
     fcntl,

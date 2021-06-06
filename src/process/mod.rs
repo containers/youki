@@ -1,5 +1,5 @@
-//! This provides a thin wrapper around fork syscall,
-//! with enums and functions specific to youki implemented.
+//! Provides a thin wrapper around fork syscall,
+//! with enums and functions specific to youki implemented
 
 use std::time::Duration;
 

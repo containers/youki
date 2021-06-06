@@ -124,7 +124,7 @@ We also have an active [Discord](https://discord.gg/h7R3HgWUct) if you'd like to
 │   ├── main.rs
 │   ├── namespaces.rs
 │   ├── notify_socket.rs
-│   ├── process - Process management (fork, process status, init)
+│   ├── process - Fork syscall wrapper
 │   ├── rootfs.rs
 │   ├── signal.rs
 │   ├── start.rs

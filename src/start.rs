@@ -1,3 +1,5 @@
+//! Starts execution of the container
+
 use std::path::PathBuf;
 
 use anyhow::{bail, Result};

@@ -1,3 +1,5 @@
+//! Utility functionality
+
 use std::ffi::CString;
 use std::fs;
 use std::path::{Path, PathBuf};
