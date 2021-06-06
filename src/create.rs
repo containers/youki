@@ -46,7 +46,12 @@ pub struct Create {
 // associated with it like any other process.
 impl Create {
     /// Starts a new container process
-    pub fn exec(&self, root_path: PathBuf, command: impl Command) -> Result<()> {
+    pub fn exec(
+        &self,
+        root_path: PathBuf,
+        systemd_cgroup: bool,
+        command: impl Command,
+    ) -> Result<()> {
         // create a directory for the container to store state etc.
         // if already present, return error
         let bundle_canonicalized = fs::canonicalize(&self.bundle)
@@ -102,6 +107,7 @@ impl Create {
             rootfs,
             spec,
             csocketfd,
+            systemd_cgroup,
             container,
             command,
         )?;
@@ -121,6 +127,7 @@ fn run_container<P: AsRef<Path>>(
     rootfs: PathBuf,
     spec: oci_spec::Spec,
     csocketfd: Option<FileDescriptor>,
+    systemd_cgroup: bool,
     container: Container,
     command: impl Command,
 ) -> Result<Process> {
@@ -149,7 +156,7 @@ fn run_container<P: AsRef<Path>>(
     };
 
     let cgroups_path = utils::get_cgroup_path(&linux.cgroups_path, container.id());
-    let cmanager = cgroups::common::create_cgroup_manager(&cgroups_path)?;
+    let cmanager = cgroups::common::create_cgroup_manager(&cgroups_path, systemd_cgroup)?;
 
     // first fork, which creates process, which will later create actual container process
     match fork::fork_first(pid_file, rootless, linux, &container, cmanager)? {

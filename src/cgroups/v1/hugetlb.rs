@@ -59,7 +59,7 @@ impl Hugetlb {
 mod tests {
     use super::*;
     use crate::cgroups::test::set_fixture;
-    use crate::utils::create_temp_dir; 
+    use crate::utils::create_temp_dir;
     use oci_spec::LinuxHugepageLimit;
     use std::fs::read_to_string;
 
