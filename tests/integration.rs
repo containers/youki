@@ -1,14 +1,16 @@
 use std::env;
 use std::process::{Command, Stdio};
+use std::path::PathBuf;
 
 #[test]
 fn main() {
-    let path_result = env::current_dir();
-    let path = match path_result {
-        Ok(path) => path.display().to_string(),
-        Err(_) => panic!("Path is not found"),
+    let current_dir_path_result = env::current_dir();
+    let current_dir_path = match current_dir_path_result {
+        Ok(path_buf) => path_buf,
+        Err(_) => panic!("directory is not found"),
     };
-    let status = Command::new(path + "/target/x86_64-unknown-linux-gnu/debug/youki")
+    let youki_path = current_dir_path.join(PathBuf::from("youki"));
+    let status = Command::new(youki_path)
         .stdout(Stdio::null())
         .arg("-h")
         .status()
