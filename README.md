@@ -31,10 +31,12 @@ For other platforms, please use the devcontainer that we prepared.
 ## Requires
 
 - Rust(See [here](https://www.rust-lang.org/tools/install))
-- Docker
+- Docker(See [here](https://docs.docker.com/engine/install))
 
 ## Building
-
+```sh
+$ cargo install cargo-when # installs prerequisite for building youki
+```
 ```sh
 $ git clone git@github.com:containers/youki.git
 $ cd youki
