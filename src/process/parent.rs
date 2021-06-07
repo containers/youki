@@ -1,3 +1,4 @@
+use std::io::ErrorKind;
 use std::io::Read;
 
 use super::{MAX_EVENTS, WAIT_FOR_CHILD};
@@ -47,13 +48,29 @@ impl ParentProcess {
             if let PARENT = event.token() {
                 // read data from pipe
                 let mut buf = [0; 1];
-                self.receiver.read_exact(&mut buf)?;
+                match self.receiver.read_exact(&mut buf) {
+                    // This error simply means that there are no more incoming connections waiting to be accepted at this point.
+                    Err(ref e) if e.kind() == ErrorKind::WouldBlock => (),
+                    Err(e) => bail!(
+                        "Failed to receive a message from the child process. {:?}",
+                        e
+                    ),
+                    _ => (),
+                };
                 // convert to Message wrapper
                 match Message::from(u8::from_be_bytes(buf)) {
                     Message::ChildReady => {
                         // read pid of init process forked by child, 4 bytes as the type is i32
                         let mut buf = [0; 4];
-                        self.receiver.read_exact(&mut buf)?;
+                        match self.receiver.read_exact(&mut buf) {
+                            // This error simply means that there are no more incoming connections waiting to be accepted at this point.
+                            Err(ref e) if e.kind() == ErrorKind::WouldBlock => (),
+                            Err(e) => bail!(
+                                "Failed to receive a message from the child process. {:?}",
+                                e
+                            ),
+                            _ => (),
+                        }
                         return Ok(i32::from_be_bytes(buf));
                     }
                     msg => bail!("receive unexpected message {:?} in parent process", msg),

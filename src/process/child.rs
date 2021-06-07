@@ -1,13 +1,15 @@
-use super::{MAX_EVENTS, WAIT_FOR_INIT};
+use std::io::ErrorKind;
+use std::io::Read;
+use std::io::Write;
+
 use anyhow::{bail, Result};
 use mio::unix::pipe;
 use mio::unix::pipe::Receiver;
 use mio::unix::pipe::Sender;
 use mio::{Events, Interest, Poll, Token};
 use nix::unistd::Pid;
-use std::io::Read;
-use std::io::Write;
 
+use super::{MAX_EVENTS, WAIT_FOR_INIT};
 use crate::process::message::Message;
 
 // Token is used to identify which socket generated an event
@@ -97,7 +99,15 @@ impl ChildProcess {
             if let CHILD = event.token() {
                 // read message from the init process
                 let mut buf = [0; 1];
-                receiver.read_exact(&mut buf)?;
+                match receiver.read_exact(&mut buf) {
+                    // This error simply means that there are no more incoming connections waiting to be accepted at this point.
+                    Err(ref e) if e.kind() == ErrorKind::WouldBlock => (),
+                    Err(e) => bail!(
+                        "Failed to receive a message from the child process. {:?}",
+                        e
+                    ),
+                    _ => (),
+                }
                 match Message::from(u8::from_be_bytes(buf)) {
                     Message::InitReady => return Ok(()),
                     msg => bail!("receive unexpected message {:?} in child process", msg),

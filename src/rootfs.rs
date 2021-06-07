@@ -43,7 +43,7 @@ pub fn prepare_rootfs(spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<
         let ml = &spec.linux.as_ref().unwrap().mount_label;
         if m.typ == "cgroup" {
             // skip
-            log::warn!("A feature of cgoup is unimplemented.");
+            log::warn!("A feature of cgroup is unimplemented.");
         } else if m.destination == PathBuf::from("/dev") {
             mount_to_container(&m, rootfs, flags & !MsFlags::MS_RDONLY, &data, &ml)?;
         } else {
