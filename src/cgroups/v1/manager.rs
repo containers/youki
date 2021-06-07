@@ -80,8 +80,10 @@ impl Manager {
             mount
                 .mount_point
                 .join_absolute_path(Path::new(&cgroup.pathname))?
-        } else {
+        } else if cgroup_path.is_absolute() {
             mount.mount_point.join_absolute_path(&cgroup_path)?
+        } else {
+            mount.mount_point.join(cgroup_path)
         };
 
         Ok(p)
