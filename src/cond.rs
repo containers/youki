@@ -14,7 +14,8 @@ pub struct Cond {
 
 impl Cond {
     pub fn new() -> Result<Cond> {
-        let (rfd, wfd) = pipe2(OFlag::O_CLOEXEC)?; //Sets as close-on-execution
+        // Sets as close-on-execution
+        let (rfd, wfd) = pipe2(OFlag::O_CLOEXEC)?; 
         Ok(Cond { rfd, wfd })
     }
 
