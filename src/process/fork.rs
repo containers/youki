@@ -11,6 +11,7 @@ use init::InitProcess;
 use nix::sched;
 use nix::sys::wait::{waitpid, WaitStatus};
 use nix::unistd;
+use nix::unistd::Pid;
 
 use crate::cgroups::common::CgroupManager;
 use crate::container::ContainerStatus;
@@ -62,11 +63,11 @@ pub fn fork_first<P: AsRef<Path>>(
             unistd::ForkResult::Parent { child } => {
                 ccond.wait()?;
 
-                // apply the control group to the child process
-                cmanager.apply(&linux.resources.as_ref().unwrap(), child)?;
-
                 // wait for child to fork init process and report back its pid
                 let init_pid = parent.wait_for_child_ready()?;
+                log::debug!("init pid is {:?}", init_pid);
+                cmanager.apply(&linux.resources.as_ref().unwrap(), Pid::from_raw(init_pid))?;
+
                 // update status and pid of the container process
                 container
                     .update_status(ContainerStatus::Created)?
