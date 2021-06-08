@@ -26,7 +26,7 @@ impl PathBufExt for PathBuf {
     fn join_absolute_path(&self, p: &Path) -> Result<PathBuf> {
         if !p.is_absolute() && !p.as_os_str().is_empty() {
             bail!(
-                "connot join {:?} because it is not the absolute path.",
+                "cannot join {:?} because it is not the absolute path.",
                 p.display()
             )
         }
