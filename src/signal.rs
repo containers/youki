@@ -1,3 +1,5 @@
+//! Returns *nix signal enum value from passed string
+
 use anyhow::{bail, Result};
 use nix::sys::signal::Signal;
 

@@ -1,3 +1,6 @@
+//! During kernel initialization, a minimal replica of the ramfs filesystem is loaded, called rootfs.
+//! Most systems mount another filesystem over it
+
 use std::fs::OpenOptions;
 use std::fs::{canonicalize, create_dir_all, remove_file};
 use std::os::unix::fs::symlink;

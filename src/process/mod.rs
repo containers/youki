@@ -1,5 +1,5 @@
-//! This provides a thin wrapper around fork syscall,
-//! with enums and functions specific to youki implemented.
+//! Provides a thin wrapper around fork syscall,
+//! with enums and functions specific to youki implemented
 
 use std::time::Duration;
 
@@ -13,7 +13,7 @@ mod parent;
 pub use init::InitProcess;
 
 /// Used to describe type of process after fork.
-/// Parent and child processes mean same things as in normal fork call
+/// Parent and child processes mean the same thing as in a normal fork call
 /// InitProcess is specifically used to indicate the process which will run the command of container
 pub enum Process {
     Parent(parent::ParentProcess),

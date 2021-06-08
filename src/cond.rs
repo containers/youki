@@ -1,3 +1,5 @@
+//! Conditional variable that performs busy waiting on lock
+
 use std::os::unix::io::RawFd;
 
 use anyhow::Result;
@@ -11,7 +13,8 @@ pub struct Cond {
 
 impl Cond {
     pub fn new() -> Result<Cond> {
-        let (rfd, wfd) = pipe2(OFlag::O_CLOEXEC)?;
+        // Sets as close-on-execution
+        let (rfd, wfd) = pipe2(OFlag::O_CLOEXEC)?; 
         Ok(Cond { rfd, wfd })
     }
 
@@ -22,6 +25,7 @@ impl Cond {
         close(self.rfd)?;
         Ok(())
     }
+
     pub fn notify(&self) -> Result<()> {
         close(self.rfd)?;
         close(self.wfd)?;

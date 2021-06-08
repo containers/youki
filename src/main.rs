@@ -91,7 +91,7 @@ fn main() -> Result<()> {
             // root directory given in commandline options
             let container_root = root_path.join(&kill.container_id);
             if !container_root.exists() {
-                bail!("{} doesn't exists.", kill.container_id)
+                bail!("{} doesn't exist.", kill.container_id)
             }
 
             // load container state from json file, and check status of the container
@@ -105,7 +105,7 @@ fn main() -> Result<()> {
                 std::process::exit(0)
             } else {
                 bail!(
-                    "{} counld not be killed because it was {:?}",
+                    "{} could not be killed because it was {:?}",
                     container.id(),
                     container.status()
                 )
@@ -117,7 +117,7 @@ fn main() -> Result<()> {
             // root directory given in commandline options
             let container_root = root_path.join(&delete.container_id);
             if !container_root.exists() {
-                bail!("{} doesn't exists.", delete.container_id)
+                bail!("{} doesn't exist.", delete.container_id)
             }
             // load container state from json file, and check status of the container
             // it might be possible that delete is invoked on a running container.
@@ -150,7 +150,7 @@ fn main() -> Result<()> {
                 std::process::exit(0)
             } else {
                 bail!(
-                    "{} counld not be deleted because it was {:?}",
+                    "{} could not be deleted because it was {:?}",
                     container.id(),
                     container.status()
                 )

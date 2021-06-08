@@ -1,3 +1,5 @@
+//! tty (teletype) for user-system interaction
+
 use std::os::unix::fs::symlink;
 use std::os::unix::io::AsRawFd;
 use std::path::Path;

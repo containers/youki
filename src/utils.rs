@@ -1,3 +1,5 @@
+//! Utility functionality
+
 use std::ffi::CString;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -14,7 +16,7 @@ pub trait PathBufExt {
 impl PathBufExt for PathBuf {
     fn as_in_container(&self) -> Result<PathBuf> {
         if self.is_relative() {
-            bail!("Relative path cannnot be converted to the path in the container.")
+            bail!("Relative path cannot be converted to the path in the container.")
         } else {
             let path_string = self.to_string_lossy().into_owned();
             Ok(PathBuf::from(path_string[1..].to_string()))
@@ -24,7 +26,7 @@ impl PathBufExt for PathBuf {
     fn join_absolute_path(&self, p: &Path) -> Result<PathBuf> {
         if !p.is_absolute() && !p.as_os_str().is_empty() {
             bail!(
-                "connnot join {:?} because it is not the absolute path.",
+                "cannot join {:?} because it is not the absolute path.",
                 p.display()
             )
         }
