@@ -1,3 +1,4 @@
+//! Information about status and state of the container
 use std::collections::HashMap;
 use std::fs;
 use std::{fs::File, path::Path};
@@ -7,17 +8,17 @@ use serde::{Deserialize, Serialize};
 
 const STATE_FILE_PATH: &str = "state.json";
 
+/// Indicates status of the container
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 #[serde(rename_all = "camelCase")]
 pub enum ContainerStatus {
-    // StateCreating indicates that the container is being created
+    // The container is being created
     Creating,
-    // StateCreated indicates that the runtime has finished the create operation
+    // The runtime has finished the create operation
     Created,
-    // StateRunning indicates that the container process has executed the
-    // user-specified program but has not exited
+    // The container process has executed the user-specified program but has not exited
     Running,
-    // StateStopped indicates that the container process has exited
+    // The container process has exited
     Stopped,
 }
 
@@ -39,6 +40,7 @@ impl ContainerStatus {
     }
 }
 
+/// Stores the state information of the container
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct State {
