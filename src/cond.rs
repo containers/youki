@@ -1,5 +1,4 @@
 //! Conditional variable that performs busy waiting on lock
-//! and notifies when 
 
 use std::os::unix::io::RawFd;
 
