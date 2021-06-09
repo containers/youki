@@ -214,11 +214,11 @@ impl Memory {
                 let current_limit = Self::get_memory_limit(cgroup_root)?;
                 match resource.swap {
                     Some(swap) => {
-                        let is_updated = swap <= -1 || current_limit < swap;
+                        let is_updated = swap == -1 || current_limit < swap;
                         Self::set_memory_and_swap(limit, swap, is_updated, cgroup_root)?;
                     }
                     None => {
-                        if limit <= -1 {
+                        if limit == -1 {
                             Self::set_memory_and_swap(limit, -1, true, cgroup_root)?;
                         } else {
                             let is_updated = current_limit < 0;
@@ -432,7 +432,7 @@ mod tests {
                                 && swap_content == swap.to_string()
                         }
                         None => {
-                            if limit <= -1 {
+                            if limit == -1 {
                                 limit_content == limit.to_string()
                                     && swap_content == "-1"
                             } else {

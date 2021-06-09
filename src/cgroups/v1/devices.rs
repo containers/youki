@@ -100,6 +100,7 @@ mod tests {
     use super::*;
     use crate::cgroups::test::{create_temp_dir, set_fixture};
     use oci_spec::{LinuxDeviceCgroup, LinuxDeviceType};
+    use std::fs::read_to_string;
 
     #[test]
     fn test_set_default_devices() {
@@ -118,11 +119,11 @@ mod tests {
             println!("Device: {}", d.to_string());
             if d.allow {
                 let allowed_content =
-                    std::fs::read_to_string(tmp.join("devices.allow")).expect("read to string");
+                    read_to_string(tmp.join("devices.allow")).expect("read to string");
                 assert_eq!(allowed_content, d.to_string());
             } else {
                 let denied_content =
-                    std::fs::read_to_string(tmp.join("devices.deny")).expect("read to string");
+                    read_to_string(tmp.join("devices.deny")).expect("read to string");
                 assert_eq!(denied_content, d.to_string());
             }
         });
@@ -170,11 +171,11 @@ mod tests {
             println!("Device: {}", d.to_string());
             if d.allow {
                 let allowed_content =
-                    std::fs::read_to_string(tmp.join("devices.allow")).expect("read to string");
+                    read_to_string(tmp.join("devices.allow")).expect("read to string");
                 assert_eq!(allowed_content, d.to_string());
             } else {
                 let denied_content =
-                    std::fs::read_to_string(tmp.join("devices.deny")).expect("read to string");
+                    read_to_string(tmp.join("devices.deny")).expect("read to string");
                 assert_eq!(denied_content, d.to_string());
             }
         });
@@ -188,11 +189,11 @@ mod tests {
             Devices::apply_device(&device, &tmp).expect("Apply default device");
             if device.allow {
                 let allowed_content =
-                    std::fs::read_to_string(tmp.join("devices.allow")).expect("read to string");
+                    read_to_string(tmp.join("devices.allow")).expect("read to string");
                 allowed_content == device.to_string()
             } else {
                 let denied_content =
-                    std::fs::read_to_string(tmp.join("devices.deny")).expect("read to string");
+                    read_to_string(tmp.join("devices.deny")).expect("read to string");
                 denied_content == device.to_string()
             }
         }
@@ -206,15 +207,15 @@ mod tests {
                     Devices::apply_device(&device, &tmp).expect("Apply default device");
                     if device.allow {
                         let allowed_content =
-                            std::fs::read_to_string(tmp.join("devices.allow")).expect("read to string");
+                            read_to_string(tmp.join("devices.allow")).expect("read to string");
                         allowed_content == device.to_string()
                     } else {
                         let denied_content =
-                            std::fs::read_to_string(tmp.join("devices.deny")).expect("read to string");
+                            read_to_string(tmp.join("devices.deny")).expect("read to string");
                         denied_content == device.to_string()
                     }
                 })
-                .fold(true, |a, b| a && b)
+                .all(|is_ok| is_ok)
         }
     }
 }

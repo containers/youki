@@ -60,6 +60,7 @@ mod tests {
     use super::*;
     use crate::cgroups::test::{create_temp_dir, set_fixture};
     use oci_spec::LinuxHugepageLimit;
+    use std::fs::read_to_string;
 
     #[test]
     fn test_set_hugetlb() {
@@ -72,8 +73,7 @@ mod tests {
             limit: 16384,
         };
         Hugetlb::apply(&tmp, &hugetlb).expect("apply hugetlb");
-        let content =
-            std::fs::read_to_string(tmp.join(page_file_name)).expect("Read hugetlb file content");
+        let content = read_to_string(tmp.join(page_file_name)).expect("Read hugetlb file content");
         assert_eq!(hugetlb.limit.to_string(), content);
     }
 
@@ -108,7 +108,7 @@ mod tests {
             let page_size: u64 = caps["pagesize"].parse().expect("should contain captured pagesize");
             if Hugetlb::is_power_of_two(page_size) && page_size != 1 {
                 let content =
-                    std::fs::read_to_string(tmp.join(page_file_name)).expect("Read hugetlb file content");
+                    read_to_string(tmp.join(page_file_name)).expect("Read hugetlb file content");
                 hugetlb.limit.to_string() == content
             } else {
                 result.is_err()
