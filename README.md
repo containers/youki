@@ -1,5 +1,9 @@
 # youki: A container runtime in Rust
 
+[![Discord](https://img.shields.io/discord/849943000770412575.svg?logo=discord)](https://discord.gg/NtAbbGn)
+![GitHub commit activity](https://img.shields.io/github/commit-activity/m/containers/youki)
+![GitHub contributors](https://img.shields.io/github/contributors/containers/youki)
+
 <p align="center">
   <img src="docs/youki.png" width="230" height="230">
 </p>
@@ -36,9 +40,11 @@ For other platforms, please use the devcontainer that we prepared.
 - Docker(See [here](https://docs.docker.com/engine/install))
 
 ## Building
+
 ```sh
 $ cargo install cargo-when # installs prerequisite for building youki
 ```
+
 ```sh
 $ git clone git@github.com:containers/youki.git
 $ cd youki
@@ -47,6 +53,7 @@ $ ./youki -h # you can get information about youki command
 ```
 
 ## Tutorial
+
 Let's try to run a container that executes `sleep 5` using youki.
 Maybe this tutorial is need permission as root.
 
@@ -98,6 +105,7 @@ $ ./integration_test.sh
 ```
 
 # Community
+
 We also have an active [Discord](https://discord.gg/h7R3HgWUct) if you'd like to come and chat with us.
 
 # Design and implementation of youki
