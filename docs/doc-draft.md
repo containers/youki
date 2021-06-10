@@ -76,5 +76,19 @@ The main youki process sets up the pipe and forks the child process and waits on
 - [user-namespace man page](https://man7.org/linux/man-pages/man7/user_namespaces.7.html)
 - [wait man page](https://man7.org/linux/man-pages/man3/wait.3p.html)
 
+### Container
+
+This contains structure represent and functions related to container process and its state and status.
+
+### Command
+
+This contains a trait to wrap commonly required syscalls, so that they can be abstracted from implementation details for rest of Youki.
+This also provides implementation for Linux syscalls for the trait.
+
+- [pivot_root man page](https://man7.org/linux/man-pages/man2/pivot_root.2.html)
+- [umount2 man page](https://man7.org/linux/man-pages/man2/umount2.2.html)
+- [capabilities man page](https://man7.org/linux/man-pages/man7/capabilities.7.html)
+- [unshare man page](https://man7.org/linux/man-pages/man2/unshare.2.html)
+
 [oci runtime specification]: https://github.com/opencontainers/runtime-spec/blob/master/runtime.md
 [runc man pages]: (https://github.com/opencontainers/runc/blob/master/man/runc.8.md)

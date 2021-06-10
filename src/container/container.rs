@@ -7,9 +7,12 @@ use procfs::process::Process;
 
 use crate::container::{ContainerStatus, State};
 
+/// Structure representing the container data
 #[derive(Debug)]
 pub struct Container {
+    // State of the container
     pub state: State,
+    // indicated the directory for the root path in the container
     pub root: PathBuf,
 }
 
@@ -36,10 +39,12 @@ impl Container {
     pub fn status(&self) -> ContainerStatus {
         self.state.status
     }
-
     pub fn refresh_status(&self) -> Result<Self> {
         let new_status = match self.pid() {
             Some(pid) => {
+                // Note that Process::new does not spawn a new process
+                // but instead creates a new Process structure, and fill
+                // it with information about the process with given pid
                 if let Ok(proc) = Process::new(pid.as_raw()) {
                     use procfs::process::ProcState;
                     match proc.stat.state().unwrap() {
