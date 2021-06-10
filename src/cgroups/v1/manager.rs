@@ -57,13 +57,19 @@ impl Manager {
                     // Some systems mount net_prio and net_cls in the same directory
                     // other systems mount them in their own diretories. This
                     // should handle both cases.
-                    if subsystem == "net_cls" || subsystem == "net_prio" {
+                    if subsystem == "net_cls" {
                         return m.mount_point.ends_with("net_cls,net_prio")
-                            || m.mount_point.ends_with("net_prio,net_cls");
+                            || m.mount_point.ends_with("net_prio,net_cls")
+                            || m.mount_point.ends_with("net_cls");
+                    } else if subsystem == "net_prio" {
+                        return m.mount_point.ends_with("net_cls,net_prio")
+                            || m.mount_point.ends_with("net_prio,net_cls")
+                            || m.mount_point.ends_with("net_prio");
                     }
 
                     if subsystem == "cpu" {
-                        return m.mount_point.ends_with("cpu,cpuacct");
+                        return m.mount_point.ends_with("cpu,cpuacct")
+                            || m.mount_point.ends_with("cpu");
                     }
                 }
                 m.mount_point.ends_with(subsystem)

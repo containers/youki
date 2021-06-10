@@ -60,6 +60,7 @@ mod tests {
     use super::*;
     use crate::cgroups::test::{create_temp_dir, set_fixture};
     use oci_spec::LinuxHugepageLimit;
+    use std::fs::read_to_string;
 
     #[test]
     fn test_set_hugetlb() {
@@ -72,8 +73,7 @@ mod tests {
             limit: 16384,
         };
         Hugetlb::apply(&tmp, &hugetlb).expect("apply hugetlb");
-        let content =
-            std::fs::read_to_string(tmp.join(page_file_name)).expect("Read hugetlb file content");
+        let content = read_to_string(tmp.join(page_file_name)).expect("Read hugetlb file content");
         assert_eq!(hugetlb.limit.to_string(), content);
     }
 
@@ -92,5 +92,27 @@ mod tests {
             result.is_err(),
             "page size that is not a power of two should be an error"
         );
+    }
+
+    quickcheck! {
+        fn property_test_set_hugetlb(hugetlb: LinuxHugepageLimit) -> bool {
+            let page_file_name = format!("hugetlb.{:?}.limit_in_bytes", hugetlb.page_size);
+            let tmp = create_temp_dir("property_test_set_hugetlb").expect("create temp directory for test");
+            set_fixture(&tmp, &page_file_name, "0").expect("Set fixture for page size");
+
+            let result = Hugetlb::apply(&tmp, &hugetlb);
+
+            let re = Regex::new(r"(?P<pagesize>[0-9]+)[KMG]B").expect("create regex for parsing pagesize");
+            let caps = re.captures(&hugetlb.page_size).expect("should capture pagesize");
+
+            let page_size: u64 = caps["pagesize"].parse().expect("should contain captured pagesize");
+            if Hugetlb::is_power_of_two(page_size) && page_size != 1 {
+                let content =
+                    read_to_string(tmp.join(page_file_name)).expect("Read hugetlb file content");
+                hugetlb.limit.to_string() == content
+            } else {
+                result.is_err()
+            }
+        }
     }
 }
