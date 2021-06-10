@@ -1,8 +1,9 @@
 # youki: A container runtime in Rust
 
-[![Discord](https://img.shields.io/discord/849943000770412575.svg?logo=discord)](https://discord.gg/NtAbbGn)
-![GitHub commit activity](https://img.shields.io/github/commit-activity/m/containers/youki)
-![GitHub contributors](https://img.shields.io/github/contributors/containers/youki)
+[![Discord](https://img.shields.io/discord/849943000770412575.svg?logo=discord)](https://discord.gg/zHnyXKSQFD)
+[![GitHub commit activity](https://img.shields.io/github/commit-activity/m/containers/youki)](https://github.com/containers/youki/graphs/commit-activity)
+[![GitHub contributors](https://img.shields.io/github/contributors/containers/youki)](https://github.com/containers/youki/graphs/contributors)
+[![Github CI](https://github.com/containers/youki/actions/workflows/main.yml/badge.svg?branch=main)](https://github.com/containers/youki/actions)
 
 <p align="center">
   <img src="docs/youki.png" width="230" height="230">
