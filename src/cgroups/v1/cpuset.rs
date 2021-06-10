@@ -18,12 +18,12 @@ impl Controller for CpuSet {
         log::debug!("Apply CpuSet cgroup config");
         fs::create_dir_all(cgroup_path)?;
 
+        Self::ensure_not_empty(cgroup_path, CGROUP_CPUSET_CPUS)?;
+        Self::ensure_not_empty(cgroup_path, CGROUP_CPUSET_MEMS)?;
+
         if let Some(cpuset) = &linux_resources.cpu {
             Self::apply(cgroup_path, cpuset)?;
         }
-
-        Self::ensure_not_empty(cgroup_path, CGROUP_CPUSET_CPUS)?;
-        Self::ensure_not_empty(cgroup_path, CGROUP_CPUSET_MEMS)?;
 
         common::write_cgroup_file(cgroup_path.join(CGROUP_PROCS), pid)?;
         Ok(())
