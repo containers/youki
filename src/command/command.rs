@@ -1,3 +1,6 @@
+//! An interface trait so that rest of Youki can call
+//! necessary functions without having to worry about their
+//! implementation details
 use std::{any::Any, path::Path};
 
 use anyhow::Result;
@@ -9,6 +12,8 @@ use nix::{
 
 use oci_spec::LinuxRlimit;
 
+/// This specifies various kernel/other functionalities required for
+/// container management
 pub trait Command {
     fn as_any(&self) -> &dyn Any;
     fn pivot_rootfs(&self, path: &Path) -> Result<()>;
