@@ -49,7 +49,7 @@ pub fn do_exec(path: impl AsRef<Path>, args: &[String], envs: &[String]) -> Resu
         let mut split = e.split("=");
         match split.next() {
             Some(key) => {
-                let value: String = split.collect();
+                let value: String = split.collect::<Vec<&str>>().join("=");
                 env::set_var(key, value)
             }
             None => {}
