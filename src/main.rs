@@ -2,6 +2,7 @@
 //! Container Runtime written in Rust, inspired by [railcar](https://github.com/oracle/railcar)
 //! This crate provides a container runtime which can be used by a high-level container runtime to run containers.
 
+use procfs;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -66,6 +67,8 @@ enum SubCommand {
     Delete(Delete),
     #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
     State(StateArgs),
+    #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
+    Info,
 }
 
 /// This is the entry point in the container runtime. The binary is run by a high-level container runtime,
@@ -161,6 +164,47 @@ fn main() -> Result<()> {
             let container = Container::load(container_root)?.refresh_status()?;
             println!("{}", serde_json::to_string_pretty(&container.state)?);
             std::process::exit(0);
+        }
+
+        SubCommand::Info => {
+            let uname = nix::sys::utsname::uname();
+            println!("{:<18}{}", "Kernel-Release", uname.release());
+            println!("{:<18}{}", "Kernel-Version", uname.version());
+            println!("{:<18}{}", "Architecture", uname.machine());
+
+            let cpu_info = procfs::CpuInfo::new()?;
+            println!("{:<18}{}", "Cores", cpu_info.num_cores());
+            let mem_info = procfs::Meminfo::new()?;
+            println!(
+                "{:<18}{}",
+                "Total Memory",
+                mem_info.mem_total / u64::pow(1024, 2)
+            );
+
+            let cgroup_fs: Vec<String> = cgroups::common::get_supported_cgroup_fs()?
+                .into_iter()
+                .map(|c| c.to_string())
+                .collect();
+            println!("{:<18}{}", "cgroup version", cgroup_fs.join(" and "));
+
+            println!("cgroup mounts");
+            let mut cgroup_v1_mounts: Vec<String> =
+                cgroups::v1::util::list_subsystem_mount_points()?
+                    .iter()
+                    .map(|kv| format!("  {:<16}{:?}", kv.0, kv.1))
+                    .collect();
+
+            cgroup_v1_mounts.sort();
+            for cgroup_mount in cgroup_v1_mounts {
+                println!("{}", cgroup_mount);
+            }
+
+            let unified = cgroups::v2::util::get_unified_mount_point();
+            if let Ok(mount_point) = unified {
+                println!("  {:<16}{:?}", "unified", mount_point);
+            }
+
+            Ok(())
         }
     }
 }
