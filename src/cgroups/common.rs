@@ -6,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use nix::unistd::Pid;
 use oci_spec::LinuxResources;
 use procfs::process::Process;
@@ -45,8 +45,10 @@ pub fn write_cgroup_file_str<P: AsRef<Path>>(path: P, data: &str) -> Result<()> 
         .create(false)
         .write(true)
         .truncate(false)
-        .open(path)?
-        .write_all(data.as_bytes())?;
+        .open(path.as_ref())
+        .with_context(|| format!("failed to open {:?}", path.as_ref()))?
+        .write_all(data.as_bytes())
+        .with_context(|| format!("failed to write to {:?}", path.as_ref()))?;
 
     Ok(())
 }
@@ -57,8 +59,10 @@ pub fn write_cgroup_file<P: AsRef<Path>, T: ToString>(path: P, data: T) -> Resul
         .create(false)
         .write(true)
         .truncate(false)
-        .open(path)?
-        .write_all(data.to_string().as_bytes())?;
+        .open(path.as_ref())
+        .with_context(|| format!("failed to open {:?}", path.as_ref()))?
+        .write_all(data.to_string().as_bytes())
+        .with_context(|| format!("failed to write to {:?}", path.as_ref()))?;
 
     Ok(())
 }
