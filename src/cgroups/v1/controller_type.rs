@@ -1,4 +1,4 @@
-use std::string::ToString;
+use std::fmt::Display;
 
 pub enum ControllerType {
     Cpu,
@@ -12,18 +12,32 @@ pub enum ControllerType {
     NetworkClassifier,
 }
 
-impl ToString for ControllerType {
-    fn to_string(&self) -> String {
-        match self {
-            Self::Cpu => "cpu".into(),
-            Self::CpuSet => "cpuset".into(),
-            Self::Devices => "devices".into(),
-            Self::HugeTlb => "hugetlb".into(),
-            Self::Pids => "pids".into(),
-            Self::Memory => "memory".into(),
-            Self::Blkio => "blkio".into(),
-            Self::NetworkPriority => "net_prio".into(),
-            Self::NetworkClassifier => "net_cls".into(),
-        }
+impl Display for ControllerType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let print = match *self {
+            Self::Cpu => "cpu",
+            Self::CpuSet => "cpuset",
+            Self::Devices => "devices",
+            Self::HugeTlb => "hugetlb",
+            Self::Pids => "pids",
+            Self::Memory => "memory",
+            Self::Blkio => "blkio",
+            Self::NetworkPriority => "net_prio",
+            Self::NetworkClassifier => "net_cls",
+        };
+
+        write!(f, "{}", print)
     }
 }
+
+pub const CONTROLLERS: &[ControllerType] = &[
+    ControllerType::Cpu,
+    ControllerType::CpuSet,
+    ControllerType::Devices,
+    ControllerType::HugeTlb,
+    ControllerType::Memory,
+    ControllerType::Pids,
+    ControllerType::Blkio,
+    ControllerType::NetworkPriority,
+    ControllerType::NetworkClassifier,
+];

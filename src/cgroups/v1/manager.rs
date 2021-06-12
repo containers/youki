@@ -8,28 +8,15 @@ use nix::unistd::Pid;
 use procfs::process::Process;
 
 use super::{
-    blkio::Blkio, cpu::Cpu, cpuset::CpuSet, devices::Devices, hugetlb::Hugetlb, memory::Memory,
-    network_classifier::NetworkClassifier, network_priority::NetworkPriority, pids::Pids,
-    Controller, ControllerType,
+    blkio::Blkio, controller_type::CONTROLLERS, cpu::Cpu, cpuset::CpuSet, devices::Devices,
+    hugetlb::Hugetlb, memory::Memory, network_classifier::NetworkClassifier,
+    network_priority::NetworkPriority, pids::Pids, util, Controller,
 };
 
 use crate::cgroups::common::CGROUP_PROCS;
 use crate::utils;
 use crate::{cgroups::common::CgroupManager, utils::PathBufExt};
 use oci_spec::LinuxResources;
-
-const CONTROLLERS: &[ControllerType] = &[
-    ControllerType::Cpu,
-    ControllerType::CpuSet,
-    ControllerType::Devices,
-    ControllerType::HugeTlb,
-    ControllerType::Memory,
-    ControllerType::Pids,
-    ControllerType::Blkio,
-    ControllerType::NetworkPriority,
-    ControllerType::NetworkClassifier,
-];
-
 pub struct Manager {
     subsystems: HashMap<String, PathBuf>,
 }
@@ -49,32 +36,7 @@ impl Manager {
 
     fn get_subsystem_path(cgroup_path: &Path, subsystem: &str) -> anyhow::Result<PathBuf> {
         log::debug!("Get path for subsystem: {}", subsystem);
-        let mount = Process::myself()?
-            .mountinfo()?
-            .into_iter()
-            .find(|m| {
-                if m.fs_type == "cgroup" {
-                    // Some systems mount net_prio and net_cls in the same directory
-                    // other systems mount them in their own diretories. This
-                    // should handle both cases.
-                    if subsystem == "net_cls" {
-                        return m.mount_point.ends_with("net_cls,net_prio")
-                            || m.mount_point.ends_with("net_prio,net_cls")
-                            || m.mount_point.ends_with("net_cls");
-                    } else if subsystem == "net_prio" {
-                        return m.mount_point.ends_with("net_cls,net_prio")
-                            || m.mount_point.ends_with("net_prio,net_cls")
-                            || m.mount_point.ends_with("net_prio");
-                    }
-
-                    if subsystem == "cpu" {
-                        return m.mount_point.ends_with("cpu,cpuacct")
-                            || m.mount_point.ends_with("cpu");
-                    }
-                }
-                m.mount_point.ends_with(subsystem)
-            })
-            .unwrap();
+        let mount_point = util::get_subsystem_mount_points(subsystem)?;
 
         let cgroup = Process::myself()?
             .cgroups()?
@@ -83,13 +45,11 @@ impl Manager {
             .unwrap();
 
         let p = if cgroup_path.to_string_lossy().into_owned().is_empty() {
-            mount
-                .mount_point
-                .join_absolute_path(Path::new(&cgroup.pathname))?
+            mount_point.join_absolute_path(Path::new(&cgroup.pathname))?
         } else if cgroup_path.is_absolute() {
-            mount.mount_point.join_absolute_path(&cgroup_path)?
+            mount_point.join_absolute_path(&cgroup_path)?
         } else {
-            mount.mount_point.join(cgroup_path)
+            mount_point.join(cgroup_path)
         };
 
         Ok(p)

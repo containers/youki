@@ -6,7 +6,7 @@ use oci_spec::{LinuxCpu, LinuxResources};
 
 use crate::cgroups::common::{self, CGROUP_PROCS};
 
-use super::{Controller, ControllerType};
+use super::{util, Controller, ControllerType};
 
 const CGROUP_CPUSET_CPUS: &str = "cpuset.cpus";
 const CGROUP_CPUSET_MEMS: &str = "cpuset.mems";
@@ -34,11 +34,11 @@ impl CpuSet {
     fn apply(cgroup_path: &Path, cpuset: &LinuxCpu) -> Result<()> {
         if let Some(cpus) = &cpuset.cpus {
             common::write_cgroup_file_str(cgroup_path.join(CGROUP_CPUSET_CPUS), cpus)?;
-        } 
+        }
 
         if let Some(mems) = &cpuset.mems {
             common::write_cgroup_file_str(cgroup_path.join(CGROUP_CPUSET_MEMS), mems)?;
-        } 
+        }
 
         Ok(())
     }
@@ -46,7 +46,7 @@ impl CpuSet {
     // if a task is moved into the cgroup and a value has not been set for cpus and mems
     // Errno 28 (no space left on device) will be returned. Therefore we set the value from the parent if required.
     fn ensure_not_empty(cgroup_path: &Path, interface_file: &str) -> Result<()> {
-        let mut current = common::get_cgroupv1_mount_path(&ControllerType::CpuSet.to_string())?;
+        let mut current = util::get_subsystem_mount_points(&ControllerType::CpuSet.to_string())?;
         let relative_cgroup_path = cgroup_path.strip_prefix(&current)?;
 
         for component in relative_cgroup_path.components() {
