@@ -98,7 +98,7 @@ $ docker run -it --rm --runtime youki busybox
 
 ### Integration test
 
-Go and node-tap are required to run integration test. See the [opencontainers/runtime-tools]((https://github.com/opencontainers/runtime-tools) README for details.
+Go and node-tap are required to run integration test. See the [opencontainers/runtime-tools](https://github.com/opencontainers/runtime-tools) README for details.
 
 ```
 $ git submodule update --init --recursive
