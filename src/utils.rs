@@ -46,13 +46,10 @@ pub fn do_exec(path: impl AsRef<Path>, args: &[String], envs: &[String]) -> Resu
     env::vars().for_each(|(key, _value)| std::env::remove_var(key));
     // set env vars
     envs.iter().for_each(|e| {
-        let mut split = e.split("=");
-        match split.next() {
-            Some(key) => {
-                let value: String = split.collect::<Vec<&str>>().join("=");
-                env::set_var(key, value)
-            }
-            None => {}
+        let mut split = e.split('=');
+        if let Some(key) = split.next() {
+            let value: String = split.collect::<Vec<&str>>().join("=");
+            env::set_var(key, value)
         };
     });
 

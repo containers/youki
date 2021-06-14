@@ -6,44 +6,21 @@ use std::path::Path;
 
 use anyhow::{bail, Result};
 use nix::errno::Errno;
-use nix::fcntl;
 use nix::sys::socket;
-use nix::sys::stat;
+use nix::sys::uio;
 use nix::unistd::{close, setsid};
 
 use crate::stdio;
 use crate::stdio::FileDescriptor;
 
-pub fn ready(console_fd: FileDescriptor) -> Result<()> {
-    let openpty_result = nix::pty::openpty(None, None)?;
-    let data: &[u8] = b"/dev/ptmx";
-    let iov = [nix::sys::uio::IoVec::from_slice(data)];
-    let fds = [openpty_result.master];
-    let cmsg = socket::ControlMessage::ScmRights(&fds);
-    socket::sendmsg(
-        console_fd.as_raw_fd(),
-        &iov,
-        &[cmsg],
-        socket::MsgFlags::empty(),
-        None,
-    )?;
+// TODO: Handling when there isn't console-socket.
 
-    setsid()?;
-    if unsafe { libc::ioctl(openpty_result.slave, libc::TIOCSCTTY) } < 0 {
-        log::warn!("could not TIOCSCTTY");
-    };
-    let slave = FileDescriptor::from(openpty_result.slave);
-    stdio::connect_stdio(&slave, &slave, &slave).expect("could not dup tty to stderr");
-    close(console_fd.as_raw_fd())?;
-    Ok(())
-}
-
-pub fn load_console_sockets(
+pub fn setup_console_socket(
     container_dir: &Path,
-    console_socket: &str,
-) -> Result<(FileDescriptor, FileDescriptor)> {
-    let csocket = "console-stdout";
-    symlink(console_socket, container_dir.join(csocket))?;
+    console_socket_path: &Path,
+) -> Result<FileDescriptor> {
+    let csocket = "console-socket";
+    symlink(console_socket_path, container_dir.join(csocket))?;
 
     let mut csocketfd = socket::socket(
         socket::AddressFamily::Unix,
@@ -63,19 +40,31 @@ pub fn load_console_sockets(
         }
         Ok(()) => csocketfd,
     };
-    let console = "console";
-    let consolefd = match fcntl::open(
-        &*console,
-        fcntl::OFlag::O_NOCTTY | fcntl::OFlag::O_RDWR,
-        stat::Mode::empty(),
-    ) {
-        Err(e) => {
-            if e != ::nix::Error::Sys(Errno::ENOENT) {
-                bail!("failed to open {}", console);
-            }
-            -1
-        }
-        Ok(fd) => fd,
+    Ok(csocketfd.into())
+}
+
+pub fn setup_console(console_fd: FileDescriptor) -> Result<()> {
+    // You can also access pty master, but it is better to use the API.
+    // ref. https://github.com/containerd/containerd/blob/261c107ffc4ff681bc73988f64e3f60c32233b37/vendor/github.com/containerd/go-runc/console.go#L139-L154
+    let openpty_result = nix::pty::openpty(None, None)?;
+    let pty_name: &[u8] = b"/dev/ptmx";
+    let iov = [uio::IoVec::from_slice(pty_name)];
+    let fds = [openpty_result.master];
+    let cmsg = socket::ControlMessage::ScmRights(&fds);
+    socket::sendmsg(
+        console_fd.as_raw_fd(),
+        &iov,
+        &[cmsg],
+        socket::MsgFlags::empty(),
+        None,
+    )?;
+
+    setsid()?;
+    if unsafe { libc::ioctl(openpty_result.slave, libc::TIOCSCTTY) } < 0 {
+        log::warn!("could not TIOCSCTTY");
     };
-    Ok((csocketfd.into(), consolefd.into()))
+    let slave = FileDescriptor::from(openpty_result.slave);
+    stdio::connect_stdio(&slave, &slave, &slave).expect("could not dup tty to stderr");
+    close(console_fd.as_raw_fd())?;
+    Ok(())
 }
