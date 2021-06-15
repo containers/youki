@@ -16,7 +16,7 @@ use nix::unistd::Pid;
 use crate::cgroups::common::CgroupManager;
 use crate::container::ContainerStatus;
 use crate::process::{child, init, parent, Process};
-use crate::{cond::Cond, container::Container};
+use crate::{container::Container, pipe::Pipe};
 
 /// Function to perform the first fork for in order to run the container process
 pub fn fork_first<P: AsRef<Path>>(
@@ -27,7 +27,7 @@ pub fn fork_first<P: AsRef<Path>>(
     cmanager: Box<dyn CgroupManager>,
 ) -> Result<Process> {
     // create a new pipe
-    let ccond = Cond::new()?;
+    let cpipe = Pipe::new()?;
 
     // create new parent process structure
     let (mut parent, sender_for_parent) = parent::ParentProcess::new()?;
@@ -55,12 +55,12 @@ pub fn fork_first<P: AsRef<Path>>(
                 sched::unshare(sched::CloneFlags::CLONE_NEWUSER)?;
             }
 
-            ccond.notify()?;
+            cpipe.notify()?;
             Ok(Process::Child(child))
         }
         // in the parent process
         unistd::ForkResult::Parent { child } => {
-            ccond.wait()?;
+            cpipe.wait()?;
 
             // wait for child to fork init process and report back its pid
             let init_pid = parent.wait_for_child_ready()?;

@@ -1,4 +1,4 @@
-//! Conditional variable that performs busy waiting on lock
+//! Unix pipe wrapper
 
 use std::os::unix::io::RawFd;
 
@@ -6,16 +6,16 @@ use anyhow::Result;
 use nix::fcntl::OFlag;
 use nix::unistd::{close, pipe2, read};
 
-pub struct Cond {
+pub struct Pipe {
     rfd: RawFd,
     wfd: RawFd,
 }
 
-impl Cond {
-    pub fn new() -> Result<Cond> {
+impl Pipe {
+    pub fn new() -> Result<Self> {
         // Sets as close-on-execution
-        let (rfd, wfd) = pipe2(OFlag::O_CLOEXEC)?; 
-        Ok(Cond { rfd, wfd })
+        let (rfd, wfd) = pipe2(OFlag::O_CLOEXEC)?;
+        Ok(Pipe { rfd, wfd })
     }
 
     pub fn wait(&self) -> Result<()> {
