@@ -2,7 +2,6 @@
 //! Container Runtime written in Rust, inspired by [railcar](https://github.com/oracle/railcar)
 //! This crate provides a container runtime which can be used by a high-level container runtime to run containers.
 
-use procfs;
 use std::fs;
 use std::path::{Path, PathBuf};
 

@@ -33,7 +33,7 @@ pub struct Create {
     bundle: PathBuf,
     /// Unix socket (file) path , which will receive file descriptor of the writing end of the pseudoterminal
     #[clap(short, long)]
-    console_socket: Option<String>,
+    console_socket: Option<PathBuf>,
     /// name of the container instance to be started
     pub container_id: String,
 }
@@ -86,16 +86,13 @@ impl Create {
         let mut notify_socket: NotifyListener = NotifyListener::new(&container_dir)?;
         // convert path of root file system of the container to absolute path
         let rootfs = fs::canonicalize(&spec.root.path)?;
+
         // if socket file path is given in commandline options,
-        // get file descriptors of console and console socket
-        let (csocketfd, _consolefd) = {
-            if let Some(console_socket) = &self.console_socket {
-                let (csocketfd, consolefd) =
-                    tty::load_console_sockets(&container_dir, console_socket)?;
-                (Some(csocketfd), Some(consolefd))
-            } else {
-                (None, None)
-            }
+        // get file descriptors of console socket
+        let csocketfd = if let Some(console_socket) = &self.console_socket {
+            Some(tty::setup_console_socket(&container_dir, console_socket)?)
+        } else {
+            None
         };
 
         let process = run_container(
@@ -162,7 +159,7 @@ fn run_container<P: AsRef<Path>>(
 
             // set up tty if specified
             if let Some(csocketfd) = csocketfd {
-                tty::ready(csocketfd)?;
+                tty::setup_console(csocketfd)?;
             }
 
             // set namespaces
