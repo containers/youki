@@ -12,6 +12,7 @@ use nix::sys::signal as nix_signal;
 use youki::command::linux::LinuxCommand;
 use youki::container::{Container, ContainerStatus};
 use youki::create;
+use youki::rootless::should_use_rootless;
 use youki::signal;
 use youki::start;
 
@@ -79,7 +80,11 @@ fn main() -> Result<()> {
         eprintln!("log init failed: {:?}", e);
     }
 
-    let root_path = PathBuf::from(&opts.root);
+    let root_path = if should_use_rootless()? && opts.root.eq(&PathBuf::from("/run/youki")) {
+        PathBuf::from("/tmp/rootless") 
+    } else {
+        PathBuf::from(&opts.root)
+    };
     fs::create_dir_all(&root_path)?;
 
     match opts.subcmd {
