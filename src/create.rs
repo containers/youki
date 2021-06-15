@@ -152,9 +152,7 @@ fn run_container<P: AsRef<Path>>(
     // first fork, which creates process, which will later create actual container process
     match fork::fork_first(
         pid_file,
-        namespaces
-            .clone_flags
-            .contains(sched::CloneFlags::CLONE_NEWUSER),
+        rootless,
         linux,
         &container,
         cmanager,

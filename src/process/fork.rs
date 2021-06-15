@@ -16,23 +16,22 @@ use nix::unistd::Pid;
 use crate::cgroups::common::CgroupManager;
 use crate::container::ContainerStatus;
 use crate::process::{child, init, parent, Process};
-use crate::{container::Container, pipe::Pipe};
+use crate::rootless::Rootless;
+use crate::{container::Container};
 
 /// Function to perform the first fork for in order to run the container process
 pub fn fork_first<P: AsRef<Path>>(
     pid_file: Option<P>,
-    is_userns: bool,
+    rootless: Option<Rootless>,
     linux: &oci_spec::Linux,
     container: &Container,
     cmanager: Box<dyn CgroupManager>,
 ) -> Result<Process> {
-    // create a new pipe
-    let cpipe = Pipe::new()?;
-
     // create new parent process structure
-    let (mut parent, sender_for_parent) = parent::ParentProcess::new()?;
+    let (mut parent, parent_channel) = parent::ParentProcess::new(rootless.clone())?;
     // create a new child process structure with sending end of parent process
-    let child = child::ChildProcess::new(sender_for_parent)?;
+    let mut child = child::ChildProcess::new(parent_channel)?;
+    
 
     // fork the process
     match unsafe { unistd::fork()? } {
@@ -51,21 +50,28 @@ pub fn fork_first<P: AsRef<Path>>(
             // if new user is specified in specification, this will be true
             // and new namespace will be created, check https://man7.org/linux/man-pages/man7/user_namespaces.7.html
             // for more information
-            if is_userns {
+            if rootless.is_some() {
+                log::debug!("creating new user namespace");
                 sched::unshare(sched::CloneFlags::CLONE_NEWUSER)?;
+
+                // child needs to be dumpable, otherwise the non root parent is not
+                // allowed to write the uid/gid maps
+                prctl::set_dumpable(true).unwrap();
+                child.request_identifier_mapping()?;
+                child.wait_for_mapping_ack()?;
+                prctl::set_dumpable(false).unwrap();
             }
 
-            cpipe.notify()?;
             Ok(Process::Child(child))
         }
         // in the parent process
         unistd::ForkResult::Parent { child } => {
-            cpipe.wait()?;
-
             // wait for child to fork init process and report back its pid
-            let init_pid = parent.wait_for_child_ready()?;
+            let init_pid = parent.wait_for_child_ready(child)?;
             log::debug!("init pid is {:?}", init_pid);
-            cmanager.apply(&linux.resources.as_ref().unwrap(), Pid::from_raw(init_pid))?;
+            if rootless.is_none() {
+                cmanager.apply(&linux.resources.as_ref().unwrap(), Pid::from_raw(init_pid))?;
+            }
 
             // update status and pid of the container process
             container
