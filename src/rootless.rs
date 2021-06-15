@@ -1,8 +1,33 @@
+use std::{env, path::PathBuf};
+
 use anyhow::{bail, Result};
 use nix::sched::CloneFlags;
-use oci_spec::{LinuxIdMapping, Mount, Spec};
+use oci_spec::{Linux, LinuxIdMapping, Mount, Spec};
 
 use crate::namespaces::Namespaces;
+
+#[derive(Debug, Clone)]
+pub struct Rootless {
+    /// Location of the newuidmap binary
+    pub newuidmap: Option<PathBuf>,
+    /// Location of the newgidmap binary
+    pub newgidmap: Option<PathBuf>,
+    /// Mappings for user ids
+    pub uid_mappings: Vec<LinuxIdMapping>,
+    /// Mappings for group ids
+    pub gid_mappings: Vec<LinuxIdMapping>,
+}
+
+impl From<&Linux> for Rootless {
+    fn from(linux: &Linux) -> Self {
+        Self {
+            newuidmap: None,
+            newgidmap: None,
+            uid_mappings: linux.uid_mappings.clone(),
+            gid_mappings: linux.uid_mappings.clone(),
+        }
+    }
+}
 
 /// Checks if rootless mode should be used
 pub fn should_use_rootless() -> Result<bool> {
@@ -63,4 +88,32 @@ fn is_id_mapped(id: &str, mappings: &Vec<LinuxIdMapping>) -> Result<bool> {
     Ok(mappings
         .iter()
         .all(|m| id >= m.container_id && id <= m.container_id + m.size))
+}
+
+/// Looks up the location of the newuidmap and newgidmap binaries which
+/// are required to write multiple user/group mappings
+pub fn lookup_map_binaries(spec: &Linux) -> Result<Option<(PathBuf, PathBuf)>> {
+    if spec.uid_mappings.len() == 1 && spec.uid_mappings.len() == 1 {
+        return Ok(None);
+    }
+
+    let uidmap = lookup_map_binary("newuidmap")?;
+    let gidmap = lookup_map_binary("newgidmap")?;
+
+    match (uidmap, gidmap) {
+        (Some(newuidmap), Some(newgidmap)) => Ok(Some((newuidmap, newgidmap))),
+        _ => bail!("newuidmap/newgidmap binaries could not be found in path. This is required if multiple id mappings are specified"),
+    }
+}
+
+fn lookup_map_binary(binary: &str) -> Result<Option<PathBuf>> {
+    let paths = env::var("PATH")?;
+    for p in paths.split_terminator(':') {
+        let binary_path = PathBuf::from(p).join(binary);
+        if binary_path.exists() {
+            return Ok(Some(binary_path));
+        }
+    }
+
+    Ok(None)
 }

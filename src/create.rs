@@ -9,7 +9,8 @@ use nix::sched;
 use nix::unistd;
 use nix::unistd::{Gid, Uid};
 
-use crate::cgroups;
+use crate::rootless::{Rootless, lookup_map_binaries, should_use_rootless};
+use crate::{cgroups, rootless};
 use crate::container::{Container, ContainerStatus};
 use crate::namespaces::Namespaces;
 use crate::notify_socket::NotifyListener;
@@ -130,6 +131,20 @@ fn run_container<P: AsRef<Path>>(
     // refer https://github.com/opencontainers/runtime-spec/blob/master/config-linux.md for more information
     let linux = spec.linux.as_ref().unwrap();
     let namespaces: Namespaces = linux.namespaces.clone().into();
+
+    let rootless = if let Ok(true) = should_use_rootless() {
+        log::debug!("rootless container should be created");
+        rootless::validate(&spec)?;
+        let mut rootless = Rootless::from(linux);
+        if let Some((uid_binary, gid_binary)) = lookup_map_binaries(linux)? {
+            rootless.newuidmap = Some(uid_binary);
+            rootless.newgidmap = Some(gid_binary);
+        }
+        Some(rootless)
+    } else {
+        None
+    };
+
 
     let cgroups_path = utils::get_cgroup_path(&linux.cgroups_path, container.id());
     let cmanager = cgroups::common::create_cgroup_manager(&cgroups_path)?;
