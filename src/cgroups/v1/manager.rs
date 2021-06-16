@@ -8,8 +8,8 @@ use nix::unistd::Pid;
 use procfs::process::Process;
 
 use super::{
-    blkio::Blkio, controller_type::CONTROLLERS, cpu::Cpu, cpuset::CpuSet, devices::Devices,
-    hugetlb::Hugetlb, memory::Memory, network_classifier::NetworkClassifier,
+    blkio::Blkio, controller_type::CONTROLLERS, cpu::Cpu, cpuacct::CpuAcct, cpuset::CpuSet,
+    devices::Devices, hugetlb::Hugetlb, memory::Memory, network_classifier::NetworkClassifier,
     network_priority::NetworkPriority, pids::Pids, util, Controller,
 };
 
@@ -61,6 +61,7 @@ impl CgroupManager for Manager {
         for subsys in &self.subsystems {
             match subsys.0.as_str() {
                 "cpu" => Cpu::apply(linux_resources, &subsys.1, pid)?,
+                "cpuacct" => CpuAcct::apply(linux_resources, &subsys.1, pid)?,
                 "cpuset" => CpuSet::apply(linux_resources, &subsys.1, pid)?,
                 "devices" => Devices::apply(linux_resources, &subsys.1, pid)?,
                 "hugetlb" => Hugetlb::apply(linux_resources, &subsys.1, pid)?,

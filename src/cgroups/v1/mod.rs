@@ -2,6 +2,7 @@ mod blkio;
 mod controller;
 mod controller_type;
 mod cpu;
+mod cpuacct;
 mod cpuset;
 mod devices;
 mod hugetlb;
