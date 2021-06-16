@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{bail, Result};
 
 use nix::unistd::Pid;
 use oci_spec::LinuxResources;
@@ -80,10 +80,10 @@ impl Manager {
     ) -> Result<Vec<ControllerType>> {
         let controllers_path = self.root_path.join(cgroup_path).join(CGROUP_CONTROLLERS);
         if !controllers_path.exists() {
-            return Err(anyhow!(
+            bail!(
                 "cannot get available controllers. {:?} does not exist",
                 controllers_path
-            ));
+            )
         }
 
         let mut controllers = Vec::new();
@@ -95,7 +95,7 @@ impl Manager {
                 "io" => controllers.push(ControllerType::Io),
                 "memory" => controllers.push(ControllerType::Memory),
                 "pids" => controllers.push(ControllerType::Pids),
-                _ => continue,
+                tpe => log::warn!("Controller {} is not yet implemented.", tpe),
             }
         }
 
