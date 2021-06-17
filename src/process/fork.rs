@@ -69,7 +69,7 @@ pub fn fork_first<P: AsRef<Path>>(
             // wait for child to fork init process and report back its pid
             let init_pid = parent.wait_for_child_ready(child)?;
             log::debug!("init pid is {:?}", init_pid);
-            if rootless.is_none() {
+            if rootless.is_none() && linux.resources.is_some() {
                 cmanager.apply(&linux.resources.as_ref().unwrap(), Pid::from_raw(init_pid))?;
             }
 
