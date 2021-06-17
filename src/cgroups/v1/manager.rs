@@ -9,8 +9,9 @@ use procfs::process::Process;
 
 use super::{
     blkio::Blkio, controller_type::CONTROLLERS, cpu::Cpu, cpuacct::CpuAcct, cpuset::CpuSet,
-    devices::Devices, hugetlb::Hugetlb, memory::Memory, network_classifier::NetworkClassifier,
-    network_priority::NetworkPriority, pids::Pids, util, Controller,
+    devices::Devices, freezer::Freezer, hugetlb::Hugetlb, memory::Memory,
+    network_classifier::NetworkClassifier, network_priority::NetworkPriority, pids::Pids, util,
+    Controller,
 };
 
 use crate::cgroups::common::CGROUP_PROCS;
@@ -70,6 +71,7 @@ impl CgroupManager for Manager {
                 "blkio" => Blkio::apply(linux_resources, &subsys.1, pid)?,
                 "net_prio" => NetworkPriority::apply(linux_resources, &subsys.1, pid)?,
                 "net_cls" => NetworkClassifier::apply(linux_resources, &subsys.1, pid)?,
+                "freezer" => Freezer::apply(linux_resources, &subsys.1, pid)?,
                 _ => unreachable!("every subsystem should have an associated controller"),
             }
         }

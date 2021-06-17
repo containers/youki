@@ -364,6 +364,7 @@ mod tests {
                 block_io: None,
                 hugepage_limits: vec![],
                 network: None,
+                freezer: None,
             };
 
             let pid = Pid::from_raw(pid_int);
