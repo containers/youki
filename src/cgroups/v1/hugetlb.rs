@@ -1,6 +1,6 @@
 use std::{fs, path::Path};
 
-use anyhow::anyhow;
+use anyhow::bail;
 use regex::Regex;
 
 use crate::cgroups::{
@@ -34,11 +34,11 @@ impl Hugetlb {
         let re = Regex::new(r"(?P<pagesize>[0-9]+)[KMG]B")?;
         let caps = re.captures(&hugetlb.page_size);
         match caps {
-            None => return Err(anyhow!("page size must be in the format [0-9]+[KMG]B")),
+            None => bail!("page size must be in the format [0-9]+[KMG]B"),
             Some(caps) => {
                 let page_size: u64 = caps["pagesize"].parse()?;
                 if !Self::is_power_of_two(page_size) {
-                    return Err(anyhow!("page size must be in the format of 2^(integer)"));
+                    bail!("page size must be in the format of 2^(integer)");
                 }
             }
         }
