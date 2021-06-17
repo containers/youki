@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{bail, Result};
 use std::path::Path;
 
 use crate::cgroups::common;
@@ -26,7 +26,7 @@ impl Controller for Cpu {
 impl Cpu {
     fn apply(path: &Path, cpu: &LinuxCpu) -> Result<()> {
         if Self::is_realtime_requested(cpu) {
-            return Err(anyhow!("realtime is not supported on cgroup v2 yet"));
+            bail!("realtime is not supported on cgroup v2 yet");
         }
 
         if let Some(mut shares) = cpu.shares {
