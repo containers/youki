@@ -559,9 +559,9 @@ pub enum LinuxSeccompOperator {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Linux {
-    #[serde(default, rename = "LinuxIDMapping")]
+    #[serde(default)]
     pub uid_mappings: Vec<LinuxIdMapping>,
-    #[serde(default, rename = "LinuxIDMapping")]
+    #[serde(default)]
     pub gid_mappings: Vec<LinuxIdMapping>,
     #[serde(default)]
     pub sysctl: HashMap<String, String>,
