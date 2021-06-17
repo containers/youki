@@ -87,7 +87,7 @@ fn is_id_mapped(id: &str, mappings: &Vec<LinuxIdMapping>) -> Result<bool> {
     let id = id.parse::<u32>()?;
     Ok(mappings
         .iter()
-        .all(|m| id >= m.container_id && id <= m.container_id + m.size))
+        .any(|m| id >= m.container_id && id <= m.container_id + m.size))
 }
 
 /// Looks up the location of the newuidmap and newgidmap binaries which
