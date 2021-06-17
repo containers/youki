@@ -40,6 +40,10 @@ pub fn get_subsystem_mount_points(subsystem: &str) -> Result<PathBuf> {
                     return m.mount_point.ends_with("cpu,cpuacct")
                         || m.mount_point.ends_with("cpu");
                 }
+                if subsystem == "cpuacct" {
+                    return m.mount_point.ends_with("cpu,cpuacct")
+                        || m.mount_point.ends_with("cpuacct");
+                }
             }
             m.mount_point.ends_with(&subsystem)
         })

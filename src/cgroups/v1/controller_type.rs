@@ -2,6 +2,7 @@ use std::fmt::Display;
 
 pub enum ControllerType {
     Cpu,
+    CpuAcct,
     CpuSet,
     Devices,
     HugeTlb,
@@ -16,6 +17,7 @@ impl Display for ControllerType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let print = match *self {
             Self::Cpu => "cpu",
+            Self::CpuAcct => "cpuacct",
             Self::CpuSet => "cpuset",
             Self::Devices => "devices",
             Self::HugeTlb => "hugetlb",
@@ -32,6 +34,7 @@ impl Display for ControllerType {
 
 pub const CONTROLLERS: &[ControllerType] = &[
     ControllerType::Cpu,
+    ControllerType::CpuAcct,
     ControllerType::CpuSet,
     ControllerType::Devices,
     ControllerType::HugeTlb,
