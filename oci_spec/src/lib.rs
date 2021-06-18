@@ -460,6 +460,7 @@ pub struct LinuxResources {
     #[serde(default)]
     pub hugepage_limits: Vec<LinuxHugepageLimit>,
     pub network: Option<LinuxNetwork>,
+    pub freezer: Option<FreezerState>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -554,6 +555,13 @@ pub enum LinuxSeccompOperator {
     ScmpCmpGe = 5,
     ScmpCmpGt = 6,
     ScmpCmpMaskedEq = 7,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+pub enum FreezerState {
+    Undefined,
+    Frozen,
+    Thawed,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
