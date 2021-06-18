@@ -81,7 +81,7 @@ fn main() -> Result<()> {
     }
 
     let root_path = if should_use_rootless()? && opts.root.eq(&PathBuf::from("/run/youki")) {
-        PathBuf::from("/tmp/rootless") 
+        PathBuf::from("/tmp/rootless")
     } else {
         PathBuf::from(&opts.root)
     };

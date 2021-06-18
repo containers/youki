@@ -5,8 +5,8 @@ use std::path::Path;
 use std::process::Command;
 
 use super::{MAX_EVENTS, WAIT_FOR_CHILD};
-use crate::process::WAIT_FOR_MAPPING;
 use crate::process::message::Message;
+use crate::process::WAIT_FOR_MAPPING;
 use crate::rootless::Rootless;
 use crate::utils;
 use anyhow::Context;
@@ -31,9 +31,7 @@ impl ParentProcess {
     /// Create new Parent process structure
     pub fn new(rootless: Option<Rootless>) -> Result<(Self, ParentChannel)> {
         let (parent_channel, child_channel) = Self::setup_pipes(rootless)?;
-        let parent = Self {
-            child_channel,
-        };
+        let parent = Self { child_channel };
 
         Ok((parent, parent_channel))
     }
@@ -131,7 +129,7 @@ struct ChildChannel {
     sender: Sender,
     receiver: Receiver,
     poll: Poll,
-    rootless: Option<Rootless>
+    rootless: Option<Rootless>,
 }
 
 impl ChildChannel {
@@ -209,7 +207,7 @@ impl ChildChannel {
 
     fn notify_mapping_written(&mut self) -> Result<()> {
         self.sender
-        .write_all(&(Message::MappingWritten as u8).to_be_bytes())?;
+            .write_all(&(Message::MappingWritten as u8).to_be_bytes())?;
         Ok(())
     }
 
@@ -221,7 +219,7 @@ impl ChildChannel {
             rootless.newuidmap.as_deref(),
         )
     }
-    
+
     fn write_gid_mapping(&self, target_pid: Pid) -> Result<()> {
         let rootless = self.rootless.as_ref().unwrap();
         write_id_mapping(
@@ -234,7 +232,7 @@ impl ChildChannel {
 
 fn write_id_mapping(
     map_file: &str,
-    mappings: &Vec<LinuxIdMapping>,
+    mappings: &[LinuxIdMapping],
     map_binary: Option<&Path>,
 ) -> Result<()> {
     let mappings: Vec<String> = mappings

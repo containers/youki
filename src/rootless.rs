@@ -66,15 +66,17 @@ pub fn validate(spec: &Spec) -> Result<()> {
 }
 
 fn validate_mounts(
-    mounts: &Vec<Mount>,
-    uid_mappings: &Vec<LinuxIdMapping>,
-    gid_mappings: &Vec<LinuxIdMapping>,
+    mounts: &[Mount],
+    uid_mappings: &[LinuxIdMapping],
+    gid_mappings: &[LinuxIdMapping],
 ) -> Result<()> {
     for mount in mounts {
         for opt in &mount.options {
             if opt.starts_with("uid=") && !is_id_mapped(&opt[4..], uid_mappings)? {
                 bail!("Mount {:?} specifies option {} which is not mapped inside the rootless container", mount, opt);
-            } else if opt.starts_with("gid=") && !is_id_mapped(&opt[4..], gid_mappings)? {
+            }
+
+            if opt.starts_with("gid=") && !is_id_mapped(&opt[4..], gid_mappings)? {
                 bail!("Mount {:?} specifies option {} which is not mapped inside the rootless container", mount, opt);
             }
         }
@@ -83,7 +85,7 @@ fn validate_mounts(
     Ok(())
 }
 
-fn is_id_mapped(id: &str, mappings: &Vec<LinuxIdMapping>) -> Result<bool> {
+fn is_id_mapped(id: &str, mappings: &[LinuxIdMapping]) -> Result<bool> {
     let id = id.parse::<u32>()?;
     Ok(mappings
         .iter()

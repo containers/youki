@@ -9,17 +9,17 @@ use nix::sched;
 use nix::unistd;
 use nix::unistd::{Gid, Uid};
 
-use crate::rootless::{Rootless, lookup_map_binaries, should_use_rootless};
-use crate::{cgroups, rootless};
 use crate::container::{Container, ContainerStatus};
 use crate::namespaces::Namespaces;
 use crate::notify_socket::NotifyListener;
 use crate::process::{fork, Process};
 use crate::rootfs;
+use crate::rootless::{lookup_map_binaries, should_use_rootless, Rootless};
 use crate::stdio::FileDescriptor;
 use crate::tty;
 use crate::utils;
 use crate::{capabilities, command::Command};
+use crate::{cgroups, rootless};
 
 /// This is the main structure which stores various commandline options given by
 /// high-level container runtime
@@ -145,18 +145,11 @@ fn run_container<P: AsRef<Path>>(
         None
     };
 
-
     let cgroups_path = utils::get_cgroup_path(&linux.cgroups_path, container.id());
     let cmanager = cgroups::common::create_cgroup_manager(&cgroups_path)?;
 
     // first fork, which creates process, which will later create actual container process
-    match fork::fork_first(
-        pid_file,
-        rootless,
-        linux,
-        &container,
-        cmanager,
-    )? {
+    match fork::fork_first(pid_file, rootless, linux, &container, cmanager)? {
         // In the parent process, which called run_container
         Process::Parent(parent) => Ok(Process::Parent(parent)),
         // in child process

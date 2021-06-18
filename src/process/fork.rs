@@ -14,10 +14,10 @@ use nix::unistd;
 use nix::unistd::Pid;
 
 use crate::cgroups::common::CgroupManager;
+use crate::container::Container;
 use crate::container::ContainerStatus;
 use crate::process::{child, init, parent, Process};
 use crate::rootless::Rootless;
-use crate::{container::Container};
 
 /// Function to perform the first fork for in order to run the container process
 pub fn fork_first<P: AsRef<Path>>(
@@ -31,7 +31,6 @@ pub fn fork_first<P: AsRef<Path>>(
     let (mut parent, parent_channel) = parent::ParentProcess::new(rootless.clone())?;
     // create a new child process structure with sending end of parent process
     let mut child = child::ChildProcess::new(parent_channel)?;
-    
 
     // fork the process
     match unsafe { unistd::fork()? } {
