@@ -19,3 +19,22 @@ impl Controller for CpuAcct {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cgroups::test::setup;
+
+    #[test]
+    fn test_apply() {
+        let (tmp, procs) = setup("test_cpuacct_apply", CGROUP_PROCS);
+        let resource = LinuxResources::default();
+        let pid = Pid::from_raw(1000);
+
+        CpuAcct::apply(&resource, &tmp, pid).expect("apply cpuacct");
+
+        let content = fs::read_to_string(&procs)
+            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_PROCS));
+        assert_eq!(content, "1000");
+    }
+}
