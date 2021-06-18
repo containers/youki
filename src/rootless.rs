@@ -24,7 +24,7 @@ impl From<&Linux> for Rootless {
             newuidmap: None,
             newgidmap: None,
             uid_mappings: linux.uid_mappings.clone(),
-            gid_mappings: linux.uid_mappings.clone(),
+            gid_mappings: linux.gid_mappings.clone(),
         }
     }
 }
