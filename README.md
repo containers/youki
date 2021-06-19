@@ -33,7 +33,7 @@ youki is not at the practical stage yet. However, it is getting closer to practi
 # Getting Started
 
 Local build is only supported on linux.
-For other platforms, please use the devcontainer that we prepared.
+For other platforms, please use [Vagrantfile](#setting-up-vagrant) that we prepared.
 
 ## Requires
 
@@ -103,6 +103,19 @@ Go and node-tap are required to run integration test. See the [opencontainers/ru
 ```
 $ git submodule update --init --recursive
 $ ./integration_test.sh
+```
+
+### Setting up Vagrant
+You can try youki on platforms other than linux by using the Vagrantfile we have prepared.
+
+```
+$ git clone git@github.com:containers/youki.git
+$ cd youki
+$ vagrant up
+$ vagrant ssh
+# in virtual machine
+$ cd youki # in virtual machine
+$ ./build.sh
 ```
 
 # Community
