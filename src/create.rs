@@ -132,8 +132,11 @@ fn run_container<P: AsRef<Path>>(
     let linux = spec.linux.as_ref().unwrap();
     let namespaces: Namespaces = linux.namespaces.clone().into();
 
-    let rootless = if let Ok(true) = should_use_rootless() {
+    let rootless = if should_use_rootless() {
         log::debug!("rootless container should be created");
+        log::warn!(
+            "resource constraints and multi id mapping is unimplemented for rootless containers"
+        );
         rootless::validate(&spec)?;
         let mut rootless = Rootless::from(linux);
         if let Some((uid_binary, gid_binary)) = lookup_map_binaries(linux)? {

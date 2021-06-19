@@ -30,16 +30,16 @@ impl From<&Linux> for Rootless {
 }
 
 /// Checks if rootless mode should be used
-pub fn should_use_rootless() -> Result<bool> {
+pub fn should_use_rootless() -> bool {
     if !nix::unistd::geteuid().is_root() {
-        return Ok(true);
+        return true;
     }
 
     if let Ok("true") = std::env::var("YOUKI_USE_ROOTLESS").as_deref() {
-        return Ok(true);
+        return true;
     }
 
-    Ok(false)
+    false
 }
 
 /// Validates that the spec contains the required information for
@@ -110,12 +110,8 @@ pub fn lookup_map_binaries(spec: &Linux) -> Result<Option<(PathBuf, PathBuf)>> {
 
 fn lookup_map_binary(binary: &str) -> Result<Option<PathBuf>> {
     let paths = env::var("PATH")?;
-    for p in paths.split_terminator(':') {
-        let binary_path = PathBuf::from(p).join(binary);
-        if binary_path.exists() {
-            return Ok(Some(binary_path));
-        }
-    }
-
-    Ok(None)
+    Ok(paths
+        .split_terminator(':')
+        .find(|p| PathBuf::from(p).join(binary).exists())
+        .map(PathBuf::from))
 }

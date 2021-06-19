@@ -80,7 +80,7 @@ fn main() -> Result<()> {
         eprintln!("log init failed: {:?}", e);
     }
 
-    let root_path = if should_use_rootless()? && opts.root.eq(&PathBuf::from("/run/youki")) {
+    let root_path = if should_use_rootless() && opts.root.eq(&PathBuf::from("/run/youki")) {
         PathBuf::from("/tmp/rootless")
     } else {
         PathBuf::from(&opts.root)
