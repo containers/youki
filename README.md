@@ -43,10 +43,6 @@ For other platforms, please use the devcontainer that we prepared.
 ## Building
 
 ```sh
-$ cargo install cargo-when # installs prerequisite for building youki
-```
-
-```sh
 $ git clone git@github.com:containers/youki.git
 $ cd youki
 $ ./build.sh

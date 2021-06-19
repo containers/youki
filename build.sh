@@ -8,8 +8,7 @@ VERSION=debug
 if [[ "$1" == "--release" ]]; then
     VERSION=release
 fi
-cargo when --channel=stable build --verbose $TGT $1 && \
-cargo when --channel=beta build --verbose $TGT $1 && \
-cargo when --channel=nightly build --verbose --features nightly $TGT $1 && \
+
+cargo build --verbose $TGT $1
 rm -f youki
 cp target/$TARGET/$VERSION/youki .

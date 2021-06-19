@@ -25,7 +25,6 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           args: --all-features
-      - run: cargo install cargo-when
       - name: Build
         run: ./build.sh
       - name: Run tests
@@ -48,7 +47,6 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-      - run: cargo install cargo-when
       - name: Build
         run: ./build.sh
       - uses: actions/setup-go@v2
