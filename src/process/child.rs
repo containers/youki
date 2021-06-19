@@ -1,6 +1,5 @@
 use std::io::ErrorKind;
 use std::io::Read;
-use std::io::Write;
 
 use anyhow::{bail, Result};
 use mio::unix::pipe;
@@ -9,6 +8,7 @@ use mio::unix::pipe::Sender;
 use mio::{Events, Interest, Poll, Token};
 use nix::unistd::Pid;
 
+use super::parent::ParentChannel;
 use super::{MAX_EVENTS, WAIT_FOR_INIT};
 use crate::process::message::Message;
 
@@ -18,7 +18,7 @@ const CHILD: Token = Token(1);
 /// Contains sending end of pipe for parent process, receiving end of pipe
 /// for the init process and poller for that
 pub struct ChildProcess {
-    sender_for_parent: Sender,
+    parent_channel: ParentChannel,
     receiver: Option<Receiver>,
     poll: Option<Poll>,
 }
@@ -29,9 +29,9 @@ pub struct ChildProcess {
 // a process point of view, init process is child of child process, which is child of original youki process.
 impl ChildProcess {
     /// create a new Child process structure
-    pub fn new(sender_for_parent: Sender) -> Result<Self> {
+    pub fn new(parent_channel: ParentChannel) -> Result<Self> {
         Ok(Self {
-            sender_for_parent,
+            parent_channel,
             receiver: None,
             poll: None,
         })
@@ -55,24 +55,17 @@ impl ChildProcess {
 
     /// Indicate that child process has forked the init process to parent process
     pub fn notify_parent(&mut self, init_pid: Pid) -> Result<()> {
-        log::debug!(
-            "child send to parent {:?}",
-            (Message::ChildReady as u8).to_be_bytes()
-        );
-        // write ChildReady message to the pipe to parent
-        self.write_message_for_parent(Message::ChildReady)?;
-        // write pid of init process which is forked by child process to the pipe,
-        // Pid in nix::unistd is type alias of SessionId which itself is alias of i32
-        self.sender_for_parent
-            .write_all(&(init_pid.as_raw()).to_be_bytes())?;
+        self.parent_channel.send_init_pid(init_pid)?;
         Ok(())
     }
 
-    /// writes given message to pipe for the parent
-    #[inline]
-    fn write_message_for_parent(&mut self, msg: Message) -> Result<()> {
-        self.sender_for_parent
-            .write_all(&(msg as u8).to_be_bytes())?;
+    pub fn request_identifier_mapping(&mut self) -> Result<()> {
+        self.parent_channel.request_identifier_mapping()?;
+        Ok(())
+    }
+
+    pub fn wait_for_mapping_ack(&mut self) -> Result<()> {
+        self.parent_channel.wait_for_mapping_ack()?;
         Ok(())
     }
 

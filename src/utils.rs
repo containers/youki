@@ -6,6 +6,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use anyhow::Context;
 use anyhow::{bail, Result};
 use nix::unistd;
 
@@ -86,6 +87,12 @@ pub fn delete_with_retry<P: AsRef<Path>>(path: P) -> Result<()> {
     }
 
     bail!("could not delete {:?}", path)
+}
+
+pub fn write_file<P: AsRef<Path>, C: AsRef<[u8]>>(path: P, contents: C) -> Result<()> {
+    let path = path.as_ref();
+    fs::write(path, contents).with_context(|| format!("failed to write to {:?}", path))?;
+    Ok(())
 }
 
 #[cfg(test)]

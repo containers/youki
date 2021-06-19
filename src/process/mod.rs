@@ -26,3 +26,5 @@ const MAX_EVENTS: usize = 128;
 const WAIT_FOR_CHILD: Duration = Duration::from_secs(5);
 /// Time to wait when polling for message from init process
 const WAIT_FOR_INIT: Duration = Duration::from_millis(1000);
+/// Time to wait when polling for mapping ack from parent
+const WAIT_FOR_MAPPING: Duration = Duration::from_secs(3);
