@@ -36,7 +36,8 @@ impl NetworkPriority {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cgroups::test::{create_temp_dir, set_fixture};
+    use crate::cgroups::test::set_fixture;
+    use crate::utils::create_temp_dir;
     use oci_spec::LinuxInterfacePriority;
 
     #[test]
