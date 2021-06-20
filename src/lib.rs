@@ -7,6 +7,7 @@ pub mod cgroups;
 pub mod command;
 pub mod container;
 pub mod create;
+pub mod info;
 pub mod logger;
 pub mod namespaces;
 pub mod notify_socket;
