@@ -36,8 +36,8 @@ impl NetworkClassifier {
 
 #[cfg(test)]
 mod tests {
-    use crate::cgroups::test::{create_temp_dir, set_fixture};
-
+    use crate::cgroups::test::set_fixture;
+    use crate::utils::create_temp_dir;
     use super::*;
 
     #[test]
