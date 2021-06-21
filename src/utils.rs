@@ -162,12 +162,9 @@ mod tests {
 
     #[test]
     fn test_join_absolute_path_error() {
-        assert_eq!(
-            PathBuf::from("sample/a/")
-                .join_absolute_path(&PathBuf::from("b/c"))
-                .is_err(),
-            true
-        );
+        assert!(PathBuf::from("sample/a/")
+            .join_absolute_path(&PathBuf::from("b/c"))
+            .is_err(),);
     }
 
     #[test]
