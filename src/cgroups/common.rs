@@ -6,11 +6,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
-
 use anyhow::{bail, Context, Result};
 use nix::unistd::Pid;
 use oci_spec::LinuxResources;
 use procfs::process::Process;
+use systemd::daemon::booted;
 
 use crate::cgroups::v1;
 use crate::cgroups::v2;
@@ -91,7 +91,10 @@ pub fn get_supported_cgroup_fs() -> Result<Vec<Cgroup>> {
     Ok(cgroups)
 }
 
-pub fn create_cgroup_manager<P: Into<PathBuf>>(cgroup_path: P) -> Result<Box<dyn CgroupManager>> {
+pub fn create_cgroup_manager<P: Into<PathBuf>>(
+    cgroup_path: P,
+    systemd_cgroup: bool,
+) -> Result<Box<dyn CgroupManager>> {
     let cgroup_mount = Process::myself()?
         .mountinfo()?
         .into_iter()
@@ -109,6 +112,16 @@ pub fn create_cgroup_manager<P: Into<PathBuf>>(cgroup_path: P) -> Result<Box<dyn
         }
         (None, Some(cgroup2)) => {
             log::info!("cgroup manager V2 will be used");
+            if systemd_cgroup {
+                if !booted()? {
+                    bail!("systemd cgroup flag passed, but systemd support for managing cgroups is not available");
+                }
+                log::info!("systemd cgroup manager will be used");
+                return Ok(Box::new(v2::SystemDCGroupManager::new(
+                    cgroup2.mount_point,
+                    cgroup_path.into(),
+                )?));
+            }
             Ok(Box::new(v2::manager::Manager::new(
                 cgroup2.mount_point,
                 cgroup_path.into(),
@@ -119,6 +132,16 @@ pub fn create_cgroup_manager<P: Into<PathBuf>>(cgroup_path: P) -> Result<Box<dyn
             match cgroup_override {
                 Ok(v) if v == "true" => {
                     log::info!("cgroup manager V2 will be used");
+                    if systemd_cgroup {
+                        if !booted()? {
+                            bail!("systemd cgroup flag passed, but systemd support for managing cgroups is not available");
+                        }
+                        log::info!("systemd cgroup manager will be used");
+                        return Ok(Box::new(v2::SystemDCGroupManager::new(
+                            cgroup2.mount_point,
+                            cgroup_path.into(),
+                        )?));
+                    }
                     Ok(Box::new(v2::manager::Manager::new(
                         cgroup2.mount_point,
                         cgroup_path.into(),

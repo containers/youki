@@ -2,14 +2,13 @@
 
 use anyhow::Result;
 use std::{
-    io::Write,    
+    io::Write,
     path::{Path, PathBuf},
 };
 
 use oci_spec::LinuxCpu;
 
-use crate::utils::{create_temp_dir, TempDir}; 
-
+use crate::utils::{create_temp_dir, TempDir};
 
 pub fn setup(testname: &str, cgroup_file: &str) -> (TempDir, PathBuf) {
     let tmp = create_temp_dir(testname).expect("create temp directory for test");

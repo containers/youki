@@ -46,9 +46,9 @@ impl Pids {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::cgroups::test::set_fixture;
     use crate::utils::create_temp_dir;
-    use super::*;
     use oci_spec::LinuxPids;
 
     #[test]

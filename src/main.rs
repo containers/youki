@@ -33,6 +33,9 @@ struct Opts {
     log: Option<PathBuf>,
     #[clap(long)]
     log_format: Option<String>,
+    /// Enable systemd cgroup manager, rather then use the cgroupfs directly.
+    #[clap(short, long)]
+    systemd_cgroup: bool,
     /// command to actually manage container
     #[clap(subcommand)]
     subcmd: SubCommand,
@@ -47,6 +50,9 @@ pub struct Kill {
 #[derive(Clap, Debug)]
 pub struct Delete {
     container_id: String,
+    // forces deletion of the container.
+    #[clap(short, long)]
+    force: bool,
 }
 
 #[derive(Clap, Debug)]
@@ -88,8 +94,10 @@ fn main() -> Result<()> {
     };
     fs::create_dir_all(&root_path)?;
 
+    let systemd_cgroup = opts.systemd_cgroup;
+
     match opts.subcmd {
-        SubCommand::Create(create) => create.exec(root_path, LinuxCommand),
+        SubCommand::Create(create) => create.exec(root_path, systemd_cgroup, LinuxCommand),
         SubCommand::Start(start) => start.exec(root_path),
         SubCommand::Kill(kill) => {
             // resolves relative paths, symbolic links etc. and get complete path
@@ -151,7 +159,8 @@ fn main() -> Result<()> {
                     // remove the cgroup created for the container
                     // check https://man7.org/linux/man-pages/man7/cgroups.7.html
                     // creating and removing cgroups section for more information on cgroups
-                    let cmanager = cgroups::common::create_cgroup_manager(cgroups_path)?;
+                    let cmanager =
+                        cgroups::common::create_cgroup_manager(cgroups_path, systemd_cgroup)?;
                     cmanager.remove()?;
                 }
                 std::process::exit(0)

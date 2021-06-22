@@ -7,4 +7,6 @@ mod io;
 pub mod manager;
 mod memory;
 mod pids;
+pub mod systemd_manager;
 pub mod util;
+pub use systemd_manager::SystemDCGroupManager;

@@ -40,12 +40,29 @@ For other platforms, please use the devcontainer that we prepared.
 - Rust(See [here](https://www.rust-lang.org/tools/install))
 - Docker(See [here](https://docs.docker.com/engine/install))
 
-## Building
-
+## Dependencies
 ```sh
-$ cargo install cargo-when # installs prerequisite for building youki
+$ cargo install cargo-when
 ```
 
+### Debian, Ubuntu and related distributions
+```sh
+$ sudo dnf install        \
+      pkg-config          \
+      libsystemd-dev      \
+      libdbus-glib-1-dev
+```
+
+
+### Fedora, Centos, RHEL and related distributions
+```sh
+$ sudo dnf install \
+      pkg-config   \
+      systemd-dev  \
+      dbus-devel
+```
+
+## Build
 ```sh
 $ git clone git@github.com:containers/youki.git
 $ cd youki
