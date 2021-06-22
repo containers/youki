@@ -30,6 +30,21 @@ Here is why I am rewriting a new container runtime in Rust.
 youki is not at the practical stage yet. However, it is getting closer to practical use, running with docker and passing all the default tests provided by [opencontainers/runtime-tools](https://github.com/opencontainers/runtime-tools).
 ![youki demo](docs/demo.gif)
 
+## Features
+
+- [x] run with docker
+- [ ] run with podman(WIP on [#24](https://github.com/containers/youki/issues/24))
+- [x] pivot root
+- [x] mount devices
+- [x] namespaces
+- [x] capabilities
+- [x] rlimits
+- [ ] cgroups v1(WIP on [#9](https://github.com/containers/youki/issues/9))
+- [ ] cgroups v2(WIP on [#78](https://github.com/containers/youki/issues/78))
+- [ ] seccomp(WIP on [#25](https://github.com/containers/youki/issues/25))
+- [ ] hooks(WIP on [#13](https://github.com/containers/youki/issues/13))
+- [ ] rootless(WIP on [#77](https://github.com/containers/youki/issues/77))
+
 # Getting Started
 
 Local build is only supported on linux.
@@ -41,11 +56,13 @@ For other platforms, please use the devcontainer that we prepared.
 - Docker(See [here](https://docs.docker.com/engine/install))
 
 ## Dependencies
+
 ```sh
 $ cargo install cargo-when
 ```
 
 ### Debian, Ubuntu and related distributions
+
 ```sh
 $ sudo dnf install        \
       pkg-config          \
@@ -53,8 +70,8 @@ $ sudo dnf install        \
       libdbus-glib-1-dev
 ```
 
-
 ### Fedora, Centos, RHEL and related distributions
+
 ```sh
 $ sudo dnf install \
       pkg-config   \
@@ -63,6 +80,7 @@ $ sudo dnf install \
 ```
 
 ## Build
+
 ```sh
 $ git clone git@github.com:containers/youki.git
 $ cd youki
@@ -129,21 +147,6 @@ We also have an active [Discord](https://discord.gg/h7R3HgWUct) if you'd like to
 # Design and implementation of youki
 
 TBD(WIP on [#14](https://github.com/containers/youki/issues/14))
-
-# Features
-
-- [x] run with docker
-- [ ] run with podman
-- [x] pivot root
-- [x] mount devices
-- [x] namespaces
-- [x] capabilities
-- [x] rlimits
-- [ ] cgroups v1(WIP on [#9](https://github.com/containers/youki/issues/9))
-- [ ] cgroups v2
-- [ ] seccomp
-- [ ] hooks(WIP on [#13](https://github.com/containers/youki/issues/13))
-- [ ] rootless
 
 # Contribution
 
