@@ -3,7 +3,7 @@
 //! to call syscalls required for container management
 
 #[allow(clippy::module_inception)]
-mod command;
+pub mod command;
 pub mod linux;
 pub mod test;
 

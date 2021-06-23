@@ -1,7 +1,7 @@
 //! An interface trait so that rest of Youki can call
 //! necessary functions without having to worry about their
 //! implementation details
-use std::{any::Any, path::Path};
+use std::{any::Any, ffi::OsStr, path::Path, sync::Arc};
 
 use anyhow::Result;
 use caps::{errors::CapsError, CapSet, CapsHashSet};
@@ -11,6 +11,8 @@ use nix::{
 };
 
 use oci_spec::LinuxRlimit;
+
+use crate::command::{linux::LinuxCommand, test::TestHelperCommand};
 
 /// This specifies various kernel/other functionalities required for
 /// container management
@@ -23,4 +25,13 @@ pub trait Command {
     fn set_capability(&self, cset: CapSet, value: &CapsHashSet) -> Result<(), CapsError>;
     fn set_hostname(&self, hostname: &str) -> Result<()>;
     fn set_rlimit(&self, rlimit: &LinuxRlimit) -> Result<()>;
+    fn get_pwuid(&self, uid: u32) -> Option<Arc<OsStr>>;
+}
+
+pub fn create_command() -> Box<dyn Command> {
+    if cfg!(test) {
+        Box::new(TestHelperCommand::default())
+    } else {
+        Box::new(LinuxCommand)
+    }
 }

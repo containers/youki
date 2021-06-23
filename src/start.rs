@@ -36,7 +36,7 @@ impl Start {
         let mut notify_socket = NotifySocket::new(&container.root)?;
         notify_socket.notify_container_start()?;
 
-        container.update_status(ContainerStatus::Running)?.save()?;
+        container.update_status(ContainerStatus::Running).save()?;
         Ok(())
     }
 }

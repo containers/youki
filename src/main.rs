@@ -2,14 +2,21 @@
 //! Container Runtime written in Rust, inspired by [railcar](https://github.com/oracle/railcar)
 //! This crate provides a container runtime which can be used by a high-level container runtime to run containers.
 
+use std::ffi::OsString;
+
 use std::fs;
+use std::io;
+use std::io::Write;
+
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Result};
+use chrono::{DateTime, Local};
 use clap::Clap;
 use nix::sys::signal as nix_signal;
 
 use youki::command::linux::LinuxCommand;
+
 use youki::container::{Container, ContainerStatus};
 use youki::create;
 use youki::info::{print_cgroups, print_hardware, print_kernel, print_os, print_youki};
@@ -17,6 +24,7 @@ use youki::rootless::should_use_rootless;
 use youki::signal;
 use youki::start;
 
+use tabwriter::TabWriter;
 use youki::cgroups;
 use youki::utils;
 
@@ -76,6 +84,8 @@ enum SubCommand {
     State(StateArgs),
     #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
     Info,
+    #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
+    List,
 }
 
 /// This is the entry point in the container runtime. The binary is run by a high-level container runtime,
@@ -116,7 +126,7 @@ fn main() -> Result<()> {
                 let sig = signal::from_str(kill.signal.as_str())?;
                 log::debug!("kill signal {} to {}", sig, container.pid().unwrap());
                 nix_signal::kill(container.pid().unwrap(), sig)?;
-                container.update_status(ContainerStatus::Stopped)?.save()?;
+                container.update_status(ContainerStatus::Stopped).save()?;
                 std::process::exit(0)
             } else {
                 bail!(
@@ -186,6 +196,56 @@ fn main() -> Result<()> {
             print_os();
             print_hardware();
             print_cgroups();
+
+            Ok(())
+        }
+
+        SubCommand::List => {
+            let root_path = fs::canonicalize(root_path)?;
+            let mut content = String::new();
+
+            for container_dir in fs::read_dir(root_path)? {
+                let container_dir = container_dir?.path();
+                let state_file = container_dir.join("state.json");
+                if !state_file.exists() {
+                    continue;
+                }
+
+                let container = Container::load(container_dir)?.refresh_status()?;
+                let pid = if let Some(pid) = container.pid() {
+                    pid.to_string()
+                } else {
+                    "".to_owned()
+                };
+
+                let user_name = if let Some(creator) = container.creator() {
+                    creator
+                } else {
+                    OsString::new()
+                };
+
+                let created = if let Some(utc) = container.created() {
+                    let local: DateTime<Local> = DateTime::from(utc);
+                    local.to_rfc3339_opts(chrono::SecondsFormat::Secs, false)
+                } else {
+                    "".to_owned()
+                };
+
+                content.push_str(&format!(
+                    "{}\t{}\t{}\t{}\t{}\t{}\n",
+                    container.id(),
+                    pid,
+                    container.status(),
+                    container.bundle(),
+                    created,
+                    user_name.to_string_lossy()
+                ));
+            }
+
+            let mut tab_writer = TabWriter::new(io::stdout());
+            writeln!(&mut tab_writer, "ID\tPID\tSTATUS\tBUNDLE\tCREATED\tCREATOR")?;
+            write!(&mut tab_writer, "{}", content)?;
+            tab_writer.flush()?;
 
             Ok(())
         }

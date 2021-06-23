@@ -1,8 +1,12 @@
 //! Implements Command trait for Linux systems
-use std::{any::Any, path::Path};
+use std::ffi::{CStr, OsStr};
+use std::os::unix::ffi::OsStrExt;
+use std::sync::Arc;
+use std::{any::Any, mem, path::Path, ptr};
 
 use anyhow::{bail, Result};
 use caps::{errors::CapsError, CapSet, CapsHashSet};
+use libc::{c_char, uid_t};
 use nix::{
     errno::Errno,
     unistd::{fchdir, pivot_root, sethostname},
@@ -26,6 +30,21 @@ use crate::capabilities;
 /// Empty structure to implement Command trait for
 #[derive(Clone)]
 pub struct LinuxCommand;
+
+impl LinuxCommand {
+    unsafe fn from_raw_buf<'a, T>(p: *const c_char) -> T
+    where
+        T: From<&'a OsStr>,
+    {
+        T::from(OsStr::from_bytes(CStr::from_ptr(p).to_bytes()))
+    }
+
+    /// Reads data from the `c_passwd` and returns it as a `User`.
+    unsafe fn passwd_to_user(passwd: libc::passwd) -> Arc<OsStr> {
+        let name: Arc<OsStr> = Self::from_raw_buf(passwd.pw_name);
+        name
+    }
+}
 
 impl Command for LinuxCommand {
     /// To enable dynamic typing,
@@ -117,5 +136,39 @@ impl Command for LinuxCommand {
             bail!("Failed to set {:?}. {:?}", rlimit.typ, e)
         }
         Ok(())
+    }
+
+    // taken from https://crates.io/crates/users
+    fn get_pwuid(&self, uid: uid_t) -> Option<Arc<OsStr>> {
+        let mut passwd = unsafe { mem::zeroed::<libc::passwd>() };
+        let mut buf = vec![0; 2048];
+        let mut result = ptr::null_mut::<libc::passwd>();
+
+        loop {
+            let r = unsafe {
+                libc::getpwuid_r(uid, &mut passwd, buf.as_mut_ptr(), buf.len(), &mut result)
+            };
+
+            if r != libc::ERANGE {
+                break;
+            }
+
+            let newsize = buf.len().checked_mul(2)?;
+            buf.resize(newsize, 0);
+        }
+
+        if result.is_null() {
+            // There is no such user, or an error has occurred.
+            // errno gets set if there’s an error.
+            return None;
+        }
+
+        if result != &mut passwd {
+            // The result of getpwuid_r should be its input passwd.
+            return None;
+        }
+
+        let user = unsafe { Self::passwd_to_user(result.read()) };
+        Some(user)
     }
 }

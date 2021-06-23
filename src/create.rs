@@ -196,7 +196,10 @@ fn run_container<P: AsRef<Path>>(
                     // actually run the command / program to be run in container
                     utils::do_exec(&spec_args[0], spec_args, envs)?;
                     // the command / program is done executing
-                    container.update_status(ContainerStatus::Stopped)?.save()?;
+                    container
+                        .refresh_state()?
+                        .update_status(ContainerStatus::Stopped)
+                        .save()?;
 
                     Ok(Process::Init(init))
                 }
