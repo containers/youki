@@ -2,6 +2,7 @@ mod controller;
 mod controller_type;
 mod cpu;
 mod cpuset;
+mod freezer;
 mod hugetlb;
 mod io;
 pub mod manager;
