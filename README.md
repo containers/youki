@@ -73,9 +73,9 @@ $ sudo dnf install        \
 ### Fedora, Centos, RHEL and related distributions
 
 ```sh
-$ sudo dnf install \
-      pkg-config   \
-      systemd-dev  \
+$ sudo dnf install   \
+      pkg-config     \
+      systemd-devel  \
       dbus-devel
 ```
 
