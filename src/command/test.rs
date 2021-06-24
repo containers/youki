@@ -1,4 +1,4 @@
-use std::{any::Any, cell::RefCell};
+use std::{any::Any, cell::RefCell, ffi::OsStr, sync::Arc};
 
 use caps::{errors::CapsError, CapSet, CapsHashSet};
 use nix::sched::CloneFlags;
@@ -58,6 +58,10 @@ impl Command for TestHelperCommand {
     }
 
     fn set_rlimit(&self, _rlimit: &LinuxRlimit) -> anyhow::Result<()> {
+        todo!()
+    }
+
+    fn get_pwuid(&self, _: u32) -> Option<Arc<OsStr>> {
         todo!()
     }
 }

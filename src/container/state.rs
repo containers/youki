@@ -1,9 +1,11 @@
 //! Information about status and state of the container
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::fs;
 use std::{fs::File, path::Path};
 
 use anyhow::Result;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 const STATE_FILE_PATH: &str = "state.json";
@@ -40,6 +42,19 @@ impl ContainerStatus {
     }
 }
 
+impl Display for ContainerStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let print = match *self {
+            Self::Creating => "Creating",
+            Self::Created => "Created",
+            Self::Running => "Running",
+            Self::Stopped => "Stopped",
+        };
+
+        write!(f, "{}", print)
+    }
+}
+
 /// Stores the state information of the container
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -57,6 +72,12 @@ pub struct State {
     pub bundle: String,
     // Annotations are key values associated with the container.
     pub annotations: HashMap<String, String>,
+    // Creation time of the container
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub created: Option<DateTime<Utc>>,
+    // User that created the container
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub creator: Option<u32>,
 }
 
 impl State {
@@ -73,6 +94,8 @@ impl State {
             pid,
             bundle: bundle.to_string(),
             annotations: HashMap::default(),
+            created: None,
+            creator: None,
         }
     }
 

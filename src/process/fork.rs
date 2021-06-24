@@ -74,7 +74,8 @@ pub fn fork_first<P: AsRef<Path>>(
 
             // update status and pid of the container process
             container
-                .update_status(ContainerStatus::Created)?
+                .update_status(ContainerStatus::Created)
+                .set_creator(nix::unistd::geteuid().as_raw())
                 .set_pid(init_pid)
                 .save()?;
             // if file to write the pid to is specified, write pid of the child

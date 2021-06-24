@@ -15,8 +15,8 @@ use nix::{
     unistd::{self, Gid, Uid},
 };
 
-use crate::command::{linux::LinuxCommand, test::TestHelperCommand, Command};
-use oci_spec::{LinuxNamespace, LinuxNamespaceType};
+use crate::command::{command::create_command, Command};
+use oci_spec::LinuxNamespace;
 
 pub struct Namespaces {
     spaces: Vec<LinuxNamespace>,
@@ -33,11 +33,7 @@ impl From<Vec<LinuxNamespace>> for Namespaces {
                 cf
             },
         );
-        let command: Box<dyn Command> = if cfg!(test) {
-            Box::new(TestHelperCommand::default())
-        } else {
-            Box::new(LinuxCommand)
-        };
+        let command: Box<dyn Command> = create_command();
 
         Namespaces {
             spaces: namespaces,
@@ -80,10 +76,13 @@ impl Namespaces {
     }
 }
 
+#[cfg(test)]
 mod tests {
-    use super::*;
+    use oci_spec::LinuxNamespaceType;
 
-    #[allow(dead_code)]
+    use super::*;
+    use crate::command::test::TestHelperCommand;
+
     fn gen_sample_linux_namespaces() -> Vec<LinuxNamespace> {
         vec![
             LinuxNamespace {
