@@ -1,8 +1,9 @@
 use std::{fs, path::Path};
 
 use anyhow::{bail, Result};
-use nix::unistd::Pid;
+use nix::unistd;
 use oci_spec::{LinuxCpu, LinuxResources};
+use unistd::Pid;
 
 use crate::cgroups::common::{self, CGROUP_PROCS};
 
@@ -14,18 +15,23 @@ const CGROUP_CPUSET_MEMS: &str = "cpuset.mems";
 pub struct CpuSet {}
 
 impl Controller for CpuSet {
-    fn apply(linux_resources: &LinuxResources, cgroup_path: &Path, pid: Pid) -> Result<()> {
-        log::debug!("Apply CpuSet cgroup config");
+    fn add_task(pid: Pid, cgroup_path: &Path) -> Result<()> {
         fs::create_dir_all(cgroup_path)?;
 
         Self::ensure_not_empty(cgroup_path, CGROUP_CPUSET_CPUS)?;
         Self::ensure_not_empty(cgroup_path, CGROUP_CPUSET_MEMS)?;
 
+        common::write_cgroup_file(cgroup_path.join(CGROUP_PROCS), pid)?;
+        Ok(())
+    }
+
+    fn apply(linux_resources: &LinuxResources, cgroup_path: &Path) -> Result<()> {
+        log::debug!("Apply CpuSet cgroup config");
+
         if let Some(cpuset) = &linux_resources.cpu {
             Self::apply(cgroup_path, cpuset)?;
         }
 
-        common::write_cgroup_file(cgroup_path.join(CGROUP_PROCS), pid)?;
         Ok(())
     }
 }

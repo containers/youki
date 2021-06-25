@@ -1,14 +1,8 @@
-use std::{
-    fs::{self},
-    path::Path,
-};
+use std::path::Path;
 
 use anyhow::Result;
 
-use crate::cgroups::{
-    common::{self, CGROUP_PROCS},
-    v1::Controller,
-};
+use crate::cgroups::{common, v1::Controller};
 use oci_spec::{LinuxPids, LinuxResources};
 
 pub struct Pids {}
@@ -17,16 +11,13 @@ impl Controller for Pids {
     fn apply(
         linux_resources: &LinuxResources,
         cgroup_root: &std::path::Path,
-        pid: nix::unistd::Pid,
     ) -> anyhow::Result<()> {
         log::debug!("Apply pids cgroup config");
-        fs::create_dir_all(cgroup_root)?;
 
         if let Some(pids) = &linux_resources.pids {
             Self::apply(cgroup_root, pids)?;
         }
 
-        common::write_cgroup_file(cgroup_root.join(CGROUP_PROCS), pid)?;
         Ok(())
     }
 }

@@ -1,12 +1,7 @@
-use std::{
-    fs::{self},
-    path::Path,
-};
+use std::path::Path;
 
-use crate::cgroups::{
-    common::{self, CGROUP_PROCS},
-    v1::Controller,
-};
+use crate::cgroups::{common, v1::Controller};
+use anyhow::Result;
 use oci_spec::{LinuxBlockIo, LinuxResources};
 
 const CGROUP_BLKIO_THROTTLE_READ_BPS: &str = "blkio.throttle.read_bps_device";
@@ -17,25 +12,19 @@ const CGROUP_BLKIO_THROTTLE_WRITE_IOPS: &str = "blkio.throttle.write_iops_device
 pub struct Blkio {}
 
 impl Controller for Blkio {
-    fn apply(
-        linux_resources: &LinuxResources,
-        cgroup_root: &Path,
-        pid: nix::unistd::Pid,
-    ) -> anyhow::Result<()> {
+    fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply blkio cgroup config");
-        fs::create_dir_all(cgroup_root)?;
 
         if let Some(blkio) = &linux_resources.block_io {
             Self::apply(cgroup_root, blkio)?;
         }
 
-        common::write_cgroup_file(cgroup_root.join(CGROUP_PROCS), pid)?;
         Ok(())
     }
 }
 
 impl Blkio {
-    fn apply(root_path: &Path, blkio: &LinuxBlockIo) -> anyhow::Result<()> {
+    fn apply(root_path: &Path, blkio: &LinuxBlockIo) -> Result<()> {
         for trbd in &blkio.blkio_throttle_read_bps_device {
             common::write_cgroup_file_str(
                 &root_path.join(CGROUP_BLKIO_THROTTLE_READ_BPS),
@@ -70,6 +59,8 @@ impl Blkio {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use super::*;
     use crate::cgroups::test::setup;
     use oci_spec::{LinuxBlockIo, LinuxThrottleDevice};

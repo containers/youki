@@ -1,13 +1,10 @@
 use std::io::{prelude::*, Write};
-use std::{
-    fs::{create_dir_all, OpenOptions},
-    path::Path,
-};
+use std::{fs::OpenOptions, path::Path};
 
 use anyhow::{Result, *};
-use nix::{errno::Errno, unistd::Pid};
+use nix::errno::Errno;
 
-use crate::cgroups::common::{self, CGROUP_PROCS};
+use crate::cgroups::common::{self};
 use crate::cgroups::v1::Controller;
 use oci_spec::{LinuxMemory, LinuxResources};
 
@@ -25,9 +22,8 @@ const CGROUP_KERNEL_TCP_MEMORY_LIMIT: &str = "memory.kmem.tcp.limit_in_bytes";
 pub struct Memory {}
 
 impl Controller for Memory {
-    fn apply(linux_resources: &LinuxResources, cgroup_root: &Path, pid: Pid) -> Result<()> {
+    fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply Memory cgroup config");
-        create_dir_all(&cgroup_root)?;
 
         if let Some(memory) = &linux_resources.memory {
             let reservation = memory.reservation.unwrap_or(0);
@@ -76,7 +72,6 @@ impl Controller for Memory {
             }
         }
 
-        common::write_cgroup_file(cgroup_root.join(CGROUP_PROCS), pid)?;
         Ok(())
     }
 }
@@ -239,6 +234,7 @@ impl Memory {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cgroups::common::CGROUP_PROCS;
     use crate::cgroups::test::set_fixture;
     use crate::utils::create_temp_dir;
     use oci_spec::LinuxMemory;
@@ -368,8 +364,7 @@ mod tests {
                 freezer: None,
             };
 
-            let pid = Pid::from_raw(pid_int);
-            let result = <Memory as Controller>::apply(&linux_resources, &tmp, pid);
+            let result = <Memory as Controller>::apply(&linux_resources, &tmp);
 
             if result.is_err() {
                 if let Some(swappiness) = memory_limits.swappiness {
@@ -455,10 +450,6 @@ mod tests {
                 }
             };
 
-            // check procs file
-            let procs_content = std::fs::read_to_string(tmp.join(CGROUP_PROCS)).expect("read procs file");
-            let procs_check = procs_content == pid.to_string();
-
             // useful for debugging
             println!("reservation_check: {:?}", reservation_check);
             println!("kernel_check: {:?}", kernel_check);
@@ -467,7 +458,7 @@ mod tests {
             println!("limit_swap_check: {:?}", limit_swap_check);
 
             // combine all the checks
-            reservation_check && kernel_check && kernel_tcp_check && swappiness_check && limit_swap_check && procs_check
+            reservation_check && kernel_check && kernel_tcp_check && swappiness_check && limit_swap_check
         }
     }
 }

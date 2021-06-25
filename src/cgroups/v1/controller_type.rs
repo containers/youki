@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+#[derive(Hash, PartialEq, Eq, Debug, Clone)]
 pub enum ControllerType {
     Cpu,
     CpuAcct,
