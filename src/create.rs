@@ -9,16 +9,17 @@ use nix::sched;
 use nix::unistd;
 use nix::unistd::{Gid, Uid};
 
-use crate::cgroups;
 use crate::container::{Container, ContainerStatus};
 use crate::namespaces::Namespaces;
 use crate::notify_socket::NotifyListener;
 use crate::process::{fork, Process};
 use crate::rootfs;
+use crate::rootless::{lookup_map_binaries, should_use_rootless, Rootless};
 use crate::stdio::FileDescriptor;
 use crate::tty;
 use crate::utils;
 use crate::{capabilities, command::Command};
+use crate::{cgroups, rootless};
 
 /// This is the main structure which stores various commandline options given by
 /// high-level container runtime
@@ -45,7 +46,12 @@ pub struct Create {
 // associated with it like any other process.
 impl Create {
     /// Starts a new container process
-    pub fn exec(&self, root_path: PathBuf, command: impl Command) -> Result<()> {
+    pub fn exec(
+        &self,
+        root_path: PathBuf,
+        systemd_cgroup: bool,
+        command: impl Command,
+    ) -> Result<()> {
         // create a directory for the container to store state etc.
         // if already present, return error
         let bundle_canonicalized = fs::canonicalize(&self.bundle)
@@ -101,6 +107,7 @@ impl Create {
             rootfs,
             spec,
             csocketfd,
+            systemd_cgroup,
             container,
             command,
         )?;
@@ -120,6 +127,7 @@ fn run_container<P: AsRef<Path>>(
     rootfs: PathBuf,
     spec: oci_spec::Spec,
     csocketfd: Option<FileDescriptor>,
+    systemd_cgroup: bool,
     container: Container,
     command: impl Command,
 ) -> Result<Process> {
@@ -131,19 +139,27 @@ fn run_container<P: AsRef<Path>>(
     let linux = spec.linux.as_ref().unwrap();
     let namespaces: Namespaces = linux.namespaces.clone().into();
 
+    let rootless = if should_use_rootless() {
+        log::debug!("rootless container should be created");
+        log::warn!(
+            "resource constraints and multi id mapping is unimplemented for rootless containers"
+        );
+        rootless::validate(&spec)?;
+        let mut rootless = Rootless::from(linux);
+        if let Some((uid_binary, gid_binary)) = lookup_map_binaries(linux)? {
+            rootless.newuidmap = Some(uid_binary);
+            rootless.newgidmap = Some(gid_binary);
+        }
+        Some(rootless)
+    } else {
+        None
+    };
+
     let cgroups_path = utils::get_cgroup_path(&linux.cgroups_path, container.id());
-    let cmanager = cgroups::common::create_cgroup_manager(&cgroups_path)?;
+    let cmanager = cgroups::common::create_cgroup_manager(&cgroups_path, systemd_cgroup)?;
 
     // first fork, which creates process, which will later create actual container process
-    match fork::fork_first(
-        pid_file,
-        namespaces
-            .clone_flags
-            .contains(sched::CloneFlags::CLONE_NEWUSER),
-        linux,
-        &container,
-        cmanager,
-    )? {
+    match fork::fork_first(pid_file, rootless, linux, &container, cmanager)? {
         // In the parent process, which called run_container
         Process::Parent(parent) => Ok(Process::Parent(parent)),
         // in child process
@@ -180,7 +196,10 @@ fn run_container<P: AsRef<Path>>(
                     // actually run the command / program to be run in container
                     utils::do_exec(&spec_args[0], spec_args, envs)?;
                     // the command / program is done executing
-                    container.update_status(ContainerStatus::Stopped)?.save()?;
+                    container
+                        .refresh_state()?
+                        .update_status(ContainerStatus::Stopped)
+                        .save()?;
 
                     Ok(Process::Init(init))
                 }

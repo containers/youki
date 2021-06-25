@@ -86,7 +86,8 @@ impl Cpu {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cgroups::test::{create_temp_dir, set_fixture, setup, LinuxCpuBuilder};
+    use crate::cgroups::test::{set_fixture, setup, LinuxCpuBuilder};
+    use crate::utils::create_temp_dir;
     use std::fs;
 
     #[test]

@@ -11,6 +11,7 @@ pub enum ControllerType {
     Blkio,
     NetworkPriority,
     NetworkClassifier,
+    Freezer,
 }
 
 impl Display for ControllerType {
@@ -26,6 +27,7 @@ impl Display for ControllerType {
             Self::Blkio => "blkio",
             Self::NetworkPriority => "net_prio",
             Self::NetworkClassifier => "net_cls",
+            Self::Freezer => "freezer",
         };
 
         write!(f, "{}", print)
@@ -43,4 +45,5 @@ pub const CONTROLLERS: &[ControllerType] = &[
     ControllerType::Blkio,
     ControllerType::NetworkPriority,
     ControllerType::NetworkClassifier,
+    ControllerType::Freezer,
 ];

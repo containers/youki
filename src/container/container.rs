@@ -1,9 +1,15 @@
+use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
+use chrono::DateTime;
 use nix::unistd::Pid;
+
+use chrono::Utc;
 use procfs::process::Process;
+
+use crate::command::command::create_command;
 
 use crate::container::{ContainerStatus, State};
 
@@ -39,7 +45,7 @@ impl Container {
     pub fn status(&self) -> ContainerStatus {
         self.state.status
     }
-    pub fn refresh_status(&self) -> Result<Self> {
+    pub fn refresh_status(&mut self) -> Result<Self> {
         let new_status = match self.pid() {
             Some(pid) => {
                 // Note that Process::new does not spawn a new process
@@ -60,11 +66,19 @@ impl Container {
             }
             None => ContainerStatus::Stopped,
         };
-        self.update_status(new_status)
+        Ok(self.update_status(new_status))
+    }
+
+    pub fn refresh_state(&self) -> Result<Self> {
+        let state = State::load(&self.root)?;
+        Ok(Self {
+            state,
+            root: self.root.clone(),
+        })
     }
 
     pub fn save(&self) -> Result<()> {
-        log::debug!("Sava container status: {:?} in {:?}", self, self.root);
+        log::debug!("Save container status: {:?} in {:?}", self, self.root);
         self.state.save(&self.root)
     }
 
@@ -85,24 +99,50 @@ impl Container {
     }
 
     pub fn set_pid(&self, pid: i32) -> Self {
-        Self::new(
-            self.state.id.as_str(),
-            self.state.status,
-            Some(pid),
-            self.state.bundle.as_str(),
-            &self.root,
-        )
-        .expect("unexpected error")
+        let mut new_state = self.state.clone();
+        new_state.pid = Some(pid);
+
+        Self {
+            state: new_state,
+            root: self.root.clone(),
+        }
     }
 
-    pub fn update_status(&self, status: ContainerStatus) -> Result<Self> {
-        Self::new(
-            self.state.id.as_str(),
-            status,
-            self.state.pid,
-            self.state.bundle.as_str(),
-            &self.root,
-        )
+    pub fn created(&self) -> Option<DateTime<Utc>> {
+        self.state.created
+    }
+
+    pub fn set_creator(mut self, uid: u32) -> Self {
+        self.state.creator = Some(uid);
+        self
+    }
+
+    pub fn creator(&self) -> Option<OsString> {
+        if let Some(uid) = self.state.creator {
+            let command = create_command();
+            let user_name = command.get_pwuid(uid);
+            if let Some(user_name) = user_name {
+                return Some((&*user_name).to_owned());
+            }
+        }
+
+        None
+    }
+
+    pub fn update_status(&self, status: ContainerStatus) -> Self {
+        let created = match (status, self.state.created) {
+            (ContainerStatus::Created, None) => Some(Utc::now()),
+            _ => self.state.created,
+        };
+
+        let mut new_state = self.state.clone();
+        new_state.created = created;
+        new_state.status = status;
+
+        Self {
+            state: new_state,
+            root: self.root.clone(),
+        }
     }
 
     pub fn load(container_root: PathBuf) -> Result<Self> {
@@ -111,5 +151,9 @@ impl Container {
             state,
             root: container_root,
         })
+    }
+
+    pub fn bundle(&self) -> String {
+        self.state.bundle.clone()
     }
 }

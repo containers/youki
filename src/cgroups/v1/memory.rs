@@ -239,7 +239,8 @@ impl Memory {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cgroups::test::{create_temp_dir, set_fixture};
+    use crate::cgroups::test::set_fixture;
+    use crate::utils::create_temp_dir;
     use oci_spec::LinuxMemory;
 
     #[test]
@@ -364,6 +365,7 @@ mod tests {
                 block_io: None,
                 hugepage_limits: vec![],
                 network: None,
+                freezer: None,
             };
 
             let pid = Pid::from_raw(pid_int);

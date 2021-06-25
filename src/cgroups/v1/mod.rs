@@ -5,6 +5,7 @@ mod cpu;
 mod cpuacct;
 mod cpuset;
 mod devices;
+mod freezer;
 mod hugetlb;
 pub mod manager;
 mod memory;

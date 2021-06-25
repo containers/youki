@@ -2,19 +2,29 @@
 //! Container Runtime written in Rust, inspired by [railcar](https://github.com/oracle/railcar)
 //! This crate provides a container runtime which can be used by a high-level container runtime to run containers.
 
+use std::ffi::OsString;
+
 use std::fs;
+use std::io;
+use std::io::Write;
+
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Result};
+use chrono::{DateTime, Local};
 use clap::Clap;
 use nix::sys::signal as nix_signal;
 
 use youki::command::linux::LinuxCommand;
+
 use youki::container::{Container, ContainerStatus};
 use youki::create;
+use youki::info::{print_cgroups, print_hardware, print_kernel, print_os, print_youki};
+use youki::rootless::should_use_rootless;
 use youki::signal;
 use youki::start;
 
+use tabwriter::TabWriter;
 use youki::cgroups;
 use youki::utils;
 
@@ -31,6 +41,9 @@ struct Opts {
     log: Option<PathBuf>,
     #[clap(long)]
     log_format: Option<String>,
+    /// Enable systemd cgroup manager, rather then use the cgroupfs directly.
+    #[clap(short, long)]
+    systemd_cgroup: bool,
     /// command to actually manage container
     #[clap(subcommand)]
     subcmd: SubCommand,
@@ -45,6 +58,9 @@ pub struct Kill {
 #[derive(Clap, Debug)]
 pub struct Delete {
     container_id: String,
+    // forces deletion of the container.
+    #[clap(short, long)]
+    force: bool,
 }
 
 #[derive(Clap, Debug)]
@@ -68,6 +84,8 @@ enum SubCommand {
     State(StateArgs),
     #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
     Info,
+    #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
+    List,
 }
 
 /// This is the entry point in the container runtime. The binary is run by a high-level container runtime,
@@ -79,11 +97,17 @@ fn main() -> Result<()> {
         eprintln!("log init failed: {:?}", e);
     }
 
-    let root_path = PathBuf::from(&opts.root);
+    let root_path = if should_use_rootless() && opts.root.eq(&PathBuf::from("/run/youki")) {
+        PathBuf::from("/tmp/rootless")
+    } else {
+        PathBuf::from(&opts.root)
+    };
     fs::create_dir_all(&root_path)?;
 
+    let systemd_cgroup = opts.systemd_cgroup;
+
     match opts.subcmd {
-        SubCommand::Create(create) => create.exec(root_path, LinuxCommand),
+        SubCommand::Create(create) => create.exec(root_path, systemd_cgroup, LinuxCommand),
         SubCommand::Start(start) => start.exec(root_path),
         SubCommand::Kill(kill) => {
             // resolves relative paths, symbolic links etc. and get complete path
@@ -102,7 +126,7 @@ fn main() -> Result<()> {
                 let sig = signal::from_str(kill.signal.as_str())?;
                 log::debug!("kill signal {} to {}", sig, container.pid().unwrap());
                 nix_signal::kill(container.pid().unwrap(), sig)?;
-                container.update_status(ContainerStatus::Stopped)?.save()?;
+                container.update_status(ContainerStatus::Stopped).save()?;
                 std::process::exit(0)
             } else {
                 bail!(
@@ -145,7 +169,8 @@ fn main() -> Result<()> {
                     // remove the cgroup created for the container
                     // check https://man7.org/linux/man-pages/man7/cgroups.7.html
                     // creating and removing cgroups section for more information on cgroups
-                    let cmanager = cgroups::common::create_cgroup_manager(cgroups_path)?;
+                    let cmanager =
+                        cgroups::common::create_cgroup_manager(cgroups_path, systemd_cgroup)?;
                     cmanager.remove()?;
                 }
                 std::process::exit(0)
@@ -166,42 +191,61 @@ fn main() -> Result<()> {
         }
 
         SubCommand::Info => {
-            let uname = nix::sys::utsname::uname();
-            println!("{:<18}{}", "Kernel-Release", uname.release());
-            println!("{:<18}{}", "Kernel-Version", uname.version());
-            println!("{:<18}{}", "Architecture", uname.machine());
+            print_youki();
+            print_kernel();
+            print_os();
+            print_hardware();
+            print_cgroups();
 
-            let cpu_info = procfs::CpuInfo::new()?;
-            println!("{:<18}{}", "Cores", cpu_info.num_cores());
-            let mem_info = procfs::Meminfo::new()?;
-            println!(
-                "{:<18}{}",
-                "Total Memory",
-                mem_info.mem_total / u64::pow(1024, 2)
-            );
+            Ok(())
+        }
 
-            let cgroup_fs: Vec<String> = cgroups::common::get_supported_cgroup_fs()?
-                .into_iter()
-                .map(|c| c.to_string())
-                .collect();
-            println!("{:<18}{}", "cgroup version", cgroup_fs.join(" and "));
+        SubCommand::List => {
+            let root_path = fs::canonicalize(root_path)?;
+            let mut content = String::new();
 
-            println!("cgroup mounts");
-            let mut cgroup_v1_mounts: Vec<String> =
-                cgroups::v1::util::list_subsystem_mount_points()?
-                    .iter()
-                    .map(|kv| format!("  {:<16}{:?}", kv.0, kv.1))
-                    .collect();
+            for container_dir in fs::read_dir(root_path)? {
+                let container_dir = container_dir?.path();
+                let state_file = container_dir.join("state.json");
+                if !state_file.exists() {
+                    continue;
+                }
 
-            cgroup_v1_mounts.sort();
-            for cgroup_mount in cgroup_v1_mounts {
-                println!("{}", cgroup_mount);
+                let container = Container::load(container_dir)?.refresh_status()?;
+                let pid = if let Some(pid) = container.pid() {
+                    pid.to_string()
+                } else {
+                    "".to_owned()
+                };
+
+                let user_name = if let Some(creator) = container.creator() {
+                    creator
+                } else {
+                    OsString::new()
+                };
+
+                let created = if let Some(utc) = container.created() {
+                    let local: DateTime<Local> = DateTime::from(utc);
+                    local.to_rfc3339_opts(chrono::SecondsFormat::Secs, false)
+                } else {
+                    "".to_owned()
+                };
+
+                content.push_str(&format!(
+                    "{}\t{}\t{}\t{}\t{}\t{}\n",
+                    container.id(),
+                    pid,
+                    container.status(),
+                    container.bundle(),
+                    created,
+                    user_name.to_string_lossy()
+                ));
             }
 
-            let unified = cgroups::v2::util::get_unified_mount_point();
-            if let Ok(mount_point) = unified {
-                println!("  {:<16}{:?}", "unified", mount_point);
-            }
+            let mut tab_writer = TabWriter::new(io::stdout());
+            writeln!(&mut tab_writer, "ID\tPID\tSTATUS\tBUNDLE\tCREATED\tCREATOR")?;
+            write!(&mut tab_writer, "{}", content)?;
+            tab_writer.flush()?;
 
             Ok(())
         }
