@@ -57,10 +57,6 @@ For other platforms, please use the devcontainer that we prepared.
 
 ## Dependencies
 
-```sh
-$ cargo install cargo-when
-```
-
 ### Debian, Ubuntu and related distributions
 
 ```sh
