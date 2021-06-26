@@ -24,6 +24,7 @@ pub struct Manager {
 }
 
 impl Manager {
+    /// Constructs a new cgroup manager with cgroups_path being relative to the root of the subsystem
     pub fn new(cgroup_path: PathBuf) -> Result<Self> {
         let mut subsystems = HashMap::<CtrlType, PathBuf>::new();
         for subsystem in CONTROLLERS {

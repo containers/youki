@@ -19,8 +19,11 @@ pub const CGROUP_PROCS: &str = "cgroup.procs";
 pub const DEFAULT_CGROUP_ROOT: &str = "/sys/fs/cgroup";
 
 pub trait CgroupManager {
+    /// Adds a task specified by its pid to the cgroup
     fn add_task(&self, pid: Pid) -> Result<()>;
+    /// Applies resource restrictions to the cgroup
     fn apply(&self, linux_resources: &LinuxResources) -> Result<()>;
+    /// Removes the cgroup
     fn remove(&self) -> Result<()>;
 }
 

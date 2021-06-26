@@ -47,8 +47,8 @@ struct CgroupsPath {
 impl SystemDCGroupManager {
     pub fn new(root_path: PathBuf, cgroups_path: PathBuf) -> Result<Self> {
         // TODO: create the systemd unit using a dbus client.
-        let cgroups_path = Self::new_cgroups_path(cgroups_path)?;
-        let cgroups_path = Self::get_cgroups_path(cgroups_path)?;
+        let destructured_path = Self::destructure_cgroups_path(cgroups_path)?;
+        let cgroups_path = Self::construct_cgroups_path(destructured_path)?;
         let full_path = root_path.join_absolute_path(&cgroups_path)?;
 
         Ok(SystemDCGroupManager {
@@ -58,7 +58,7 @@ impl SystemDCGroupManager {
         })
     }
 
-    fn new_cgroups_path(cgroups_path: PathBuf) -> Result<CgroupsPath> {
+    fn destructure_cgroups_path(cgroups_path: PathBuf) -> Result<CgroupsPath> {
         // cgroups path may never be empty as it is defaulted to `/youki`
         // see 'get_cgroup_path' under utils.rs.
         // if cgroups_path was provided it should be of the form [slice]:[scope_prefix]:[name],
@@ -97,7 +97,7 @@ impl SystemDCGroupManager {
         if !cgroups_path.name.ends_with(".slice") {
             return format!("{}-{}.scope", cgroups_path.scope, cgroups_path.name);
         }
-        cgroups_path.name.clone()
+        cgroups_path.name
     }
 
     // systemd represents slice hierarchy using `-`, so we need to follow suit when
@@ -131,7 +131,7 @@ impl SystemDCGroupManager {
 
     // get_cgroups_path generates a cgroups path from the one provided by the user via cgroupsPath.
     // an example of the final path: "/machine.slice/docker-foo.scope"
-    fn get_cgroups_path(cgroups_path: CgroupsPath) -> Result<PathBuf> {
+    fn construct_cgroups_path(cgroups_path: CgroupsPath) -> Result<PathBuf> {
         // the root slice is under 'machine.slice'.
         let mut slice = Path::new("/machine.slice").to_path_buf();
         // if the user provided a '.slice' (as in a branch of a tree)
@@ -176,8 +176,7 @@ impl SystemDCGroupManager {
             }
         }
 
-        common::write_cgroup_file(self.full_path.join(CGROUP_PROCS), &pid)?;
-        Ok(())
+        common::write_cgroup_file(self.full_path.join(CGROUP_PROCS), pid)
     }
 
     fn get_available_controllers<P: AsRef<Path>>(
@@ -263,11 +262,11 @@ mod tests {
     #[test]
     fn get_cgroups_path_works_with_a_complex_slice() -> Result<()> {
         let cgroups_path =
-            SystemDCGroupManager::new_cgroups_path(PathBuf::from("test-a-b.slice:docker:foo"))
+            SystemDCGroupManager::destructure_cgroups_path(PathBuf::from("test-a-b.slice:docker:foo"))
                 .expect("");
 
         assert_eq!(
-            SystemDCGroupManager::get_cgroups_path(cgroups_path)?,
+            SystemDCGroupManager::construct_cgroups_path(cgroups_path)?,
             PathBuf::from("/test.slice/test-a.slice/test-a-b.slice/docker-foo.scope"),
         );
 
@@ -277,11 +276,11 @@ mod tests {
     #[test]
     fn get_cgroups_path_works_with_a_simple_slice() -> Result<()> {
         let cgroups_path =
-            SystemDCGroupManager::new_cgroups_path(PathBuf::from("machine.slice:libpod:foo"))
+            SystemDCGroupManager::destructure_cgroups_path(PathBuf::from("machine.slice:libpod:foo"))
                 .expect("");
 
         assert_eq!(
-            SystemDCGroupManager::get_cgroups_path(cgroups_path)?,
+            SystemDCGroupManager::construct_cgroups_path(cgroups_path)?,
             PathBuf::from("/machine.slice/libpod-foo.scope"),
         );
 
@@ -291,10 +290,10 @@ mod tests {
     #[test]
     fn get_cgroups_path_works_with_scope() -> Result<()> {
         let cgroups_path =
-            SystemDCGroupManager::new_cgroups_path(PathBuf::from(":docker:foo")).expect("");
+            SystemDCGroupManager::destructure_cgroups_path(PathBuf::from(":docker:foo")).expect("");
 
         assert_eq!(
-            SystemDCGroupManager::get_cgroups_path(cgroups_path)?,
+            SystemDCGroupManager::construct_cgroups_path(cgroups_path)?,
             PathBuf::from("/machine.slice/docker-foo.scope"),
         );
 
