@@ -60,7 +60,7 @@ For other platforms, please use the devcontainer that we prepared.
 ### Debian, Ubuntu and related distributions
 
 ```sh
-$ sudo dnf install        \
+$ sudo apt-get install    \
       pkg-config          \
       libsystemd-dev      \
       libdbus-glib-1-dev
