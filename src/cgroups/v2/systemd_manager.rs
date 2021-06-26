@@ -202,7 +202,7 @@ impl SystemDCGroupManager {
         Ok(controllers)
     }
 
-    fn write_controllers(path: &Path, controllers: &Vec<String>) -> Result<()> {
+    fn write_controllers(path: &Path, controllers: &[String]) -> Result<()> {
         for controller in controllers {
             common::write_cgroup_file_str(path.join(CGROUP_SUBTREE_CONTROL), controller)?;
         }
