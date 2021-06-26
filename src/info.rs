@@ -1,7 +1,25 @@
-use procfs::{CpuInfo, Meminfo};
 use std::{fs, path::Path};
 
+use anyhow::Result;
+use clap::Clap;
+use procfs::{CpuInfo, Meminfo};
+
 use crate::cgroups;
+
+#[derive(Clap, Debug)]
+pub struct Info {}
+
+impl Info {
+    pub fn exec(&self) -> Result<()> {
+        print_youki();
+        print_kernel();
+        print_os();
+        print_hardware();
+        print_cgroups();
+
+        Ok(())
+    }
+}
 
 pub fn print_youki() {
     println!("{:<18}{}", "Version", env!("CARGO_PKG_VERSION"));
