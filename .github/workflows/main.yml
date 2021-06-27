@@ -30,7 +30,7 @@ jobs:
       - name: Build
         run: ./build.sh
       - name: Run tests
-        run: cargo test
+        run: cargo test -- --skip integration
   integration_tests:
     runs-on: ubuntu-latest
     steps:
