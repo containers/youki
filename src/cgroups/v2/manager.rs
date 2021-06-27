@@ -34,28 +34,33 @@ const CONTROLLER_TYPES: &[ControllerType] = &[
 pub struct Manager {
     root_path: PathBuf,
     cgroup_path: PathBuf,
+    full_path: PathBuf,
 }
 
 impl Manager {
+    /// Constructs a new cgroup manager with root path being the mount point
+    /// of a cgroup v2 fs and cgroup path being a relative path from the root
     pub fn new(root_path: PathBuf, cgroup_path: PathBuf) -> Result<Self> {
+        let full_path = root_path.join_absolute_path(&cgroup_path)?;
+
         Ok(Self {
             root_path,
             cgroup_path,
+            full_path,
         })
     }
 
-    fn create_unified_cgroup(&self, cgroup_path: &Path, pid: Pid) -> Result<PathBuf> {
-        let full_path = self.root_path.join_absolute_path(cgroup_path)?;
+    fn create_unified_cgroup(&self, pid: Pid) -> Result<()> {
         let controllers: Vec<String> = self
-            .get_available_controllers(&self.root_path)?
-            .into_iter()
+            .get_available_controllers()?
+            .iter()
             .map(|c| format!("{}{}", "+", c.to_string()))
             .collect();
 
         Self::write_controllers(&self.root_path, &controllers)?;
 
         let mut current_path = self.root_path.clone();
-        let mut components = cgroup_path.components().skip(1).peekable();
+        let mut components = self.cgroup_path.components().skip(1).peekable();
         while let Some(component) = components.next() {
             current_path = current_path.join(component);
             if !current_path.exists() {
@@ -70,15 +75,12 @@ impl Manager {
             }
         }
 
-        common::write_cgroup_file(&full_path.join(CGROUP_PROCS), pid)?;
-        Ok(full_path)
+        common::write_cgroup_file(&self.full_path.join(CGROUP_PROCS), pid)?;
+        Ok(())
     }
 
-    fn get_available_controllers<P: AsRef<Path>>(
-        &self,
-        cgroup_path: P,
-    ) -> Result<Vec<ControllerType>> {
-        let controllers_path = self.root_path.join(cgroup_path).join(CGROUP_CONTROLLERS);
+    fn get_available_controllers(&self) -> Result<Vec<ControllerType>> {
+        let controllers_path = self.root_path.join(CGROUP_CONTROLLERS);
         if !controllers_path.exists() {
             bail!(
                 "cannot get available controllers. {:?} does not exist",
@@ -112,17 +114,20 @@ impl Manager {
 }
 
 impl CgroupManager for Manager {
-    fn apply(&self, linux_resources: &LinuxResources, pid: Pid) -> Result<()> {
-        let full_cgroup_path = self.create_unified_cgroup(&self.cgroup_path, pid)?;
+    fn add_task(&self, pid: Pid) -> Result<()> {
+        self.create_unified_cgroup(pid)?;
+        Ok(())
+    }
 
+    fn apply(&self, linux_resources: &LinuxResources) -> Result<()> {
         for controller in CONTROLLER_TYPES {
             match controller {
-                ControllerType::Cpu => Cpu::apply(linux_resources, &full_cgroup_path)?,
-                ControllerType::CpuSet => CpuSet::apply(linux_resources, &full_cgroup_path)?,
-                ControllerType::HugeTlb => HugeTlb::apply(linux_resources, &&full_cgroup_path)?,
-                ControllerType::Io => Io::apply(linux_resources, &&full_cgroup_path)?,
-                ControllerType::Memory => Memory::apply(linux_resources, &full_cgroup_path)?,
-                ControllerType::Pids => Pids::apply(linux_resources, &&full_cgroup_path)?,
+                ControllerType::Cpu => Cpu::apply(linux_resources, &self.full_path)?,
+                ControllerType::CpuSet => CpuSet::apply(linux_resources, &self.full_path)?,
+                ControllerType::HugeTlb => HugeTlb::apply(linux_resources, &self.full_path)?,
+                ControllerType::Io => Io::apply(linux_resources, &self.full_path)?,
+                ControllerType::Memory => Memory::apply(linux_resources, &self.full_path)?,
+                ControllerType::Pids => Pids::apply(linux_resources, &self.full_path)?,
             }
         }
 
@@ -130,9 +135,8 @@ impl CgroupManager for Manager {
     }
 
     fn remove(&self) -> Result<()> {
-        let full_path = self.root_path.join_absolute_path(&self.cgroup_path)?;
-        log::debug!("remove cgroup {:?}", full_path);
-        fs::remove_dir_all(full_path)?;
+        log::debug!("remove cgroup {:?}", self.full_path);
+        fs::remove_dir_all(&self.full_path)?;
 
         Ok(())
     }

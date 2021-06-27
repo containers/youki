@@ -1,25 +1,21 @@
-use std::{fs::create_dir_all, path::Path};
+use std::path::Path;
 
 use anyhow::Result;
-use nix::unistd::Pid;
 
 use crate::cgroups::common;
-use crate::cgroups::common::CGROUP_PROCS;
 use crate::cgroups::v1::Controller;
 use oci_spec::{LinuxNetwork, LinuxResources};
 
 pub struct NetworkClassifier {}
 
 impl Controller for NetworkClassifier {
-    fn apply(linux_resources: &LinuxResources, cgroup_root: &Path, pid: Pid) -> Result<()> {
+    fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply NetworkClassifier cgroup config");
-        create_dir_all(&cgroup_root)?;
 
         if let Some(network) = linux_resources.network.as_ref() {
             Self::apply(cgroup_root, network)?;
         }
 
-        common::write_cgroup_file(cgroup_root.join(CGROUP_PROCS), pid)?;
         Ok(())
     }
 }

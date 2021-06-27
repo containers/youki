@@ -30,7 +30,8 @@ const CONTROLLER_TYPES: &[ControllerType] = &[
 /// SystemDCGroupManager is a driver for managing cgroups via systemd.
 pub struct SystemDCGroupManager {
     root_path: PathBuf,
-    cgroups_path: CgroupsPath,
+    cgroups_path: PathBuf,
+    full_path: PathBuf,
 }
 
 /// Represents the systemd cgroups path:
@@ -45,6 +46,19 @@ struct CgroupsPath {
 
 impl SystemDCGroupManager {
     pub fn new(root_path: PathBuf, cgroups_path: PathBuf) -> Result<Self> {
+        // TODO: create the systemd unit using a dbus client.
+        let destructured_path = Self::destructure_cgroups_path(cgroups_path)?;
+        let cgroups_path = Self::construct_cgroups_path(destructured_path)?;
+        let full_path = root_path.join_absolute_path(&cgroups_path)?;
+
+        Ok(SystemDCGroupManager {
+            root_path,
+            cgroups_path,
+            full_path,
+        })
+    }
+
+    fn destructure_cgroups_path(cgroups_path: PathBuf) -> Result<CgroupsPath> {
         // cgroups path may never be empty as it is defaulted to `/youki`
         // see 'get_cgroup_path' under utils.rs.
         // if cgroups_path was provided it should be of the form [slice]:[scope_prefix]:[name],
@@ -69,35 +83,27 @@ impl SystemDCGroupManager {
             name = parts[2];
         }
 
-        // TODO: create the systemd unit using a dbus client.
-
-        Ok(SystemDCGroupManager {
-            root_path,
-            cgroups_path: CgroupsPath {
-                parent: parent.to_owned(),
-                scope: scope.to_owned(),
-                name: name.to_owned(),
-            },
+        Ok(CgroupsPath {
+            parent: parent.to_owned(),
+            scope: scope.to_owned(),
+            name: name.to_owned(),
         })
     }
 
     /// get_unit_name returns the unit (scope) name from the path provided by the user
     /// for example: foo:docker:bar returns in '/docker-bar.scope'
-    fn get_unit_name(&self) -> String {
+    fn get_unit_name(cgroups_path: CgroupsPath) -> String {
         // By default we create a scope unless specified explicitly.
-        if !self.cgroups_path.name.ends_with(".slice") {
-            return format!(
-                "{}-{}.scope",
-                self.cgroups_path.scope, self.cgroups_path.name
-            );
+        if !cgroups_path.name.ends_with(".slice") {
+            return format!("{}-{}.scope", cgroups_path.scope, cgroups_path.name);
         }
-        self.cgroups_path.name.clone()
+        cgroups_path.name
     }
 
     // systemd represents slice hierarchy using `-`, so we need to follow suit when
     // generating the path of slice. For example, 'test-a-b.slice' becomes
     // '/test.slice/test-a.slice/test-a-b.slice'.
-    fn expand_slice(&self, slice: &str) -> Result<PathBuf> {
+    fn expand_slice(slice: &str) -> Result<PathBuf> {
         let suffix = ".slice";
         if slice.len() <= suffix.len() || !slice.ends_with(suffix) {
             bail!("invalid slice name: {}", slice);
@@ -125,15 +131,15 @@ impl SystemDCGroupManager {
 
     // get_cgroups_path generates a cgroups path from the one provided by the user via cgroupsPath.
     // an example of the final path: "/machine.slice/docker-foo.scope"
-    fn get_cgroups_path(&self) -> Result<PathBuf> {
+    fn construct_cgroups_path(cgroups_path: CgroupsPath) -> Result<PathBuf> {
         // the root slice is under 'machine.slice'.
         let mut slice = Path::new("/machine.slice").to_path_buf();
         // if the user provided a '.slice' (as in a branch of a tree)
         // we need to "unpack it".
-        if !self.cgroups_path.parent.is_empty() {
-            slice = self.expand_slice(&self.cgroups_path.parent)?;
+        if !cgroups_path.parent.is_empty() {
+            slice = Self::expand_slice(&cgroups_path.parent)?;
         }
-        let unit_name = self.get_unit_name();
+        let unit_name = Self::get_unit_name(cgroups_path);
         let cgroups_path = slice.join(unit_name);
         Ok(cgroups_path)
     }
@@ -141,9 +147,7 @@ impl SystemDCGroupManager {
     /// create_unified_cgroup verifies sure that *each level* in the downward path from the root cgroup
     /// down to the cgroup_path provided by the user is a valid cgroup hierarchy,
     /// containing the attached controllers and that it contains the container pid.
-    fn create_unified_cgroup(&self, pid: Pid) -> Result<PathBuf> {
-        let cgroups_path = self.get_cgroups_path()?;
-        let full_path = self.root_path.join_absolute_path(&cgroups_path)?;
+    fn create_unified_cgroup(&self, pid: Pid) -> Result<()> {
         let controllers: Vec<String> = self
             .get_available_controllers(&self.root_path)?
             .into_iter()
@@ -154,7 +158,7 @@ impl SystemDCGroupManager {
         Self::write_controllers(&self.root_path, &controllers)?;
 
         let mut current_path = self.root_path.clone();
-        let mut components = cgroups_path.components().skip(1).peekable();
+        let mut components = self.cgroups_path.components().skip(1).peekable();
         // Verify that *each level* in the downward path from the root cgroup
         // down to the cgroup_path provided by the user is a valid cgroup hierarchy.
         // containing the attached controllers.
@@ -172,8 +176,7 @@ impl SystemDCGroupManager {
             }
         }
 
-        common::write_cgroup_file(full_path.join(CGROUP_PROCS), &pid)?;
-        Ok(full_path)
+        common::write_cgroup_file(self.full_path.join(CGROUP_PROCS), pid)
     }
 
     fn get_available_controllers<P: AsRef<Path>>(
@@ -212,21 +215,25 @@ impl SystemDCGroupManager {
 }
 
 impl CgroupManager for SystemDCGroupManager {
-    fn apply(&self, linux_resources: &LinuxResources, pid: Pid) -> Result<()> {
+    fn add_task(&self, pid: Pid) -> Result<()> {
         // Dont attach any pid to the cgroup if -1 is specified as a pid
         if pid.as_raw() == -1 {
             return Ok(());
         }
-        let full_cgroup_path = self.create_unified_cgroup(pid)?;
 
+        self.create_unified_cgroup(pid)?;
+        Ok(())
+    }
+
+    fn apply(&self, linux_resources: &LinuxResources) -> Result<()> {
         for controller in CONTROLLER_TYPES {
             match controller {
-                ControllerType::Cpu => Cpu::apply(linux_resources, &full_cgroup_path)?,
-                ControllerType::CpuSet => CpuSet::apply(linux_resources, &full_cgroup_path)?,
-                ControllerType::HugeTlb => HugeTlb::apply(linux_resources, &&full_cgroup_path)?,
-                ControllerType::Io => Io::apply(linux_resources, &&full_cgroup_path)?,
-                ControllerType::Memory => Memory::apply(linux_resources, &full_cgroup_path)?,
-                ControllerType::Pids => Pids::apply(linux_resources, &&full_cgroup_path)?,
+                ControllerType::Cpu => Cpu::apply(linux_resources, &self.full_path)?,
+                ControllerType::CpuSet => CpuSet::apply(linux_resources, &self.full_path)?,
+                ControllerType::HugeTlb => HugeTlb::apply(linux_resources, &self.full_path)?,
+                ControllerType::Io => Io::apply(linux_resources, &self.full_path)?,
+                ControllerType::Memory => Memory::apply(linux_resources, &self.full_path)?,
+                ControllerType::Pids => Pids::apply(linux_resources, &self.full_path)?,
             }
         }
 
@@ -244,13 +251,8 @@ mod tests {
 
     #[test]
     fn expand_slice_works() -> Result<()> {
-        let manager = SystemDCGroupManager::new(
-            PathBuf::from("/sys/fs/cgroup"),
-            PathBuf::from("test-a-b.slice:docker:foo"),
-        )?;
-
         assert_eq!(
-            manager.expand_slice("test-a-b.slice")?,
+            SystemDCGroupManager::expand_slice("test-a-b.slice")?,
             PathBuf::from("/test.slice/test-a.slice/test-a-b.slice"),
         );
 
@@ -259,13 +261,12 @@ mod tests {
 
     #[test]
     fn get_cgroups_path_works_with_a_complex_slice() -> Result<()> {
-        let manager = SystemDCGroupManager::new(
-            PathBuf::from("/sys/fs/cgroup"),
-            PathBuf::from("test-a-b.slice:docker:foo"),
-        )?;
+        let cgroups_path =
+            SystemDCGroupManager::destructure_cgroups_path(PathBuf::from("test-a-b.slice:docker:foo"))
+                .expect("");
 
         assert_eq!(
-            manager.get_cgroups_path()?,
+            SystemDCGroupManager::construct_cgroups_path(cgroups_path)?,
             PathBuf::from("/test.slice/test-a.slice/test-a-b.slice/docker-foo.scope"),
         );
 
@@ -274,13 +275,12 @@ mod tests {
 
     #[test]
     fn get_cgroups_path_works_with_a_simple_slice() -> Result<()> {
-        let manager = SystemDCGroupManager::new(
-            PathBuf::from("/sys/fs/cgroup"),
-            PathBuf::from("machine.slice:libpod:foo"),
-        )?;
+        let cgroups_path =
+            SystemDCGroupManager::destructure_cgroups_path(PathBuf::from("machine.slice:libpod:foo"))
+                .expect("");
 
         assert_eq!(
-            manager.get_cgroups_path()?,
+            SystemDCGroupManager::construct_cgroups_path(cgroups_path)?,
             PathBuf::from("/machine.slice/libpod-foo.scope"),
         );
 
@@ -289,13 +289,11 @@ mod tests {
 
     #[test]
     fn get_cgroups_path_works_with_scope() -> Result<()> {
-        let manager = SystemDCGroupManager::new(
-            PathBuf::from("/sys/fs/cgroup"),
-            PathBuf::from(":docker:foo"),
-        )?;
+        let cgroups_path =
+            SystemDCGroupManager::destructure_cgroups_path(PathBuf::from(":docker:foo")).expect("");
 
         assert_eq!(
-            manager.get_cgroups_path()?,
+            SystemDCGroupManager::construct_cgroups_path(cgroups_path)?,
             PathBuf::from("/machine.slice/docker-foo.scope"),
         );
 

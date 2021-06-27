@@ -1,36 +1,27 @@
-use std::{fs, path::Path};
+use std::path::Path;
 
-use anyhow::bail;
+use anyhow::{bail, Result};
 use regex::Regex;
 
-use crate::cgroups::{
-    common::{self, CGROUP_PROCS},
-    v1::Controller,
-};
+use crate::cgroups::{common, v1::Controller};
 use oci_spec::{LinuxHugepageLimit, LinuxResources};
 
 pub struct Hugetlb {}
 
 impl Controller for Hugetlb {
-    fn apply(
-        linux_resources: &LinuxResources,
-        cgroup_root: &std::path::Path,
-        pid: nix::unistd::Pid,
-    ) -> anyhow::Result<()> {
+    fn apply(linux_resources: &LinuxResources, cgroup_root: &std::path::Path) -> Result<()> {
         log::debug!("Apply Hugetlb cgroup config");
-        fs::create_dir_all(cgroup_root)?;
 
         for hugetlb in &linux_resources.hugepage_limits {
             Self::apply(cgroup_root, hugetlb)?
         }
 
-        common::write_cgroup_file(cgroup_root.join(CGROUP_PROCS), pid)?;
         Ok(())
     }
 }
 
 impl Hugetlb {
-    fn apply(root_path: &Path, hugetlb: &LinuxHugepageLimit) -> anyhow::Result<()> {
+    fn apply(root_path: &Path, hugetlb: &LinuxHugepageLimit) -> Result<()> {
         let re = Regex::new(r"(?P<pagesize>[0-9]+)[KMG]B")?;
         let caps = re.captures(&hugetlb.page_size);
         match caps {
@@ -44,8 +35,8 @@ impl Hugetlb {
         }
 
         common::write_cgroup_file(
-            &root_path.join(format!("hugetlb.{}.limit_in_bytes", hugetlb.page_size)),
-            &hugetlb.limit,
+            root_path.join(format!("hugetlb.{}.limit_in_bytes", hugetlb.page_size)),
+            hugetlb.limit,
         )?;
         Ok(())
     }

@@ -1,10 +1,9 @@
-use std::{fs, path::Path};
+use std::path::Path;
 
 use anyhow::Result;
-use nix::unistd::Pid;
 use oci_spec::{LinuxCpu, LinuxResources};
 
-use crate::cgroups::common::{self, CGROUP_PROCS};
+use crate::cgroups::common;
 
 use super::Controller;
 
@@ -17,14 +16,13 @@ const CGROUP_CPU_RT_PERIOD: &str = "cpu.rt_period_us";
 pub struct Cpu {}
 
 impl Controller for Cpu {
-    fn apply(linux_resources: &LinuxResources, cgroup_root: &Path, pid: Pid) -> Result<()> {
+    fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply Cpu cgroup config");
-        fs::create_dir_all(cgroup_root)?;
+
         if let Some(cpu) = &linux_resources.cpu {
             Self::apply(cgroup_root, cpu)?;
         }
 
-        common::write_cgroup_file(cgroup_root.join(CGROUP_PROCS), pid)?;
         Ok(())
     }
 }

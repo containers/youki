@@ -1,18 +1,16 @@
-use std::{fs::create_dir_all, path::Path};
+use std::path::Path;
 
 use anyhow::Result;
-use nix::unistd::Pid;
 
-use crate::cgroups::common::{self, CGROUP_PROCS};
+use crate::cgroups::common;
 use crate::{cgroups::v1::Controller, rootfs::default_devices};
 use oci_spec::{LinuxDeviceCgroup, LinuxDeviceType, LinuxResources};
 
 pub struct Devices {}
 
 impl Controller for Devices {
-    fn apply(linux_resources: &LinuxResources, cgroup_root: &Path, pid: Pid) -> Result<()> {
+    fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply Devices cgroup config");
-        create_dir_all(&cgroup_root)?;
 
         for d in &linux_resources.devices {
             Self::apply_device(d, cgroup_root)?;
@@ -27,7 +25,6 @@ impl Controller for Devices {
             Self::apply_device(&d, &cgroup_root)?;
         }
 
-        common::write_cgroup_file(cgroup_root.join(CGROUP_PROCS), pid)?;
         Ok(())
     }
 }

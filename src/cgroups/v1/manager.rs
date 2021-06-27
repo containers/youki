@@ -7,6 +7,7 @@ use nix::unistd::Pid;
 
 use procfs::process::Process;
 
+use super::ControllerType as CtrlType;
 use super::{
     blkio::Blkio, controller_type::CONTROLLERS, cpu::Cpu, cpuacct::CpuAcct, cpuset::CpuSet,
     devices::Devices, freezer::Freezer, hugetlb::Hugetlb, memory::Memory,
@@ -19,16 +20,17 @@ use crate::utils;
 use crate::{cgroups::common::CgroupManager, utils::PathBufExt};
 use oci_spec::LinuxResources;
 pub struct Manager {
-    subsystems: HashMap<String, PathBuf>,
+    subsystems: HashMap<CtrlType, PathBuf>,
 }
 
 impl Manager {
+    /// Constructs a new cgroup manager with cgroups_path being relative to the root of the subsystem
     pub fn new(cgroup_path: PathBuf) -> Result<Self> {
-        let mut subsystems = HashMap::<String, PathBuf>::new();
-        for subsystem in CONTROLLERS.iter().map(|c| c.to_string()) {
+        let mut subsystems = HashMap::<CtrlType, PathBuf>::new();
+        for subsystem in CONTROLLERS {
             subsystems.insert(
-                subsystem.to_owned(),
-                Self::get_subsystem_path(&cgroup_path, &subsystem)?,
+                subsystem.clone(),
+                Self::get_subsystem_path(&cgroup_path, &subsystem.to_string())?,
             );
         }
 
@@ -58,21 +60,42 @@ impl Manager {
 }
 
 impl CgroupManager for Manager {
-    fn apply(&self, linux_resources: &LinuxResources, pid: Pid) -> Result<()> {
+    fn add_task(&self, pid: Pid) -> Result<()> {
         for subsys in &self.subsystems {
-            match subsys.0.as_str() {
-                "cpu" => Cpu::apply(linux_resources, &subsys.1, pid)?,
-                "cpuacct" => CpuAcct::apply(linux_resources, &subsys.1, pid)?,
-                "cpuset" => CpuSet::apply(linux_resources, &subsys.1, pid)?,
-                "devices" => Devices::apply(linux_resources, &subsys.1, pid)?,
-                "hugetlb" => Hugetlb::apply(linux_resources, &subsys.1, pid)?,
-                "memory" => Memory::apply(linux_resources, &subsys.1, pid)?,
-                "pids" => Pids::apply(linux_resources, &subsys.1, pid)?,
-                "blkio" => Blkio::apply(linux_resources, &subsys.1, pid)?,
-                "net_prio" => NetworkPriority::apply(linux_resources, &subsys.1, pid)?,
-                "net_cls" => NetworkClassifier::apply(linux_resources, &subsys.1, pid)?,
-                "freezer" => Freezer::apply(linux_resources, &subsys.1, pid)?,
-                _ => unreachable!("every subsystem should have an associated controller"),
+            match subsys.0 {
+                CtrlType::Cpu => Cpu::add_task(pid, subsys.1)?,
+                CtrlType::CpuAcct => CpuAcct::add_task(pid, subsys.1)?,
+                CtrlType::CpuSet => CpuSet::add_task(pid, subsys.1)?,
+                CtrlType::Devices => Devices::add_task(pid, subsys.1)?,
+                CtrlType::HugeTlb => Hugetlb::add_task(pid, subsys.1)?,
+                CtrlType::Memory => Memory::add_task(pid, subsys.1)?,
+                CtrlType::Pids => Pids::add_task(pid, subsys.1)?,
+                CtrlType::Blkio => Blkio::add_task(pid, subsys.1)?,
+                CtrlType::NetworkPriority => NetworkPriority::add_task(pid, subsys.1)?,
+                CtrlType::NetworkClassifier => NetworkClassifier::add_task(pid, subsys.1)?,
+                _ => continue,
+            }
+        }
+
+        Ok(())
+    }
+
+    fn apply(&self, linux_resources: &LinuxResources) -> Result<()> {
+        for subsys in &self.subsystems {
+            match subsys.0 {
+                CtrlType::Cpu => Cpu::apply(linux_resources, &subsys.1)?,
+                CtrlType::CpuAcct => CpuAcct::apply(linux_resources, &subsys.1)?,
+                CtrlType::CpuSet => CpuSet::apply(linux_resources, &subsys.1)?,
+                CtrlType::Devices => Devices::apply(linux_resources, &subsys.1)?,
+                CtrlType::HugeTlb => Hugetlb::apply(linux_resources, &subsys.1)?,
+                CtrlType::Memory => Memory::apply(linux_resources, &subsys.1)?,
+                CtrlType::Pids => Pids::apply(linux_resources, &subsys.1)?,
+                CtrlType::Blkio => Blkio::apply(linux_resources, &subsys.1)?,
+                CtrlType::NetworkPriority => NetworkPriority::apply(linux_resources, &subsys.1)?,
+                CtrlType::NetworkClassifier => {
+                    NetworkClassifier::apply(linux_resources, &subsys.1)?
+                }
+                CtrlType::Freezer => Freezer::apply(linux_resources, &subsys.1)?,
             }
         }
 
