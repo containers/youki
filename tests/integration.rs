@@ -57,4 +57,38 @@ mod integration {
             panic!("Can not cleanup test.");
         }
     }
+
+    // This is a test of the create command.
+    // It follows the `opencontainers/runtime-tools` test case.
+    #[test]
+    fn create() {
+        let project_path = support::create_project_path();
+        let uuid = support::generate_uuid();
+        if  support::initialize_test(&project_path).is_err() {
+            panic!("Can not initilize test.");
+        }
+
+        if create::exec(&project_path, "") {
+            if support::cleanup_test(&project_path).is_err() {
+                panic!("Can not cleanup test.");
+            }
+            panic!("This operation MUST generate an error if it is not provided a path to the bundle and the container ID to associate with the container.");
+        }
+        if !create::exec(&project_path, &uuid.to_string()) {
+            if support::cleanup_test(&project_path).is_err() {
+                panic!("Can not cleanup test.");
+            }
+            panic!("This operation MUST create a new container.");
+        }
+        if create::exec(&project_path, &uuid.to_string()) {
+            if support::cleanup_test(&project_path).is_err() {
+                panic!("Can not cleanup test.");
+            }
+            panic!("If the ID provided is not unique across all containers within the scope of the runtime, or is not valid in any other way, the implementation MUST generate an error and a new container MUST NOT be created.");
+        }
+
+        if support::cleanup_test(&project_path).is_err() {
+            panic!("Can not cleanup test.");
+        }
+    }
 }
