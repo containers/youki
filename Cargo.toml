@@ -30,3 +30,7 @@ tabwriter = "1"
 oci_spec = { version = "0.1.0", path = "./oci_spec", features = ["proptests"] }
 quickcheck = "1"
 serial_test = "0.5.1"
+uuid = "0.8"
+rand = "0.8.0"
+tar = "0.4"
+flate2 = "1.0"
