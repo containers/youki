@@ -8,3 +8,5 @@ tags
 tags.lock
 tags.temp
 
+integration-binary
+integration-workspace
