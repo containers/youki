@@ -9,14 +9,26 @@ use oci_spec::{LinuxHugepageLimit, LinuxResources};
 pub struct Hugetlb {}
 
 impl Controller for Hugetlb {
+    type Resource = Vec<LinuxHugepageLimit>;
+
     fn apply(linux_resources: &LinuxResources, cgroup_root: &std::path::Path) -> Result<()> {
         log::debug!("Apply Hugetlb cgroup config");
 
-        for hugetlb in &linux_resources.hugepage_limits {
-            Self::apply(cgroup_root, hugetlb)?
+        if let Some(hugepage_limits) = Self::needs_to_handle(linux_resources) {
+            for hugetlb in hugepage_limits {
+                Self::apply(cgroup_root, hugetlb)?
+            }
         }
 
         Ok(())
+    }
+
+    fn needs_to_handle(linux_resources: &LinuxResources) -> Option<&Self::Resource> {
+        if !linux_resources.hugepage_limits.is_empty() {
+            return Some(&linux_resources.hugepage_limits);
+        }
+
+        None
     }
 }
 

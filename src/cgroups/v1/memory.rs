@@ -22,10 +22,12 @@ const CGROUP_KERNEL_TCP_MEMORY_LIMIT: &str = "memory.kmem.tcp.limit_in_bytes";
 pub struct Memory {}
 
 impl Controller for Memory {
+    type Resource = LinuxMemory;
+
     fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply Memory cgroup config");
 
-        if let Some(memory) = &linux_resources.memory {
+        if let Some(memory) = Self::needs_to_handle(linux_resources) {
             let reservation = memory.reservation.unwrap_or(0);
 
             Self::apply(&memory, cgroup_root)?;
@@ -73,6 +75,14 @@ impl Controller for Memory {
         }
 
         Ok(())
+    }
+
+    fn needs_to_handle(linux_resources: &LinuxResources) -> Option<&Self::Resource> {
+        if let Some(memory) = &linux_resources.memory {
+            return Some(memory);
+        }
+
+        None
     }
 }
 

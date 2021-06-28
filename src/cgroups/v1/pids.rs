@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path};
 
 use anyhow::Result;
 
@@ -8,10 +8,12 @@ use oci_spec::{LinuxPids, LinuxResources};
 pub struct Pids {}
 
 impl Controller for Pids {
+    type Resource = LinuxPids;
+
     fn apply(
         linux_resources: &LinuxResources,
-        cgroup_root: &std::path::Path,
-    ) -> anyhow::Result<()> {
+        cgroup_root: &Path,
+    ) -> Result<()> {
         log::debug!("Apply pids cgroup config");
 
         if let Some(pids) = &linux_resources.pids {
@@ -19,6 +21,14 @@ impl Controller for Pids {
         }
 
         Ok(())
+    }
+
+    fn needs_to_handle(linux_resources: &LinuxResources) -> Option<&Self::Resource> {
+        if let Some(pids) = &linux_resources.pids {
+            return Some(pids);
+        }
+
+        None
     }
 }
 

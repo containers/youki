@@ -2,6 +2,7 @@ use std::fs;
 use std::path::Path;
 use std::{collections::HashMap, path::PathBuf};
 
+use anyhow::bail;
 use anyhow::Result;
 use nix::unistd::Pid;
 
@@ -28,23 +29,24 @@ impl Manager {
     pub fn new(cgroup_path: PathBuf) -> Result<Self> {
         let mut subsystems = HashMap::<CtrlType, PathBuf>::new();
         for subsystem in CONTROLLERS {
-            subsystems.insert(
-                subsystem.clone(),
-                Self::get_subsystem_path(&cgroup_path, &subsystem.to_string())?,
-            );
+            if let Ok(subsystem_path) = Self::get_subsystem_path(&cgroup_path, subsystem) {
+                subsystems.insert(subsystem.clone(), subsystem_path);
+            } else {
+                log::warn!("Cgroup {} not supported on this system", subsystem);
+            }
         }
 
         Ok(Manager { subsystems })
     }
 
-    fn get_subsystem_path(cgroup_path: &Path, subsystem: &str) -> anyhow::Result<PathBuf> {
+    fn get_subsystem_path(cgroup_path: &Path, subsystem: &CtrlType) -> Result<PathBuf> {
         log::debug!("Get path for subsystem: {}", subsystem);
-        let mount_point = util::get_subsystem_mount_points(subsystem)?;
+        let mount_point = util::get_subsystem_mount_point(subsystem)?;
 
         let cgroup = Process::myself()?
             .cgroups()?
             .into_iter()
-            .find(|c| c.controllers.contains(&subsystem.to_owned()))
+            .find(|c| c.controllers.contains(&subsystem.to_string()))
             .unwrap();
 
         let p = if cgroup_path.to_string_lossy().into_owned().is_empty() {
@@ -56,6 +58,43 @@ impl Manager {
         };
 
         Ok(p)
+    }
+
+    fn get_required_controllers(
+        &self,
+        linux_resources: &LinuxResources,
+    ) -> Result<HashMap<&CtrlType, &PathBuf>> {
+        let mut required_controllers = HashMap::new();
+
+        for controller in CONTROLLERS {
+            let required = match controller {
+                CtrlType::Cpu => Cpu::needs_to_handle(linux_resources).is_some(),
+                CtrlType::CpuAcct => CpuAcct::needs_to_handle(linux_resources).is_some(),
+                CtrlType::CpuSet => CpuSet::needs_to_handle(linux_resources).is_some(),
+                CtrlType::Devices => Devices::needs_to_handle(linux_resources).is_some(),
+                CtrlType::HugeTlb => Hugetlb::needs_to_handle(linux_resources).is_some(),
+                CtrlType::Memory => Memory::needs_to_handle(linux_resources).is_some(),
+                CtrlType::Pids => Pids::needs_to_handle(linux_resources).is_some(),
+                CtrlType::Blkio => Blkio::needs_to_handle(linux_resources).is_some(),
+                CtrlType::NetworkPriority => {
+                    NetworkPriority::needs_to_handle(linux_resources).is_some()
+                }
+                CtrlType::NetworkClassifier => {
+                    NetworkClassifier::needs_to_handle(linux_resources).is_some()
+                }
+                CtrlType::Freezer => Freezer::needs_to_handle(linux_resources).is_some(),
+            };
+
+            if required {
+                if let Some(subsystem_path) = self.subsystems.get(controller) {
+                    required_controllers.insert(controller, subsystem_path);
+                } else {
+                    bail!("Cgroup {} is required to fullfill the request, but is not supported by this system", controller);
+                }
+            }
+        }
+
+        Ok(required_controllers)
     }
 }
 
@@ -81,7 +120,7 @@ impl CgroupManager for Manager {
     }
 
     fn apply(&self, linux_resources: &LinuxResources) -> Result<()> {
-        for subsys in &self.subsystems {
+        for subsys in self.get_required_controllers(linux_resources)? {
             match subsys.0 {
                 CtrlType::Cpu => Cpu::apply(linux_resources, &subsys.1)?,
                 CtrlType::CpuAcct => CpuAcct::apply(linux_resources, &subsys.1)?,

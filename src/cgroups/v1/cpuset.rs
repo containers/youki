@@ -15,6 +15,8 @@ const CGROUP_CPUSET_MEMS: &str = "cpuset.mems";
 pub struct CpuSet {}
 
 impl Controller for CpuSet {
+    type Resource = LinuxCpu;
+
     fn add_task(pid: Pid, cgroup_path: &Path) -> Result<()> {
         fs::create_dir_all(cgroup_path)?;
 
@@ -28,11 +30,21 @@ impl Controller for CpuSet {
     fn apply(linux_resources: &LinuxResources, cgroup_path: &Path) -> Result<()> {
         log::debug!("Apply CpuSet cgroup config");
 
-        if let Some(cpuset) = &linux_resources.cpu {
+        if let Some(cpuset) = Self::needs_to_handle(linux_resources) {
             Self::apply(cgroup_path, cpuset)?;
         }
 
         Ok(())
+    }
+
+    fn needs_to_handle(linux_resources: &LinuxResources) -> Option<&Self::Resource> {
+        if let Some(cpuset) = &linux_resources.cpu {
+            if cpuset.cpus.is_some() || cpuset.mems.is_some() {
+                return Some(cpuset);
+            }
+        }
+
+        None
     }
 }
 
@@ -52,7 +64,7 @@ impl CpuSet {
     // if a task is moved into the cgroup and a value has not been set for cpus and mems
     // Errno 28 (no space left on device) will be returned. Therefore we set the value from the parent if required.
     fn ensure_not_empty(cgroup_path: &Path, interface_file: &str) -> Result<()> {
-        let mut current = util::get_subsystem_mount_points(&ControllerType::CpuSet.to_string())?;
+        let mut current = util::get_subsystem_mount_point(&ControllerType::CpuSet)?;
         let relative_cgroup_path = cgroup_path.strip_prefix(&current)?;
 
         for component in relative_cgroup_path.components() {

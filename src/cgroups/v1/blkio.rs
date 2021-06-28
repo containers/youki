@@ -12,14 +12,24 @@ const CGROUP_BLKIO_THROTTLE_WRITE_IOPS: &str = "blkio.throttle.write_iops_device
 pub struct Blkio {}
 
 impl Controller for Blkio {
+    type Resource = LinuxBlockIo;
+
     fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply blkio cgroup config");
 
-        if let Some(blkio) = &linux_resources.block_io {
+        if let Some(blkio) = Self::needs_to_handle(linux_resources) {
             Self::apply(cgroup_root, blkio)?;
         }
 
         Ok(())
+    }
+
+    fn needs_to_handle(linux_resources: &LinuxResources) -> Option<&Self::Resource> {
+        if let Some(blkio) = &linux_resources.block_io {
+            return Some(blkio);
+        }
+
+        None
     }
 }
 
