@@ -9,14 +9,24 @@ use oci_spec::{LinuxNetwork, LinuxResources};
 pub struct NetworkClassifier {}
 
 impl Controller for NetworkClassifier {
+    type Resource = LinuxNetwork;
+
     fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply NetworkClassifier cgroup config");
 
-        if let Some(network) = linux_resources.network.as_ref() {
+        if let Some(network) = Self::needs_to_handle(linux_resources) {
             Self::apply(cgroup_root, network)?;
         }
 
         Ok(())
+    }
+
+    fn needs_to_handle(linux_resources: &LinuxResources) -> Option<&Self::Resource> {
+        if let Some(network) = &linux_resources.network {
+            return Some(network);
+        }
+
+        None
     }
 }
 

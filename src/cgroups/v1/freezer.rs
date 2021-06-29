@@ -19,20 +19,30 @@ const FREEZER_STATE_FREEZING: &str = "FREEZING";
 pub struct Freezer {}
 
 impl Controller for Freezer {
+    type Resource = FreezerState;
+
     fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply Freezer cgroup config");
         create_dir_all(&cgroup_root)?;
 
-        if let Some(freezer_state) = linux_resources.freezer {
+        if let Some(freezer_state) = Self::needs_to_handle(linux_resources) {
             Self::apply(freezer_state, cgroup_root)?;
         }
 
         Ok(())
     }
+
+    fn needs_to_handle(linux_resources: &LinuxResources) -> Option<&Self::Resource> {
+        if let Some(freezer_state) = &linux_resources.freezer {
+            return Some(freezer_state);
+        }
+
+        None
+    }
 }
 
 impl Freezer {
-    fn apply(freezer_state: FreezerState, cgroup_root: &Path) -> Result<()> {
+    fn apply(freezer_state: &FreezerState, cgroup_root: &Path) -> Result<()> {
         match freezer_state {
             FreezerState::Undefined => {}
             FreezerState::Thawed => {
@@ -129,7 +139,7 @@ mod tests {
         // set Frozen state.
         {
             let freezer_state = FreezerState::Frozen;
-            Freezer::apply(freezer_state, &tmp).expect("Set freezer state");
+            Freezer::apply(&freezer_state, &tmp).expect("Set freezer state");
 
             let state_content =
                 std::fs::read_to_string(tmp.join(CGROUP_FREEZER_STATE)).expect("Read to string");
@@ -139,7 +149,7 @@ mod tests {
         // set Thawed state.
         {
             let freezer_state = FreezerState::Thawed;
-            Freezer::apply(freezer_state, &tmp).expect("Set freezer state");
+            Freezer::apply(&freezer_state, &tmp).expect("Set freezer state");
 
             let state_content =
                 std::fs::read_to_string(tmp.join(CGROUP_FREEZER_STATE)).expect("Read to string");
@@ -151,7 +161,7 @@ mod tests {
             let old_state_content =
                 std::fs::read_to_string(tmp.join(CGROUP_FREEZER_STATE)).expect("Read to string");
             let freezer_state = FreezerState::Undefined;
-            Freezer::apply(freezer_state, &tmp).expect("Set freezer state");
+            Freezer::apply(&freezer_state, &tmp).expect("Set freezer state");
 
             let state_content =
                 std::fs::read_to_string(tmp.join(CGROUP_FREEZER_STATE)).expect("Read to string");

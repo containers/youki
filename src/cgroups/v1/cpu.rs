@@ -16,14 +16,31 @@ const CGROUP_CPU_RT_PERIOD: &str = "cpu.rt_period_us";
 pub struct Cpu {}
 
 impl Controller for Cpu {
+    type Resource = LinuxCpu;
+
     fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply Cpu cgroup config");
 
-        if let Some(cpu) = &linux_resources.cpu {
+        if let Some(cpu) = Self::needs_to_handle(linux_resources) {
             Self::apply(cgroup_root, cpu)?;
         }
 
         Ok(())
+    }
+
+    fn needs_to_handle(linux_resources: &LinuxResources) -> Option<&Self::Resource> {
+        if let Some(cpu) = &linux_resources.cpu {
+            if cpu.shares.is_some()
+                || cpu.period.is_some()
+                || cpu.quota.is_some()
+                || cpu.realtime_period.is_some()
+                || cpu.realtime_runtime.is_some()
+            {
+                return Some(cpu);
+            }
+        }
+
+        None
     }
 }
 

@@ -9,6 +9,8 @@ use oci_spec::{LinuxDeviceCgroup, LinuxDeviceType, LinuxResources};
 pub struct Devices {}
 
 impl Controller for Devices {
+    type Resource = ();
+
     fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply Devices cgroup config");
 
@@ -26,6 +28,11 @@ impl Controller for Devices {
         }
 
         Ok(())
+    }
+
+    // always needs to be called due to default devices
+    fn needs_to_handle(_linux_resources: &LinuxResources) -> Option<&Self::Resource> {
+        Some(&())
     }
 }
 
