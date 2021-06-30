@@ -120,6 +120,7 @@ impl Create {
         Ok(())
     }
 }
+
 /// Fork the process and actually start the container process
 fn run_container<P: AsRef<Path>>(
     pid_file: Option<P>,
@@ -186,15 +187,15 @@ fn run_container<P: AsRef<Path>>(
                 Process::Child(_child) => unreachable!(),
                 // This is actually the child process after fork
                 Process::Init(mut init) => {
-                    // setup args and env vars as in the spec
-                    let spec_args: &Vec<String> = &spec.process.args.clone();
-                    let envs: &Vec<String> = &spec.process.env.clone();
                     // prepare process
-                    init_process(spec, command, rootfs, namespaces)?;
+                    setup_init_process(&spec, command, rootfs, &namespaces)?;
                     init.ready()?;
                     notify_socket.wait_for_container_start()?;
                     // actually run the command / program to be run in container
-                    utils::do_exec(&spec_args[0], spec_args, envs)?;
+                    let args: &Vec<String> = &spec.process.args;
+                    let envs: &Vec<String> = &spec.process.env;
+                    utils::do_exec(&args[0], args, envs)?;
+
                     // the command / program is done executing
                     container
                         .refresh_state()?
@@ -211,16 +212,16 @@ fn run_container<P: AsRef<Path>>(
 }
 
 /// setup hostname, rootfs for the container process
-fn init_process(
-    spec: oci_spec::Spec,
+fn setup_init_process(
+    spec: &oci_spec::Spec,
     command: impl Command,
     rootfs: PathBuf,
-    namespaces: Namespaces,
+    namespaces: &Namespaces,
 ) -> Result<()> {
-    let proc = spec.process.clone();
+    let proc = &spec.process;
 
-    command.set_hostname(&spec.hostname.as_str())?;
-    if spec.process.no_new_privileges {
+    command.set_hostname(spec.hostname.as_str())?;
+    if proc.no_new_privileges {
         let _ = prctl::set_no_new_privileges(true);
     }
 
