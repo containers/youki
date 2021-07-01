@@ -16,7 +16,7 @@ use crate::command::{linux::LinuxCommand, test::TestHelperCommand};
 
 /// This specifies various kernel/other functionalities required for
 /// container management
-pub trait Command {
+pub trait Syscall {
     fn as_any(&self) -> &dyn Any;
     fn pivot_rootfs(&self, path: &Path) -> Result<()>;
     fn set_ns(&self, rawfd: i32, nstype: CloneFlags) -> Result<()>;
@@ -28,7 +28,7 @@ pub trait Command {
     fn get_pwuid(&self, uid: u32) -> Option<Arc<OsStr>>;
 }
 
-pub fn create_command() -> Box<dyn Command> {
+pub fn create_syscall() -> Box<dyn Syscall> {
     if cfg!(test) {
         Box::new(TestHelperCommand::default())
     } else {

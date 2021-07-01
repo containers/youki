@@ -9,7 +9,7 @@ use nix::unistd::Pid;
 use chrono::Utc;
 use procfs::process::Process;
 
-use crate::command::command::create_command;
+use crate::command::syscall::create_syscall;
 
 use crate::container::{ContainerStatus, State};
 
@@ -119,7 +119,7 @@ impl Container {
 
     pub fn creator(&self) -> Option<OsString> {
         if let Some(uid) = self.state.creator {
-            let command = create_command();
+            let command = create_syscall();
             let user_name = command.get_pwuid(uid);
             if let Some(user_name) = user_name {
                 return Some((&*user_name).to_owned());

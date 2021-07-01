@@ -15,12 +15,12 @@ use nix::{
     unistd::{self, Gid, Uid},
 };
 
-use crate::command::{command::create_command, Command};
+use crate::command::{syscall::create_syscall, Syscall};
 use oci_spec::LinuxNamespace;
 
 pub struct Namespaces {
     spaces: Vec<LinuxNamespace>,
-    command: Box<dyn Command>,
+    command: Box<dyn Syscall>,
     pub clone_flags: CloneFlags,
 }
 
@@ -33,7 +33,7 @@ impl From<Vec<LinuxNamespace>> for Namespaces {
                 cf
             },
         );
-        let command: Box<dyn Command> = create_command();
+        let command: Box<dyn Syscall> = create_syscall();
 
         Namespaces {
             spaces: namespaces,

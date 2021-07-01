@@ -4,7 +4,7 @@ use caps::{errors::CapsError, CapSet, CapsHashSet};
 use nix::sched::CloneFlags;
 use oci_spec::LinuxRlimit;
 
-use super::Command;
+use super::Syscall;
 
 #[derive(Clone)]
 pub struct TestHelperCommand {
@@ -23,7 +23,7 @@ impl Default for TestHelperCommand {
     }
 }
 
-impl Command for TestHelperCommand {
+impl Syscall for TestHelperCommand {
     fn as_any(&self) -> &dyn Any {
         self
     }

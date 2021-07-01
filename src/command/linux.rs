@@ -24,7 +24,7 @@ use nix::{sched::unshare, sys::stat::Mode};
 
 use oci_spec::LinuxRlimit;
 
-use super::Command;
+use super::Syscall;
 use crate::capabilities;
 
 /// Empty structure to implement Command trait for
@@ -46,7 +46,7 @@ impl LinuxCommand {
     }
 }
 
-impl Command for LinuxCommand {
+impl Syscall for LinuxCommand {
     /// To enable dynamic typing,
     /// see https://doc.rust-lang.org/std/any/index.html for more information
     fn as_any(&self) -> &dyn Any {

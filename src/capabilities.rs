@@ -1,4 +1,4 @@
-use crate::command::Command;
+use crate::command::Syscall;
 use caps::*;
 
 use anyhow::Result;
@@ -12,13 +12,13 @@ fn to_set(caps: &[LinuxCapabilityType]) -> CapsHashSet {
     capabilities
 }
 
-pub fn reset_effective(command: &impl Command) -> Result<()> {
+pub fn reset_effective(command: &impl Syscall) -> Result<()> {
     log::debug!("reset all caps");
     command.set_capability(CapSet::Effective, &caps::all())?;
     Ok(())
 }
 
-pub fn drop_privileges(cs: &LinuxCapabilities, command: &impl Command) -> Result<()> {
+pub fn drop_privileges(cs: &LinuxCapabilities, command: &impl Syscall) -> Result<()> {
     let all = caps::all();
     log::debug!("dropping bounding capabilities to {:?}", cs.bounding);
     for c in all.difference(&to_set(&cs.bounding)) {
