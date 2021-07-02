@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Result};
+use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -608,10 +608,12 @@ pub struct Spec {
 
 impl Spec {
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let file = File::open(path)?;
+        let path = path.as_ref();
+        let file = File::open(path).with_context(|| format!("failed to open {:?}", path))?;
         let mut spec: Spec = serde_json::from_reader(&file)?;
         // FIME: It is fail if the caller isn't in the correct directory.
-        spec.root.path = std::fs::canonicalize(spec.root.path)?;
+        spec.root.path = std::fs::canonicalize(&spec.root.path)
+        .with_context(|| format!("failed to canonicalize {:?}", spec.root.path))?;
         Ok(spec)
     }
 }
