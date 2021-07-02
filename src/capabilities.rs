@@ -1,4 +1,4 @@
-use crate::command::Syscall;
+use crate::command::{Syscall};
 use caps::*;
 
 use anyhow::Result;
@@ -12,13 +12,13 @@ fn to_set(caps: &[LinuxCapabilityType]) -> CapsHashSet {
     capabilities
 }
 
-pub fn reset_effective(command: &impl Syscall) -> Result<()> {
+pub fn reset_effective(syscall: &impl Syscall) -> Result<()> {
     log::debug!("reset all caps");
-    command.set_capability(CapSet::Effective, &caps::all())?;
+    syscall.set_capability(CapSet::Effective, &caps::all())?;
     Ok(())
 }
 
-pub fn drop_privileges(cs: &LinuxCapabilities, command: &impl Syscall) -> Result<()> {
+pub fn drop_privileges(cs: &LinuxCapabilities, syscall: &impl Syscall) -> Result<()> {
     let all = caps::all();
     log::debug!("dropping bounding capabilities to {:?}", cs.bounding);
     for c in all.difference(&to_set(&cs.bounding)) {
@@ -31,11 +31,11 @@ pub fn drop_privileges(cs: &LinuxCapabilities, command: &impl Syscall) -> Result
         }
     }
 
-    command.set_capability(CapSet::Effective, &to_set(&cs.effective))?;
-    command.set_capability(CapSet::Permitted, &to_set(&cs.permitted))?;
-    command.set_capability(CapSet::Inheritable, &to_set(&cs.inheritable))?;
+    syscall.set_capability(CapSet::Effective, &to_set(&cs.effective))?;
+    syscall.set_capability(CapSet::Permitted, &to_set(&cs.permitted))?;
+    syscall.set_capability(CapSet::Inheritable, &to_set(&cs.inheritable))?;
 
-    if let Err(e) = command.set_capability(CapSet::Ambient, &to_set(&cs.ambient)) {
+    if let Err(e) = syscall.set_capability(CapSet::Ambient, &to_set(&cs.ambient)) {
         log::error!("failed to set ambient capabilities: {}", e);
     }
     Ok(())

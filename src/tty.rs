@@ -43,7 +43,7 @@ pub fn setup_console_socket(
     Ok(csocketfd.into())
 }
 
-pub fn setup_console(console_fd: FileDescriptor) -> Result<()> {
+pub fn setup_console(console_fd: &FileDescriptor) -> Result<()> {
     // You can also access pty master, but it is better to use the API.
     // ref. https://github.com/containerd/containerd/blob/261c107ffc4ff681bc73988f64e3f60c32233b37/vendor/github.com/containerd/go-runc/console.go#L139-L154
     let openpty_result = nix::pty::openpty(None, None)?;
@@ -137,7 +137,7 @@ mod tests {
         let lis = UnixListener::bind(Path::join(&testdir, "console-socket"));
         assert!(lis.is_ok());
         let fd = setup_console_socket(&&rundir_path, &socket_path);
-        let status = setup_console(fd.unwrap());
+        let status = setup_console(&fd.unwrap());
         assert!(status.is_ok());
     }
 }
