@@ -6,7 +6,7 @@ use nix::sys::signal as nix_signal;
 
 use crate::{
     container::{Container, ContainerStatus},
-    signal,
+    signal::ToSignal,
 };
 
 #[derive(Clap, Debug)]
@@ -30,7 +30,7 @@ impl Kill {
         // it might be possible that kill is invoked on a already stopped container etc.
         let container = Container::load(container_root)?.refresh_status()?;
         if container.can_kill() {
-            let sig = signal::from_str(self.signal.as_str())?;
+            let sig = self.signal.to_signal()?;
             log::debug!("kill signal {} to {}", sig, container.pid().unwrap());
             nix_signal::kill(container.pid().unwrap(), sig)?;
             container.update_status(ContainerStatus::Stopped).save()?;

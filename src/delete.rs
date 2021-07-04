@@ -4,13 +4,11 @@ use std::path::PathBuf;
 
 use anyhow::{bail, Result};
 use clap::Clap;
+use nix::sys::signal::Signal;
 
 use crate::cgroups;
+use crate::container::{Container, ContainerStatus};
 use crate::utils;
-use crate::{
-    container::{Container, ContainerStatus},
-    signal,
-};
 use nix::sys::signal as nix_signal;
 
 #[derive(Clap, Debug)]
@@ -35,7 +33,7 @@ impl Delete {
         log::debug!("load the container from {:?}", container_root);
         let mut container = Container::load(container_root)?.refresh_status()?;
         if container.can_kill() && self.force {
-            let sig = signal::from_str("SIGKILL")?;
+            let sig = Signal::SIGKILL;
             log::debug!("kill signal {} to {}", sig, container.pid().unwrap());
             nix_signal::kill(container.pid().unwrap(), sig)?;
             container = container.update_status(ContainerStatus::Stopped);
