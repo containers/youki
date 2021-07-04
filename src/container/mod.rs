@@ -1,9 +1,11 @@
 //! Container management
 
+pub mod builder;
+mod builder_impl;
 #[allow(clippy::module_inception)]
 mod container;
+pub mod init_builder;
 mod state;
-mod builder_impl;
-pub mod builder;
+pub mod tenant_builder;
 pub use container::Container;
 pub use state::{ContainerStatus, State};

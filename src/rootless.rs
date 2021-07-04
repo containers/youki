@@ -29,6 +29,28 @@ impl From<&Linux> for Rootless {
     }
 }
 
+pub fn detect_rootless(spec: &Spec) -> Result<Option<Rootless>> {
+    let linux = spec.linux.as_ref().unwrap();
+
+    let rootless = if should_use_rootless() {
+        log::debug!("rootless container should be created");
+        log::warn!(
+            "resource constraints and multi id mapping is unimplemented for rootless containers"
+        );
+        validate(spec)?;
+        let mut rootless = Rootless::from(linux);
+        if let Some((uid_binary, gid_binary)) = lookup_map_binaries(linux)? {
+            rootless.newuidmap = Some(uid_binary);
+            rootless.newgidmap = Some(gid_binary);
+        }
+        Some(rootless)
+    } else {
+        None
+    };
+
+    Ok(rootless)
+}
+
 /// Checks if rootless mode should be used
 pub fn should_use_rootless() -> bool {
     if !nix::unistd::geteuid().is_root() {

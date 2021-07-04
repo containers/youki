@@ -1,28 +1,9 @@
-#![allow(unused_imports)]
-
 //! Handles the creation of a new container
-use std::fs;
-use std::path::{Path, PathBuf};
-use std::process;
-
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::Clap;
-use nix::sched;
-use nix::unistd;
-use nix::unistd::{Gid, Uid};
+use std::path::PathBuf;
 
 use crate::container::builder::ContainerBuilder;
-use crate::container::{Container, ContainerStatus};
-use crate::namespaces::Namespaces;
-use crate::notify_socket::NotifyListener;
-use crate::process::{fork, Process};
-use crate::rootfs;
-use crate::rootless::{lookup_map_binaries, should_use_rootless, Rootless};
-use crate::stdio::FileDescriptor;
-use crate::tty;
-use crate::utils;
-use crate::{capabilities, command::Syscall};
-use crate::{cgroups, rootless};
 
 /// This is the main structure which stores various commandline options given by
 /// high-level container runtime
@@ -49,14 +30,8 @@ pub struct Create {
 // associated with it like any other process.
 impl Create {
     /// Starts a new container process
-    pub fn exec(
-        &self,
-        root_path: PathBuf,
-        systemd_cgroup: bool,
-        command: impl Syscall,
-    ) -> Result<()> {
-
-        let mut builder = ContainerBuilder::new_init(self.container_id.to_owned(), self.bundle.clone())?;
+    pub fn exec(&self, root_path: PathBuf, systemd_cgroup: bool) -> Result<()> {
+        let mut builder = ContainerBuilder::new(self.container_id.clone());
         if let Some(pid_file) = &self.pid_file {
             builder = builder.with_pid_file(pid_file);
         }
@@ -64,14 +39,13 @@ impl Create {
         if let Some(console_socket) = &self.console_socket {
             builder = builder.with_console_socket(console_socket);
         }
- 
+
         builder
-        .with_root_path(root_path)
-        .with_systemd(systemd_cgroup)
-        .build()?;
+            .with_root_path(root_path)
+            .as_init(&self.bundle)
+            .with_systemd(systemd_cgroup)
+            .build()?;
 
         Ok(())
     }
 }
-
-

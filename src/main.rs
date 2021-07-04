@@ -8,7 +8,6 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::Clap;
 
-use youki::command::linux::LinuxCommand;
 use youki::create;
 use youki::delete;
 use youki::info;
@@ -17,6 +16,7 @@ use youki::list;
 use youki::rootless::should_use_rootless;
 use youki::start;
 use youki::state;
+
 
 /// High-level commandline option definition
 /// This takes global options as well as individual commands as specified in [OCI runtime-spec](https://github.com/opencontainers/runtime-spec/blob/master/runtime.md)
@@ -78,7 +78,7 @@ fn main() -> Result<()> {
     let systemd_cgroup = opts.systemd_cgroup;
 
     match opts.subcmd {
-        SubCommand::Create(create) => create.exec(root_path, systemd_cgroup, LinuxCommand),
+        SubCommand::Create(create) => create.exec(root_path, systemd_cgroup),
         SubCommand::Start(start) => start.exec(root_path),
         SubCommand::Kill(kill) => kill.exec(root_path),
         SubCommand::Delete(delete) => delete.exec(root_path, systemd_cgroup),

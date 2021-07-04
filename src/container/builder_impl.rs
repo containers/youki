@@ -1,17 +1,26 @@
-use std::{path::PathBuf};
+use std::path::PathBuf;
 
-use anyhow::{Result};
+use anyhow::Result;
 use nix::{
     sched,
     unistd::{Gid, Uid},
 };
 use oci_spec::Spec;
 
-use crate::{cgroups, command::{Syscall, linux::LinuxCommand}, namespaces::Namespaces, notify_socket::NotifyListener, process::{Process, fork, setup_init_process}, rootless::{Rootless}, stdio::FileDescriptor, tty, utils};
+use crate::{
+    cgroups,
+    command::{linux::LinuxCommand, Syscall},
+    namespaces::Namespaces,
+    notify_socket::NotifyListener,
+    process::{fork, setup_init_process, Process},
+    rootless::Rootless,
+    stdio::FileDescriptor,
+    tty, utils,
+};
 
 use super::{Container, ContainerStatus};
 
-pub(super) struct ContainerBuilderImpl{
+pub(super) struct ContainerBuilderImpl {
     pub init: bool,
     pub syscall: LinuxCommand,
     pub use_systemd: bool,
@@ -80,7 +89,12 @@ impl ContainerBuilderImpl {
                     // This is actually the child process after fork
                     Process::Init(mut init) => {
                         // prepare process
-                        setup_init_process(&self.spec, &self.syscall, self.rootfs.clone(), &namespaces)?;
+                        setup_init_process(
+                            &self.spec,
+                            &self.syscall,
+                            self.rootfs.clone(),
+                            &namespaces,
+                        )?;
                         init.ready()?;
                         self.notify_socket.wait_for_container_start()?;
                         // actually run the command / program to be run in container
@@ -91,9 +105,9 @@ impl ContainerBuilderImpl {
                         if let Some(container) = &self.container {
                             // the command / program is done executing
                             container
-                            .refresh_state()?
-                            .update_status(ContainerStatus::Stopped)
-                            .save()?;
+                                .refresh_state()?
+                                .update_status(ContainerStatus::Stopped)
+                                .save()?;
                         }
 
                         Ok(Process::Init(init))
