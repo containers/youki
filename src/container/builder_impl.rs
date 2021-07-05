@@ -37,7 +37,7 @@ pub(super) struct ContainerBuilderImpl {
 }
 
 impl ContainerBuilderImpl {
-    pub fn create(&mut self) -> Result<()> {
+    pub(super) fn create(&mut self) -> Result<()> {
         if let Process::Parent(_) = self.run_container()? {
             std::process::exit(0);
         }
