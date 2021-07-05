@@ -9,7 +9,7 @@ use oci_spec::Spec;
 
 use crate::{
     cgroups,
-    command::{linux::LinuxCommand, Syscall},
+    command::{linux::LinuxSyscall, Syscall},
     namespaces::Namespaces,
     notify_socket::NotifyListener,
     process::{fork, setup_init_process, Process},
@@ -22,7 +22,7 @@ use super::{Container, ContainerStatus};
 
 pub(super) struct ContainerBuilderImpl {
     pub init: bool,
-    pub syscall: LinuxCommand,
+    pub syscall: LinuxSyscall,
     pub use_systemd: bool,
     pub container_id: String,
     pub root_path: PathBuf,

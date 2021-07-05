@@ -12,7 +12,7 @@ use nix::{
 
 use oci_spec::LinuxRlimit;
 
-use crate::command::{linux::LinuxCommand, test::TestHelperCommand};
+use crate::command::{linux::LinuxSyscall, test::TestHelperSyscall};
 
 /// This specifies various kernel/other functionalities required for
 /// container management
@@ -30,8 +30,8 @@ pub trait Syscall {
 
 pub fn create_syscall() -> Box<dyn Syscall> {
     if cfg!(test) {
-        Box::new(TestHelperCommand::default())
+        Box::new(TestHelperSyscall::default())
     } else {
-        Box::new(LinuxCommand)
+        Box::new(LinuxSyscall)
     }
 }

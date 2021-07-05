@@ -81,7 +81,7 @@ mod tests {
     use oci_spec::LinuxNamespaceType;
 
     use super::*;
-    use crate::command::test::TestHelperCommand;
+    use crate::command::test::TestHelperSyscall;
 
     fn gen_sample_linux_namespaces() -> Vec<LinuxNamespace> {
         vec![
@@ -112,7 +112,7 @@ mod tests {
     fn test_namespaces_set_ns() {
         let sample_linux_namespaces = gen_sample_linux_namespaces();
         let namespaces: Namespaces = sample_linux_namespaces.into();
-        let test_command: &TestHelperCommand = namespaces.command.as_any().downcast_ref().unwrap();
+        let test_command: &TestHelperSyscall = namespaces.command.as_any().downcast_ref().unwrap();
         assert!(namespaces.apply_setns().is_ok());
 
         let mut setns_args: Vec<_> = test_command
@@ -132,7 +132,7 @@ mod tests {
         let namespaces: Namespaces = sample_linux_namespaces.into();
         assert!(namespaces.apply_unshare(CloneFlags::CLONE_NEWIPC).is_ok());
 
-        let test_command: &TestHelperCommand = namespaces.command.as_any().downcast_ref().unwrap();
+        let test_command: &TestHelperSyscall = namespaces.command.as_any().downcast_ref().unwrap();
         let mut unshare_args = test_command.get_unshare_args();
         unshare_args.sort();
         let mut expect = vec![CloneFlags::CLONE_NEWUSER | CloneFlags::CLONE_NEWPID];

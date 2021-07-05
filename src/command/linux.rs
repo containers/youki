@@ -29,9 +29,9 @@ use crate::capabilities;
 
 /// Empty structure to implement Command trait for
 #[derive(Clone)]
-pub struct LinuxCommand;
+pub struct LinuxSyscall;
 
-impl LinuxCommand {
+impl LinuxSyscall {
     unsafe fn from_raw_buf<'a, T>(p: *const c_char) -> T
     where
         T: From<&'a OsStr>,
@@ -46,7 +46,7 @@ impl LinuxCommand {
     }
 }
 
-impl Syscall for LinuxCommand {
+impl Syscall for LinuxSyscall {
     /// To enable dynamic typing,
     /// see https://doc.rust-lang.org/std/any/index.html for more information
     fn as_any(&self) -> &dyn Any {

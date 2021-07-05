@@ -44,11 +44,11 @@ pub fn drop_privileges(cs: &LinuxCapabilities, syscall: &impl Syscall) -> Result
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::command::test::TestHelperCommand;
+    use crate::command::test::TestHelperSyscall;
 
     #[test]
     fn test_reset_effective() {
-        let test_command = TestHelperCommand::default();
+        let test_command = TestHelperSyscall::default();
         assert!(reset_effective(&test_command).is_ok());
         let set_capability_args: Vec<_> = test_command
             .get_set_capability_args()

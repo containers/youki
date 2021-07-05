@@ -1,4 +1,4 @@
-use crate::command::linux::LinuxCommand;
+use crate::command::linux::LinuxSyscall;
 use std::path::PathBuf;
 
 use super::{init_builder::InitContainerBuilder, tenant_builder::TenantContainerBuilder};
@@ -7,7 +7,7 @@ pub struct ContainerBuilder {
 
     pub(super) root_path: PathBuf,
 
-    pub(super) syscall: LinuxCommand,
+    pub(super) syscall: LinuxSyscall,
 
     pub(super) pid_file: Option<PathBuf>,
 
@@ -46,7 +46,7 @@ impl ContainerBuilder {
         Self {
             container_id,
             root_path,
-            syscall: LinuxCommand,
+            syscall: LinuxSyscall,
             pid_file: None,
             console_socket: None,
         }
