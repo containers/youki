@@ -10,6 +10,8 @@ use crate::{notify_socket::NotifyListener, rootless::detect_rootless, tty};
 
 use super::{builder::ContainerBuilder, builder_impl::ContainerBuilderImpl};
 
+/// Builder that can be used to configure the properties of a process
+/// that will join an existing container sandbox
 pub struct TenantContainerBuilder {
     base: ContainerBuilder,
     env: HashMap<String, String>,
@@ -18,6 +20,9 @@ pub struct TenantContainerBuilder {
 }
 
 impl TenantContainerBuilder {
+    /// Generates the base configuration for a process that will join
+    /// an existing container sandbox from which configuration methods
+    /// can be chained
     pub(super) fn new(builder: ContainerBuilder) -> Self {
         Self {
             base: builder,
@@ -27,21 +32,25 @@ impl TenantContainerBuilder {
         }
     }
 
+    /// Sets environment variables for the container
     pub fn with_env(mut self, env: HashMap<String, String>) -> Self {
         self.env = env;
         self
     }
 
+    /// Sets the working directory of the container
     pub fn with_cwd<P: Into<PathBuf>>(mut self, path: P) -> Self {
         self.cwd = Some(path.into());
         self
     }
 
+    /// Sets the command the container will be started with
     pub fn with_container_command(mut self, command: Vec<String>) -> Self {
         self.command = command;
         self
     }
 
+    /// Joins an existing container
     pub fn build(self) -> Result<()> {
         let container_dir = self.lookup_container_dir()?;
         let spec = self.load_init_spec(&container_dir)?;

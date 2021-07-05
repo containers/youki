@@ -13,6 +13,7 @@ use super::{
     builder::ContainerBuilder, builder_impl::ContainerBuilderImpl, Container, ContainerStatus,
 };
 
+// Builder that can be used to configure the properties of a new container
 pub struct InitContainerBuilder {
     base: ContainerBuilder,
     bundle: PathBuf,
@@ -20,6 +21,8 @@ pub struct InitContainerBuilder {
 }
 
 impl InitContainerBuilder {
+    /// Generates the base configuration for a new container from which 
+    /// configuration methods can be chained
     pub(super) fn new(builder: ContainerBuilder, bundle: PathBuf) -> Self {
         Self {
             base: builder,
@@ -28,11 +31,13 @@ impl InitContainerBuilder {
         }
     }
 
+    /// Sets if systemd should be used for managing cgroups
     pub fn with_systemd(mut self, should_use: bool) -> Self {
         self.use_systemd = should_use;
         self
     }
 
+    /// Creates a new container
     pub fn build(self) -> Result<()> {
         let container_dir = self.create_container_dir()?;
         let spec = self.load_and_safeguard_spec(&container_dir)?;
