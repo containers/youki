@@ -101,7 +101,9 @@ impl InitContainerBuilder {
             )
         })?;
 
-        let spec = oci_spec::Spec::load(&target_spec_path)?;
+        let mut spec = oci_spec::Spec::load(&target_spec_path)?;
+        unistd::chdir(&self.bundle)?;
+        spec.canonicalize_rootfs()?;
         Ok(spec)
     }
 

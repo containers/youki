@@ -610,11 +610,14 @@ impl Spec {
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path = path.as_ref();
         let file = File::open(path).with_context(|| format!("failed to open {:?}", path))?;
-        let mut spec: Spec = serde_json::from_reader(&file)?;
-        // FIME: It is fail if the caller isn't in the correct directory.
-        spec.root.path = std::fs::canonicalize(&spec.root.path)
-        .with_context(|| format!("failed to canonicalize {:?}", spec.root.path))?;
+        let spec: Spec = serde_json::from_reader(&file)?;
         Ok(spec)
+    }
+
+    pub fn canonicalize_rootfs(&mut self) -> Result<()> {
+        self.root.path = std::fs::canonicalize(&self.root.path)
+        .with_context(|| format!("failed to canonicalize {:?}", self.root.path))?;
+        Ok(())
     }
 }
 
