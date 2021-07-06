@@ -2,9 +2,14 @@ use std::{io::Write, path::PathBuf};
 
 use anyhow::Result;
 use mio::unix::pipe::Sender;
-use nix::{sched, unistd::{Gid, Uid}};
+use nix::{
+    sched,
+    unistd::{Gid, Uid},
+};
 
-use crate::{capabilities, command::Syscall, namespaces::Namespaces, process::message::Message, rootfs};
+use crate::{
+    capabilities, command::Syscall, namespaces::Namespaces, process::message::Message, rootfs,
+};
 
 /// Contains sending end for pipe for the child process
 pub struct InitProcess {

@@ -1,4 +1,4 @@
-use crate::command::{Syscall};
+use crate::command::Syscall;
 use caps::*;
 
 use anyhow::Result;

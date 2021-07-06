@@ -14,9 +14,9 @@ pub struct ContainerBuilder {
     pub(super) console_socket: Option<PathBuf>,
 }
 
-/// Builder that can be used to configure the common properties of 
-/// either a init or a tenant container 
-/// 
+/// Builder that can be used to configure the common properties of
+/// either a init or a tenant container
+///
 /// # Example
 ///
 /// ```no_run
@@ -54,7 +54,7 @@ impl ContainerBuilder {
 
     /// Transforms this builder into a tenant builder
     /// # Example
-    /// 
+    ///
     /// ```no_run
     /// # use youki::container::builder::ContainerBuilder;
     ///
@@ -70,7 +70,7 @@ impl ContainerBuilder {
 
     /// Transforms this builder into an init builder
     /// # Example
-    /// 
+    ///
     /// ```no_run
     /// # use youki::container::builder::ContainerBuilder;
     ///
@@ -86,7 +86,7 @@ impl ContainerBuilder {
 
     /// Sets the root path which will be used to store the container state
     /// # Example
-    /// 
+    ///
     /// ```no_run
     /// # use youki::container::builder::ContainerBuilder;
     ///
@@ -101,7 +101,7 @@ impl ContainerBuilder {
     /// Sets the pid file which will be used to write the pid of the container
     /// process
     /// # Example
-    /// 
+    ///
     /// ```no_run
     /// # use youki::container::builder::ContainerBuilder;
     ///
@@ -113,10 +113,10 @@ impl ContainerBuilder {
         self
     }
 
-    /// Sets the console socket, which will be used to send the file descriptor 
+    /// Sets the console socket, which will be used to send the file descriptor
     /// of the pseudoterminal
     /// # Example
-    /// 
+    ///
     /// ```no_run
     /// # use youki::container::builder::ContainerBuilder;
     ///
@@ -128,4 +128,3 @@ impl ContainerBuilder {
         self
     }
 }
-

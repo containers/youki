@@ -1,4 +1,4 @@
-use std::path::{Path};
+use std::path::Path;
 
 use anyhow::Result;
 
@@ -10,10 +10,7 @@ pub struct Pids {}
 impl Controller for Pids {
     type Resource = LinuxPids;
 
-    fn apply(
-        linux_resources: &LinuxResources,
-        cgroup_root: &Path,
-    ) -> Result<()> {
+    fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply pids cgroup config");
 
         if let Some(pids) = &linux_resources.pids {

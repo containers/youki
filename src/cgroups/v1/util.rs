@@ -3,7 +3,7 @@ use std::{collections::HashMap, path::PathBuf};
 use anyhow::{anyhow, Result};
 use procfs::process::Process;
 
-use super::{ControllerType, controller_type::CONTROLLERS};
+use super::{controller_type::CONTROLLERS, ControllerType};
 
 pub fn list_subsystem_mount_points() -> Result<HashMap<ControllerType, PathBuf>> {
     let mut mount_paths = HashMap::with_capacity(CONTROLLERS.len());

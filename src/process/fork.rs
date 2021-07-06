@@ -74,14 +74,14 @@ pub fn fork_first<P: AsRef<Path>>(
             }
 
             if let Some(container) = container {
-                 // update status and pid of the container process
-            container
-            .update_status(ContainerStatus::Created)
-            .set_creator(nix::unistd::geteuid().as_raw())
-            .set_pid(init_pid)
-            .save()?;
+                // update status and pid of the container process
+                container
+                    .update_status(ContainerStatus::Created)
+                    .set_creator(nix::unistd::geteuid().as_raw())
+                    .set_pid(init_pid)
+                    .save()?;
             }
-   
+
             // if file to write the pid to is specified, write pid of the child
             if let Some(pid_file) = pid_file {
                 fs::write(&pid_file, format!("{}", child))?;

@@ -21,7 +21,7 @@ pub struct InitContainerBuilder {
 }
 
 impl InitContainerBuilder {
-    /// Generates the base configuration for a new container from which 
+    /// Generates the base configuration for a new container from which
     /// configuration methods can be chained
     pub(super) fn new(builder: ContainerBuilder, bundle: PathBuf) -> Self {
         Self {

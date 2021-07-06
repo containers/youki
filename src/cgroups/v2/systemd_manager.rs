@@ -261,9 +261,10 @@ mod tests {
 
     #[test]
     fn get_cgroups_path_works_with_a_complex_slice() -> Result<()> {
-        let cgroups_path =
-            SystemDCGroupManager::destructure_cgroups_path(PathBuf::from("test-a-b.slice:docker:foo"))
-                .expect("");
+        let cgroups_path = SystemDCGroupManager::destructure_cgroups_path(PathBuf::from(
+            "test-a-b.slice:docker:foo",
+        ))
+        .expect("");
 
         assert_eq!(
             SystemDCGroupManager::construct_cgroups_path(cgroups_path)?,
@@ -275,9 +276,10 @@ mod tests {
 
     #[test]
     fn get_cgroups_path_works_with_a_simple_slice() -> Result<()> {
-        let cgroups_path =
-            SystemDCGroupManager::destructure_cgroups_path(PathBuf::from("machine.slice:libpod:foo"))
-                .expect("");
+        let cgroups_path = SystemDCGroupManager::destructure_cgroups_path(PathBuf::from(
+            "machine.slice:libpod:foo",
+        ))
+        .expect("");
 
         assert_eq!(
             SystemDCGroupManager::construct_cgroups_path(cgroups_path)?,
