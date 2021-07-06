@@ -5,8 +5,12 @@ authors = ["utam0k <k0ma@utam0k.jp>"]
 edition = "2018"
 description = "A container runtime written in Rust"
 
+[dependencies.clap]
+version = "3.0.0-beta.2"
+default-features = false
+features = ["std", "suggestions", "derive"]
+
 [dependencies]
-clap = "3.0.0-beta.2"
 nix = "0.19.1"
 procfs = "0.9.1"
 caps = "0.5.1"
@@ -20,7 +24,6 @@ mio = { version = "0.7", features = ["os-ext", "os-poll"] }
 chrono = { version="0.4", features = ["serde"] }
 once_cell = "1.6.0"
 futures = { version = "0.3", features = ["thread-pool"] }
-regex = "1.5"
 oci_spec = { version = "0.1.0", path = "./oci_spec" }
 systemd = { version = "0.8", default-features = false }
 dbus = "0.9.2"
@@ -30,3 +33,6 @@ tabwriter = "1"
 oci_spec = { version = "0.1.0", path = "./oci_spec", features = ["proptests"] }
 quickcheck = "1"
 serial_test = "0.5.1"
+
+[profile.release]
+lto = true
