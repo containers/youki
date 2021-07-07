@@ -1,7 +1,6 @@
 use std::path::Path;
 
 use anyhow::{bail, Result};
-use regex::Regex;
 
 use crate::cgroups::{common, v1::Controller};
 use oci_spec::{LinuxHugepageLimit, LinuxResources};
@@ -34,16 +33,14 @@ impl Controller for Hugetlb {
 
 impl Hugetlb {
     fn apply(root_path: &Path, hugetlb: &LinuxHugepageLimit) -> Result<()> {
-        let re = Regex::new(r"(?P<pagesize>[0-9]+)[KMG]B")?;
-        let caps = re.captures(&hugetlb.page_size);
-        match caps {
-            None => bail!("page size must be in the format [0-9]+[KMG]B"),
-            Some(caps) => {
-                let page_size: u64 = caps["pagesize"].parse()?;
-                if !Self::is_power_of_two(page_size) {
-                    bail!("page size must be in the format of 2^(integer)");
-                }
-            }
+        let page_size: String = hugetlb
+            .page_size
+            .chars()
+            .take_while(|c| c.is_digit(10))
+            .collect();
+        let page_size: u64 = page_size.parse()?;
+        if !Self::is_power_of_two(page_size) {
+            bail!("page size must be in the format of 2^(integer)");
         }
 
         common::write_cgroup_file(
@@ -106,10 +103,13 @@ mod tests {
 
             let result = Hugetlb::apply(&tmp, &hugetlb);
 
-            let re = Regex::new(r"(?P<pagesize>[0-9]+)[KMG]B").expect("create regex for parsing pagesize");
-            let caps = re.captures(&hugetlb.page_size).expect("should capture pagesize");
+            let page_size: String = hugetlb
+            .page_size
+            .chars()
+            .take_while(|c| c.is_digit(10))
+            .collect();
+            let page_size: u64 = page_size.parse().expect("parse page size");
 
-            let page_size: u64 = caps["pagesize"].parse().expect("should contain captured pagesize");
             if Hugetlb::is_power_of_two(page_size) && page_size != 1 {
                 let content =
                     read_to_string(tmp.join(page_file_name)).expect("Read hugetlb file content");
