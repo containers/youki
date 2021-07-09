@@ -24,14 +24,14 @@ use nix::{sched::unshare, sys::stat::Mode};
 
 use oci_spec::LinuxRlimit;
 
-use super::Command;
+use super::Syscall;
 use crate::capabilities;
 
 /// Empty structure to implement Command trait for
 #[derive(Clone)]
-pub struct LinuxCommand;
+pub struct LinuxSyscall;
 
-impl LinuxCommand {
+impl LinuxSyscall {
     unsafe fn from_raw_buf<'a, T>(p: *const c_char) -> T
     where
         T: From<&'a OsStr>,
@@ -46,7 +46,7 @@ impl LinuxCommand {
     }
 }
 
-impl Command for LinuxCommand {
+impl Syscall for LinuxSyscall {
     /// To enable dynamic typing,
     /// see https://doc.rust-lang.org/std/any/index.html for more information
     fn as_any(&self) -> &dyn Any {

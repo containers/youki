@@ -31,6 +31,8 @@ jobs:
         run: ./build.sh
       - name: Run tests
         run: cargo test
+      - name: Run doc tests
+        run: cargo test --doc
   integration_tests:
     runs-on: ubuntu-latest
     steps:

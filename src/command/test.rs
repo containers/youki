@@ -4,18 +4,18 @@ use caps::{errors::CapsError, CapSet, CapsHashSet};
 use nix::sched::CloneFlags;
 use oci_spec::LinuxRlimit;
 
-use super::Command;
+use super::Syscall;
 
 #[derive(Clone)]
-pub struct TestHelperCommand {
+pub struct TestHelperSyscall {
     set_ns_args: RefCell<Vec<(i32, CloneFlags)>>,
     unshare_args: RefCell<Vec<CloneFlags>>,
     set_capability_args: RefCell<Vec<(CapSet, CapsHashSet)>>,
 }
 
-impl Default for TestHelperCommand {
+impl Default for TestHelperSyscall {
     fn default() -> Self {
-        TestHelperCommand {
+        TestHelperSyscall {
             set_ns_args: RefCell::new(vec![]),
             unshare_args: RefCell::new(vec![]),
             set_capability_args: RefCell::new(vec![]),
@@ -23,7 +23,7 @@ impl Default for TestHelperCommand {
     }
 }
 
-impl Command for TestHelperCommand {
+impl Syscall for TestHelperSyscall {
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -66,7 +66,7 @@ impl Command for TestHelperCommand {
     }
 }
 
-impl TestHelperCommand {
+impl TestHelperSyscall {
     pub fn get_setns_args(&self) -> Vec<(i32, CloneFlags)> {
         self.set_ns_args.borrow_mut().clone()
     }
