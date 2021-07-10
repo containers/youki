@@ -26,10 +26,7 @@ impl Pids {
         } else {
             "max".to_string()
         };
-        Ok(common::write_cgroup_file(
-            &root_path.join("pids.max"),
-            &limit,
-        )?)
+        common::write_cgroup_file(&root_path.join("pids.max"), &limit)
     }
 }
 
