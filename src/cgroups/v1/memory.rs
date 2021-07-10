@@ -343,7 +343,7 @@ mod tests {
     }
 
     quickcheck! {
-        fn property_test_set_memory(linux_memory: LinuxMemory, disable_oom_killer: bool, pid_int: i32) -> bool {
+        fn property_test_set_memory(linux_memory: LinuxMemory, disable_oom_killer: bool) -> bool {
             let tmp =
                 create_temp_dir("property_test_set_memory").expect("create temp directory for test");
             set_fixture(&tmp, CGROUP_MEMORY_USAGE, "0").expect("Set fixure for memory usage");
