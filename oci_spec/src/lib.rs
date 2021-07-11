@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -616,7 +616,7 @@ impl Spec {
 
     pub fn canonicalize_rootfs(&mut self) -> Result<()> {
         self.root.path = std::fs::canonicalize(&self.root.path)
-        .with_context(|| format!("failed to canonicalize {:?}", self.root.path))?;
+            .with_context(|| format!("failed to canonicalize {:?}", self.root.path))?;
         Ok(())
     }
 }
