@@ -1,5 +1,4 @@
 use std::fs;
-use std::path::Path;
 use std::path::PathBuf;
 
 use anyhow::{bail, Result};
@@ -42,11 +41,7 @@ impl Delete {
         log::debug!("container status: {:?}", container.status());
         if container.can_delete() {
             if container.root.exists() {
-                nix::unistd::chdir(&PathBuf::from(&container.state.bundle))?;
-                let config_absolute_path = &PathBuf::from(&container.state.bundle)
-                    .join(Path::new("config.json"))
-                    .to_string_lossy()
-                    .to_string();
+                let config_absolute_path = container.root.join("config.json");
                 log::debug!("load spec from {:?}", config_absolute_path);
                 let spec = oci_spec::Spec::load(config_absolute_path)?;
                 log::debug!("spec: {:?}", spec);

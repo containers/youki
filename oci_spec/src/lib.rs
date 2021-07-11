@@ -609,7 +609,8 @@ pub struct Spec {
 impl Spec {
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path = path.as_ref();
-        let file = File::open(path).with_context(|| format!("failed to open {:?}", path))?;
+        let file =
+            File::open(path).with_context(|| format!("load spec: failed to open {:?}", path))?;
         let spec: Spec = serde_json::from_reader(&file)?;
         Ok(spec)
     }
