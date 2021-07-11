@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::{any::Any, mem, path::Path, ptr};
 
 use anyhow::{bail, Result};
-use caps::{errors::CapsError, CapSet, CapsHashSet};
+use caps::{errors::CapsError, CapSet, Capability, CapsHashSet};
 use libc::{c_char, uid_t};
 use nix::{
     errno::Errno,
@@ -114,7 +114,31 @@ impl Syscall for LinuxSyscall {
 
     /// Set capabilities for container process
     fn set_capability(&self, cset: CapSet, value: &CapsHashSet) -> Result<(), CapsError> {
-        caps::set(None, cset, value)
+        match cset {
+            // caps::set cannot set capabilities in bounding set,
+            // so we do it differently
+            CapSet::Bounding => {
+                // get all capabilities
+                let all = caps::all();
+                // the difference will give capabilities
+                // which are to be unset
+                // for each such =, drop that capability
+                // after this, only those which are to be set will remain set
+                for c in all.difference(value) {
+                    match c {
+                        Capability::CAP_PERFMON
+                        | Capability::CAP_CHECKPOINT_RESTORE
+                        | Capability::CAP_BPF => {
+                            log::warn!("{:?} is not supported.", c);
+                            continue;
+                        }
+                        _ => caps::drop(None, CapSet::Bounding, *c)?,
+                    }
+                }
+                Ok(())
+            }
+            _ => caps::set(None, cset, value),
+        }
     }
 
     /// Sets hostname for process
