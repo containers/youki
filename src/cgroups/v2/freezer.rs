@@ -178,8 +178,8 @@ mod tests {
 
     #[test]
     fn test_set_freezer_state_error() {
-        let tmp =
-            create_temp_dir("test_set_freezer_state").expect("create temp directory for test");
+        let tmp = create_temp_dir("test_set_freezer_state_error")
+            .expect("create temp directory for test");
         set_fixture(&tmp, CGROUP_FREEZE, "").expect("Set fixure for freezer state");
         set_fixture(&tmp, CGROUP_EVENTS, "").expect("Set fixure for freezer state");
 
