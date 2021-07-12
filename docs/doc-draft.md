@@ -92,3 +92,7 @@ This also provides implementation for Linux syscalls for the trait.
 
 [oci runtime specification]: https://github.com/opencontainers/runtime-spec/blob/master/runtime.md
 [runc man pages]: (https://github.com/opencontainers/runc/blob/master/man/runc.8.md)
+
+## Capabilities
+
+- [Simple explanation of capabilities](https://blog.container-solutions.com/linux-capabilities-in-practice)

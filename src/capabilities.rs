@@ -1,9 +1,11 @@
+//! Handles Management of Capabilities
 use crate::command::Syscall;
 use caps::*;
 
 use anyhow::Result;
 use oci_spec::{LinuxCapabilities, LinuxCapabilityType};
 
+/// Converts a list of capability types to capabilities has set
 fn to_set(caps: &[LinuxCapabilityType]) -> CapsHashSet {
     let mut capabilities = CapsHashSet::new();
     for c in caps {
@@ -12,29 +14,25 @@ fn to_set(caps: &[LinuxCapabilityType]) -> CapsHashSet {
     capabilities
 }
 
+/// reset capabilities of process calling this to effective capabilities
+/// effective capability set is set of capabilities used by kernel to perform checks
+/// see https://man7.org/linux/man-pages/man7/capabilities.7.html for more information
 pub fn reset_effective(syscall: &impl Syscall) -> Result<()> {
     log::debug!("reset all caps");
     syscall.set_capability(CapSet::Effective, &caps::all())?;
     Ok(())
 }
 
+/// Drop any extra granted capabilities, and reset to defaults which are in oci specification
 pub fn drop_privileges(cs: &LinuxCapabilities, syscall: &impl Syscall) -> Result<()> {
-    let all = caps::all();
     log::debug!("dropping bounding capabilities to {:?}", cs.bounding);
-    for c in all.difference(&to_set(&cs.bounding)) {
-        match c {
-            Capability::CAP_PERFMON | Capability::CAP_CHECKPOINT_RESTORE | Capability::CAP_BPF => {
-                log::warn!("{:?} doesn't support.", c);
-                continue;
-            }
-            _ => caps::drop(None, CapSet::Bounding, *c)?,
-        }
-    }
+    syscall.set_capability(CapSet::Bounding, &to_set(&cs.bounding))?;
 
     syscall.set_capability(CapSet::Effective, &to_set(&cs.effective))?;
     syscall.set_capability(CapSet::Permitted, &to_set(&cs.permitted))?;
     syscall.set_capability(CapSet::Inheritable, &to_set(&cs.inheritable))?;
 
+    // check specifically for ambient, as those might not always be available
     if let Err(e) = syscall.set_capability(CapSet::Ambient, &to_set(&cs.ambient)) {
         log::error!("failed to set ambient capabilities: {}", e);
     }
