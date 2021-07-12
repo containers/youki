@@ -62,7 +62,7 @@ mod tests {
     #[test]
     fn test_set_hugetlb() {
         let page_file_name = "hugetlb.2MB.limit_in_bytes";
-        let tmp = create_temp_dir("test_set_hugetlb").expect("create temp directory for test");
+        let tmp = create_temp_dir("test_set_hugetlbv2").expect("create temp directory for test");
         set_fixture(&tmp, page_file_name, "0").expect("Set fixture for 2 MB page size");
 
         let hugetlb = LinuxHugepageLimit {
@@ -76,7 +76,7 @@ mod tests {
 
     #[test]
     fn test_set_hugetlb_with_invalid_page_size() {
-        let tmp = create_temp_dir("test_set_hugetlb_with_invalid_page_size")
+        let tmp = create_temp_dir("test_set_hugetlbv2_with_invalid_page_size")
             .expect("create temp directory for test");
 
         let hugetlb = LinuxHugepageLimit {
