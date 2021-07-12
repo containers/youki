@@ -53,7 +53,7 @@ enum SubCommand {
     #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
     State(state::State),
     #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
-    Info(info::Info),
+    Info,
     #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
     List(list::List),
 }
@@ -82,7 +82,7 @@ fn main() -> Result<()> {
         SubCommand::Kill(kill) => kill.exec(root_path),
         SubCommand::Delete(delete) => delete.exec(root_path, systemd_cgroup),
         SubCommand::State(state) => state.exec(root_path),
-        SubCommand::Info(info) => info.exec(),
+        SubCommand::Info => info::Info::print(),
         SubCommand::List(list) => list.exec(root_path),
     }
 }
