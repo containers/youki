@@ -4,7 +4,6 @@ use std::path::Path;
 use super::controller::Controller;
 use crate::cgroups::common;
 use oci_spec::{LinuxHugepageLimit, LinuxResources};
-use regex::Regex;
 
 pub struct HugeTlb {}
 
@@ -22,16 +21,14 @@ impl Controller for HugeTlb {
 
 impl HugeTlb {
     fn apply(root_path: &Path, hugetlb: &LinuxHugepageLimit) -> Result<()> {
-        let re = Regex::new(r"(?P<pagesize>[0-9]+)[KMG]B")?;
-        let caps = re.captures(&hugetlb.page_size);
-        match caps {
-            None => bail!("page size must be in the format [0-9]+[KMG]B"),
-            Some(caps) => {
-                let page_size: u64 = caps["pagesize"].parse()?;
-                if !Self::is_power_of_two(page_size) {
-                    bail!("page size must be in the format of 2^(integer)");
-                }
-            }
+        let page_size: String = hugetlb
+            .page_size
+            .chars()
+            .take_while(|c| c.is_digit(10))
+            .collect();
+        let page_size: u64 = page_size.parse()?;
+        if !Self::is_power_of_two(page_size) {
+            bail!("page size must be in the format of 2^(integer)");
         }
 
         common::write_cgroup_file(
@@ -97,15 +94,17 @@ mod tests {
     quickcheck! {
         fn property_test_set_hugetlb(hugetlb: LinuxHugepageLimit) -> bool {
             let page_file_name = format!("hugetlb.{:?}.limit_in_bytes", hugetlb.page_size);
-            let tmp = create_temp_dir("property_test_set_hugetlb").expect("create temp directory for test");
+            let tmp = create_temp_dir("property_test_set_hugetlbv2").expect("create temp directory for test");
             set_fixture(&tmp, &page_file_name, "0").expect("Set fixture for page size");
-
             let result = HugeTlb::apply(&tmp, &hugetlb);
 
-            let re = Regex::new(r"(?P<pagesize>[0-9]+)[KMG]B").expect("create regex for parsing pagesize");
-            let caps = re.captures(&hugetlb.page_size).expect("should capture pagesize");
+            let page_size: String = hugetlb
+            .page_size
+            .chars()
+            .take_while(|c| c.is_digit(10))
+            .collect();
+            let page_size: u64 = page_size.parse().expect("parse page size");
 
-            let page_size: u64 = caps["pagesize"].parse().expect("should contain captured pagesize");
             if HugeTlb::is_power_of_two(page_size) && page_size != 1 {
                 let content =
                     read_to_string(tmp.join(page_file_name)).expect("Read hugetlb file content");
