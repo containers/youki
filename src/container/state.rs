@@ -4,14 +4,14 @@ use std::fmt::Display;
 use std::fs;
 use std::{fs::File, path::Path};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 const STATE_FILE_PATH: &str = "state.json";
 
 /// Indicates status of the container
-#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum ContainerStatus {
     // The container is being created
@@ -78,6 +78,8 @@ pub struct State {
     // User that created the container
     #[serde(skip_serializing_if = "Option::is_none")]
     pub creator: Option<u32>,
+    // Specifies if systemd should be used to manage cgroups
+    pub use_systemd: Option<bool>,
 }
 
 impl State {
@@ -96,6 +98,7 @@ impl State {
             annotations: HashMap::default(),
             created: None,
             creator: None,
+            use_systemd: None,
         }
     }
 
@@ -115,7 +118,9 @@ impl State {
 
     pub fn load(container_root: &Path) -> Result<Self> {
         let state_file_path = container_root.join(STATE_FILE_PATH);
-        let file = File::open(state_file_path)?;
+        let file = File::open(&state_file_path).with_context(|| {
+            format!("failed to open container state file {:?}", state_file_path)
+        })?;
         let state: Self = serde_json::from_reader(&file)?;
         Ok(state)
     }

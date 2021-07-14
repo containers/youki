@@ -94,6 +94,10 @@ impl Container {
         self.state.status.can_delete()
     }
 
+    pub fn can_exec(&self) -> bool {
+        self.state.status == ContainerStatus::Running
+    }
+
     pub fn pid(&self) -> Option<Pid> {
         self.state.pid.map(Pid::from_raw)
     }
@@ -129,6 +133,19 @@ impl Container {
         None
     }
 
+    pub fn bundle(&self) -> String {
+        self.state.bundle.clone()
+    }
+
+    pub fn set_systemd(mut self, should_use: bool) -> Self {
+        self.state.use_systemd = Some(should_use);
+        self
+    }
+
+    pub fn systemd(&self) -> Option<bool> {
+        self.state.use_systemd
+    }
+
     pub fn update_status(&self, status: ContainerStatus) -> Self {
         let created = match (status, self.state.created) {
             (ContainerStatus::Created, None) => Some(Utc::now()),
@@ -151,9 +168,5 @@ impl Container {
             state,
             root: container_root,
         })
-    }
-
-    pub fn bundle(&self) -> String {
-        self.state.bundle.clone()
     }
 }

@@ -21,6 +21,7 @@ use crate::rootless::Rootless;
 
 /// Function to perform the first fork for in order to run the container process
 pub fn fork_first<P: AsRef<Path>>(
+    init: bool,
     pid_file: &Option<P>,
     rootless: &Option<Rootless>,
     linux: &oci_spec::Linux,
@@ -61,6 +62,7 @@ pub fn fork_first<P: AsRef<Path>>(
                 prctl::set_dumpable(false).unwrap();
             }
 
+            log::debug!("Child End");
             Ok(Process::Child(child))
         }
         // in the parent process
@@ -68,8 +70,9 @@ pub fn fork_first<P: AsRef<Path>>(
             // wait for child to fork init process and report back its pid
             let init_pid = parent.wait_for_child_ready(child)?;
             log::debug!("init pid is {:?}", init_pid);
-            if rootless.is_none() && linux.resources.is_some() {
-                cmanager.add_task(Pid::from_raw(init_pid))?;
+
+            cmanager.add_task(Pid::from_raw(init_pid))?;
+            if rootless.is_none() && linux.resources.is_some() && init {
                 cmanager.apply(&linux.resources.as_ref().unwrap())?;
             }
 
@@ -86,6 +89,7 @@ pub fn fork_first<P: AsRef<Path>>(
             if let Some(pid_file) = pid_file {
                 fs::write(&pid_file, format!("{}", child))?;
             }
+
             Ok(Process::Parent(parent))
         }
     }

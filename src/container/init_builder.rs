@@ -7,7 +7,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{notify_socket::NotifyListener, rootless, tty, utils};
+use crate::{
+    notify_socket::{NotifyListener, NOTIFY_FILE},
+    rootless, tty, utils,
+};
 
 use super::{
     builder::ContainerBuilder, builder_impl::ContainerBuilderImpl, Container, ContainerStatus,
@@ -43,16 +46,22 @@ impl InitContainerBuilder {
         let spec = self.load_and_safeguard_spec(&container_dir)?;
 
         unistd::chdir(&*container_dir)?;
-        let container_state = self.create_container_state(&container_dir)?;
+        let container_state = self
+            .create_container_state(&container_dir)?
+            .set_systemd(self.use_systemd);
 
-        let notify_socket: NotifyListener = NotifyListener::new(&container_dir)?;
+        let notify_socket: NotifyListener = NotifyListener::new( NOTIFY_FILE)?;
         // convert path of root file system of the container to absolute path
         let rootfs = fs::canonicalize(&spec.root.path)?;
 
         // if socket file path is given in commandline options,
         // get file descriptors of console socket
         let csocketfd = if let Some(console_socket) = &self.base.console_socket {
-            Some(tty::setup_console_socket(&container_dir, console_socket)?)
+            Some(tty::setup_console_socket(
+                &container_dir,
+                console_socket,
+                "console-socket",
+            )?)
         } else {
             None
         };

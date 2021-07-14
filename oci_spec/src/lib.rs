@@ -1,5 +1,7 @@
 use nix::sys::stat::SFlag;
 use std::collections::HashMap;
+use std::convert::TryFrom;
+
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
@@ -473,6 +475,23 @@ pub enum LinuxNamespaceType {
     User = 0x10000000,
     Pid = 0x20000000,
     Network = 0x40000000,
+}
+
+impl TryFrom<&str> for LinuxNamespaceType {
+    type Error = anyhow::Error;
+
+    fn try_from(namespace: &str) -> Result<Self, Self::Error> {
+        match namespace {
+            "mnt" => Ok(LinuxNamespaceType::Mount),
+            "cgroup" => Ok(LinuxNamespaceType::Cgroup),
+            "uts" => Ok(LinuxNamespaceType::Uts),
+            "ipc" => Ok(LinuxNamespaceType::Ipc),
+            "user" => Ok(LinuxNamespaceType::User),
+            "pid" => Ok(LinuxNamespaceType::Pid),
+            "net" => Ok(LinuxNamespaceType::Network),
+            _ => bail!("unknown namespace {}, could not convert", namespace),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

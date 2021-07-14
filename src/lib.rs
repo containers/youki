@@ -9,6 +9,7 @@ pub mod container;
 pub mod create;
 pub mod dbus;
 pub mod delete;
+pub mod exec;
 pub mod info;
 pub mod kill;
 pub mod list;

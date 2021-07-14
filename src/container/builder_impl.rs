@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use nix::{
     sched,
     unistd::{Gid, Uid},
@@ -39,7 +39,9 @@ pub(super) struct ContainerBuilderImpl {
 impl ContainerBuilderImpl {
     pub(super) fn create(&mut self) -> Result<()> {
         if let Process::Parent(_) = self.run_container()? {
-            std::process::exit(0);
+            if self.init {
+                std::process::exit(0);
+            }
         }
 
         Ok(())
@@ -56,6 +58,7 @@ impl ContainerBuilderImpl {
 
         // first fork, which creates process, which will later create actual container process
         match fork::fork_first(
+            self.init,
             &self.pid_file,
             &self.rootless,
             linux,
@@ -68,12 +71,18 @@ impl ContainerBuilderImpl {
             Process::Child(child) => {
                 // set limits and namespaces to the process
                 for rlimit in self.spec.process.rlimits.iter() {
-                    self.syscall.set_rlimit(rlimit)?
+                    self.syscall
+                        .set_rlimit(rlimit)
+                        .context("failed to set rlimit")?;
                 }
-                self.syscall.set_id(Uid::from_raw(0), Gid::from_raw(0))?;
+                self.syscall
+                    .set_id(Uid::from_raw(0), Gid::from_raw(0))
+                    .context("failed to become root")?;
 
                 let without = sched::CloneFlags::CLONE_NEWUSER;
-                namespaces.apply_unshare(without)?;
+                namespaces
+                    .apply_unshare(without)
+                    .context("could not unshare namespaces")?;
 
                 // set up tty if specified
                 if let Some(csocketfd) = &self.console_socket {
@@ -89,12 +98,15 @@ impl ContainerBuilderImpl {
                     // This is actually the child process after fork
                     Process::Init(mut init) => {
                         // prepare process
-                        setup_init_process(
-                            &self.spec,
-                            &self.syscall,
-                            self.rootfs.clone(),
-                            &namespaces,
-                        )?;
+                        if self.init {
+                            setup_init_process(
+                                &self.spec,
+                                &self.syscall,
+                                self.rootfs.clone(),
+                                &namespaces,
+                            )?;
+                        }
+
                         init.ready()?;
                         self.notify_socket.wait_for_container_start()?;
                         // actually run the command / program to be run in container
