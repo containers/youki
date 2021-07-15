@@ -32,6 +32,8 @@ oci_spec = { version = "0.1.0", path = "./oci_spec" }
 systemd = { version = "0.8", default-features = false, optional = true }
 dbus = "0.9.2"
 tabwriter = "1"
+rio = "0.9.4"
+async-trait = "0.1.50"
 
 [dev-dependencies]
 oci_spec = { version = "0.1.0", path = "./oci_spec", features = ["proptests"] }
