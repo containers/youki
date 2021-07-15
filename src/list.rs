@@ -1,3 +1,4 @@
+//! Contains Functionality of list container command
 use std::ffi::OsString;
 use std::fs;
 use std::io;
@@ -11,14 +12,17 @@ use tabwriter::TabWriter;
 
 use crate::container::Container;
 
+/// Empty struct for list command
 #[derive(Clap, Debug)]
 pub struct List {}
 
 impl List {
+    /// lists all existing containers
     pub fn exec(&self, root_path: PathBuf) -> Result<()> {
         let root_path = fs::canonicalize(root_path)?;
         let mut content = String::new();
-
+        // all containers' data is stored in their respective dir in root directory
+        // so we iterate through each and print the various info
         for container_dir in fs::read_dir(root_path)? {
             let container_dir = container_dir?.path();
             let state_file = container_dir.join("state.json");

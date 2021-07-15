@@ -1,3 +1,4 @@
+//! Contains functionality of kill container command
 use std::{fs, path::PathBuf};
 
 use anyhow::{bail, Result};
