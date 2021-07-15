@@ -144,9 +144,7 @@ impl TenantContainerBuilder {
     fn load_init_spec(&self, container_dir: &Path) -> Result<Spec> {
         let spec_path = container_dir.join("config.json");
 
-        let mut spec = oci_spec::Spec::load(spec_path).context("failed to load spec")?;
-        // TODO: Change Dir
-        spec.canonicalize_rootfs()?;
+        let spec = oci_spec::Spec::load(spec_path).context("failed to load spec")?;
         Ok(spec)
     }
 

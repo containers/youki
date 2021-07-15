@@ -62,7 +62,6 @@ pub fn fork_first<P: AsRef<Path>>(
                 prctl::set_dumpable(false).unwrap();
             }
 
-            log::debug!("Child End");
             Ok(Process::Child(child))
         }
         // in the parent process
