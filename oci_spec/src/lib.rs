@@ -1,9 +1,9 @@
 use nix::sys::stat::SFlag;
 use std::collections::HashMap;
 use std::fs::File;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -557,7 +557,7 @@ pub enum LinuxSeccompOperator {
     ScmpCmpMaskedEq = 7,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FreezerState {
     Undefined,
     Frozen,
@@ -607,12 +607,18 @@ pub struct Spec {
 }
 
 impl Spec {
-    pub fn load(path: &str) -> Result<Self> {
-        let file = File::open(path)?;
-        let mut spec: Spec = serde_json::from_reader(&file)?;
-        // FIME: It is fail if the caller isn't in the correct directory.
-        spec.root.path = std::fs::canonicalize(spec.root.path)?;
+    pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let path = path.as_ref();
+        let file =
+            File::open(path).with_context(|| format!("load spec: failed to open {:?}", path))?;
+        let spec: Spec = serde_json::from_reader(&file)?;
         Ok(spec)
+    }
+
+    pub fn canonicalize_rootfs(&mut self) -> Result<()> {
+        self.root.path = std::fs::canonicalize(&self.root.path)
+            .with_context(|| format!("failed to canonicalize {:?}", self.root.path))?;
+        Ok(())
     }
 }
 

@@ -9,7 +9,10 @@ use anyhow::{bail, Result};
 use nix::unistd::Pid;
 use oci_spec::LinuxResources;
 
-use super::{cpu::Cpu, cpuset::CpuSet, hugetlb::HugeTlb, io::Io, memory::Memory, pids::Pids};
+use super::{
+    cpu::Cpu, cpuset::CpuSet, freezer::Freezer, hugetlb::HugeTlb, io::Io, memory::Memory,
+    pids::Pids,
+};
 use crate::{
     cgroups::v2::controller::Controller,
     cgroups::{
@@ -29,6 +32,7 @@ const CONTROLLER_TYPES: &[ControllerType] = &[
     ControllerType::Io,
     ControllerType::Memory,
     ControllerType::Pids,
+    ControllerType::Freezer,
 ];
 
 pub struct Manager {
@@ -97,6 +101,7 @@ impl Manager {
                 "io" => controllers.push(ControllerType::Io),
                 "memory" => controllers.push(ControllerType::Memory),
                 "pids" => controllers.push(ControllerType::Pids),
+                "freezer" => controllers.push(ControllerType::Freezer),
                 tpe => log::warn!("Controller {} is not yet implemented.", tpe),
             }
         }
@@ -128,6 +133,7 @@ impl CgroupManager for Manager {
                 ControllerType::Io => Io::apply(linux_resources, &self.full_path)?,
                 ControllerType::Memory => Memory::apply(linux_resources, &self.full_path)?,
                 ControllerType::Pids => Pids::apply(linux_resources, &self.full_path)?,
+                ControllerType::Freezer => Freezer::apply(linux_resources, &self.full_path)?,
             }
         }
 

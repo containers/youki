@@ -1,18 +1,19 @@
 use std::fs;
-use std::path::Path;
 use std::path::PathBuf;
 
 use anyhow::{bail, Result};
 use clap::Clap;
+use nix::sys::signal::Signal;
 
 use crate::cgroups;
-use crate::container::Container;
+use crate::container::{Container, ContainerStatus};
 use crate::utils;
+use nix::sys::signal as nix_signal;
 
 #[derive(Clap, Debug)]
 pub struct Delete {
     container_id: String,
-    // forces deletion of the container.
+    /// forces deletion of the container if it is still running (using SIGKILL)
     #[clap(short, long)]
     force: bool,
 }
@@ -29,14 +30,18 @@ impl Delete {
         // load container state from json file, and check status of the container
         // it might be possible that delete is invoked on a running container.
         log::debug!("load the container from {:?}", container_root);
-        let container = Container::load(container_root)?.refresh_status()?;
+        let mut container = Container::load(container_root)?.refresh_status()?;
+        if container.can_kill() && self.force {
+            let sig = Signal::SIGKILL;
+            log::debug!("kill signal {} to {}", sig, container.pid().unwrap());
+            nix_signal::kill(container.pid().unwrap(), sig)?;
+            container = container.update_status(ContainerStatus::Stopped);
+            container.save()?;
+        }
+        log::debug!("container status: {:?}", container.status());
         if container.can_delete() {
             if container.root.exists() {
-                nix::unistd::chdir(&PathBuf::from(&container.state.bundle))?;
-                let config_absolute_path = &PathBuf::from(&container.state.bundle)
-                    .join(Path::new("config.json"))
-                    .to_string_lossy()
-                    .to_string();
+                let config_absolute_path = container.root.join("config.json");
                 log::debug!("load spec from {:?}", config_absolute_path);
                 let spec = oci_spec::Spec::load(config_absolute_path)?;
                 log::debug!("spec: {:?}", spec);

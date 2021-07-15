@@ -21,10 +21,10 @@ use crate::rootless::Rootless;
 
 /// Function to perform the first fork for in order to run the container process
 pub fn fork_first<P: AsRef<Path>>(
-    pid_file: Option<P>,
-    rootless: Option<Rootless>,
+    pid_file: &Option<P>,
+    rootless: &Option<Rootless>,
     linux: &oci_spec::Linux,
-    container: &Container,
+    container: Option<&Container>,
     cmanager: Box<dyn CgroupManager>,
 ) -> Result<Process> {
     // create new parent process structure
@@ -73,12 +73,15 @@ pub fn fork_first<P: AsRef<Path>>(
                 cmanager.apply(&linux.resources.as_ref().unwrap())?;
             }
 
-            // update status and pid of the container process
-            container
-                .update_status(ContainerStatus::Created)
-                .set_creator(nix::unistd::geteuid().as_raw())
-                .set_pid(init_pid)
-                .save()?;
+            if let Some(container) = container {
+                // update status and pid of the container process
+                container
+                    .update_status(ContainerStatus::Created)
+                    .set_creator(nix::unistd::geteuid().as_raw())
+                    .set_pid(init_pid)
+                    .save()?;
+            }
+
             // if file to write the pid to is specified, write pid of the child
             if let Some(pid_file) = pid_file {
                 fs::write(&pid_file, format!("{}", child))?;

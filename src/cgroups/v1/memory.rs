@@ -22,10 +22,12 @@ const CGROUP_KERNEL_TCP_MEMORY_LIMIT: &str = "memory.kmem.tcp.limit_in_bytes";
 pub struct Memory {}
 
 impl Controller for Memory {
+    type Resource = LinuxMemory;
+
     fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply Memory cgroup config");
 
-        if let Some(memory) = &linux_resources.memory {
+        if let Some(memory) = Self::needs_to_handle(linux_resources) {
             let reservation = memory.reservation.unwrap_or(0);
 
             Self::apply(&memory, cgroup_root)?;
@@ -73,6 +75,14 @@ impl Controller for Memory {
         }
 
         Ok(())
+    }
+
+    fn needs_to_handle(linux_resources: &LinuxResources) -> Option<&Self::Resource> {
+        if let Some(memory) = &linux_resources.memory {
+            return Some(memory);
+        }
+
+        None
     }
 }
 
@@ -333,7 +343,7 @@ mod tests {
     }
 
     quickcheck! {
-        fn property_test_set_memory(linux_memory: LinuxMemory, disable_oom_killer: bool, pid_int: i32) -> bool {
+        fn property_test_set_memory(linux_memory: LinuxMemory, disable_oom_killer: bool) -> bool {
             let tmp =
                 create_temp_dir("property_test_set_memory").expect("create temp directory for test");
             set_fixture(&tmp, CGROUP_MEMORY_USAGE, "0").expect("Set fixure for memory usage");

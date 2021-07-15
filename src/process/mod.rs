@@ -10,7 +10,7 @@ mod child;
 mod init;
 mod parent;
 
-pub use init::InitProcess;
+pub use init::{setup_init_process, InitProcess};
 
 /// Used to describe type of process after fork.
 /// Parent and child processes mean the same thing as in a normal fork call

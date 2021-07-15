@@ -96,6 +96,11 @@ pub fn write_file<P: AsRef<Path>, C: AsRef<[u8]>>(path: P, contents: C) -> Resul
     Ok(())
 }
 
+pub fn create_dir_all<P: AsRef<Path>>(path: P) -> Result<()> {
+    let path = path.as_ref();
+    fs::create_dir_all(path).with_context(|| format!("failed to create directory {:?}", path))
+}
+
 pub struct TempDir {
     path: Option<PathBuf>,
 }

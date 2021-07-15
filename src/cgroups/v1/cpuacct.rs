@@ -8,8 +8,15 @@ use super::Controller;
 pub struct CpuAcct {}
 
 impl Controller for CpuAcct {
+    type Resource = ();
+
     fn apply(_linux_resources: &LinuxResources, _cgroup_path: &Path) -> Result<()> {
         Ok(())
+    }
+
+    // apply never needs to be called, for accounting only
+    fn needs_to_handle(_linux_resources: &LinuxResources) -> Option<&Self::Resource> {
+        None
     }
 }
 

@@ -8,7 +8,10 @@ use nix::unistd::Pid;
 use oci_spec::LinuxResources;
 use std::path::{Path, PathBuf};
 
-use super::{cpu::Cpu, cpuset::CpuSet, hugetlb::HugeTlb, io::Io, memory::Memory, pids::Pids};
+use super::{
+    cpu::Cpu, cpuset::CpuSet, freezer::Freezer, hugetlb::HugeTlb, io::Io, memory::Memory,
+    pids::Pids,
+};
 use crate::cgroups::common;
 use crate::cgroups::common::CgroupManager;
 use crate::cgroups::v2::controller::Controller;
@@ -234,6 +237,7 @@ impl CgroupManager for SystemDCGroupManager {
                 ControllerType::Io => Io::apply(linux_resources, &self.full_path)?,
                 ControllerType::Memory => Memory::apply(linux_resources, &self.full_path)?,
                 ControllerType::Pids => Pids::apply(linux_resources, &self.full_path)?,
+                ControllerType::Freezer => Freezer::apply(linux_resources, &self.full_path)?,
             }
         }
 
@@ -261,9 +265,10 @@ mod tests {
 
     #[test]
     fn get_cgroups_path_works_with_a_complex_slice() -> Result<()> {
-        let cgroups_path =
-            SystemDCGroupManager::destructure_cgroups_path(PathBuf::from("test-a-b.slice:docker:foo"))
-                .expect("");
+        let cgroups_path = SystemDCGroupManager::destructure_cgroups_path(PathBuf::from(
+            "test-a-b.slice:docker:foo",
+        ))
+        .expect("");
 
         assert_eq!(
             SystemDCGroupManager::construct_cgroups_path(cgroups_path)?,
@@ -275,9 +280,10 @@ mod tests {
 
     #[test]
     fn get_cgroups_path_works_with_a_simple_slice() -> Result<()> {
-        let cgroups_path =
-            SystemDCGroupManager::destructure_cgroups_path(PathBuf::from("machine.slice:libpod:foo"))
-                .expect("");
+        let cgroups_path = SystemDCGroupManager::destructure_cgroups_path(PathBuf::from(
+            "machine.slice:libpod:foo",
+        ))
+        .expect("");
 
         assert_eq!(
             SystemDCGroupManager::construct_cgroups_path(cgroups_path)?,

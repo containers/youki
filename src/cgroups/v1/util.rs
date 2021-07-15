@@ -3,21 +3,22 @@ use std::{collections::HashMap, path::PathBuf};
 use anyhow::{anyhow, Result};
 use procfs::process::Process;
 
-use super::controller_type::CONTROLLERS;
+use super::{controller_type::CONTROLLERS, ControllerType};
 
-pub fn list_subsystem_mount_points() -> Result<HashMap<String, PathBuf>> {
+pub fn list_subsystem_mount_points() -> Result<HashMap<ControllerType, PathBuf>> {
     let mut mount_paths = HashMap::with_capacity(CONTROLLERS.len());
 
     for controller in CONTROLLERS {
-        if let Ok(mount_point) = get_subsystem_mount_points(&controller.to_string()) {
-            mount_paths.insert(controller.to_string(), mount_point);
+        if let Ok(mount_point) = get_subsystem_mount_point(controller) {
+            mount_paths.insert(controller.to_owned(), mount_point);
         }
     }
 
     Ok(mount_paths)
 }
 
-pub fn get_subsystem_mount_points(subsystem: &str) -> Result<PathBuf> {
+pub fn get_subsystem_mount_point(subsystem: &ControllerType) -> Result<PathBuf> {
+    let subsystem = subsystem.to_string();
     Process::myself()?
         .mountinfo()?
         .into_iter()
