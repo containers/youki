@@ -1,14 +1,15 @@
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use caps::Capability;
 use nix::unistd;
 use oci_spec::{
     LinuxCapabilities, LinuxCapabilityType, LinuxNamespace, LinuxNamespaceType, Process, Spec,
 };
+
 use std::{
     collections::HashMap,
     convert::TryFrom,
     ffi::{CString, OsString},
-    fs::{self, File},
+    fs,
     os::unix::prelude::OsStrExt,
     path::{Path, PathBuf},
     str::FromStr,
@@ -17,13 +18,15 @@ use std::{
 use crate::{
     notify_socket::{NotifyListener, NotifySocket},
     rootless::detect_rootless,
-    tty,
+    stdio::FileDescriptor,
+    tty, utils,
 };
 
 use super::{builder::ContainerBuilder, builder_impl::ContainerBuilderImpl, Container};
 
 const NAMESPACE_TYPES: &[&str] = &["ipc", "uts", "net", "pid", "mnt", "cgroup"];
-pub const TENANT_SOCK: &str = "notify-exec.sock";
+const TENANT_NOTIFY: &str = "tenant-notify-";
+const TENANT_TTY: &str = "tenant-tty-";
 
 /// Builder that can be used to configure the properties of a process
 /// that will join an existing container sandbox
@@ -95,21 +98,13 @@ impl TenantContainerBuilder {
         log::debug!("{:#?}", spec);
 
         unistd::chdir(&*container_dir)?;
-        let notify_socket: NotifyListener = NotifyListener::new(TENANT_SOCK)?;
+        let (notify_listener, notify_path) = Self::setup_notify_listener(&container_dir)?;
         // convert path of root file system of the container to absolute path
         let rootfs = fs::canonicalize(&spec.root.path)?;
 
         // if socket file path is given in commandline options,
         // get file descriptors of console socket
-        let csocketfd = if let Some(console_socket) = &self.base.console_socket {
-            Some(tty::setup_console_socket(
-                &container_dir,
-                console_socket,
-                "tty-exec.sock",
-            )?)
-        } else {
-            None
-        };
+        let csocketfd = self.setup_tty_socket(&container_dir)?;
 
         let use_systemd = self.should_use_systemd(&container);
         let rootless = detect_rootless(&spec)?;
@@ -121,18 +116,18 @@ impl TenantContainerBuilder {
             root_path: self.base.root_path,
             pid_file: self.base.pid_file,
             console_socket: csocketfd,
-            use_systemd: use_systemd,
-            container_dir: container_dir.clone(),
+            use_systemd,
+            container_dir,
             spec,
             rootfs,
             rootless,
-            notify_socket,
+            notify_socket: notify_listener,
             container: None,
         };
 
         builder_impl.create()?;
 
-        let mut notify_socket = NotifySocket::new(container_dir.join(TENANT_SOCK))?;
+        let mut notify_socket = NotifySocket::new(notify_path);
         notify_socket.notify_container_start()?;
         Ok(())
     }
@@ -149,7 +144,7 @@ impl TenantContainerBuilder {
     fn load_init_spec(&self, container_dir: &Path) -> Result<Spec> {
         let spec_path = container_dir.join("config.json");
 
-        let mut spec = oci_spec::Spec::load(spec_path)?;
+        let mut spec = oci_spec::Spec::load(spec_path).context("failed to load spec")?;
         // TODO: Change Dir
         spec.canonicalize_rootfs()?;
         Ok(spec)
@@ -174,7 +169,7 @@ impl TenantContainerBuilder {
             self.set_working_dir(spec)?;
             self.set_args(spec)?;
             self.set_environment(spec)?;
-            self.set_no_new_privileges(spec)?;
+            self.set_no_new_privileges(spec);
             self.set_capabilities(spec)?;
         }
 
@@ -196,10 +191,10 @@ impl TenantContainerBuilder {
             )
         }
 
-        let process = File::open(process)?;
+        let process = utils::open(process)?;
         let process_spec: Process = serde_json::from_reader(process)?;
         spec.process = process_spec;
-        return Ok(());
+        Ok(())
     }
 
     fn set_working_dir(&self, spec: &mut Spec) -> Result<()> {
@@ -238,12 +233,10 @@ impl TenantContainerBuilder {
         Ok(())
     }
 
-    fn set_no_new_privileges(&self, spec: &mut Spec) -> Result<()> {
+    fn set_no_new_privileges(&self, spec: &mut Spec) {
         if let Some(no_new_privs) = self.no_new_privs {
             spec.process.no_new_privileges = no_new_privs;
         }
-
-        Ok(())
     }
 
     fn set_capabilities(&self, spec: &mut Spec) -> Result<()> {
@@ -260,14 +253,14 @@ impl TenantContainerBuilder {
                 spec_caps.bounding.append(&mut caps.clone());
                 spec_caps.effective.append(&mut caps.clone());
                 spec_caps.inheritable.append(&mut caps.clone());
-                spec_caps.permitted.append(&mut caps.clone());
+                spec_caps.permitted.append(&mut caps);
             } else {
                 spec.process.capabilities = Some(LinuxCapabilities {
                     ambient: caps.clone(),
                     bounding: caps.clone(),
                     effective: caps.clone(),
                     inheritable: caps.clone(),
-                    permitted: caps.clone(),
+                    permitted: caps,
                 })
             }
         }
@@ -299,6 +292,39 @@ impl TenantContainerBuilder {
         }
 
         false
+    }
+
+    fn setup_notify_listener(container_dir: &Path) -> Result<(NotifyListener, PathBuf)> {
+        let notify_name = Self::generate_name(&container_dir, TENANT_NOTIFY);
+        let socket_path = container_dir.join(&notify_name);
+        let notify_listener: NotifyListener = NotifyListener::new(&notify_name)?;
+
+        Ok((notify_listener, socket_path))
+    }
+
+    fn setup_tty_socket(&self, container_dir: &Path) -> Result<Option<FileDescriptor>> {
+        let tty_name = Self::generate_name(&container_dir, TENANT_TTY);
+        let csocketfd = if let Some(console_socket) = &self.base.console_socket {
+            Some(tty::setup_console_socket(
+                container_dir,
+                console_socket,
+                &tty_name,
+            )?)
+        } else {
+            None
+        };
+
+        Ok(csocketfd)
+    }
+
+    fn generate_name(dir: &Path, prefix: &str) -> String {
+        loop {
+            let rand = fastrand::i32(..);
+            let name = format!("{}{:x}.sock", prefix, rand);
+            if !dir.join(&name).exists() {
+                return name;
+            }
+        }
     }
 }
 

@@ -21,7 +21,8 @@ pub fn setup_console_socket(
     console_socket_path: &Path,
     socket_name: &str,
 ) -> Result<FileDescriptor> {
-    symlink(console_socket_path, container_dir.join(socket_name))?;
+    let linked = container_dir.join(socket_name);
+    symlink(console_socket_path, &linked)?;
 
     let mut csocketfd = socket::socket(
         socket::AddressFamily::Unix,

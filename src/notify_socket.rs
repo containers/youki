@@ -42,10 +42,10 @@ pub struct NotifySocket {
 }
 
 impl NotifySocket {
-    pub fn new<P: Into<PathBuf>>(socket_path: P) -> Result<Self> {
-        Ok(Self {
+    pub fn new<P: Into<PathBuf>>(socket_path: P) -> Self {
+        Self {
             path: socket_path.into(),
-        })
+        }
     }
 
     pub fn notify_container_start(&mut self) -> Result<()> {

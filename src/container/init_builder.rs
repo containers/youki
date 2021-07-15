@@ -50,7 +50,7 @@ impl InitContainerBuilder {
             .create_container_state(&container_dir)?
             .set_systemd(self.use_systemd);
 
-        let notify_socket: NotifyListener = NotifyListener::new( NOTIFY_FILE)?;
+        let notify_socket: NotifyListener = NotifyListener::new(NOTIFY_FILE)?;
         // convert path of root file system of the container to absolute path
         let rootfs = fs::canonicalize(&spec.root.path)?;
 
