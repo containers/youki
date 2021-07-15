@@ -6,5 +6,5 @@ Here is a preview implementation of the integration test.
 ```
 $ cp ../youki .
 $ ./build.sh
-$ sudo ./integration-binary --test-threads=1
+$ sudo ./youki_integration_test
 ```

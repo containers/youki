@@ -1,0 +1,11 @@
+[package]
+name = "youki_integration_test"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+uuid = "0.8"
+rand = "0.8.0"
+tar = "0.4"
+flate2 = "1.0"
+testanything = "0.2.1"
