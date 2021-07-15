@@ -40,7 +40,6 @@ impl Exec {
     pub fn exec(&self, root_path: PathBuf) -> Result<()> {
         let mut builder =
             ContainerBuilder::new(self.container_id.clone()).with_root_path(root_path);
-        //log::debug!("{:#?}", self);
 
         if let Some(console_socket) = &self.console_socket {
             builder = builder.with_console_socket(console_socket);

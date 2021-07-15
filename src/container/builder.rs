@@ -60,7 +60,7 @@ impl ContainerBuilder {
     ///
     /// ContainerBuilder::new("74f1a4cb3801".to_owned())
     /// .as_tenant()
-    /// .with_container_command(vec!["sleep".to_owned(), "9001".to_owned()])
+    /// .with_container_args(vec!["sleep".to_owned(), "9001".to_owned()])
     /// .build();
     /// ```
     #[allow(clippy::wrong_self_convention)]
