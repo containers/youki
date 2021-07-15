@@ -18,11 +18,11 @@ pub struct Cpu {}
 impl Controller for Cpu {
     type Resource = LinuxCpu;
 
-    fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
+    async fn apply(linux_resources: &LinuxResources, ring: &Rio, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply Cpu cgroup config");
 
         if let Some(cpu) = Self::needs_to_handle(linux_resources) {
-            Self::apply(cgroup_root, cpu)?;
+            await Self::apply(cgroup_root, cpu)?;
         }
 
         Ok(())
@@ -45,16 +45,18 @@ impl Controller for Cpu {
 }
 
 impl Cpu {
-    fn apply(root_path: &Path, cpu: &LinuxCpu) -> Result<()> {
+    async fn apply(ring: &Rio, root_path: &Path, cpu: &LinuxCpu) -> Result<()> {
         if let Some(cpu_shares) = cpu.shares {
             if cpu_shares != 0 {
-                common::write_cgroup_file(root_path.join(CGROUP_CPU_SHARES), cpu_shares)?;
+                let shares_file = common::open_cgroup_file(root_path.join(CGROUP_CPU_SHARES))?;
+                await common::async_write_cgroup_file(ring, &shares_file, cpu_shares)?;
             }
         }
 
         if let Some(cpu_period) = cpu.period {
             if cpu_period != 0 {
-                common::write_cgroup_file(root_path.join(CGROUP_CPU_PERIOD), cpu_period)?;
+                let period_file = common::open_cgroup_file(root_path.join(CGROUP_PERIOD))?;
+                await common::async_write_cgroup_file(ring, &shares_file, cpu_period)?;
             }
         }
 

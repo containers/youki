@@ -10,6 +10,7 @@ use anyhow::{bail, Context, Result};
 use nix::unistd::Pid;
 use oci_spec::LinuxResources;
 use procfs::process::Process;
+use rio::{Rio, Ordering, AsIoVec, Completion};
 #[cfg(feature = "systemd_cgroups")]
 use systemd::daemon::booted;
 #[cfg(not(feature = "systemd_cgroups"))]
@@ -75,6 +76,44 @@ pub fn write_cgroup_file<P: AsRef<Path>, T: ToString>(path: P, data: T) -> Resul
         .with_context(|| format!("failed to write to {:?}", path.as_ref()))?;
 
     Ok(())
+}
+
+#[inline]
+pub fn open_cgroup_file<P: AsRef<Path>>(path: P) -> Result<File> {
+    OpenOptions::new()
+        .create(false)
+        .write(true)
+        .truncate(false)
+        .open(path.as_ref())
+        .with_context(|| format!("failed to open {:?}", path.as_ref()))
+}
+
+#[inline]
+pub async fn async_write_cgroup_file_str(ring: &Rio, file: &File, data: &str) -> Result<Completion> {
+    ring.write_at_ordered(
+        &file,
+        &data,
+        0,
+        // Maybe we pass this control to the caller, but for now this is gives use some
+        // notion of ordering to keep writes in sequence
+        Ordering::Link,
+    )
+}
+
+#[inline]
+pub async fn async_write_cgroup_file<T: ToString>(ring: &Rio, file: &File, data: T) -> Result<Completion> {
+    await async_write_cgroup_file_str(ring, file, &data.to_string())
+}
+
+impl AsIoVec for &str {
+    fn into_new_iovec(&self) -> libc::iovec {
+        let self_ref: &[u8] = self.as_bytes();
+        let self_ptr: *const [u8] = self.as_ref();
+        libc::iovec {
+            iov_base: self_ptr as *mut _,
+            iov_len: self_ref.len(),
+        }
+    }
 }
 
 pub fn get_supported_cgroup_fs() -> Result<Vec<Cgroup>> {
