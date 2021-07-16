@@ -14,7 +14,7 @@ use procfs::process::Process;
 use systemd::daemon::booted;
 #[cfg(not(feature = "systemd_cgroups"))]
 fn booted() -> Result<bool> {
-    Ok(false)
+    bail!("This build does not include the systemd cgroups feature")
 }
 
 use crate::cgroups::v1;
