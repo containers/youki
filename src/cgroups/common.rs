@@ -10,7 +10,12 @@ use anyhow::{bail, Context, Result};
 use nix::unistd::Pid;
 use oci_spec::LinuxResources;
 use procfs::process::Process;
+#[cfg(feature = "systemd_cgroups")]
 use systemd::daemon::booted;
+#[cfg(not(feature = "systemd_cgroups"))]
+fn booted() -> Result<bool> {
+    bail!("This build does not include the systemd cgroups feature")
+}
 
 use crate::cgroups::v1;
 use crate::cgroups::v2;
