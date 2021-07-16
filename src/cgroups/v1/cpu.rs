@@ -55,26 +55,29 @@ impl Cpu {
 
         if let Some(cpu_period) = cpu.period {
             if cpu_period != 0 {
-                let period_file = common::open_cgroup_file(root_path.join(CGROUP_PERIOD))?;
+                let period_file = common::open_cgroup_file(root_path.join(CGROUP_CPU_PERIOD))?;
                 await common::async_write_cgroup_file(ring, &shares_file, cpu_period)?;
             }
         }
 
         if let Some(cpu_quota) = cpu.quota {
             if cpu_quota != 0 {
-                common::write_cgroup_file(root_path.join(CGROUP_CPU_QUOTA), cpu_quota)?;
+                let quota_file = common::open_cgroup_file(root_path.join(CGROUP_CPU_QUOTA))?;
+                await common::async_write_cgroup_file(ring, &quota_file, cpu_quota)?;
             }
         }
 
         if let Some(rt_runtime) = cpu.realtime_runtime {
             if rt_runtime != 0 {
-                common::write_cgroup_file(root_path.join(CGROUP_CPU_RT_RUNTIME), rt_runtime)?;
+                let rt_runtime_file = common::open_cgroup_file(root_path.join(CGROUP_CPU_RT_RUNTIME))?;
+                await common::async_write_cgroup_file(ring, &rt_runtime_file, rt_runtime)?;
             }
         }
 
         if let Some(rt_period) = cpu.realtime_period {
             if rt_period != 0 {
-                common::write_cgroup_file(root_path.join(CGROUP_CPU_RT_PERIOD), rt_period)?;
+                let rt_period_file = common::open_cgroup_file(root_path.join(CGROUP_CPU_RT_PERIOD));
+                await common::async_write_cgroup_file(ring, &rt_period_file, rt_period)?;
             }
         }
 

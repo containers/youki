@@ -89,7 +89,7 @@ pub fn open_cgroup_file<P: AsRef<Path>>(path: P) -> Result<File> {
 }
 
 #[inline]
-pub async fn async_write_cgroup_file_str(ring: &Rio, file: &File, data: &str) -> Result<Completion> {
+pub async fn async_write_cgroup_file_str(ring: &Rio, file: &File, data: &str) -> Result<()> {
     ring.write_at_ordered(
         &file,
         &data,
@@ -97,7 +97,9 @@ pub async fn async_write_cgroup_file_str(ring: &Rio, file: &File, data: &str) ->
         // Maybe we pass this control to the caller, but for now this is gives use some
         // notion of ordering to keep writes in sequence
         Ordering::Link,
-    )
+    ).await?;
+
+    Ok(())
 }
 
 #[inline]
