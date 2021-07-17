@@ -2,7 +2,7 @@
 
 use std::env;
 use std::ffi::CString;
-use std::fs;
+use std::fs::{self, File};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -99,6 +99,11 @@ pub fn write_file<P: AsRef<Path>, C: AsRef<[u8]>>(path: P, contents: C) -> Resul
 pub fn create_dir_all<P: AsRef<Path>>(path: P) -> Result<()> {
     let path = path.as_ref();
     fs::create_dir_all(path).with_context(|| format!("failed to create directory {:?}", path))
+}
+
+pub fn open<P: AsRef<Path>>(path: P) -> Result<File> {
+    let path = path.as_ref();
+    File::open(path).with_context(|| format!("failed to open {:?}", path))
 }
 
 pub struct TempDir {

@@ -60,6 +60,7 @@ impl Namespaces {
                 (space, fd)
             })
             .collect();
+
         for &(space, fd) in &to_enter {
             self.command.set_ns(fd, space)?;
             unistd::close(fd)?;

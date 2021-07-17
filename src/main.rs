@@ -10,6 +10,7 @@ use clap::Clap;
 
 use youki::create;
 use youki::delete;
+use youki::exec;
 use youki::info;
 use youki::kill;
 use youki::list;
@@ -47,6 +48,8 @@ enum SubCommand {
     #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
     Start(start::Start),
     #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
+    Exec(exec::Exec),
+    #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
     Kill(kill::Kill),
     #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
     Delete(delete::Delete),
@@ -79,6 +82,7 @@ fn main() -> Result<()> {
     match opts.subcmd {
         SubCommand::Create(create) => create.exec(root_path, systemd_cgroup),
         SubCommand::Start(start) => start.exec(root_path),
+        SubCommand::Exec(exec) => exec.exec(root_path),
         SubCommand::Kill(kill) => kill.exec(root_path),
         SubCommand::Delete(delete) => delete.exec(root_path, systemd_cgroup),
         SubCommand::State(state) => state.exec(root_path),
