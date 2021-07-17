@@ -113,7 +113,6 @@ impl TenantContainerBuilder {
             init: false,
             syscall: self.base.syscall,
             container_id: self.base.container_id,
-            root_path: self.base.root_path,
             pid_file: self.base.pid_file,
             console_socket: csocketfd,
             use_systemd,

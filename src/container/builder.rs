@@ -3,14 +3,16 @@ use std::path::PathBuf;
 
 use super::{init_builder::InitContainerBuilder, tenant_builder::TenantContainerBuilder};
 pub struct ContainerBuilder {
+    /// Id of the container
     pub(super) container_id: String,
-
+    /// Root directory for container state
     pub(super) root_path: PathBuf,
-
+    /// Interface to operating system primitives
     pub(super) syscall: LinuxSyscall,
-
+    /// File which will be used to communicate the pid of the
+    /// container process to the higher level runtime
     pub(super) pid_file: Option<PathBuf>,
-
+    /// Socket to communicate the file descriptor of the ptty
     pub(super) console_socket: Option<PathBuf>,
 }
 
