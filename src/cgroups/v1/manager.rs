@@ -19,7 +19,7 @@ use super::{
 use crate::cgroups::common::CGROUP_PROCS;
 use crate::utils;
 use crate::{cgroups::common::CgroupManager, utils::PathBufExt};
-use oci_spec::LinuxResources;
+use oci_spec::{FreezerState, LinuxResources};
 pub struct Manager {
     subsystems: HashMap<CtrlType, PathBuf>,
 }
@@ -112,7 +112,7 @@ impl CgroupManager for Manager {
                 CtrlType::Blkio => Blkio::add_task(pid, subsys.1)?,
                 CtrlType::NetworkPriority => NetworkPriority::add_task(pid, subsys.1)?,
                 CtrlType::NetworkClassifier => NetworkClassifier::add_task(pid, subsys.1)?,
-                _ => continue,
+                CtrlType::Freezer => Freezer::add_task(pid, subsys.1)?,
             }
         }
 
@@ -158,5 +158,16 @@ impl CgroupManager for Manager {
         }
 
         Ok(())
+    }
+
+    fn freeze(&self, state: FreezerState) -> Result<()> {
+        let linux_resources = LinuxResources {
+            freezer: Some(state),
+            ..Default::default()
+        };
+        Freezer::apply(
+            &linux_resources,
+            &self.subsystems.get(&CtrlType::Freezer).unwrap(),
+        )
     }
 }

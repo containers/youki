@@ -7,7 +7,7 @@ use std::{
 use anyhow::{bail, Result};
 
 use nix::unistd::Pid;
-use oci_spec::LinuxResources;
+use oci_spec::{FreezerState, LinuxResources};
 
 use super::{
     cpu::Cpu, cpuset::CpuSet, freezer::Freezer, hugetlb::HugeTlb, io::Io, memory::Memory,
@@ -145,5 +145,13 @@ impl CgroupManager for Manager {
         fs::remove_dir_all(&self.full_path)?;
 
         Ok(())
+    }
+
+    fn freeze(&self, state: FreezerState) -> Result<()> {
+        let linux_resources = LinuxResources {
+            freezer: Some(state),
+            ..Default::default()
+        };
+        Freezer::apply(&linux_resources, &self.full_path)
     }
 }

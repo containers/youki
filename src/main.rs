@@ -14,6 +14,8 @@ use youki::exec;
 use youki::info;
 use youki::kill;
 use youki::list;
+use youki::pause;
+use youki::resume;
 use youki::rootless::should_use_rootless;
 use youki::start;
 use youki::state;
@@ -59,6 +61,10 @@ enum SubCommand {
     Info(info::Info),
     #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
     List(list::List),
+    #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
+    Pause(pause::Pause),
+    #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
+    Resume(resume::Resume),
 }
 
 /// This is the entry point in the container runtime. The binary is run by a high-level container runtime,
@@ -88,5 +94,7 @@ fn main() -> Result<()> {
         SubCommand::State(state) => state.exec(root_path),
         SubCommand::Info(info) => info.exec(),
         SubCommand::List(list) => list.exec(root_path),
+        SubCommand::Pause(pause) => pause.exec(root_path, systemd_cgroup),
+        SubCommand::Resume(resume) => return resume.exec(root_path, systemd_cgroup),
     }
 }
