@@ -5,7 +5,7 @@ use std::{
 
 use anyhow::{anyhow, bail, Result};
 use nix::unistd::Pid;
-use oci_spec::LinuxResources;
+use oci_spec::{FreezerState, LinuxResources};
 use std::path::{Path, PathBuf};
 
 use super::{
@@ -246,6 +246,14 @@ impl CgroupManager for SystemDCGroupManager {
 
     fn remove(&self) -> Result<()> {
         Ok(())
+    }
+
+    fn freeze(&self, state: FreezerState) -> Result<()> {
+        let linux_resources = LinuxResources {
+            freezer: Some(state),
+            ..Default::default()
+        };
+        Freezer::apply(&linux_resources, &self.full_path)
     }
 }
 

@@ -22,6 +22,8 @@ pub enum ContainerStatus {
     Running,
     // The container process has exited
     Stopped,
+    // The container process has paused
+    Paused,
 }
 
 impl ContainerStatus {
@@ -33,12 +35,20 @@ impl ContainerStatus {
         use ContainerStatus::*;
         match self {
             Creating | Stopped => false,
-            Created | Running => true,
+            Created | Running | Paused => true,
         }
     }
 
     pub fn can_delete(&self) -> bool {
         matches!(self, ContainerStatus::Stopped)
+    }
+
+    pub fn can_pause(&self) -> bool {
+        matches!(self, ContainerStatus::Running)
+    }
+
+    pub fn can_resume(&self) -> bool {
+        matches!(self, ContainerStatus::Paused)
     }
 }
 
@@ -49,6 +59,7 @@ impl Display for ContainerStatus {
             Self::Created => "Created",
             Self::Running => "Running",
             Self::Stopped => "Stopped",
+            Self::Paused => "Paused",
         };
 
         write!(f, "{}", print)

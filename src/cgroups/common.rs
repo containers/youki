@@ -8,7 +8,7 @@ use std::{
 
 use anyhow::{bail, Context, Result};
 use nix::unistd::Pid;
-use oci_spec::LinuxResources;
+use oci_spec::{FreezerState, LinuxResources};
 use procfs::process::Process;
 use systemd::daemon::booted;
 
@@ -25,6 +25,8 @@ pub trait CgroupManager {
     fn apply(&self, linux_resources: &LinuxResources) -> Result<()>;
     /// Removes the cgroup
     fn remove(&self) -> Result<()>;
+    // Sets the freezer cgroup to the specified state
+    fn freeze(&self, state: FreezerState) -> Result<()>;
 }
 
 #[derive(Debug)]

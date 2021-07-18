@@ -7,6 +7,7 @@ use chrono::DateTime;
 use nix::unistd::Pid;
 
 use chrono::Utc;
+use oci_spec::Spec;
 use procfs::process::Process;
 
 use crate::command::syscall::create_syscall;
@@ -56,7 +57,9 @@ impl Container {
                     match proc.stat.state().unwrap() {
                         ProcState::Zombie | ProcState::Dead => ContainerStatus::Stopped,
                         _ => match self.status() {
-                            ContainerStatus::Creating | ContainerStatus::Created => self.status(),
+                            ContainerStatus::Creating
+                            | ContainerStatus::Created
+                            | ContainerStatus::Paused => self.status(),
                             _ => ContainerStatus::Running,
                         },
                     }
@@ -96,6 +99,14 @@ impl Container {
 
     pub fn can_exec(&self) -> bool {
         self.state.status == ContainerStatus::Running
+    }
+
+    pub fn can_pause(&self) -> bool {
+        self.state.status.can_pause()
+    }
+
+    pub fn can_resume(&self) -> bool {
+        self.state.status.can_resume()
     }
 
     pub fn pid(&self) -> Option<Pid> {
@@ -168,5 +179,9 @@ impl Container {
             state,
             root: container_root,
         })
+    }
+
+    pub fn spec(&self) -> Result<Spec> {
+        Spec::load(self.root.join("config.json"))
     }
 }
