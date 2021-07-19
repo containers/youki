@@ -3,7 +3,7 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use anyhow::Result;
 use nix::unistd::dup2;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FileDescriptor(RawFd);
 
 const STDIN: i32 = 0;
