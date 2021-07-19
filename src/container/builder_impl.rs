@@ -245,10 +245,12 @@ fn container_init(
 
     // set limits and namespaces to the process
     for rlimit in spec.process.rlimits.iter() {
-        command.set_rlimit(rlimit)?
+        command.set_rlimit(rlimit).context("failed to set rlimit")?;
     }
 
-    command.set_id(Uid::from_raw(0), Gid::from_raw(0))?;
+    command
+        .set_id(Uid::from_raw(0), Gid::from_raw(0))
+        .context("failed to become root")?;
 
     // set up tty if specified
     if let Some(csocketfd) = console_socket {
