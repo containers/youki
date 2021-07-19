@@ -24,17 +24,16 @@ sequenceDiagram
 participant U as User
 participant D as Docker
 participant YP as Youki(Parent Process)
-participant YC as Youki(Child Process)
 participant YI as Youki(Init Process)
 
 
 U ->> D : $ docker run --rm -it --runtime youki $image
 D ->> YP : youki create $container_id
-YP ->> YC : fork(2)
-YC ->> YC : create new namespace
-YC ->> YI : fork(2)
-YI ->> YI : Mount the device
+YP ->> YI : clone(2) to create new process and new namespaces
+YI ->> YP : set user id mapping if entering into usernamespaces
+YI ->> YI : configure resource limits, mount the devices, and etc.
 YI -->> YP : ready message (Unix domain socket)
+YP ->> : set cgroup configuration for YI
 YP ->> D : exit $code
 D ->> YP : $ youki start $container_id
 YP -->> YI : start message (Unix domain socket)
