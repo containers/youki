@@ -1,4 +1,4 @@
-use anyhow::{Result, *};
+use anyhow::{bail, Result};
 use std::path::Path;
 
 use oci_spec::{LinuxMemory, LinuxResources};
@@ -86,7 +86,7 @@ mod tests {
     use std::fs::read_to_string;
 
     #[test]
-    fn test_set_memory_v2() {
+    fn test_set_memory() {
         let tmp = create_temp_dir("test_set_memory_v2").expect("create temp directory for test");
         set_fixture(&tmp, CGROUP_MEMORY_MAX, "0").expect("set fixture for memory limit");
         set_fixture(&tmp, CGROUP_MEMORY_LOW, "0").expect("set fixture for memory reservation");
@@ -117,7 +117,7 @@ mod tests {
     }
 
     #[test]
-    fn test_set_memory_unlimited_v2() {
+    fn test_set_memory_unlimited() {
         let tmp = create_temp_dir("test_set_memory_unlimited_v2")
             .expect("create temp directory for test");
         set_fixture(&tmp, CGROUP_MEMORY_MAX, "0").expect("set fixture for memory limit");
@@ -142,7 +142,7 @@ mod tests {
     }
 
     #[test]
-    fn test_err_swap_no_memory_v2() {
+    fn test_err_swap_no_memory() {
         let tmp =
             create_temp_dir("test_err_swap_no_memory_v2").expect("create temp directory for test");
         set_fixture(&tmp, CGROUP_MEMORY_MAX, "0").expect("set fixture for memory limit");
@@ -164,7 +164,7 @@ mod tests {
     }
 
     #[test]
-    fn test_err_bad_limit_v2() {
+    fn test_err_bad_limit() {
         let tmp = create_temp_dir("test_err_bad_limit_v2").expect("create temp directory for test");
         set_fixture(&tmp, CGROUP_MEMORY_MAX, "0").expect("set fixture for memory limit");
         set_fixture(&tmp, CGROUP_MEMORY_LOW, "0").expect("set fixture for memory reservation");
@@ -185,7 +185,7 @@ mod tests {
     }
 
     #[test]
-    fn test_err_bad_swap_v2() {
+    fn test_err_bad_swap() {
         let tmp = create_temp_dir("test_err_bad_swap_v2").expect("create temp directory for test");
         set_fixture(&tmp, CGROUP_MEMORY_MAX, "0").expect("set fixture for memory limit");
         set_fixture(&tmp, CGROUP_MEMORY_LOW, "0").expect("set fixture for memory reservation");
@@ -206,7 +206,7 @@ mod tests {
     }
 
     quickcheck! {
-        fn property_test_set_memory_v2(linux_memory: LinuxMemory) -> bool {
+        fn property_test_set_memory(linux_memory: LinuxMemory) -> bool {
             let tmp = create_temp_dir("property_test_set_memory_v2").expect("create temp directory for test");
             set_fixture(&tmp, CGROUP_MEMORY_MAX, "0").expect("set fixture for memory limit");
             set_fixture(&tmp, CGROUP_MEMORY_LOW, "0").expect("set fixture for memory reservation");
