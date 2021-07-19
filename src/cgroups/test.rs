@@ -10,6 +10,14 @@ use oci_spec::LinuxCpu;
 
 use crate::utils::{create_temp_dir, TempDir};
 
+// helper macro for testing the result of async operations
+macro_rules! aw {
+    ($e:expr) => {
+        futures::executor::block_on($e)
+    };
+}
+pub(crate) use aw;
+
 pub fn setup(testname: &str, cgroup_file: &str) -> (TempDir, PathBuf) {
     let tmp = create_temp_dir(testname).expect("create temp directory for test");
     let cgroup_file = set_fixture(&tmp, cgroup_file, "")

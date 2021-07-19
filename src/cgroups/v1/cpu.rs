@@ -1,8 +1,11 @@
 use std::path::Path;
 
 use anyhow::Result;
+use async_trait::async_trait;
 use oci_spec::{LinuxCpu, LinuxResources};
+use rio::Rio;
 
+#[macro_use]
 use crate::cgroups::common;
 
 use super::Controller;
@@ -15,14 +18,15 @@ const CGROUP_CPU_RT_PERIOD: &str = "cpu.rt_period_us";
 
 pub struct Cpu {}
 
+#[async_trait]
 impl Controller for Cpu {
     type Resource = LinuxCpu;
 
-    async fn apply(linux_resources: &LinuxResources, ring: &Rio, cgroup_root: &Path) -> Result<()> {
+    async fn apply(ring: &Rio, linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply Cpu cgroup config");
 
         if let Some(cpu) = Self::needs_to_handle(linux_resources) {
-            await Self::apply(cgroup_root, cpu)?;
+            Self::apply(ring, cgroup_root, cpu).await?;
         }
 
         Ok(())
@@ -49,35 +53,35 @@ impl Cpu {
         if let Some(cpu_shares) = cpu.shares {
             if cpu_shares != 0 {
                 let shares_file = common::open_cgroup_file(root_path.join(CGROUP_CPU_SHARES))?;
-                await common::async_write_cgroup_file(ring, &shares_file, cpu_shares)?;
+                 common::async_write_cgroup_file(ring, &shares_file, cpu_shares).await?;
             }
         }
 
         if let Some(cpu_period) = cpu.period {
             if cpu_period != 0 {
                 let period_file = common::open_cgroup_file(root_path.join(CGROUP_CPU_PERIOD))?;
-                await common::async_write_cgroup_file(ring, &shares_file, cpu_period)?;
+                common::async_write_cgroup_file(ring, &period_file, cpu_period).await?;
             }
         }
 
         if let Some(cpu_quota) = cpu.quota {
             if cpu_quota != 0 {
                 let quota_file = common::open_cgroup_file(root_path.join(CGROUP_CPU_QUOTA))?;
-                await common::async_write_cgroup_file(ring, &quota_file, cpu_quota)?;
+                common::async_write_cgroup_file(ring, &quota_file, cpu_quota).await?;
             }
         }
 
         if let Some(rt_runtime) = cpu.realtime_runtime {
             if rt_runtime != 0 {
                 let rt_runtime_file = common::open_cgroup_file(root_path.join(CGROUP_CPU_RT_RUNTIME))?;
-                await common::async_write_cgroup_file(ring, &rt_runtime_file, rt_runtime)?;
+                common::async_write_cgroup_file(ring, &rt_runtime_file, rt_runtime).await?;
             }
         }
 
         if let Some(rt_period) = cpu.realtime_period {
             if rt_period != 0 {
                 let rt_period_file = common::open_cgroup_file(root_path.join(CGROUP_CPU_RT_PERIOD));
-                await common::async_write_cgroup_file(ring, &rt_period_file, rt_period)?;
+                common::async_write_cgroup_file(ring, &rt_period_file, rt_period).await?;
             }
         }
 
@@ -88,7 +92,7 @@ impl Cpu {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cgroups::test::{set_fixture, setup, LinuxCpuBuilder};
+    use crate::cgroups::test::{set_fixture, setup, LinuxCpuBuilder, aw};
     use std::fs;
 
     #[test]
@@ -100,7 +104,8 @@ mod tests {
         let cpu = LinuxCpuBuilder::new().with_shares(2048).build();
 
         // act
-        Cpu::apply(&tmp, &cpu).expect("apply cpu");
+        let ring = rio::new().expect("start io_uring");
+        aw!(Cpu::apply(&ring, &tmp, &cpu)).expect("apply cpu");
 
         // assert
         let content = fs::read_to_string(shares)
@@ -116,7 +121,8 @@ mod tests {
         let cpu = LinuxCpuBuilder::new().with_quota(QUOTA).build();
 
         // act
-        Cpu::apply(&tmp, &cpu).expect("apply cpu");
+        let ring = rio::new().expect("start io_uring");
+        aw!(Cpu::apply(&ring, &tmp, &cpu)).expect("apply cpu");
 
         // assert
         let content = fs::read_to_string(max)
@@ -132,7 +138,8 @@ mod tests {
         let cpu = LinuxCpuBuilder::new().with_period(PERIOD).build();
 
         // act
-        Cpu::apply(&tmp, &cpu).expect("apply cpu");
+        let ring = rio::new().expect("start io_uring");
+        aw!(Cpu::apply(&ring, &tmp, &cpu)).expect("apply cpu");
 
         // assert
         let content = fs::read_to_string(max)
@@ -150,7 +157,8 @@ mod tests {
             .build();
 
         // act
-        Cpu::apply(&tmp, &cpu).expect("apply cpu");
+        let ring = rio::new().expect("start io_uring");
+        aw!(Cpu::apply(&ring, &tmp, &cpu)).expect("apply cpu");
 
         // assert
         let content = fs::read_to_string(max)
@@ -166,7 +174,8 @@ mod tests {
         let cpu = LinuxCpuBuilder::new().with_realtime_period(PERIOD).build();
 
         // act
-        Cpu::apply(&tmp, &cpu).expect("apply cpu");
+        let ring = rio::new().expect("start io_uring");
+        aw!(Cpu::apply(&ring, &tmp, &cpu)).expect("apply cpu");
 
         // assert
         let content = fs::read_to_string(max)

@@ -20,7 +20,7 @@ pub trait Controller {
     }
 
     /// Applies resource restrictions to the cgroup
-    async fn apply(linux_resources: &LinuxResources, ring: &rio::Rio, cgroup_root: &Path) -> Result<()>;
+    async fn apply(ring: &rio::Rio, linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()>;
 
     /// Checks if the controller needs to handle this request
     fn needs_to_handle(linux_resources: &LinuxResources) -> Option<&Self::Resource>;
