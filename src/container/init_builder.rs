@@ -7,10 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{
-    notify_socket::{NotifyListener, NOTIFY_FILE},
-    rootless, tty, utils,
-};
+use crate::{notify_socket::NOTIFY_FILE, rootless, tty, utils};
 
 use super::{
     builder::ContainerBuilder, builder_impl::ContainerBuilderImpl, Container, ContainerStatus,

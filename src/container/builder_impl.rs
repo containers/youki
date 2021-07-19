@@ -51,99 +51,9 @@ pub(super) struct ContainerBuilderImpl {
 
 impl ContainerBuilderImpl {
     pub(super) fn create(&mut self) -> Result<()> {
-        if let Process::Parent(_) = self.run_container()? {
-            if self.init {
-                std::process::exit(0);
-            }
-        }
-
         self.run_container_clone()?;
 
         Ok(())
-    }
-
-    fn run_container(&mut self) -> Result<Process> {
-        prctl::set_dumpable(false).unwrap();
-
-        let linux = self.spec.linux.as_ref().unwrap();
-        let namespaces: Namespaces = linux.namespaces.clone().into();
-
-        let cgroups_path = utils::get_cgroup_path(&linux.cgroups_path, &self.container_id);
-        let cmanager = cgroups::common::create_cgroup_manager(&cgroups_path, self.use_systemd)?;
-
-        // first fork, which creates process, which will later create actual container process
-        match fork::fork_first(
-            self.init,
-            &self.pid_file,
-            &self.rootless,
-            linux,
-            self.container.as_ref(),
-            cmanager,
-        )? {
-            // In the parent process, which called run_container
-            Process::Parent(parent) => Ok(Process::Parent(parent)),
-            // in child process
-            Process::Child(child) => {
-                // set limits and namespaces to the process
-                for rlimit in self.spec.process.rlimits.iter() {
-                    self.syscall
-                        .set_rlimit(rlimit)
-                        .context("failed to set rlimit")?;
-                }
-                self.syscall
-                    .set_id(Uid::from_raw(0), Gid::from_raw(0))
-                    .context("failed to become root")?;
-
-                let without = sched::CloneFlags::CLONE_NEWUSER;
-                namespaces
-                    .apply_unshare(without)
-                    .context("could not unshare namespaces")?;
-
-                // set up tty if specified
-                if let Some(csocketfd) = &self.console_socket {
-                    tty::setup_console(csocketfd)?;
-                }
-
-                // set namespaces
-                namespaces.apply_setns()?;
-
-                // fork second time, which will later create container
-                match fork::fork_init(child)? {
-                    Process::Child(_child) => unreachable!(),
-                    // This is actually the child process after fork
-                    Process::Init(mut init) => {
-                        // prepare process
-                        if self.init {
-                            setup_init_process(
-                                &self.spec,
-                                &self.syscall,
-                                self.rootfs.clone(),
-                                &namespaces,
-                            )?;
-                        }
-
-                        init.ready()?;
-                        self.notify_socket.wait_for_container_start()?;
-                        // actually run the command / program to be run in container
-                        let args: &Vec<String> = &self.spec.process.args;
-                        let envs: &Vec<String> = &self.spec.process.env;
-                        utils::do_exec(&args[0], args, envs)?;
-
-                        if let Some(container) = &self.container {
-                            // the command / program is done executing
-                            container
-                                .refresh_state()?
-                                .update_status(ContainerStatus::Stopped)
-                                .save()?;
-                        }
-
-                        Ok(Process::Init(init))
-                    }
-                    Process::Parent(_) => unreachable!(),
-                }
-            }
-            _ => unreachable!(),
-        }
     }
 
     fn run_container_clone(&mut self) -> Result<()> {
@@ -180,8 +90,8 @@ impl ContainerBuilderImpl {
 
         parent.wait_for_child_ready(init_pid)?;
 
-        if self.rootless.is_none() && linux.resources.is_some() {
-            cmanager.add_task(init_pid)?;
+        cmanager.add_task(init_pid)?;
+        if self.rootless.is_none() && linux.resources.is_some() && self.init {
             cmanager.apply(&linux.resources.as_ref().unwrap())?;
         }
 

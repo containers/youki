@@ -1,6 +1,5 @@
 use anyhow::{bail, Context, Result};
 use caps::Capability;
-use nix::unistd;
 use oci_spec::{LinuxCapabilities, LinuxNamespace, LinuxNamespaceType, Process, Spec};
 
 use std::{
@@ -14,7 +13,7 @@ use std::{
 };
 
 use crate::{
-    notify_socket::{NotifyListener, NotifySocket},
+    notify_socket::{NotifySocket},
     rootless::detect_rootless,
     stdio::FileDescriptor,
     tty, utils,
