@@ -13,10 +13,7 @@ use std::{
 };
 
 use crate::{
-    notify_socket::{NotifySocket},
-    rootless::detect_rootless,
-    stdio::FileDescriptor,
-    tty, utils,
+    notify_socket::NotifySocket, rootless::detect_rootless, stdio::FileDescriptor, tty, utils,
 };
 
 use super::{builder::ContainerBuilder, builder_impl::ContainerBuilderImpl, Container};
