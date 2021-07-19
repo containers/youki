@@ -54,8 +54,8 @@ impl ChildProcess {
     }
 
     /// Indicate that child process has forked the init process to parent process
-    pub fn notify_parent(&mut self, init_pid: Pid) -> Result<()> {
-        self.parent_channel.send_init_pid(init_pid)?;
+    pub fn notify_parent(&mut self) -> Result<()> {
+        self.parent_channel.send_child_ready()?;
         Ok(())
     }
 
