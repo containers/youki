@@ -58,23 +58,21 @@ From there it matches subcommand arg with possible subcommand and takes appropri
 
 One thing to note is that in the end, container is just another process in Linux. It has specific/different control group, namespace, using which program executing in it can be given impression that is is running on a complete system, but on the system which it is running, it is just another process, and has attributes such as pid, file descriptors, etc. associated with it like any other process.
 
-When given create command, Youki will load the specification, configuration, sockets etc.
-forks the process into parent an child (C1), forks the child process again (C2), applies the limits, namespaces etc to the child of child (C2)process ,and runs the command/program in the C2. After the command / program is finished the C2 returns. The C1 is waiting for the C2 to exit, after which it also exits.
+When given create command, Youki will load the specification, configuration, sockets etc., use clone syscall to create the container process (init process),applies the limits, namespaces, and etc. to the cloned container process. The container process will wait on a unix domain socket before exec into the command/program.
 
-### Process
-
-This handles creation of process and thus the container process. The hierarchy is :
-main youki process -> intermediate child process(C1) -> Init Process (C2)
-
-where -> indicate fork.
-
-The main youki process sets up the pipe and forks the child process and waits on it to send message and pid of init process using pipe. The child process sets up another pipe for init process, and forks the init process. The init process then notifies the child process that it is ready, which in turn notifies the main youki process that init process is forked and its pid.
+The main youki process will setup pipes used to communicate and syncronize with the init process. The init process will notify the youki process that it is ready and start to wait on a unix domain socket. The youki process will then write the container state and exit.
 
 - [mio Token definition](https://docs.rs/mio/0.7.11/mio/struct.Token.html)
 - [oom-score-adj](https://dev.to/rrampage/surviving-the-linux-oom-killer-2ki9)
 - [unshare man page](https://man7.org/linux/man-pages/man1/unshare.1.html)
 - [user-namespace man page](https://man7.org/linux/man-pages/man7/user_namespaces.7.html)
 - [wait man page](https://man7.org/linux/man-pages/man3/wait.3p.html)
+
+### Process
+
+This handles creation of the container process. The main youki process creates the container process (init process) using clone syscall. The main youki process will set up pipes used as message passing and synchronization mechanism with the init process. Youki uses clone instead of fork to create the container process. Using clone, Youki can directly pass the namespace creation flag to the syscall. Otherwise, if using fork, Youki would need to fork two processes, the first to enter into usernamespace, and a second time to enter into pid namespace correctly.
+
+- [clone(2) man page](https://man7.org/linux/man-pages/man2/clone.2.html)
 
 ### Container
 
