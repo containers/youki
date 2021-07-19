@@ -51,12 +51,12 @@ pub(super) struct ContainerBuilderImpl {
 
 impl ContainerBuilderImpl {
     pub(super) fn create(&mut self) -> Result<()> {
-        self.run_container_clone()?;
+        self.run_container()?;
 
         Ok(())
     }
 
-    fn run_container_clone(&mut self) -> Result<()> {
+    fn run_container(&mut self) -> Result<()> {
         prctl::set_dumpable(false).unwrap();
 
         let linux = self.spec.linux.as_ref().unwrap();
