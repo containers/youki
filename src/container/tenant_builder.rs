@@ -240,9 +240,7 @@ impl TenantContainerBuilder {
         if !self.capabilities.is_empty() {
             let mut caps: Vec<LinuxCapabilityType> = Vec::with_capacity(self.capabilities.len());
             for cap in &self.capabilities {
-                caps.push(LinuxCapabilityType {
-                    cap: Capability::from_str(cap)?,
-                });
+                caps.push(Capability::from_str(cap)?.into());
             }
 
             if let Some(ref mut spec_caps) = spec.process.capabilities {
