@@ -19,6 +19,18 @@ use crate::container::ContainerStatus;
 use crate::process::{child, init, parent, Process};
 use crate::rootless::Rootless;
 
+pub fn clone(cb: sched::CloneCb, clone_flags: sched::CloneFlags) -> Result<Pid> {
+    // unlike fork, clone requires the caller to allocate the stack. here, we use the default
+    // 1MB for stack size.
+    const STACK_SIZE: usize = 1024 * 1024;
+    let ref mut stack: [u8; STACK_SIZE] = [0; STACK_SIZE];
+    // pass in the SIGCHID flag to mimic the effect of forking a process
+    let signal = nix::sys::signal::Signal::SIGCHLD;
+    let pid = sched::clone(cb, stack, clone_flags, Some(signal as i32))?;
+
+    Ok(pid)
+}
+
 /// Function to perform the first fork for in order to run the container process
 pub fn fork_first<P: AsRef<Path>>(
     init: bool,
@@ -125,5 +137,51 @@ pub fn fork_init(mut child_process: ChildProcess) -> Result<Process> {
                 _ => bail!("abnormal exited!"),
             }
         }
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use anyhow::bail;
+    use nix::unistd;
+
+    #[test]
+    fn test_fork_clone() -> Result<()> {
+        let cb = || -> Result<()> {
+            // in a new pid namespace, pid of this process should be 1
+            let pid = unistd::getpid();
+            assert_eq!(unistd::Pid::from_raw(1), pid, "PID should set to 1");
+
+            Ok(())
+        };
+
+        // For now, we test clone with new pid and user namespace. user
+        // namespace is needed for the test to run without root
+        let flags = sched::CloneFlags::CLONE_NEWPID | sched::CloneFlags::CLONE_NEWUSER;
+        let pid = super::clone(
+            Box::new(|| {
+                if let Err(_) = cb() {
+                    return -1;
+                }
+
+                0
+            }),
+            flags,
+        )?;
+
+        let status = nix::sys::wait::waitpid(pid, None)?;
+        if let nix::sys::wait::WaitStatus::Exited(_, exit_code) = status {
+            assert_eq!(
+                0, exit_code,
+                "Process didn't exit correctly {:?}",
+                exit_code
+            );
+
+            return Ok(());
+        }
+
+        bail!("Process didn't exit correctly")
     }
 }
