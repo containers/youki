@@ -7,6 +7,7 @@
 //! UTS (hostname and domain information, processes will think they're running on servers with different names),
 //! Cgroup (Resource limits, execution priority etc.)
 
+use crate::command::{syscall::create_syscall, Syscall};
 use anyhow::Result;
 use nix::{
     fcntl,
@@ -14,9 +15,10 @@ use nix::{
     sys::stat,
     unistd::{self, Gid, Uid},
 };
-
-use crate::command::{syscall::create_syscall, Syscall};
 use oci_spec::LinuxNamespace;
+use std::collections;
+use std::iter::FromIterator;
+use std::vec;
 
 pub struct Namespaces {
     spaces: Vec<LinuxNamespace>,
@@ -75,6 +77,26 @@ impl Namespaces {
         self.command.unshare(self.clone_flags & !without)?;
         Ok(())
     }
+}
+pub fn translate_clone_flag(namespace_type: oci_spec::LinuxNamespaceType) -> sched::CloneFlags {
+    match namespace_type {
+        oci_spec::LinuxNamespaceType::Pid => sched::CloneFlags::CLONE_NEWPID,
+        oci_spec::LinuxNamespaceType::User => sched::CloneFlags::CLONE_NEWUSER,
+        oci_spec::LinuxNamespaceType::Uts => sched::CloneFlags::CLONE_NEWUTS,
+        oci_spec::LinuxNamespaceType::Cgroup => sched::CloneFlags::CLONE_NEWCGROUP,
+        oci_spec::LinuxNamespaceType::Ipc => sched::CloneFlags::CLONE_NEWIPC,
+        oci_spec::LinuxNamespaceType::Network => sched::CloneFlags::CLONE_NEWNET,
+        oci_spec::LinuxNamespaceType::Mount => sched::CloneFlags::CLONE_NEWNS,
+    }
+}
+
+pub fn get_namespace_map(
+    namespace_list: &vec::Vec<oci_spec::LinuxNamespace>,
+) -> collections::HashMap<oci_spec::LinuxNamespaceType, &oci_spec::LinuxNamespace> {
+    let to_tuple = namespace_list
+        .iter()
+        .map(|ns| -> (oci_spec::LinuxNamespaceType, &oci_spec::LinuxNamespace) { (ns.typ, ns) });
+    collections::HashMap::from_iter(to_tuple)
 }
 
 #[cfg(test)]
