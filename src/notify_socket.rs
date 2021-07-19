@@ -2,7 +2,7 @@ use std::env;
 use std::io::prelude::*;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::net::{UnixListener, UnixStream};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use nix::unistd::{self, close};
@@ -14,7 +14,7 @@ pub struct NotifyListener {
 }
 
 impl NotifyListener {
-    pub fn new(socket_name: &str) -> Result<Self> {
+    pub fn new(socket_name: &Path) -> Result<Self> {
         let stream = UnixListener::bind(socket_name)?;
         Ok(Self { socket: stream })
     }

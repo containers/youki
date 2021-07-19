@@ -43,8 +43,8 @@ pub(super) struct ContainerBuilderImpl {
     pub console_socket: Option<FileDescriptor>,
     /// Options for rootless containers
     pub rootless: Option<Rootless>,
-    /// Socket to communicate container start
-    pub notify_socket: NotifyListener,
+    /// Path to the Unix Domain Socket to communicate container start
+    pub notify_path: PathBuf,
     /// Container state
     pub container: Option<Container>,
 }
@@ -165,7 +165,7 @@ impl ContainerBuilderImpl {
                 self.syscall.clone(),
                 self.rootfs.clone(),
                 self.console_socket.clone(),
-                self.container_dir.clone(),
+                self.notify_path.clone(),
                 &mut child,
             ) {
                 log::debug!("failed to run container_init: {:?}", error);
@@ -209,14 +209,14 @@ fn container_init(
     command: LinuxSyscall,
     rootfs: PathBuf,
     console_socket: Option<FileDescriptor>,
-    container_dir: PathBuf,
+    notify_name: PathBuf,
     child: &mut child::ChildProcess,
 ) -> Result<()> {
     let linux = spec.linux.as_ref().unwrap();
     let namespaces: Namespaces = linux.namespaces.clone().into();
     // need to create the notify socket before we pivot root, since the unix
     // domain socket used here is outside of the rootfs of container
-    let mut notify_socket: NotifyListener = NotifyListener::new(&container_dir)?;
+    let mut notify_socket: NotifyListener = NotifyListener::new(&notify_name)?;
     let proc = &spec.process;
 
     // if Out-of-memory score adjustment is set in specification.  set the score
