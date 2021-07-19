@@ -4,8 +4,8 @@ use nix::unistd::Pid;
 
 pub fn clone(cb: sched::CloneCb, clone_flags: sched::CloneFlags) -> Result<Pid> {
     // unlike fork, clone requires the caller to allocate the stack. here, we use the default
-    // 1MB for stack size.
-    const STACK_SIZE: usize = 1024 * 1024;
+    // 4KB for stack size, consistant with the runc implementation.
+    const STACK_SIZE: usize = 4096;
     let ref mut stack: [u8; STACK_SIZE] = [0; STACK_SIZE];
     // pass in the SIGCHID flag to mimic the effect of forking a process
     let signal = nix::sys::signal::Signal::SIGCHLD;
