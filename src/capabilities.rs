@@ -9,7 +9,8 @@ use oci_spec::{LinuxCapabilities, LinuxCapabilityType};
 fn to_set(caps: &[LinuxCapabilityType]) -> CapsHashSet {
     let mut capabilities = CapsHashSet::new();
     for c in caps {
-        capabilities.insert(c.cap);
+        let caps = *c;
+        capabilities.insert(caps.into());
     }
     capabilities
 }

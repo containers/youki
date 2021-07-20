@@ -23,6 +23,7 @@ pub mod resume;
 pub mod rootfs;
 pub mod rootless;
 pub mod signal;
+pub mod spec_json;
 pub mod start;
 pub mod state;
 pub mod stdio;
