@@ -49,12 +49,12 @@ checksum = "14c189c53d098945499cdfa7ecc63567cf3886b3332b312a5b4585d8d3a6a610"
 
 [[package]]
 name = "caps"
-version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c088f2dddef283f86b023ab1ebe2301c653326834996458b2f48d29b804e9540"
+version = "0.5.3-alpha.0"
+source = "git+https://github.com/lucab/caps-rs?rev=cb54844#cb54844125d9dd6de51d6c8c8a951aefbd0d3904"
 dependencies = [
  "errno",
  "libc",
+ "serde",
  "thiserror",
 ]
 

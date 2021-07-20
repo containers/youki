@@ -1,4 +1,5 @@
 use super::*;
+use caps::Capability;
 
 // Specifies the container process. This property is used when youki start is called.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -154,171 +155,25 @@ pub struct User {
     pub username: String,
 }
 
-// Linux capabilities (see https://man7.org/linux/man-pages/man7/capabilities.7.html)
-#[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Copy)]
-#[allow(non_camel_case_types)]
-pub enum LinuxCapabilityType {
-    CAP_CHOWN,
-    CAP_DAC_OVERRIDE,
-    CAP_DAC_READ_SEARCH,
-    CAP_FOWNER,
-    CAP_FSETID,
-    CAP_KILL,
-    CAP_SETGID,
-    CAP_SETUID,
-    CAP_SETPCAP,
-    CAP_LINUX_IMMUTABLE,
-    CAP_NET_BIND_SERVICE,
-    CAP_NET_BROADCAST,
-    CAP_NET_ADMIN,
-    CAP_NET_RAW,
-    CAP_IPC_LOCK,
-    CAP_IPC_OWNER,
-    CAP_SYS_MODULE,
-    CAP_SYS_RAWIO,
-    CAP_SYS_CHROOT,
-    CAP_SYS_PTRACE,
-    CAP_SYS_PACCT,
-    CAP_SYS_ADMIN,
-    CAP_SYS_BOOT,
-    CAP_SYS_NICE,
-    CAP_SYS_RESOURCE,
-    CAP_SYS_TIME,
-    CAP_SYS_TTY_CONFIG,
-    CAP_MKNOD,
-    CAP_LEASE,
-    CAP_AUDIT_WRITE,
-    CAP_AUDIT_CONTROL,
-    CAP_SETFCAP,
-    CAP_MAC_OVERRIDE,
-    CAP_MAC_ADMIN,
-    CAP_SYSLOG,
-    CAP_WAKE_ALARM,
-    CAP_BLOCK_SUSPEND,
-    CAP_AUDIT_READ,
-    CAP_PERFMON,
-    CAP_BPF,
-    CAP_CHECKPOINT_RESTORE,
-}
-
-// impl Into and From for LinuxCapabilityType
-impl From<Capability> for LinuxCapabilityType {
-    fn from(cap: Capability) -> Self {
-        match cap {
-            Capability::CAP_CHOWN => LinuxCapabilityType::CAP_CHOWN,
-            Capability::CAP_DAC_OVERRIDE => LinuxCapabilityType::CAP_DAC_OVERRIDE,
-            Capability::CAP_DAC_READ_SEARCH => LinuxCapabilityType::CAP_DAC_READ_SEARCH,
-            Capability::CAP_FOWNER => LinuxCapabilityType::CAP_FOWNER,
-            Capability::CAP_FSETID => LinuxCapabilityType::CAP_FSETID,
-            Capability::CAP_KILL => LinuxCapabilityType::CAP_KILL,
-            Capability::CAP_SETGID => LinuxCapabilityType::CAP_SETGID,
-            Capability::CAP_SETUID => LinuxCapabilityType::CAP_SETUID,
-            Capability::CAP_SETPCAP => LinuxCapabilityType::CAP_SETPCAP,
-            Capability::CAP_LINUX_IMMUTABLE => LinuxCapabilityType::CAP_LINUX_IMMUTABLE,
-            Capability::CAP_NET_BIND_SERVICE => LinuxCapabilityType::CAP_NET_BIND_SERVICE,
-            Capability::CAP_NET_BROADCAST => LinuxCapabilityType::CAP_NET_BROADCAST,
-            Capability::CAP_NET_ADMIN => LinuxCapabilityType::CAP_NET_ADMIN,
-            Capability::CAP_NET_RAW => LinuxCapabilityType::CAP_NET_RAW,
-            Capability::CAP_IPC_LOCK => LinuxCapabilityType::CAP_IPC_LOCK,
-            Capability::CAP_IPC_OWNER => LinuxCapabilityType::CAP_IPC_OWNER,
-            Capability::CAP_SYS_MODULE => LinuxCapabilityType::CAP_SYS_MODULE,
-            Capability::CAP_SYS_RAWIO => LinuxCapabilityType::CAP_SYS_RAWIO,
-            Capability::CAP_SYS_CHROOT => LinuxCapabilityType::CAP_SYS_CHROOT,
-            Capability::CAP_SYS_PTRACE => LinuxCapabilityType::CAP_SYS_PTRACE,
-            Capability::CAP_SYS_PACCT => LinuxCapabilityType::CAP_SYS_PACCT,
-            Capability::CAP_SYS_ADMIN => LinuxCapabilityType::CAP_SYS_ADMIN,
-            Capability::CAP_SYS_BOOT => LinuxCapabilityType::CAP_SYS_BOOT,
-            Capability::CAP_SYS_NICE => LinuxCapabilityType::CAP_SYS_NICE,
-            Capability::CAP_SYS_RESOURCE => LinuxCapabilityType::CAP_SYS_RESOURCE,
-            Capability::CAP_SYS_TIME => LinuxCapabilityType::CAP_SYS_TIME,
-            Capability::CAP_SYS_TTY_CONFIG => LinuxCapabilityType::CAP_SYS_TTY_CONFIG,
-            Capability::CAP_SYSLOG => LinuxCapabilityType::CAP_SYSLOG,
-            Capability::CAP_MKNOD => LinuxCapabilityType::CAP_MKNOD,
-            Capability::CAP_LEASE => LinuxCapabilityType::CAP_LEASE,
-            Capability::CAP_AUDIT_WRITE => LinuxCapabilityType::CAP_AUDIT_WRITE,
-            Capability::CAP_AUDIT_CONTROL => LinuxCapabilityType::CAP_AUDIT_CONTROL,
-            Capability::CAP_AUDIT_READ => LinuxCapabilityType::CAP_AUDIT_READ,
-            Capability::CAP_SETFCAP => LinuxCapabilityType::CAP_SETFCAP,
-            Capability::CAP_MAC_OVERRIDE => LinuxCapabilityType::CAP_MAC_OVERRIDE,
-            Capability::CAP_MAC_ADMIN => LinuxCapabilityType::CAP_MAC_ADMIN,
-            Capability::CAP_WAKE_ALARM => LinuxCapabilityType::CAP_WAKE_ALARM,
-            Capability::CAP_BLOCK_SUSPEND => LinuxCapabilityType::CAP_BLOCK_SUSPEND,
-            Capability::CAP_PERFMON => LinuxCapabilityType::CAP_PERFMON,
-            Capability::CAP_BPF => LinuxCapabilityType::CAP_BPF,
-            Capability::CAP_CHECKPOINT_RESTORE => LinuxCapabilityType::CAP_CHECKPOINT_RESTORE,
-            Capability::__Nonexhaustive => unreachable!("unexpected Linux Capability Type"),
-        }
-    }
-}
-
-// impl Into and From for caps::Capability
-impl From<LinuxCapabilityType> for Capability {
-    fn from(linux_cap: LinuxCapabilityType) -> Self {
-        match linux_cap {
-            LinuxCapabilityType::CAP_CHOWN => Capability::CAP_CHOWN,
-            LinuxCapabilityType::CAP_DAC_OVERRIDE => Capability::CAP_DAC_OVERRIDE,
-            LinuxCapabilityType::CAP_DAC_READ_SEARCH => Capability::CAP_DAC_READ_SEARCH,
-            LinuxCapabilityType::CAP_FOWNER => Capability::CAP_FOWNER,
-            LinuxCapabilityType::CAP_FSETID => Capability::CAP_FSETID,
-            LinuxCapabilityType::CAP_KILL => Capability::CAP_KILL,
-            LinuxCapabilityType::CAP_SETGID => Capability::CAP_SETGID,
-            LinuxCapabilityType::CAP_SETUID => Capability::CAP_SETUID,
-            LinuxCapabilityType::CAP_SETPCAP => Capability::CAP_SETPCAP,
-            LinuxCapabilityType::CAP_LINUX_IMMUTABLE => Capability::CAP_LINUX_IMMUTABLE,
-            LinuxCapabilityType::CAP_NET_BIND_SERVICE => Capability::CAP_NET_BIND_SERVICE,
-            LinuxCapabilityType::CAP_NET_BROADCAST => Capability::CAP_NET_BROADCAST,
-            LinuxCapabilityType::CAP_NET_ADMIN => Capability::CAP_NET_ADMIN,
-            LinuxCapabilityType::CAP_NET_RAW => Capability::CAP_NET_RAW,
-            LinuxCapabilityType::CAP_IPC_LOCK => Capability::CAP_IPC_LOCK,
-            LinuxCapabilityType::CAP_IPC_OWNER => Capability::CAP_IPC_OWNER,
-            LinuxCapabilityType::CAP_SYS_MODULE => Capability::CAP_SYS_MODULE,
-            LinuxCapabilityType::CAP_SYS_RAWIO => Capability::CAP_SYS_RAWIO,
-            LinuxCapabilityType::CAP_SYS_CHROOT => Capability::CAP_SYS_CHROOT,
-            LinuxCapabilityType::CAP_SYS_PTRACE => Capability::CAP_SYS_PTRACE,
-            LinuxCapabilityType::CAP_SYS_PACCT => Capability::CAP_SYS_PACCT,
-            LinuxCapabilityType::CAP_SYS_ADMIN => Capability::CAP_SYS_ADMIN,
-            LinuxCapabilityType::CAP_SYS_BOOT => Capability::CAP_SYS_BOOT,
-            LinuxCapabilityType::CAP_SYS_NICE => Capability::CAP_SYS_NICE,
-            LinuxCapabilityType::CAP_SYS_RESOURCE => Capability::CAP_SYS_RESOURCE,
-            LinuxCapabilityType::CAP_SYS_TIME => Capability::CAP_SYS_TIME,
-            LinuxCapabilityType::CAP_SYS_TTY_CONFIG => Capability::CAP_SYS_TTY_CONFIG,
-            LinuxCapabilityType::CAP_SYSLOG => Capability::CAP_SYSLOG,
-            LinuxCapabilityType::CAP_MKNOD => Capability::CAP_MKNOD,
-            LinuxCapabilityType::CAP_LEASE => Capability::CAP_LEASE,
-            LinuxCapabilityType::CAP_AUDIT_WRITE => Capability::CAP_AUDIT_WRITE,
-            LinuxCapabilityType::CAP_AUDIT_CONTROL => Capability::CAP_AUDIT_CONTROL,
-            LinuxCapabilityType::CAP_AUDIT_READ => Capability::CAP_AUDIT_READ,
-            LinuxCapabilityType::CAP_SETFCAP => Capability::CAP_SETFCAP,
-            LinuxCapabilityType::CAP_MAC_OVERRIDE => Capability::CAP_MAC_OVERRIDE,
-            LinuxCapabilityType::CAP_MAC_ADMIN => Capability::CAP_MAC_ADMIN,
-            LinuxCapabilityType::CAP_WAKE_ALARM => Capability::CAP_WAKE_ALARM,
-            LinuxCapabilityType::CAP_BLOCK_SUSPEND => Capability::CAP_BLOCK_SUSPEND,
-            LinuxCapabilityType::CAP_PERFMON => Capability::CAP_PERFMON,
-            LinuxCapabilityType::CAP_BPF => Capability::CAP_BPF,
-            LinuxCapabilityType::CAP_CHECKPOINT_RESTORE => Capability::CAP_CHECKPOINT_RESTORE,
-        }
-    }
-}
-
 // see https://man7.org/linux/man-pages/man7/capabilities.7.html
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct LinuxCapabilities {
     // Limiting superset for capabilities that can be added to the inheritable set (for security)
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub bounding: Vec<LinuxCapabilityType>,
+    pub bounding: Vec<Capability>,
     // Capability set used by kernel to perform permission checks for container process
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub effective: Vec<LinuxCapabilityType>,
+    pub effective: Vec<Capability>,
     // set of capabilities preserved across an execve(2)
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub inheritable: Vec<LinuxCapabilityType>,
+    pub inheritable: Vec<Capability>,
     // Limiting superset for the effective capabilities that the container may assume
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub permitted: Vec<LinuxCapabilityType>,
+    pub permitted: Vec<Capability>,
     // set of capabilities preserved across non root execve(2),
     // capabilities must be both permitted and inheritable to be ambient
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub ambient: Vec<LinuxCapabilityType>,
+    pub ambient: Vec<Capability>,
 }
 
 // Default container's linux capabilities:
@@ -327,9 +182,9 @@ pub struct LinuxCapabilities {
 // CAP_NET_BIND_SERVICE allows container to bind to ports below 1024
 impl Default for LinuxCapabilities {
     fn default() -> Self {
-        let audit_write = LinuxCapabilityType::CAP_AUDIT_WRITE;
-        let cap_kill = LinuxCapabilityType::CAP_KILL;
-        let net_bind = LinuxCapabilityType::CAP_NET_BIND_SERVICE;
+        let audit_write = Capability::CAP_AUDIT_WRITE;
+        let cap_kill = Capability::CAP_KILL;
+        let net_bind = Capability::CAP_NET_BIND_SERVICE;
         let default_vec = vec![audit_write, cap_kill, net_bind];
         LinuxCapabilities {
             bounding: default_vec.clone(),

@@ -1,5 +1,4 @@
 use anyhow::{bail, Context, Result};
-use caps::Capability;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::TryFrom;

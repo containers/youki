@@ -2,20 +2,6 @@
 use super::*;
 
 #[test]
-fn test_caps_to_linux_caps() {
-    let spec: Spec = Default::default();
-    if let Some(linux) = spec.process.capabilities {
-        let linux_caps = linux.bounding[0];
-        let convert_caps: Capability = linux_caps.into();
-        assert_eq!(convert_caps, Capability::CAP_AUDIT_WRITE);
-        assert_eq!(
-            linux_caps,
-            LinuxCapabilityType::from(Capability::CAP_AUDIT_WRITE)
-        );
-    }
-}
-
-#[test]
 fn serialize_and_deserialize_spec() {
     let spec: Spec = Default::default();
     let json_string = serde_json::to_string(&spec).unwrap();
