@@ -46,6 +46,7 @@ impl InitContainerBuilder {
             .create_container_state(&container_dir)?
             .set_systemd(self.use_systemd);
 
+        unistd::chdir(&*container_dir)?;
         let notify_path = container_dir.join(NOTIFY_FILE);
         // convert path of root file system of the container to absolute path
         let rootfs = fs::canonicalize(&spec.root.path)?;

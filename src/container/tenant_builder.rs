@@ -1,6 +1,9 @@
 use anyhow::{bail, Context, Result};
 use caps::Capability;
-use oci_spec::{LinuxCapabilities, LinuxNamespace, LinuxNamespaceType, Process, Spec};
+use nix::unistd;
+use oci_spec::{
+    LinuxCapabilities, LinuxNamespace, LinuxNamespaceType, Process, Spec,
+};
 
 use std::{
     collections::HashMap,
@@ -91,6 +94,7 @@ impl TenantContainerBuilder {
         self.adapt_spec_for_tenant(&mut spec, &container)?;
         log::debug!("{:#?}", spec);
 
+        unistd::chdir(&*container_dir)?;
         let notify_path = Self::setup_notify_listener(&container_dir)?;
         // convert path of root file system of the container to absolute path
         let rootfs = fs::canonicalize(&spec.root.path)?;
