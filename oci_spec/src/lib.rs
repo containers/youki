@@ -3,7 +3,7 @@ use caps::Capability;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::fs::File;
+use std::fs;
 use std::path::{Path, PathBuf};
 
 mod linux;
@@ -65,15 +65,39 @@ impl Default for Spec {
 impl Spec {
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path = path.as_ref();
-        let file =
-            File::open(path).with_context(|| format!("load spec: failed to open {:?}", path))?;
+        let file = fs::File::open(path)
+            .with_context(|| format!("load spec: failed to open {:?}", path))?;
         let spec: Spec = serde_json::from_reader(&file)?;
         Ok(spec)
     }
 
-    pub fn canonicalize_rootfs(&mut self) -> Result<()> {
-        self.root.path = std::fs::canonicalize(&self.root.path)
-            .with_context(|| format!("failed to canonicalize {:?}", self.root.path))?;
+    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+        let path = path.as_ref();
+        let file = fs::File::create(path)
+            .with_context(|| format!("save spec: failed to create/open {:?}", path))?;
+        serde_json::to_writer(&file, self)
+            .with_context(|| format!("failed to save spec to {:?}", path))?;
+
+        Ok(())
+    }
+
+    pub fn canonicalize_rootfs<P: AsRef<Path>>(&mut self, bundle: P) -> Result<()> {
+        let canonical_root_path = if self.root.path.is_absolute() {
+            fs::canonicalize(&self.root.path)
+                .with_context(|| format!("failed to canonicalize {:?}", self.root.path))?
+        } else {
+            let canonical_bundle_path = fs::canonicalize(&bundle).context(format!(
+                "failed to canonicalize bundle: {:?}",
+                bundle.as_ref()
+            ))?;
+
+            fs::canonicalize(&canonical_bundle_path.join(&self.root.path)).context(format!(
+                "failed to canonicalize rootfs: {:?}",
+                &self.root.path
+            ))?
+        };
+        self.root.path = canonical_root_path;
+
         Ok(())
     }
 }
