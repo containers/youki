@@ -70,6 +70,7 @@ impl ContainerBuilderImpl {
 
         let cb = Box::new(|| {
             if let Err(error) = container_init(
+                self.init,
                 self.rootless.clone(),
                 self.spec.clone(),
                 self.syscall.clone(),
@@ -114,6 +115,7 @@ impl ContainerBuilderImpl {
 }
 
 fn container_init(
+    init: bool,
     rootless: Option<Rootless>,
     spec: Spec,
     command: LinuxSyscall,
@@ -176,16 +178,21 @@ fn container_init(
         let _ = prctl::set_no_new_privileges(true);
     }
 
-    rootfs::prepare_rootfs(
-        &spec,
-        &rootfs,
-        namespaces
-            .clone_flags
-            .contains(sched::CloneFlags::CLONE_NEWUSER),
-    )?;
+    if init {
+        rootfs::prepare_rootfs(
+            &spec,
+            &rootfs,
+            namespaces
+                .clone_flags
+                .contains(sched::CloneFlags::CLONE_NEWUSER),
+        )
+        .with_context(|| "Failed to prepare rootfs")?;
 
-    // change the root of filesystem of the process to the rootfs
-    command.pivot_rootfs(&rootfs)?;
+        // change the root of filesystem of the process to the rootfs
+        command
+            .pivot_rootfs(&rootfs)
+            .with_context(|| format!("Failed to pivot root to {:?}", &rootfs))?;
+    }
 
     command.set_id(Uid::from_raw(proc.user.uid), Gid::from_raw(proc.user.gid))?;
     capabilities::reset_effective(&command)?;

@@ -1,9 +1,7 @@
 use anyhow::{bail, Context, Result};
 use caps::Capability;
 use nix::unistd;
-use oci_spec::{
-    LinuxCapabilities, LinuxNamespace, LinuxNamespaceType, Process, Spec,
-};
+use oci_spec::{LinuxCapabilities, LinuxNamespace, LinuxNamespaceType, Process, Spec};
 
 use std::{
     collections::HashMap,
