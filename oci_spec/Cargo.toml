@@ -14,3 +14,4 @@ anyhow = "1.0"
 serde_json = "1.0"
 caps = "0.5.1"
 quickcheck = { version = "1", optional = true }
+tempfile = "3"
