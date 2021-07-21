@@ -109,20 +109,63 @@ mod tests {
 
     #[test]
     fn test_canonicalize_rootfs() -> Result<()> {
+        let rootfs_name = "rootfs";
+        let bundle = tempfile::tempdir().with_context(|| "Failed to create tmp test bundle dir")?;
+        let rootfs_absolute_path = bundle.path().join(rootfs_name);
+        assert!(
+            rootfs_absolute_path.is_absolute(),
+            "rootfs path is not absolute path"
+        );
+        fs::create_dir_all(&rootfs_absolute_path).with_context(|| "Failed to create the testing rootfs")?;
+        {
+            // Test the case with absolute path
+            let mut spec = Spec {
+                root: Root {
+                    path: rootfs_absolute_path.clone(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            spec.canonicalize_rootfs(bundle.path())
+                .with_context(|| "Failed to canonicalize rootfs")?;
+            assert_eq!(rootfs_absolute_path, spec.root.path);
+        }
+
+        {
+            // Test the case with relative path
+            let mut spec = Spec {
+                root: Root {
+                    path: PathBuf::from(rootfs_name),
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            spec.canonicalize_rootfs(bundle.path())
+                .with_context(|| "Failed to canonicalize rootfs")?;
+            assert_eq!(rootfs_absolute_path, spec.root.path);
+        }
+
         Ok(())
     }
 
     #[test]
     fn test_load_save() -> Result<()> {
-        let spec = Spec{..Default::default()};
+        let spec = Spec {
+            ..Default::default()
+        };
         let test_dir = tempfile::tempdir().with_context(|| "Failed to create tmp test dir")?;
         let spec_path = test_dir.into_path().join("config.json");
-        
+
         // Test first save the default config, and then load the saved config.
         // The before and after should be the same.
-        spec.save(&spec_path).with_context(|| "Failed to save spec")?;
-        let loaded_spec = Spec::load(&spec_path).with_context(|| "Failed to load the saved spec.")?;
-        assert_eq!(spec, loaded_spec, "The saved spec is not the same as the loaded spec");
+        spec.save(&spec_path)
+            .with_context(|| "Failed to save spec")?;
+        let loaded_spec =
+            Spec::load(&spec_path).with_context(|| "Failed to load the saved spec.")?;
+        assert_eq!(
+            spec, loaded_spec,
+            "The saved spec is not the same as the loaded spec"
+        );
 
         Ok(())
     }
