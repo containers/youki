@@ -9,13 +9,13 @@ use oci_spec::Spec;
 
 use crate::{
     capabilities, cgroups,
-    command::{linux::LinuxSyscall, Syscall},
     namespaces::Namespaces,
     notify_socket::NotifyListener,
     process::{child, fork, parent},
     rootfs,
     rootless::Rootless,
     stdio::FileDescriptor,
+    syscall::{linux::LinuxSyscall, Syscall},
     tty, utils,
 };
 

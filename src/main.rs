@@ -8,18 +8,18 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::Clap;
 
-use youki::create;
-use youki::delete;
-use youki::exec;
-use youki::info;
-use youki::kill;
-use youki::list;
-use youki::pause;
-use youki::resume;
+use youki::commands::create;
+use youki::commands::delete;
+use youki::commands::exec;
+use youki::commands::info;
+use youki::commands::kill;
+use youki::commands::list;
+use youki::commands::pause;
+use youki::commands::resume;
+use youki::commands::spec_json;
+use youki::commands::start;
+use youki::commands::state;
 use youki::rootless::should_use_rootless;
-use youki::spec_json;
-use youki::start;
-use youki::state;
 
 /// High-level commandline option definition
 /// This takes global options as well as individual commands as specified in [OCI runtime-spec](https://github.com/opencontainers/runtime-spec/blob/master/runtime.md)
