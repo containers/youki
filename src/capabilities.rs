@@ -3,14 +3,13 @@ use crate::command::Syscall;
 use caps::*;
 
 use anyhow::Result;
-use oci_spec::{LinuxCapabilities, LinuxCapabilityType};
+use oci_spec::LinuxCapabilities;
 
 /// Converts a list of capability types to capabilities has set
-fn to_set(caps: &[LinuxCapabilityType]) -> CapsHashSet {
+fn to_set(caps: &[Capability]) -> CapsHashSet {
     let mut capabilities = CapsHashSet::new();
     for c in caps {
-        let caps = *c;
-        capabilities.insert(caps.into());
+        capabilities.insert(*c);
     }
     capabilities
 }

@@ -1,9 +1,7 @@
 use anyhow::{bail, Context, Result};
 use caps::Capability;
 use nix::unistd;
-use oci_spec::{
-    LinuxCapabilities, LinuxCapabilityType, LinuxNamespace, LinuxNamespaceType, Process, Spec,
-};
+use oci_spec::{LinuxCapabilities, LinuxNamespace, LinuxNamespaceType, Process, Spec};
 
 use std::{
     collections::HashMap,
@@ -238,9 +236,9 @@ impl TenantContainerBuilder {
 
     fn set_capabilities(&self, spec: &mut Spec) -> Result<()> {
         if !self.capabilities.is_empty() {
-            let mut caps: Vec<LinuxCapabilityType> = Vec::with_capacity(self.capabilities.len());
+            let mut caps: Vec<Capability> = Vec::with_capacity(self.capabilities.len());
             for cap in &self.capabilities {
-                caps.push(Capability::from_str(cap)?.into());
+                caps.push(Capability::from_str(cap)?);
             }
 
             if let Some(ref mut spec_caps) = spec.process.capabilities {
