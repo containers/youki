@@ -116,7 +116,8 @@ mod tests {
             rootfs_absolute_path.is_absolute(),
             "rootfs path is not absolute path"
         );
-        fs::create_dir_all(&rootfs_absolute_path).with_context(|| "Failed to create the testing rootfs")?;
+        fs::create_dir_all(&rootfs_absolute_path)
+            .with_context(|| "Failed to create the testing rootfs")?;
         {
             // Test the case with absolute path
             let mut spec = Spec {
