@@ -2,7 +2,7 @@ use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::fs::File;
+use std::fs;
 use std::path::{Path, PathBuf};
 
 mod linux;
@@ -64,15 +64,109 @@ impl Default for Spec {
 impl Spec {
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path = path.as_ref();
-        let file =
-            File::open(path).with_context(|| format!("load spec: failed to open {:?}", path))?;
+        let file = fs::File::open(path)
+            .with_context(|| format!("load spec: failed to open {:?}", path))?;
         let spec: Spec = serde_json::from_reader(&file)?;
         Ok(spec)
     }
 
-    pub fn canonicalize_rootfs(&mut self) -> Result<()> {
-        self.root.path = std::fs::canonicalize(&self.root.path)
-            .with_context(|| format!("failed to canonicalize {:?}", self.root.path))?;
+    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+        let path = path.as_ref();
+        let file = fs::File::create(path)
+            .with_context(|| format!("save spec: failed to create/open {:?}", path))?;
+        serde_json::to_writer(&file, self)
+            .with_context(|| format!("failed to save spec to {:?}", path))?;
+
+        Ok(())
+    }
+
+    pub fn canonicalize_rootfs<P: AsRef<Path>>(&mut self, bundle: P) -> Result<()> {
+        let canonical_root_path = if self.root.path.is_absolute() {
+            fs::canonicalize(&self.root.path)
+                .with_context(|| format!("failed to canonicalize {:?}", self.root.path))?
+        } else {
+            let canonical_bundle_path = fs::canonicalize(&bundle).context(format!(
+                "failed to canonicalize bundle: {:?}",
+                bundle.as_ref()
+            ))?;
+
+            fs::canonicalize(&canonical_bundle_path.join(&self.root.path)).context(format!(
+                "failed to canonicalize rootfs: {:?}",
+                &self.root.path
+            ))?
+        };
+        self.root.path = canonical_root_path;
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile;
+
+    #[test]
+    fn test_canonicalize_rootfs() -> Result<()> {
+        let rootfs_name = "rootfs";
+        let bundle = tempfile::tempdir().with_context(|| "Failed to create tmp test bundle dir")?;
+        let rootfs_absolute_path = bundle.path().join(rootfs_name);
+        assert!(
+            rootfs_absolute_path.is_absolute(),
+            "rootfs path is not absolute path"
+        );
+        fs::create_dir_all(&rootfs_absolute_path)
+            .with_context(|| "Failed to create the testing rootfs")?;
+        {
+            // Test the case with absolute path
+            let mut spec = Spec {
+                root: Root {
+                    path: rootfs_absolute_path.clone(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            spec.canonicalize_rootfs(bundle.path())
+                .with_context(|| "Failed to canonicalize rootfs")?;
+            assert_eq!(rootfs_absolute_path, spec.root.path);
+        }
+
+        {
+            // Test the case with relative path
+            let mut spec = Spec {
+                root: Root {
+                    path: PathBuf::from(rootfs_name),
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            spec.canonicalize_rootfs(bundle.path())
+                .with_context(|| "Failed to canonicalize rootfs")?;
+            assert_eq!(rootfs_absolute_path, spec.root.path);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_load_save() -> Result<()> {
+        let spec = Spec {
+            ..Default::default()
+        };
+        let test_dir = tempfile::tempdir().with_context(|| "Failed to create tmp test dir")?;
+        let spec_path = test_dir.into_path().join("config.json");
+
+        // Test first save the default config, and then load the saved config.
+        // The before and after should be the same.
+        spec.save(&spec_path)
+            .with_context(|| "Failed to save spec")?;
+        let loaded_spec =
+            Spec::load(&spec_path).with_context(|| "Failed to load the saved spec.")?;
+        assert_eq!(
+            spec, loaded_spec,
+            "The saved spec is not the same as the loaded spec"
+        );
+
         Ok(())
     }
 }

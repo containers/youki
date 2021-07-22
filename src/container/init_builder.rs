@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 use nix::unistd;
 use oci_spec::Spec;
 use rootless::detect_rootless;
@@ -102,16 +102,11 @@ impl InitContainerBuilder {
     fn load_and_safeguard_spec(&self, container_dir: &Path) -> Result<Spec> {
         let source_spec_path = self.bundle.join("config.json");
         let target_spec_path = container_dir.join("config.json");
-        fs::copy(&source_spec_path, &target_spec_path).with_context(|| {
-            format!(
-                "failed to copy {:?} to {:?}",
-                source_spec_path, target_spec_path
-            )
-        })?;
 
-        let mut spec = oci_spec::Spec::load(&target_spec_path)?;
-        unistd::chdir(&self.bundle)?;
-        spec.canonicalize_rootfs()?;
+        let mut spec = oci_spec::Spec::load(&source_spec_path)?;
+        spec.canonicalize_rootfs(&self.bundle)?;
+        spec.save(target_spec_path)?;
+
         Ok(spec)
     }
 
