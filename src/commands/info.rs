@@ -114,7 +114,7 @@ pub fn print_cgroups() {
     if let Ok(v1_mounts) = cgroups::v1::util::list_subsystem_mount_points() {
         let mut v1_mounts: Vec<String> = v1_mounts
             .iter()
-            .map(|kv| format!("  {:<16}{}", kv.0, kv.1.display()))
+            .map(|kv| format!("  {:<16}{}", kv.0.to_string(), kv.1.display()))
             .collect();
 
         v1_mounts.sort();
