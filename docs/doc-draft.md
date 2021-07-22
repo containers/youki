@@ -87,9 +87,6 @@ This also provides implementation for Linux syscalls for the trait.
 - [capabilities man page](https://man7.org/linux/man-pages/man7/capabilities.7.html)
 - [unshare man page](https://man7.org/linux/man-pages/man2/unshare.2.html)
 
-[oci runtime specification]: https://github.com/opencontainers/runtime-spec/blob/master/runtime.md
-[runc man pages]: (https://github.com/opencontainers/runc/blob/master/man/runc.8.md)
-
 ## Capabilities
 
 This has functions related to set and reset specific capabilities, as well as to drop extra privileges
@@ -102,3 +99,12 @@ This has functions related to set and reset specific capabilities, as well as to
 This is primarily for printing info about system running youki, such as OS release, architecture, cpu info, cgroups info etc. , as this info can be helpful when reporting issues.
 
 - [about /etc/os-release](https://www.freedesktop.org/software/systemd/man/os-release.html)
+
+## Namespaces
+
+This has functions related to setting of namespaces to the calling process
+
+- [CLONE_NEWUSER flag](https://man7.org/linux/man-pages/man2/clone.2.html)
+
+[oci runtime specification]: https://github.com/opencontainers/runtime-spec/blob/master/runtime.md
+[runc man pages]: (https://github.com/opencontainers/runc/blob/master/man/runc.8.md)

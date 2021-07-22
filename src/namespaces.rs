@@ -17,6 +17,7 @@ use nix::{
 };
 use oci_spec::LinuxNamespace;
 
+/// Holds information about namespaces
 pub struct Namespaces {
     spaces: Vec<LinuxNamespace>,
     command: Box<dyn Syscall>,
@@ -43,11 +44,12 @@ impl From<Vec<LinuxNamespace>> for Namespaces {
 }
 
 impl Namespaces {
+    /// sets namespaces as defined in structure to calling process
     pub fn apply_setns(&self) -> Result<()> {
         let to_enter: Vec<(CloneFlags, i32)> = self
             .spaces
             .iter()
-            .filter(|ns| ns.path.is_some())
+            .filter(|ns| ns.path.is_some()) // filter those which are actually present on the system
             .map(|ns| {
                 let space = CloneFlags::from_bits_truncate(ns.typ as i32);
                 let fd = fcntl::open(
@@ -61,8 +63,12 @@ impl Namespaces {
             .collect();
 
         for &(space, fd) in &to_enter {
+            // set the namespace
             self.command.set_ns(fd, space)?;
             unistd::close(fd)?;
+            // if namespace is cloned with newuser flag, then it creates a new user namespace,
+            // and we need to set the user and group id to 0
+            // see https://man7.org/linux/man-pages/man2/clone.2.html for more info
             if space == sched::CloneFlags::CLONE_NEWUSER {
                 self.command.set_id(Uid::from_raw(0), Gid::from_raw(0))?;
             }
@@ -70,6 +76,8 @@ impl Namespaces {
         Ok(())
     }
 
+    /// disassociate given parts context of calling process from other process
+    // see https://man7.org/linux/man-pages/man2/unshare.2.html for more info
     pub fn apply_unshare(&self, without: CloneFlags) -> Result<()> {
         self.command.unshare(self.clone_flags & !without)?;
         Ok(())
