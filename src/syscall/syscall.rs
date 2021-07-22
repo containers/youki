@@ -12,7 +12,7 @@ use nix::{
 
 use oci_spec::LinuxRlimit;
 
-use crate::command::{linux::LinuxSyscall, test::TestHelperSyscall};
+use crate::syscall::{linux::LinuxSyscall, test::TestHelperSyscall};
 
 /// This specifies various kernel/other functionalities required for
 /// container management

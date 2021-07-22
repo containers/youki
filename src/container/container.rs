@@ -10,7 +10,7 @@ use chrono::Utc;
 use oci_spec::Spec;
 use procfs::process::Process;
 
-use crate::command::syscall::create_syscall;
+use crate::syscall::syscall::create_syscall;
 
 use crate::container::{ContainerStatus, State};
 

@@ -1,4 +1,4 @@
-use crate::command::linux::LinuxSyscall;
+use crate::syscall::linux::LinuxSyscall;
 use std::path::PathBuf;
 
 use super::{init_builder::InitContainerBuilder, tenant_builder::TenantContainerBuilder};

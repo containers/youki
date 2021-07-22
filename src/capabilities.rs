@@ -1,5 +1,5 @@
 //! Handles Management of Capabilities
-use crate::command::Syscall;
+use crate::syscall::Syscall;
 use caps::*;
 
 use anyhow::Result;
@@ -42,7 +42,7 @@ pub fn drop_privileges(cs: &LinuxCapabilities, syscall: &impl Syscall) -> Result
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::command::test::TestHelperSyscall;
+    use crate::syscall::test::TestHelperSyscall;
 
     #[test]
     fn test_reset_effective() {

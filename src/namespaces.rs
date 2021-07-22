@@ -7,7 +7,7 @@
 //! UTS (hostname and domain information, processes will think they're running on servers with different names),
 //! Cgroup (Resource limits, execution priority etc.)
 
-use crate::command::{syscall::create_syscall, Syscall};
+use crate::syscall::{syscall::create_syscall, Syscall};
 use anyhow::Result;
 use nix::{
     fcntl,
@@ -88,7 +88,7 @@ mod tests {
     use oci_spec::LinuxNamespaceType;
 
     use super::*;
-    use crate::command::test::TestHelperSyscall;
+    use crate::syscall::test::TestHelperSyscall;
 
     fn gen_sample_linux_namespaces() -> Vec<LinuxNamespace> {
         vec![
