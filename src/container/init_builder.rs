@@ -7,10 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{
-    notify_socket::{NotifyListener, NOTIFY_FILE},
-    rootless, tty, utils,
-};
+use crate::{notify_socket::NOTIFY_FILE, rootless, tty, utils};
 
 use super::{
     builder::ContainerBuilder, builder_impl::ContainerBuilderImpl, Container, ContainerStatus,
@@ -45,12 +42,12 @@ impl InitContainerBuilder {
         let container_dir = self.create_container_dir()?;
         let spec = self.load_and_safeguard_spec(&container_dir)?;
 
-        unistd::chdir(&*container_dir)?;
         let container_state = self
             .create_container_state(&container_dir)?
             .set_systemd(self.use_systemd);
 
-        let notify_socket: NotifyListener = NotifyListener::new(NOTIFY_FILE)?;
+        unistd::chdir(&*container_dir)?;
+        let notify_path = container_dir.join(NOTIFY_FILE);
         // convert path of root file system of the container to absolute path
         let rootfs = fs::canonicalize(&spec.root.path)?;
 
@@ -79,7 +76,7 @@ impl InitContainerBuilder {
             spec,
             rootfs,
             rootless,
-            notify_socket,
+            notify_path,
             container: Some(container_state),
         };
 

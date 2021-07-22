@@ -1,16 +1,10 @@
-use std::io::ErrorKind;
-use std::io::Read;
-
-use anyhow::{bail, Result};
+use anyhow::Result;
 use mio::unix::pipe;
 use mio::unix::pipe::Receiver;
 use mio::unix::pipe::Sender;
-use mio::{Events, Interest, Poll, Token};
-use nix::unistd::Pid;
+use mio::{Interest, Poll, Token};
 
 use super::parent::ParentChannel;
-use super::{MAX_EVENTS, WAIT_FOR_INIT};
-use crate::process::message::Message;
 
 // Token is used to identify which socket generated an event
 const CHILD: Token = Token(1);
@@ -54,8 +48,8 @@ impl ChildProcess {
     }
 
     /// Indicate that child process has forked the init process to parent process
-    pub fn notify_parent(&mut self, init_pid: Pid) -> Result<()> {
-        self.parent_channel.send_init_pid(init_pid)?;
+    pub fn notify_parent(&mut self) -> Result<()> {
+        self.parent_channel.send_child_ready()?;
         Ok(())
     }
 
@@ -67,52 +61,5 @@ impl ChildProcess {
     pub fn wait_for_mapping_ack(&mut self) -> Result<()> {
         self.parent_channel.wait_for_mapping_ack()?;
         Ok(())
-    }
-
-    /// Wait for the init process to be ready
-    pub fn wait_for_init_ready(&mut self) -> Result<()> {
-        // make sure pipe for init process is set up
-        let receiver = self
-            .receiver
-            .as_mut()
-            .expect("Complete the setup of uds in advance.");
-        let poll = self
-            .poll
-            .as_mut()
-            .expect("Complete the setup of uds in advance.");
-
-        // Create collection with capacity to store up to MAX_EVENTS events
-        let mut events = Events::with_capacity(MAX_EVENTS);
-        // poll the receiving end of pipe created for WAIT_FOR_INIT duration an event
-        poll.poll(&mut events, Some(WAIT_FOR_INIT))?;
-        for event in events.iter() {
-            // check if the event token in PARENT
-            // note that this does not assign anything to PARENT, but instead compares PARENT and event.token()
-            // check http://patshaughnessy.net/2018/1/18/learning-rust-if-let-vs--match for a bit more detailed explanation
-            if let CHILD = event.token() {
-                // read message from the init process
-                let mut buf = [0; 1];
-                match receiver.read_exact(&mut buf) {
-                    // This error simply means that there are no more incoming connections waiting to be accepted at this point.
-                    Err(ref e) if e.kind() == ErrorKind::WouldBlock => (),
-                    Err(e) => bail!(
-                        "Failed to receive a message from the child process. {:?}",
-                        e
-                    ),
-                    _ => (),
-                }
-                match Message::from(u8::from_be_bytes(buf)) {
-                    Message::InitReady => return Ok(()),
-                    msg => bail!("receive unexpected message {:?} in child process", msg),
-                }
-            } else {
-                unreachable!()
-            }
-        }
-        // should not reach here, as there should be a ready event from init within WAIT_FOR_INIT duration
-        unreachable!(
-            "No message received from init process within {} seconds",
-            WAIT_FOR_INIT.as_secs()
-        );
     }
 }

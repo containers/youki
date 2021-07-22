@@ -7,6 +7,7 @@
 //! UTS (hostname and domain information, processes will think they're running on servers with different names),
 //! Cgroup (Resource limits, execution priority etc.)
 
+use crate::command::{syscall::create_syscall, Syscall};
 use anyhow::Result;
 use nix::{
     fcntl,
@@ -14,8 +15,6 @@ use nix::{
     sys::stat,
     unistd::{self, Gid, Uid},
 };
-
-use crate::command::{syscall::create_syscall, Syscall};
 use oci_spec::LinuxNamespace;
 
 pub struct Namespaces {
@@ -76,7 +75,6 @@ impl Namespaces {
         Ok(())
     }
 }
-
 #[cfg(test)]
 mod tests {
     use oci_spec::LinuxNamespaceType;

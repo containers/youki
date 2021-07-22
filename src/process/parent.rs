@@ -48,9 +48,9 @@ impl ParentProcess {
 
     /// Waits for associated child process to send ready message
     /// and return the pid of init process which is forked by child process
-    pub fn wait_for_child_ready(&mut self, child_pid: Pid) -> Result<i32> {
-        let init_pid = self.child_channel.wait_for_child_ready(child_pid)?;
-        Ok(init_pid)
+    pub fn wait_for_child_ready(&mut self, child_pid: Pid) -> Result<()> {
+        self.child_channel.wait_for_child_ready(child_pid)?;
+        Ok(())
     }
 }
 
@@ -73,13 +73,10 @@ impl ParentChannel {
         })
     }
 
-    pub fn send_init_pid(&mut self, pid: Pid) -> Result<()> {
+    pub fn send_child_ready(&mut self) -> Result<()> {
         // write ChildReady message to the pipe to parent
-        log::debug!("[child to parent] sending init pid ({:?})", pid);
+        log::debug!("[child to parent] sending child ready");
         self.write_message(Message::ChildReady)?;
-        // write pid of init process which is forked by child process to the pipe,
-        // Pid in nix::unistd is type alias of SessionId which itself is alias of i32
-        self.sender.write_all(&(pid.as_raw()).to_be_bytes())?;
         Ok(())
     }
 
@@ -147,7 +144,7 @@ impl ChildChannel {
 
     /// Waits for associated child process to send ready message
     /// and return the pid of init process which is forked by child process
-    pub fn wait_for_child_ready(&mut self, child_pid: Pid) -> Result<i32> {
+    pub fn wait_for_child_ready(&mut self, child_pid: Pid) -> Result<()> {
         // Create collection with capacity to store up to MAX_EVENTS events
         let mut events = Events::with_capacity(MAX_EVENTS);
         loop {
@@ -175,18 +172,7 @@ impl ChildChannel {
                     match Message::from(u8::from_be_bytes(buf)) {
                         Message::ChildReady => {
                             log::debug!("received child ready message");
-                            // read pid of init process forked by child, 4 bytes as the type is i32
-                            let mut buf = [0; 4];
-                            match self.receiver.read_exact(&mut buf) {
-                                // This error simply means that there are no more incoming connections waiting to be accepted at this point.
-                                Err(ref e) if e.kind() == ErrorKind::WouldBlock => (),
-                                Err(e) => bail!(
-                                    "Failed to receive a message from the child process. {:?}",
-                                    e
-                                ),
-                                _ => (),
-                            }
-                            return Ok(i32::from_be_bytes(buf));
+                            return Ok(());
                         }
                         Message::WriteMapping => {
                             log::debug!("write mapping for pid {:?}", child_pid);

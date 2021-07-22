@@ -14,10 +14,7 @@ use std::{
 };
 
 use crate::{
-    notify_socket::{NotifyListener, NotifySocket},
-    rootless::detect_rootless,
-    stdio::FileDescriptor,
-    tty, utils,
+    notify_socket::NotifySocket, rootless::detect_rootless, stdio::FileDescriptor, tty, utils,
 };
 
 use super::{builder::ContainerBuilder, builder_impl::ContainerBuilderImpl, Container};
@@ -96,7 +93,7 @@ impl TenantContainerBuilder {
         log::debug!("{:#?}", spec);
 
         unistd::chdir(&*container_dir)?;
-        let (notify_listener, notify_path) = Self::setup_notify_listener(&container_dir)?;
+        let notify_path = Self::setup_notify_listener(&container_dir)?;
         // convert path of root file system of the container to absolute path
         let rootfs = fs::canonicalize(&spec.root.path)?;
 
@@ -118,7 +115,7 @@ impl TenantContainerBuilder {
             spec,
             rootfs,
             rootless,
-            notify_socket: notify_listener,
+            notify_path: notify_path.clone(),
             container: None,
         };
 
@@ -287,12 +284,11 @@ impl TenantContainerBuilder {
         false
     }
 
-    fn setup_notify_listener(container_dir: &Path) -> Result<(NotifyListener, PathBuf)> {
+    fn setup_notify_listener(container_dir: &Path) -> Result<PathBuf> {
         let notify_name = Self::generate_name(&container_dir, TENANT_NOTIFY);
         let socket_path = container_dir.join(&notify_name);
-        let notify_listener: NotifyListener = NotifyListener::new(&notify_name)?;
 
-        Ok((notify_listener, socket_path))
+        Ok(socket_path)
     }
 
     fn setup_tty_socket(&self, container_dir: &Path) -> Result<Option<FileDescriptor>> {

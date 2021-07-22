@@ -2,18 +2,16 @@
 #[derive(Debug)]
 pub enum Message {
     ChildReady = 0x00,
-    InitReady = 0x01,
-    WriteMapping = 0x02,
-    MappingWritten = 0x03,
+    WriteMapping = 0x01,
+    MappingWritten = 0x02,
 }
 
 impl From<u8> for Message {
     fn from(from: u8) -> Self {
         match from {
             0x00 => Message::ChildReady,
-            0x01 => Message::InitReady,
-            0x02 => Message::WriteMapping,
-            0x03 => Message::MappingWritten,
+            0x01 => Message::WriteMapping,
+            0x02 => Message::MappingWritten,
             _ => panic!("unknown message."),
         }
     }
