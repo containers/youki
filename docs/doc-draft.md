@@ -106,5 +106,13 @@ This has functions related to setting of namespaces to the calling process
 
 - [CLONE_NEWUSER flag](https://man7.org/linux/man-pages/man2/clone.2.html)
 
+## Pause and Resume
+
+This contains functionality regarding pausing and resuming container. Pausing a container indicates suspending all processes in it.
+This can be done with signals SIGSTOP and SIGCONT, but these can be intercepted. Using cgroups to suspend and resume processes without letting tasks know.
+
+- [cgroups man page](https://man7.org/linux/man-pages/man7/cgroups.7.html)
+- [freezer cgroup kernel documentation](https://www.kernel.org/doc/Documentation/cgroup-v1/freezer-subsystem.txt)
+
 [oci runtime specification]: https://github.com/opencontainers/runtime-spec/blob/master/runtime.md
 [runc man pages]: (https://github.com/opencontainers/runc/blob/master/man/runc.8.md)
