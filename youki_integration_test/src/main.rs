@@ -33,35 +33,35 @@ fn main() {
 
 // This tests the entire lifecycle of the container.
 fn life_cycle_test(project_path: &Path) {
-    let youki = Container::new(project_path);
+    let container_runtime = Container::new(project_path);
 
     let create_test = test_builder(
-        youki.create(),
+        container_runtime.create(),
         "Create a new container test",
         "This operation must create a new container.",
     );
     let state_test = test_builder(
-        youki.state(),
+        container_runtime.state(),
         "Execute state test",
         "This operation must state the container.",
     );
     let start_test = test_builder(
-        youki.start(),
+        container_runtime.start(),
         "Execute start test",
         "This operation must start the container.",
     );
     let state_again_test = test_builder(
-        youki.state(),
+        container_runtime.state(),
         "Execute state test",
         "This operation must state the container.",
     );
     let kill_test = test_builder(
-        youki.kill(),
+        container_runtime.kill(),
         "Execute kill test",
         "This operation must kill the container.",
     );
     let delete_test = test_builder(
-        youki.delete(),
+        container_runtime.delete(),
         "Execute delete test",
         "This operation must delete the container.",
     );
@@ -83,24 +83,24 @@ fn life_cycle_test(project_path: &Path) {
 // This is a test of the create command.
 // It follows the `opencontainers/runtime-tools` test case.
 fn container_create_test(project_path: &Path) {
-    let empty_id_youki = Container::with_container_id(project_path, "");
+    let container_runtime_with_empty_id = Container::with_container_id(project_path, "");
     let empty_id_test = test_builder(
-        !empty_id_youki.create(),
+        !container_runtime_with_empty_id.create(),
         "create with no ID test",
         "This operation MUST generate an error if it is not provided a path to the bundle and the container ID to associate with the container.",
     );
 
     let uuid = generate_uuid();
-    let with_id_youki = Container::with_container_id(project_path, &uuid.to_string());
+    let container_runtime_with_id = Container::with_container_id(project_path, &uuid.to_string());
     let with_id_test = test_builder(
-        with_id_youki.create(),
+        container_runtime_with_id.create(),
         "create with ID test",
         "This operation MUST create a new container.",
     );
 
-    let exist_id_youki = Container::with_container_id(project_path, &uuid.to_string());
+    let container_id_with_exist_id = Container::with_container_id(project_path, &uuid.to_string());
     let exist_id_test = test_builder(
-        !exist_id_youki.create(),
+        !container_id_with_exist_id.create(),
         "create with an already existing ID test",
         "If the ID provided is not unique across all containers within the scope of the runtime, or is not valid in any other way, the implementation MUST generate an error and a new container MUST NOT be created.",
     );
