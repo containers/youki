@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::support::generate_uuid;
 
@@ -10,13 +10,13 @@ pub struct Container {
 }
 
 impl Container {
-    pub fn new(project_path: &PathBuf) -> Self {
+    pub fn new(project_path: &Path) -> Self {
         Container {
             project_path: project_path.to_owned(),
             container_id: generate_uuid().to_string(),
         }
     }
-    pub fn with_container_id(project_path: &PathBuf, container_id: &str) -> Self {
+    pub fn with_container_id(project_path: &Path, container_id: &str) -> Self {
         Container {
             project_path: project_path.to_owned(),
             container_id: container_id.to_string(),

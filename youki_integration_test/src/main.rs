@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::Path;
 
 mod command;
 mod support;
@@ -32,7 +32,7 @@ fn main() {
 }
 
 // This tests the entire lifecycle of the container.
-fn life_cycle_test(project_path: &PathBuf) {
+fn life_cycle_test(project_path: &Path) {
     let youki = Container::new(project_path);
 
     let create_test = test_builder(
@@ -82,7 +82,7 @@ fn life_cycle_test(project_path: &PathBuf) {
 
 // This is a test of the create command.
 // It follows the `opencontainers/runtime-tools` test case.
-fn container_create_test(project_path: &PathBuf) {
+fn container_create_test(project_path: &Path) {
     let empty_id_youki = Container::with_container_id(project_path, "");
     let empty_id_test = test_builder(
         !empty_id_youki.create(),

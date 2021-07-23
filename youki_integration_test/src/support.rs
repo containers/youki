@@ -2,28 +2,27 @@ use flate2::read::GzDecoder;
 use rand::Rng;
 use std::fs::File;
 use std::io;
-use std::{env, fs, path::PathBuf};
+use std::path::PathBuf;
+use std::{env, fs, path::Path};
 use tar::Archive;
 use testanything::tap_suite_builder::TapSuiteBuilder;
 use testanything::{tap_test::TapTest, tap_test_builder::TapTestBuilder};
 use uuid::Uuid;
 
-pub fn initialize_test(project_path: &PathBuf) -> Result<(), std::io::Error> {
-    let result = prepare_test_workspace(project_path);
-    return result;
+pub fn initialize_test(project_path: &Path) -> Result<(), std::io::Error> {
+    prepare_test_workspace(project_path)
 }
 
-pub fn cleanup_test(project_path: &PathBuf) -> Result<(), std::io::Error> {
-    let result = delete_test_workspace(project_path);
-    return result;
+pub fn cleanup_test(project_path: &Path) -> Result<(), std::io::Error> {
+    delete_test_workspace(project_path)
 }
 
 pub fn create_project_path() -> PathBuf {
     let current_dir_path_result = env::current_dir();
-    return match current_dir_path_result {
+    match current_dir_path_result {
         Ok(path_buf) => path_buf,
         Err(_) => panic!("directory is not found"),
-    };
+    }
 }
 
 // This will generate the UUID needed when creating the container.
@@ -38,21 +37,21 @@ pub fn generate_uuid() -> Uuid {
         })
         .collect();
 
-    return match Uuid::parse_str(&rand_string) {
+    match Uuid::parse_str(&rand_string) {
         Ok(uuid) => uuid,
         Err(e) => panic!("{}", e),
-    };
+    }
 }
 
 pub fn test_builder(status: bool, name: &str, diagnostic: &str) -> TapTest {
     TapTestBuilder::new()
         .name(name)
         .passed(status)
-        .diagnostics(&vec![diagnostic])
+        .diagnostics(&[diagnostic])
         .finalize()
 }
 
-pub fn print_test_results(test_name: &str, tests: Vec<TapTest>) -> () {
+pub fn print_test_results(test_name: &str, tests: Vec<TapTest>) {
     let tap_suite = TapSuiteBuilder::new()
         .name(test_name)
         .tests(tests)
@@ -68,7 +67,7 @@ pub fn print_test_results(test_name: &str, tests: Vec<TapTest>) -> () {
 }
 
 // Temporary files to be used for testing are created in the `integration-workspace`.
-fn prepare_test_workspace(project_path: &PathBuf) -> Result<(), std::io::Error> {
+fn prepare_test_workspace(project_path: &Path) -> Result<(), std::io::Error> {
     let integration_test_workspace_path = project_path.join("integration-workspace");
     let create_dir_result = fs::create_dir_all(&integration_test_workspace_path);
     if fs::create_dir_all(&integration_test_workspace_path).is_err() {
@@ -89,7 +88,7 @@ fn prepare_test_workspace(project_path: &PathBuf) -> Result<(), std::io::Error> 
 }
 
 // This deletes all temporary files.
-fn delete_test_workspace(project_path: &PathBuf) -> Result<(), std::io::Error> {
+fn delete_test_workspace(project_path: &Path) -> Result<(), std::io::Error> {
     fs::remove_dir_all(project_path.join("integration-workspace"))?;
 
     Ok(())
