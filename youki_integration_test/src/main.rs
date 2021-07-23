@@ -1,5 +1,5 @@
-use std::path::Path;
 use anyhow::{bail, Result};
+use std::path::Path;
 
 mod command;
 mod support;
