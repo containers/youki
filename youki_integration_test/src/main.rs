@@ -1,4 +1,5 @@
 use std::path::Path;
+use anyhow::{bail, Result};
 
 mod command;
 mod support;
@@ -12,23 +13,24 @@ use crate::support::test_builder;
 
 use crate::command::youki::Container;
 
-fn main() {
+fn main() -> Result<()> {
     let project_path = create_project_path();
     if initialize_test(&project_path).is_err() {
-        panic!("Can not initilize test.");
+        bail!("Can not initilize test.")
     }
     life_cycle_test(&project_path);
     if cleanup_test(&project_path).is_err() {
-        panic!("Can not cleanup test.");
+        bail!("Can not cleanup test.")
     }
 
     if initialize_test(&project_path).is_err() {
-        panic!("Can not initilize test.");
+        bail!("Can not initilize test.")
     }
     container_create_test(&project_path);
     if cleanup_test(&project_path).is_err() {
-        panic!("Can not cleanup test.");
+        bail!("Can not cleanup test.")
     }
+    Ok(())
 }
 
 // This tests the entire lifecycle of the container.
