@@ -271,7 +271,7 @@ impl TenantContainerBuilder {
             }
         }
 
-        let mut linux = spec.linux.as_mut().unwrap();
+        let mut linux = &mut spec.linux;
         linux.namespaces = tenant_namespaces;
         Ok(())
     }

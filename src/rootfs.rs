@@ -21,15 +21,14 @@ use oci_spec::{LinuxDevice, LinuxDeviceType, Mount, Spec};
 
 pub fn prepare_rootfs(spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<()> {
     let mut flags = MsFlags::MS_REC;
-    match spec.linux {
-        Some(ref linux) => match linux.rootfs_propagation.as_ref() {
-            "shared" => flags |= MsFlags::MS_SHARED,
-            "private" => flags |= MsFlags::MS_PRIVATE,
-            "slave" | "" => flags |= MsFlags::MS_SLAVE,
-            _ => panic!(),
-        },
-        None => flags |= MsFlags::MS_SLAVE,
-    };
+
+    match spec.linux.rootfs_propagation.as_ref() {
+        "shared" => flags |= MsFlags::MS_SHARED,
+        "private" => flags |= MsFlags::MS_PRIVATE,
+        "slave" | "" => flags |= MsFlags::MS_SLAVE,
+        _ => panic!(),
+    }
+
     nix_mount(None::<&str>, "/", None::<&str>, flags, None::<&str>)?;
 
     log::debug!("mount root fs {:?}", rootfs);
@@ -43,7 +42,7 @@ pub fn prepare_rootfs(spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<
 
     for m in spec.mounts.iter() {
         let (flags, data) = parse_mount(&m);
-        let ml = &spec.linux.as_ref().unwrap().mount_label;
+        let ml = &spec.linux.mount_label;
         if m.typ == "cgroup" {
             // skip
             log::warn!("A feature of cgroup is unimplemented.");
@@ -58,7 +57,7 @@ pub fn prepare_rootfs(spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<
     chdir(rootfs)?;
 
     setup_default_symlinks(rootfs)?;
-    create_devices(&spec.linux.as_ref().unwrap().devices, bind_devices)?;
+    create_devices(&spec.linux.devices, bind_devices)?;
     setup_ptmx(rootfs)?;
 
     chdir(&olddir)?;

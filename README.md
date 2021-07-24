@@ -121,10 +121,30 @@ Starting the docker daemon.
 $ dockerd --experimental --add-runtime="youki=$(pwd)/target/x86_64-unknown-linux-gnu/debug/youki"
 ```
 
+In case you get an error like :
+
+```
+failed to start daemon: pid file found, ensure docker is not running or delete /var/run/docker.pid
+```
+
+That means your normal Docker daemon is running, and it needs to be stopped. For that, open a new shell in same directory and run :
+
+```
+$ systemctl stop docker # might need root permission
+```
+
+Now in the same shell run the first command, which should start the docker daemon.
+
 You can use youki in a different terminal to start the container.
 
 ```
 $ docker run -it --rm --runtime youki busybox
+```
+
+Afterwards, you can close the docker daemon process in other the other terminal. To restart normal docker daemon (if you had stopped it before), run :
+
+```
+$ systemctl start docker # might need root permission
 ```
 
 ### Integration test
@@ -137,6 +157,7 @@ $ ./integration_test.sh
 ```
 
 ### Setting up Vagrant
+
 You can try youki on platforms other than linux by using the Vagrantfile we have prepared.
 
 ```

@@ -59,7 +59,7 @@ impl ContainerBuilderImpl {
     fn run_container(&mut self) -> Result<()> {
         prctl::set_dumpable(false).unwrap();
 
-        let linux = self.spec.linux.as_ref().unwrap();
+        let linux = &self.spec.linux;
         let cgroups_path = utils::get_cgroup_path(&linux.cgroups_path, &self.container_id);
         let cmanager = cgroups::common::create_cgroup_manager(&cgroups_path, self.use_systemd)?;
         let namespaces: Namespaces = linux.namespaces.clone().into();
@@ -124,7 +124,7 @@ fn container_init(
     notify_name: PathBuf,
     child: &mut child::ChildProcess,
 ) -> Result<()> {
-    let linux = spec.linux.as_ref().unwrap();
+    let linux = &spec.linux;
     let namespaces: Namespaces = linux.namespaces.clone().into();
     // need to create the notify socket before we pivot root, since the unix
     // domain socket used here is outside of the rootfs of container

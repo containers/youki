@@ -37,7 +37,8 @@ pub struct Spec {
     #[serde(default)]
     pub annotations: HashMap<String, String>,
     // Platform specific config for Linux based containers
-    pub linux: Option<Linux>,
+    #[serde(default)]
+    pub linux: Linux,
 }
 
 // This gives a basic boilerplate for Spec that can be used calling Default::default().
@@ -56,7 +57,7 @@ impl Default for Spec {
             mounts: get_default_mounts(),
             // Defaults to empty metadata
             annotations: Default::default(),
-            linux: Some(Default::default()),
+            linux: Default::default(),
         }
     }
 }
