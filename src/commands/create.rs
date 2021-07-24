@@ -29,6 +29,20 @@ pub struct Create {
 // it is running, it is just another process, and has attributes such as pid, file descriptors, etc.
 // associated with it like any other process.
 impl Create {
+    /// instant Create Command
+    pub fn new(
+        container_id: String,
+        pid_file: Option<String>,
+        bundle: PathBuf,
+        console_socket: Option<PathBuf>,
+    ) -> Self {
+        Self {
+            container_id,
+            pid_file,
+            bundle,
+            console_socket,
+        }
+    }
     /// Starts a new container process
     pub fn exec(&self, root_path: PathBuf, systemd_cgroup: bool) -> Result<()> {
         let mut builder = ContainerBuilder::new(self.container_id.clone());
