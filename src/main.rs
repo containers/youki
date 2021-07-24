@@ -16,6 +16,7 @@ use youki::commands::kill;
 use youki::commands::list;
 use youki::commands::pause;
 use youki::commands::resume;
+use youki::commands::run;
 use youki::commands::spec_json;
 use youki::commands::start;
 use youki::commands::state;
@@ -50,6 +51,8 @@ enum SubCommand {
     Create(create::Create),
     #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
     Start(start::Start),
+    #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
+    Run(run::Run),
     #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
     Exec(exec::Exec),
     #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
@@ -91,6 +94,7 @@ fn main() -> Result<()> {
     match opts.subcmd {
         SubCommand::Create(create) => create.exec(root_path, systemd_cgroup),
         SubCommand::Start(start) => start.exec(root_path),
+        SubCommand::Run(run) => run.exec(root_path, systemd_cgroup),
         SubCommand::Exec(exec) => exec.exec(root_path),
         SubCommand::Kill(kill) => kill.exec(root_path),
         SubCommand::Delete(delete) => delete.exec(root_path, systemd_cgroup),
