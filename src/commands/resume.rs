@@ -43,12 +43,7 @@ impl Resume {
         }
 
         let spec = container.spec()?;
-        // get cgroup path defined in spec
-        let path_in_spec = match spec.linux {
-            Some(linux) => linux.cgroups_path,
-            None => None,
-        };
-        let cgroups_path = utils::get_cgroup_path(&path_in_spec, &self.container_id);
+        let cgroups_path = utils::get_cgroup_path(&spec.linux.cgroups_path, &self.container_id);
         // create cgroup manager structure from the config at the path
         let cmanager = cgroups::common::create_cgroup_manager(cgroups_path, systemd_cgroup)?;
         // resume the frozen container
