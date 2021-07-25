@@ -132,7 +132,10 @@ impl Cpu {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cgroups::test::{set_fixture, setup, LinuxCpuBuilder};
+    use crate::{
+        cgroups::test::{set_fixture, setup, LinuxCpuBuilder},
+        utils::create_temp_dir,
+    };
     use std::fs;
 
     #[test]
@@ -216,5 +219,25 @@ mod tests {
         let content = fs::read_to_string(max)
             .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_RT_PERIOD));
         assert_eq!(content, PERIOD.to_string());
+    }
+
+    #[test]
+    fn test_stat_cpu_throttling() {
+        let tmp = create_temp_dir("test_stat_cpu_throttling").expect("create test directory");
+        let stat_content = &[
+            "nr_periods 165000",
+            "nr_throttled 27",
+            "throttled_time 1080",
+        ]
+        .join("\n");
+        set_fixture(&tmp, CGROUP_CPU_STAT, &stat_content).expect("create stat file");
+
+        let actual = Cpu::stats(&tmp).expect("get cgroup stats");
+        let expected = CpuThrottling {
+            periods: 165000,
+            throttled_periods: 27,
+            throttled_time: 1080,
+        };
+        assert_eq!(actual, expected);
     }
 }

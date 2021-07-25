@@ -131,7 +131,35 @@ mod tests {
     use nix::unistd::Pid;
 
     use super::*;
-    use crate::cgroups::{common::CGROUP_PROCS, test::setup};
+    use crate::{
+        cgroups::{
+            common::CGROUP_PROCS,
+            test::{set_fixture, setup},
+        },
+        utils::{create_temp_dir, TempDir},
+    };
+
+    fn setup_total_cpu(test_name: &str, stat_content: &str, usage_content: &str) -> TempDir {
+        let tmp = create_temp_dir(test_name).expect("create temp directory for test");
+
+        let _ = set_fixture(&tmp, CGROUP_CPUACCT_STAT, stat_content)
+            .unwrap_or_else(|_| panic!("create {} file", CGROUP_CPUACCT_STAT));
+        let _ = set_fixture(&tmp, CGROUP_CPUACCT_USAGE, usage_content)
+            .unwrap_or_else(|_| panic!("create {} file", CGROUP_CPUACCT_USAGE));
+
+        tmp
+    }
+
+    fn setup_per_core(test_name: &str, percpu_content: &str, usage_all_content: &str) -> TempDir {
+        let tmp = create_temp_dir(test_name).expect("create temp directory for test");
+
+        let _ = set_fixture(&tmp, CGROUP_CPUACCT_PERCPU, percpu_content)
+            .unwrap_or_else(|_| panic!("create {} file", CGROUP_CPUACCT_PERCPU));
+        let _ = set_fixture(&tmp, CGROUP_CPUACCT_USAGE_ALL, usage_all_content)
+            .unwrap_or_else(|_| panic!("create {} file", CGROUP_CPUACCT_USAGE_ALL));
+
+        tmp
+    }
 
     #[test]
     fn test_add_task() {
@@ -143,5 +171,55 @@ mod tests {
         let content = fs::read_to_string(&procs)
             .unwrap_or_else(|_| panic!("read {} file content", CGROUP_PROCS));
         assert_eq!(content, "1000");
+    }
+
+    #[test]
+    fn test_stat_total_cpu_usage() {
+        let stat_content = &["user 1300888", "system 364592"].join("\n");
+        let usage_content = "18198092369681";
+        let tmp = setup_total_cpu("test_get_total_cpu", stat_content, usage_content);
+
+        let mut stats = CpuUsage::default();
+        CpuAcct::get_total_cpu_usage(tmp.path(), &mut stats).expect("get cgroup stats");
+
+        assert_eq!(stats.usage_user, 1300888);
+        assert_eq!(stats.usage_kernel, 364592);
+        assert_eq!(stats.usage_total, 18198092369681);
+    }
+
+    #[test]
+    fn test_stat_per_cpu_usage() {
+        let percpu_content = "989683000640 4409567860144 4439880333849 4273328034121";
+        let usage_all_content = &[
+            "cpu user system",
+            "0 5838999815217 295316023007",
+            "1 4139072325517 325194619244",
+            "2 4175712075766 323435639997",
+            "3 4021385867300 304269989810",
+        ]
+        .join("\n");
+        let tmp = setup_per_core(
+            "test_get_per_core_cpu_usage",
+            percpu_content,
+            usage_all_content,
+        );
+
+        let mut stats = CpuUsage::default();
+        CpuAcct::get_per_core_usage(tmp.path(), &mut stats).expect("get cgroup stats");
+
+        assert_eq!(
+            stats.per_core_usage_user,
+            &[5838999815217, 4139072325517, 4175712075766, 4021385867300]
+        );
+
+        assert_eq!(
+            stats.per_core_usage_kernel,
+            &[295316023007, 325194619244, 323435639997, 304269989810]
+        );
+
+        assert_eq!(
+            stats.per_core_usage_total,
+            &[989683000640, 4409567860144, 4439880333849, 4273328034121]
+        );
     }
 }

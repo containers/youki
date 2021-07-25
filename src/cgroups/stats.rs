@@ -36,7 +36,7 @@ impl Default for CpuStats {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 /// Reports the cpu usage for a cgroup
 pub struct CpuUsage {
     /// Cpu time consumed by tasks in total
@@ -66,7 +66,7 @@ impl Default for CpuUsage {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 /// Reports the cpu throttling for a cgroup
 pub struct CpuThrottling {
     /// Number of period intervals (as specified in cpu.cfs_period_us) that have elapsed
