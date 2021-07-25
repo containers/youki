@@ -1,9 +1,12 @@
 use std::path::Path;
 
-use anyhow::Result;
+use anyhow::{bail, Context, Result};
 use oci_spec::{LinuxCpu, LinuxResources};
 
-use crate::cgroups::common;
+use crate::cgroups::{
+    common,
+    stats::{CpuThrottling, StatsProvider},
+};
 
 use super::Controller;
 
@@ -12,6 +15,7 @@ const CGROUP_CPU_QUOTA: &str = "cpu.cfs_quota_us";
 const CGROUP_CPU_PERIOD: &str = "cpu.cfs_period_us";
 const CGROUP_CPU_RT_RUNTIME: &str = "cpu.rt_runtime_us";
 const CGROUP_CPU_RT_PERIOD: &str = "cpu.rt_period_us";
+const CGROUP_CPU_STAT: &str = "cpu.stat";
 
 pub struct Cpu {}
 
@@ -41,6 +45,51 @@ impl Controller for Cpu {
         }
 
         None
+    }
+}
+
+impl StatsProvider for Cpu {
+    type Stats = CpuThrottling;
+
+    fn stats(cgroup_path: &Path) -> Result<Self::Stats> {
+        let mut stats = CpuThrottling::default();
+        let stat_path = cgroup_path.join(CGROUP_CPU_STAT);
+        let stat_content = common::read_cgroup_file(&stat_path)?;
+
+        let parts: Vec<&str> = stat_content.split_ascii_whitespace().collect();
+        if parts.len() < 6 {
+            bail!(
+                "{} contains less than the expected number of entries",
+                stat_path.display()
+            );
+        }
+
+        if parts[0] != "nr_periods" {
+            bail!(
+                "{} does not contain the number of elapsed periods",
+                stat_path.display()
+            );
+        }
+
+        if parts[2] != "nr_throttled" {
+            bail!(
+                "{} does not contain the number of throttled periods",
+                stat_path.display()
+            );
+        }
+
+        if parts[4] != "throttled_time" {
+            bail!(
+                "{} does not contain the total time tasks have spent throttled",
+                stat_path.display()
+            );
+        }
+
+        stats.periods = parts[1].parse().context("failed to parse nr_periods")?;
+        stats.throttled_periods = parts[3].parse().context("failed to parse nr_throttled")?;
+        stats.throttled_time = parts[5].parse().context("failed to parse throttled time")?;
+
+        Ok(stats)
     }
 }
 
