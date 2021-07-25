@@ -17,6 +17,7 @@ use super::{
 };
 
 use crate::cgroups::common::CGROUP_PROCS;
+use crate::cgroups::stats::{Stats, StatsProvider};
 use crate::utils;
 use crate::{cgroups::common::CgroupManager, utils::PathBufExt};
 use oci_spec::{FreezerState, LinuxResources};
@@ -172,5 +173,9 @@ impl CgroupManager for Manager {
             &linux_resources,
             &self.subsystems.get(&CtrlType::Freezer).unwrap(),
         )
+    }
+
+    fn stats(&self) -> Result<Stats> {
+        todo!();
     }
 }

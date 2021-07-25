@@ -12,10 +12,10 @@ use super::{
     cpu::Cpu, cpuset::CpuSet, freezer::Freezer, hugetlb::HugeTlb, io::Io, memory::Memory,
     pids::Pids,
 };
-use crate::cgroups::common;
 use crate::cgroups::common::CgroupManager;
 use crate::cgroups::v2::controller::Controller;
 use crate::cgroups::v2::controller_type::ControllerType;
+use crate::cgroups::{common, stats::Stats};
 use crate::utils::PathBufExt;
 
 const CGROUP_PROCS: &str = "cgroup.procs";
@@ -254,6 +254,10 @@ impl CgroupManager for SystemDCGroupManager {
             ..Default::default()
         };
         Freezer::apply(&linux_resources, &self.full_path)
+    }
+
+    fn stats(&self) -> Result<Stats> {
+        todo!();
     }
 }
 
