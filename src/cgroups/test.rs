@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use std::{
     io::Write,
     path::{Path, PathBuf},
@@ -25,8 +25,10 @@ pub fn set_fixture(temp_dir: &Path, filename: &str, val: &str) -> Result<PathBuf
         .create(true)
         .write(true)
         .truncate(true)
-        .open(&full_path)?
-        .write_all(val.as_bytes())?;
+        .open(&full_path)
+        .with_context(|| format!("failed to open {:?}", full_path))?
+        .write_all(val.as_bytes())
+        .with_context(|| format!("failed to write to {:?}", full_path))?;
 
     Ok(full_path)
 }

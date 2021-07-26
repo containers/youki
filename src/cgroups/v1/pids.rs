@@ -10,9 +10,9 @@ use crate::cgroups::{
 use oci_spec::{LinuxPids, LinuxResources};
 
 // Contains the current number of active pids
-const PIDS_CURRENT: &str = "pids.current";
+const CGROUP_PIDS_CURRENT: &str = "pids.current";
 // Contains the maximum allowed number of active pids
-const PIDS_MAX: &str = "pids.max";
+const CGROUP_PIDS_MAX: &str = "pids.max";
 
 pub struct Pids {}
 
@@ -44,14 +44,14 @@ impl StatsProvider for Pids {
     fn stats(cgroup_path: &Path) -> Result<Self::Stats> {
         let mut stats = PidStats::default();
 
-        let current = common::read_cgroup_file(cgroup_path.join(PIDS_CURRENT))?;
+        let current = common::read_cgroup_file(cgroup_path.join(CGROUP_PIDS_CURRENT))?;
         stats.current = current
             .trim()
             .parse()
             .context("failed to parse current pids")?;
 
         let limit =
-            common::read_cgroup_file(cgroup_path.join(PIDS_MAX)).map(|l| l.trim().to_owned())?;
+            common::read_cgroup_file(cgroup_path.join(CGROUP_PIDS_MAX)).map(|l| l.trim().to_owned())?;
         if limit != "max" {
             stats.limit = limit.parse().context("failed to parse pids limit")?;
         }
@@ -82,30 +82,52 @@ mod tests {
 
     #[test]
     fn test_set_pids() {
-        let pids_file_name = "pids.max";
         let tmp = create_temp_dir("test_set_pids").expect("create temp directory for test");
-        set_fixture(&tmp, pids_file_name, "1000").expect("Set fixture for 1000 pids");
+        set_fixture(&tmp, CGROUP_PIDS_MAX, "1000").expect("Set fixture for 1000 pids");
 
         let pids = LinuxPids { limit: 1000 };
 
         Pids::apply(&tmp, &pids).expect("apply pids");
         let content =
-            std::fs::read_to_string(tmp.join(pids_file_name)).expect("Read pids contents");
+            std::fs::read_to_string(tmp.join(CGROUP_PIDS_MAX)).expect("Read pids contents");
         assert_eq!(pids.limit.to_string(), content);
     }
 
     #[test]
     fn test_set_pids_max() {
-        let pids_file_name = "pids.max";
         let tmp = create_temp_dir("test_set_pids_max").expect("create temp directory for test");
-        set_fixture(&tmp, pids_file_name, "0").expect("set fixture for 0 pids");
+        set_fixture(&tmp, CGROUP_PIDS_MAX, "0").expect("set fixture for 0 pids");
 
         let pids = LinuxPids { limit: 0 };
 
         Pids::apply(&tmp, &pids).expect("apply pids");
 
         let content =
-            std::fs::read_to_string(tmp.join(pids_file_name)).expect("Read pids contents");
+            std::fs::read_to_string(tmp.join(CGROUP_PIDS_MAX)).expect("Read pids contents");
         assert_eq!("max".to_string(), content);
+    }
+
+    #[test]
+    fn test_stat_pids() {
+        let tmp = create_temp_dir("test_stat_pids").expect("create temp dir for test");
+        set_fixture(&tmp, CGROUP_PIDS_CURRENT, "5\n").unwrap();
+        set_fixture(&tmp, CGROUP_PIDS_MAX, "30\n").unwrap();
+
+        let stats = Pids::stats(&tmp).expect("get cgroup stats");
+
+        assert_eq!(stats.current, 5);
+        assert_eq!(stats.limit, 30);
+    }
+
+    #[test]
+    fn test_stat_pids_max() {
+        let tmp = create_temp_dir("test_stat_pids_max").expect("create temp dir for test");
+        set_fixture(&tmp, CGROUP_PIDS_CURRENT, "5\n").unwrap();
+        set_fixture(&tmp, CGROUP_PIDS_MAX, "max\n").unwrap();
+
+        let stats = Pids::stats(&tmp).expect("get cgroup stats");
+        
+        assert_eq!(stats.current, 5);
+        assert_eq!(stats.limit, 0);
     }
 }
