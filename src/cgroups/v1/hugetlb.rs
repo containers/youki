@@ -187,4 +187,21 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn test_stat_hugetlb() {
+        let tmp = create_temp_dir("test_stat_hugetlb").expect("create temp directory for test");
+        set_fixture(&tmp, "hugetlb.2MB.usage_in_bytes", "1024\n").expect("set hugetlb usage");
+        set_fixture(&tmp, "hugetlb.2MB.max_usage_in_bytes", "4096\n").expect("set hugetlb max usage");
+        set_fixture(&tmp, "hugetlb.2MB.failcnt", "5").expect("set hugetlb fail count");
+
+        let actual = Hugetlb::stats_for_page_size(&tmp, "2MB").expect("get cgroup stats");
+
+        let expected = HugeTlbStats {
+            usage: 1024,
+            max_usage: 4096,
+            fail_count: 5,
+        };
+        assert_eq!(actual, expected);
+    }
 }
