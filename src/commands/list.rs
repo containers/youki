@@ -10,7 +10,7 @@ use chrono::{DateTime, Local};
 use clap::Clap;
 use tabwriter::TabWriter;
 
-use crate::container::Container;
+use crate::container::{state::State, Container};
 
 /// Empty struct for list command
 #[derive(Clap, Debug)]
@@ -25,7 +25,7 @@ impl List {
         // so we iterate through each and print the various info
         for container_dir in fs::read_dir(root_path)? {
             let container_dir = container_dir?.path();
-            let state_file = container_dir.join("state.json");
+            let state_file = State::file_path(&container_dir);
             if !state_file.exists() {
                 continue;
             }
