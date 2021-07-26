@@ -1,9 +1,18 @@
 use std::path::Path;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 
-use crate::cgroups::{common, v1::Controller};
+use crate::cgroups::{
+    common,
+    stats::{PidStats, StatsProvider},
+    v1::Controller,
+};
 use oci_spec::{LinuxPids, LinuxResources};
+
+// Contains the current number of active pids
+const PIDS_CURRENT: &str = "pids.current";
+// Contains the maximum allowed number of active pids
+const PIDS_MAX: &str = "pids.max";
 
 pub struct Pids {}
 
@@ -26,6 +35,28 @@ impl Controller for Pids {
         }
 
         None
+    }
+}
+
+impl StatsProvider for Pids {
+    type Stats = PidStats;
+
+    fn stats(cgroup_path: &Path) -> Result<Self::Stats> {
+        let mut stats = PidStats::default();
+
+        let current = common::read_cgroup_file(cgroup_path.join(PIDS_CURRENT))?;
+        stats.current = current
+            .trim()
+            .parse()
+            .context("failed to parse current pids")?;
+
+        let limit =
+            common::read_cgroup_file(cgroup_path.join(PIDS_MAX)).map(|l| l.trim().to_owned())?;
+        if limit != "max" {
+            stats.limit = limit.parse().context("failed to parse pids limit")?;
+        }
+
+        Ok(stats)
     }
 }
 

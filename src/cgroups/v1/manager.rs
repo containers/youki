@@ -176,6 +176,17 @@ impl CgroupManager for Manager {
     }
 
     fn stats(&self) -> Result<Stats> {
-        todo!();
+        let mut stats = Stats::default();
+
+        for subsystem in &self.subsystems {
+            match subsystem.0 {
+                CtrlType::Cpu => stats.cpu.throttling = Cpu::stats(subsystem.1)?,
+                CtrlType::CpuAcct => stats.cpu.usage = CpuAcct::stats(subsystem.1)?,
+                CtrlType::Pids => stats.pids = Pids::stats(subsystem.1)?,
+                _ => continue,
+            }
+        }
+
+        Ok(stats)
     }
 }

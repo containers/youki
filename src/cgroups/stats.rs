@@ -10,12 +10,14 @@ pub trait StatsProvider {
 #[derive(Debug)]
 pub struct Stats {
     pub cpu: CpuStats,
+    pub pids: PidStats,
 }
 
 impl Default for Stats {
     fn default() -> Self {
         Self {
             cpu: CpuStats::default(),
+            pids: PidStats::default(),
         }
     }
 }
@@ -89,7 +91,23 @@ impl Default for CpuThrottling {
 
 pub struct MemoryStats {}
 
-pub struct PidStats {}
+#[derive(Debug, PartialEq, Eq)]
+/// Reports pid stats for a cgroup
+pub struct PidStats {
+    /// Current number of active pids
+    pub current: u64,
+    /// Allowed number of active pids (0 means no limit)
+    pub limit: u64,
+}
+
+impl Default for PidStats {
+    fn default() -> Self {
+        Self {
+            current: 0,
+            limit: 0,
+        }
+    }
+}
 
 pub struct BlkioStats {}
 
