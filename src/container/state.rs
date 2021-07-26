@@ -2,13 +2,12 @@
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::fs;
+use std::path::PathBuf;
 use std::{fs::File, path::Path};
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-
-const STATE_FILE_PATH: &str = "state.json";
 
 /// Indicates status of the container
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]
@@ -94,6 +93,8 @@ pub struct State {
 }
 
 impl State {
+    const STATE_FILE_PATH: &'static str = "state.json";
+
     pub fn new(
         container_id: &str,
         status: ContainerStatus,
@@ -114,7 +115,7 @@ impl State {
     }
 
     pub fn save(&self, container_root: &Path) -> Result<()> {
-        let state_file_path = container_root.join(STATE_FILE_PATH);
+        let state_file_path = Self::file_path(container_root);
         let file = fs::OpenOptions::new()
             .read(true)
             .write(true)
@@ -128,11 +129,25 @@ impl State {
     }
 
     pub fn load(container_root: &Path) -> Result<Self> {
-        let state_file_path = container_root.join(STATE_FILE_PATH);
+        let state_file_path = Self::file_path(container_root);
         let file = File::open(&state_file_path).with_context(|| {
             format!("failed to open container state file {:?}", state_file_path)
         })?;
         let state: Self = serde_json::from_reader(&file)?;
         Ok(state)
+    }
+
+    /// Returns the path to the state JSON file for the provided `container_root`.
+    ///
+    /// ```
+    /// # use std::path::Path;
+    /// # use youki::container::State;
+    ///
+    /// let container_root = Path::new("/var/run/containers/container");
+    /// let state_file = State::file_path(&container_root);
+    /// assert_eq!(state_file.to_str(), Some("/var/run/containers/container/state.json"));
+    /// ```
+    pub fn file_path(container_root: &Path) -> PathBuf {
+        container_root.join(Self::STATE_FILE_PATH)
     }
 }
