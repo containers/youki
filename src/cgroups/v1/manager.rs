@@ -183,6 +183,7 @@ impl CgroupManager for Manager {
                 CtrlType::Cpu => stats.cpu.throttling = Cpu::stats(subsystem.1)?,
                 CtrlType::CpuAcct => stats.cpu.usage = CpuAcct::stats(subsystem.1)?,
                 CtrlType::Pids => stats.pids = Pids::stats(subsystem.1)?,
+                CtrlType::HugeTlb => stats.hugetlb = Hugetlb::stats(subsystem.1)?,
                 _ => continue,
             }
         }

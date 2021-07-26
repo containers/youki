@@ -50,8 +50,8 @@ impl StatsProvider for Pids {
             .parse()
             .context("failed to parse current pids")?;
 
-        let limit =
-            common::read_cgroup_file(cgroup_path.join(CGROUP_PIDS_MAX)).map(|l| l.trim().to_owned())?;
+        let limit = common::read_cgroup_file(cgroup_path.join(CGROUP_PIDS_MAX))
+            .map(|l| l.trim().to_owned())?;
         if limit != "max" {
             stats.limit = limit.parse().context("failed to parse pids limit")?;
         }
@@ -126,7 +126,7 @@ mod tests {
         set_fixture(&tmp, CGROUP_PIDS_MAX, "max\n").unwrap();
 
         let stats = Pids::stats(&tmp).expect("get cgroup stats");
-        
+
         assert_eq!(stats.current, 5);
         assert_eq!(stats.limit, 0);
     }

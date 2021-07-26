@@ -1,5 +1,5 @@
 use anyhow::Result;
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
 
 pub trait StatsProvider {
     type Stats;
@@ -8,9 +8,14 @@ pub trait StatsProvider {
 }
 
 #[derive(Debug)]
+/// Reports the statistics for a cgroup
 pub struct Stats {
+    /// Cpu statistics for the cgroup
     pub cpu: CpuStats,
+    /// Pid statistics for the cgroup
     pub pids: PidStats,
+    /// Hugetlb statistics for the cgroup
+    pub hugetlb: HashMap<String, HugeTlbStats>,
 }
 
 impl Default for Stats {
@@ -18,6 +23,7 @@ impl Default for Stats {
         Self {
             cpu: CpuStats::default(),
             pids: PidStats::default(),
+            hugetlb: HashMap::new(),
         }
     }
 }
@@ -25,7 +31,9 @@ impl Default for Stats {
 #[derive(Debug)]
 /// Reports the cpu statistics for a cgroup
 pub struct CpuStats {
+    /// Cpu usage statistics for the cgroup
     pub usage: CpuUsage,
+    /// Cpu Throttling statistics for the cgroup
     pub throttling: CpuThrottling,
 }
 
@@ -111,4 +119,23 @@ impl Default for PidStats {
 
 pub struct BlkioStats {}
 
-pub struct HugeTlbStats {}
+/// Reports hugetlb stats for a cgroup
+#[derive(Debug, PartialEq, Eq)]
+pub struct HugeTlbStats {
+    /// Current usage in bytes
+    pub usage: u64,
+    /// Maximum recorded usage in bytes
+    pub max_usage: u64,
+    /// Number of allocation failures due to HugeTlb usage limit
+    pub fail_count: u64,
+}
+
+impl Default for HugeTlbStats {
+    fn default() -> Self {
+        Self {
+            usage: 0,
+            max_usage: 0,
+            fail_count: 0,
+        }
+    }
+}
