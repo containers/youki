@@ -9,7 +9,7 @@ proptests = ["quickcheck"]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
-nix = "0.19.1"
+nix = "0.22.0"
 anyhow = "1.0"
 serde_json = "1.0"
 # Waiting for new caps release, replace git with version on release
