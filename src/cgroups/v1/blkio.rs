@@ -1,4 +1,4 @@
-use std::{path::Path};
+use std::path::Path;
 
 use crate::cgroups::{
     common,
@@ -223,7 +223,11 @@ mod tests {
     use std::fs;
 
     use super::*;
-    use crate::cgroups::test::setup;
+    use crate::{
+        cgroups::test::{set_fixture, setup},
+        utils::create_temp_dir,
+    };
+    use anyhow::Result;
     use oci_spec::{LinuxBlockIo, LinuxThrottleDevice};
 
     struct BlockIoBuilder {
@@ -344,5 +348,41 @@ mod tests {
             .unwrap_or_else(|_| panic!("read {} content", BLKIO_THROTTLE_WRITE_IOPS));
 
         assert_eq!("8:0 102400", content);
+    }
+
+    #[test]
+    fn test_stat_throttling_policy() -> Result<()> {
+        let tmp = create_temp_dir("test_stat_throttling_policy").expect("create test directory");
+        let content = &[
+            "8:0 Read 20",
+            "8:0 Write 20",
+            "8:0 Sync 20",
+            "8:0 Async 20",
+            "8:0 Discard 20",
+            "8:0 Total 20",
+            "Total 0",
+        ]
+        .join("\n");
+        set_fixture(&tmp, BLKIO_THROTTLE_IO_SERVICE_BYTES, &content).unwrap();
+        set_fixture(&tmp, BLKIO_THROTTLE_IO_SERVICED, &content).unwrap();
+
+        let actual = Blkio::stats(&tmp).expect("get cgroup stats");
+        let mut expected = BlkioStats::default();
+        let devices: Vec<BlkioDeviceStat> = ["Read", "Write", "Sync", "Async", "Discard", "Total"]
+            .iter()
+            .copied()
+            .map(|op| BlkioDeviceStat {
+                major: 8,
+                minor: 0,
+                op_type: Some(op.to_owned()),
+                value: 20,
+            })
+            .collect();
+
+        expected.service_bytes = devices.clone();
+        expected.serviced = devices;
+
+        assert_eq!(expected, actual);
+        Ok(())
     }
 }
