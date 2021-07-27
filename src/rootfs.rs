@@ -261,10 +261,8 @@ fn mount_to_container(
         PathBuf::from(&m.source)
     };
 
-    if let Err(::nix::Error::Sys(errno)) =
-        nix_mount(Some(&*src), dest, Some(&*m.typ), flags, Some(&*d))
-    {
-        if errno != Errno::EINVAL {
+    if let Err(errno) = nix_mount(Some(&*src), dest, Some(&*m.typ), flags, Some(&*d)) {
+        if !matches!(errno, Errno::EINVAL) {
             bail!("mount of {} failed", m.destination.display());
         }
         nix_mount(Some(&*src), dest, Some(&*m.typ), flags, Some(data))?;

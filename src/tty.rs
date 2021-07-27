@@ -34,8 +34,8 @@ pub fn setup_console_socket(
         csocketfd,
         &socket::SockAddr::Unix(socket::UnixAddr::new(&*socket_name)?),
     ) {
-        Err(e) => {
-            if e != ::nix::Error::Sys(Errno::ENOENT) {
+        Err(errno) => {
+            if !matches!(errno, Errno::ENOENT) {
                 bail!("failed to open {}", socket_name);
             }
             -1

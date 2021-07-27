@@ -6,7 +6,7 @@ pub fn clone(cb: sched::CloneCb, clone_flags: sched::CloneFlags) -> Result<Pid> 
     // unlike fork, clone requires the caller to allocate the stack. here, we use the default
     // 4KB for stack size, consistant with the runc implementation.
     const STACK_SIZE: usize = 4096;
-    let ref mut stack: [u8; STACK_SIZE] = [0; STACK_SIZE];
+    let stack: &mut [u8; STACK_SIZE] = &mut [0; STACK_SIZE];
     // pass in the SIGCHID flag to mimic the effect of forking a process
     let signal = nix::sys::signal::Signal::SIGCHLD;
     let pid = sched::clone(cb, stack, clone_flags, Some(signal as i32))?;
@@ -35,7 +35,7 @@ mod tests {
         let flags = sched::CloneFlags::CLONE_NEWPID | sched::CloneFlags::CLONE_NEWUSER;
         let pid = super::clone(
             Box::new(|| {
-                if let Err(_) = cb() {
+                if cb().is_err() {
                     return -1;
                 }
 
