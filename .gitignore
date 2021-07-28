@@ -1,6 +1,7 @@
 youki
 
 /tutorial
+.idea/
 
 **/target
 .vagrant/
