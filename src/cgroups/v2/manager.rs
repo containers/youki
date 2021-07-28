@@ -142,7 +142,7 @@ impl CgroupManager for Manager {
 
     fn remove(&self) -> Result<()> {
         log::debug!("remove cgroup {:?}", self.full_path);
-        fs::remove_dir_all(&self.full_path)?;
+        fs::remove_dir(&self.full_path)?;
 
         Ok(())
     }
