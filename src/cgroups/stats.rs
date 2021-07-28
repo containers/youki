@@ -18,6 +18,8 @@ pub struct Stats {
     pub hugetlb: HashMap<String, HugeTlbStats>,
     /// Blkio statistics for the cgroup
     pub blkio: BlkioStats,
+    /// Memory statistics for the cgroup
+    pub memory: MemoryStats,
 }
 
 impl Default for Stats {
@@ -27,6 +29,7 @@ impl Default for Stats {
             pids: PidStats::default(),
             hugetlb: HashMap::new(),
             blkio: BlkioStats::default(),
+            memory: MemoryStats::default(),
         }
     }
 }
@@ -100,7 +103,62 @@ impl Default for CpuThrottling {
     }
 }
 
-pub struct MemoryStats {}
+/// Reports memory stats for a cgroup
+#[derive(Debug)]
+pub struct MemoryStats {
+    /// Usage of memory
+    pub memory: MemoryData,
+    /// Usage of memory and swap
+    pub memswap: MemoryData,
+    /// Usage of kernel memory
+    pub kernel: MemoryData,
+    /// Usage of kernel tcp memory
+    pub kernel_tcp: MemoryData,
+    /// Page cache in bytes
+    pub cache: u64,
+    /// Returns true if hierarchical accounting is enabled
+    pub hierarchy: bool,
+    /// Various memory statistics
+    pub stats: HashMap<String, u64>,
+}
+
+impl Default for MemoryStats {
+    fn default() -> Self {
+        Self {
+            memory: MemoryData::default(),
+            memswap: MemoryData::default(),
+            kernel: MemoryData::default(),
+            kernel_tcp: MemoryData::default(),
+            cache: 0,
+            hierarchy: false,
+            stats: HashMap::default(),
+        }
+    }
+}
+
+/// Reports memory stats for one type of memory
+#[derive(Debug, PartialEq, Eq)]
+pub struct MemoryData {
+    /// Usage in bytes
+    pub usage: u64,
+    /// Maximum recorded usage in bytes
+    pub max_usage: u64,
+    /// Number of times memory usage hit limits
+    pub fail_count: u64,
+    /// Memory usage limit
+    pub limit: u64,
+}
+
+impl Default for MemoryData {
+    fn default() -> Self {
+        Self {
+            usage: 0,
+            max_usage: 0,
+            fail_count: 0,
+            limit: 0,
+        }
+    }
+}
 
 /// Reports pid stats for a cgroup
 #[derive(Debug, PartialEq, Eq)]
@@ -156,7 +214,7 @@ impl Default for BlkioStats {
     }
 }
 
-/// Reports single value for a specific device
+/// Reports single stat value for a specific device
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct BlkioDeviceStat {
     /// Major device number

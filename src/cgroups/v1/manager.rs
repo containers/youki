@@ -185,6 +185,7 @@ impl CgroupManager for Manager {
                 CtrlType::Pids => stats.pids = Pids::stats(subsystem.1)?,
                 CtrlType::HugeTlb => stats.hugetlb = Hugetlb::stats(subsystem.1)?,
                 CtrlType::Blkio => stats.blkio = Blkio::stats(subsystem.1)?,
+                CtrlType::Memory => stats.memory = Memory::stats(subsystem.1)?,
                 _ => continue,
             }
         }
