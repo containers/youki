@@ -581,4 +581,95 @@ mod tests {
             reservation_check && kernel_check && kernel_tcp_check && swappiness_check && limit_swap_check
         }
     }
+
+    #[test]
+    fn test_stat_memory_data() {
+        let tmp = create_temp_dir("test_stat_memory_data").expect("create test directory");
+        set_fixture(
+            &tmp,
+            &format!("{}{}", MEMORY_PREFIX, MEMORY_USAGE_IN_BYTES),
+            "1024\n",
+        )
+        .unwrap();
+        set_fixture(
+            &tmp,
+            &format!("{}{}", MEMORY_PREFIX, MEMORY_MAX_USAGE_IN_BYTES),
+            "2048\n",
+        )
+        .unwrap();
+        set_fixture(
+            &tmp,
+            &format!("{}{}", MEMORY_PREFIX, MEMORY_LIMIT_IN_BYTES),
+            "4096\n",
+        )
+        .unwrap();
+        set_fixture(
+            &tmp,
+            &format!("{}{}", MEMORY_PREFIX, MEMORY_FAIL_COUNT),
+            "5\n",
+        )
+        .unwrap();
+
+        let actual = Memory::get_memory_data(&tmp, MEMORY_PREFIX).expect("get cgroup stats");
+        let expected = MemoryData {
+            usage: 1024,
+            max_usage: 2048,
+            limit: 4096,
+            fail_count: 5,
+        };
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_stat_hierarchy_enabled() {
+        let tmp = create_temp_dir("test_stat_hierarchy_enabled").expect("create test directory");
+        set_fixture(&tmp, MEMORY_USE_HIERARCHY, "1").unwrap();
+
+        let enabled = Memory::hierarchy_enabled(&tmp).expect("get cgroup stats");
+        assert!(enabled)
+    }
+
+    #[test]
+    fn test_stat_hierarchy_disabled() {
+        let tmp = create_temp_dir("test_stat_hierarchy_disabled").expect("create test directory");
+        set_fixture(&tmp, MEMORY_USE_HIERARCHY, "0").unwrap();
+
+        let enabled = Memory::hierarchy_enabled(&tmp).expect("get cgroup stats");
+        assert!(!enabled)
+    }
+
+    #[test]
+    fn test_stat_memory_stats() {
+        let tmp = create_temp_dir("test_stat_memory_stats").expect("create test directory");
+        let content = [
+            "cache 0",
+            "rss 0",
+            "rss_huge 0",
+            "shmem 0",
+            "pgpgout 0",
+            "unevictable 0",
+            "hierarchical_memory_limit 9223372036854771712",
+            "hierarchical_memsw_limit 9223372036854771712",
+        ]
+        .join("\n");
+        set_fixture(&tmp, MEMORY_STAT, &content).unwrap();
+
+        let actual = Memory::get_stat_data(&tmp).expect("get cgroup data");
+        let expected: HashMap<String, u64> = [
+            ("cache".to_owned(), 0),
+            ("rss".to_owned(), 0),
+            ("rss_huge".to_owned(), 0),
+            ("shmem".to_owned(), 0),
+            ("pgpgout".to_owned(), 0),
+            ("unevictable".to_owned(), 0),
+            ("hierarchical_memory_limit".to_owned(), 9223372036854771712),
+            ("hierarchical_memsw_limit".to_owned(), 9223372036854771712),
+        ]
+        .iter()
+        .cloned()
+        .collect();
+
+        assert_eq!(actual, expected);
+    }
 }
