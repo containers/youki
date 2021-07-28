@@ -11,6 +11,7 @@ pub mod manager;
 mod memory;
 mod network_classifier;
 mod network_priority;
+pub mod perf_event;
 mod pids;
 pub mod util;
 pub use controller::Controller;

@@ -12,8 +12,8 @@ use super::ControllerType as CtrlType;
 use super::{
     blkio::Blkio, controller_type::CONTROLLERS, cpu::Cpu, cpuacct::CpuAcct, cpuset::CpuSet,
     devices::Devices, freezer::Freezer, hugetlb::Hugetlb, memory::Memory,
-    network_classifier::NetworkClassifier, network_priority::NetworkPriority, pids::Pids, util,
-    Controller,
+    network_classifier::NetworkClassifier, network_priority::NetworkPriority,
+    perf_event::PerfEvent, pids::Pids, util, Controller,
 };
 
 use crate::cgroups::common::CGROUP_PROCS;
@@ -75,6 +75,7 @@ impl Manager {
                 CtrlType::HugeTlb => Hugetlb::needs_to_handle(linux_resources).is_some(),
                 CtrlType::Memory => Memory::needs_to_handle(linux_resources).is_some(),
                 CtrlType::Pids => Pids::needs_to_handle(linux_resources).is_some(),
+                CtrlType::PerfEvent => PerfEvent::needs_to_handle(linux_resources).is_some(),
                 CtrlType::Blkio => Blkio::needs_to_handle(linux_resources).is_some(),
                 CtrlType::NetworkPriority => {
                     NetworkPriority::needs_to_handle(linux_resources).is_some()
@@ -109,6 +110,7 @@ impl CgroupManager for Manager {
                 CtrlType::HugeTlb => Hugetlb::add_task(pid, subsys.1)?,
                 CtrlType::Memory => Memory::add_task(pid, subsys.1)?,
                 CtrlType::Pids => Pids::add_task(pid, subsys.1)?,
+                CtrlType::PerfEvent => PerfEvent::add_task(pid, subsys.1)?,
                 CtrlType::Blkio => Blkio::add_task(pid, subsys.1)?,
                 CtrlType::NetworkPriority => NetworkPriority::add_task(pid, subsys.1)?,
                 CtrlType::NetworkClassifier => NetworkClassifier::add_task(pid, subsys.1)?,
@@ -129,6 +131,7 @@ impl CgroupManager for Manager {
                 CtrlType::HugeTlb => Hugetlb::apply(linux_resources, &subsys.1)?,
                 CtrlType::Memory => Memory::apply(linux_resources, &subsys.1)?,
                 CtrlType::Pids => Pids::apply(linux_resources, &subsys.1)?,
+                CtrlType::PerfEvent => PerfEvent::apply(linux_resources, &subsys.1)?,
                 CtrlType::Blkio => Blkio::apply(linux_resources, &subsys.1)?,
                 CtrlType::NetworkPriority => NetworkPriority::apply(linux_resources, &subsys.1)?,
                 CtrlType::NetworkClassifier => {
