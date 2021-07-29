@@ -4,6 +4,8 @@ use mio::unix::pipe::Receiver;
 use mio::unix::pipe::Sender;
 use mio::{Interest, Poll, Token};
 
+use crate::notify_socket::NotifyListener;
+
 use super::parent::ParentChannel;
 
 // Token is used to identify which socket generated an event
@@ -15,6 +17,7 @@ pub struct ChildProcess {
     parent_channel: ParentChannel,
     receiver: Option<Receiver>,
     poll: Option<Poll>,
+    notify: NotifyListener,
 }
 
 // Note : The original youki process first forks into 'parent' (P) and 'child' (C1) process
@@ -23,11 +26,12 @@ pub struct ChildProcess {
 // a process point of view, init process is child of child process, which is child of original youki process.
 impl ChildProcess {
     /// create a new Child process structure
-    pub fn new(parent_channel: ParentChannel) -> Result<Self> {
+    pub fn new(parent_channel: ParentChannel, notify: NotifyListener) -> Result<Self> {
         Ok(Self {
             parent_channel,
             receiver: None,
             poll: None,
+            notify,
         })
     }
 
@@ -61,5 +65,9 @@ impl ChildProcess {
     pub fn wait_for_mapping_ack(&mut self) -> Result<()> {
         self.parent_channel.wait_for_mapping_ack()?;
         Ok(())
+    }
+
+    pub fn wait_for_container_start(&mut self) -> Result<()> {
+        self.notify.wait_for_container_start()
     }
 }

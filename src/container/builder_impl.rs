@@ -66,7 +66,10 @@ impl ContainerBuilderImpl {
 
         // create the parent and child process structure so the parent and child process can sync with each other
         let (mut parent, parent_channel) = parent::ParentProcess::new(self.rootless.clone())?;
-        let mut child = child::ChildProcess::new(parent_channel)?;
+        // need to create the notify socket before we pivot root, since the unix
+        // domain socket used here is outside of the rootfs of container
+        let notify: NotifyListener = NotifyListener::new(&self.notify_path)?;
+        let mut child = child::ChildProcess::new(parent_channel, notify)?;
 
         let cb = Box::new(|| {
             if let Err(error) = container_init(
@@ -76,7 +79,6 @@ impl ContainerBuilderImpl {
                 self.syscall.clone(),
                 self.rootfs.clone(),
                 self.console_socket.clone(),
-                self.notify_path.clone(),
                 &mut child,
             ) {
                 log::debug!("failed to run container_init: {:?}", error);
@@ -121,14 +123,10 @@ fn container_init(
     command: LinuxSyscall,
     rootfs: PathBuf,
     console_socket: Option<FileDescriptor>,
-    notify_name: PathBuf,
     child: &mut child::ChildProcess,
 ) -> Result<()> {
     let linux = &spec.linux;
     let namespaces: Namespaces = linux.namespaces.clone().into();
-    // need to create the notify socket before we pivot root, since the unix
-    // domain socket used here is outside of the rootfs of container
-    let mut notify_socket: NotifyListener = NotifyListener::new(&notify_name)?;
     let proc = &spec.process;
 
     // if Out-of-memory score adjustment is set in specification.  set the score
@@ -204,7 +202,7 @@ fn container_init(
     child.notify_parent()?;
 
     // listing on the notify socket for container start command
-    notify_socket.wait_for_container_start()?;
+    child.wait_for_container_start()?;
 
     let args: &Vec<String> = &spec.process.args;
     let envs: &Vec<String> = &spec.process.env;
