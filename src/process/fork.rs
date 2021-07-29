@@ -120,6 +120,7 @@ pub fn clone(cb: CloneCb, clone_flags: sched::CloneFlags) -> Result<Pid> {
 mod tests {
     use super::*;
     use anyhow::bail;
+    use nix::sys::wait;
     use nix::unistd;
 
     #[test]
@@ -185,5 +186,28 @@ mod tests {
         }
 
         bail!("Process didn't exit correctly")
+    }
+
+    fn clone_closure_ownership_test_payload() -> super::CloneCb {
+        // The vec should not be deallocated after this function returns. The
+        // ownership should correctly transfer to the closure returned, to be
+        // passed to the clone and new child process.
+        let numbers: Vec<i32> = (0..101).into_iter().collect();
+        Box::new(move || {
+            assert_eq!(numbers.iter().sum::<i32>(), 5050);
+            0
+        })
+    }
+
+    #[test]
+    fn test_clone_closure_ownership() -> Result<()> {
+        let flags = sched::CloneFlags::empty();
+
+        let pid = super::clone(clone_closure_ownership_test_payload(), flags)?;
+        let exit_status =
+            wait::waitpid(pid, Some(wait::WaitPidFlag::__WALL)).expect("Waiting for child");
+        assert_eq!(exit_status, wait::WaitStatus::Exited(pid, 0));
+
+        Ok(())
     }
 }
