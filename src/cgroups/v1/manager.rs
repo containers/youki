@@ -16,7 +16,7 @@ use super::{
     perf_event::PerfEvent, pids::Pids, util, Controller,
 };
 
-use crate::cgroups::common::CGROUP_PROCS;
+use crate::cgroups::common::{self, CGROUP_PROCS};
 use crate::cgroups::stats::{Stats, StatsProvider};
 use crate::utils;
 use crate::{cgroups::common::CgroupManager, utils::PathBufExt};
@@ -101,6 +101,14 @@ impl Manager {
 }
 
 impl CgroupManager for Manager {
+    fn get_all_pids(&self) -> Result<Vec<Pid>> {
+        let devices = self.subsystems.get(&CtrlType::Devices);
+        if let Some(p) = devices {
+            common::get_all_pids(p)
+        } else {
+            bail!("subsystem does not exist")
+        }
+    }
     fn add_task(&self, pid: Pid) -> Result<()> {
         for subsys in &self.subsystems {
             match subsys.0 {

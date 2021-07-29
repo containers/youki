@@ -16,6 +16,7 @@ use youki::commands::info;
 use youki::commands::kill;
 use youki::commands::list;
 use youki::commands::pause;
+use youki::commands::ps;
 use youki::commands::resume;
 use youki::commands::run;
 use youki::commands::spec_json;
@@ -74,6 +75,8 @@ enum SubCommand {
     Resume(resume::Resume),
     #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
     Events(events::Events),
+    #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>", setting=clap::AppSettings::AllowLeadingHyphen)]
+    Ps(ps::Ps),
 }
 
 /// This is the entry point in the container runtime. The binary is run by a high-level container runtime,
@@ -108,5 +111,6 @@ fn main() -> Result<()> {
         SubCommand::Pause(pause) => pause.exec(root_path, systemd_cgroup),
         SubCommand::Resume(resume) => resume.exec(root_path, systemd_cgroup),
         SubCommand::Events(events) => events.exec(root_path),
+        SubCommand::Ps(ps) => ps.exec(root_path),
     }
 }

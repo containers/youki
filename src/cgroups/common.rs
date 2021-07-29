@@ -1,8 +1,8 @@
 use std::{
     env,
     fmt::{Debug, Display},
-    fs,
-    io::Write,
+    fs::{self, File},
+    io::{BufRead, BufReader, Write},
     path::{Path, PathBuf},
 };
 
@@ -36,6 +36,8 @@ pub trait CgroupManager {
     fn freeze(&self, state: FreezerState) -> Result<()>;
     /// Retrieve statistics for the cgroup
     fn stats(&self) -> Result<Stats>;
+    // Gets the PIDs inside the cgroup
+    fn get_all_pids(&self) -> Result<Vec<Pid>>;
 }
 
 #[derive(Debug)]
@@ -176,4 +178,38 @@ pub fn create_cgroup_manager<P: Into<PathBuf>>(
         }
         _ => bail!("could not find cgroup filesystem"),
     }
+}
+
+pub fn get_all_pids(path: &Path) -> Result<Vec<Pid>> {
+    log::debug!("scan pids in folder: {:?}", path);
+    let mut result = vec![];
+    walk_dir(&path, &mut |p| {
+        let file_path = p.join(CGROUP_PROCS);
+        if file_path.exists() {
+            let file = File::open(file_path)?;
+            for line in BufReader::new(file).lines() {
+                if let Ok(line) = line {
+                    result.push(Pid::from_raw(line.parse::<i32>()?))
+                }
+            }
+        }
+        Ok(())
+    })?;
+    Ok(result)
+}
+
+fn walk_dir<F>(path: &Path, c: &mut F) -> Result<()>
+where
+    F: FnMut(&Path) -> Result<()>,
+{
+    c(&path)?;
+    for entry in fs::read_dir(path)? {
+        let entry = entry?;
+        let path = entry.path();
+
+        if path.is_dir() {
+            walk_dir(&path, c)?;
+        }
+    }
+    Ok(())
 }

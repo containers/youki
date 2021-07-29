@@ -6,6 +6,7 @@ pub mod info;
 pub mod kill;
 pub mod list;
 pub mod pause;
+pub mod ps;
 pub mod resume;
 pub mod run;
 pub mod spec_json;

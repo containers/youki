@@ -159,4 +159,8 @@ impl CgroupManager for Manager {
     fn stats(&self) -> Result<Stats> {
         Ok(Stats::default())
     }
+
+    fn get_all_pids(&self) -> Result<Vec<Pid>> {
+        common::get_all_pids(&self.full_path)
+    }
 }
