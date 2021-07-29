@@ -18,6 +18,23 @@ pub fn clone(mut cb: sched::CloneCb, clone_flags: sched::CloneFlags) -> Result<P
         (*cb)() as c_int
     }
 
+    // Use sysconf to find the page size. If there is an error, we assume
+    // the default 4K page size.
+    let page_size: usize = unsafe {
+        match libc::sysconf(libc::_SC_PAGE_SIZE) {
+            -1 => 4 * 1024, // default to 4K page size
+            x => x as usize,
+        }
+    };
+
+    // Find out the default stack max size through getrlimit.
+    let mut rlimit = libc::rlimit {
+        rlim_cur: 0,
+        rlim_max: 0,
+    };
+    unsafe { Errno::result(libc::getrlimit(libc::RLIMIT_STACK, &mut rlimit))? };
+    let default_stack_size = rlimit.rlim_cur as usize;
+
     // Using the clone syscall requires us to create the stack space for the
     // child process instead of taken cared for us like fork call. We use mmap
     // here to create the stack.  Instead of guessing how much space the child
@@ -28,34 +45,20 @@ pub fn clone(mut cb: sched::CloneCb, clone_flags: sched::CloneFlags) -> Result<P
     // researved, so no wasted memory here. Lastly, the child stack only needs
     // to support the container init process set up code in Youki. When Youki
     // calls exec into the container payload, exec will reset the stack.
-    let child_stack_top = unsafe {
-        // Use sysconf to find the page size. If there is an error, we assume
-        // the default 4K page size.
-        let page_size: usize = match libc::sysconf(libc::_SC_PAGE_SIZE) {
-            -1 => 4 * 1024, // default to 4K page size
-            x => x as usize,
-        };
-
-        // Find out the default stack max size through getrlimit.
-        let mut rlimit = libc::rlimit {
-            rlim_cur: 0,
-            rlim_max: 0,
-        };
-        Errno::result(libc::getrlimit(libc::RLIMIT_STACK, &mut rlimit))?;
-        let default_stack_size = rlimit.rlim_cur as usize;
-
-        // mmap to reserve the child stack. Note, even though we researved
-        // `default_stack_size`, the memory is not allocated until it is used.
-        // Also, do not use MAP_GROWSDOWN since it is not well supported.
-        // Ref: https://man7.org/linux/man-pages/man2/mmap.2.html 
-        let child_stack = libc::mmap(
+    // Ref: https://man7.org/linux/man-pages/man2/mmap.2.html
+    let child_stack = unsafe {
+        // Note, do not use MAP_GROWSDOWN since it is not well supported.
+        libc::mmap(
             libc::PT_NULL as *mut c_void,
             default_stack_size,
             libc::PROT_READ | libc::PROT_WRITE,
             libc::MAP_PRIVATE | libc::MAP_ANONYMOUS | libc::MAP_STACK,
             -1,
             0,
-        );
+        )
+    };
+
+    let res = unsafe {
         // Consistant with how pthread_create sets up the stack, we create a
         // guard page of 1 page, to protect the child stack collision. Note, for
         // clone call, the child stack will grow downward, so the bottom of the
@@ -66,10 +69,6 @@ pub fn clone(mut cb: sched::CloneCb, clone_flags: sched::CloneFlags) -> Result<P
         // the top of the stack address.
         let child_stack_top = child_stack.add(default_stack_size);
 
-        child_stack_top
-    };
-
-    let res = unsafe {
         let signal = sys::signal::Signal::SIGCHLD;
         let combined = clone_flags.bits() | signal as c_int;
         libc::clone(
