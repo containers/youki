@@ -1,11 +1,14 @@
+use anyhow::Context;
 use anyhow::Result;
 use libc::c_int;
 use libc::c_void;
 use nix::errno::Errno;
 use nix::sched;
 use nix::sys;
+use nix::sys::mman;
 use nix::unistd::Pid;
 use std::mem;
+use std::ptr;
 
 /// clone uses syscall clone(2) to create a new process for the container init
 /// process. Using clone syscall gives us better control over how to can create
@@ -48,14 +51,14 @@ pub fn clone(mut cb: sched::CloneCb, clone_flags: sched::CloneFlags) -> Result<P
     // Ref: https://man7.org/linux/man-pages/man2/mmap.2.html
     let child_stack = unsafe {
         // Note, do not use MAP_GROWSDOWN since it is not well supported.
-        libc::mmap(
-            libc::PT_NULL as *mut c_void,
+        mman::mmap(
+            ptr::null_mut(),
             default_stack_size,
-            libc::PROT_READ | libc::PROT_WRITE,
-            libc::MAP_PRIVATE | libc::MAP_ANONYMOUS | libc::MAP_STACK,
+            mman::ProtFlags::PROT_READ | mman::ProtFlags::PROT_WRITE,
+            mman::MapFlags::MAP_PRIVATE | mman::MapFlags::MAP_ANONYMOUS | mman::MapFlags::MAP_STACK,
             -1,
             0,
-        )
+        )?
     };
 
     let res = unsafe {
@@ -63,7 +66,8 @@ pub fn clone(mut cb: sched::CloneCb, clone_flags: sched::CloneFlags) -> Result<P
         // guard page of 1 page, to protect the child stack collision. Note, for
         // clone call, the child stack will grow downward, so the bottom of the
         // child stack is in the beginning.
-        Errno::result(libc::mprotect(child_stack, page_size, libc::PROT_NONE))?;
+        mman::mprotect(child_stack, page_size, mman::ProtFlags::PROT_NONE)
+            .with_context(|| "Failed to create guard page")?;
 
         // Since the child stack for clone grows downward, we need to pass in
         // the top of the stack address.
