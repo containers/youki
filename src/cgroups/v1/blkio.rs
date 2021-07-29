@@ -138,11 +138,13 @@ impl Blkio {
     }
 
     fn get_throttling_policy_stats(cgroup_path: &Path) -> Result<BlkioStats> {
-        let mut stats = BlkioStats::default();
-
-        stats.service_bytes =
-            Self::parse_blkio_file(&cgroup_path.join(BLKIO_THROTTLE_IO_SERVICE_BYTES))?;
-        stats.serviced = Self::parse_blkio_file(&cgroup_path.join(BLKIO_THROTTLE_IO_SERVICED))?;
+        let stats = BlkioStats {
+            service_bytes: Self::parse_blkio_file(
+                &cgroup_path.join(BLKIO_THROTTLE_IO_SERVICE_BYTES),
+            )?,
+            serviced: Self::parse_blkio_file(&cgroup_path.join(BLKIO_THROTTLE_IO_SERVICED))?,
+            ..Default::default()
+        };
 
         Ok(stats)
     }

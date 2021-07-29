@@ -257,7 +257,7 @@ impl CgroupManager for SystemDCGroupManager {
     }
 
     fn stats(&self) -> Result<Stats> {
-        todo!();
+        Ok(Stats::default())
     }
 }
 

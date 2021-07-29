@@ -157,6 +157,6 @@ impl CgroupManager for Manager {
     }
 
     fn stats(&self) -> Result<Stats> {
-        todo!();
+        Ok(Stats::default())
     }
 }

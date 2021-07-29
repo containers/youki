@@ -166,10 +166,7 @@ impl Memory {
     fn hierarchy_enabled(cgroup_path: &Path) -> Result<bool> {
         let hierarchy_path = cgroup_path.join(MEMORY_USE_HIERARCHY);
         let hierarchy = common::read_cgroup_file(hierarchy_path)?;
-        let enabled = match hierarchy.trim() {
-            "1" => true,
-            _ => false,
-        };
+        let enabled = matches!(hierarchy.trim(), "1");
 
         Ok(enabled)
     }
