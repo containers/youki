@@ -76,6 +76,13 @@ pub fn clone(mut cb: sched::CloneCb, clone_flags: sched::CloneFlags) -> Result<P
         // the top of the stack address.
         let child_stack_top = child_stack.add(default_stack_size);
 
+        // Using the clone syscall is one of the rare cases where we don't want
+        // rust to manage the child stack memory.  Instead, we want to use
+        // c_void directly here. The nix::sched::clone wrapper doesn't provide
+        // the right interface and its interface can't be changed. Therefore,
+        // here we are using libc::clone syscall directly for better control.
+        // The child stack will be cleaned when exec is called or the child
+        // process terminates.
         libc::clone(
             mem::transmute(callback as extern "C" fn(*mut Box<dyn FnMut() -> isize>) -> i32),
             child_stack_top,
