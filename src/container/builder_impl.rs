@@ -68,15 +68,23 @@ impl ContainerBuilderImpl {
         let (mut parent, parent_channel) = parent::ParentProcess::new(self.rootless.clone())?;
         let mut child = child::ChildProcess::new(parent_channel)?;
 
-        let cb = Box::new(|| {
+        let init = self.init;
+        let rootless = self.rootless.clone();
+        let spec = self.spec.clone();
+        let syscall = self.syscall.clone();
+        let rootfs = self.rootfs.clone();
+        let console_socket = self.console_socket.clone();
+        let notify_path = self.notify_path.clone();
+
+        let cb = Box::new(move || {
             if let Err(error) = container_init(
-                self.init,
-                self.rootless.clone(),
-                self.spec.clone(),
-                self.syscall.clone(),
-                self.rootfs.clone(),
-                self.console_socket.clone(),
-                self.notify_path.clone(),
+                init,
+                rootless,
+                spec,
+                syscall,
+                rootfs,
+                console_socket,
+                notify_path,
                 &mut child,
             ) {
                 log::debug!("failed to run container_init: {:?}", error);
