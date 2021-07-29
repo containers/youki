@@ -47,10 +47,10 @@ pub fn clone(mut cb: sched::CloneCb, clone_flags: sched::CloneFlags) -> Result<P
     // physical memory upfront.  The stack will grow as needed, up to the size
     // researved, so no wasted memory here. Lastly, the child stack only needs
     // to support the container init process set up code in Youki. When Youki
-    // calls exec into the container payload, exec will reset the stack.
+    // calls exec into the container payload, exec will reset the stack.  Note,
+    // do not use MAP_GROWSDOWN since it is not well supported.
     // Ref: https://man7.org/linux/man-pages/man2/mmap.2.html
     let child_stack = unsafe {
-        // Note, do not use MAP_GROWSDOWN since it is not well supported.
         mman::mmap(
             ptr::null_mut(),
             default_stack_size,
@@ -61,6 +61,9 @@ pub fn clone(mut cb: sched::CloneCb, clone_flags: sched::CloneFlags) -> Result<P
         )?
     };
 
+    // Adds SIGCHLD flag to mimic the same behavior as fork.
+    let signal = sys::signal::Signal::SIGCHLD;
+    let combined = clone_flags.bits() | signal as c_int;
     let res = unsafe {
         // Consistant with how pthread_create sets up the stack, we create a
         // guard page of 1 page, to protect the child stack collision. Note, for
@@ -73,8 +76,6 @@ pub fn clone(mut cb: sched::CloneCb, clone_flags: sched::CloneFlags) -> Result<P
         // the top of the stack address.
         let child_stack_top = child_stack.add(default_stack_size);
 
-        let signal = sys::signal::Signal::SIGCHLD;
-        let combined = clone_flags.bits() | signal as c_int;
         libc::clone(
             mem::transmute(callback as extern "C" fn(*mut Box<dyn FnMut() -> isize>) -> i32),
             child_stack_top,
