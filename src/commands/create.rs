@@ -12,7 +12,7 @@ pub struct Create {
     /// File to write pid of the container created
     // note that in the end, container is just another process
     #[clap(short, long)]
-    pid_file: Option<String>,
+    pid_file: Option<PathBuf>,
     /// path to the bundle directory, containing config.json and root filesystem
     #[clap(short, long, default_value = ".")]
     bundle: PathBuf,
@@ -32,34 +32,25 @@ impl Create {
     /// instant Create Command
     pub fn new(
         container_id: String,
-        pid_file: Option<String>,
+        pid_file: Option<PathBuf>,
         bundle: PathBuf,
         console_socket: Option<PathBuf>,
     ) -> Self {
         Self {
-            container_id,
             pid_file,
             bundle,
             console_socket,
+            container_id,
         }
     }
     /// Starts a new container process
     pub fn exec(&self, root_path: PathBuf, systemd_cgroup: bool) -> Result<()> {
-        let mut builder = ContainerBuilder::new(self.container_id.clone());
-        if let Some(pid_file) = &self.pid_file {
-            builder = builder.with_pid_file(pid_file);
-        }
-
-        if let Some(console_socket) = &self.console_socket {
-            builder = builder.with_console_socket(console_socket);
-        }
-
-        builder
+        ContainerBuilder::new(self.container_id.clone())
+            .with_pid_file(self.pid_file.as_ref())
+            .with_console_socket(self.console_socket.as_ref())
             .with_root_path(root_path)
             .as_init(&self.bundle)
             .with_systemd(systemd_cgroup)
-            .build()?;
-
-        Ok(())
+            .build()
     }
 }

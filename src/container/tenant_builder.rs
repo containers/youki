@@ -58,8 +58,8 @@ impl TenantContainerBuilder {
     }
 
     /// Sets the working directory of the container
-    pub fn with_cwd<P: Into<PathBuf>>(mut self, path: P) -> Self {
-        self.cwd = Some(path.into());
+    pub fn with_cwd<P: Into<PathBuf>>(mut self, path: Option<P>) -> Self {
+        self.cwd = path.map(|p| p.into());
         self
     }
 
@@ -79,8 +79,8 @@ impl TenantContainerBuilder {
         self
     }
 
-    pub fn with_process<P: Into<PathBuf>>(mut self, path: P) -> Self {
-        self.process = Some(path.into());
+    pub fn with_process<P: Into<PathBuf>>(mut self, path: Option<P>) -> Self {
+        self.process = path.map(|p| p.into());
         self
     }
 
