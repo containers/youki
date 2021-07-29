@@ -3,29 +3,51 @@ use libc::c_int;
 use libc::c_void;
 use nix::errno::Errno;
 use nix::sched;
+use nix::sys;
 use nix::unistd::Pid;
 use std::mem;
 
+/// clone uses syscall clone(2) to create a new process for the container init
+/// process. Using clone syscall gives us better control over how to can create
+/// the new container process, where we can enter into namespaces directly instead
+/// of using unshare and fork. This call will only create one new process, instead
+/// of two using fork.
 pub fn clone(mut cb: sched::CloneCb, clone_flags: sched::CloneFlags) -> Result<Pid> {
     extern "C" fn callback(data: *mut sched::CloneCb) -> c_int {
         let cb: &mut sched::CloneCb = unsafe { &mut *data };
         (*cb)() as c_int
     }
 
+    // Using the clone syscall requires us to create the stack space for the
+    // child process instead of taken cared for us like fork call. We use mmap
+    // here to create the stack.  Instead of guessing how much space the child
+    // process needs, we allocate through mmap to the system default limit,
+    // which is 8MB on most of the linux system today. This is OK since mmap
+    // will only researve the address space upfront, instead of allocating
+    // physical memory upfront.  The stack will grow as needed, up to the size
+    // researved, so no wasted memory here. Lastly, the child stack only needs
+    // to support the container init process set up code in Youki. When Youki
+    // calls exec into the container payload, exec will reset the stack.
     let child_stack_top = unsafe {
+        // Use sysconf to find the page size. If there is an error, we assume
+        // the default 4K page size.
         let page_size: usize = match libc::sysconf(libc::_SC_PAGE_SIZE) {
             -1 => 4 * 1024, // default to 4K page size
             x => x as usize,
         };
 
+        // Find out the default stack max size through getrlimit.
         let mut rlimit = libc::rlimit {
             rlim_cur: 0,
             rlim_max: 0,
         };
-
         Errno::result(libc::getrlimit(libc::RLIMIT_STACK, &mut rlimit))?;
         let default_stack_size = rlimit.rlim_cur as usize;
 
+        // mmap to reserve the child stack. Note, even though we researved
+        // `default_stack_size`, the memory is not allocated until it is used.
+        // Also, do not use MAP_GROWSDOWN since it is not well supported.
+        // Ref: https://man7.org/linux/man-pages/man2/mmap.2.html 
         let child_stack = libc::mmap(
             libc::PT_NULL as *mut c_void,
             default_stack_size,
@@ -34,14 +56,21 @@ pub fn clone(mut cb: sched::CloneCb, clone_flags: sched::CloneFlags) -> Result<P
             -1,
             0,
         );
+        // Consistant with how pthread_create sets up the stack, we create a
+        // guard page of 1 page, to protect the child stack collision. Note, for
+        // clone call, the child stack will grow downward, so the bottom of the
+        // child stack is in the beginning.
         Errno::result(libc::mprotect(child_stack, page_size, libc::PROT_NONE))?;
+
+        // Since the child stack for clone grows downward, we need to pass in
+        // the top of the stack address.
         let child_stack_top = child_stack.add(default_stack_size);
 
         child_stack_top
     };
 
     let res = unsafe {
-        let signal = nix::sys::signal::Signal::SIGCHLD;
+        let signal = sys::signal::Signal::SIGCHLD;
         let combined = clone_flags.bits() | signal as c_int;
         libc::clone(
             mem::transmute(callback as extern "C" fn(*mut Box<dyn FnMut() -> isize>) -> i32),
