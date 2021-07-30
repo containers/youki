@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use clap::Clap;
 use nix::sys::signal::Signal;
 
@@ -50,7 +50,10 @@ impl Delete {
                 log::debug!("remove dir {:?}", container.root);
                 fs::remove_dir_all(&container.root)?;
 
-                let cgroups_path = utils::get_cgroup_path(&spec.linux.cgroups_path, container.id());
+                let cgroups_path = utils::get_cgroup_path(
+                    &spec.linux.context("no linux in spec")?.cgroups_path,
+                    container.id(),
+                );
 
                 // remove the cgroup created for the container
                 // check https://man7.org/linux/man-pages/man7/cgroups.7.html

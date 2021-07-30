@@ -2,7 +2,7 @@
 use std::fs::canonicalize;
 use std::path::PathBuf;
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use clap::Clap;
 
 use crate::cgroups;
@@ -45,7 +45,10 @@ impl Pause {
         }
 
         let spec = container.spec()?;
-        let cgroups_path = utils::get_cgroup_path(&spec.linux.cgroups_path, &self.container_id);
+        let cgroups_path = utils::get_cgroup_path(
+            &spec.linux.context("no linux in spec")?.cgroups_path,
+            &self.container_id,
+        );
         // create cgroup manager structure from the config at the path
         let cmanager = cgroups::common::create_cgroup_manager(cgroups_path, systemd_cgroup)?;
         // freeze the container
