@@ -21,24 +21,6 @@ use crate::{
 
 use super::{Container, ContainerStatus};
 
-struct ContainerInitArgs {
-    /// Flag indicating if an init or a tenant container should be created
-    pub init: bool,
-    /// Interface to operating system primitives
-    pub syscall: LinuxSyscall,
-    /// OCI complient runtime spec
-    pub spec: Spec,
-    /// Root filesystem of the container
-    pub rootfs: PathBuf,
-    /// Socket to communicate the file descriptor of the ptty
-    pub console_socket: Option<FileDescriptor>,
-    /// Options for rootless containers
-    pub rootless: Option<Rootless>,
-    /// Path to the Unix Domain Socket to communicate container start
-    pub notify_path: PathBuf,
-    /// Pipe used to communicate with the child process
-    pub child: child::ChildProcess,
-}
 pub(super) struct ContainerBuilderImpl {
     /// Flag indicating if an init or a tenant container should be created
     pub init: bool,
@@ -135,6 +117,25 @@ impl ContainerBuilderImpl {
 
         Ok(())
     }
+}
+
+struct ContainerInitArgs {
+    /// Flag indicating if an init or a tenant container should be created
+    pub init: bool,
+    /// Interface to operating system primitives
+    pub syscall: LinuxSyscall,
+    /// OCI complient runtime spec
+    pub spec: Spec,
+    /// Root filesystem of the container
+    pub rootfs: PathBuf,
+    /// Socket to communicate the file descriptor of the ptty
+    pub console_socket: Option<FileDescriptor>,
+    /// Options for rootless containers
+    pub rootless: Option<Rootless>,
+    /// Path to the Unix Domain Socket to communicate container start
+    pub notify_path: PathBuf,
+    /// Pipe used to communicate with the child process
+    pub child: child::ChildProcess,
 }
 
 fn container_init(args: ContainerInitArgs) -> Result<()> {
