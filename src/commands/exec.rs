@@ -38,37 +38,18 @@ pub struct Exec {
 
 impl Exec {
     pub fn exec(&self, root_path: PathBuf) -> Result<()> {
-        let mut builder =
-            ContainerBuilder::new(self.container_id.clone()).with_root_path(root_path);
-
-        if let Some(console_socket) = &self.console_socket {
-            builder = builder.with_console_socket(console_socket);
-        }
-
-        if let Some(pid_file) = &self.pid_file {
-            builder = builder.with_pid_file(pid_file);
-        }
-
-        let mut builder = builder.as_tenant();
-
-        if let Some(cwd) = &self.cwd {
-            builder = builder.with_cwd(cwd);
-        }
-
-        if !self.env.is_empty() {
-            let env = self.env.clone().into_iter().collect();
-            builder = builder.with_env(env)
-        }
-
-        builder = builder.with_no_new_privs(self.no_new_privs);
-
-        if let Some(process) = &self.process {
-            builder = builder.with_process(process);
-        }
-
-        builder.with_container_args(self.command.clone()).build()?;
-
-        Ok(())
+        ContainerBuilder::new(self.container_id.clone())
+            .with_root_path(root_path)
+            .with_console_socket(self.console_socket.as_ref())
+            .with_pid_file(self.pid_file.as_ref())
+            .as_tenant()
+            .with_cwd(self.cwd.as_ref())
+            .with_env(self.env.clone().into_iter().collect())
+            .with_process(self.process.as_ref())
+            .with_no_new_privs(self.no_new_privs)
+            .with_process(self.process.as_ref())
+            .with_container_args(self.command.clone())
+            .build()
     }
 }
 

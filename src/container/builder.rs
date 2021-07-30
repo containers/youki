@@ -26,8 +26,8 @@ pub struct ContainerBuilder {
 ///
 /// ContainerBuilder::new("74f1a4cb3801".to_owned())
 /// .with_root_path("/run/containers/youki")
-/// .with_pid_file("/var/run/docker.pid")
-/// .with_console_socket("/var/run/docker/sock.tty")
+/// .with_pid_file(Some("/var/run/docker.pid"))
+/// .with_console_socket(Some("/var/run/docker/sock.tty"))
 /// .as_init("/var/run/docker/bundle")
 /// .build();
 /// ```
@@ -108,10 +108,10 @@ impl ContainerBuilder {
     /// # use youki::container::builder::ContainerBuilder;
     ///
     /// ContainerBuilder::new("74f1a4cb3801".to_owned())
-    /// .with_pid_file("/var/run/docker.pid");
+    /// .with_pid_file(Some("/var/run/docker.pid"));
     /// ```
-    pub fn with_pid_file<P: Into<PathBuf>>(mut self, path: P) -> Self {
-        self.pid_file = Some(path.into());
+    pub fn with_pid_file<P: Into<PathBuf>>(mut self, path: Option<P>) -> Self {
+        self.pid_file = path.map(|p| p.into());
         self
     }
 
@@ -123,10 +123,10 @@ impl ContainerBuilder {
     /// # use youki::container::builder::ContainerBuilder;
     ///
     /// ContainerBuilder::new("74f1a4cb3801".to_owned())
-    /// .with_console_socket("/var/run/docker/sock.tty");
+    /// .with_console_socket(Some("/var/run/docker/sock.tty"));
     /// ```
-    pub fn with_console_socket<P: Into<PathBuf>>(mut self, path: P) -> Self {
-        self.console_socket = Some(path.into());
+    pub fn with_console_socket<P: Into<PathBuf>>(mut self, path: Option<P>) -> Self {
+        self.console_socket = path.map(|p| p.into());
         self
     }
 }

@@ -103,6 +103,6 @@ fn main() -> Result<()> {
         SubCommand::List(list) => list.exec(root_path),
         SubCommand::Spec(spec) => spec.exec(),
         SubCommand::Pause(pause) => pause.exec(root_path, systemd_cgroup),
-        SubCommand::Resume(resume) => return resume.exec(root_path, systemd_cgroup),
+        SubCommand::Resume(resume) => resume.exec(root_path, systemd_cgroup),
     }
 }

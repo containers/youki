@@ -11,7 +11,7 @@ pub struct Run {
     /// File to write pid of the container created
     // note that in the end, container is just another process
     #[clap(short, long)]
-    pid_file: Option<String>,
+    pid_file: Option<PathBuf>,
     /// path to the bundle directory, containing config.json and root filesystem
     #[clap(short, long, default_value = ".")]
     bundle: PathBuf,
@@ -32,7 +32,7 @@ impl Run {
         )
         .exec(root_path.clone(), systemd_cgroup)?;
 
-        Start::new(self.container_id.clone()).exec(root_path.clone())?;
+        Start::new(self.container_id.clone()).exec(root_path)?;
 
         Ok(())
     }
