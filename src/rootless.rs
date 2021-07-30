@@ -1,6 +1,6 @@
 use std::{env, path::PathBuf};
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use nix::sched::CloneFlags;
 use oci_spec::{Linux, LinuxIdMapping, Mount, Spec};
 
@@ -36,8 +36,9 @@ pub fn detect_rootless(spec: &Spec) -> Result<Option<Rootless>> {
             "resource constraints and multi id mapping is unimplemented for rootless containers"
         );
         validate(spec)?;
-        let mut rootless = Rootless::from(&spec.linux);
-        if let Some((uid_binary, gid_binary)) = lookup_map_binaries(&spec.linux)? {
+        let linux = spec.linux.as_ref().context("no linux in spec")?;
+        let mut rootless = Rootless::from(linux);
+        if let Some((uid_binary, gid_binary)) = lookup_map_binaries(&linux)? {
             rootless.newuidmap = Some(uid_binary);
             rootless.newgidmap = Some(gid_binary);
         }
@@ -65,7 +66,7 @@ pub fn should_use_rootless() -> bool {
 /// Validates that the spec contains the required information for
 /// running in rootless mode
 pub fn validate(spec: &Spec) -> Result<()> {
-    let linux = &spec.linux;
+    let linux = spec.linux.as_ref().context("no linux in spec")?;
 
     if linux.uid_mappings.is_empty() {
         bail!("rootless containers require at least one uid mapping");
@@ -80,7 +81,11 @@ pub fn validate(spec: &Spec) -> Result<()> {
         bail!("rootless containers require the specification of a user namespace");
     }
 
-    validate_mounts(&spec.mounts, &linux.uid_mappings, &linux.gid_mappings)?;
+    validate_mounts(
+        spec.mounts.as_ref().context("no mounts in spec")?,
+        &linux.uid_mappings,
+        &linux.gid_mappings,
+    )?;
 
     Ok(())
 }

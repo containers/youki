@@ -95,7 +95,7 @@ impl TenantContainerBuilder {
         unistd::chdir(&*container_dir)?;
         let notify_path = Self::setup_notify_listener(&container_dir)?;
         // convert path of root file system of the container to absolute path
-        let rootfs = fs::canonicalize(&spec.root.path)?;
+        let rootfs = fs::canonicalize(&spec.root.as_ref().context("no root in spec")?.path)?;
 
         // if socket file path is given in commandline options,
         // get file descriptors of console socket
@@ -161,7 +161,7 @@ impl TenantContainerBuilder {
             self.set_working_dir(spec)?;
             self.set_args(spec)?;
             self.set_environment(spec)?;
-            self.set_no_new_privileges(spec);
+            self.set_no_new_privileges(spec)?;
             self.set_capabilities(spec)?;
         }
 
@@ -185,7 +185,7 @@ impl TenantContainerBuilder {
 
         let process = utils::open(process)?;
         let process_spec: Process = serde_json::from_reader(process)?;
-        spec.process = process_spec;
+        spec.process = Some(process_spec);
         Ok(())
     }
 
@@ -198,7 +198,8 @@ impl TenantContainerBuilder {
                 );
             }
 
-            spec.process.cwd = cwd.to_string_lossy().to_string();
+            spec.process.as_mut().context("no process in spec")?.cwd =
+                cwd.to_string_lossy().to_string();
         }
 
         Ok(())
@@ -209,26 +210,34 @@ impl TenantContainerBuilder {
             bail!("Container command was not specified")
         }
 
-        spec.process.args = self.args.clone();
+        spec.process.as_mut().context("no process in spec")?.args = self.args.clone();
         Ok(())
     }
 
     fn set_environment(&self, spec: &mut Spec) -> Result<()> {
-        spec.process.env.append(
-            &mut self
-                .env
-                .iter()
-                .map(|(k, v)| format!("{}={}", k, v))
-                .collect(),
-        );
+        spec.process
+            .as_mut()
+            .context("no process in spec")?
+            .env
+            .append(
+                &mut self
+                    .env
+                    .iter()
+                    .map(|(k, v)| format!("{}={}", k, v))
+                    .collect(),
+            );
 
         Ok(())
     }
 
-    fn set_no_new_privileges(&self, spec: &mut Spec) {
+    fn set_no_new_privileges(&self, spec: &mut Spec) -> Result<()> {
         if let Some(no_new_privs) = self.no_new_privs {
-            spec.process.no_new_privileges = no_new_privs;
+            spec.process
+                .as_mut()
+                .context("no process in spec")?
+                .no_new_privileges = no_new_privs;
         }
+        Ok(())
     }
 
     fn set_capabilities(&self, spec: &mut Spec) -> Result<()> {
@@ -238,14 +247,22 @@ impl TenantContainerBuilder {
                 caps.push(Capability::from_str(cap)?);
             }
 
-            if let Some(ref mut spec_caps) = spec.process.capabilities {
+            if let Some(ref mut spec_caps) = spec
+                .process
+                .as_mut()
+                .context("no process in spec")?
+                .capabilities
+            {
                 spec_caps.ambient.append(&mut caps.clone());
                 spec_caps.bounding.append(&mut caps.clone());
                 spec_caps.effective.append(&mut caps.clone());
                 spec_caps.inheritable.append(&mut caps.clone());
                 spec_caps.permitted.append(&mut caps);
             } else {
-                spec.process.capabilities = Some(LinuxCapabilities {
+                spec.process
+                    .as_mut()
+                    .context("no process in spec")?
+                    .capabilities = Some(LinuxCapabilities {
                     ambient: caps.clone(),
                     bounding: caps.clone(),
                     effective: caps.clone(),
@@ -271,7 +288,7 @@ impl TenantContainerBuilder {
             }
         }
 
-        let mut linux = &mut spec.linux;
+        let mut linux = &mut spec.linux.as_mut().context("no linux in spec")?;
         linux.namespaces = tenant_namespaces;
         Ok(())
     }

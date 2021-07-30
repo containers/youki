@@ -59,7 +59,7 @@ impl ContainerBuilderImpl {
     fn run_container(&mut self) -> Result<()> {
         prctl::set_dumpable(false).unwrap();
 
-        let linux = &self.spec.linux;
+        let linux = self.spec.linux.as_ref().context("no linux in spec")?;
         let cgroups_path = utils::get_cgroup_path(&linux.cgroups_path, &self.container_id);
         let cmanager = cgroups::common::create_cgroup_manager(&cgroups_path, self.use_systemd)?;
         let namespaces: Namespaces = linux.namespaces.clone().into();
@@ -124,12 +124,12 @@ fn container_init(
     notify_name: PathBuf,
     child: &mut child::ChildProcess,
 ) -> Result<()> {
-    let linux = &spec.linux;
+    let linux = &spec.linux.as_ref().context("no linux in spec")?;
     let namespaces: Namespaces = linux.namespaces.clone().into();
     // need to create the notify socket before we pivot root, since the unix
     // domain socket used here is outside of the rootfs of container
     let mut notify_socket: NotifyListener = NotifyListener::new(&notify_name)?;
-    let proc = &spec.process;
+    let proc = &spec.process.as_ref().context("no process in spec")?;
 
     // if Out-of-memory score adjustment is set in specification.  set the score
     // value for the current process check
@@ -156,7 +156,7 @@ fn container_init(
     }
 
     // set limits and namespaces to the process
-    for rlimit in spec.process.rlimits.iter() {
+    for rlimit in proc.rlimits.iter() {
         command.set_rlimit(rlimit).context("failed to set rlimit")?;
     }
 
@@ -172,7 +172,7 @@ fn container_init(
     // join existing namespaces
     namespaces.apply_setns()?;
 
-    command.set_hostname(spec.hostname.as_str())?;
+    command.set_hostname(&spec.hostname.as_ref().context("no hostname in spec")?)?;
 
     if proc.no_new_privileges {
         let _ = prctl::set_no_new_privileges(true);
@@ -206,8 +206,8 @@ fn container_init(
     // listing on the notify socket for container start command
     notify_socket.wait_for_container_start()?;
 
-    let args: &Vec<String> = &spec.process.args;
-    let envs: &Vec<String> = &spec.process.env;
+    let args: &Vec<String> = &proc.args;
+    let envs: &Vec<String> = &proc.env;
     utils::do_exec(&args[0], args, envs)?;
 
     // After do_exec is called, the process is replaced with the container
