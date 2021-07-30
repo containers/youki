@@ -48,8 +48,6 @@ pub(super) struct ContainerBuilderImpl {
     pub use_systemd: bool,
     /// Id of the container
     pub container_id: String,
-    /// Directory where the state of the container will be stored
-    pub container_dir: PathBuf,
     /// OCI complient runtime spec
     pub spec: Spec,
     /// Root filesystem of the container
