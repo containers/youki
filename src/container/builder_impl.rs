@@ -21,6 +21,24 @@ use crate::{
 
 use super::{Container, ContainerStatus};
 
+struct ContainerInitArgs {
+    /// Flag indicating if an init or a tenant container should be created
+    pub init: bool,
+    /// Interface to operating system primitives
+    pub syscall: LinuxSyscall,
+    /// OCI complient runtime spec
+    pub spec: Spec,
+    /// Root filesystem of the container
+    pub rootfs: PathBuf,
+    /// Socket to communicate the file descriptor of the ptty
+    pub console_socket: Option<FileDescriptor>,
+    /// Options for rootless containers
+    pub rootless: Option<Rootless>,
+    /// Path to the Unix Domain Socket to communicate container start
+    pub notify_path: PathBuf,
+    /// Pipe used to communicate with the child process
+    pub child: child::ChildProcess,
+}
 pub(super) struct ContainerBuilderImpl {
     /// Flag indicating if an init or a tenant container should be created
     pub init: bool,
@@ -66,27 +84,26 @@ impl ContainerBuilderImpl {
 
         // create the parent and child process structure so the parent and child process can sync with each other
         let (mut parent, parent_channel) = parent::ParentProcess::new(self.rootless.clone())?;
-        let mut child = child::ChildProcess::new(parent_channel)?;
+        let child = child::ChildProcess::new(parent_channel)?;
 
-        let init = self.init;
-        let rootless = self.rootless.clone();
-        let spec = self.spec.clone();
-        let syscall = self.syscall.clone();
-        let rootfs = self.rootfs.clone();
-        let console_socket = self.console_socket.clone();
-        let notify_path = self.notify_path.clone();
+        // This init_args will be passed to the container init process,
+        // therefore we will have to move all the variable by value. Since self
+        // is a shared reference, we have to clone these variables here.
+        let init_args = ContainerInitArgs {
+            init: self.init,
+            syscall: self.syscall.clone(),
+            spec: self.spec.clone(),
+            rootfs: self.rootfs.clone(),
+            console_socket: self.console_socket.clone(),
+            rootless: self.rootless.clone(),
+            notify_path: self.notify_path.clone(),
+            child: child,
+        };
 
+        // We have to box up this closure to correctly pass to the init function
+        // of the new process.
         let cb = Box::new(move || {
-            if let Err(error) = container_init(
-                init,
-                rootless,
-                spec,
-                syscall,
-                rootfs,
-                console_socket,
-                notify_path,
-                &mut child,
-            ) {
+            if let Err(error) = container_init(init_args) {
                 log::debug!("failed to run container_init: {:?}", error);
                 return -1;
             }
@@ -122,22 +139,17 @@ impl ContainerBuilderImpl {
     }
 }
 
-fn container_init(
-    init: bool,
-    rootless: Option<Rootless>,
-    spec: Spec,
-    command: LinuxSyscall,
-    rootfs: PathBuf,
-    console_socket: Option<FileDescriptor>,
-    notify_name: PathBuf,
-    child: &mut child::ChildProcess,
-) -> Result<()> {
+fn container_init(args: ContainerInitArgs) -> Result<()> {
+    let command = &args.syscall;
+    let spec = &args.spec;
     let linux = &spec.linux.as_ref().context("no linux in spec")?;
     let namespaces: Namespaces = linux.namespaces.clone().into();
     // need to create the notify socket before we pivot root, since the unix
     // domain socket used here is outside of the rootfs of container
-    let mut notify_socket: NotifyListener = NotifyListener::new(&notify_name)?;
+    let mut notify_socket: NotifyListener = NotifyListener::new(&args.notify_path)?;
     let proc = &spec.process.as_ref().context("no process in spec")?;
+    let rootfs = &args.rootfs;
+    let mut child = args.child;
 
     // if Out-of-memory score adjustment is set in specification.  set the score
     // value for the current process check
@@ -154,7 +166,7 @@ fn container_init(
     // namespace will be created, check
     // https://man7.org/linux/man-pages/man7/user_namespaces.7.html for more
     // information
-    if rootless.is_some() {
+    if args.rootless.is_some() {
         // child needs to be dumpable, otherwise the non root parent is not
         // allowed to write the uid/gid maps
         prctl::set_dumpable(true).unwrap();
@@ -173,7 +185,7 @@ fn container_init(
         .context("failed to become root")?;
 
     // set up tty if specified
-    if let Some(csocketfd) = console_socket {
+    if let Some(csocketfd) = args.console_socket {
         tty::setup_console(&csocketfd)?;
     }
 
@@ -186,7 +198,7 @@ fn container_init(
         let _ = prctl::set_no_new_privileges(true);
     }
 
-    if init {
+    if args.init {
         rootfs::prepare_rootfs(
             &spec,
             &rootfs,
@@ -198,14 +210,14 @@ fn container_init(
 
         // change the root of filesystem of the process to the rootfs
         command
-            .pivot_rootfs(&rootfs)
-            .with_context(|| format!("Failed to pivot root to {:?}", &rootfs))?;
+            .pivot_rootfs(rootfs)
+            .with_context(|| format!("Failed to pivot root to {:?}", rootfs))?;
     }
 
     command.set_id(Uid::from_raw(proc.user.uid), Gid::from_raw(proc.user.gid))?;
-    capabilities::reset_effective(&command)?;
+    capabilities::reset_effective(command)?;
     if let Some(caps) = &proc.capabilities {
-        capabilities::drop_privileges(&caps, &command)?;
+        capabilities::drop_privileges(&caps, command)?;
     }
 
     // notify parents that the init process is ready to execute the payload.

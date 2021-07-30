@@ -17,10 +17,12 @@ pub struct ChildProcess {
     poll: Option<Poll>,
 }
 
-// Note : The original youki process first forks into 'parent' (P) and 'child' (C1) process
-// of which this represents the child (C1) process. The C1 then again forks into parent process which is C1,
-// and Child (C2) process. C2 is called as init process as it will run the command of the container. But form
-// a process point of view, init process is child of child process, which is child of original youki process.
+// Note: The original Youki process "forks" a child process using clone(2). The
+// child process will become the container init process, where it will set up
+// namespaces, device mounts, and etc. for the container process.  Finally, the
+// container init process will run the actual container payload through exec
+// call. The ChildProcess will be used to synchronize between the Youki main
+// process and the child process (container init process).
 impl ChildProcess {
     /// create a new Child process structure
     pub fn new(parent_channel: ParentChannel) -> Result<Self> {
