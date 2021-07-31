@@ -1,10 +1,12 @@
+use std::collections::HashMap;
 use std::io::{prelude::*, Write};
 use std::{fs::OpenOptions, path::Path};
 
-use anyhow::{Result, *};
+use anyhow::{anyhow, bail, Context, Result};
 use nix::errno::Errno;
 
 use crate::cgroups::common::{self};
+use crate::cgroups::stats::{MemoryData, MemoryStats, StatsProvider};
 use crate::cgroups::v1::Controller;
 use oci_spec::{LinuxMemory, LinuxResources};
 
@@ -18,6 +20,27 @@ const CGROUP_MEMORY_OOM_CONTROL: &str = "memory.oom_control";
 
 const CGROUP_KERNEL_MEMORY_LIMIT: &str = "memory.kmem.limit_in_bytes";
 const CGROUP_KERNEL_TCP_MEMORY_LIMIT: &str = "memory.kmem.tcp.limit_in_bytes";
+
+// Shows various memory statistics
+const MEMORY_STAT: &str = "memory.stat";
+//
+const MEMORY_USE_HIERARCHY: &str = "memory.use_hierarchy";
+// Prefix for memory cgroup files
+const MEMORY_PREFIX: &str = "memory";
+// Prefix for memory and swap cgroup files
+const MEMORY_AND_SWAP_PREFIX: &str = "memory.memsw";
+// Prefix for kernel memory cgroup files
+const MEMORY_KERNEL_PREFIX: &str = "memory.kmem";
+// Prefix for kernel tcp memory cgroup files
+const MEMORY_KERNEL_TCP_PREFIX: &str = "memory.kmem.tcp";
+// Memory usage in bytes
+const MEMORY_USAGE_IN_BYTES: &str = ".usage_in_bytes";
+// Maximum recorded memory usage
+const MEMORY_MAX_USAGE_IN_BYTES: &str = ".max_usage_in_bytes";
+// Memory usage limit in bytes
+const MEMORY_LIMIT_IN_BYTES: &str = ".limit_in_bytes";
+// Number of times memory usage hit limits
+const MEMORY_FAIL_COUNT: &str = ".failcnt";
 
 pub struct Memory {}
 
@@ -86,7 +109,91 @@ impl Controller for Memory {
     }
 }
 
+impl StatsProvider for Memory {
+    type Stats = MemoryStats;
+
+    fn stats(cgroup_path: &Path) -> Result<Self::Stats> {
+        let memory = Self::get_memory_data(cgroup_path, MEMORY_PREFIX)?;
+        let memswap = Self::get_memory_data(cgroup_path, MEMORY_AND_SWAP_PREFIX)?;
+        let kernel = Self::get_memory_data(cgroup_path, MEMORY_KERNEL_PREFIX)?;
+        let kernel_tcp = Self::get_memory_data(cgroup_path, MEMORY_KERNEL_TCP_PREFIX)?;
+        let hierarchy = Self::hierarchy_enabled(cgroup_path)?;
+        let stats = Self::get_stat_data(cgroup_path)?;
+
+        Ok(MemoryStats {
+            memory,
+            memswap,
+            kernel,
+            kernel_tcp,
+            cache: stats["cache"],
+            hierarchy,
+            stats,
+        })
+    }
+}
+
 impl Memory {
+    fn get_memory_data(cgroup_path: &Path, file_prefix: &str) -> Result<MemoryData> {
+        let memory_data = MemoryData {
+            usage: Self::get_single_value(
+                &cgroup_path.join(format!("{}{}", file_prefix, MEMORY_USAGE_IN_BYTES)),
+            )?,
+            max_usage: Self::get_single_value(
+                &cgroup_path.join(format!("{}{}", file_prefix, MEMORY_MAX_USAGE_IN_BYTES)),
+            )?,
+            limit: Self::get_single_value(
+                &cgroup_path.join(format!("{}{}", file_prefix, MEMORY_LIMIT_IN_BYTES)),
+            )?,
+            fail_count: Self::get_single_value(
+                &cgroup_path.join(format!("{}{}", file_prefix, MEMORY_FAIL_COUNT)),
+            )?,
+        };
+
+        Ok(memory_data)
+    }
+
+    fn get_single_value(file_path: &Path) -> Result<u64> {
+        let value = common::read_cgroup_file(file_path)?;
+        value.trim().parse().with_context(|| {
+            format!(
+                "failed to parse value {} from {}",
+                value,
+                file_path.display()
+            )
+        })
+    }
+
+    fn hierarchy_enabled(cgroup_path: &Path) -> Result<bool> {
+        let hierarchy_path = cgroup_path.join(MEMORY_USE_HIERARCHY);
+        let hierarchy = common::read_cgroup_file(hierarchy_path)?;
+        let enabled = matches!(hierarchy.trim(), "1");
+
+        Ok(enabled)
+    }
+
+    fn get_stat_data(cgroup_path: &Path) -> Result<HashMap<String, u64>> {
+        let mut stats = HashMap::new();
+        let memory_stat = common::read_cgroup_file(cgroup_path.join(MEMORY_STAT))?;
+        for entry in memory_stat.lines() {
+            let entry_fields: Vec<&str> = entry.split_ascii_whitespace().collect();
+            if entry_fields.len() != 2 {
+                continue;
+            }
+
+            stats.insert(
+                entry_fields[0].to_owned(),
+                entry_fields[1].parse().with_context(|| {
+                    format!(
+                        "failed to parse value {} from {}",
+                        entry_fields[0], MEMORY_STAT
+                    )
+                })?,
+            );
+        }
+
+        Ok(stats)
+    }
+
     fn get_memory_usage(cgroup_root: &Path) -> Result<u64> {
         let path = cgroup_root.join(CGROUP_MEMORY_USAGE);
         let mut contents = String::new();
@@ -470,5 +577,96 @@ mod tests {
             // combine all the checks
             reservation_check && kernel_check && kernel_tcp_check && swappiness_check && limit_swap_check
         }
+    }
+
+    #[test]
+    fn test_stat_memory_data() {
+        let tmp = create_temp_dir("test_stat_memory_data").expect("create test directory");
+        set_fixture(
+            &tmp,
+            &format!("{}{}", MEMORY_PREFIX, MEMORY_USAGE_IN_BYTES),
+            "1024\n",
+        )
+        .unwrap();
+        set_fixture(
+            &tmp,
+            &format!("{}{}", MEMORY_PREFIX, MEMORY_MAX_USAGE_IN_BYTES),
+            "2048\n",
+        )
+        .unwrap();
+        set_fixture(
+            &tmp,
+            &format!("{}{}", MEMORY_PREFIX, MEMORY_LIMIT_IN_BYTES),
+            "4096\n",
+        )
+        .unwrap();
+        set_fixture(
+            &tmp,
+            &format!("{}{}", MEMORY_PREFIX, MEMORY_FAIL_COUNT),
+            "5\n",
+        )
+        .unwrap();
+
+        let actual = Memory::get_memory_data(&tmp, MEMORY_PREFIX).expect("get cgroup stats");
+        let expected = MemoryData {
+            usage: 1024,
+            max_usage: 2048,
+            limit: 4096,
+            fail_count: 5,
+        };
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_stat_hierarchy_enabled() {
+        let tmp = create_temp_dir("test_stat_hierarchy_enabled").expect("create test directory");
+        set_fixture(&tmp, MEMORY_USE_HIERARCHY, "1").unwrap();
+
+        let enabled = Memory::hierarchy_enabled(&tmp).expect("get cgroup stats");
+        assert!(enabled)
+    }
+
+    #[test]
+    fn test_stat_hierarchy_disabled() {
+        let tmp = create_temp_dir("test_stat_hierarchy_disabled").expect("create test directory");
+        set_fixture(&tmp, MEMORY_USE_HIERARCHY, "0").unwrap();
+
+        let enabled = Memory::hierarchy_enabled(&tmp).expect("get cgroup stats");
+        assert!(!enabled)
+    }
+
+    #[test]
+    fn test_stat_memory_stats() {
+        let tmp = create_temp_dir("test_stat_memory_stats").expect("create test directory");
+        let content = [
+            "cache 0",
+            "rss 0",
+            "rss_huge 0",
+            "shmem 0",
+            "pgpgout 0",
+            "unevictable 0",
+            "hierarchical_memory_limit 9223372036854771712",
+            "hierarchical_memsw_limit 9223372036854771712",
+        ]
+        .join("\n");
+        set_fixture(&tmp, MEMORY_STAT, &content).unwrap();
+
+        let actual = Memory::get_stat_data(&tmp).expect("get cgroup data");
+        let expected: HashMap<String, u64> = [
+            ("cache".to_owned(), 0),
+            ("rss".to_owned(), 0),
+            ("rss_huge".to_owned(), 0),
+            ("shmem".to_owned(), 0),
+            ("pgpgout".to_owned(), 0),
+            ("unevictable".to_owned(), 0),
+            ("hierarchical_memory_limit".to_owned(), 9223372036854771712),
+            ("hierarchical_memsw_limit".to_owned(), 9223372036854771712),
+        ]
+        .iter()
+        .cloned()
+        .collect();
+
+        assert_eq!(actual, expected);
     }
 }

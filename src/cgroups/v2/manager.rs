@@ -17,6 +17,7 @@ use crate::{
     cgroups::v2::controller::Controller,
     cgroups::{
         common::{self, CgroupManager, CGROUP_PROCS},
+        stats::Stats,
         v2::controller_type::ControllerType,
     },
     utils::PathBufExt,
@@ -153,5 +154,9 @@ impl CgroupManager for Manager {
             ..Default::default()
         };
         Freezer::apply(&linux_resources, &self.full_path)
+    }
+
+    fn stats(&self) -> Result<Stats> {
+        Ok(Stats::default())
     }
 }

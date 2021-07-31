@@ -10,6 +10,7 @@ use clap::Clap;
 
 use youki::commands::create;
 use youki::commands::delete;
+use youki::commands::events;
 use youki::commands::exec;
 use youki::commands::info;
 use youki::commands::kill;
@@ -71,6 +72,8 @@ enum SubCommand {
     Pause(pause::Pause),
     #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
     Resume(resume::Resume),
+    #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
+    Events(events::Events),
 }
 
 /// This is the entry point in the container runtime. The binary is run by a high-level container runtime,
@@ -104,5 +107,6 @@ fn main() -> Result<()> {
         SubCommand::Spec(spec) => spec.exec(),
         SubCommand::Pause(pause) => pause.exec(root_path, systemd_cgroup),
         SubCommand::Resume(resume) => resume.exec(root_path, systemd_cgroup),
+        SubCommand::Events(events) => events.exec(root_path),
     }
 }

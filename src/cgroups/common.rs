@@ -20,6 +20,8 @@ fn booted() -> Result<bool> {
 use crate::cgroups::v1;
 use crate::cgroups::v2;
 
+use super::stats::Stats;
+
 pub const CGROUP_PROCS: &str = "cgroup.procs";
 pub const DEFAULT_CGROUP_ROOT: &str = "/sys/fs/cgroup";
 
@@ -32,6 +34,8 @@ pub trait CgroupManager {
     fn remove(&self) -> Result<()>;
     // Sets the freezer cgroup to the specified state
     fn freeze(&self, state: FreezerState) -> Result<()>;
+    /// Retrieve statistics for the cgroup
+    fn stats(&self) -> Result<Stats>;
 }
 
 #[derive(Debug)]
@@ -77,6 +81,12 @@ pub fn write_cgroup_file<P: AsRef<Path>, T: ToString>(path: P, data: T) -> Resul
         .with_context(|| format!("failed to write to {:?}", path.as_ref()))?;
 
     Ok(())
+}
+
+#[inline]
+pub fn read_cgroup_file<P: AsRef<Path>>(path: P) -> Result<String> {
+    let path = path.as_ref();
+    fs::read_to_string(path).with_context(|| format!("failed to open {:?}", path))
 }
 
 pub fn get_supported_cgroup_fs() -> Result<Vec<Cgroup>> {

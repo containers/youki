@@ -17,6 +17,7 @@ use super::{
 };
 
 use crate::cgroups::common::CGROUP_PROCS;
+use crate::cgroups::stats::{Stats, StatsProvider};
 use crate::utils;
 use crate::{cgroups::common::CgroupManager, utils::PathBufExt};
 use oci_spec::{FreezerState, LinuxResources};
@@ -172,5 +173,23 @@ impl CgroupManager for Manager {
             &linux_resources,
             &self.subsystems.get(&CtrlType::Freezer).unwrap(),
         )
+    }
+
+    fn stats(&self) -> Result<Stats> {
+        let mut stats = Stats::default();
+
+        for subsystem in &self.subsystems {
+            match subsystem.0 {
+                CtrlType::Cpu => stats.cpu.throttling = Cpu::stats(subsystem.1)?,
+                CtrlType::CpuAcct => stats.cpu.usage = CpuAcct::stats(subsystem.1)?,
+                CtrlType::Pids => stats.pids = Pids::stats(subsystem.1)?,
+                CtrlType::HugeTlb => stats.hugetlb = Hugetlb::stats(subsystem.1)?,
+                CtrlType::Blkio => stats.blkio = Blkio::stats(subsystem.1)?,
+                CtrlType::Memory => stats.memory = Memory::stats(subsystem.1)?,
+                _ => continue,
+            }
+        }
+
+        Ok(stats)
     }
 }

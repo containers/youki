@@ -3,6 +3,7 @@
 //! freezing, checkpointing and restarting groups of processes.
 
 pub mod common;
+pub mod stats;
 mod test;
 pub mod v1;
 pub mod v2;
