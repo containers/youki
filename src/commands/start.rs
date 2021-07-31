@@ -16,8 +16,9 @@ pub struct Start {
 
 impl Start {
     pub fn new(container_id: String) -> Self {
-        return Self { container_id };
+        Self { container_id }
     }
+
     pub fn exec(&self, root_path: PathBuf) -> Result<()> {
         let container_root = root_path.join(&self.container_id);
         if !container_root.exists() {
