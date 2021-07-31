@@ -111,7 +111,6 @@ impl TenantContainerBuilder {
             pid_file: self.base.pid_file,
             console_socket: csocketfd,
             use_systemd,
-            container_dir,
             spec,
             rootfs,
             rootless,
