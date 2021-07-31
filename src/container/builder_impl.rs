@@ -77,7 +77,7 @@ impl ContainerBuilderImpl {
             console_socket: self.console_socket.clone(),
             rootless: self.rootless.clone(),
             notify_path: self.notify_path.clone(),
-            child: child,
+            child,
         };
 
         // We have to box up this closure to correctly pass to the init function
