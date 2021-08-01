@@ -7,8 +7,11 @@ on:
       - main
 
 jobs:
-  rustfmt:
+  check:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust: [stable]
     steps:
       - uses: actions/checkout@v2
       - uses: actions/cache@v2
@@ -20,29 +23,40 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: rustup component add rustfmt
-      - name: Check formatting
-        run: cargo fmt --all -- --check
-  tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/cache@v2
+      - uses: actions-rs/toolchain@v1
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: rustup component add clippy
+          toolchain: ${{ matrix.rust }}
+          override: true
+      - run: rustup component add rustfmt clippy
       - run: sudo apt-get -y update
       - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev
+      - name: Check formatting
+        run: cargo fmt --all -- --check
       - uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-features
+          args: --all-targets --all-features -- -D warnings
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust: [1.54.0]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.rust }}
+      - run: sudo apt-get -y update
+      - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev
       - name: Build
         run: ./build.sh --release
       - name: Run tests
@@ -51,6 +65,9 @@ jobs:
         run: cargo test --doc
   integration_tests:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust: [1.54.0]
     steps:
       - uses: actions/checkout@v2
         with:
@@ -66,7 +83,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          toolchain: ${{ matrix.rust }}
       - run: sudo apt-get -y update
       - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev
       - name: Build
