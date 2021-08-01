@@ -34,23 +34,23 @@ pub fn prepare_rootfs(spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<
 
     log::debug!("mount root fs {:?}", rootfs);
     nix_mount::<Path, Path, str, str>(
-        Some(&rootfs),
-        &rootfs,
+        Some(rootfs),
+        rootfs,
         None::<&str>,
         MsFlags::MS_BIND | MsFlags::MS_REC,
         None::<&str>,
     )?;
 
     for m in spec.mounts.as_ref().context("no mounts in spec")?.iter() {
-        let (flags, data) = parse_mount(&m);
+        let (flags, data) = parse_mount(m);
         let ml = &linux.mount_label;
         if m.typ == "cgroup" {
             // skip
             log::warn!("A feature of cgroup is unimplemented.");
         } else if m.destination == PathBuf::from("/dev") {
-            mount_to_container(&m, rootfs, flags & !MsFlags::MS_RDONLY, &data, &ml)?;
+            mount_to_container(m, rootfs, flags & !MsFlags::MS_RDONLY, &data, ml)?;
         } else {
-            mount_to_container(&m, rootfs, flags, &data, &ml)?;
+            mount_to_container(m, rootfs, flags, &data, ml)?;
         }
     }
 

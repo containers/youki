@@ -183,14 +183,12 @@ pub fn create_cgroup_manager<P: Into<PathBuf>>(
 pub fn get_all_pids(path: &Path) -> Result<Vec<Pid>> {
     log::debug!("scan pids in folder: {:?}", path);
     let mut result = vec![];
-    walk_dir(&path, &mut |p| {
+    walk_dir(path, &mut |p| {
         let file_path = p.join(CGROUP_PROCS);
         if file_path.exists() {
             let file = File::open(file_path)?;
-            for line in BufReader::new(file).lines() {
-                if let Ok(line) = line {
-                    result.push(Pid::from_raw(line.parse::<i32>()?))
-                }
+            for line in BufReader::new(file).lines().flatten() {
+                result.push(Pid::from_raw(line.parse::<i32>()?))
             }
         }
         Ok(())
@@ -202,7 +200,7 @@ fn walk_dir<F>(path: &Path, c: &mut F) -> Result<()>
 where
     F: FnMut(&Path) -> Result<()>,
 {
-    c(&path)?;
+    c(path)?;
     for entry in fs::read_dir(path)? {
         let entry = entry?;
         let path = entry.path();

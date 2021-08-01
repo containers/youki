@@ -98,7 +98,7 @@ impl ContainerBuilderImpl {
 
         cmanager.add_task(init_pid)?;
         if self.rootless.is_none() && linux.resources.is_some() && self.init {
-            cmanager.apply(&linux.resources.as_ref().unwrap())?;
+            cmanager.apply(linux.resources.as_ref().unwrap())?;
         }
 
         // if file to write the pid to is specified, write pid of the child
@@ -191,7 +191,7 @@ fn container_init(args: ContainerInitArgs) -> Result<()> {
     // join existing namespaces
     namespaces.apply_setns()?;
 
-    command.set_hostname(&spec.hostname.as_ref().context("no hostname in spec")?)?;
+    command.set_hostname(spec.hostname.as_ref().context("no hostname in spec")?)?;
 
     if proc.no_new_privileges {
         let _ = prctl::set_no_new_privileges(true);
@@ -199,8 +199,8 @@ fn container_init(args: ContainerInitArgs) -> Result<()> {
 
     if args.init {
         rootfs::prepare_rootfs(
-            &spec,
-            &rootfs,
+            spec,
+            rootfs,
             namespaces
                 .clone_flags
                 .contains(sched::CloneFlags::CLONE_NEWUSER),
@@ -216,7 +216,7 @@ fn container_init(args: ContainerInitArgs) -> Result<()> {
     command.set_id(Uid::from_raw(proc.user.uid), Gid::from_raw(proc.user.gid))?;
     capabilities::reset_effective(command)?;
     if let Some(caps) = &proc.capabilities {
-        capabilities::drop_privileges(&caps, command)?;
+        capabilities::drop_privileges(caps, command)?;
     }
 
     // notify parents that the init process is ready to execute the payload.

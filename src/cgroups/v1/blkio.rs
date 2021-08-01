@@ -365,8 +365,8 @@ mod tests {
             "Total 0",
         ]
         .join("\n");
-        set_fixture(&tmp, BLKIO_THROTTLE_IO_SERVICE_BYTES, &content).unwrap();
-        set_fixture(&tmp, BLKIO_THROTTLE_IO_SERVICED, &content).unwrap();
+        set_fixture(&tmp, BLKIO_THROTTLE_IO_SERVICE_BYTES, content).unwrap();
+        set_fixture(&tmp, BLKIO_THROTTLE_IO_SERVICED, content).unwrap();
 
         let actual = Blkio::stats(&tmp).expect("get cgroup stats");
         let mut expected = BlkioStats::default();

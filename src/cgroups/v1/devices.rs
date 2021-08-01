@@ -24,7 +24,7 @@ impl Controller for Devices {
         ]
         .concat()
         {
-            Self::apply_device(&d, &cgroup_root)?;
+            Self::apply_device(&d, cgroup_root)?;
         }
 
         Ok(())
@@ -120,7 +120,7 @@ mod tests {
             set_fixture(&tmp, "devices.allow", "").expect("create allowed devices list");
             set_fixture(&tmp, "devices.deny", "").expect("create denied devices list");
 
-            Devices::apply_device(&d, &tmp).expect("Apply default device");
+            Devices::apply_device(d, &tmp).expect("Apply default device");
             println!("Device: {}", d.to_string());
             if d.allow {
                 let allowed_content =
@@ -172,7 +172,7 @@ mod tests {
             set_fixture(&tmp, "devices.allow", "").expect("create allowed devices list");
             set_fixture(&tmp, "devices.deny", "").expect("create denied devices list");
 
-            Devices::apply_device(&d, &tmp).expect("Apply default device");
+            Devices::apply_device(d, &tmp).expect("Apply default device");
             println!("Device: {}", d.to_string());
             if d.allow {
                 let allowed_content =
@@ -209,7 +209,7 @@ mod tests {
                 .map(|device| {
                     set_fixture(&tmp, "devices.allow", "").expect("create allowed devices list");
                     set_fixture(&tmp, "devices.deny", "").expect("create denied devices list");
-                    Devices::apply_device(&device, &tmp).expect("Apply default device");
+                    Devices::apply_device(device, &tmp).expect("Apply default device");
                     if device.allow {
                         let allowed_content =
                             read_to_string(tmp.join("devices.allow")).expect("read to string");

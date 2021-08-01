@@ -112,7 +112,7 @@ impl InitContainerBuilder {
             ContainerStatus::Creating,
             None,
             self.bundle.as_path().to_str().unwrap(),
-            &container_dir,
+            container_dir,
         )?;
         container.save()?;
         Ok(container)
