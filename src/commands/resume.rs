@@ -5,10 +5,10 @@ use std::path::PathBuf;
 use anyhow::{bail, Context, Result};
 use clap::Clap;
 
-use crate::cgroups;
 use crate::container::Container;
 use crate::container::ContainerStatus;
 use crate::utils;
+use cgroups;
 use oci_spec::FreezerState;
 
 /// Structure to implement resume command

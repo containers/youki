@@ -1,4 +1,5 @@
-use crate::{cgroups::common, utils};
+use crate::utils;
+use cgroups::common;
 use clap::Clap;
 use std::{path::PathBuf, thread, time::Duration};
 

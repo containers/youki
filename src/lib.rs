@@ -1,9 +1,4 @@
-#[cfg(test)]
-#[macro_use]
-extern crate quickcheck;
-
 pub mod capabilities;
-pub mod cgroups;
 pub mod commands;
 pub mod container;
 pub mod dbus;
