@@ -14,6 +14,8 @@ pub struct ContainerBuilder {
     pub(super) pid_file: Option<PathBuf>,
     /// Socket to communicate the file descriptor of the ptty
     pub(super) console_socket: Option<PathBuf>,
+    /// File descriptors to be passed into the container process
+    pub(super) preserve_fds: i32,
 }
 
 /// Builder that can be used to configure the common properties of
@@ -51,6 +53,7 @@ impl ContainerBuilder {
             syscall: LinuxSyscall,
             pid_file: None,
             console_socket: None,
+            preserve_fds: 0,
         }
     }
 
@@ -127,6 +130,21 @@ impl ContainerBuilder {
     /// ```
     pub fn with_console_socket<P: Into<PathBuf>>(mut self, path: Option<P>) -> Self {
         self.console_socket = path.map(|p| p.into());
+        self
+    }
+
+    /// Sets the console socket, which will be used to send the file descriptor
+    /// of the pseudoterminal
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use youki::container::builder::ContainerBuilder;
+    ///
+    /// ContainerBuilder::new("74f1a4cb3801".to_owned())
+    /// .with_preserved_fds(5);
+    /// ```
+    pub fn with_preserved_fds(mut self, preserved_fds: i32) -> Self {
+        self.preserve_fds = preserved_fds;
         self
     }
 }
