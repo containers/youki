@@ -210,12 +210,17 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
                 }
             };
 
-            // The LISTEN_FDS will have to be passed to container init process. The LISTEN_PID will
-            // be set to PID 1.
-            envs.append(&mut vec![
-                format!("LISTEN_FDS={}", listen_fds),
-                "LISTEN_PID=1".to_string(),
-            ]);
+            // The LISTEN_FDS will have to be passed to container init process.
+            // The LISTEN_PID will be set to PID 1. Based on the spec, if
+            // LISTEN_FDS is 0, the variable should be unset, so we just ignore
+            // it here, if it is 0.
+            if listen_fds > 0 {
+                envs.append(&mut vec![
+                    format!("LISTEN_FDS={}", listen_fds),
+                    "LISTEN_PID=1".to_string(),
+                ]);
+            }
+
             args.preserve_fds + listen_fds
         }
         Err(env::VarError::NotPresent) => args.preserve_fds,
