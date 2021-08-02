@@ -214,3 +214,50 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     // payload through execvp, so it should never reach here.
     unreachable!();
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use anyhow::{bail, Result};
+    use nix::{fcntl, sys, unistd};
+    use std::fs;
+
+    #[test]
+    fn test_get_open_fds() -> Result<()> {
+        let file = fs::File::open("/dev/null")?;
+        let fd = file.as_raw_fd();
+        let open_fds = super::get_open_fds()?;
+
+        if !open_fds.iter().any(|&v| v == fd) {
+            bail!("Failed to find the opened dev null fds: {:?}", open_fds);
+        }
+
+        // explicitly close the file before the test case returns.
+        drop(file);
+
+        // The stdio fds should also be contained in the list of opened fds.
+        if !vec![0, 1, 2]
+            .iter()
+            .all(|&stdio_fd| open_fds.iter().any(|&open_fd| open_fd == stdio_fd))
+        {
+            bail!("Failed to find the stdio fds: {:?}", open_fds);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_cleanup_file_descriptors() -> Result<()> {
+        // Open a fd without the CLOEXEC flag. Rust automatically adds the flag,
+        // so we use fcntl::open here for more control.
+        let fd = fcntl::open("/dev/null", fcntl::OFlag::O_RDWR, sys::stat::Mode::empty())?;
+        cleanup_file_descriptors(fd - 1).with_context(|| "Failed to clean up the fds")?;
+        let fd_flag = fcntl::fcntl(fd, fcntl::F_GETFD)?;
+        if (fd_flag & fcntl::FdFlag::FD_CLOEXEC.bits()) != 0 {
+            bail!("CLOEXEC flag is not set correctly");
+        }
+
+        unistd::close(fd)?;
+        Ok(())
+    }
+}
