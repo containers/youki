@@ -73,14 +73,9 @@ fn get_open_fds() -> Result<Vec<i32>> {
 // fds immediatly since we at least still need it for the pipe used to wait on
 // starting the container.
 fn cleanup_file_descriptors(preserve_fds: i32) -> Result<()> {
+    let open_fds = get_open_fds().with_context(|| "Failed to obtain opened fds")?;
     // Include stdin, stdout, and stderr for fd 0, 1, and 2 respectively.
     let min_fd = preserve_fds + 3;
-    // Walk through the PROCFS_FD_PATH to find all the fd that are opened for
-    // the current process.
-    const PROCFS_FD_PATH: &str = "/proc/self/fd";
-    ensure_procfs(Path::new(PROCFS_FD_PATH))
-        .with_context(|| format!("{} is not on the procfs", PROCFS_FD_PATH))?;
-    let open_fds = get_open_fds().with_context(|| "Failed to obtain opened fds")?;
     let to_be_cleaned_up_fds: Vec<i32> = open_fds
         .iter()
         .filter_map(|&fd| if fd >= min_fd { Some(fd) } else { None })
