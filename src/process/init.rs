@@ -198,10 +198,13 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     // environment variables.
     let preserve_fds: i32 = match env::var("LISTEN_FDS") {
         Ok(listen_fds_str) => {
-            let listen_fds = match listen_fds_str.parse::<i32>(){
+            let listen_fds = match listen_fds_str.parse::<i32>() {
                 Ok(v) => v,
                 Err(error) => {
-                    log::warn!("LISTEN_FDS entered is not a fd. Ignore the value. {:?}", error);
+                    log::warn!(
+                        "LISTEN_FDS entered is not a fd. Ignore the value. {:?}",
+                        error
+                    );
 
                     0
                 }
@@ -209,14 +212,18 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
 
             // The LISTEN_FDS will have to be passed to container init process. The LISTEN_PID will
             // be set to PID 1.
-            envs.append(&mut vec![format!("LISTEN_FDS={}", listen_fds), "LISTEN_PID=1".to_string()]);
+            envs.append(&mut vec![
+                format!("LISTEN_FDS={}", listen_fds),
+                "LISTEN_PID=1".to_string(),
+            ]);
             args.preserve_fds + listen_fds
-        },
-        Err(env::VarError::NotPresent) => {
-            args.preserve_fds
-        },
+        }
+        Err(env::VarError::NotPresent) => args.preserve_fds,
         Err(env::VarError::NotUnicode(value)) => {
-            log::warn!("LISTEN_FDS entered is malformed: {:?}. Ignore the value.", &value);
+            log::warn!(
+                "LISTEN_FDS entered is malformed: {:?}. Ignore the value.",
+                &value
+            );
             args.preserve_fds
         }
     };
