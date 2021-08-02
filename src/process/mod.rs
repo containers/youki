@@ -5,6 +5,7 @@ use std::time::Duration;
 
 pub mod child;
 pub mod fork;
+pub mod init;
 pub mod message;
 pub mod parent;
 

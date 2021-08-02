@@ -77,6 +77,7 @@ impl InitContainerBuilder {
             rootless,
             notify_path,
             container: Some(container_state),
+            preserve_fds: self.base.preserve_fds,
         };
 
         builder_impl.create()?;
