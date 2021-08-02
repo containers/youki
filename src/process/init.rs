@@ -4,7 +4,7 @@ use nix::{
     unistd::{Gid, Uid},
 };
 use oci_spec::Spec;
-use std::os::unix::io::AsRawFd;
+use std::{env, os::unix::io::AsRawFd};
 use std::{fs, io::Write, path::Path, path::PathBuf};
 
 use crate::{
@@ -120,6 +120,7 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     // domain socket used here is outside of the rootfs of container
     let mut notify_socket: NotifyListener = NotifyListener::new(&args.notify_path)?;
     let proc = &spec.process.as_ref().context("no process in spec")?;
+    let mut envs: Vec<String> = proc.env.clone();
     let rootfs = &args.rootfs;
     let mut child = args.child;
 
@@ -192,8 +193,36 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
         capabilities::drop_privileges(&caps, command)?;
     }
 
+    // Take care of LISTEN_FDS used for systemd-active-socket. If the value is
+    // not 0, then we have to preserve those fds as well, and set up the correct
+    // environment variables.
+    let preserve_fds: i32 = match env::var("LISTEN_FDS") {
+        Ok(listen_fds_str) => {
+            let listen_fds = match listen_fds_str.parse::<i32>(){
+                Ok(v) => v,
+                Err(error) => {
+                    log::warn!("LISTEN_FDS entered is not a fd. Ignore the value. {:?}", error);
+
+                    0
+                }
+            };
+
+            // The LISTEN_FDS will have to be passed to container init process. The LISTEN_PID will
+            // be set to PID 1.
+            envs.append(&mut vec![format!("LISTEN_FDS={}", listen_fds), "LISTEN_PID=1".to_string()]);
+            args.preserve_fds + listen_fds
+        },
+        Err(env::VarError::NotPresent) => {
+            args.preserve_fds
+        },
+        Err(env::VarError::NotUnicode(value)) => {
+            log::warn!("LISTEN_FDS entered is malformed: {:?}. Ignore the value.", &value);
+            args.preserve_fds
+        }
+    };
+
     // clean up and handle perserved fds.
-    cleanup_file_descriptors(args.preserve_fds).with_context(|| "Failed to clean up extra fds")?;
+    cleanup_file_descriptors(preserve_fds).with_context(|| "Failed to clean up extra fds")?;
 
     // notify parents that the init process is ready to execute the payload.
     child.notify_parent()?;
@@ -202,8 +231,7 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     notify_socket.wait_for_container_start()?;
 
     let args: &Vec<String> = &proc.args;
-    let envs: &Vec<String> = &proc.env;
-    utils::do_exec(&args[0], args, envs)?;
+    utils::do_exec(&args[0], args, &envs)?;
 
     // After do_exec is called, the process is replaced with the container
     // payload through execvp, so it should never reach here.
