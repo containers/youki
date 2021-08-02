@@ -83,13 +83,13 @@ fn cleanup_file_descriptors(preserve_fds: i32) -> Result<()> {
     let open_fds = get_open_fds().with_context(|| "Failed to obtain opened fds")?;
     let to_be_cleaned_up_fds: Vec<i32> = open_fds
         .iter()
-        .filter_map(|fd| if *fd >= min_fd { Some(*fd) } else { None })
+        .filter_map(|&fd| if fd >= min_fd { Some(fd) } else { None })
         .collect();
 
-    to_be_cleaned_up_fds.iter().for_each(|fd| {
+    to_be_cleaned_up_fds.iter().for_each(|&fd| {
         // Intentionally ignore errors here -- the cases where this might fail
         // are basically file descriptors that have already been closed.
-        let _ = fcntl::fcntl(*fd, fcntl::F_SETFD(fcntl::FdFlag::FD_CLOEXEC));
+        let _ = fcntl::fcntl(fd, fcntl::F_SETFD(fcntl::FdFlag::FD_CLOEXEC));
     });
 
     Ok(())
