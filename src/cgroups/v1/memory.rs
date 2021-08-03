@@ -6,7 +6,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use nix::errno::Errno;
 
 use crate::cgroups::common::{self};
-use crate::cgroups::stats::{MemoryData, MemoryStats, StatsProvider};
+use crate::cgroups::stats::{parse_single_value, MemoryData, MemoryStats, StatsProvider};
 use crate::cgroups::v1::Controller;
 use oci_spec::{LinuxMemory, LinuxResources};
 
@@ -135,32 +135,21 @@ impl StatsProvider for Memory {
 impl Memory {
     fn get_memory_data(cgroup_path: &Path, file_prefix: &str) -> Result<MemoryData> {
         let memory_data = MemoryData {
-            usage: Self::get_single_value(
+            usage: parse_single_value(
                 &cgroup_path.join(format!("{}{}", file_prefix, MEMORY_USAGE_IN_BYTES)),
             )?,
-            max_usage: Self::get_single_value(
+            max_usage: parse_single_value(
                 &cgroup_path.join(format!("{}{}", file_prefix, MEMORY_MAX_USAGE_IN_BYTES)),
             )?,
-            limit: Self::get_single_value(
+            limit: parse_single_value(
                 &cgroup_path.join(format!("{}{}", file_prefix, MEMORY_LIMIT_IN_BYTES)),
             )?,
-            fail_count: Self::get_single_value(
+            fail_count: parse_single_value(
                 &cgroup_path.join(format!("{}{}", file_prefix, MEMORY_FAIL_COUNT)),
             )?,
         };
 
         Ok(memory_data)
-    }
-
-    fn get_single_value(file_path: &Path) -> Result<u64> {
-        let value = common::read_cgroup_file(file_path)?;
-        value.trim().parse().with_context(|| {
-            format!(
-                "failed to parse value {} from {}",
-                value,
-                file_path.display()
-            )
-        })
     }
 
     fn hierarchy_enabled(cgroup_path: &Path) -> Result<bool> {

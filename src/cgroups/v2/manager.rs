@@ -13,7 +13,15 @@ use super::{
     cpu::Cpu, cpuset::CpuSet, freezer::Freezer, hugetlb::HugeTlb, io::Io, memory::Memory,
     pids::Pids,
 };
-use crate::{cgroups::v2::controller::Controller, cgroups::{common::{self, CgroupManager, CGROUP_PROCS}, stats::{Stats, StatsProvider}, v2::controller_type::ControllerType}, utils::PathBufExt};
+use crate::{
+    cgroups::v2::controller::Controller,
+    cgroups::{
+        common::{self, CgroupManager, CGROUP_PROCS},
+        stats::{Stats, StatsProvider},
+        v2::controller_type::ControllerType,
+    },
+    utils::PathBufExt,
+};
 
 const CGROUP_CONTROLLERS: &str = "cgroup.controllers";
 const CGROUP_SUBTREE_CONTROL: &str = "cgroup.subtree_control";
@@ -154,8 +162,9 @@ impl CgroupManager for Manager {
         for subsystem in CONTROLLER_TYPES {
             match subsystem {
                 ControllerType::Cpu => stats.cpu.usage = Cpu::stats(&self.full_path)?,
-                _=> continue,
-            }   
+                ControllerType::HugeTlb => stats.hugetlb = HugeTlb::stats(&self.full_path)?,
+                _ => continue,
+            }
         }
 
         Ok(stats)

@@ -4,7 +4,7 @@ use anyhow::{bail, Result};
 
 use crate::cgroups::{
     common,
-    stats::{HugeTlbStats, StatsProvider},
+    stats::{supported_page_sizes, HugeTlbStats, StatsProvider},
     v1::Controller,
 };
 use oci_spec::{LinuxHugepageLimit, LinuxResources};
@@ -39,7 +39,7 @@ impl StatsProvider for Hugetlb {
     type Stats = HashMap<String, HugeTlbStats>;
 
     fn stats(cgroup_path: &Path) -> Result<Self::Stats> {
-        let page_sizes = Self::supported_page_sizes()?;
+        let page_sizes = supported_page_sizes()?;
         let mut hugetlb_stats = HashMap::with_capacity(page_sizes.len());
 
         for page_size in &page_sizes {
@@ -72,36 +72,6 @@ impl Hugetlb {
 
     fn is_power_of_two(number: u64) -> bool {
         (number != 0) && (number & (number - 1)) == 0
-    }
-
-    fn supported_page_sizes() -> Result<Vec<String>> {
-        let mut sizes = Vec::new();
-        for hugetlb_entry in fs::read_dir("/sys/kernel/mm/hugepages")? {
-            let hugetlb_entry = hugetlb_entry?;
-            if !hugetlb_entry.path().is_dir() {
-                continue;
-            }
-
-            let file_name = hugetlb_entry.file_name();
-            let file_name = file_name.to_str().unwrap();
-            if let Some(name_stripped) = file_name.strip_prefix("hugepages-") {
-                if let Some(size) = name_stripped.strip_suffix("kB") {
-                    let size: u64 = size.parse()?;
-
-                    let size_moniker = if size >= (1 << 20) {
-                        (size >> 20).to_string() + "GB"
-                    } else if size >= (1 << 10) {
-                        (size >> 10).to_string() + "MB"
-                    } else {
-                        size.to_string() + "KB"
-                    };
-
-                    sizes.push(size_moniker);
-                }
-            }
-        }
-
-        Ok(sizes)
     }
 
     fn stats_for_page_size(cgroup_path: &Path, page_size: &str) -> Result<HugeTlbStats> {

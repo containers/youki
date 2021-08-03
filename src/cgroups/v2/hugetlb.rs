@@ -1,8 +1,11 @@
-use anyhow::{bail, Result};
-use std::path::Path;
+use anyhow::{bail, Context, Result};
+use std::{collections::HashMap, path::Path};
 
 use super::controller::Controller;
-use crate::cgroups::common;
+use crate::cgroups::{
+    common,
+    stats::{parse_single_value, supported_page_sizes, HugeTlbStats, StatsProvider},
+};
 use oci_spec::{LinuxHugepageLimit, LinuxResources};
 
 pub struct HugeTlb {}
@@ -16,6 +19,24 @@ impl Controller for HugeTlb {
             }
         }
         Ok(())
+    }
+}
+
+impl StatsProvider for HugeTlb {
+    type Stats = HashMap<String, HugeTlbStats>;
+
+    fn stats(cgroup_path: &Path) -> Result<Self::Stats> {
+        let page_sizes = supported_page_sizes()?;
+        let mut hugetlb_stats = HashMap::with_capacity(page_sizes.len());
+
+        for page_size in page_sizes {
+            hugetlb_stats.insert(
+                page_size.clone(),
+                Self::stats_for_page_size(cgroup_path, &page_size)?,
+            );
+        }
+
+        Ok(hugetlb_stats)
     }
 }
 
@@ -48,6 +69,24 @@ impl HugeTlb {
 
     fn is_power_of_two(number: u64) -> bool {
         (number != 0) && (number & (number - 1)) == 0
+    }
+
+    fn stats_for_page_size(cgroup_path: &Path, page_size: &str) -> Result<HugeTlbStats> {
+        let events_file = format!("hugetlb.{}.events", page_size);
+        let events = common::read_cgroup_file(cgroup_path.join(&events_file))?;
+        let fail_count: u64 = events
+            .lines()
+            .find(|l| l.starts_with("max"))
+            .map(|l| l[3..].trim().parse())
+            .transpose()
+            .with_context(|| format!("failed to parse max value for {}", events_file))?
+            .unwrap_or_default();
+
+        Ok(HugeTlbStats {
+            usage: parse_single_value(&cgroup_path.join(format!("hugetlb.{}.current", page_size)))?,
+            fail_count,
+            ..Default::default()
+        })
     }
 }
 
