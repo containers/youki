@@ -1,7 +1,10 @@
 use anyhow::{bail, Result};
 use std::path::Path;
 
-use crate::cgroups::{common, stats::{CpuUsage, StatsProvider}};
+use crate::cgroups::{
+    common,
+    stats::{CpuUsage, StatsProvider},
+};
 use oci_spec::{LinuxCpu, LinuxResources};
 
 use super::controller::Controller;
@@ -33,7 +36,7 @@ impl StatsProvider for Cpu {
 
         let stat_content = common::read_cgroup_file(cgroup_path.join(CPU_STAT))?;
         for entry in stat_content.lines() {
-            let parts:Vec<&str> = entry.split_ascii_whitespace().collect();
+            let parts: Vec<&str> = entry.split_ascii_whitespace().collect();
             if parts.len() != 2 {
                 continue;
             }
@@ -46,11 +49,10 @@ impl StatsProvider for Cpu {
                 _ => continue,
             }
         }
-        
+
         Ok(stats)
     }
 }
-
 
 impl Cpu {
     fn apply(path: &Path, cpu: &LinuxCpu) -> Result<()> {
@@ -256,5 +258,22 @@ mod tests {
             result.is_err(),
             "realtime period is not supported and should return an error"
         );
+    }
+
+    #[test]
+    fn test_stat_usage() {
+        let tmp = create_temp_dir("test_stat_usage").expect("create temp directory for test");
+        let content = ["usage_usec 7730", "user_usec 4387", "system_usec 3498"].join("\n");
+        set_fixture(&tmp, CPU_STAT, &content).expect("create stat file");
+
+        let actual = Cpu::stats(&tmp).expect("get cgroup stats");
+        let expected = CpuUsage {
+            usage_total: 7730,
+            usage_user: 4387,
+            usage_kernel: 3498,
+            ..Default::default()
+        };
+
+        assert_eq!(actual, expected);
     }
 }
