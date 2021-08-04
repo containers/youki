@@ -320,4 +320,23 @@ mod tests {
             limit_check && swap_check && reservation_check
         }
     }
+
+    #[test]
+    fn test_get_memory_data() {
+        let tmp = create_temp_dir("test_stat_memory").expect("create test directory");
+        set_fixture(&tmp, "memory.current", "12500\n").unwrap();
+        set_fixture(&tmp, "memory.max", "25000\n").unwrap();
+        let events = ["slab 5", "anon 13", "oom 3"].join("\n");
+        set_fixture(&tmp, "memory.events", &events).unwrap();
+
+        let actual = Memory::get_memory_data(&tmp, "memory", "oom").expect("get cgroup stats");
+        let expected = MemoryData {
+            usage: 12500,
+            limit: 25000,
+            fail_count: 3,
+            ..Default::default()
+        };
+
+        assert_eq!(actual, expected);
+    }
 }
