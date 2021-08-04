@@ -163,6 +163,7 @@ impl CgroupManager for Manager {
             match subsystem {
                 ControllerType::Cpu => stats.cpu.usage = Cpu::stats(&self.full_path)?,
                 ControllerType::HugeTlb => stats.hugetlb = HugeTlb::stats(&self.full_path)?,
+                ControllerType::Pids => stats.pids = Pids::stats(&self.full_path)?,
                 _ => continue,
             }
         }

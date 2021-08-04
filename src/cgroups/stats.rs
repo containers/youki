@@ -304,3 +304,21 @@ pub fn parse_single_value(file_path: &Path) -> Result<u64> {
         )
     })
 }
+
+pub fn pid_stats(cgroup_path: &Path) -> Result<PidStats> {
+    let mut stats = PidStats::default();
+
+    let current = common::read_cgroup_file(cgroup_path.join("pids.current"))?;
+    stats.current = current
+        .trim()
+        .parse()
+        .context("failed to parse current pids")?;
+
+    let limit =
+        common::read_cgroup_file(cgroup_path.join("pids.max")).map(|l| l.trim().to_owned())?;
+    if limit != "max" {
+        stats.limit = limit.parse().context("failed to parse pids limit")?;
+    }
+
+    Ok(stats)
+}
