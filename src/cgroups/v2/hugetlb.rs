@@ -153,4 +153,20 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn test_stat_hugetbl() {
+        let tmp = create_temp_dir("test_stat_hugetlb").expect("create temp directory for test");
+        set_fixture(&tmp, "hugetlb.2MB.current", "1024\n").expect("set hugetlb current");
+        set_fixture(&tmp, "hugetlb.2MB.events", "max 5\n").expect("set hugetlb events");
+
+        let actual = HugeTlb::stats_for_page_size(&tmp, "2MB").expect("get cgroup stats");
+
+        let expected = HugeTlbStats {
+            usage: 1024,
+            max_usage: 0,
+            fail_count: 5,
+        };
+        assert_eq!(actual, expected);
+    }
 }
