@@ -1,10 +1,13 @@
 use anyhow::{bail, Context, Result};
 use nix::mount::mount as nix_mount;
 use nix::mount::MsFlags;
+use crossbeam_channel::RecvTimeoutError;
 use nix::{
-    fcntl, sched, sys,
-    unistd::{Gid, Uid},
+    fcntl, sched,
+    sys::{signal, statfs},
+    unistd::{Gid, Pid, Uid},
 };
+use oci_spec::Hook;
 use oci_spec::Spec;
 use std::collections::HashMap;
 use std::{
@@ -12,6 +15,10 @@ use std::{
     os::unix::{io::AsRawFd, prelude::RawFd},
 };
 use std::{fs, io::Write, path::Path, path::PathBuf};
+use std::{
+    collections::HashMap, 
+    process, thread, time,
+};
 
 use crate::{
     capabilities,
@@ -23,13 +30,92 @@ use crate::{
     tty, utils,
 };
 
+fn parse_env(envs: Vec<String>) -> HashMap<String, String> {
+    envs.iter()
+        .filter_map(|e| {
+            let mut split = e.split('=');
+
+            if let Some(key) = split.next() {
+                let value: String = split.collect::<Vec<&str>>().join("=");
+                Some((String::from(key), value))
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+fn run_hooks(hooks: Option<Vec<Hook>>) -> Result<()> {
+    if let Some(hooks) = hooks {
+        for hook in hooks {
+            let envs: HashMap<String, String> = if let Some(env) = hook.env {
+                parse_env(env)
+            } else {
+                HashMap::new()
+            };
+            // TODO: pass in container state?
+            let mut hook_command = process::Command::new(hook.path)
+                .args(hook.args.unwrap_or_default())
+                .env_clear()
+                .envs(envs)
+                .spawn()
+                .with_context(|| "Failed to execute hook")?;
+            let hook_command_pid = Pid::from_raw(hook_command.id() as i32);
+            if let Some(timeout_sec) = hook.timeout {
+                // Rust does not make it easy to handle executing a command and
+                // timeout. Here we decided to wait for the command in a
+                // different thread, so the main thread is not blocked. We use a
+                // channel shared between main thread and the wait thread, since
+                // the channel has timeout functions out of the box. Rust won't
+                // let us copy the Command structure, so we can't share it
+                // between the wait thread and main thread. Therefore, we will
+                // use pid to identify the process and send a kill signal. This
+                // is what the Command.kill() does under the hood anyway. When
+                // timeout, we have to kill the process and clean up properly.
+                let (s, r) = crossbeam_channel::unbounded();
+                thread::spawn(move || {
+                    let res = hook_command.wait();
+                    let _ = s.send(res);
+                });
+                match r.recv_timeout(time::Duration::from_secs(timeout_sec as u64)) {
+                    Ok(res) => {
+                        match res {
+                            Ok(exit_status) => {
+                                if !exit_status.success() {
+                                    bail!("Failed to execute hook command. Non-zero return code. {:?}", exit_status);
+                                }
+                            }
+                            Err(e) => {
+                                bail!("Failed to execute hook command: {:?}", e);
+                            }
+                        }
+                    }
+                    Err(RecvTimeoutError::Timeout) => {
+                        // Kill the process. There is no need to further clean
+                        // up because we will be error out.
+                        let _ = signal::kill(hook_command_pid, signal::Signal::SIGKILL);
+                        bail!("Timeout executing hook");
+                    }
+                    Err(_) => {
+                        unreachable!();
+                    }
+                }
+            } else {
+                hook_command.wait()?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
 // Make sure a given path is on procfs. This is to avoid the security risk that
 // /proc path is mounted over. Ref: CVE-2019-16884
 fn ensure_procfs(path: &Path) -> Result<()> {
     let procfs_fd = fs::File::open(path)?;
-    let fstat_info = sys::statfs::fstatfs(&procfs_fd.as_raw_fd())?;
+    let fstat_info = statfs::fstatfs(&procfs_fd.as_raw_fd())?;
 
-    if fstat_info.filesystem_type() != sys::statfs::PROC_SUPER_MAGIC {
+    if fstat_info.filesystem_type() != statfs::PROC_SUPER_MAGIC {
         bail!(format!("{:?} is not on the procfs", path));
     }
 
@@ -113,7 +199,6 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     let command = &args.syscall;
     let spec = &args.spec;
     let linux = spec.linux.as_ref().context("no linux in spec")?;
-
     // need to create the notify socket before we pivot root, since the unix
     // domain socket used here is outside of the rootfs of container
     let mut notify_socket: NotifyListener = NotifyListener::new(&args.notify_path)?;
@@ -121,6 +206,7 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     let mut envs: Vec<String> = proc.env.as_ref().unwrap_or(&vec![]).clone();
     let rootfs = &args.rootfs;
     let mut child = args.child;
+    let hooks = spec.hooks.clone();
 
     // if Out-of-memory score adjustment is set in specification.  set the score
     // value for the current process check
@@ -182,6 +268,11 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     }
 
     if args.init {
+        // create_runtime hook needs to be called after the namespace setup, but
+        // before pivot_root is called.
+        if let Some(hooks) = hooks {
+            run_hooks(hooks.create_runtime)?
+        }
         rootfs::prepare_rootfs(spec, rootfs, bind_service)
             .with_context(|| "Failed to prepare rootfs")?;
 
@@ -353,6 +444,22 @@ mod tests {
         }
 
         unistd::close(fd)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_env() -> Result<()> {
+        let key = "key".to_string();
+        let value = "value".to_string();
+        let env_input = vec![format!("{}={}", key, value)];
+        let env_output = parse_env(env_input);
+        assert_eq!(
+            env_output.len(),
+            1,
+            "There should be exactly one entry inside"
+        );
+        assert_eq!(env_output.get_key_value(&key), Some((&key, &value)));
+
         Ok(())
     }
 }

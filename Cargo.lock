@@ -83,7 +83,7 @@ dependencies = [
  "anyhow",
  "dbus",
  "log",
- "nix 0.22.0",
+ "nix",
  "oci_spec",
  "procfs",
  "serde",
