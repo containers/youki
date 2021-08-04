@@ -3,13 +3,17 @@ use std::path::Path;
 
 use oci_spec::{LinuxMemory, LinuxResources};
 
-use crate::cgroups::common;
+use crate::cgroups::{
+    common,
+    stats::{self, MemoryData, MemoryStats, StatsProvider},
+};
 
 use super::controller::Controller;
 
 const CGROUP_MEMORY_SWAP: &str = "memory.swap.max";
 const CGROUP_MEMORY_MAX: &str = "memory.max";
 const CGROUP_MEMORY_LOW: &str = "memory.low";
+const MEMORY_STAT: &str = "memory.stat";
 
 pub struct Memory {}
 
@@ -23,7 +27,50 @@ impl Controller for Memory {
     }
 }
 
+impl StatsProvider for Memory {
+    type Stats = MemoryStats;
+
+    fn stats(cgroup_path: &Path) -> Result<Self::Stats> {
+        let stats = MemoryStats {
+            memory: Self::get_memory_data(cgroup_path, "memory", "oom")?,
+            memswap: Self::get_memory_data(cgroup_path, "memory.swap", "fail")?,
+            hierarchy: true,
+            stats: stats::parse_flat_keyed_data(&cgroup_path.join(MEMORY_STAT))?,
+            ..Default::default()
+        };
+
+        Ok(stats)
+    }
+}
+
 impl Memory {
+    fn get_memory_data(
+        cgroup_path: &Path,
+        file_prefix: &str,
+        fail_event: &str,
+    ) -> Result<MemoryData> {
+        let usage =
+            stats::parse_single_value(&cgroup_path.join(format!("{}.{}", file_prefix, "current")))?;
+        let limit =
+            stats::parse_single_value(&cgroup_path.join(format!("{}.{}", file_prefix, "max")))?;
+
+        let events = stats::parse_flat_keyed_data(
+            &cgroup_path.join(format!("{}.{}", file_prefix, "events")),
+        )?;
+        let fail_count = if let Some((_, v)) = events.get_key_value(fail_event) {
+            v.clone()
+        } else {
+            Default::default()
+        };
+
+        Ok(MemoryData {
+            usage,
+            limit,
+            fail_count,
+            ..Default::default()
+        })
+    }
+
     fn set<P: AsRef<Path>>(path: P, val: i64) -> Result<()> {
         if val == 0 {
             Ok(())

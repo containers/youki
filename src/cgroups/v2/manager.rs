@@ -164,6 +164,7 @@ impl CgroupManager for Manager {
                 ControllerType::Cpu => stats.cpu.usage = Cpu::stats(&self.full_path)?,
                 ControllerType::HugeTlb => stats.hugetlb = HugeTlb::stats(&self.full_path)?,
                 ControllerType::Pids => stats.pids = Pids::stats(&self.full_path)?,
+                ControllerType::Memory => stats.memory = Memory::stats(&self.full_path)?,
                 _ => continue,
             }
         }

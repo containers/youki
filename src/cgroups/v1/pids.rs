@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use anyhow::{Result};
+use anyhow::Result;
 
 use crate::cgroups::{
     common,

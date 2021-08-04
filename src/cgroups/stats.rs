@@ -296,13 +296,42 @@ pub fn supported_page_sizes() -> Result<Vec<String>> {
 
 pub fn parse_single_value(file_path: &Path) -> Result<u64> {
     let value = common::read_cgroup_file(file_path)?;
-    value.trim().parse().with_context(|| {
+    let value = value.trim();
+    if value == "max" {
+        return Ok(u64::MAX);
+    }
+
+    value.parse().with_context(|| {
         format!(
             "failed to parse value {} from {}",
             value,
             file_path.display()
         )
     })
+}
+
+pub fn parse_flat_keyed_data(file_path: &Path) -> Result<HashMap<String, u64>> {
+    let mut stats = HashMap::new();
+    let keyed_data = common::read_cgroup_file(file_path)?;
+    for entry in keyed_data.lines() {
+        let entry_fields: Vec<&str> = entry.split_ascii_whitespace().collect();
+        if entry_fields.len() != 2 {
+            continue;
+        }
+
+        stats.insert(
+            entry_fields[0].to_owned(),
+            entry_fields[1].parse().with_context(|| {
+                format!(
+                    "failed to parse value {} from {}",
+                    entry_fields[0],
+                    file_path.display()
+                )
+            })?,
+        );
+    }
+
+    Ok(stats)
 }
 
 pub fn pid_stats(cgroup_path: &Path) -> Result<PidStats> {
