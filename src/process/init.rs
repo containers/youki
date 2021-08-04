@@ -462,4 +462,34 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_run_hook() -> Result<()> {
+        run_hooks(None)?;
+
+        {
+            let hook = Hook {
+                path: PathBuf::from("/bin/true"),
+                args: None,
+                env: None,
+                timeout: None,
+            };
+            let hooks = Some(vec![hook]);
+            run_hooks(hooks)?;
+        }
+
+        {
+            // Use `printenv` to make sure the environment is set correctly.
+            let hook = Hook {
+                path: PathBuf::from("/bin/printenv"),
+                args: Some(vec!["key".to_string()]),
+                env: Some(vec!["key=value".to_string()]),
+                timeout: None,
+            };
+            let hooks = Some(vec![hook]);
+            run_hooks(hooks)?;
+        }
+
+        Ok(())
+    }
 }
