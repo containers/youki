@@ -94,7 +94,7 @@ impl ContainerBuilderImpl {
 
         cmanager.add_task(init_pid)?;
         if self.rootless.is_none() && linux.resources.is_some() && self.init {
-            cmanager.apply(&linux.resources.as_ref().unwrap())?;
+            cmanager.apply(linux.resources.as_ref().unwrap())?;
         }
 
         // if file to write the pid to is specified, write pid of the child

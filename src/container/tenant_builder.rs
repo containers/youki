@@ -302,14 +302,14 @@ impl TenantContainerBuilder {
     }
 
     fn setup_notify_listener(container_dir: &Path) -> Result<PathBuf> {
-        let notify_name = Self::generate_name(&container_dir, TENANT_NOTIFY);
+        let notify_name = Self::generate_name(container_dir, TENANT_NOTIFY);
         let socket_path = container_dir.join(&notify_name);
 
         Ok(socket_path)
     }
 
     fn setup_tty_socket(&self, container_dir: &Path) -> Result<Option<FileDescriptor>> {
-        let tty_name = Self::generate_name(&container_dir, TENANT_TTY);
+        let tty_name = Self::generate_name(container_dir, TENANT_TTY);
         let csocketfd = if let Some(console_socket) = &self.base.console_socket {
             Some(tty::setup_console_socket(
                 container_dir,

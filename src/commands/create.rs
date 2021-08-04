@@ -45,7 +45,7 @@ impl Create {
             bundle,
             console_socket,
             container_id,
-            preserve_fds: preserve_fds,
+            preserve_fds,
         }
     }
     /// Starts a new container process

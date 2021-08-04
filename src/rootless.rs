@@ -38,7 +38,7 @@ pub fn detect_rootless(spec: &Spec) -> Result<Option<Rootless>> {
         validate(spec)?;
         let linux = spec.linux.as_ref().context("no linux in spec")?;
         let mut rootless = Rootless::from(linux);
-        if let Some((uid_binary, gid_binary)) = lookup_map_binaries(&linux)? {
+        if let Some((uid_binary, gid_binary)) = lookup_map_binaries(linux)? {
             rootless.newuidmap = Some(uid_binary);
             rootless.newgidmap = Some(gid_binary);
         }

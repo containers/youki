@@ -53,7 +53,7 @@ impl Controller for Memory {
         if let Some(memory) = Self::needs_to_handle(linux_resources) {
             let reservation = memory.reservation.unwrap_or(0);
 
-            Self::apply(&memory, cgroup_root)?;
+            Self::apply(memory, cgroup_root)?;
 
             if reservation != 0 {
                 common::write_cgroup_file(

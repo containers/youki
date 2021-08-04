@@ -54,7 +54,7 @@ impl Ps {
                     println!("{}", std::str::from_utf8(&output.stderr)?);
                 } else {
                     let lines = std::str::from_utf8(&output.stdout)?;
-                    let lines: Vec<&str> = lines.split("\n").collect();
+                    let lines: Vec<&str> = lines.split('\n').collect();
                     let pid_index = get_pid_index(lines[0])?;
                     println!("{}", &lines[0]);
                     for line in &lines[1..] {

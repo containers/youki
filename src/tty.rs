@@ -106,7 +106,7 @@ mod tests {
         let (testdir, rundir_path, socket_path) = init.unwrap();
         let lis = UnixListener::bind(Path::join(&testdir, "console-socket"));
         assert!(lis.is_ok());
-        let fd = setup_console_socket(&&rundir_path, &socket_path, CONSOLE_SOCKET);
+        let fd = setup_console_socket(&rundir_path, &socket_path, CONSOLE_SOCKET);
         assert!(fd.is_ok());
         assert_ne!(fd.unwrap().as_raw_fd(), -1);
     }
@@ -142,7 +142,7 @@ mod tests {
         let (testdir, rundir_path, socket_path) = init.unwrap();
         let lis = UnixListener::bind(Path::join(&testdir, "console-socket"));
         assert!(lis.is_ok());
-        let fd = setup_console_socket(&&rundir_path, &socket_path, CONSOLE_SOCKET);
+        let fd = setup_console_socket(&rundir_path, &socket_path, CONSOLE_SOCKET);
         let status = setup_console(&fd.unwrap());
         assert!(status.is_ok());
     }

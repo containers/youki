@@ -33,7 +33,7 @@ impl Controller for NetworkPriority {
 impl NetworkPriority {
     fn apply(root_path: &Path, network: &LinuxNetwork) -> Result<()> {
         let priorities: String = network.priorities.iter().map(|p| p.to_string()).collect();
-        common::write_cgroup_file_str(root_path.join("net_prio.ifpriomap"), &priorities.trim())?;
+        common::write_cgroup_file_str(root_path.join("net_prio.ifpriomap"), priorities.trim())?;
 
         Ok(())
     }

@@ -230,7 +230,7 @@ mod tests {
             "throttled_time 1080",
         ]
         .join("\n");
-        set_fixture(&tmp, CGROUP_CPU_STAT, &stat_content).expect("create stat file");
+        set_fixture(&tmp, CGROUP_CPU_STAT, stat_content).expect("create stat file");
 
         let actual = Cpu::stats(&tmp).expect("get cgroup stats");
         let expected = CpuThrottling {

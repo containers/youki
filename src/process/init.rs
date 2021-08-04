@@ -43,14 +43,8 @@ fn get_open_fds() -> Result<Vec<i32>> {
             Ok(entry) => Some(entry.path()),
             Err(_) => None,
         })
-        .filter_map(|path| match path.file_name() {
-            Some(file_name) => Some(file_name.to_owned()),
-            None => None,
-        })
-        .filter_map(|file_name| match file_name.to_str() {
-            Some(file_name) => Some(String::from(file_name)),
-            None => None,
-        })
+        .filter_map(|path| path.file_name().map(|file_name| file_name.to_owned()))
+        .filter_map(|file_name| file_name.to_str().map(String::from))
         .filter_map(|file_name| -> Option<i32> {
             // Convert the file name from string into i32. Since we are looking
             // at /proc/<pid>/fd, anything that's not a number (i32) can be
@@ -165,7 +159,7 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     // join existing namespaces
     namespaces.apply_setns()?;
 
-    command.set_hostname(&spec.hostname.as_ref().context("no hostname in spec")?)?;
+    command.set_hostname(spec.hostname.as_ref().context("no hostname in spec")?)?;
 
     if proc.no_new_privileges {
         let _ = prctl::set_no_new_privileges(true);
@@ -173,8 +167,8 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
 
     if args.init {
         rootfs::prepare_rootfs(
-            &spec,
-            &rootfs,
+            spec,
+            rootfs,
             namespaces
                 .clone_flags
                 .contains(sched::CloneFlags::CLONE_NEWUSER),
@@ -190,7 +184,7 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     command.set_id(Uid::from_raw(proc.user.uid), Gid::from_raw(proc.user.gid))?;
     capabilities::reset_effective(command)?;
     if let Some(caps) = &proc.capabilities {
-        capabilities::drop_privileges(&caps, command)?;
+        capabilities::drop_privileges(caps, command)?;
     }
 
     // Take care of LISTEN_FDS used for systemd-active-socket. If the value is

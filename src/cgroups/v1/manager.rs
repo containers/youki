@@ -53,7 +53,7 @@ impl Manager {
         let p = if cgroup_path.to_string_lossy().into_owned().is_empty() {
             mount_point.join_absolute_path(Path::new(&cgroup.pathname))?
         } else if cgroup_path.is_absolute() {
-            mount_point.join_absolute_path(&cgroup_path)?
+            mount_point.join_absolute_path(cgroup_path)?
         } else {
             mount_point.join(cgroup_path)
         };
@@ -133,20 +133,18 @@ impl CgroupManager for Manager {
     fn apply(&self, linux_resources: &LinuxResources) -> Result<()> {
         for subsys in self.get_required_controllers(linux_resources)? {
             match subsys.0 {
-                CtrlType::Cpu => Cpu::apply(linux_resources, &subsys.1)?,
-                CtrlType::CpuAcct => CpuAcct::apply(linux_resources, &subsys.1)?,
-                CtrlType::CpuSet => CpuSet::apply(linux_resources, &subsys.1)?,
-                CtrlType::Devices => Devices::apply(linux_resources, &subsys.1)?,
-                CtrlType::HugeTlb => Hugetlb::apply(linux_resources, &subsys.1)?,
-                CtrlType::Memory => Memory::apply(linux_resources, &subsys.1)?,
-                CtrlType::Pids => Pids::apply(linux_resources, &subsys.1)?,
-                CtrlType::PerfEvent => PerfEvent::apply(linux_resources, &subsys.1)?,
-                CtrlType::Blkio => Blkio::apply(linux_resources, &subsys.1)?,
-                CtrlType::NetworkPriority => NetworkPriority::apply(linux_resources, &subsys.1)?,
-                CtrlType::NetworkClassifier => {
-                    NetworkClassifier::apply(linux_resources, &subsys.1)?
-                }
-                CtrlType::Freezer => Freezer::apply(linux_resources, &subsys.1)?,
+                CtrlType::Cpu => Cpu::apply(linux_resources, subsys.1)?,
+                CtrlType::CpuAcct => CpuAcct::apply(linux_resources, subsys.1)?,
+                CtrlType::CpuSet => CpuSet::apply(linux_resources, subsys.1)?,
+                CtrlType::Devices => Devices::apply(linux_resources, subsys.1)?,
+                CtrlType::HugeTlb => Hugetlb::apply(linux_resources, subsys.1)?,
+                CtrlType::Memory => Memory::apply(linux_resources, subsys.1)?,
+                CtrlType::Pids => Pids::apply(linux_resources, subsys.1)?,
+                CtrlType::PerfEvent => PerfEvent::apply(linux_resources, subsys.1)?,
+                CtrlType::Blkio => Blkio::apply(linux_resources, subsys.1)?,
+                CtrlType::NetworkPriority => NetworkPriority::apply(linux_resources, subsys.1)?,
+                CtrlType::NetworkClassifier => NetworkClassifier::apply(linux_resources, subsys.1)?,
+                CtrlType::Freezer => Freezer::apply(linux_resources, subsys.1)?,
             }
         }
 
@@ -179,7 +177,7 @@ impl CgroupManager for Manager {
         };
         Freezer::apply(
             &linux_resources,
-            &self.subsystems.get(&CtrlType::Freezer).unwrap(),
+            self.subsystems.get(&CtrlType::Freezer).unwrap(),
         )
     }
 
