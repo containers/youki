@@ -18,6 +18,9 @@ pub struct Run {
     /// Unix socket (file) path , which will receive file descriptor of the writing end of the pseudoterminal
     #[clap(short, long)]
     console_socket: Option<PathBuf>,
+    /// Pass N additional file descriptors to the container (stdio + $LISTEN_FDS + N in total)
+    #[clap(long, default_value = "0")]
+    preserve_fds: i32,
     /// name of the container instance to be started
     pub container_id: String,
 }
@@ -29,6 +32,7 @@ impl Run {
             self.pid_file.clone(),
             self.bundle.clone(),
             self.console_socket.clone(),
+            self.preserve_fds,
         )
         .exec(root_path.clone(), systemd_cgroup)?;
 

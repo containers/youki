@@ -116,6 +116,7 @@ impl TenantContainerBuilder {
             rootless,
             notify_path: notify_path.clone(),
             container: None,
+            preserve_fds: self.base.preserve_fds,
         };
 
         builder_impl.create()?;

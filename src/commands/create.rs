@@ -19,6 +19,9 @@ pub struct Create {
     /// Unix socket (file) path , which will receive file descriptor of the writing end of the pseudoterminal
     #[clap(short, long)]
     console_socket: Option<PathBuf>,
+    /// Pass N additional file descriptors to the container (stdio + $LISTEN_FDS + N in total)
+    #[clap(long, default_value = "0")]
+    preserve_fds: i32,
     /// name of the container instance to be started
     pub container_id: String,
 }
@@ -35,12 +38,14 @@ impl Create {
         pid_file: Option<PathBuf>,
         bundle: PathBuf,
         console_socket: Option<PathBuf>,
+        preserve_fds: i32,
     ) -> Self {
         Self {
             pid_file,
             bundle,
             console_socket,
             container_id,
+            preserve_fds: preserve_fds,
         }
     }
     /// Starts a new container process
@@ -49,6 +54,7 @@ impl Create {
             .with_pid_file(self.pid_file.as_ref())
             .with_console_socket(self.console_socket.as_ref())
             .with_root_path(root_path)
+            .with_preserved_fds(self.preserve_fds)
             .as_init(&self.bundle)
             .with_systemd(systemd_cgroup)
             .build()
