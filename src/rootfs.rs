@@ -23,7 +23,12 @@ pub fn prepare_rootfs(spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<
     let mut flags = MsFlags::MS_REC;
 
     let linux = spec.linux.as_ref().context("no linux in spec")?;
-    match linux.rootfs_propagation.as_ref() {
+    match linux
+        .rootfs_propagation
+        .as_ref()
+        .context("no rootfs_propagation in spec")?
+        .as_str()
+    {
         "shared" => flags |= MsFlags::MS_SHARED,
         "private" => flags |= MsFlags::MS_PRIVATE,
         "slave" | "" => flags |= MsFlags::MS_SLAVE,
@@ -43,8 +48,11 @@ pub fn prepare_rootfs(spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<
 
     for m in spec.mounts.as_ref().context("no mounts in spec")?.iter() {
         let (flags, data) = parse_mount(m);
-        let ml = &linux.mount_label;
-        if m.typ == "cgroup" {
+        let ml = linux
+            .mount_label
+            .as_ref()
+            .context("no mount_label in spec")?;
+        if m.typ.as_ref().context("no type in mount spec")? == "cgroup" {
             // skip
             log::warn!("A feature of cgroup is unimplemented.");
         } else if m.destination == PathBuf::from("/dev") {
@@ -58,7 +66,10 @@ pub fn prepare_rootfs(spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<
     chdir(rootfs)?;
 
     setup_default_symlinks(rootfs)?;
-    create_devices(&linux.devices, bind_devices)?;
+    create_devices(
+        linux.devices.as_ref().context("no devices in spec")?,
+        bind_devices,
+    )?;
     setup_ptmx(rootfs)?;
 
     chdir(&olddir)?;
@@ -199,8 +210,11 @@ fn bind_dev(dev: &LinuxDevice) -> Result<()> {
 }
 
 fn mknod_dev(dev: &LinuxDevice) -> Result<()> {
-    fn makedev(major: u64, minor: u64) -> u64 {
-        (minor & 0xff) | ((major & 0xfff) << 8) | ((minor & !0xff) << 12) | ((major & !0xfff) << 32)
+    fn makedev(major: i64, minor: i64) -> u64 {
+        ((minor & 0xff)
+            | ((major & 0xfff) << 8)
+            | ((minor & !0xff) << 12)
+            | ((major & !0xfff) << 32)) as u64
     }
 
     mknod(
@@ -224,7 +238,8 @@ fn mount_to_container(
     data: &str,
     label: &str,
 ) -> Result<()> {
-    let d = if !label.is_empty() && m.typ != "proc" && m.typ != "sysfs" {
+    let typ = m.typ.as_ref().context("no type in mount spec")?;
+    let d = if !label.is_empty() && typ != "proc" && typ != "sysfs" {
         if data.is_empty() {
             format!("context=\"{}\"", label)
         } else {
@@ -241,8 +256,9 @@ fn mount_to_container(
     );
     let dest = Path::new(&dest_for_host);
 
-    let src = if m.typ == "bind" {
-        let src = canonicalize(&m.source)?;
+    let source = &m.source.as_ref().context("no source in mount spec")?;
+    let src = if typ == "bind" {
+        let src = canonicalize(source)?;
         let dir = if src.is_file() {
             Path::new(&dest).parent().unwrap()
         } else {
@@ -259,14 +275,14 @@ fn mount_to_container(
         src
     } else {
         create_dir_all(&dest).unwrap();
-        PathBuf::from(&m.source)
+        PathBuf::from(source)
     };
 
-    if let Err(errno) = nix_mount(Some(&*src), dest, Some(&*m.typ), flags, Some(&*d)) {
+    if let Err(errno) = nix_mount(Some(&*src), dest, Some(&*typ.as_str()), flags, Some(&*d)) {
         if !matches!(errno, Errno::EINVAL) {
             bail!("mount of {} failed", m.destination.display());
         }
-        nix_mount(Some(&*src), dest, Some(&*m.typ), flags, Some(data))?;
+        nix_mount(Some(&*src), dest, Some(&*typ.as_str()), flags, Some(data))?;
     }
     if flags.contains(MsFlags::MS_BIND)
         && flags.intersects(
@@ -292,51 +308,53 @@ fn mount_to_container(
 fn parse_mount(m: &Mount) -> (MsFlags, String) {
     let mut flags = MsFlags::empty();
     let mut data = Vec::new();
-    for s in &m.options {
-        if let Some((is_clear, flag)) = match s.as_str() {
-            "defaults" => Some((false, MsFlags::empty())),
-            "ro" => Some((false, MsFlags::MS_RDONLY)),
-            "rw" => Some((true, MsFlags::MS_RDONLY)),
-            "suid" => Some((true, MsFlags::MS_NOSUID)),
-            "nosuid" => Some((false, MsFlags::MS_NOSUID)),
-            "dev" => Some((true, MsFlags::MS_NODEV)),
-            "nodev" => Some((false, MsFlags::MS_NODEV)),
-            "exec" => Some((true, MsFlags::MS_NOEXEC)),
-            "noexec" => Some((false, MsFlags::MS_NOEXEC)),
-            "sync" => Some((false, MsFlags::MS_SYNCHRONOUS)),
-            "async" => Some((true, MsFlags::MS_SYNCHRONOUS)),
-            "dirsync" => Some((false, MsFlags::MS_DIRSYNC)),
-            "remount" => Some((false, MsFlags::MS_REMOUNT)),
-            "mand" => Some((false, MsFlags::MS_MANDLOCK)),
-            "nomand" => Some((true, MsFlags::MS_MANDLOCK)),
-            "atime" => Some((true, MsFlags::MS_NOATIME)),
-            "noatime" => Some((false, MsFlags::MS_NOATIME)),
-            "diratime" => Some((true, MsFlags::MS_NODIRATIME)),
-            "nodiratime" => Some((false, MsFlags::MS_NODIRATIME)),
-            "bind" => Some((false, MsFlags::MS_BIND)),
-            "rbind" => Some((false, MsFlags::MS_BIND | MsFlags::MS_REC)),
-            "unbindable" => Some((false, MsFlags::MS_UNBINDABLE)),
-            "runbindable" => Some((false, MsFlags::MS_UNBINDABLE | MsFlags::MS_REC)),
-            "private" => Some((false, MsFlags::MS_PRIVATE)),
-            "rprivate" => Some((false, MsFlags::MS_PRIVATE | MsFlags::MS_REC)),
-            "shared" => Some((false, MsFlags::MS_SHARED)),
-            "rshared" => Some((false, MsFlags::MS_SHARED | MsFlags::MS_REC)),
-            "slave" => Some((false, MsFlags::MS_SLAVE)),
-            "rslave" => Some((false, MsFlags::MS_SLAVE | MsFlags::MS_REC)),
-            "relatime" => Some((false, MsFlags::MS_RELATIME)),
-            "norelatime" => Some((true, MsFlags::MS_RELATIME)),
-            "strictatime" => Some((false, MsFlags::MS_STRICTATIME)),
-            "nostrictatime" => Some((true, MsFlags::MS_STRICTATIME)),
-            _ => None,
-        } {
-            if is_clear {
-                flags &= !flag;
+    if let Some(options) = &m.options {
+        for s in options {
+            if let Some((is_clear, flag)) = match s.as_str() {
+                "defaults" => Some((false, MsFlags::empty())),
+                "ro" => Some((false, MsFlags::MS_RDONLY)),
+                "rw" => Some((true, MsFlags::MS_RDONLY)),
+                "suid" => Some((true, MsFlags::MS_NOSUID)),
+                "nosuid" => Some((false, MsFlags::MS_NOSUID)),
+                "dev" => Some((true, MsFlags::MS_NODEV)),
+                "nodev" => Some((false, MsFlags::MS_NODEV)),
+                "exec" => Some((true, MsFlags::MS_NOEXEC)),
+                "noexec" => Some((false, MsFlags::MS_NOEXEC)),
+                "sync" => Some((false, MsFlags::MS_SYNCHRONOUS)),
+                "async" => Some((true, MsFlags::MS_SYNCHRONOUS)),
+                "dirsync" => Some((false, MsFlags::MS_DIRSYNC)),
+                "remount" => Some((false, MsFlags::MS_REMOUNT)),
+                "mand" => Some((false, MsFlags::MS_MANDLOCK)),
+                "nomand" => Some((true, MsFlags::MS_MANDLOCK)),
+                "atime" => Some((true, MsFlags::MS_NOATIME)),
+                "noatime" => Some((false, MsFlags::MS_NOATIME)),
+                "diratime" => Some((true, MsFlags::MS_NODIRATIME)),
+                "nodiratime" => Some((false, MsFlags::MS_NODIRATIME)),
+                "bind" => Some((false, MsFlags::MS_BIND)),
+                "rbind" => Some((false, MsFlags::MS_BIND | MsFlags::MS_REC)),
+                "unbindable" => Some((false, MsFlags::MS_UNBINDABLE)),
+                "runbindable" => Some((false, MsFlags::MS_UNBINDABLE | MsFlags::MS_REC)),
+                "private" => Some((false, MsFlags::MS_PRIVATE)),
+                "rprivate" => Some((false, MsFlags::MS_PRIVATE | MsFlags::MS_REC)),
+                "shared" => Some((false, MsFlags::MS_SHARED)),
+                "rshared" => Some((false, MsFlags::MS_SHARED | MsFlags::MS_REC)),
+                "slave" => Some((false, MsFlags::MS_SLAVE)),
+                "rslave" => Some((false, MsFlags::MS_SLAVE | MsFlags::MS_REC)),
+                "relatime" => Some((false, MsFlags::MS_RELATIME)),
+                "norelatime" => Some((true, MsFlags::MS_RELATIME)),
+                "strictatime" => Some((false, MsFlags::MS_STRICTATIME)),
+                "nostrictatime" => Some((true, MsFlags::MS_STRICTATIME)),
+                _ => None,
+            } {
+                if is_clear {
+                    flags &= !flag;
+                } else {
+                    flags |= flag;
+                }
             } else {
-                flags |= flag;
-            }
-        } else {
-            data.push(s.as_str());
-        };
+                data.push(s.as_str());
+            };
+        }
     }
     (flags, data.join(","))
 }

@@ -178,16 +178,18 @@ mod tests {
         // set Thawed state.
         {
             let linux_resources = LinuxResources {
-                devices: vec![],
+                devices: Some(vec![]),
                 disable_oom_killer: false,
                 oom_score_adj: None,
                 memory: None,
                 cpu: None,
                 pids: None,
                 block_io: None,
-                hugepage_limits: vec![],
+                hugepage_limits: Some(vec![]),
                 network: None,
                 freezer: Some(FreezerState::Thawed),
+                rdma: None,
+                unified: None,
             };
 
             let pid = Pid::from_raw(1000);
@@ -204,16 +206,18 @@ mod tests {
         // set Frozen state.
         {
             let linux_resources = LinuxResources {
-                devices: vec![],
+                devices: Some(vec![]),
                 disable_oom_killer: false,
                 oom_score_adj: None,
                 memory: None,
                 cpu: None,
                 pids: None,
                 block_io: None,
-                hugepage_limits: vec![],
+                hugepage_limits: Some(vec![]),
                 network: None,
                 freezer: Some(FreezerState::Frozen),
+                rdma: None,
+                unified: None,
             };
 
             let pid = Pid::from_raw(1001);
@@ -230,16 +234,18 @@ mod tests {
         // set Undefined state.
         {
             let linux_resources = LinuxResources {
-                devices: vec![],
+                devices: Some(vec![]),
                 disable_oom_killer: false,
                 oom_score_adj: None,
                 memory: None,
                 cpu: None,
                 pids: None,
                 block_io: None,
-                hugepage_limits: vec![],
+                hugepage_limits: Some(vec![]),
                 network: None,
                 freezer: Some(FreezerState::Undefined),
+                rdma: None,
+                unified: None,
             };
 
             let pid = Pid::from_raw(1002);

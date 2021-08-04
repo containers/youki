@@ -1,44 +1,70 @@
-use super::*;
+use anyhow::{bail, Result};
 use nix::sys::stat::SFlag;
+use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, convert::TryFrom, path::PathBuf};
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
+/// Linux contains platform-specific configuration for Linux based containers.
 pub struct Linux {
-    // UIDMapping for supporting user namespaces
-    #[serde(default, rename = "uidMappings")]
-    pub uid_mappings: Vec<LinuxIdMapping>,
-    // GIDMapping for supporting group namespaces
-    #[serde(default, rename = "gidMappings")]
-    pub gid_mappings: Vec<LinuxIdMapping>,
-    // Sysctl that are set for container on start
-    #[serde(default)]
-    pub sysctl: HashMap<String, String>,
-    // Resources contain cgroup info for handling resource constraints
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// UIDMappings specifies user mappings for supporting user namespaces.
+    pub uid_mappings: Option<Vec<LinuxIdMapping>>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// GIDMappings specifies group mappings for supporting user namespaces.
+    pub gid_mappings: Option<Vec<LinuxIdMapping>>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Sysctl are a set of key value pairs that are set for the container on start.
+    pub sysctl: Option<HashMap<String, String>>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Resources contain cgroup information for handling resource constraints for the container.
     pub resources: Option<LinuxResources>,
-    // CgroupsPath specifies the path to cgroups that are created and/or joined by the container.
-    // The path is expected to be relative to the cgroups mountpoint.
-    // If resources are specified, the cgroups at CgroupsPath will be updated based on resources.
-    #[serde(default)]
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// CgroupsPath specifies the path to cgroups that are created and/or joined by the container.
+    /// The path is expected to be relative to the cgroups mountpoint. If resources are specified,
+    /// the cgroups at CgroupsPath will be updated based on resources.
     pub cgroups_path: Option<PathBuf>,
-    // Namespaces contains the namespaces that are created and/or joined by the container
-    #[serde(default)]
-    pub namespaces: Vec<LinuxNamespace>,
-    // Devices are a list of device nodes that are created for the container
-    #[serde(default)]
-    pub devices: Vec<LinuxDevice>,
-    // The rootfs mount propagation mode for the container
-    #[serde(default)]
-    pub rootfs_propagation: String,
-    // Masks over the provided paths inside the container so they cannot be read
-    #[serde(default)]
-    pub masked_paths: Vec<String>,
-    // Sets the provided paths as RO inside the container
-    #[serde(default)]
-    pub readonly_paths: Vec<String>,
-    // Specifies th selinux context for the mounts in the container
-    #[serde(default)]
-    pub mount_label: String,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Namespaces contains the namespaces that are created and/or joined by the container.
+    pub namespaces: Option<Vec<LinuxNamespace>>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Devices are a list of device nodes that are created for the container.
+    pub devices: Option<Vec<LinuxDevice>>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Seccomp specifies the seccomp security settings for the container.
+    pub seccomp: Option<LinuxSeccomp>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// RootfsPropagation is the rootfs mount propagation mode for the container.
+    pub rootfs_propagation: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// MaskedPaths masks over the provided paths inside the container.
+    pub masked_paths: Option<Vec<String>>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// ReadonlyPaths sets the provided paths as RO inside the container.
+    pub readonly_paths: Option<Vec<String>>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// MountLabel specifies the selinux context for the mounts in the container.
+    pub mount_label: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// IntelRdt contains Intel Resource Director Technology (RDT) information for handling
+    /// resource constraints (e.g., L3 cache, memory bandwidth) for the container.
+    pub intel_rdt: Option<LinuxIntelRdt>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Personality contains configuration for the Linux personality syscall.
+    pub personality: Option<LinuxPersonality>,
 }
 
 // Default impl for Linux (see funtions for more info)
@@ -53,12 +79,13 @@ impl Default for Linux {
             sysctl: Default::default(),
             resources: Some(LinuxResources {
                 devices: vec![LinuxDeviceCgroup {
-                    access: "rwm".to_string(),
+                    access: "rwm".to_string().into(),
                     allow: false,
                     typ: Default::default(),
                     major: Default::default(),
                     minor: Default::default(),
-                }],
+                }]
+                .into(),
                 disable_oom_killer: Default::default(),
                 oom_score_adj: Default::default(),
                 memory: Default::default(),
@@ -68,50 +95,61 @@ impl Default for Linux {
                 hugepage_limits: Default::default(),
                 network: Default::default(),
                 freezer: Default::default(),
+                rdma: Default::default(),
+                unified: Default::default(),
             }),
             // Defaults to None
             cgroups_path: Default::default(),
-            namespaces: get_default_namespaces(),
+            namespaces: get_default_namespaces().into(),
             // Empty Vec
             devices: Default::default(),
             // Empty String
             rootfs_propagation: Default::default(),
-            masked_paths: get_default_maskedpaths(),
-            readonly_paths: get_default_readonly_paths(),
+            masked_paths: get_default_maskedpaths().into(),
+            readonly_paths: get_default_readonly_paths().into(),
             // Empty String
             mount_label: Default::default(),
+            seccomp: None,
+            intel_rdt: None,
+            personality: None,
         }
     }
 }
 
-// Specifies UID/GID mappings
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
+/// LinuxIDMapping specifies UID/GID mappings.
 pub struct LinuxIdMapping {
-    // Starting uid/gid on the host to be mapped to container_id
     #[serde(default, rename = "hostID")]
+    /// HostID is the starting UID/GID on the host to be mapped to `container_id`.
     pub host_id: u32,
-    // Starting uid/gid in the container
+
     #[serde(default, rename = "containerID")]
+    /// ContainerID is the starting UID/GID in the container.
     pub container_id: u32,
-    // Number of IDs to be mapped
+
     #[serde(default)]
+    /// Size is the number of IDs to be mapped.
     pub size: u32,
 }
 
-// Device types
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
+/// Device types
 pub enum LinuxDeviceType {
-    // block (buffered)
+    /// block (buffered)
     B,
-    // character (unbuffered)
+
+    /// character (unbuffered)
     C,
-    // character (unbufferd)
+
+    /// character (unbufferd)
     U,
-    // FIFO
+
+    /// FIFO
     P,
-    // ??
+
+    /// ??
     A,
 }
 
@@ -142,22 +180,26 @@ impl LinuxDeviceType {
     }
 }
 
-// Represents a device rule for the devices specified to the device controller
-#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+/// Represents a device rule for the devices specified to the device controller
 pub struct LinuxDeviceCgroup {
-    // allow or deny
     #[serde(default)]
+    /// Allow or deny
     pub allow: bool,
-    // Device type, block, char, etc.
+
+    /// Device type, block, char, etc.
     #[serde(default, rename = "type")]
-    pub typ: LinuxDeviceType,
-    // Device's major number
+    pub typ: Option<LinuxDeviceType>,
+
+    /// Device's major number
     pub major: Option<i64>,
-    // Device's minor number
+
+    /// Device's minor number
     pub minor: Option<i64>,
-    // Cgroup access premissions format, rwm.
+
+    /// Cgroup access premissions format, rwm.
     #[serde(default)]
-    pub access: String,
+    pub access: Option<String>,
 }
 
 impl ToString for LinuxDeviceCgroup {
@@ -170,99 +212,193 @@ impl ToString for LinuxDeviceCgroup {
             .minor
             .map(|mi| mi.to_string())
             .unwrap_or_else(|| "*".to_string());
+        let unknown = "unknown".to_string();
         format!(
             "{} {}:{} {}",
-            self.typ.as_str(),
+            &self
+                .typ
+                .map(|x| x.as_str().to_string())
+                .unwrap_or(unknown.clone()),
             &major,
             &minor,
-            &self.access
+            &self.access.as_ref().unwrap_or(&unknown)
         )
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+/// LinuxMemory for Linux cgroup 'memory' resource management.
 pub struct LinuxMemory {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Memory limit (in bytes).
     pub limit: Option<i64>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Memory reservation or soft_limit (in bytes).
     pub reservation: Option<i64>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Total memory limit (memory + swap).
     pub swap: Option<i64>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Kernel memory limit (in bytes).
     pub kernel: Option<i64>,
-    #[serde(rename = "kernelTCP")]
+
+    #[serde(skip_serializing_if = "Option::is_none", rename = "kernelTCP")]
+    /// Kernel memory limit for tcp (in bytes).
     pub kernel_tcp: Option<i64>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// How aggressive the kernel will swap memory pages.
     pub swappiness: Option<u64>,
+
+    #[serde(skip_serializing_if = "Option::is_none", rename = "disableOOMKiller")]
+    /// DisableOOMKiller disables the OOM killer for out of memory conditions.
+    pub disable_oom_killer: Option<bool>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Enables hierarchical memory accounting
+    pub use_hierarchy: Option<bool>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
+/// LinuxCPU for Linux cgroup 'cpu' resource management.
 pub struct LinuxCpu {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// CPU shares (relative weight (ratio) vs. other cgroups with cpu shares).
     pub shares: Option<u64>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// CPU hardcap limit (in usecs). Allowed cpu time in a given period.
     pub quota: Option<i64>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// CPU period to be used for hardcapping (in usecs).
     pub period: Option<u64>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// How much time realtime scheduling may use (in usecs).
     pub realtime_runtime: Option<i64>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// CPU period to be used for realtime scheduling (in usecs).
     pub realtime_period: Option<u64>,
-    #[serde(default)]
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// CPUs to use within the cpuset. Default is to use any CPU available.
     pub cpus: Option<String>,
-    #[serde(default)]
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// List of memory nodes in the cpuset. Default is to use any available memory node.
     pub mems: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// LinuxPids for Linux cgroup 'pids' resource management (Linux 4.3).
 pub struct LinuxPids {
     #[serde(default)]
+    /// Maximum number of PIDs. Default is "no limit".
     pub limit: i64,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
+/// LinuxWeightDevice struct holds a `major:minor weight` pair for weightDevice.
 pub struct LinuxWeightDevice {
     #[serde(default)]
+    /// Major is the device's major number.
     pub major: i64,
+
     #[serde(default)]
+    /// Minor is the device's minor number.
     pub minor: i64,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Weight is the bandwidth rate for the device.
     pub weight: Option<u16>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// LeafWeight is the bandwidth rate for the device while competing with the cgroup's child
+    /// cgroups, CFQ scheduler only.
     pub leaf_weight: Option<u16>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// LinuxThrottleDevice struct holds a `major:minor rate_per_second` pair.
 pub struct LinuxThrottleDevice {
     #[serde(default)]
+    /// Major is the device's major number.
     pub major: i64,
+
     #[serde(default)]
+    /// Minor is the device's minor number.
     pub minor: i64,
+
     #[serde(default)]
+    /// Rate is the IO rate limit per cgroup per device.
     pub rate: u64,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
+/// LinuxBlockIO for Linux cgroup 'blkio' resource management.
 pub struct LinuxBlockIo {
-    pub blkio_weight: Option<u16>,
-    pub blkio_leaf_weight: Option<u16>,
-    #[serde(default)]
-    pub blkio_weight_device: Vec<LinuxWeightDevice>,
-    #[serde(default, rename = "throttleReadBpsDevice")]
-    pub blkio_throttle_read_bps_device: Vec<LinuxThrottleDevice>,
-    #[serde(default, rename = "throttleWriteBpsDevice")]
-    pub blkio_throttle_write_bps_device: Vec<LinuxThrottleDevice>,
-    #[serde(default, rename = "throttleReadIOPSDevice")]
-    pub blkio_throttle_read_iops_device: Vec<LinuxThrottleDevice>,
-    #[serde(default, rename = "throttleWriteIOPSDevice")]
-    pub blkio_throttle_write_iops_device: Vec<LinuxThrottleDevice>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Specifies per cgroup weight.
+    pub weight: Option<u16>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Specifies tasks' weight in the given cgroup while competing with the cgroup's child
+    /// cgroups, CFQ scheduler only.
+    pub leaf_weight: Option<u16>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Weight per cgroup per device, can override BlkioWeight.
+    pub weight_device: Option<Vec<LinuxWeightDevice>>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// IO read rate limit per cgroup per device, bytes per second.
+    pub throttle_read_bps_device: Option<Vec<LinuxThrottleDevice>>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// IO write rate limit per cgroup per device, bytes per second.
+    pub throttle_write_bps_device: Option<Vec<LinuxThrottleDevice>>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// IO read rate limit per cgroup per device, IO per second.
+    pub throttle_read_iops_device: Option<Vec<LinuxThrottleDevice>>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// IO write rate limit per cgroup per device, IO per second.
+    pub throttle_write_iops_device: Option<Vec<LinuxThrottleDevice>>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
+/// LinuxHugepageLimit structure corresponds to limiting kernel hugepages.
 pub struct LinuxHugepageLimit {
     #[serde(default)]
+    /// Pagesize is the hugepage size.
+    /// Format: "<size><unit-prefix>B' (e.g. 64KB, 2MB, 1GB, etc.)
     pub page_size: String,
+
     #[serde(default)]
+    /// Limit is the limit of "hugepagesize" hugetlb usage.
     pub limit: i64,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// LinuxInterfacePriority for network interfaces.
 pub struct LinuxInterfacePriority {
     #[serde(default)]
+    /// Name is the name of the network interface.
     pub name: String,
+
     #[serde(default)]
+    /// Priority for the interface.
     pub priority: u32,
 }
 
@@ -272,60 +408,107 @@ impl ToString for LinuxInterfacePriority {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// LinuxNetwork identification and priority configuration.
 pub struct LinuxNetwork {
-    #[serde(rename = "classID")]
+    #[serde(skip_serializing_if = "Option::is_none", rename = "classID")]
+    /// Set class identifier for container's network packets
     pub class_id: Option<u32>,
-    #[serde(default)]
-    pub priorities: Vec<LinuxInterfacePriority>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Set priority of network traffic for container.
+    pub priorities: Option<Vec<LinuxInterfacePriority>>,
 }
 
-// Resource constraints for container
-#[derive(Default, Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
+/// Resource constraints for container
 pub struct LinuxResources {
-    // Devices configures the device allow list
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Devices configures the device allowlist.
+    pub devices: Option<Vec<LinuxDeviceCgroup>>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Memory restriction configuration.
+    pub memory: Option<LinuxMemory>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// CPU resource restriction configuration.
+    pub cpu: Option<LinuxCpu>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Task resource restrictions
+    pub pids: Option<LinuxPids>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "blockIO")]
+    /// BlockIO restriction configuration.
+    pub block_io: Option<LinuxBlockIo>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Hugetlb limit (in bytes).
+    pub hugepage_limits: Option<Vec<LinuxHugepageLimit>>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Network restriction configuration.
+    pub network: Option<LinuxNetwork>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Rdma resource restriction configuration. Limits are a set of key value pairs that define
+    /// RDMA resource limits, where the key is device name and value is resource limits.
+    pub rdma: Option<HashMap<String, LinuxRdma>>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Unified resources.
+    pub unified: Option<HashMap<String, String>>,
+
+    // TODO: I am not part of the official spec
     #[serde(default)]
-    pub devices: Vec<LinuxDeviceCgroup>,
     // Disables the OOM killer for out of memory conditions
-    #[serde(default)]
     pub disable_oom_killer: bool,
+
+    // TODO: I am not part of the official spec
     // Specify an oom_score_adj for container
     pub oom_score_adj: Option<i32>,
-    // Memory usage restrictions
-    pub memory: Option<LinuxMemory>,
-    // CPU resource restrictions
-    pub cpu: Option<LinuxCpu>,
-    // Task resource restrictions
-    pub pids: Option<LinuxPids>,
-    // BlockIO restrictions
-    #[serde(rename = "blockIO")]
-    pub block_io: Option<LinuxBlockIo>,
-    // Hugelb restrictions
-    #[serde(default)]
-    pub hugepage_limits: Vec<LinuxHugepageLimit>,
-    // Network usage restrictions
-    pub network: Option<LinuxNetwork>,
+
+    // TODO: I am not part of the official spec
     pub freezer: Option<FreezerState>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+/// LinuxRdma for Linux cgroup 'rdma' resource management (Linux 4.11).
+pub struct LinuxRdma {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Maximum number of HCA handles that can be opened. Default is "no limit".
+    hca_handles: Option<u32>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Maximum number of HCA objects that can be created. Default is "no limit".
+    hca_objects: Option<u32>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LinuxNamespaceType {
-    // Mount Namespace for isolating mount points
+    /// Mount Namespace for isolating mount points
     Mount = 0x00020000,
-    // Cgroup Namespace for isolating cgroup hierarchies
+
+    /// Cgroup Namespace for isolating cgroup hierarchies
     Cgroup = 0x02000000,
-    // Uts Namespace for isolating hostname and NIS domain name
+
+    /// Uts Namespace for isolating hostname and NIS domain name
     Uts = 0x04000000,
-    // Ipc Namespace for isolating System V, IPC, POSIX message queues
+
+    /// Ipc Namespace for isolating System V, IPC, POSIX message queues
     Ipc = 0x08000000,
-    // User Namespace for isolating user and group  ids
+
+    /// User Namespace for isolating user and group  ids
     User = 0x10000000,
-    // PID Namespace for isolating process ids
+
+    /// PID Namespace for isolating process ids
     Pid = 0x20000000,
-    // Network Namespace for isolating network devices, ports, stacks etc.
+
+    /// Network Namespace for isolating network devices, ports, stacks etc.
     Network = 0x40000000,
 }
 
@@ -346,10 +529,16 @@ impl TryFrom<&str> for LinuxNamespaceType {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// LinuxNamespace is the configuration for a Linux namespace.
 pub struct LinuxNamespace {
     #[serde(rename = "type")]
+    /// Type is the type of namespace.
     pub typ: LinuxNamespaceType,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Path is a path to an existing namespace persisted on disk that can be joined and is of the
+    /// same type
     pub path: Option<String>,
 }
 
@@ -379,19 +568,36 @@ pub fn get_default_namespaces() -> Vec<LinuxNamespace> {
     default_namespace
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
+/// LinuxDevice represents the mknod information for a Linux special device file.
 pub struct LinuxDevice {
     #[serde(default)]
+    /// Path to the device.
     pub path: PathBuf,
+
     #[serde(rename = "type")]
+    /// Device type, block, char, etc..
     pub typ: LinuxDeviceType,
+
     #[serde(default)]
-    pub major: u64,
+    /// Major is the device's major number.
+    pub major: i64,
+
     #[serde(default)]
-    pub minor: u64,
+    /// Minor is the device's minor number.
+    pub minor: i64,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// FileMode permission bits for the device.
     pub file_mode: Option<u32>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// UID of the device.
     pub uid: Option<u32>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Gid of the device.
     pub gid: Option<u32>,
 }
 
@@ -399,15 +605,31 @@ impl From<&LinuxDevice> for LinuxDeviceCgroup {
     fn from(linux_device: &LinuxDevice) -> LinuxDeviceCgroup {
         LinuxDeviceCgroup {
             allow: true,
-            typ: linux_device.typ,
+            typ: linux_device.typ.into(),
             major: Some(linux_device.major as i64),
             minor: Some(linux_device.minor as i64),
-            access: "rwm".to_string(),
+            access: "rwm".to_string().into(),
         }
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+/// LinuxSeccomp represents syscall restrictions.
+pub struct LinuxSeccomp {
+    pub default_action: LinuxSeccompAction,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub architectures: Option<Vec<Arch>>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flags: Option<Vec<String>>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub syscalls: Option<Vec<LinuxSyscall>>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 #[repr(u32)]
 pub enum LinuxSeccompAction {
@@ -419,7 +641,7 @@ pub enum LinuxSeccompAction {
 }
 
 #[allow(clippy::enum_clike_unportable_variant)]
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum Arch {
     ScmpArchNative = 0x00000000,
@@ -441,7 +663,7 @@ pub enum Arch {
     ScmpArchS390x = 0x80000016,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 #[repr(u32)]
 pub enum LinuxSeccompOperator {
@@ -452,6 +674,34 @@ pub enum LinuxSeccompOperator {
     ScmpCmpGe = 5,
     ScmpCmpGt = 6,
     ScmpCmpMaskedEq = 7,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// LinuxSyscall is used to match a syscall in seccomp.
+pub struct LinuxSyscall {
+    pub names: Vec<String>,
+
+    pub action: LinuxSeccompAction,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub errno_ret: Option<u32>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub args: Option<Vec<LinuxSeccompArg>>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+/// LinuxSeccompArg used for matching specific syscall arguments in seccomp.
+pub struct LinuxSeccompArg {
+    pub index: usize,
+
+    pub value: u64,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub value_two: Option<u64>,
+
+    pub op: LinuxSeccompOperator,
 }
 
 // Default masks paths, cannot read these host files
@@ -484,11 +734,56 @@ pub fn get_default_readonly_paths() -> Vec<String> {
     ]
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum FreezerState {
     Undefined,
     Frozen,
     Thawed,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+/// LinuxIntelRdt has container runtime resource constraints for Intel RDT CAT and MBA features
+/// which introduced in Linux 4.10 and 4.12 kernel.
+pub struct LinuxIntelRdt {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// The identity for RDT Class of Service.
+    pub clos_id: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// The schema for L3 cache id and capacity bitmask (CBM).
+    /// Format: "L3:<cache_id0>=<cbm0>;<cache_id1>=<cbm1>;..."
+    pub l3_cache_schema: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// The schema of memory bandwidth per L3 cache id.
+    /// Format: "MB:<cache_id0>=bandwidth0;<cache_id1>=bandwidth1;..."
+    /// The unit of memory bandwidth is specified in "percentages" by default, and in "MBps" if MBA
+    /// Software Controller is enabled.
+    pub mem_bw_schema: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// LinuxPersonality represents the Linux personality syscall input.
+pub struct LinuxPersonality {
+    /// Domain for the personality.
+    domain: LinuxPersonalityDomain,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Additional flags
+    flags: Option<Vec<String>>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Define domain and flags for LinuxPersonality.
+pub enum LinuxPersonalityDomain {
+    #[serde(rename = "LINUX")]
+    /// PerLinux is the standard Linux personality.
+    PerLinux,
+
+    #[serde(rename = "LINUX32")]
+    /// PerLinux32 sets personality to 32 bit.
+    PerLinux32,
 }
 
 #[cfg(feature = "proptests")]
@@ -522,10 +817,10 @@ impl Arbitrary for LinuxDeviceCgroup {
         let access_choices = ["rwm", "m"];
         LinuxDeviceCgroup {
             allow: bool::arbitrary(g),
-            typ,
+            typ: typ.into(),
             major: some_none_generator_util::<i64>(g),
             minor: some_none_generator_util::<i64>(g),
-            access: g.choose(&access_choices).unwrap().to_string(),
+            access: g.choose(&access_choices).unwrap().to_string().into(),
         }
     }
 }
@@ -540,6 +835,8 @@ impl Arbitrary for LinuxMemory {
             reservation: some_none_generator_util::<i64>(g),
             swap: some_none_generator_util::<i64>(g),
             swappiness: some_none_generator_util::<u64>(g),
+            disable_oom_killer: some_none_generator_util::<bool>(g),
+            use_hierarchy: some_none_generator_util::<bool>(g),
         }
     }
 }

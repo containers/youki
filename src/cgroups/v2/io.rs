@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 
 use crate::cgroups::{
     common,
@@ -85,18 +85,22 @@ impl Io {
 
     // linux kernel doc: https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html#io
     fn apply(root_path: &Path, blkio: &LinuxBlockIo) -> Result<()> {
-        for wd in &blkio.blkio_weight_device {
+        for wd in blkio
+            .weight_device
+            .as_ref()
+            .context("no weight_device in blkio")?
+        {
             common::write_cgroup_file(
                 root_path.join(CGROUP_BFQ_IO_WEIGHT),
                 &format!("{}:{} {}", wd.major, wd.minor, wd.weight.unwrap()),
             )?;
         }
-        if let Some(leaf_weight) = blkio.blkio_leaf_weight {
+        if let Some(leaf_weight) = blkio.leaf_weight {
             if leaf_weight > 0 {
                 bail!("cannot set leaf_weight with cgroupv2");
             }
         }
-        if let Some(io_weight) = blkio.blkio_weight {
+        if let Some(io_weight) = blkio.weight {
             if io_weight > 0 {
                 common::write_cgroup_file(
                     root_path.join(CGROUP_IO_WEIGHT),
@@ -105,26 +109,42 @@ impl Io {
             }
         }
 
-        for trbd in &blkio.blkio_throttle_read_bps_device {
+        for trbd in blkio
+            .throttle_read_bps_device
+            .as_ref()
+            .context("no throttle_read_bps_device in blkio")?
+        {
             common::write_cgroup_file(
                 Self::io_max_path(root_path),
                 &format!("{}:{} rbps={}", trbd.major, trbd.minor, trbd.rate),
             )?;
         }
 
-        for twbd in &blkio.blkio_throttle_write_bps_device {
+        for twbd in blkio
+            .throttle_write_bps_device
+            .as_ref()
+            .context("no throttle_write_bps_device in blkio")?
+        {
             common::write_cgroup_file(
                 Self::io_max_path(root_path),
                 format!("{}:{} wbps={}", twbd.major, twbd.minor, twbd.rate),
             )?;
         }
-        for trid in &blkio.blkio_throttle_read_iops_device {
+        for trid in blkio
+            .throttle_read_iops_device
+            .as_ref()
+            .context("no throttle_read_iops_device in blkio")?
+        {
             common::write_cgroup_file(
                 Self::io_max_path(root_path),
                 format!("{}:{} riops={}", trid.major, trid.minor, trid.rate),
             )?;
         }
-        for twid in &blkio.blkio_throttle_write_iops_device {
+        for twid in blkio
+            .throttle_write_iops_device
+            .as_ref()
+            .context("no throttle_write_iops_device in blkio")?
+        {
             common::write_cgroup_file(
                 Self::io_max_path(root_path),
                 format!("{}:{} wiops={}", twid.major, twid.minor, twid.rate),
@@ -148,43 +168,43 @@ mod test {
     impl BlockIoBuilder {
         fn new() -> Self {
             let block_io = LinuxBlockIo {
-                blkio_weight: Some(0),
-                blkio_leaf_weight: Some(0),
-                blkio_weight_device: vec![],
-                blkio_throttle_read_bps_device: vec![],
-                blkio_throttle_write_bps_device: vec![],
-                blkio_throttle_read_iops_device: vec![],
-                blkio_throttle_write_iops_device: vec![],
+                weight: Some(0),
+                leaf_weight: Some(0),
+                weight_device: vec![].into(),
+                throttle_read_bps_device: vec![].into(),
+                throttle_write_bps_device: vec![].into(),
+                throttle_read_iops_device: vec![].into(),
+                throttle_write_iops_device: vec![].into(),
             };
 
             Self { block_io }
         }
         fn with_write_weight_device(mut self, throttle: Vec<LinuxWeightDevice>) -> Self {
-            self.block_io.blkio_weight_device = throttle;
+            self.block_io.weight_device = throttle.into();
             self
         }
         fn with_write_io_weight(mut self, iow: u16) -> Self {
-            self.block_io.blkio_weight = Some(iow);
+            self.block_io.weight = Some(iow);
             self
         }
 
         fn with_read_bps(mut self, throttle: Vec<LinuxThrottleDevice>) -> Self {
-            self.block_io.blkio_throttle_read_bps_device = throttle;
+            self.block_io.throttle_read_bps_device = throttle.into();
             self
         }
 
         fn with_write_bps(mut self, throttle: Vec<LinuxThrottleDevice>) -> Self {
-            self.block_io.blkio_throttle_write_bps_device = throttle;
+            self.block_io.throttle_write_bps_device = throttle.into();
             self
         }
 
         fn with_read_iops(mut self, throttle: Vec<LinuxThrottleDevice>) -> Self {
-            self.block_io.blkio_throttle_read_iops_device = throttle;
+            self.block_io.throttle_read_iops_device = throttle.into();
             self
         }
 
         fn with_write_iops(mut self, throttle: Vec<LinuxThrottleDevice>) -> Self {
-            self.block_io.blkio_throttle_write_iops_device = throttle;
+            self.block_io.throttle_write_iops_device = throttle.into();
             self
         }
 

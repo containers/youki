@@ -55,7 +55,7 @@ mod tests {
         let id = 0x100001;
         let network = LinuxNetwork {
             class_id: Some(id),
-            priorities: vec![],
+            priorities: Some(vec![]),
         };
 
         NetworkClassifier::apply(&tmp, &network).expect("apply network classID");

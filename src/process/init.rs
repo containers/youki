@@ -108,12 +108,21 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     let command = &args.syscall;
     let spec = &args.spec;
     let linux = &spec.linux.as_ref().context("no linux in spec")?;
-    let namespaces: Namespaces = linux.namespaces.clone().into();
+    let namespaces: Namespaces = linux
+        .namespaces
+        .as_ref()
+        .context("no namepsaces in linux spec")?
+        .clone()
+        .into();
     // need to create the notify socket before we pivot root, since the unix
     // domain socket used here is outside of the rootfs of container
     let mut notify_socket: NotifyListener = NotifyListener::new(&args.notify_path)?;
     let proc = &spec.process.as_ref().context("no process in spec")?;
-    let mut envs: Vec<String> = proc.env.clone();
+    let mut envs: Vec<String> = proc
+        .env
+        .as_ref()
+        .context("no envs in process spec")?
+        .clone();
     let rootfs = &args.rootfs;
     let mut child = args.child;
 
@@ -142,7 +151,12 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     }
 
     // set limits and namespaces to the process
-    for rlimit in proc.rlimits.iter() {
+    for rlimit in proc
+        .rlimits
+        .as_ref()
+        .context("no rlimits in process spec")?
+        .iter()
+    {
         command.set_rlimit(rlimit).context("failed to set rlimit")?;
     }
 
@@ -160,7 +174,7 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
 
     command.set_hostname(spec.hostname.as_ref().context("no hostname in spec")?)?;
 
-    if proc.no_new_privileges {
+    if let Some(true) = proc.no_new_privileges {
         let _ = prctl::set_no_new_privileges(true);
     }
 
@@ -235,7 +249,7 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     // listing on the notify socket for container start command
     notify_socket.wait_for_container_start()?;
 
-    let args: &Vec<String> = &proc.args;
+    let args: &Vec<String> = proc.args.as_ref().context("no args in process spec")?;
     utils::do_exec(&args[0], args, &envs)?;
 
     // After do_exec is called, the process is replaced with the container

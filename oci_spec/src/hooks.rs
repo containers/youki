@@ -1,6 +1,8 @@
-use super::*;
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 /// Hooks specifies a command that is run in the container at a particular event in the lifecycle
 /// (setup and teardown) of a container.
 pub struct Hooks {
@@ -19,31 +21,19 @@ pub struct Hooks {
     /// The `prestart` hooks MUST be executed in the runtime namespace.
     pub prestart: Option<Vec<Hook>>,
 
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        rename = "createRuntime"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     /// CreateRuntime is a list of hooks to be run after the container has been created but before
     /// `pivot_root` or any equivalent operation has been called. It is called in the Runtime
     /// Namespace.
     pub create_runtime: Option<Vec<Hook>>,
 
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        rename = "createContainer"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     /// CreateContainer is a list of hooks to be run after the container has been created but
     /// before `pivot_root` or any equivalent operation has been called. It is called in the
     /// Container Namespace.
     pub create_container: Option<Vec<Hook>>,
 
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        rename = "startContainer"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     /// StartContainer is a list of hooks to be run after the start operation is called but before
     /// the container process is started. It is called in the Container Namespace.
     pub start_container: Option<Vec<Hook>>,
