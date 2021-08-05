@@ -40,7 +40,7 @@ impl PathBufExt for PathBuf {
     }
 }
 
-pub fn parse_env(envs: &Vec<String>) -> HashMap<String, String> {
+pub fn parse_env(envs: &[String]) -> HashMap<String, String> {
     envs.iter()
         .filter_map(|e| {
             let mut split = e.split('=');

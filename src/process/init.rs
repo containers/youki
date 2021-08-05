@@ -267,7 +267,9 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     };
 
     // clean up and handle perserved fds.
-    cleanup_file_descriptors(preserve_fds).with_context(|| "Failed to clean up extra fds")?;
+    if args.init {
+        cleanup_file_descriptors(preserve_fds).with_context(|| "Failed to clean up extra fds")?;
+    }
 
     // Reset the process env based on oci spec.
     env::vars().for_each(|(key, _value)| std::env::remove_var(key));
