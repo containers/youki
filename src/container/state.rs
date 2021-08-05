@@ -24,6 +24,11 @@ pub enum ContainerStatus {
     // The container process has paused
     Paused,
 }
+impl Default for ContainerStatus {
+    fn default() -> Self {
+        ContainerStatus::Creating
+    }
+}
 
 impl ContainerStatus {
     pub fn can_start(&self) -> bool {
@@ -66,7 +71,7 @@ impl Display for ContainerStatus {
 }
 
 /// Stores the state information of the container
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct State {
     // Version is the version of the specification that is supported.

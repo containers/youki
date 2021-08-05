@@ -15,12 +15,21 @@ use crate::syscall::syscall::create_syscall;
 use crate::container::{ContainerStatus, State};
 
 /// Structure representing the container data
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Container {
     // State of the container
     pub state: State,
     // indicated the directory for the root path in the container
     pub root: PathBuf,
+}
+
+impl Default for Container {
+    fn default() -> Self {
+        Self {
+            state: State::default(),
+            root: PathBuf::from("/run/youki"),
+        }
+    }
 }
 
 impl Container {

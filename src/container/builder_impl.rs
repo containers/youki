@@ -74,6 +74,7 @@ impl<'a> ContainerBuilderImpl<'a> {
             is_rootless: self.rootless.is_some(),
             notify_path: self.notify_path.clone(),
             preserve_fds: self.preserve_fds,
+            container: self.container.clone(),
             child,
         };
 

@@ -23,6 +23,7 @@ use std::{
 
 use crate::{
     capabilities,
+    container::Container,
     namespaces::Namespaces,
     notify_socket::NotifyListener,
     process::child,
@@ -35,8 +36,8 @@ use crate::{
 // timeout vs. other error.
 #[derive(Debug)]
 struct HookTimeoutError;
-impl std::error::Error for HookTimeoutError{}
-impl fmt::Display for HookTimeoutError{
+impl std::error::Error for HookTimeoutError {}
+impl fmt::Display for HookTimeoutError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         "hook command timeout".fmt(f)
     }
@@ -57,7 +58,7 @@ fn parse_env(envs: Vec<String>) -> HashMap<String, String> {
         .collect()
 }
 
-fn run_hooks(hooks: Option<Vec<Hook>>) -> Result<()> {
+fn run_hooks(hooks: Option<Vec<Hook>>, container: Option<Container>) -> Result<()> {
     if let Some(hooks) = hooks {
         for hook in hooks {
             let envs: HashMap<String, String> = if let Some(env) = hook.env {
@@ -65,14 +66,29 @@ fn run_hooks(hooks: Option<Vec<Hook>>) -> Result<()> {
             } else {
                 HashMap::new()
             };
-            // TODO: pass in container state?
             let mut hook_command = process::Command::new(hook.path)
                 .args(hook.args.unwrap_or_default())
                 .env_clear()
                 .envs(envs)
+                .stdin(if container.is_some() {
+                    process::Stdio::piped()
+                } else {
+                    process::Stdio::null()
+                })
+                .stdout(process::Stdio::null())
+                .stderr(process::Stdio::null())
                 .spawn()
                 .with_context(|| "Failed to execute hook")?;
             let hook_command_pid = Pid::from_raw(hook_command.id() as i32);
+            // Based on the OCI spec, we need to pipe the container state into
+            // the hook command through stdin.
+            if hook_command.stdin.is_some() {
+                let stdin = hook_command.stdin.take().unwrap();
+                if let Some(container) = &container {
+                    serde_json::to_writer(stdin, &container.state)?;
+                }
+            }
+
             if let Some(timeout_sec) = hook.timeout {
                 // Rust does not make it easy to handle executing a command and
                 // timeout. Here we decided to wait for the command in a
@@ -203,6 +219,8 @@ pub struct ContainerInitArgs {
     pub notify_path: PathBuf,
     /// File descriptos preserved/passed to the container init process.
     pub preserve_fds: i32,
+    /// Container state
+    pub container: Option<Container>,
     /// Pipe used to communicate with the child process
     pub child: child::ChildProcess,
 }
@@ -283,7 +301,7 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
         // create_runtime hook needs to be called after the namespace setup, but
         // before pivot_root is called.
         if let Some(hooks) = hooks {
-            run_hooks(hooks.create_runtime)?
+            run_hooks(hooks.create_runtime, args.container)?
         }
         rootfs::prepare_rootfs(spec, rootfs, bind_service)
             .with_context(|| "Failed to prepare rootfs")?;
@@ -477,9 +495,10 @@ mod tests {
 
     #[test]
     fn test_run_hook() -> Result<()> {
-        run_hooks(None)?;
+        run_hooks(None, None)?;
 
         {
+            let default_container: Container = Default::default();
             let hook = Hook {
                 path: PathBuf::from("/bin/true"),
                 args: None,
@@ -487,11 +506,12 @@ mod tests {
                 timeout: None,
             };
             let hooks = Some(vec![hook]);
-            run_hooks(hooks)?;
+            run_hooks(hooks, Some(default_container))?;
         }
 
         {
             // Use `printenv` to make sure the environment is set correctly.
+            let default_container: Container = Default::default();
             let hook = Hook {
                 path: PathBuf::from("/bin/printenv"),
                 args: Some(vec!["key".to_string()]),
@@ -499,7 +519,7 @@ mod tests {
                 timeout: None,
             };
             let hooks = Some(vec![hook]);
-            run_hooks(hooks)?;
+            run_hooks(hooks, Some(default_container))?;
         }
 
         Ok(())
@@ -519,7 +539,7 @@ mod tests {
             timeout: Some(1),
         };
         let hooks = Some(vec![hook]);
-        match run_hooks(hooks) {
+        match run_hooks(hooks, None) {
             Ok(_) => {
                 bail!("The test expects the hook to error out with timeout. Should not execute cleanly");
             }
