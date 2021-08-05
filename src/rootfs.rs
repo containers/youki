@@ -62,10 +62,9 @@ pub fn prepare_rootfs(spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<
     chdir(rootfs)?;
 
     setup_default_symlinks(rootfs)?;
-    create_devices(
-        linux.devices.as_ref().context("no devices in spec")?,
-        bind_devices,
-    )?;
+    if let Some(devices) = linux.devices.as_ref() {
+        create_devices(devices, bind_devices)?;
+    }
     setup_ptmx(rootfs)?;
 
     chdir(&olddir)?;
