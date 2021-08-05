@@ -62,6 +62,12 @@ impl<'a> ContainerBuilderImpl<'a> {
         let (mut parent, parent_channel) = parent::ParentProcess::new(&self.rootless)?;
         let child = child::ChildProcess::new(parent_channel)?;
 
+        if self.init {
+            if let Some(hooks) = self.spec.hooks.as_ref() {
+                hook::run_hooks(hooks.create_runtime.as_ref(), self.container.as_ref())?
+            }
+        }
+
         // This init_args will be passed to the container init process,
         // therefore we will have to move all the variable by value. Since self
         // is a shared reference, we have to clone these variables here.
