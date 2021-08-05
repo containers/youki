@@ -61,6 +61,11 @@ impl Delete {
                 let cmanager =
                     cgroups::common::create_cgroup_manager(cgroups_path, systemd_cgroup)?;
                 cmanager.remove()?;
+
+                if let Some(hooks) = spec.hooks.as_ref() {
+                    hooks::run_hooks(hooks.poststop.as_ref(), Some(&container))
+                        .with_context(|| "Failed to run post start hooks")?;
+                }
             }
             std::process::exit(0)
         } else {
