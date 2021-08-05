@@ -15,16 +15,21 @@ impl fmt::Display for HookTimeoutError {
     }
 }
 
-pub fn run_hooks(hooks: Option<Vec<Hook>>, container: Option<Container>) -> Result<()> {
+pub fn run_hooks(hooks: Option<&Vec<Hook>>, container: Option<&Container>) -> Result<()> {
     if let Some(hooks) = hooks {
         for hook in hooks {
-            let envs: HashMap<String, String> = if let Some(env) = hook.env {
+            let envs: HashMap<String, String> = if let Some(env) = hook.env.as_ref() {
                 utils::parse_env(env)
             } else {
                 HashMap::new()
             };
-            let mut hook_command = process::Command::new(hook.path)
-                .args(hook.args.unwrap_or_default())
+            let args = if let Some(args) = hook.args.clone() {
+                args
+            } else {
+                vec![]
+            };
+            let mut hook_command = process::Command::new(&hook.path)
+                .args(&args)
                 .env_clear()
                 .envs(envs)
                 .stdin(if container.is_some() {
@@ -113,7 +118,7 @@ mod test {
                 timeout: None,
             };
             let hooks = Some(vec![hook]);
-            run_hooks(hooks, Some(default_container))?;
+            run_hooks(hooks.as_ref(), Some(&default_container))?;
         }
 
         {
@@ -126,7 +131,7 @@ mod test {
                 timeout: None,
             };
             let hooks = Some(vec![hook]);
-            run_hooks(hooks, Some(default_container))?;
+            run_hooks(hooks.as_ref(), Some(&default_container))?;
         }
 
         Ok(())
@@ -146,7 +151,7 @@ mod test {
             timeout: Some(1),
         };
         let hooks = Some(vec![hook]);
-        match run_hooks(hooks, None) {
+        match run_hooks(hooks.as_ref(), None) {
             Ok(_) => {
                 bail!("The test expects the hook to error out with timeout. Should not execute cleanly");
             }

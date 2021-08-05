@@ -131,7 +131,8 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     let mut envs: Vec<String> = proc.env.as_ref().unwrap_or(&vec![]).clone();
     let rootfs = &args.rootfs;
     let mut envs: Vec<String> = proc.env.clone();
-    let hooks = spec.hooks.clone();
+    let hooks = spec.hooks.as_ref();
+    let container = args.container.as_ref();
     let mut child = args.child;
 
     // if Out-of-memory score adjustment is set in specification.  set the score
@@ -197,7 +198,7 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
         // create_container hook needs to be called after the namespace setup, but
         // before pivot_root is called. This runs in the container namespaces.
         if let Some(hooks) = hooks {
-            hook::run_hooks(hooks.create_container, args.container)?
+            hook::run_hooks(hooks.create_container.as_ref(), container)?
         }
         rootfs::prepare_rootfs(spec, rootfs, bind_service)
             .with_context(|| "Failed to prepare rootfs")?;
@@ -270,9 +271,9 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
 
     // Reset the process env based on oci spec.
     env::vars().for_each(|(key, _value)| std::env::remove_var(key));
-    utils::parse_env(envs).iter().for_each(|(key, value)| {
-        env::set_var(key, value)
-    });
+    utils::parse_env(&envs)
+        .iter()
+        .for_each(|(key, value)| env::set_var(key, value));
 
     // notify parents that the init process is ready to execute the payload.
     child.notify_parent()?;
@@ -282,9 +283,12 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
 
     // create_container hook needs to be called after the namespace setup, but
     // before pivot_root is called. This runs in the container namespaces.
-    // if let Some(hooks) = hooks {
-    //     hook::run_hooks(hooks.start_container, args.container)?
-    // }
+    if args.init {
+        if let Some(hooks) = hooks {
+            hook::run_hooks(hooks.start_container.as_ref(), container)?
+        }
+    }
+
     if let Some(args) = proc.args.as_ref() {
         utils::do_exec(&args[0], args, &envs)?;
     } else {
