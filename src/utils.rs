@@ -1,7 +1,6 @@
 //! Utility functionality
 
 use std::collections::HashMap;
-use std::env;
 use std::ffi::CString;
 use std::fs::{self, DirBuilder, File};
 use std::ops::Deref;
@@ -56,24 +55,12 @@ pub fn parse_env(envs: Vec<String>) -> HashMap<String, String> {
         .collect()
 }
 
-pub fn do_exec(path: impl AsRef<Path>, args: &[String], envs: &[String]) -> Result<()> {
+pub fn do_exec(path: impl AsRef<Path>, args: &[String]) -> Result<()> {
     let p = CString::new(path.as_ref().to_string_lossy().to_string())?;
     let a: Vec<CString> = args
         .iter()
         .map(|s| CString::new(s.to_string()).unwrap_or_default())
         .collect();
-
-    // clear env vars
-    env::vars().for_each(|(key, _value)| std::env::remove_var(key));
-    // set env vars
-    envs.iter().for_each(|e| {
-        let mut split = e.split('=');
-        if let Some(key) = split.next() {
-            let value: String = split.collect::<Vec<&str>>().join("=");
-            env::set_var(key, value)
-        };
-    });
-
     unistd::execvp(&p, &a)?;
     Ok(())
 }

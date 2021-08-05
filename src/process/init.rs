@@ -130,8 +130,9 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     let proc = spec.process.as_ref().context("no process in spec")?;
     let mut envs: Vec<String> = proc.env.as_ref().unwrap_or(&vec![]).clone();
     let rootfs = &args.rootfs;
-    let mut child = args.child;
+    let mut envs: Vec<String> = proc.env.clone();
     let hooks = spec.hooks.clone();
+    let mut child = args.child;
 
     // if Out-of-memory score adjustment is set in specification.  set the score
     // value for the current process check
@@ -266,6 +267,12 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
 
     // clean up and handle perserved fds.
     cleanup_file_descriptors(preserve_fds).with_context(|| "Failed to clean up extra fds")?;
+
+    // Reset the process env based on oci spec.
+    env::vars().for_each(|(key, _value)| std::env::remove_var(key));
+    utils::parse_env(envs).iter().for_each(|(key, value)| {
+        env::set_var(key, value)
+    });
 
     // notify parents that the init process is ready to execute the payload.
     child.notify_parent()?;
