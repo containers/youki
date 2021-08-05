@@ -64,7 +64,7 @@ impl<'a> ContainerBuilderImpl<'a> {
 
         if self.init {
             if let Some(hooks) = self.spec.hooks.as_ref() {
-                hook::run_hooks(hooks.create_runtime.as_ref(), self.container.as_ref())?
+                hooks::run_hooks(hooks.create_runtime.as_ref(), self.container.as_ref())?
             }
         }
 

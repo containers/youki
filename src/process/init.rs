@@ -23,7 +23,7 @@ use std::{
 use crate::{
     capabilities,
     container::Container,
-    hook,
+    hooks,
     namespaces::Namespaces,
     notify_socket::NotifyListener,
     process::child,
@@ -198,7 +198,7 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
         // create_container hook needs to be called after the namespace setup, but
         // before pivot_root is called. This runs in the container namespaces.
         if let Some(hooks) = hooks {
-            hook::run_hooks(hooks.create_container.as_ref(), container)?
+            hooks::run_hooks(hooks.create_container.as_ref(), container)?
         }
         rootfs::prepare_rootfs(spec, rootfs, bind_service)
             .with_context(|| "Failed to prepare rootfs")?;
@@ -285,7 +285,7 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     // before pivot_root is called. This runs in the container namespaces.
     if args.init {
         if let Some(hooks) = hooks {
-            hook::run_hooks(hooks.start_container.as_ref(), container)?
+            hooks::run_hooks(hooks.start_container.as_ref(), container)?
         }
     }
 
