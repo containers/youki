@@ -13,7 +13,7 @@ pub struct HugeTlb {}
 impl Controller for HugeTlb {
     fn apply(linux_resources: &LinuxResources, cgroup_root: &std::path::Path) -> Result<()> {
         log::debug!("Apply hugetlb cgroup v2 config");
-        if let Some(hugepage_limits) = Self::needs_to_handle(linux_resources)? {
+        if let Some(hugepage_limits) = linux_resources.hugepage_limits.as_ref() {
             for hugetlb in hugepage_limits {
                 Self::apply(cgroup_root, hugetlb)?
             }
@@ -57,21 +57,6 @@ impl HugeTlb {
             hugetlb.limit,
         )?;
         Ok(())
-    }
-
-    fn needs_to_handle(
-        linux_resources: &LinuxResources,
-    ) -> Result<Option<&Vec<LinuxHugepageLimit>>> {
-        if !linux_resources
-            .hugepage_limits
-            .as_ref()
-            .context("no hugepage_limits in linux resources")?
-            .is_empty()
-        {
-            return Ok(linux_resources.hugepage_limits.as_ref());
-        }
-
-        Ok(None)
     }
 
     fn is_power_of_two(number: u64) -> bool {
