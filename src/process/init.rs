@@ -18,6 +18,7 @@ use std::{fs, io::Write, path::Path, path::PathBuf};
 use std::{
     collections::HashMap, 
     process, thread, time,
+    fmt,
 };
 
 use crate::{
@@ -29,6 +30,17 @@ use crate::{
     syscall::{linux::LinuxSyscall, Syscall},
     tty, utils,
 };
+
+// A special error used to signal a timeout. We want to differenciate between a
+// timeout vs. other error.
+#[derive(Debug)]
+struct HookTimeoutError;
+impl std::error::Error for HookTimeoutError{}
+impl fmt::Display for HookTimeoutError{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        "hook command timeout".fmt(f)
+    }
+}
 
 fn parse_env(envs: Vec<String>) -> HashMap<String, String> {
     envs.iter()
@@ -94,7 +106,7 @@ fn run_hooks(hooks: Option<Vec<Hook>>) -> Result<()> {
                         // Kill the process. There is no need to further clean
                         // up because we will be error out.
                         let _ = signal::kill(hook_command_pid, signal::Signal::SIGKILL);
-                        bail!("Timeout executing hook");
+                        return Err(HookTimeoutError.into());
                     }
                     Err(_) => {
                         unreachable!();
@@ -488,6 +500,36 @@ mod tests {
             };
             let hooks = Some(vec![hook]);
             run_hooks(hooks)?;
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    #[ignore]
+    // This will test executing hook with a timeout. Since the timeout is set in
+    // secs, minimally, the test will run for 1 second to trigger the timeout.
+    // Therefore, we leave this test in the normal execution.
+    fn test_run_hook_timeout() -> Result<()> {
+        // We use `/bin/cat` here to simulate a hook command that hangs.
+        let hook = Hook {
+            path: PathBuf::from("tail"),
+            args: Some(vec![String::from("-f"), String::from("/dev/null")]),
+            env: None,
+            timeout: Some(1),
+        };
+        let hooks = Some(vec![hook]);
+        match run_hooks(hooks) {
+            Ok(_) => {
+                bail!("The test expects the hook to error out with timeout. Should not execute cleanly");
+            }
+            Err(err) => {
+                // We want to make sure the error returned is indeed timeout
+                // error. All other errors are considered failure.
+                if !err.is::<HookTimeoutError>() {
+                    bail!("Failed to execute hook: {:?}", err);
+                }
+            }
         }
 
         Ok(())
