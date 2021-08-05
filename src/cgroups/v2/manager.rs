@@ -165,6 +165,7 @@ impl CgroupManager for Manager {
                 ControllerType::HugeTlb => stats.hugetlb = HugeTlb::stats(&self.full_path)?,
                 ControllerType::Pids => stats.pids = Pids::stats(&self.full_path)?,
                 ControllerType::Memory => stats.memory = Memory::stats(&self.full_path)?,
+                ControllerType::Io => stats.blkio = Io::stats(&self.full_path)?,
                 _ => continue,
             }
         }

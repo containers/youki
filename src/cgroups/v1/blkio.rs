@@ -2,7 +2,7 @@ use std::path::Path;
 
 use crate::cgroups::{
     common,
-    stats::{BlkioDeviceStat, BlkioStats, StatsProvider},
+    stats::{self, BlkioDeviceStat, BlkioStats, StatsProvider},
     v1::Controller,
 };
 use anyhow::{bail, Context, Result};
@@ -173,7 +173,7 @@ impl Blkio {
                 continue;
             }
 
-            let (major, minor) = Self::parse_device_number(entry_fields[0])?;
+            let (major, minor) = stats::parse_device_number(entry_fields[0])?;
             let op_type = if entry_fields.len() == 3 {
                 Some(entry_fields[1].to_owned())
             } else {
@@ -208,15 +208,6 @@ impl Blkio {
         }
 
         Ok(stats)
-    }
-
-    fn parse_device_number(entry: &str) -> Result<(u64, u64)> {
-        let numbers: Vec<&str> = entry.split_terminator(':').collect();
-        if numbers.len() != 2 {
-            bail!("failed to parse device number {}", entry);
-        }
-
-        Ok((numbers[0].parse()?, numbers[1].parse()?))
     }
 }
 

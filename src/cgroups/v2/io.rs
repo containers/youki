@@ -2,13 +2,17 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Result};
 
-use crate::cgroups::common;
+use crate::cgroups::{
+    common,
+    stats::{self, BlkioDeviceStat, BlkioStats, StatsProvider},
+};
 
 use super::controller::Controller;
 use oci_spec::{LinuxBlockIo, LinuxResources};
 
 const CGROUP_BFQ_IO_WEIGHT: &str = "io.bfq.weight";
 const CGROUP_IO_WEIGHT: &str = "io.weight";
+const CGROUP_IO_STAT: &str = "io.stat";
 
 pub struct Io {}
 
@@ -19,6 +23,58 @@ impl Controller for Io {
             Self::apply(cgroup_root, io)?;
         }
         Ok(())
+    }
+}
+
+impl StatsProvider for Io {
+    type Stats = BlkioStats;
+
+    fn stats(cgroup_path: &Path) -> Result<Self::Stats> {
+        let keyed_data = stats::parse_nested_keyed_data(&cgroup_path.join(CGROUP_IO_STAT))?;
+        let mut service_bytes = Vec::with_capacity(keyed_data.len());
+        let mut serviced = Vec::with_capacity(keyed_data.len());
+        for entry in keyed_data {
+            let (major, minor) = stats::parse_device_number(&entry.0)?;
+            for value in &entry.1 {
+                if value.starts_with("rbytes") {
+                    service_bytes.push(BlkioDeviceStat {
+                        major,
+                        minor,
+                        op_type: Some("read".to_owned()),
+                        value: stats::parse_value(&value[7..])?,
+                    });
+                } else if value.starts_with("wbytes") {
+                    service_bytes.push(BlkioDeviceStat {
+                        major,
+                        minor,
+                        op_type: Some("write".to_owned()),
+                        value: stats::parse_value(&value[7..])?,
+                    });
+                } else if value.starts_with("rios") {
+                    serviced.push(BlkioDeviceStat {
+                        major,
+                        minor,
+                        op_type: Some("read".to_owned()),
+                        value: stats::parse_value(&value[5..])?,
+                    });
+                } else if value.starts_with("wios") {
+                    serviced.push(BlkioDeviceStat {
+                        major,
+                        minor,
+                        op_type: Some("write".to_owned()),
+                        value: stats::parse_value(&value[5..])?,
+                    });
+                }
+            }
+        }
+
+        let stats = BlkioStats {
+            service_bytes,
+            serviced,
+            ..Default::default()
+        };
+
+        Ok(stats)
     }
 }
 

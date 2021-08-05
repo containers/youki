@@ -1,5 +1,5 @@
-use anyhow::{Context, Result};
-use std::{collections::HashMap, fmt::Display, fs, path::Path};
+use anyhow::{bail, Context, Result};
+use std::{collections::HashMap, fmt::Display, fs, hash::Hash, path::Path};
 
 use super::common;
 
@@ -294,6 +294,12 @@ pub fn supported_page_sizes() -> Result<Vec<String>> {
     Ok(sizes)
 }
 
+pub fn parse_value(value: &str) -> Result<u64> {
+    value
+        .parse()
+        .with_context(|| format!("failed to parse {}", value))
+}
+
 pub fn parse_single_value(file_path: &Path) -> Result<u64> {
     let value = common::read_cgroup_file(file_path)?;
     let value = value.trim();
@@ -332,6 +338,37 @@ pub fn parse_flat_keyed_data(file_path: &Path) -> Result<HashMap<String, u64>> {
     }
 
     Ok(stats)
+}
+
+pub fn parse_nested_keyed_data(file_path: &Path) -> Result<HashMap<String, Vec<String>>> {
+    let mut stats: HashMap<String, Vec<String>> = HashMap::new();
+    let keyed_data = common::read_cgroup_file(file_path)?;
+    for entry in keyed_data.lines() {
+        let entry_fields: Vec<&str> = entry.split_ascii_whitespace().collect();
+        if entry_fields.len() < 2 {
+            continue;
+        }
+
+        stats.insert(
+            entry_fields[0].to_owned(),
+            entry_fields[1..]
+                .iter()
+                .copied()
+                .map(|p| p.to_owned())
+                .collect(),
+        );
+    }
+
+    Ok(stats)
+}
+
+pub fn parse_device_number(device: &str) -> Result<(u64, u64)> {
+    let numbers: Vec<&str> = device.split_terminator(':').collect();
+    if numbers.len() != 2 {
+        bail!("failed to parse device number {}", device);
+    }
+
+    Ok((numbers[0].parse()?, numbers[1].parse()?))
 }
 
 pub fn pid_stats(cgroup_path: &Path) -> Result<PidStats> {
