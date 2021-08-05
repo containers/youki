@@ -1,5 +1,6 @@
 //! Utility functionality
 
+use std::collections::HashMap;
 use std::env;
 use std::ffi::CString;
 use std::fs::{self, DirBuilder, File};
@@ -38,6 +39,21 @@ impl PathBufExt for PathBuf {
         }
         Ok(PathBuf::from(format!("{}{}", self.display(), p.display())))
     }
+}
+
+pub fn parse_env(envs: Vec<String>) -> HashMap<String, String> {
+    envs.iter()
+        .filter_map(|e| {
+            let mut split = e.split('=');
+
+            if let Some(key) = split.next() {
+                let value: String = split.collect::<Vec<&str>>().join("=");
+                Some((String::from(key), value))
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 pub fn do_exec(path: impl AsRef<Path>, args: &[String], envs: &[String]) -> Result<()> {
@@ -232,5 +248,20 @@ mod tests {
             get_cgroup_path(&Some(PathBuf::from("/youki")), cid),
             PathBuf::from("/youki")
         );
+    }
+    #[test]
+    fn test_parse_env() -> Result<()> {
+        let key = "key".to_string();
+        let value = "value".to_string();
+        let env_input = vec![format!("{}={}", key, value)];
+        let env_output = parse_env(env_input);
+        assert_eq!(
+            env_output.len(),
+            1,
+            "There should be exactly one entry inside"
+        );
+        assert_eq!(env_output.get_key_value(&key), Some((&key, &value)));
+
+        Ok(())
     }
 }
