@@ -47,10 +47,7 @@ pub fn prepare_rootfs(spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<
 
     for m in spec.mounts.as_ref().context("no mounts in spec")?.iter() {
         let (flags, data) = parse_mount(m);
-        let ml = linux
-            .mount_label
-            .as_ref()
-            .context("no mount_label in spec")?;
+        let ml = linux.mount_label.as_ref();
         if m.typ.as_ref().context("no type in mount spec")? == "cgroup" {
             // skip
             log::warn!("A feature of cgroup is unimplemented.");
@@ -235,14 +232,18 @@ fn mount_to_container(
     rootfs: &Path,
     flags: MsFlags,
     data: &str,
-    label: &str,
+    label: Option<&String>,
 ) -> Result<()> {
     let typ = m.typ.as_ref().context("no type in mount spec")?;
-    let d = if !label.is_empty() && typ != "proc" && typ != "sysfs" {
-        if data.is_empty() {
-            format!("context=\"{}\"", label)
+    let d = if let Some(l) = label {
+        if typ != "proc" && typ != "sysfs" {
+            if data.is_empty() {
+                format!("context=\"{}\"", l)
+            } else {
+                format!("{},context=\"{}\"", data, l)
+            }
         } else {
-            format!("{},context=\"{}\"", data, label)
+            data.to_string()
         }
     } else {
         data.to_string()
