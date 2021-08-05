@@ -136,7 +136,10 @@ impl Io {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::cgroups::test::setup;
+    use crate::{
+        cgroups::test::{set_fixture, setup},
+        utils::create_temp_dir,
+    };
     use oci_spec::{LinuxBlockIo, LinuxThrottleDevice, LinuxWeightDevice};
     use std::fs;
     struct BlockIoBuilder {
@@ -289,5 +292,75 @@ mod test {
             fs::read_to_string(throttle).unwrap_or_else(|_| panic!("read bfq_io_weight content"));
 
         assert_eq!("100", content);
+    }
+
+    #[test]
+    fn test_stat_io() {
+        let tmp = create_temp_dir("test_stat_io").expect("create test directory");
+        let stat_content = [
+            "7:10 rbytes=18432 wbytes=16842 rios=12 wios=0 dbytes=0 dios=0",
+            "7:9 rbytes=34629632 wbytes=274965 rios=1066 wios=319 dbytes=0 dios=0",
+        ]
+        .join("\n");
+        set_fixture(&tmp, "io.stat", &stat_content).unwrap();
+
+        let actual = Io::stats(&tmp).expect("get cgroup stats");
+        let expected = BlkioStats {
+            service_bytes: vec![
+                BlkioDeviceStat {
+                    major: 7,
+                    minor: 10,
+                    op_type: Some("read".to_owned()),
+                    value: 18432,
+                },
+                BlkioDeviceStat {
+                    major: 7,
+                    minor: 10,
+                    op_type: Some("write".to_owned()),
+                    value: 16842,
+                },
+                BlkioDeviceStat {
+                    major: 7,
+                    minor: 9,
+                    op_type: Some("read".to_owned()),
+                    value: 34629632,
+                },
+                BlkioDeviceStat {
+                    major: 7,
+                    minor: 9,
+                    op_type: Some("write".to_owned()),
+                    value: 274965,
+                },
+            ],
+            serviced: vec![
+                BlkioDeviceStat {
+                    major: 7,
+                    minor: 10,
+                    op_type: Some("read".to_owned()),
+                    value: 12,
+                },
+                BlkioDeviceStat {
+                    major: 7,
+                    minor: 10,
+                    op_type: Some("write".to_owned()),
+                    value: 0,
+                },
+                BlkioDeviceStat {
+                    major: 7,
+                    minor: 9,
+                    op_type: Some("read".to_owned()),
+                    value: 1066,
+                },
+                BlkioDeviceStat {
+                    major: 7,
+                    minor: 9,
+                    op_type: Some("write".to_owned()),
+                    value: 319,
+                },
+            ],
+            ..Default::default()
+        };
+
+        assert_eq!(actual, expected);
     }
 }
