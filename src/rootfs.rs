@@ -23,16 +23,15 @@ pub fn prepare_rootfs(spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<
     let mut flags = MsFlags::MS_REC;
 
     let linux = spec.linux.as_ref().context("no linux in spec")?;
-    match linux
-        .rootfs_propagation
-        .as_ref()
-        .context("no rootfs_propagation in spec")?
-        .as_str()
-    {
-        "shared" => flags |= MsFlags::MS_SHARED,
-        "private" => flags |= MsFlags::MS_PRIVATE,
-        "slave" | "" => flags |= MsFlags::MS_SLAVE,
-        _ => panic!(),
+    if let Some(roofs_propagation) = linux.rootfs_propagation.as_ref() {
+        match roofs_propagation.as_str() {
+            "shared" => flags |= MsFlags::MS_SHARED,
+            "private" => flags |= MsFlags::MS_PRIVATE,
+            "slave" => flags |= MsFlags::MS_SLAVE,
+            uknown => bail!("unknown rootfs_propagation: {}", uknown),
+        }
+    } else {
+        flags |= MsFlags::MS_SLAVE;
     }
 
     nix_mount(None::<&str>, "/", None::<&str>, flags, None::<&str>)?;
