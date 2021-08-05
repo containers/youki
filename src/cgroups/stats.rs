@@ -1,5 +1,6 @@
 use anyhow::{bail, Context, Result};
-use std::{collections::HashMap, fmt::Display, fs, hash::Hash, path::Path};
+use serde::Serialize;
+use std::{collections::HashMap, fmt::Display, fs, path::Path};
 
 use super::common;
 
@@ -10,7 +11,7 @@ pub trait StatsProvider {
 }
 
 /// Reports the statistics for a cgroup
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Stats {
     /// Cpu statistics for the cgroup
     pub cpu: CpuStats,
@@ -37,7 +38,7 @@ impl Default for Stats {
 }
 
 /// Reports the cpu statistics for a cgroup
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct CpuStats {
     /// Cpu usage statistics for the cgroup
     pub usage: CpuUsage,
@@ -55,7 +56,7 @@ impl Default for CpuStats {
 }
 
 /// Reports the cpu usage for a cgroup
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Serialize)]
 pub struct CpuUsage {
     /// Cpu time consumed by tasks in total
     pub usage_total: u64,
@@ -85,7 +86,7 @@ impl Default for CpuUsage {
 }
 
 /// Reports the cpu throttling for a cgroup
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Serialize)]
 pub struct CpuThrottling {
     /// Number of period intervals (as specified in cpu.cfs_period_us) that have elapsed
     pub periods: u64,
@@ -106,7 +107,7 @@ impl Default for CpuThrottling {
 }
 
 /// Reports memory stats for a cgroup
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct MemoryStats {
     /// Usage of memory
     pub memory: MemoryData,
@@ -139,7 +140,7 @@ impl Default for MemoryStats {
 }
 
 /// Reports memory stats for one type of memory
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Serialize)]
 pub struct MemoryData {
     /// Usage in bytes
     pub usage: u64,
@@ -163,7 +164,7 @@ impl Default for MemoryData {
 }
 
 /// Reports pid stats for a cgroup
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Serialize)]
 pub struct PidStats {
     /// Current number of active pids
     pub current: u64,
@@ -181,7 +182,7 @@ impl Default for PidStats {
 }
 
 /// Reports block io stats for a cgroup
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Serialize)]
 pub struct BlkioStats {
     // Number of bytes transfered to/from a device by the cgroup
     pub service_bytes: Vec<BlkioDeviceStat>,
@@ -217,7 +218,7 @@ impl Default for BlkioStats {
 }
 
 /// Reports single stat value for a specific device
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize)]
 pub struct BlkioDeviceStat {
     /// Major device number
     pub major: u64,
@@ -244,7 +245,7 @@ impl Display for BlkioDeviceStat {
 }
 
 /// Reports hugetlb stats for a cgroup
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Serialize)]
 pub struct HugeTlbStats {
     /// Current usage in bytes
     pub usage: u64,

@@ -58,15 +58,15 @@ impl Memory {
             &cgroup_path.join(format!("{}.{}", file_prefix, "events")),
         )?;
         let fail_count = if let Some((_, v)) = events.get_key_value(fail_event) {
-            v.clone()
+            *v
         } else {
             Default::default()
         };
 
         Ok(MemoryData {
             usage,
-            limit,
             fail_count,
+            limit,
             ..Default::default()
         })
     }

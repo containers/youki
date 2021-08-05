@@ -45,9 +45,13 @@ impl Events {
 
         let cgroup_manager = common::create_cgroup_manager(cgroups_path, use_systemd)?;
         match self.stats {
-            true => println!("{:#?}", cgroup_manager.stats()),
+            true => {
+                let stats = cgroup_manager.stats()?;
+                println!("{}", serde_json::to_string_pretty(&stats)?);
+            }
             false => loop {
-                println!("{:#?}", cgroup_manager.stats());
+                let stats = cgroup_manager.stats()?;
+                println!("{}", serde_json::to_string_pretty(&stats)?);
                 thread::sleep(Duration::from_secs(self.interval as u64));
             },
         }

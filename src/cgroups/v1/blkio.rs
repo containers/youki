@@ -5,7 +5,7 @@ use crate::cgroups::{
     stats::{self, BlkioDeviceStat, BlkioStats, StatsProvider},
     v1::Controller,
 };
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use oci_spec::{LinuxBlockIo, LinuxResources};
 
 // Throttling/upper limit policy
