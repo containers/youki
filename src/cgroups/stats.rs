@@ -218,7 +218,7 @@ impl Default for BlkioStats {
 }
 
 /// Reports single stat value for a specific device
-#[derive(Debug, PartialEq, Eq, Clone, Serialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, PartialOrd, Ord)]
 pub struct BlkioDeviceStat {
     /// Major device number
     pub major: u64,

@@ -304,21 +304,9 @@ mod test {
         .join("\n");
         set_fixture(&tmp, "io.stat", &stat_content).unwrap();
 
-        let actual = Io::stats(&tmp).expect("get cgroup stats");
+        let mut actual = Io::stats(&tmp).expect("get cgroup stats");
         let expected = BlkioStats {
             service_bytes: vec![
-                BlkioDeviceStat {
-                    major: 7,
-                    minor: 10,
-                    op_type: Some("read".to_owned()),
-                    value: 18432,
-                },
-                BlkioDeviceStat {
-                    major: 7,
-                    minor: 10,
-                    op_type: Some("write".to_owned()),
-                    value: 16842,
-                },
                 BlkioDeviceStat {
                     major: 7,
                     minor: 9,
@@ -331,20 +319,20 @@ mod test {
                     op_type: Some("write".to_owned()),
                     value: 274965,
                 },
-            ],
-            serviced: vec![
                 BlkioDeviceStat {
                     major: 7,
                     minor: 10,
                     op_type: Some("read".to_owned()),
-                    value: 12,
+                    value: 18432,
                 },
                 BlkioDeviceStat {
                     major: 7,
                     minor: 10,
                     op_type: Some("write".to_owned()),
-                    value: 0,
+                    value: 16842,
                 },
+            ],
+            serviced: vec![
                 BlkioDeviceStat {
                     major: 7,
                     minor: 9,
@@ -357,9 +345,24 @@ mod test {
                     op_type: Some("write".to_owned()),
                     value: 319,
                 },
+                BlkioDeviceStat {
+                    major: 7,
+                    minor: 10,
+                    op_type: Some("read".to_owned()),
+                    value: 12,
+                },
+                BlkioDeviceStat {
+                    major: 7,
+                    minor: 10,
+                    op_type: Some("write".to_owned()),
+                    value: 0,
+                },
             ],
             ..Default::default()
         };
+
+        actual.service_bytes.sort();
+        actual.serviced.sort();
 
         assert_eq!(actual, expected);
     }
