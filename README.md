@@ -39,7 +39,7 @@ youki is not at the practical stage yet. However, it is getting closer to practi
 - [x] namespaces
 - [x] capabilities
 - [x] rlimits
-- [ ] cgroups v1(WIP on [#9](https://github.com/containers/youki/issues/9))
+- [x] cgroups v1
 - [ ] cgroups v2(WIP on [#78](https://github.com/containers/youki/issues/78))
 - [ ] seccomp(WIP on [#25](https://github.com/containers/youki/issues/25))
 - [ ] hooks(WIP on [#13](https://github.com/containers/youki/issues/13))
