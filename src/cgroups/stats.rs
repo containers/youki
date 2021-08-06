@@ -273,26 +273,33 @@ pub fn supported_page_sizes() -> Result<Vec<String>> {
             continue;
         }
 
-        let file_name = hugetlb_entry.file_name();
-        let file_name = file_name.to_str().unwrap();
-        if let Some(name_stripped) = file_name.strip_prefix("hugepages-") {
-            if let Some(size) = name_stripped.strip_suffix("kB") {
-                let size: u64 = size.parse()?;
+        let dir_name = hugetlb_entry.file_name();
+        let dir_name = dir_name.to_str().unwrap();
 
-                let size_moniker = if size >= (1 << 20) {
-                    (size >> 20).to_string() + "GB"
-                } else if size >= (1 << 10) {
-                    (size >> 10).to_string() + "MB"
-                } else {
-                    size.to_string() + "KB"
-                };
-
-                sizes.push(size_moniker);
-            }
-        }
+        sizes.push(extract_page_size(dir_name)?);
     }
 
     Ok(sizes)
+}
+
+fn extract_page_size(dir_name: &str) -> Result<String> {
+    if let Some(name_stripped) = dir_name.strip_prefix("hugepages-") {
+        if let Some(size) = name_stripped.strip_suffix("kB") {
+            let size: u64 = parse_value(size)?;
+
+            let size_moniker = if size >= (1 << 20) {
+                (size >> 20).to_string() + "GB"
+            } else if size >= (1 << 10) {
+                (size >> 10).to_string() + "MB"
+            } else {
+                size.to_string() + "KB"
+            };
+
+            return Ok(size_moniker);
+        }
+    }
+
+    bail!("failed to determine page size from {}", dir_name);
 }
 
 pub fn parse_value(value: &str) -> Result<u64> {
@@ -388,4 +395,124 @@ pub fn pid_stats(cgroup_path: &Path) -> Result<PidStats> {
     }
 
     Ok(stats)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{cgroups::test::set_fixture, utils::create_temp_dir};
+
+    use super::*;
+
+    #[test]
+    fn test_supported_page_sizes_gigabyte() {
+        let page_size = extract_page_size("hugepages-1048576kB").unwrap();
+        assert_eq!(page_size, "1GB");
+    }
+
+    #[test]
+    fn test_supported_page_sizes_megabyte() {
+        let page_size = extract_page_size("hugepages-2048kB").unwrap();
+        assert_eq!(page_size, "2MB");
+    }
+
+    #[test]
+    fn test_supported_page_sizes_kilobyte() {
+        let page_size = extract_page_size("hugepages-512kB").unwrap();
+        assert_eq!(page_size, "512KB");
+    }
+
+    #[test]
+    fn test_parse_single_value_valid() {
+        let tmp = create_temp_dir("test_parse_single_value_valid").unwrap();
+        let file_path = set_fixture(&tmp, "single_valued_file", "1200\n").unwrap();
+
+        let value = parse_single_value(&file_path).unwrap();
+        assert_eq!(value, 1200);
+    }
+
+    #[test]
+    fn test_parse_single_value_invalid_number() {
+        let tmp = create_temp_dir("test_parse_single_value_invalid_number").unwrap();
+        let file_path = set_fixture(&tmp, "single_invalid_file", "noop\n").unwrap();
+
+        let value = parse_single_value(&file_path);
+        assert!(value.is_err());
+    }
+
+    #[test]
+    fn test_parse_single_value_multiple_entries() {
+        let tmp = create_temp_dir("test_parse_single_value_multiple_entries").unwrap();
+        let file_path = set_fixture(&tmp, "multi_valued_file", "1200\n1400\n1600").unwrap();
+
+        let value = parse_single_value(&file_path);
+        assert!(value.is_err());
+    }
+
+    #[test]
+    fn test_parse_flat_keyed_data() {
+        let tmp = create_temp_dir("test_parse_flat_keyed_data").unwrap();
+        let file_content = ["key1 1", "key2 2", "key3 3"].join("\n");
+        let file_path = set_fixture(&tmp, "flat_keyed_data", &file_content).unwrap();
+
+        let actual = parse_flat_keyed_data(&file_path).unwrap();
+        let mut expected = HashMap::with_capacity(3);
+        expected.insert("key1".to_owned(), 1);
+        expected.insert("key2".to_owned(), 2);
+        expected.insert("key3".to_owned(), 3);
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_parse_nested_keyed_data() {
+        let tmp = create_temp_dir("test_parse_nested_keyed_data").unwrap();
+        let file_content = [
+            "key1 subkey1=value1 subkey2=value2 subkey3=value3",
+            "key2 subkey1=value1 subkey2=value2 subkey3=value3",
+            "key3 subkey1=value1 subkey2=value2 subkey3=value3",
+        ]
+        .join("\n");
+        let file_path = set_fixture(&tmp, "nested_keyed_data", &file_content).unwrap();
+
+        let actual = parse_nested_keyed_data(&file_path).unwrap();
+        let mut expected = HashMap::with_capacity(3);
+        expected.insert(
+            "key1".to_owned(),
+            vec![
+                "subkey1=value1".to_owned(),
+                "subkey2=value2".to_owned(),
+                "subkey3=value3".to_owned(),
+            ],
+        );
+        expected.insert(
+            "key2".to_owned(),
+            vec![
+                "subkey1=value1".to_owned(),
+                "subkey2=value2".to_owned(),
+                "subkey3=value3".to_owned(),
+            ],
+        );
+        expected.insert(
+            "key3".to_owned(),
+            vec![
+                "subkey1=value1".to_owned(),
+                "subkey2=value2".to_owned(),
+                "subkey3=value3".to_owned(),
+            ],
+        );
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_parse_device_number() {
+        let (major, minor) = parse_device_number("8:0").unwrap();
+        assert_eq!((major, minor), (8,0));
+    }
+
+    #[test]
+    fn test_parse_invalid_device_number() {
+        let result = parse_device_number("a:b");
+        assert!(result.is_err());
+    }
 }
