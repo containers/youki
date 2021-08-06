@@ -349,7 +349,10 @@ pub fn parse_flat_keyed_data(file_path: &Path) -> Result<HashMap<String, u64>> {
     for entry in keyed_data.lines() {
         let entry_fields: Vec<&str> = entry.split_ascii_whitespace().collect();
         if entry_fields.len() != 2 {
-            continue;
+            bail!(
+                "flat keyed data at {} contains entries that do not conform to 'key value'",
+                &file_path.display()
+            );
         }
 
         stats.insert(
@@ -373,8 +376,8 @@ pub fn parse_nested_keyed_data(file_path: &Path) -> Result<HashMap<String, Vec<S
     let keyed_data = common::read_cgroup_file(file_path)?;
     for entry in keyed_data.lines() {
         let entry_fields: Vec<&str> = entry.split_ascii_whitespace().collect();
-        if entry_fields.len() < 2 {
-            continue;
+        if entry_fields.len() < 2 || !entry_fields[1..].iter().all(|p| p.contains('=')) {
+            bail!("nested key data at {} contains entries that do not conform to the nested key format", file_path.display());
         }
 
         stats.insert(
@@ -493,6 +496,51 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_flat_keyed_data_with_characters() {
+        let tmp = create_temp_dir("test_parse_flat_keyed_data_with_characters").unwrap();
+        let file_content = ["key1 1", "key2 a", "key3 b"].join("\n");
+        let file_path = set_fixture(&tmp, "flat_keyed_data", &file_content).unwrap();
+
+        let result = parse_flat_keyed_data(&file_path);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_space_separated_as_flat_keyed_data() {
+        let tmp = create_temp_dir("test_parse_space_separated_as_flat_keyed_data").unwrap();
+        let file_content = ["key1", "key2", "key3", "key4"].join(" ");
+        let file_path = set_fixture(&tmp, "space_separated", &file_content).unwrap();
+
+        let result = parse_flat_keyed_data(&file_path);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_newline_separated_as_flat_keyed_data() {
+        let tmp = create_temp_dir("test_parse_newline_separated_as_flat_keyed_data").unwrap();
+        let file_content = ["key1", "key2", "key3", "key4"].join("\n");
+        let file_path = set_fixture(&tmp, "newline_separated", &file_content).unwrap();
+
+        let result = parse_flat_keyed_data(&file_path);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_nested_keyed_data_as_flat_keyed_data() {
+        let tmp = create_temp_dir("test_parse_nested_keyed_data_as_flat_keyed_data").unwrap();
+        let file_content = [
+            "key1 subkey1=value1 subkey2=value2 subkey3=value3",
+            "key2 subkey1=value1 subkey2=value2 subkey3=value3",
+            "key3 subkey1=value1 subkey2=value2 subkey3=value3",
+        ]
+        .join("\n");
+        let file_path = set_fixture(&tmp, "nested_keyed_data", &file_content).unwrap();
+
+        let result = parse_flat_keyed_data(&file_path);
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_parse_nested_keyed_data() {
         let tmp = create_temp_dir("test_parse_nested_keyed_data").unwrap();
         let file_content = [
@@ -531,6 +579,36 @@ mod tests {
         );
 
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_parse_space_separated_as_nested_keyed_data() {
+        let tmp = create_temp_dir("test_parse_newline_separated_as_nested_keyed_data").unwrap();
+        let file_content = ["key1", "key2", "key3", "key4"].join(" ");
+        let file_path = set_fixture(&tmp, "space_separated", &file_content).unwrap();
+
+        let result = parse_nested_keyed_data(&file_path);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_newline_separated_as_nested_keyed_data() {
+        let tmp = create_temp_dir("test_parse_newline_separated_as_nested_keyed_data").unwrap();
+        let file_content = ["key1", "key2", "key3", "key4"].join("\n");
+        let file_path = set_fixture(&tmp, "newline_separated", &file_content).unwrap();
+
+        let result = parse_nested_keyed_data(&file_path);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_flat_keyed_as_nested_keyed_data() {
+        let tmp = create_temp_dir("test_parse_newline_separated_as_nested_keyed_data").unwrap();
+        let file_content = ["key1 1", "key2 2", "key3 3"].join("\n");
+        let file_path = set_fixture(&tmp, "newline_separated", &file_content).unwrap();
+
+        let result = parse_nested_keyed_data(&file_path);
+        assert!(result.is_err());
     }
 
     #[test]
