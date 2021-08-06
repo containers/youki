@@ -64,7 +64,7 @@ impl Delete {
 
                 if let Some(hooks) = spec.hooks.as_ref() {
                     hooks::run_hooks(hooks.poststop.as_ref(), Some(&container))
-                        .with_context(|| "Failed to run post start hooks")?;
+                        .with_context(|| "Failed to run post stop hooks")?;
                 }
             }
             std::process::exit(0)

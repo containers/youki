@@ -18,6 +18,7 @@ impl fmt::Display for HookTimeoutError {
 pub fn run_hooks(hooks: Option<&Vec<Hook>>, container: Option<&Container>) -> Result<()> {
     if let Some(hooks) = hooks {
         for hook in hooks {
+            log::debug!("running hooks: {:?}", hook);
             let envs: HashMap<String, String> = if let Some(env) = hook.env.as_ref() {
                 utils::parse_env(env)
             } else {
