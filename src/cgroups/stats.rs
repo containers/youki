@@ -265,6 +265,7 @@ impl Default for HugeTlbStats {
     }
 }
 
+/// Reports which hugepage sizes are supported by the system
 pub fn supported_page_sizes() -> Result<Vec<String>> {
     let mut sizes = Vec::new();
     for hugetlb_entry in fs::read_dir("/sys/kernel/mm/hugepages")? {
@@ -302,12 +303,29 @@ fn extract_page_size(dir_name: &str) -> Result<String> {
     bail!("failed to determine page size from {}", dir_name);
 }
 
+/// Parses this string slice into an u64
+/// # Example
+/// ```
+/// use youki::cgroups::stats::parse_value;
+///
+/// let value = parse_value("32").unwrap();
+/// assert_eq!(value, 32);
+/// ```
 pub fn parse_value(value: &str) -> Result<u64> {
     value
         .parse()
         .with_context(|| format!("failed to parse {}", value))
 }
 
+/// Parses a single valued file to an u64
+/// # Example
+/// ```no_run
+/// use std::path::Path;
+/// use youki::cgroups::stats::parse_single_value;
+///
+/// let value = parse_single_value(&Path::new("memory.current")).unwrap();
+/// assert_eq!(value, 32);
+/// ```
 pub fn parse_single_value(file_path: &Path) -> Result<u64> {
     let value = common::read_cgroup_file(file_path)?;
     let value = value.trim();
@@ -324,6 +342,7 @@ pub fn parse_single_value(file_path: &Path) -> Result<u64> {
     })
 }
 
+/// Parses a file that is structed according to the flat keyed format
 pub fn parse_flat_keyed_data(file_path: &Path) -> Result<HashMap<String, u64>> {
     let mut stats = HashMap::new();
     let keyed_data = common::read_cgroup_file(file_path)?;
@@ -348,6 +367,7 @@ pub fn parse_flat_keyed_data(file_path: &Path) -> Result<HashMap<String, u64>> {
     Ok(stats)
 }
 
+/// Parses a file that is structed according to the nested keyed format
 pub fn parse_nested_keyed_data(file_path: &Path) -> Result<HashMap<String, Vec<String>>> {
     let mut stats: HashMap<String, Vec<String>> = HashMap::new();
     let keyed_data = common::read_cgroup_file(file_path)?;
@@ -370,6 +390,14 @@ pub fn parse_nested_keyed_data(file_path: &Path) -> Result<HashMap<String, Vec<S
     Ok(stats)
 }
 
+/// Parses a file that is structed according to the nested keyed format
+/// # Example
+/// ```
+/// use youki::cgroups::stats::parse_device_number;
+///
+/// let (major, minor) = parse_device_number("8:0").unwrap();
+/// assert_eq!((major, minor), (8, 0));
+/// ```
 pub fn parse_device_number(device: &str) -> Result<(u64, u64)> {
     let numbers: Vec<&str> = device.split_terminator(':').collect();
     if numbers.len() != 2 {
@@ -379,6 +407,7 @@ pub fn parse_device_number(device: &str) -> Result<(u64, u64)> {
     Ok((numbers[0].parse()?, numbers[1].parse()?))
 }
 
+/// Returns cgroup pid statistics
 pub fn pid_stats(cgroup_path: &Path) -> Result<PidStats> {
     let mut stats = PidStats::default();
 
@@ -507,7 +536,7 @@ mod tests {
     #[test]
     fn test_parse_device_number() {
         let (major, minor) = parse_device_number("8:0").unwrap();
-        assert_eq!((major, minor), (8,0));
+        assert_eq!((major, minor), (8, 0));
     }
 
     #[test]
