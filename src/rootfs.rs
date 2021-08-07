@@ -45,16 +45,18 @@ pub fn prepare_rootfs(spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<
         None::<&str>,
     )?;
 
-    for m in spec.mounts.as_ref().context("no mounts in spec")?.iter() {
-        let (flags, data) = parse_mount(m);
-        let ml = linux.mount_label.as_ref();
-        if m.typ.as_ref().context("no type in mount spec")? == "cgroup" {
-            // skip
-            log::warn!("A feature of cgroup is unimplemented.");
-        } else if m.destination == PathBuf::from("/dev") {
-            mount_to_container(m, rootfs, flags & !MsFlags::MS_RDONLY, &data, ml)?;
-        } else {
-            mount_to_container(m, rootfs, flags, &data, ml)?;
+    if let Some(mounts) = spec.mounts.as_ref() {
+        for m in mounts.iter() {
+            let (flags, data) = parse_mount(m);
+            let ml = linux.mount_label.as_ref();
+            if m.typ.as_ref().context("no type in mount spec")? == "cgroup" {
+                // skip
+                log::warn!("A feature of cgroup is unimplemented.");
+            } else if m.destination == PathBuf::from("/dev") {
+                mount_to_container(m, rootfs, flags & !MsFlags::MS_RDONLY, &data, ml)?;
+            } else {
+                mount_to_container(m, rootfs, flags, &data, ml)?;
+            }
         }
     }
 
