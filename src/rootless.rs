@@ -135,20 +135,20 @@ fn is_id_mapped(id: &str, mappings: &[LinuxIdMapping]) -> Result<bool> {
 /// Looks up the location of the newuidmap and newgidmap binaries which
 /// are required to write multiple user/group mappings
 pub fn lookup_map_binaries(spec: &Linux) -> Result<Option<(PathBuf, PathBuf)>> {
-    let uid_mappings = spec
-        .uid_mappings
-        .as_ref()
-        .context("no uid_mappings in spec")?;
-    if uid_mappings.len() == 1 && uid_mappings.len() == 1 {
-        return Ok(None);
-    }
+    if let Some(uid_mappings) = spec.uid_mappings.as_ref() {
+        if uid_mappings.len() == 1 && uid_mappings.len() == 1 {
+            return Ok(None);
+        }
 
-    let uidmap = lookup_map_binary("newuidmap")?;
-    let gidmap = lookup_map_binary("newgidmap")?;
+        let uidmap = lookup_map_binary("newuidmap")?;
+        let gidmap = lookup_map_binary("newgidmap")?;
 
-    match (uidmap, gidmap) {
+        match (uidmap, gidmap) {
         (Some(newuidmap), Some(newgidmap)) => Ok(Some((newuidmap, newgidmap))),
         _ => bail!("newuidmap/newgidmap binaries could not be found in path. This is required if multiple id mappings are specified"),
+    }
+    } else {
+        Ok(None)
     }
 }
 
