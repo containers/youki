@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 
 use crate::cgroups::common;
 use crate::{cgroups::v1::Controller, rootfs::default_devices};
@@ -14,12 +14,10 @@ impl Controller for Devices {
     fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply Devices cgroup config");
 
-        for d in linux_resources
-            .devices
-            .as_ref()
-            .context("no devices in linux resources")?
-        {
-            Self::apply_device(d, cgroup_root)?;
+        if let Some(devices) = linux_resources.devices.as_ref() {
+            for d in devices {
+                Self::apply_device(d, cgroup_root)?;
+            }
         }
 
         for d in [
