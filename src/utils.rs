@@ -113,7 +113,8 @@ pub struct TempDir {
 impl TempDir {
     pub fn new<P: Into<PathBuf>>(path: P) -> Result<Self> {
         let p = path.into();
-        std::fs::create_dir_all(&p)?;
+        std::fs::create_dir_all(&p)
+            .with_context(|| format!("failed to create directory {}", p.display()))?;
         Ok(Self { path: Some(p) })
     }
 

@@ -2,7 +2,10 @@ use std::path::Path;
 
 use anyhow::Result;
 
-use crate::cgroups::common;
+use crate::cgroups::{
+    common,
+    stats::{self, PidStats, StatsProvider},
+};
 
 use super::controller::Controller;
 use oci_spec::{LinuxPids, LinuxResources};
@@ -16,6 +19,14 @@ impl Controller for Pids {
             Self::apply(cgroup_root, pids)?;
         }
         Ok(())
+    }
+}
+
+impl StatsProvider for Pids {
+    type Stats = PidStats;
+
+    fn stats(cgroup_path: &Path) -> Result<Self::Stats> {
+        stats::pid_stats(cgroup_path)
     }
 }
 

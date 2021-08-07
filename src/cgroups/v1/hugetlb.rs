@@ -1,17 +1,17 @@
-use std::{collections::HashMap, fs, path::Path};
+use std::{collections::HashMap, path::Path};
 
 use anyhow::{bail, Result};
 
 use crate::cgroups::{
     common,
-    stats::{HugeTlbStats, StatsProvider},
+    stats::{supported_page_sizes, HugeTlbStats, StatsProvider},
     v1::Controller,
 };
 use oci_spec::{LinuxHugepageLimit, LinuxResources};
 
-pub struct Hugetlb {}
+pub struct HugeTlb {}
 
-impl Controller for Hugetlb {
+impl Controller for HugeTlb {
     type Resource = Vec<LinuxHugepageLimit>;
 
     fn apply(linux_resources: &LinuxResources, cgroup_root: &std::path::Path) -> Result<()> {
@@ -35,11 +35,11 @@ impl Controller for Hugetlb {
     }
 }
 
-impl StatsProvider for Hugetlb {
+impl StatsProvider for HugeTlb {
     type Stats = HashMap<String, HugeTlbStats>;
 
     fn stats(cgroup_path: &Path) -> Result<Self::Stats> {
-        let page_sizes = Self::supported_page_sizes()?;
+        let page_sizes = supported_page_sizes()?;
         let mut hugetlb_stats = HashMap::with_capacity(page_sizes.len());
 
         for page_size in &page_sizes {
@@ -51,7 +51,7 @@ impl StatsProvider for Hugetlb {
     }
 }
 
-impl Hugetlb {
+impl HugeTlb {
     fn apply(root_path: &Path, hugetlb: &LinuxHugepageLimit) -> Result<()> {
         let page_size: String = hugetlb
             .page_size
@@ -72,36 +72,6 @@ impl Hugetlb {
 
     fn is_power_of_two(number: u64) -> bool {
         (number != 0) && (number & (number - 1)) == 0
-    }
-
-    fn supported_page_sizes() -> Result<Vec<String>> {
-        let mut sizes = Vec::new();
-        for hugetlb_entry in fs::read_dir("/sys/kernel/mm/hugepages")? {
-            let hugetlb_entry = hugetlb_entry?;
-            if !hugetlb_entry.path().is_dir() {
-                continue;
-            }
-
-            let file_name = hugetlb_entry.file_name();
-            let file_name = file_name.to_str().unwrap();
-            if let Some(name_stripped) = file_name.strip_prefix("hugepages-") {
-                if let Some(size) = name_stripped.strip_suffix("kB") {
-                    let size: u64 = size.parse()?;
-
-                    let size_moniker = if size >= (1 << 20) {
-                        (size >> 20).to_string() + "GB"
-                    } else if size >= (1 << 10) {
-                        (size >> 10).to_string() + "MB"
-                    } else {
-                        size.to_string() + "KB"
-                    };
-
-                    sizes.push(size_moniker);
-                }
-            }
-        }
-
-        Ok(sizes)
     }
 
     fn stats_for_page_size(cgroup_path: &Path, page_size: &str) -> Result<HugeTlbStats> {
@@ -141,7 +111,7 @@ mod tests {
             page_size: "2MB".to_owned(),
             limit: 16384,
         };
-        Hugetlb::apply(&tmp, &hugetlb).expect("apply hugetlb");
+        HugeTlb::apply(&tmp, &hugetlb).expect("apply hugetlb");
         let content = read_to_string(tmp.join(page_file_name)).expect("Read hugetlb file content");
         assert_eq!(hugetlb.limit.to_string(), content);
     }
@@ -156,7 +126,7 @@ mod tests {
             limit: 16384,
         };
 
-        let result = Hugetlb::apply(&tmp, &hugetlb);
+        let result = HugeTlb::apply(&tmp, &hugetlb);
         assert!(
             result.is_err(),
             "page size that is not a power of two should be an error"
@@ -169,7 +139,7 @@ mod tests {
             let tmp = create_temp_dir("property_test_set_hugetlb").expect("create temp directory for test");
             set_fixture(&tmp, &page_file_name, "0").expect("Set fixture for page size");
 
-            let result = Hugetlb::apply(&tmp, &hugetlb);
+            let result = HugeTlb::apply(&tmp, &hugetlb);
 
             let page_size: String = hugetlb
             .page_size
@@ -178,7 +148,7 @@ mod tests {
             .collect();
             let page_size: u64 = page_size.parse().expect("parse page size");
 
-            if Hugetlb::is_power_of_two(page_size) && page_size != 1 {
+            if HugeTlb::is_power_of_two(page_size) && page_size != 1 {
                 let content =
                     read_to_string(tmp.join(page_file_name)).expect("Read hugetlb file content");
                 hugetlb.limit.to_string() == content
@@ -196,7 +166,7 @@ mod tests {
             .expect("set hugetlb max usage");
         set_fixture(&tmp, "hugetlb.2MB.failcnt", "5").expect("set hugetlb fail count");
 
-        let actual = Hugetlb::stats_for_page_size(&tmp, "2MB").expect("get cgroup stats");
+        let actual = HugeTlb::stats_for_page_size(&tmp, "2MB").expect("get cgroup stats");
 
         let expected = HugeTlbStats {
             usage: 1024,

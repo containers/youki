@@ -1,16 +1,14 @@
 use std::path::Path;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 
 use crate::cgroups::{
     common,
-    stats::{PidStats, StatsProvider},
+    stats::{self, PidStats, StatsProvider},
     v1::Controller,
 };
 use oci_spec::{LinuxPids, LinuxResources};
 
-// Contains the current number of active pids
-const CGROUP_PIDS_CURRENT: &str = "pids.current";
 // Contains the maximum allowed number of active pids
 const CGROUP_PIDS_MAX: &str = "pids.max";
 
@@ -42,21 +40,7 @@ impl StatsProvider for Pids {
     type Stats = PidStats;
 
     fn stats(cgroup_path: &Path) -> Result<Self::Stats> {
-        let mut stats = PidStats::default();
-
-        let current = common::read_cgroup_file(cgroup_path.join(CGROUP_PIDS_CURRENT))?;
-        stats.current = current
-            .trim()
-            .parse()
-            .context("failed to parse current pids")?;
-
-        let limit = common::read_cgroup_file(cgroup_path.join(CGROUP_PIDS_MAX))
-            .map(|l| l.trim().to_owned())?;
-        if limit != "max" {
-            stats.limit = limit.parse().context("failed to parse pids limit")?;
-        }
-
-        Ok(stats)
+        stats::pid_stats(cgroup_path)
     }
 }
 
@@ -68,7 +52,7 @@ impl Pids {
             "max".to_string()
         };
 
-        common::write_cgroup_file_str(&root_path.join("pids.max"), &limit)?;
+        common::write_cgroup_file_str(&root_path.join(CGROUP_PIDS_MAX), &limit)?;
         Ok(())
     }
 }
@@ -79,6 +63,9 @@ mod tests {
     use crate::cgroups::test::set_fixture;
     use crate::utils::create_temp_dir;
     use oci_spec::LinuxPids;
+
+    // Contains the current number of active pids
+    const CGROUP_PIDS_CURRENT: &str = "pids.current";
 
     #[test]
     fn test_set_pids() {

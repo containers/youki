@@ -2,11 +2,11 @@ use std::collections::HashMap;
 use std::io::{prelude::*, Write};
 use std::{fs::OpenOptions, path::Path};
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, bail, Result};
 use nix::errno::Errno;
 
 use crate::cgroups::common::{self};
-use crate::cgroups::stats::{MemoryData, MemoryStats, StatsProvider};
+use crate::cgroups::stats::{self, parse_single_value, MemoryData, MemoryStats, StatsProvider};
 use crate::cgroups::v1::Controller;
 use oci_spec::{LinuxMemory, LinuxResources};
 
@@ -135,32 +135,21 @@ impl StatsProvider for Memory {
 impl Memory {
     fn get_memory_data(cgroup_path: &Path, file_prefix: &str) -> Result<MemoryData> {
         let memory_data = MemoryData {
-            usage: Self::get_single_value(
+            usage: parse_single_value(
                 &cgroup_path.join(format!("{}{}", file_prefix, MEMORY_USAGE_IN_BYTES)),
             )?,
-            max_usage: Self::get_single_value(
+            max_usage: parse_single_value(
                 &cgroup_path.join(format!("{}{}", file_prefix, MEMORY_MAX_USAGE_IN_BYTES)),
             )?,
-            limit: Self::get_single_value(
+            limit: parse_single_value(
                 &cgroup_path.join(format!("{}{}", file_prefix, MEMORY_LIMIT_IN_BYTES)),
             )?,
-            fail_count: Self::get_single_value(
+            fail_count: parse_single_value(
                 &cgroup_path.join(format!("{}{}", file_prefix, MEMORY_FAIL_COUNT)),
             )?,
         };
 
         Ok(memory_data)
-    }
-
-    fn get_single_value(file_path: &Path) -> Result<u64> {
-        let value = common::read_cgroup_file(file_path)?;
-        value.trim().parse().with_context(|| {
-            format!(
-                "failed to parse value {} from {}",
-                value,
-                file_path.display()
-            )
-        })
     }
 
     fn hierarchy_enabled(cgroup_path: &Path) -> Result<bool> {
@@ -172,26 +161,7 @@ impl Memory {
     }
 
     fn get_stat_data(cgroup_path: &Path) -> Result<HashMap<String, u64>> {
-        let mut stats = HashMap::new();
-        let memory_stat = common::read_cgroup_file(cgroup_path.join(MEMORY_STAT))?;
-        for entry in memory_stat.lines() {
-            let entry_fields: Vec<&str> = entry.split_ascii_whitespace().collect();
-            if entry_fields.len() != 2 {
-                continue;
-            }
-
-            stats.insert(
-                entry_fields[0].to_owned(),
-                entry_fields[1].parse().with_context(|| {
-                    format!(
-                        "failed to parse value {} from {}",
-                        entry_fields[0], MEMORY_STAT
-                    )
-                })?,
-            );
-        }
-
-        Ok(stats)
+        stats::parse_flat_keyed_data(&cgroup_path.join(MEMORY_STAT))
     }
 
     fn get_memory_usage(cgroup_root: &Path) -> Result<u64> {

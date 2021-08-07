@@ -1,7 +1,10 @@
 use anyhow::{bail, Result};
 use std::path::Path;
 
-use crate::cgroups::common;
+use crate::cgroups::{
+    common,
+    stats::{CpuUsage, StatsProvider},
+};
 use oci_spec::{LinuxCpu, LinuxResources};
 
 use super::controller::Controller;
@@ -10,6 +13,8 @@ const CGROUP_CPU_WEIGHT: &str = "cpu.weight";
 const CGROUP_CPU_MAX: &str = "cpu.max";
 const DEFAULT_PERIOD: &str = "100000";
 const UNRESTRICTED_QUOTA: &str = "max";
+
+const CPU_STAT: &str = "cpu.stat";
 
 pub struct Cpu {}
 
@@ -20,6 +25,32 @@ impl Controller for Cpu {
         }
 
         Ok(())
+    }
+}
+
+impl StatsProvider for Cpu {
+    type Stats = CpuUsage;
+
+    fn stats(cgroup_path: &Path) -> Result<Self::Stats> {
+        let mut stats = CpuUsage::default();
+
+        let stat_content = common::read_cgroup_file(cgroup_path.join(CPU_STAT))?;
+        for entry in stat_content.lines() {
+            let parts: Vec<&str> = entry.split_ascii_whitespace().collect();
+            if parts.len() != 2 {
+                continue;
+            }
+
+            let value = parts[1].parse()?;
+            match parts[0] {
+                "usage_usec" => stats.usage_total = value,
+                "user_usec" => stats.usage_user = value,
+                "system_usec" => stats.usage_kernel = value,
+                _ => continue,
+            }
+        }
+
+        Ok(stats)
     }
 }
 
@@ -227,5 +258,22 @@ mod tests {
             result.is_err(),
             "realtime period is not supported and should return an error"
         );
+    }
+
+    #[test]
+    fn test_stat_usage() {
+        let tmp = create_temp_dir("test_stat_usage").expect("create temp directory for test");
+        let content = ["usage_usec 7730", "user_usec 4387", "system_usec 3498"].join("\n");
+        set_fixture(&tmp, CPU_STAT, &content).expect("create stat file");
+
+        let actual = Cpu::stats(&tmp).expect("get cgroup stats");
+        let expected = CpuUsage {
+            usage_total: 7730,
+            usage_user: 4387,
+            usage_kernel: 3498,
+            ..Default::default()
+        };
+
+        assert_eq!(actual, expected);
     }
 }

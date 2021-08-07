@@ -17,7 +17,7 @@ use crate::{
     cgroups::v2::controller::Controller,
     cgroups::{
         common::{self, CgroupManager, CGROUP_PROCS},
-        stats::Stats,
+        stats::{Stats, StatsProvider},
         v2::controller_type::ControllerType,
     },
     utils::PathBufExt,
@@ -157,7 +157,20 @@ impl CgroupManager for Manager {
     }
 
     fn stats(&self) -> Result<Stats> {
-        Ok(Stats::default())
+        let mut stats = Stats::default();
+
+        for subsystem in CONTROLLER_TYPES {
+            match subsystem {
+                ControllerType::Cpu => stats.cpu.usage = Cpu::stats(&self.full_path)?,
+                ControllerType::HugeTlb => stats.hugetlb = HugeTlb::stats(&self.full_path)?,
+                ControllerType::Pids => stats.pids = Pids::stats(&self.full_path)?,
+                ControllerType::Memory => stats.memory = Memory::stats(&self.full_path)?,
+                ControllerType::Io => stats.blkio = Io::stats(&self.full_path)?,
+                _ => continue,
+            }
+        }
+
+        Ok(stats)
     }
 
     fn get_all_pids(&self) -> Result<Vec<Pid>> {
