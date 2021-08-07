@@ -24,11 +24,11 @@ use youki::commands::start;
 use youki::commands::state;
 use youki::rootless::should_use_rootless;
 
-/// High-level commandline option definition
-/// This takes global options as well as individual commands as specified in [OCI runtime-spec](https://github.com/opencontainers/runtime-spec/blob/master/runtime.md)
-/// Also check [runc commandline documentation](https://github.com/opencontainers/runc/blob/master/man/runc.8.md) for more explanation
+// High-level commandline option definition
+// This takes global options as well as individual commands as specified in [OCI runtime-spec](https://github.com/opencontainers/runtime-spec/blob/master/runtime.md)
+// Also check [runc commandline documentation](https://github.com/opencontainers/runc/blob/master/man/runc.8.md) for more explanation
 #[derive(Clap, Debug)]
-#[clap(version = "1.0", author = "utam0k <k0ma@utam0k.jp>")]
+#[clap(version = "0.0.0", author = "youki team")]
 struct Opts {
     /// root directory to store container state
     #[clap(short, long, default_value = "/run/youki")]
@@ -45,37 +45,37 @@ struct Opts {
     subcmd: SubCommand,
 }
 
-/// Subcommands accepted by Youki, confirming with [OCI runtime-spec](https://github.com/opencontainers/runtime-spec/blob/master/runtime.md)
-/// Also for a short information, check [runc commandline documentation](https://github.com/opencontainers/runc/blob/master/man/runc.8.md)
+// Subcommands accepted by Youki, confirming with [OCI runtime-spec](https://github.com/opencontainers/runtime-spec/blob/master/runtime.md)
+// Also for a short information, check [runc commandline documentation](https://github.com/opencontainers/runc/blob/master/man/runc.8.md)
 #[derive(Clap, Debug)]
 enum SubCommand {
-    #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
+    #[clap(version = "0.0.0", author = "youki team")]
     Create(create::Create),
-    #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
+    #[clap(version = "0.0.0", author = "youki team")]
     Start(start::Start),
-    #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
+    #[clap(version = "0.0.0", author = "youki team")]
     Run(run::Run),
-    #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
+    #[clap(version = "0.0.0", author = "youki team")]
     Exec(exec::Exec),
-    #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
+    #[clap(version = "0.0.0", author = "youki team")]
     Kill(kill::Kill),
-    #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
+    #[clap(version = "0.0.0", author = "youki team")]
     Delete(delete::Delete),
-    #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
+    #[clap(version = "0.0.0", author = "youki team")]
     State(state::State),
-    #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
+    #[clap(version = "0.0.0", author = "youki team")]
     Info(info::Info),
-    #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
+    #[clap(version = "0.0.0", author = "youki team")]
     Spec(spec_json::SpecJson),
-    #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
+    #[clap(version = "0.0.0", author = "youki team")]
     List(list::List),
-    #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
+    #[clap(version = "0.0.0", author = "youki team")]
     Pause(pause::Pause),
-    #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
+    #[clap(version = "0.0.0", author = "youki team")]
     Resume(resume::Resume),
-    #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>")]
+    #[clap(version = "0.0.0", author = "youki team")]
     Events(events::Events),
-    #[clap(version = "0.0.1", author = "utam0k <k0ma@utam0k.jp>", setting=clap::AppSettings::AllowLeadingHyphen)]
+    #[clap(version = "0.0.0", author = "youki team", setting=clap::AppSettings::AllowLeadingHyphen)]
     Ps(ps::Ps),
 }
 
