@@ -106,48 +106,40 @@ impl StatsProvider for Blkio {
 
 impl Blkio {
     fn apply(root_path: &Path, blkio: &LinuxBlockIo) -> Result<()> {
-        for trbd in blkio
-            .throttle_read_bps_device
-            .as_ref()
-            .context("no throttle_read_bps_device in linux blkio")?
-        {
-            common::write_cgroup_file_str(
-                &root_path.join(BLKIO_THROTTLE_READ_BPS),
-                &format!("{}:{} {}", trbd.major, trbd.minor, trbd.rate),
-            )?;
+        if let Some(throttle_read_bps_device) = blkio.throttle_read_bps_device.as_ref() {
+            for trbd in throttle_read_bps_device {
+                common::write_cgroup_file_str(
+                    &root_path.join(BLKIO_THROTTLE_READ_BPS),
+                    &format!("{}:{} {}", trbd.major, trbd.minor, trbd.rate),
+                )?;
+            }
         }
 
-        for twbd in blkio
-            .throttle_write_bps_device
-            .as_ref()
-            .context("no throttle_write_bps_device in linux blkio")?
-        {
-            common::write_cgroup_file_str(
-                &root_path.join(BLKIO_THROTTLE_WRITE_BPS),
-                &format!("{}:{} {}", twbd.major, twbd.minor, twbd.rate),
-            )?;
+        if let Some(throttle_write_bps_device) = blkio.throttle_read_bps_device.as_ref() {
+            for twbd in throttle_write_bps_device {
+                common::write_cgroup_file_str(
+                    &root_path.join(BLKIO_THROTTLE_WRITE_BPS),
+                    &format!("{}:{} {}", twbd.major, twbd.minor, twbd.rate),
+                )?;
+            }
         }
 
-        for trid in blkio
-            .throttle_read_iops_device
-            .as_ref()
-            .context("no throttle_read_iops_device in linux blkio")?
-        {
-            common::write_cgroup_file_str(
-                &root_path.join(BLKIO_THROTTLE_READ_IOPS),
-                &format!("{}:{} {}", trid.major, trid.minor, trid.rate),
-            )?;
+        if let Some(throttle_read_iops_device) = blkio.throttle_read_bps_device.as_ref() {
+            for trid in throttle_read_iops_device {
+                common::write_cgroup_file_str(
+                    &root_path.join(BLKIO_THROTTLE_READ_IOPS),
+                    &format!("{}:{} {}", trid.major, trid.minor, trid.rate),
+                )?;
+            }
         }
 
-        for twid in blkio
-            .throttle_write_iops_device
-            .as_ref()
-            .context("no throttle_write_iops_device in linux blkio")?
-        {
-            common::write_cgroup_file_str(
-                &root_path.join(BLKIO_THROTTLE_WRITE_IOPS),
-                &format!("{}:{} {}", twid.major, twid.minor, twid.rate),
-            )?;
+        if let Some(throttle_write_iops_device) = blkio.throttle_write_iops_device.as_ref() {
+            for twid in throttle_write_iops_device {
+                common::write_cgroup_file_str(
+                    &root_path.join(BLKIO_THROTTLE_WRITE_IOPS),
+                    &format!("{}:{} {}", twid.major, twid.minor, twid.rate),
+                )?;
+            }
         }
 
         Ok(())
