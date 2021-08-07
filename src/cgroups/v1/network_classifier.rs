@@ -22,7 +22,7 @@ impl Controller for NetworkClassifier {
     }
 
     fn needs_to_handle(linux_resources: &LinuxResources) -> Option<&Self::Resource> {
-        if let Some(network) = &linux_resources.network {
+        if let Some(network) = linux_resources.network.as_ref() {
             return Some(network);
         }
 
