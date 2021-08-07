@@ -70,11 +70,11 @@ pub fn validate(spec: &Spec) -> Result<()> {
     let gid_mappings = linux
         .gid_mappings
         .as_ref()
-        .context("no gid_mappings in spec")?;
+        .context("rootless containers require gid_mappings in spec")?;
     let uid_mappings = linux
         .uid_mappings
         .as_ref()
-        .context("no LinuxIdMapping in spec")?;
+        .context("rootless containers require LinuxIdMapping in spec")?;
 
     if uid_mappings.is_empty() {
         bail!("rootless containers require at least one uid mapping");
@@ -87,7 +87,7 @@ pub fn validate(spec: &Spec) -> Result<()> {
     let namespaces: Namespaces = linux
         .namespaces
         .as_ref()
-        .context("no namespaces in spec")?
+        .context("rootless containers require namespaces in spec")?
         .clone()
         .into();
     if !namespaces.clone_flags.contains(CloneFlags::CLONE_NEWUSER) {
