@@ -2,7 +2,7 @@
 use crate::syscall::Syscall;
 use caps::*;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use oci_spec::LinuxCapabilities;
 
 /// Converts a list of capability types to capabilities has set
@@ -26,51 +26,29 @@ pub fn reset_effective(syscall: &impl Syscall) -> Result<()> {
 /// Drop any extra granted capabilities, and reset to defaults which are in oci specification
 pub fn drop_privileges(cs: &LinuxCapabilities, syscall: &impl Syscall) -> Result<()> {
     log::debug!("dropping bounding capabilities to {:?}", cs.bounding);
-    syscall.set_capability(
-        CapSet::Bounding,
-        &to_set(
-            cs.bounding
-                .as_ref()
-                .context("no bounding caps in linux capabilities")?,
-        ),
-    )?;
-
-    syscall.set_capability(
-        CapSet::Effective,
-        &to_set(
-            cs.effective
-                .as_ref()
-                .context("no effective caps in linux capabilities")?,
-        ),
-    )?;
-    syscall.set_capability(
-        CapSet::Permitted,
-        &to_set(
-            cs.permitted
-                .as_ref()
-                .context("no permitted caps in linux capabilities")?,
-        ),
-    )?;
-    syscall.set_capability(
-        CapSet::Inheritable,
-        &to_set(
-            cs.inheritable
-                .as_ref()
-                .context("no inheritable caps in linux capabilities")?,
-        ),
-    )?;
-
-    // check specifically for ambient, as those might not always be available
-    if let Err(e) = syscall.set_capability(
-        CapSet::Ambient,
-        &to_set(
-            cs.ambient
-                .as_ref()
-                .context("no ambient caps in linux capabilities")?,
-        ),
-    ) {
-        log::error!("failed to set ambient capabilities: {}", e);
+    if let Some(bounding) = cs.bounding.as_ref() {
+        syscall.set_capability(CapSet::Bounding, &to_set(bounding))?;
     }
+
+    if let Some(effective) = cs.effective.as_ref() {
+        syscall.set_capability(CapSet::Effective, &to_set(effective))?;
+    }
+
+    if let Some(permitted) = cs.permitted.as_ref() {
+        syscall.set_capability(CapSet::Permitted, &to_set(permitted))?;
+    }
+
+    if let Some(inheritable) = cs.inheritable.as_ref() {
+        syscall.set_capability(CapSet::Inheritable, &to_set(inheritable))?;
+    }
+
+    if let Some(ambient) = cs.ambient.as_ref() {
+        // check specifically for ambient, as those might not always be available
+        if let Err(e) = syscall.set_capability(CapSet::Ambient, &to_set(ambient)) {
+            log::error!("failed to set ambient capabilities: {}", e);
+        }
+    }
+
     Ok(())
 }
 
