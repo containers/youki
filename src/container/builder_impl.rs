@@ -70,7 +70,7 @@ impl ContainerBuilderImpl {
             spec: self.spec.clone(),
             rootfs: self.rootfs.clone(),
             console_socket: self.console_socket.clone(),
-            rootless: self.rootless.clone(),
+            is_rootless: self.rootless.is_some(),
             notify_path: self.notify_path.clone(),
             preserve_fds: self.preserve_fds,
             child,

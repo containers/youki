@@ -13,7 +13,6 @@ use crate::{
     notify_socket::NotifyListener,
     process::child,
     rootfs,
-    rootless::Rootless,
     stdio::FileDescriptor,
     syscall::{linux::LinuxSyscall, Syscall},
     tty, utils,
@@ -96,7 +95,7 @@ pub struct ContainerInitArgs {
     /// Socket to communicate the file descriptor of the ptty
     pub console_socket: Option<FileDescriptor>,
     /// Options for rootless containers
-    pub rootless: Option<Rootless>,
+    pub is_rootless: bool,
     /// Path to the Unix Domain Socket to communicate container start
     pub notify_path: PathBuf,
     /// File descriptos preserved/passed to the container init process.
@@ -133,7 +132,7 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     // namespace will be created, check
     // https://man7.org/linux/man-pages/man7/user_namespaces.7.html for more
     // information
-    if args.rootless.is_some() {
+    if args.is_rootless {
         // child needs to be dumpable, otherwise the non root parent is not
         // allowed to write the uid/gid maps
         prctl::set_dumpable(true).unwrap();
