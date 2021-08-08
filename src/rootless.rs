@@ -7,24 +7,24 @@ use oci_spec::{Linux, LinuxIdMapping, Mount, Spec};
 use crate::namespaces::Namespaces;
 
 #[derive(Debug, Clone)]
-pub struct Rootless {
+pub struct Rootless<'a> {
     /// Location of the newuidmap binary
     pub newuidmap: Option<PathBuf>,
     /// Location of the newgidmap binary
     pub newgidmap: Option<PathBuf>,
     /// Mappings for user ids
-    pub uid_mappings: Vec<LinuxIdMapping>,
+    pub uid_mappings: &'a Vec<LinuxIdMapping>,
     /// Mappings for group ids
-    pub gid_mappings: Vec<LinuxIdMapping>,
+    pub gid_mappings: &'a Vec<LinuxIdMapping>,
 }
 
-impl From<&Linux> for Rootless {
-    fn from(linux: &Linux) -> Self {
+impl<'a> From<&'a Linux> for Rootless<'a> {
+    fn from(linux: &'a Linux) -> Self {
         Self {
             newuidmap: None,
             newgidmap: None,
-            uid_mappings: linux.uid_mappings.clone(),
-            gid_mappings: linux.gid_mappings.clone(),
+            uid_mappings: linux.uid_mappings.as_ref(),
+            gid_mappings: linux.gid_mappings.as_ref(),
         }
     }
 }
