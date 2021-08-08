@@ -2,13 +2,16 @@
 
 use std::env;
 use std::ffi::CString;
-use std::fs::{self, File};
+use std::fs::{self, DirBuilder, File};
 use std::ops::Deref;
+use std::os::linux::fs::MetadataExt;
+use std::os::unix::fs::DirBuilderExt;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use anyhow::Context;
 use anyhow::{bail, Result};
+use nix::sys::stat::Mode;
 use nix::unistd;
 
 pub trait PathBufExt {
@@ -104,6 +107,46 @@ pub fn create_dir_all<P: AsRef<Path>>(path: P) -> Result<()> {
 pub fn open<P: AsRef<Path>>(path: P) -> Result<File> {
     let path = path.as_ref();
     File::open(path).with_context(|| format!("failed to open {:?}", path))
+}
+
+/// Creates the specified directory and all parent directories with the specified mode. Ensures
+/// that the directory has been created with the correct mode and that the owner of the directory
+/// is the owner that has been specified
+/// # Example
+/// ``` no_run
+/// use youki::utils::create_dir_all_with_mode;
+/// use nix::sys::stat::Mode;
+/// use std::path::Path;
+///
+/// let path = Path::new("/tmp/youki");
+/// create_dir_all_with_mode(&path, 1000, Mode::S_IRWXU).unwrap();
+/// assert!(path.exists())
+/// ```
+pub fn create_dir_all_with_mode<P: AsRef<Path>>(path: P, owner: u32, mode: Mode) -> Result<()> {
+    let path = path.as_ref();
+    if !path.exists() {
+        DirBuilder::new()
+            .recursive(true)
+            .mode(mode.bits())
+            .create(path)
+            .with_context(|| format!("failed to create directory {}", path.display()))?;
+    }
+
+    let metadata = path
+        .metadata()
+        .with_context(|| format!("failed to get metadata for {}", path.display()))?;
+
+    if metadata.is_dir()
+        && metadata.st_uid() == owner
+        && metadata.st_mode() & mode.bits() == mode.bits()
+    {
+        Ok(())
+    } else {
+        bail!(
+            "metadata for {} does not possess the expected attributes",
+            path.display()
+        );
+    }
 }
 
 pub struct TempDir {
