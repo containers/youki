@@ -2,6 +2,7 @@
 
 use std::os::unix::fs::symlink;
 use std::os::unix::io::AsRawFd;
+use std::os::unix::prelude::RawFd;
 use std::path::Path;
 
 use anyhow::Context;
@@ -12,7 +13,6 @@ use nix::sys::uio;
 use nix::unistd::{close, setsid};
 
 use crate::stdio;
-use crate::stdio::FileDescriptor;
 
 // TODO: Handling when there isn't console-socket.
 
@@ -20,7 +20,7 @@ pub fn setup_console_socket(
     container_dir: &Path,
     console_socket_path: &Path,
     socket_name: &str,
-) -> Result<FileDescriptor> {
+) -> Result<RawFd> {
     let linked = container_dir.join(socket_name);
     symlink(console_socket_path, &linked)?;
 
@@ -42,10 +42,10 @@ pub fn setup_console_socket(
         }
         Ok(()) => csocketfd,
     };
-    Ok(csocketfd.into())
+    Ok(csocketfd)
 }
 
-pub fn setup_console(console_fd: &FileDescriptor) -> Result<()> {
+pub fn setup_console(console_fd: &RawFd) -> Result<()> {
     // You can also access pty master, but it is better to use the API.
     // ref. https://github.com/containerd/containerd/blob/261c107ffc4ff681bc73988f64e3f60c32233b37/vendor/github.com/containerd/go-runc/console.go#L139-L154
     let openpty_result =
@@ -67,7 +67,7 @@ pub fn setup_console(console_fd: &FileDescriptor) -> Result<()> {
     if unsafe { libc::ioctl(openpty_result.slave, libc::TIOCSCTTY) } < 0 {
         log::warn!("could not TIOCSCTTY");
     };
-    let slave = FileDescriptor::from(openpty_result.slave);
+    let slave = openpty_result.slave;
     stdio::connect_stdio(&slave, &slave, &slave).expect("could not dup tty to stderr");
     close(console_fd.as_raw_fd()).context("could not close console socket")?;
     Ok(())

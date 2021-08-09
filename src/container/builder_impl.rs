@@ -1,13 +1,12 @@
 use anyhow::{Context, Result};
 use oci_spec::Spec;
-use std::{fs, path::PathBuf};
+use std::{fs, os::unix::prelude::RawFd, path::PathBuf};
 
 use crate::{
     cgroups,
     namespaces::Namespaces,
     process::{child, fork, init, parent},
     rootless::Rootless,
-    stdio::FileDescriptor,
     syscall::linux::LinuxSyscall,
     utils,
 };
@@ -31,7 +30,7 @@ pub(super) struct ContainerBuilderImpl {
     /// container process to the higher level runtime
     pub pid_file: Option<PathBuf>,
     /// Socket to communicate the file descriptor of the ptty
-    pub console_socket: Option<FileDescriptor>,
+    pub console_socket: Option<RawFd>,
     /// Options for rootless containers
     pub rootless: Option<Rootless>,
     /// Path to the Unix Domain Socket to communicate container start
@@ -69,7 +68,7 @@ impl ContainerBuilderImpl {
             syscall: self.syscall.clone(),
             spec: self.spec.clone(),
             rootfs: self.rootfs.clone(),
-            console_socket: self.console_socket.clone(),
+            console_socket: self.console_socket,
             rootless: self.rootless.clone(),
             notify_path: self.notify_path.clone(),
             preserve_fds: self.preserve_fds,
