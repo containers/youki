@@ -15,7 +15,6 @@ pub mod process;
 pub mod rootfs;
 pub mod rootless;
 pub mod signal;
-pub mod stdio;
 pub mod syscall;
 pub mod tty;
 pub mod utils;

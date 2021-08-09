@@ -10,12 +10,14 @@ use anyhow::{bail, Result};
 use nix::errno::Errno;
 use nix::sys::socket;
 use nix::sys::uio;
+use nix::unistd::dup2;
 use nix::unistd::{close, setsid};
 
-use crate::stdio;
+const STDIN: i32 = 0;
+const STDOUT: i32 = 1;
+const STDERR: i32 = 2;
 
 // TODO: Handling when there isn't console-socket.
-
 pub fn setup_console_socket(
     container_dir: &Path,
     console_socket_path: &Path,
@@ -68,8 +70,17 @@ pub fn setup_console(console_fd: &RawFd) -> Result<()> {
         log::warn!("could not TIOCSCTTY");
     };
     let slave = openpty_result.slave;
-    stdio::connect_stdio(&slave, &slave, &slave).expect("could not dup tty to stderr");
+    connect_stdio(&slave, &slave, &slave).context("could not dup tty to stderr")?;
     close(console_fd.as_raw_fd()).context("could not close console socket")?;
+    Ok(())
+}
+
+fn connect_stdio(stdin: &RawFd, stdout: &RawFd, stderr: &RawFd) -> Result<()> {
+    dup2(stdin.as_raw_fd(), STDIN)?;
+    dup2(stdout.as_raw_fd(), STDOUT)?;
+    // FIXME: Rarely does it fail.
+    // error message: `Error: Resource temporarily unavailable (os error 11)`
+    dup2(stderr.as_raw_fd(), STDERR)?;
     Ok(())
 }
 
