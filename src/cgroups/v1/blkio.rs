@@ -115,7 +115,7 @@ impl Blkio {
             }
         }
 
-        if let Some(throttle_write_bps_device) = blkio.throttle_read_bps_device.as_ref() {
+        if let Some(throttle_write_bps_device) = blkio.throttle_write_bps_device.as_ref() {
             for twbd in throttle_write_bps_device {
                 common::write_cgroup_file_str(
                     &root_path.join(BLKIO_THROTTLE_WRITE_BPS),
@@ -124,7 +124,7 @@ impl Blkio {
             }
         }
 
-        if let Some(throttle_read_iops_device) = blkio.throttle_read_bps_device.as_ref() {
+        if let Some(throttle_read_iops_device) = blkio.throttle_read_iops_device.as_ref() {
             for trid in throttle_read_iops_device {
                 common::write_cgroup_file_str(
                     &root_path.join(BLKIO_THROTTLE_READ_IOPS),
