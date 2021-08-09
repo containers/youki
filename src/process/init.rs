@@ -108,12 +108,12 @@ pub struct ContainerInitArgs {
 pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     let command = &args.syscall;
     let spec = &args.spec;
-    let linux = &spec.linux.as_ref().context("no linux in spec")?;
-    let namespaces: Namespaces = linux.namespaces.clone().into();
+    let linux = spec.linux.as_ref().context("no linux in spec")?;
+    let namespaces = Namespaces::from(&linux.namespaces);
     // need to create the notify socket before we pivot root, since the unix
     // domain socket used here is outside of the rootfs of container
     let mut notify_socket: NotifyListener = NotifyListener::new(&args.notify_path)?;
-    let proc = &spec.process.as_ref().context("no process in spec")?;
+    let proc = spec.process.as_ref().context("no process in spec")?;
     let mut envs: Vec<String> = proc.env.clone();
     let rootfs = &args.rootfs;
     let mut child = args.child;

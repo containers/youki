@@ -283,7 +283,7 @@ impl TenantContainerBuilder {
                 let tenant_ns = LinuxNamespaceType::try_from(ns_type)?;
                 tenant_namespaces.push(LinuxNamespace {
                     typ: tenant_ns,
-                    path: Some(init_ns.path.to_string_lossy().to_string()),
+                    path: Some(init_ns.path.clone()),
                 })
             }
         }

@@ -350,7 +350,7 @@ impl TryFrom<&str> for LinuxNamespaceType {
 pub struct LinuxNamespace {
     #[serde(rename = "type")]
     pub typ: LinuxNamespaceType,
-    pub path: Option<String>,
+    pub path: Option<PathBuf>,
 }
 
 // Utility function to get default namespaces

@@ -76,7 +76,7 @@ pub fn validate(spec: &Spec) -> Result<()> {
         bail!("rootless containers require at least one gid mapping")
     }
 
-    let namespaces: Namespaces = linux.namespaces.clone().into();
+    let namespaces = Namespaces::from(&linux.namespaces);
     if !namespaces.clone_flags.contains(CloneFlags::CLONE_NEWUSER) {
         bail!("rootless containers require the specification of a user namespace");
     }
