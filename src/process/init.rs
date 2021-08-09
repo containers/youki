@@ -118,11 +118,7 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     // domain socket used here is outside of the rootfs of container
     let mut notify_socket: NotifyListener = NotifyListener::new(&args.notify_path)?;
     let proc = &spec.process.as_ref().context("no process in spec")?;
-    let mut envs: Vec<String> = proc
-        .env
-        .as_ref()
-        .context("no envs in process spec")?
-        .clone();
+    let mut envs: Vec<String> = proc.env.as_ref().unwrap_or(&vec![]).clone();
     let rootfs = &args.rootfs;
     let mut child = args.child;
 
@@ -151,13 +147,10 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     }
 
     // set limits and namespaces to the process
-    for rlimit in proc
-        .rlimits
-        .as_ref()
-        .context("no rlimits in process spec")?
-        .iter()
-    {
-        command.set_rlimit(rlimit).context("failed to set rlimit")?;
+    if let Some(rlimits) = proc.rlimits.as_ref() {
+        for rlimit in rlimits.iter() {
+            command.set_rlimit(rlimit).context("failed to set rlimit")?;
+        }
     }
 
     command
@@ -172,7 +165,9 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     // join existing namespaces
     namespaces.apply_setns()?;
 
-    command.set_hostname(spec.hostname.as_ref().context("no hostname in spec")?)?;
+    if let Some(hostname) = spec.hostname.as_ref() {
+        command.set_hostname(hostname)?;
+    }
 
     if let Some(true) = proc.no_new_privileges {
         let _ = prctl::set_no_new_privileges(true);
@@ -249,8 +244,11 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     // listing on the notify socket for container start command
     notify_socket.wait_for_container_start()?;
 
-    let args: &Vec<String> = proc.args.as_ref().context("no args in process spec")?;
-    utils::do_exec(&args[0], args, &envs)?;
+    if let Some(args) = proc.args.as_ref() {
+        utils::do_exec(&args[0], args, &envs)?;
+    } else {
+        log::warn!("The command to be executed isn't set")
+    }
 
     // After do_exec is called, the process is replaced with the container
     // payload through execvp, so it should never reach here.
