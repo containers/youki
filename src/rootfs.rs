@@ -64,9 +64,11 @@ pub fn prepare_rootfs(spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<
     chdir(rootfs)?;
 
     setup_default_symlinks(rootfs)?;
-    if let Some(devices) = linux.devices.as_ref() {
-        create_devices(devices, bind_devices)?;
-    }
+    if let Some(added_devices) = linux.devices.as_ref() {
+        create_devices(default_devices().iter().chain(added_devices), bind_devices)
+    } else {
+        create_devices(default_devices().iter(), bind_devices)
+    }?;
     setup_ptmx(rootfs)?;
 
     chdir(&olddir)?;
@@ -160,12 +162,13 @@ pub fn default_devices() -> Vec<LinuxDevice> {
     ]
 }
 
-fn create_devices(devices: &[LinuxDevice], bind: bool) -> Result<()> {
+fn create_devices<'a, I>(devices: I, bind: bool) -> Result<()>
+where
+    I: Iterator<Item = &'a LinuxDevice>,
+{
     let old_mode = umask(Mode::from_bits_truncate(0o000));
     if bind {
-        let _ = default_devices()
-            .iter()
-            .chain(devices)
+        let _ = devices
             .map(|dev| {
                 if !dev.path.starts_with("/dev") {
                     panic!("{} is not a valid device path", dev.path.display());
@@ -174,9 +177,7 @@ fn create_devices(devices: &[LinuxDevice], bind: bool) -> Result<()> {
             })
             .collect::<Result<Vec<_>>>()?;
     } else {
-        default_devices()
-            .iter()
-            .chain(devices)
+        devices
             .map(|dev| {
                 if !dev.path.starts_with("/dev") {
                     panic!("{} is not a valid device path", dev.path.display());
