@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 
 use crate::cgroups::{
     common,
@@ -85,15 +85,13 @@ impl Io {
 
     // linux kernel doc: https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html#io
     fn apply(root_path: &Path, blkio: &LinuxBlockIo) -> Result<()> {
-        for wd in blkio
-            .weight_device
-            .as_ref()
-            .context("no weight_device in blkio")?
-        {
-            common::write_cgroup_file(
-                root_path.join(CGROUP_BFQ_IO_WEIGHT),
-                &format!("{}:{} {}", wd.major, wd.minor, wd.weight.unwrap()),
-            )?;
+        if let Some(weight_device) = blkio.weight_device.as_ref() {
+            for wd in weight_device {
+                common::write_cgroup_file(
+                    root_path.join(CGROUP_BFQ_IO_WEIGHT),
+                    &format!("{}:{} {}", wd.major, wd.minor, wd.weight.unwrap()),
+                )?;
+            }
         }
         if let Some(leaf_weight) = blkio.leaf_weight {
             if leaf_weight > 0 {
@@ -109,47 +107,42 @@ impl Io {
             }
         }
 
-        for trbd in blkio
-            .throttle_read_bps_device
-            .as_ref()
-            .context("no throttle_read_bps_device in blkio")?
-        {
-            common::write_cgroup_file(
-                Self::io_max_path(root_path),
-                &format!("{}:{} rbps={}", trbd.major, trbd.minor, trbd.rate),
-            )?;
+        if let Some(throttle_read_bps_device) = blkio.throttle_read_bps_device.as_ref() {
+            for trbd in throttle_read_bps_device {
+                common::write_cgroup_file(
+                    Self::io_max_path(root_path),
+                    &format!("{}:{} rbps={}", trbd.major, trbd.minor, trbd.rate),
+                )?;
+            }
         }
 
-        for twbd in blkio
-            .throttle_write_bps_device
-            .as_ref()
-            .context("no throttle_write_bps_device in blkio")?
-        {
-            common::write_cgroup_file(
-                Self::io_max_path(root_path),
-                format!("{}:{} wbps={}", twbd.major, twbd.minor, twbd.rate),
-            )?;
+        if let Some(throttle_write_bps_device) = blkio.throttle_write_bps_device.as_ref() {
+            for twbd in throttle_write_bps_device {
+                common::write_cgroup_file(
+                    Self::io_max_path(root_path),
+                    format!("{}:{} wbps={}", twbd.major, twbd.minor, twbd.rate),
+                )?;
+            }
         }
-        for trid in blkio
-            .throttle_read_iops_device
-            .as_ref()
-            .context("no throttle_read_iops_device in blkio")?
-        {
-            common::write_cgroup_file(
-                Self::io_max_path(root_path),
-                format!("{}:{} riops={}", trid.major, trid.minor, trid.rate),
-            )?;
+
+        if let Some(throttle_read_iops_device) = blkio.throttle_read_iops_device.as_ref() {
+            for trid in throttle_read_iops_device {
+                common::write_cgroup_file(
+                    Self::io_max_path(root_path),
+                    format!("{}:{} riops={}", trid.major, trid.minor, trid.rate),
+                )?;
+            }
         }
-        for twid in blkio
-            .throttle_write_iops_device
-            .as_ref()
-            .context("no throttle_write_iops_device in blkio")?
-        {
-            common::write_cgroup_file(
-                Self::io_max_path(root_path),
-                format!("{}:{} wiops={}", twid.major, twid.minor, twid.rate),
-            )?;
+
+        if let Some(throttle_write_iops_device) = blkio.throttle_write_iops_device.as_ref() {
+            for twid in throttle_write_iops_device {
+                common::write_cgroup_file(
+                    Self::io_max_path(root_path),
+                    format!("{}:{} wiops={}", twid.major, twid.minor, twid.rate),
+                )?;
+            }
         }
+
         Ok(())
     }
 }
