@@ -13,9 +13,9 @@ pub struct Rootless<'a> {
     /// Location of the newgidmap binary
     pub newgidmap: Option<PathBuf>,
     /// Mappings for user ids
-    pub uid_mappings: &'a Vec<LinuxIdMapping>,
+    pub uid_mappings: Option<&'a Vec<LinuxIdMapping>>,
     /// Mappings for group ids
-    pub gid_mappings: &'a Vec<LinuxIdMapping>,
+    pub gid_mappings: Option<&'a Vec<LinuxIdMapping>>,
 }
 
 impl<'a> From<&'a Linux> for Rootless<'a> {
@@ -23,8 +23,8 @@ impl<'a> From<&'a Linux> for Rootless<'a> {
         Self {
             newuidmap: None,
             newgidmap: None,
-            uid_mappings: linux.uid_mappings.as_ref().unwrap_or(&vec![]).clone(),
-            gid_mappings: linux.gid_mappings.as_ref().unwrap_or(&vec![]).clone(),
+            uid_mappings: linux.uid_mappings.as_ref(),
+            gid_mappings: linux.gid_mappings.as_ref(),
         }
     }
 }

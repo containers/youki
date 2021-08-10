@@ -198,21 +198,29 @@ impl<'a> ChildChannel<'a> {
     }
 
     fn write_uid_mapping(&self, target_pid: Pid) -> Result<()> {
-        let rootless = self.rootless.as_ref().unwrap();
-        write_id_mapping(
-            &format!("/proc/{}/uid_map", target_pid),
-            rootless.uid_mappings,
-            rootless.newuidmap.as_deref(),
-        )
+        if let Some(rootless) = self.rootless.as_ref() {
+            if let Some(uid_mappings) = rootless.gid_mappings {
+                return write_id_mapping(
+                    &format!("/proc/{}/uid_map", target_pid),
+                    uid_mappings,
+                    rootless.newuidmap.as_deref(),
+                );
+            }
+        }
+        Ok(())
     }
 
     fn write_gid_mapping(&self, target_pid: Pid) -> Result<()> {
-        let rootless = self.rootless.as_ref().unwrap();
-        write_id_mapping(
-            &format!("/proc/{}/gid_map", target_pid),
-            rootless.gid_mappings,
-            rootless.newgidmap.as_deref(),
-        )
+        if let Some(rootless) = self.rootless.as_ref() {
+            if let Some(gid_mappings) = rootless.gid_mappings {
+                return write_id_mapping(
+                    &format!("/proc/{}/gid_map", target_pid),
+                    gid_mappings,
+                    rootless.newgidmap.as_deref(),
+                );
+            }
+        }
+        Ok(())
     }
 }
 
