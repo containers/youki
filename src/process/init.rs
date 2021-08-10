@@ -4,7 +4,10 @@ use nix::{
     unistd::{Gid, Uid},
 };
 use oci_spec::Spec;
-use std::{env, os::unix::io::AsRawFd};
+use std::{
+    env,
+    os::unix::{io::AsRawFd, prelude::RawFd},
+};
 use std::{fs, io::Write, path::Path, path::PathBuf};
 
 use crate::{
@@ -13,7 +16,6 @@ use crate::{
     notify_socket::NotifyListener,
     process::child,
     rootfs,
-    stdio::FileDescriptor,
     syscall::{linux::LinuxSyscall, Syscall},
     tty, utils,
 };
@@ -93,7 +95,7 @@ pub struct ContainerInitArgs {
     /// Root filesystem of the container
     pub rootfs: PathBuf,
     /// Socket to communicate the file descriptor of the ptty
-    pub console_socket: Option<FileDescriptor>,
+    pub console_socket: Option<RawFd>,
     /// Options for rootless containers
     pub is_rootless: bool,
     /// Path to the Unix Domain Socket to communicate container start

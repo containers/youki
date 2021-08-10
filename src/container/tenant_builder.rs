@@ -8,14 +8,12 @@ use std::{
     convert::TryFrom,
     ffi::{CString, OsString},
     fs,
-    os::unix::prelude::OsStrExt,
+    os::unix::prelude::{OsStrExt, RawFd},
     path::{Path, PathBuf},
     str::FromStr,
 };
 
-use crate::{
-    notify_socket::NotifySocket, rootless::detect_rootless, stdio::FileDescriptor, tty, utils,
-};
+use crate::{notify_socket::NotifySocket, rootless::detect_rootless, tty, utils};
 
 use super::{builder::ContainerBuilder, builder_impl::ContainerBuilderImpl, Container};
 
@@ -308,7 +306,7 @@ impl TenantContainerBuilder {
         Ok(socket_path)
     }
 
-    fn setup_tty_socket(&self, container_dir: &Path) -> Result<Option<FileDescriptor>> {
+    fn setup_tty_socket(&self, container_dir: &Path) -> Result<Option<RawFd>> {
         let tty_name = Self::generate_name(container_dir, TENANT_TTY);
         let csocketfd = if let Some(console_socket) = &self.base.console_socket {
             Some(tty::setup_console_socket(
