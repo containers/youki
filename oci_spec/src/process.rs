@@ -243,7 +243,7 @@ impl Default for LinuxCapabilities {
             effective: default_vec.clone().into(),
             inheritable: default_vec.clone().into(),
             permitted: default_vec.clone().into(),
-            ambient: default_vec.clone().into(),
+            ambient: default_vec.into(),
         }
     }
 }

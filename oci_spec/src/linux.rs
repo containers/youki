@@ -212,16 +212,13 @@ impl ToString for LinuxDeviceCgroup {
             .minor
             .map(|mi| mi.to_string())
             .unwrap_or_else(|| "*".to_string());
-        let unknown = "unknown".to_string();
+        let access = self.access.as_deref().unwrap_or("");
         format!(
             "{} {}:{} {}",
-            &self
-                .typ
-                .map(|x| x.as_str().to_string())
-                .unwrap_or(unknown.clone()),
+            &self.typ.unwrap_or_default().as_str(),
             &major,
             &minor,
-            &self.access.as_ref().unwrap_or(&unknown)
+            &access
         )
     }
 }
@@ -544,28 +541,28 @@ pub struct LinuxNamespace {
 
 // Utility function to get default namespaces
 pub fn get_default_namespaces() -> Vec<LinuxNamespace> {
-    let mut default_namespace = Vec::new();
-    default_namespace.push(LinuxNamespace {
-        typ: LinuxNamespaceType::Pid,
-        path: Default::default(),
-    });
-    default_namespace.push(LinuxNamespace {
-        typ: LinuxNamespaceType::Network,
-        path: Default::default(),
-    });
-    default_namespace.push(LinuxNamespace {
-        typ: LinuxNamespaceType::Ipc,
-        path: Default::default(),
-    });
-    default_namespace.push(LinuxNamespace {
-        typ: LinuxNamespaceType::Uts,
-        path: Default::default(),
-    });
-    default_namespace.push(LinuxNamespace {
-        typ: LinuxNamespaceType::Mount,
-        path: Default::default(),
-    });
-    default_namespace
+    vec![
+        LinuxNamespace {
+            typ: LinuxNamespaceType::Pid,
+            path: Default::default(),
+        },
+        LinuxNamespace {
+            typ: LinuxNamespaceType::Network,
+            path: Default::default(),
+        },
+        LinuxNamespace {
+            typ: LinuxNamespaceType::Ipc,
+            path: Default::default(),
+        },
+        LinuxNamespace {
+            typ: LinuxNamespaceType::Uts,
+            path: Default::default(),
+        },
+        LinuxNamespace {
+            typ: LinuxNamespaceType::Mount,
+            path: Default::default(),
+        },
+    ]
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

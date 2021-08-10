@@ -13,18 +13,18 @@ fn serialize_and_deserialize_spec() {
 fn test_linux_device_cgroup_to_string() {
     let ldc = LinuxDeviceCgroup {
         allow: true,
-        typ: LinuxDeviceType::A,
+        typ: Some(LinuxDeviceType::A),
         major: None,
         minor: None,
-        access: "rwm".into(),
+        access: Some("rwm".into()),
     };
     assert_eq!(ldc.to_string(), "a *:* rwm");
     let ldc = LinuxDeviceCgroup {
         allow: true,
-        typ: LinuxDeviceType::A,
+        typ: Some(LinuxDeviceType::A),
         major: Some(1),
         minor: Some(9),
-        access: "rwm".into(),
+        access: Some("rwm".into()),
     };
     assert_eq!(ldc.to_string(), "a 1:9 rwm");
 }
