@@ -212,16 +212,13 @@ impl ToString for LinuxDeviceCgroup {
             .minor
             .map(|mi| mi.to_string())
             .unwrap_or_else(|| "*".to_string());
-        let unknown = "unknown".to_string();
+        let access = self.access.as_deref().unwrap_or("");
         format!(
             "{} {}:{} {}",
-            &self
-                .typ
-                .map(|x| x.as_str().to_string())
-                .unwrap_or(unknown.clone()),
+            &self.typ.unwrap_or_default().as_str(),
             &major,
             &minor,
-            &self.access.as_ref().unwrap_or(&unknown)
+            &access
         )
     }
 }
