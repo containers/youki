@@ -180,7 +180,6 @@ impl Spec {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile;
 
     #[test]
     fn test_canonicalize_rootfs() -> Result<()> {
