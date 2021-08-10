@@ -13,7 +13,7 @@ use crate::{
 
 use super::{Container, ContainerStatus};
 
-pub(super) struct ContainerBuilderImpl {
+pub(super) struct ContainerBuilderImpl<'a> {
     /// Flag indicating if an init or a tenant container should be created
     pub init: bool,
     /// Interface to operating system primitives
@@ -23,7 +23,7 @@ pub(super) struct ContainerBuilderImpl {
     /// Id of the container
     pub container_id: String,
     /// OCI complient runtime spec
-    pub spec: Spec,
+    pub spec: &'a Spec,
     /// Root filesystem of the container
     pub rootfs: PathBuf,
     /// File which will be used to communicate the pid of the
@@ -32,7 +32,7 @@ pub(super) struct ContainerBuilderImpl {
     /// Socket to communicate the file descriptor of the ptty
     pub console_socket: Option<RawFd>,
     /// Options for rootless containers
-    pub rootless: Option<Rootless>,
+    pub rootless: Option<Rootless<'a>>,
     /// Path to the Unix Domain Socket to communicate container start
     pub notify_path: PathBuf,
     /// Container state
@@ -41,7 +41,7 @@ pub(super) struct ContainerBuilderImpl {
     pub preserve_fds: i32,
 }
 
-impl ContainerBuilderImpl {
+impl<'a> ContainerBuilderImpl<'a> {
     pub(super) fn create(&mut self) -> Result<()> {
         self.run_container()?;
 
@@ -57,7 +57,7 @@ impl ContainerBuilderImpl {
         let namespaces: Namespaces = linux.namespaces.clone().into();
 
         // create the parent and child process structure so the parent and child process can sync with each other
-        let (mut parent, parent_channel) = parent::ParentProcess::new(self.rootless.clone())?;
+        let (mut parent, parent_channel) = parent::ParentProcess::new(&self.rootless)?;
         let child = child::ChildProcess::new(parent_channel)?;
 
         // This init_args will be passed to the container init process,
@@ -69,7 +69,7 @@ impl ContainerBuilderImpl {
             spec: self.spec.clone(),
             rootfs: self.rootfs.clone(),
             console_socket: self.console_socket,
-            rootless: self.rootless.clone(),
+            is_rootless: self.rootless.is_some(),
             notify_path: self.notify_path.clone(),
             preserve_fds: self.preserve_fds,
             child,
