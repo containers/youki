@@ -2,9 +2,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-use crate::common;
 use super::controller::Controller;
-use oci_spec::{LinuxDeviceCgroup, LinuxDeviceType, LinuxResources, LinuxDevice};
+use crate::common;
+use oci_spec::{LinuxDevice, LinuxDeviceCgroup, LinuxDeviceType, LinuxResources};
 
 pub struct Devices {}
 
@@ -163,8 +163,8 @@ impl Devices {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test::set_fixture;
     use crate::test::create_temp_dir;
+    use crate::test::set_fixture;
     use oci_spec::{LinuxDeviceCgroup, LinuxDeviceType};
     use std::fs::read_to_string;
 

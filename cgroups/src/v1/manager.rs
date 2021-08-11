@@ -16,7 +16,7 @@ use super::{
     perf_event::PerfEvent, pids::Pids, util, Controller,
 };
 
-use crate::common::{self, CGROUP_PROCS, CgroupManager, PathBufExt};
+use crate::common::{self, CgroupManager, PathBufExt, CGROUP_PROCS};
 use crate::stats::{Stats, StatsProvider};
 use oci_spec::{FreezerState, LinuxResources};
 pub struct Manager {

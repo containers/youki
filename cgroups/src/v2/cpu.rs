@@ -1,7 +1,6 @@
 use anyhow::{bail, Result};
 use std::path::Path;
 
-
 use crate::{
     common,
     stats::{CpuUsage, StatsProvider},

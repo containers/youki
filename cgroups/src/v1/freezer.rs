@@ -7,8 +7,8 @@ use std::{
 
 use anyhow::{Result, *};
 
-use crate::common;
 use super::Controller;
+use crate::common;
 use oci_spec::{FreezerState, LinuxResources};
 
 const CGROUP_FREEZER_STATE: &str = "freezer.state";
@@ -125,7 +125,7 @@ impl Freezer {
 mod tests {
     use super::*;
     use crate::common::CGROUP_PROCS;
-    use crate::test::{set_fixture, create_temp_dir};
+    use crate::test::{create_temp_dir, set_fixture};
     use nix::unistd::Pid;
     use oci_spec::FreezerState;
 

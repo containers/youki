@@ -431,7 +431,7 @@ pub fn pid_stats(cgroup_path: &Path) -> Result<PidStats> {
 
 #[cfg(test)]
 mod tests {
-    use crate::test::{set_fixture, create_temp_dir};
+    use crate::test::{create_temp_dir, set_fixture};
 
     use super::*;
 

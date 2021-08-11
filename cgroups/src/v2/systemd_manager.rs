@@ -9,8 +9,8 @@ use oci_spec::{FreezerState, LinuxResources};
 use std::path::{Path, PathBuf};
 
 use super::{
-    cpu::Cpu, cpuset::CpuSet, freezer::Freezer, hugetlb::HugeTlb, io::Io, memory::Memory,
-    pids::Pids, controller::Controller, controller_type::ControllerType
+    controller::Controller, controller_type::ControllerType, cpu::Cpu, cpuset::CpuSet,
+    freezer::Freezer, hugetlb::HugeTlb, io::Io, memory::Memory, pids::Pids,
 };
 use crate::common::{self, CgroupManager, PathBufExt};
 use crate::stats::Stats;

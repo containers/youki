@@ -122,7 +122,7 @@ impl Freezer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test::{set_fixture, create_temp_dir};
+    use crate::test::{create_temp_dir, set_fixture};
     use oci_spec::FreezerState;
     use std::sync::Arc;
 

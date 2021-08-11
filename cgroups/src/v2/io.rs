@@ -149,9 +149,7 @@ impl Io {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        test::{set_fixture, setup, create_temp_dir},
-    };
+    use crate::test::{create_temp_dir, set_fixture, setup};
 
     use oci_spec::{LinuxBlockIo, LinuxThrottleDevice, LinuxWeightDevice};
     use std::fs;

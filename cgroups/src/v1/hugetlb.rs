@@ -99,7 +99,7 @@ impl HugeTlb {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test::{set_fixture, create_temp_dir};
+    use crate::test::{create_temp_dir, set_fixture};
     use oci_spec::LinuxHugepageLimit;
     use std::fs::read_to_string;
 

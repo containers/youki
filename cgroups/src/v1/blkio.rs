@@ -6,7 +6,6 @@ use crate::{
     v1::Controller,
 };
 
-
 use anyhow::{Context, Result};
 use oci_spec::{LinuxBlockIo, LinuxResources};
 
@@ -226,8 +225,7 @@ mod tests {
     use std::fs;
 
     use super::*;
-    use crate::
-        test::{create_temp_dir, set_fixture, setup};
+    use crate::test::{create_temp_dir, set_fixture, setup};
 
     use anyhow::Result;
     use oci_spec::{LinuxBlockIo, LinuxThrottleDevice};

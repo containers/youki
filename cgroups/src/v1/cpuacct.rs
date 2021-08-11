@@ -131,10 +131,10 @@ mod tests {
     use nix::unistd::Pid;
 
     use super::*;
-    use crate::{  
-            common::CGROUP_PROCS,
-            test::{set_fixture, setup},     
+    use crate::{
+        common::CGROUP_PROCS,
         test::{create_temp_dir, TempDir},
+        test::{set_fixture, setup},
     };
 
     fn setup_total_cpu(test_name: &str, stat_content: &str, usage_content: &str) -> TempDir {

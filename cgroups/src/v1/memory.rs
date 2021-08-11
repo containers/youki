@@ -5,9 +5,9 @@ use std::{fs::OpenOptions, path::Path};
 use anyhow::{anyhow, bail, Result};
 use nix::errno::Errno;
 
+use super::Controller;
 use crate::common::{self};
 use crate::stats::{self, parse_single_value, MemoryData, MemoryStats, StatsProvider};
-use super::Controller;
 
 use oci_spec::{LinuxMemory, LinuxResources};
 
@@ -323,7 +323,7 @@ impl Memory {
 mod tests {
     use super::*;
     use crate::common::CGROUP_PROCS;
-    use crate::test::{set_fixture, create_temp_dir};
+    use crate::test::{create_temp_dir, set_fixture};
     use oci_spec::LinuxMemory;
 
     #[test]

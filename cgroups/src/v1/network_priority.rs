@@ -2,8 +2,8 @@ use std::path::Path;
 
 use anyhow::Result;
 
-use crate::common;
 use super::Controller;
+use crate::common;
 use oci_spec::{LinuxNetwork, LinuxResources};
 
 pub struct NetworkPriority {}
@@ -44,7 +44,7 @@ impl NetworkPriority {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test::{set_fixture, create_temp_dir};
+    use crate::test::{create_temp_dir, set_fixture};
     use oci_spec::LinuxInterfacePriority;
 
     #[test]

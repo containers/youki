@@ -1,7 +1,12 @@
 #![cfg(test)]
 
 use anyhow::{Context, Result};
-use std::{io::Write, ops::Deref, path::{Path, PathBuf}, fs};
+use std::{
+    fs,
+    io::Write,
+    ops::Deref,
+    path::{Path, PathBuf},
+};
 
 use oci_spec::LinuxCpu;
 

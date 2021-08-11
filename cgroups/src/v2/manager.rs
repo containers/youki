@@ -10,11 +10,13 @@ use nix::unistd::Pid;
 use oci_spec::{FreezerState, LinuxResources};
 
 use super::{
-    cpu::Cpu, cpuset::CpuSet, freezer::Freezer, hugetlb::HugeTlb, io::Io, memory::Memory,
-    pids::Pids, controller::Controller, controller_type::ControllerType
+    controller::Controller, controller_type::ControllerType, cpu::Cpu, cpuset::CpuSet,
+    freezer::Freezer, hugetlb::HugeTlb, io::Io, memory::Memory, pids::Pids,
 };
-use crate::
-    {common::{self, CGROUP_PROCS, CgroupManager, PathBufExt}, stats::{Stats, StatsProvider}};
+use crate::{
+    common::{self, CgroupManager, PathBufExt, CGROUP_PROCS},
+    stats::{Stats, StatsProvider},
+};
 
 const CGROUP_CONTROLLERS: &str = "cgroup.controllers";
 const CGROUP_SUBTREE_CONTROL: &str = "cgroup.subtree_control";
