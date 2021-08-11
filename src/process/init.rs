@@ -111,17 +111,12 @@ pub struct ContainerInitArgs {
 pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     let command = &args.syscall;
     let spec = &args.spec;
-    let linux = &spec.linux.as_ref().context("no linux in spec")?;
-    let namespaces: Namespaces = linux
-        .namespaces
-        .as_ref()
-        .context("no namepsaces in linux spec")?
-        .clone()
-        .into();
+    let linux = spec.linux.as_ref().context("no linux in spec")?;
+
     // need to create the notify socket before we pivot root, since the unix
     // domain socket used here is outside of the rootfs of container
     let mut notify_socket: NotifyListener = NotifyListener::new(&args.notify_path)?;
-    let proc = &spec.process.as_ref().context("no process in spec")?;
+    let proc = spec.process.as_ref().context("no process in spec")?;
     let mut envs: Vec<String> = proc.env.as_ref().unwrap_or(&vec![]).clone();
     let rootfs = &args.rootfs;
     let mut child = args.child;
@@ -167,7 +162,15 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     }
 
     // join existing namespaces
-    namespaces.apply_setns()?;
+    let bind_service = if let Some(ns) = linux.namespaces.as_ref() {
+        let namespaces = Namespaces::from(ns);
+        namespaces.apply_setns()?;
+        namespaces
+            .clone_flags
+            .contains(sched::CloneFlags::CLONE_NEWUSER)
+    } else {
+        false
+    };
 
     if let Some(hostname) = spec.hostname.as_ref() {
         command.set_hostname(hostname)?;
@@ -178,14 +181,8 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     }
 
     if args.init {
-        rootfs::prepare_rootfs(
-            spec,
-            rootfs,
-            namespaces
-                .clone_flags
-                .contains(sched::CloneFlags::CLONE_NEWUSER),
-        )
-        .with_context(|| "Failed to prepare rootfs")?;
+        rootfs::prepare_rootfs(spec, rootfs, bind_service)
+            .with_context(|| "Failed to prepare rootfs")?;
 
         // change the root of filesystem of the process to the rootfs
         command

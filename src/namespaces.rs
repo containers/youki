@@ -18,14 +18,14 @@ use nix::{
 use oci_spec::LinuxNamespace;
 
 /// Holds information about namespaces
-pub struct Namespaces {
-    spaces: Vec<LinuxNamespace>,
+pub struct Namespaces<'a> {
+    spaces: &'a Vec<LinuxNamespace>,
     command: Box<dyn Syscall>,
     pub clone_flags: CloneFlags,
 }
 
-impl From<Vec<LinuxNamespace>> for Namespaces {
-    fn from(namespaces: Vec<LinuxNamespace>) -> Self {
+impl<'a> From<&'a Vec<LinuxNamespace>> for Namespaces<'a> {
+    fn from(namespaces: &'a Vec<LinuxNamespace>) -> Self {
         let clone_flags = namespaces.iter().filter(|ns| ns.path.is_none()).fold(
             CloneFlags::empty(),
             |mut cf, ns| {
@@ -43,8 +43,7 @@ impl From<Vec<LinuxNamespace>> for Namespaces {
     }
 }
 
-impl Namespaces {
-    /// sets namespaces as defined in structure to calling process
+impl<'a> Namespaces<'a> {
     pub fn apply_setns(&self) -> Result<()> {
         let to_enter: Vec<(CloneFlags, i32)> = self
             .spaces
@@ -53,7 +52,7 @@ impl Namespaces {
             .map(|ns| {
                 let space = CloneFlags::from_bits_truncate(ns.typ as i32);
                 let fd = fcntl::open(
-                    &*ns.path.as_ref().unwrap().clone(),
+                    &*ns.path.as_ref().unwrap(),
                     fcntl::OFlag::empty(),
                     stat::Mode::empty(),
                 )
@@ -94,11 +93,11 @@ mod tests {
         vec![
             LinuxNamespace {
                 typ: LinuxNamespaceType::Mount,
-                path: Some("/dev/null".to_string()),
+                path: Some("/dev/null".into()),
             },
             LinuxNamespace {
                 typ: LinuxNamespaceType::Network,
-                path: Some("/dev/null".to_string()),
+                path: Some("/dev/null".into()),
             },
             LinuxNamespace {
                 typ: LinuxNamespaceType::Pid,
@@ -118,7 +117,7 @@ mod tests {
     #[test]
     fn test_namespaces_set_ns() {
         let sample_linux_namespaces = gen_sample_linux_namespaces();
-        let namespaces: Namespaces = sample_linux_namespaces.into();
+        let namespaces = Namespaces::from(&sample_linux_namespaces);
         let test_command: &TestHelperSyscall = namespaces.command.as_any().downcast_ref().unwrap();
         assert!(namespaces.apply_setns().is_ok());
 
@@ -136,7 +135,7 @@ mod tests {
     #[test]
     fn test_namespaces_unshare() {
         let sample_linux_namespaces = gen_sample_linux_namespaces();
-        let namespaces: Namespaces = sample_linux_namespaces.into();
+        let namespaces = Namespaces::from(&sample_linux_namespaces);
         assert!(namespaces.apply_unshare(CloneFlags::CLONE_NEWIPC).is_ok());
 
         let test_command: &TestHelperSyscall = namespaces.command.as_any().downcast_ref().unwrap();

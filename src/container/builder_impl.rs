@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use nix::sched::CloneFlags;
 use oci_spec::Spec;
 use std::{fs, os::unix::prelude::RawFd, path::PathBuf};
 
@@ -54,12 +55,6 @@ impl<'a> ContainerBuilderImpl<'a> {
         let linux = self.spec.linux.as_ref().context("no linux in spec")?;
         let cgroups_path = utils::get_cgroup_path(&linux.cgroups_path, &self.container_id);
         let cmanager = cgroups::common::create_cgroup_manager(&cgroups_path, self.use_systemd)?;
-        let namespaces: Namespaces = linux
-            .namespaces
-            .as_ref()
-            .context("no namespaces in linux spec")?
-            .clone()
-            .into();
 
         // create the parent and child process structure so the parent and child process can sync with each other
         let (mut parent, parent_channel) = parent::ParentProcess::new(&self.rootless)?;
@@ -91,7 +86,12 @@ impl<'a> ContainerBuilderImpl<'a> {
             0
         });
 
-        let init_pid = fork::clone(cb, namespaces.clone_flags)?;
+        let clone_flags = linux
+            .namespaces
+            .as_ref()
+            .map(|ns| Namespaces::from(ns).clone_flags)
+            .unwrap_or_else(CloneFlags::empty);
+        let init_pid = fork::clone(cb, clone_flags)?;
         log::debug!("init pid is {:?}", init_pid);
 
         parent.wait_for_child_ready(init_pid)?;

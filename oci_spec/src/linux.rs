@@ -532,11 +532,10 @@ pub struct LinuxNamespace {
     #[serde(rename = "type")]
     /// Type is the type of namespace.
     pub typ: LinuxNamespaceType,
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     /// Path is a path to an existing namespace persisted on disk that can be joined and is of the
     /// same type
-    pub path: Option<String>,
+    pub path: Option<PathBuf>,
 }
 
 // Utility function to get default namespaces
