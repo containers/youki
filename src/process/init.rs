@@ -1,4 +1,6 @@
 use anyhow::{bail, Context, Result};
+use nix::mount::mount as nix_mount;
+use nix::mount::MsFlags;
 use nix::{
     fcntl, sched, sys,
     unistd::{Gid, Uid},
@@ -191,6 +193,13 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
             .with_context(|| format!("Failed to pivot root to {:?}", rootfs))?;
     }
 
+    if let Some(paths) = &linux.readonly_paths {
+        // mount readonly path
+        for path in paths {
+            readonly_path(path)?;
+        }
+    }
+
     command.set_id(Uid::from_raw(proc.user.uid), Gid::from_raw(proc.user.gid))?;
     capabilities::reset_effective(command)?;
     if let Some(caps) = &proc.capabilities {
@@ -255,6 +264,32 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     // After do_exec is called, the process is replaced with the container
     // payload through execvp, so it should never reach here.
     unreachable!();
+}
+
+fn readonly_path(path: &str) -> Result<()> {
+    match nix_mount::<str, str, str, str>(
+        Some(path),
+        path,
+        None::<&str>,
+        MsFlags::MS_BIND
+            | MsFlags::MS_REC
+            | MsFlags::MS_NOSUID
+            | MsFlags::MS_NODEV
+            | MsFlags::MS_NOEXEC
+            | MsFlags::MS_BIND
+            | MsFlags::MS_RDONLY,
+        None::<&str>,
+    ) {
+        // ignore error if path is not exist.
+        Err(nix::errno::Errno::ENOENT) => {
+            log::warn!("readonly path {:?} not exist", path);
+            return Ok(());
+        }
+        Err(err) => bail!(err),
+        Ok(_) => {}
+    }
+    log::debug!("readonly path {:?} mounted", path);
+    Ok(())
 }
 
 #[cfg(test)]
