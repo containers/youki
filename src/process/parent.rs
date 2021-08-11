@@ -21,22 +21,22 @@ use oci_spec::LinuxIdMapping;
 const PARENT: Token = Token(0);
 
 /// Contains receiving end of pipe to child process and a poller for that.
-pub struct ParentProcess {
-    child_channel: ChildChannel,
+pub struct ParentProcess<'a> {
+    child_channel: ChildChannel<'a>,
 }
 
 // Poll is used to register and listen for various events
 // by registering it with an event source such as receiving end of a pipe
-impl ParentProcess {
+impl<'a> ParentProcess<'a> {
     /// Create new Parent process structure
-    pub fn new(rootless: Option<Rootless>) -> Result<(Self, ParentChannel)> {
+    pub fn new(rootless: &'a Option<Rootless>) -> Result<(Self, ParentChannel)> {
         let (parent_channel, child_channel) = Self::setup_pipes(rootless)?;
         let parent = Self { child_channel };
 
         Ok((parent, parent_channel))
     }
 
-    fn setup_pipes(rootless: Option<Rootless>) -> Result<(ParentChannel, ChildChannel)> {
+    fn setup_pipes(rootless: &'a Option<Rootless>) -> Result<(ParentChannel, ChildChannel<'a>)> {
         let (send_to_parent, receive_from_child) = pipe::new()?;
         let (send_to_child, receive_from_parent) = pipe::new()?;
 
@@ -122,15 +122,15 @@ impl ParentChannel {
     }
 }
 
-struct ChildChannel {
+struct ChildChannel<'a> {
     sender: Sender,
     receiver: Receiver,
     poll: Poll,
-    rootless: Option<Rootless>,
+    rootless: &'a Option<Rootless<'a>>,
 }
 
-impl ChildChannel {
-    fn new(sender: Sender, mut receiver: Receiver, rootless: Option<Rootless>) -> Result<Self> {
+impl<'a> ChildChannel<'a> {
+    fn new(sender: Sender, mut receiver: Receiver, rootless: &'a Option<Rootless>) -> Result<Self> {
         let poll = Poll::new()?;
         poll.registry()
             .register(&mut receiver, PARENT, Interest::READABLE)?;
@@ -198,21 +198,29 @@ impl ChildChannel {
     }
 
     fn write_uid_mapping(&self, target_pid: Pid) -> Result<()> {
-        let rootless = self.rootless.as_ref().unwrap();
-        write_id_mapping(
-            &format!("/proc/{}/uid_map", target_pid),
-            &rootless.uid_mappings,
-            rootless.newuidmap.as_deref(),
-        )
+        if let Some(rootless) = self.rootless.as_ref() {
+            if let Some(uid_mappings) = rootless.gid_mappings {
+                return write_id_mapping(
+                    &format!("/proc/{}/uid_map", target_pid),
+                    uid_mappings,
+                    rootless.newuidmap.as_deref(),
+                );
+            }
+        }
+        Ok(())
     }
 
     fn write_gid_mapping(&self, target_pid: Pid) -> Result<()> {
-        let rootless = self.rootless.as_ref().unwrap();
-        write_id_mapping(
-            &format!("/proc/{}/gid_map", target_pid),
-            &rootless.gid_mappings,
-            rootless.newgidmap.as_deref(),
-        )
+        if let Some(rootless) = self.rootless.as_ref() {
+            if let Some(gid_mappings) = rootless.gid_mappings {
+                return write_id_mapping(
+                    &format!("/proc/{}/gid_map", target_pid),
+                    gid_mappings,
+                    rootless.newgidmap.as_deref(),
+                );
+            }
+        }
+        Ok(())
     }
 }
 

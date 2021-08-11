@@ -382,6 +382,8 @@ mod tests {
                 kernel: None,
                 kernel_tcp: None,
                 swappiness: None,
+                disable_oom_killer: None,
+                use_hierarchy: None,
             };
             Memory::apply(linux_memory, &tmp).expect("Set memory and swap");
 
@@ -406,6 +408,8 @@ mod tests {
                 kernel: None,
                 kernel_tcp: None,
                 swappiness: None,
+                disable_oom_killer: None,
+                use_hierarchy: None,
             };
             Memory::apply(linux_memory, &tmp).expect("Set memory and swap");
 
@@ -439,16 +443,18 @@ mod tests {
             let memory_limits = linux_memory.clone();
 
             let linux_resources = LinuxResources {
-                devices: vec![],
+                devices: Some(vec![]),
                 disable_oom_killer,
                 oom_score_adj: None, // current unused
                 memory: Some(linux_memory),
                 cpu: None,
                 pids: None,
                 block_io: None,
-                hugepage_limits: vec![],
+                hugepage_limits: Some(vec![]),
                 network: None,
                 freezer: None,
+                rdma: None,
+                unified: None,
             };
 
             let result = <Memory as Controller>::apply(&linux_resources, &tmp);

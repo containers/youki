@@ -1,20 +1,20 @@
 use anyhow::{Context, Result};
+use nix::sched::CloneFlags;
 use oci_spec::Spec;
-use std::{fs, path::PathBuf};
+use std::{fs, os::unix::prelude::RawFd, path::PathBuf};
 
 use crate::{
     cgroups,
     namespaces::Namespaces,
     process::{child, fork, init, parent},
     rootless::Rootless,
-    stdio::FileDescriptor,
     syscall::linux::LinuxSyscall,
     utils,
 };
 
 use super::{Container, ContainerStatus};
 
-pub(super) struct ContainerBuilderImpl {
+pub(super) struct ContainerBuilderImpl<'a> {
     /// Flag indicating if an init or a tenant container should be created
     pub init: bool,
     /// Interface to operating system primitives
@@ -24,16 +24,16 @@ pub(super) struct ContainerBuilderImpl {
     /// Id of the container
     pub container_id: String,
     /// OCI complient runtime spec
-    pub spec: Spec,
+    pub spec: &'a Spec,
     /// Root filesystem of the container
     pub rootfs: PathBuf,
     /// File which will be used to communicate the pid of the
     /// container process to the higher level runtime
     pub pid_file: Option<PathBuf>,
     /// Socket to communicate the file descriptor of the ptty
-    pub console_socket: Option<FileDescriptor>,
+    pub console_socket: Option<RawFd>,
     /// Options for rootless containers
-    pub rootless: Option<Rootless>,
+    pub rootless: Option<Rootless<'a>>,
     /// Path to the Unix Domain Socket to communicate container start
     pub notify_path: PathBuf,
     /// Container state
@@ -42,7 +42,7 @@ pub(super) struct ContainerBuilderImpl {
     pub preserve_fds: i32,
 }
 
-impl ContainerBuilderImpl {
+impl<'a> ContainerBuilderImpl<'a> {
     pub(super) fn create(&mut self) -> Result<()> {
         self.run_container()?;
 
@@ -55,10 +55,9 @@ impl ContainerBuilderImpl {
         let linux = self.spec.linux.as_ref().context("no linux in spec")?;
         let cgroups_path = utils::get_cgroup_path(&linux.cgroups_path, &self.container_id);
         let cmanager = cgroups::common::create_cgroup_manager(&cgroups_path, self.use_systemd)?;
-        let namespaces = Namespaces::from(&linux.namespaces);
 
         // create the parent and child process structure so the parent and child process can sync with each other
-        let (mut parent, parent_channel) = parent::ParentProcess::new(self.rootless.clone())?;
+        let (mut parent, parent_channel) = parent::ParentProcess::new(&self.rootless)?;
         let child = child::ChildProcess::new(parent_channel)?;
 
         // This init_args will be passed to the container init process,
@@ -69,8 +68,8 @@ impl ContainerBuilderImpl {
             syscall: self.syscall.clone(),
             spec: self.spec.clone(),
             rootfs: self.rootfs.clone(),
-            console_socket: self.console_socket.clone(),
-            rootless: self.rootless.clone(),
+            console_socket: self.console_socket,
+            is_rootless: self.rootless.is_some(),
             notify_path: self.notify_path.clone(),
             preserve_fds: self.preserve_fds,
             child,
@@ -87,7 +86,12 @@ impl ContainerBuilderImpl {
             0
         });
 
-        let init_pid = fork::clone(cb, namespaces.clone_flags)?;
+        let clone_flags = linux
+            .namespaces
+            .as_ref()
+            .map(|ns| Namespaces::from(ns).clone_flags)
+            .unwrap_or_else(CloneFlags::empty);
+        let init_pid = fork::clone(cb, clone_flags)?;
         log::debug!("init pid is {:?}", init_pid);
 
         parent.wait_for_child_ready(init_pid)?;

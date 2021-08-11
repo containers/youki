@@ -7,24 +7,24 @@ use oci_spec::{Linux, LinuxIdMapping, Mount, Spec};
 use crate::namespaces::Namespaces;
 
 #[derive(Debug, Clone)]
-pub struct Rootless {
+pub struct Rootless<'a> {
     /// Location of the newuidmap binary
     pub newuidmap: Option<PathBuf>,
     /// Location of the newgidmap binary
     pub newgidmap: Option<PathBuf>,
     /// Mappings for user ids
-    pub uid_mappings: Vec<LinuxIdMapping>,
+    pub uid_mappings: Option<&'a Vec<LinuxIdMapping>>,
     /// Mappings for group ids
-    pub gid_mappings: Vec<LinuxIdMapping>,
+    pub gid_mappings: Option<&'a Vec<LinuxIdMapping>>,
 }
 
-impl From<&Linux> for Rootless {
-    fn from(linux: &Linux) -> Self {
+impl<'a> From<&'a Linux> for Rootless<'a> {
+    fn from(linux: &'a Linux) -> Self {
         Self {
             newuidmap: None,
             newgidmap: None,
-            uid_mappings: linux.uid_mappings.clone(),
-            gid_mappings: linux.gid_mappings.clone(),
+            uid_mappings: linux.uid_mappings.as_ref(),
+            gid_mappings: linux.gid_mappings.as_ref(),
         }
     }
 }
@@ -67,24 +67,38 @@ pub fn should_use_rootless() -> bool {
 /// running in rootless mode
 pub fn validate(spec: &Spec) -> Result<()> {
     let linux = spec.linux.as_ref().context("no linux in spec")?;
+    let gid_mappings = linux
+        .gid_mappings
+        .as_ref()
+        .context("rootless containers require gid_mappings in spec")?;
+    let uid_mappings = linux
+        .uid_mappings
+        .as_ref()
+        .context("rootless containers require LinuxIdMapping in spec")?;
 
-    if linux.uid_mappings.is_empty() {
+    if uid_mappings.is_empty() {
         bail!("rootless containers require at least one uid mapping");
     }
 
-    if linux.gid_mappings.is_empty() {
+    if gid_mappings.is_empty() {
         bail!("rootless containers require at least one gid mapping")
     }
 
-    let namespaces = Namespaces::from(&linux.namespaces);
+    let namespaces = Namespaces::from(
+        linux
+            .namespaces
+            .as_ref()
+            .context("rootless containers require the namespaces.")?,
+    );
+
     if !namespaces.clone_flags.contains(CloneFlags::CLONE_NEWUSER) {
         bail!("rootless containers require the specification of a user namespace");
     }
 
     validate_mounts(
         spec.mounts.as_ref().context("no mounts in spec")?,
-        &linux.uid_mappings,
-        &linux.gid_mappings,
+        uid_mappings,
+        gid_mappings,
     )?;
 
     Ok(())
@@ -96,13 +110,15 @@ fn validate_mounts(
     gid_mappings: &[LinuxIdMapping],
 ) -> Result<()> {
     for mount in mounts {
-        for opt in &mount.options {
-            if opt.starts_with("uid=") && !is_id_mapped(&opt[4..], uid_mappings)? {
-                bail!("Mount {:?} specifies option {} which is not mapped inside the rootless container", mount, opt);
-            }
+        if let Some(options) = &mount.options {
+            for opt in options {
+                if opt.starts_with("uid=") && !is_id_mapped(&opt[4..], uid_mappings)? {
+                    bail!("Mount {:?} specifies option {} which is not mapped inside the rootless container", mount, opt);
+                }
 
-            if opt.starts_with("gid=") && !is_id_mapped(&opt[4..], gid_mappings)? {
-                bail!("Mount {:?} specifies option {} which is not mapped inside the rootless container", mount, opt);
+                if opt.starts_with("gid=") && !is_id_mapped(&opt[4..], gid_mappings)? {
+                    bail!("Mount {:?} specifies option {} which is not mapped inside the rootless container", mount, opt);
+                }
             }
         }
     }
@@ -120,16 +136,20 @@ fn is_id_mapped(id: &str, mappings: &[LinuxIdMapping]) -> Result<bool> {
 /// Looks up the location of the newuidmap and newgidmap binaries which
 /// are required to write multiple user/group mappings
 pub fn lookup_map_binaries(spec: &Linux) -> Result<Option<(PathBuf, PathBuf)>> {
-    if spec.uid_mappings.len() == 1 && spec.uid_mappings.len() == 1 {
-        return Ok(None);
-    }
+    if let Some(uid_mappings) = spec.uid_mappings.as_ref() {
+        if uid_mappings.len() == 1 && uid_mappings.len() == 1 {
+            return Ok(None);
+        }
 
-    let uidmap = lookup_map_binary("newuidmap")?;
-    let gidmap = lookup_map_binary("newgidmap")?;
+        let uidmap = lookup_map_binary("newuidmap")?;
+        let gidmap = lookup_map_binary("newgidmap")?;
 
-    match (uidmap, gidmap) {
+        match (uidmap, gidmap) {
         (Some(newuidmap), Some(newgidmap)) => Ok(Some((newuidmap, newgidmap))),
         _ => bail!("newuidmap/newgidmap binaries could not be found in path. This is required if multiple id mappings are specified"),
+    }
+    } else {
+        Ok(None)
     }
 }
 

@@ -44,7 +44,6 @@ impl<'a> From<&'a Vec<LinuxNamespace>> for Namespaces<'a> {
 }
 
 impl<'a> Namespaces<'a> {
-    /// sets namespaces as defined in structure to calling process
     pub fn apply_setns(&self) -> Result<()> {
         let to_enter: Vec<(CloneFlags, i32)> = self
             .spaces

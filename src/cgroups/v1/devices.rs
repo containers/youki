@@ -14,8 +14,10 @@ impl Controller for Devices {
     fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply Devices cgroup config");
 
-        for d in &linux_resources.devices {
-            Self::apply_device(d, cgroup_root)?;
+        if let Some(devices) = linux_resources.devices.as_ref() {
+            for d in devices {
+                Self::apply_device(d, cgroup_root)?;
+            }
         }
 
         for d in [
@@ -52,48 +54,48 @@ impl Devices {
         vec![
             LinuxDeviceCgroup {
                 allow: true,
-                typ: LinuxDeviceType::C,
+                typ: Some(LinuxDeviceType::C),
                 major: None,
                 minor: None,
-                access: "m".to_string(),
+                access: "m".to_string().into(),
             },
             LinuxDeviceCgroup {
                 allow: true,
-                typ: LinuxDeviceType::B,
+                typ: Some(LinuxDeviceType::B),
                 major: None,
                 minor: None,
-                access: "m".to_string(),
+                access: "m".to_string().into(),
             },
             // /dev/console
             LinuxDeviceCgroup {
                 allow: true,
-                typ: LinuxDeviceType::C,
+                typ: Some(LinuxDeviceType::C),
                 major: Some(5),
                 minor: Some(1),
-                access: "rwm".to_string(),
+                access: "rwm".to_string().into(),
             },
             // /dev/pts
             LinuxDeviceCgroup {
                 allow: true,
-                typ: LinuxDeviceType::C,
+                typ: Some(LinuxDeviceType::C),
                 major: Some(136),
                 minor: None,
-                access: "rwm".to_string(),
+                access: "rwm".to_string().into(),
             },
             LinuxDeviceCgroup {
                 allow: true,
-                typ: LinuxDeviceType::C,
+                typ: Some(LinuxDeviceType::C),
                 major: Some(5),
                 minor: Some(2),
-                access: "rwm".to_string(),
+                access: "rwm".to_string().into(),
             },
             // tun/tap
             LinuxDeviceCgroup {
                 allow: true,
-                typ: LinuxDeviceType::C,
+                typ: Some(LinuxDeviceType::C),
                 major: Some(10),
                 minor: Some(200),
-                access: "rwm".to_string(),
+                access: "rwm".to_string().into(),
             },
         ]
     }
@@ -140,31 +142,31 @@ mod tests {
         [
             LinuxDeviceCgroup {
                 allow: true,
-                typ: LinuxDeviceType::C,
+                typ: Some(LinuxDeviceType::C),
                 major: Some(10),
                 minor: None,
-                access: "rwm".to_string(),
+                access: "rwm".to_string().into(),
             },
             LinuxDeviceCgroup {
                 allow: true,
-                typ: LinuxDeviceType::A,
+                typ: Some(LinuxDeviceType::A),
                 major: None,
                 minor: Some(200),
-                access: "rwm".to_string(),
+                access: "rwm".to_string().into(),
             },
             LinuxDeviceCgroup {
                 allow: false,
-                typ: LinuxDeviceType::P,
+                typ: Some(LinuxDeviceType::P),
                 major: Some(10),
                 minor: Some(200),
-                access: "m".to_string(),
+                access: "m".to_string().into(),
             },
             LinuxDeviceCgroup {
                 allow: false,
-                typ: LinuxDeviceType::U,
+                typ: Some(LinuxDeviceType::U),
                 major: None,
                 minor: None,
-                access: "rw".to_string(),
+                access: "rw".to_string().into(),
             },
         ]
         .iter()

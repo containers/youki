@@ -12,8 +12,8 @@ pub mod parent;
 /// Used to describe type of process after fork.
 /// Parent and child processes mean the same thing as in a normal fork call
 /// InitProcess is specifically used to indicate the process which will run the command of container
-pub enum Process {
-    Parent(parent::ParentProcess),
+pub enum Process<'a> {
+    Parent(parent::ParentProcess<'a>),
     Child(child::ChildProcess),
 }
 /// Maximum event capacity of polling

@@ -27,8 +27,10 @@ impl Controller for HugeTlb {
     }
 
     fn needs_to_handle(linux_resources: &LinuxResources) -> Option<&Self::Resource> {
-        if !linux_resources.hugepage_limits.is_empty() {
-            return Some(&linux_resources.hugepage_limits);
+        if let Some(hugepage_limits) = linux_resources.hugepage_limits.as_ref() {
+            if !hugepage_limits.is_empty() {
+                return linux_resources.hugepage_limits.as_ref();
+            }
         }
 
         None

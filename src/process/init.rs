@@ -4,7 +4,10 @@ use nix::{
     unistd::{Gid, Uid},
 };
 use oci_spec::Spec;
-use std::{env, os::unix::io::AsRawFd};
+use std::{
+    env,
+    os::unix::{io::AsRawFd, prelude::RawFd},
+};
 use std::{fs, io::Write, path::Path, path::PathBuf};
 
 use crate::{
@@ -13,8 +16,6 @@ use crate::{
     notify_socket::NotifyListener,
     process::child,
     rootfs,
-    rootless::Rootless,
-    stdio::FileDescriptor,
     syscall::{linux::LinuxSyscall, Syscall},
     tty, utils,
 };
@@ -94,9 +95,9 @@ pub struct ContainerInitArgs {
     /// Root filesystem of the container
     pub rootfs: PathBuf,
     /// Socket to communicate the file descriptor of the ptty
-    pub console_socket: Option<FileDescriptor>,
+    pub console_socket: Option<RawFd>,
     /// Options for rootless containers
-    pub rootless: Option<Rootless>,
+    pub is_rootless: bool,
     /// Path to the Unix Domain Socket to communicate container start
     pub notify_path: PathBuf,
     /// File descriptos preserved/passed to the container init process.
@@ -109,12 +110,12 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     let command = &args.syscall;
     let spec = &args.spec;
     let linux = spec.linux.as_ref().context("no linux in spec")?;
-    let namespaces = Namespaces::from(&linux.namespaces);
+
     // need to create the notify socket before we pivot root, since the unix
     // domain socket used here is outside of the rootfs of container
     let mut notify_socket: NotifyListener = NotifyListener::new(&args.notify_path)?;
     let proc = spec.process.as_ref().context("no process in spec")?;
-    let mut envs: Vec<String> = proc.env.clone();
+    let mut envs: Vec<String> = proc.env.as_ref().unwrap_or(&vec![]).clone();
     let rootfs = &args.rootfs;
     let mut child = args.child;
 
@@ -133,7 +134,7 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     // namespace will be created, check
     // https://man7.org/linux/man-pages/man7/user_namespaces.7.html for more
     // information
-    if args.rootless.is_some() {
+    if args.is_rootless {
         // child needs to be dumpable, otherwise the non root parent is not
         // allowed to write the uid/gid maps
         prctl::set_dumpable(true).unwrap();
@@ -143,8 +144,10 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     }
 
     // set limits and namespaces to the process
-    for rlimit in proc.rlimits.iter() {
-        command.set_rlimit(rlimit).context("failed to set rlimit")?;
+    if let Some(rlimits) = proc.rlimits.as_ref() {
+        for rlimit in rlimits.iter() {
+            command.set_rlimit(rlimit).context("failed to set rlimit")?;
+        }
     }
 
     command
@@ -157,23 +160,27 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     }
 
     // join existing namespaces
-    namespaces.apply_setns()?;
+    let bind_service = if let Some(ns) = linux.namespaces.as_ref() {
+        let namespaces = Namespaces::from(ns);
+        namespaces.apply_setns()?;
+        namespaces
+            .clone_flags
+            .contains(sched::CloneFlags::CLONE_NEWUSER)
+    } else {
+        false
+    };
 
-    command.set_hostname(spec.hostname.as_ref().context("no hostname in spec")?)?;
+    if let Some(hostname) = spec.hostname.as_ref() {
+        command.set_hostname(hostname)?;
+    }
 
-    if proc.no_new_privileges {
+    if let Some(true) = proc.no_new_privileges {
         let _ = prctl::set_no_new_privileges(true);
     }
 
     if args.init {
-        rootfs::prepare_rootfs(
-            spec,
-            rootfs,
-            namespaces
-                .clone_flags
-                .contains(sched::CloneFlags::CLONE_NEWUSER),
-        )
-        .with_context(|| "Failed to prepare rootfs")?;
+        rootfs::prepare_rootfs(spec, rootfs, bind_service)
+            .with_context(|| "Failed to prepare rootfs")?;
 
         // change the root of filesystem of the process to the rootfs
         command
@@ -236,8 +243,11 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     // listing on the notify socket for container start command
     notify_socket.wait_for_container_start()?;
 
-    let args: &Vec<String> = &proc.args;
-    utils::do_exec(&args[0], args, &envs)?;
+    if let Some(args) = proc.args.as_ref() {
+        utils::do_exec(&args[0], args, &envs)?;
+    } else {
+        log::warn!("The command to be executed isn't set")
+    }
 
     // After do_exec is called, the process is replaced with the container
     // payload through execvp, so it should never reach here.
