@@ -32,8 +32,10 @@ impl Controller for NetworkPriority {
 
 impl NetworkPriority {
     fn apply(root_path: &Path, network: &LinuxNetwork) -> Result<()> {
-        let priorities: String = network.priorities.iter().map(|p| p.to_string()).collect();
-        common::write_cgroup_file_str(root_path.join("net_prio.ifpriomap"), priorities.trim())?;
+        if let Some(ni_priorities) = network.priorities.as_ref() {
+            let priorities: String = ni_priorities.iter().map(|p| p.to_string()).collect();
+            common::write_cgroup_file_str(root_path.join("net_prio.ifpriomap"), priorities.trim())?;
+        }
 
         Ok(())
     }
@@ -64,7 +66,7 @@ mod tests {
         let priorities_string = priorities.iter().map(|p| p.to_string()).collect::<String>();
         let network = LinuxNetwork {
             class_id: None,
-            priorities,
+            priorities: priorities.into(),
         };
 
         NetworkPriority::apply(&tmp, &network).expect("apply network priorities");

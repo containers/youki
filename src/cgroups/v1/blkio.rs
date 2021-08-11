@@ -106,32 +106,40 @@ impl StatsProvider for Blkio {
 
 impl Blkio {
     fn apply(root_path: &Path, blkio: &LinuxBlockIo) -> Result<()> {
-        for trbd in &blkio.blkio_throttle_read_bps_device {
-            common::write_cgroup_file_str(
-                &root_path.join(BLKIO_THROTTLE_READ_BPS),
-                &format!("{}:{} {}", trbd.major, trbd.minor, trbd.rate),
-            )?;
+        if let Some(throttle_read_bps_device) = blkio.throttle_read_bps_device.as_ref() {
+            for trbd in throttle_read_bps_device {
+                common::write_cgroup_file_str(
+                    &root_path.join(BLKIO_THROTTLE_READ_BPS),
+                    &format!("{}:{} {}", trbd.major, trbd.minor, trbd.rate),
+                )?;
+            }
         }
 
-        for twbd in &blkio.blkio_throttle_write_bps_device {
-            common::write_cgroup_file_str(
-                &root_path.join(BLKIO_THROTTLE_WRITE_BPS),
-                &format!("{}:{} {}", twbd.major, twbd.minor, twbd.rate),
-            )?;
+        if let Some(throttle_write_bps_device) = blkio.throttle_write_bps_device.as_ref() {
+            for twbd in throttle_write_bps_device {
+                common::write_cgroup_file_str(
+                    &root_path.join(BLKIO_THROTTLE_WRITE_BPS),
+                    &format!("{}:{} {}", twbd.major, twbd.minor, twbd.rate),
+                )?;
+            }
         }
 
-        for trid in &blkio.blkio_throttle_read_iops_device {
-            common::write_cgroup_file_str(
-                &root_path.join(BLKIO_THROTTLE_READ_IOPS),
-                &format!("{}:{} {}", trid.major, trid.minor, trid.rate),
-            )?;
+        if let Some(throttle_read_iops_device) = blkio.throttle_read_iops_device.as_ref() {
+            for trid in throttle_read_iops_device {
+                common::write_cgroup_file_str(
+                    &root_path.join(BLKIO_THROTTLE_READ_IOPS),
+                    &format!("{}:{} {}", trid.major, trid.minor, trid.rate),
+                )?;
+            }
         }
 
-        for twid in &blkio.blkio_throttle_write_iops_device {
-            common::write_cgroup_file_str(
-                &root_path.join(BLKIO_THROTTLE_WRITE_IOPS),
-                &format!("{}:{} {}", twid.major, twid.minor, twid.rate),
-            )?;
+        if let Some(throttle_write_iops_device) = blkio.throttle_write_iops_device.as_ref() {
+            for twid in throttle_write_iops_device {
+                common::write_cgroup_file_str(
+                    &root_path.join(BLKIO_THROTTLE_WRITE_IOPS),
+                    &format!("{}:{} {}", twid.major, twid.minor, twid.rate),
+                )?;
+            }
         }
 
         Ok(())
@@ -230,35 +238,35 @@ mod tests {
     impl BlockIoBuilder {
         fn new() -> Self {
             let block_io = LinuxBlockIo {
-                blkio_weight: Some(0),
-                blkio_leaf_weight: Some(0),
-                blkio_weight_device: vec![],
-                blkio_throttle_read_bps_device: vec![],
-                blkio_throttle_write_bps_device: vec![],
-                blkio_throttle_read_iops_device: vec![],
-                blkio_throttle_write_iops_device: vec![],
+                weight: Some(0),
+                leaf_weight: Some(0),
+                weight_device: vec![].into(),
+                throttle_read_bps_device: vec![].into(),
+                throttle_write_bps_device: vec![].into(),
+                throttle_read_iops_device: vec![].into(),
+                throttle_write_iops_device: vec![].into(),
             };
 
             Self { block_io }
         }
 
         fn with_read_bps(mut self, throttle: Vec<LinuxThrottleDevice>) -> Self {
-            self.block_io.blkio_throttle_read_bps_device = throttle;
+            self.block_io.throttle_read_bps_device = throttle.into();
             self
         }
 
         fn with_write_bps(mut self, throttle: Vec<LinuxThrottleDevice>) -> Self {
-            self.block_io.blkio_throttle_write_bps_device = throttle;
+            self.block_io.throttle_write_bps_device = throttle.into();
             self
         }
 
         fn with_read_iops(mut self, throttle: Vec<LinuxThrottleDevice>) -> Self {
-            self.block_io.blkio_throttle_read_iops_device = throttle;
+            self.block_io.throttle_read_iops_device = throttle.into();
             self
         }
 
         fn with_write_iops(mut self, throttle: Vec<LinuxThrottleDevice>) -> Self {
-            self.block_io.blkio_throttle_write_iops_device = throttle;
+            self.block_io.throttle_write_iops_device = throttle.into();
             self
         }
 

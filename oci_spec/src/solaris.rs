@@ -1,21 +1,18 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 /// Solaris contains platform-specific configuration for Solaris application containers.
 pub struct Solaris {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     /// SMF FMRI which should go "online" before we start the container process.
     pub milestone: Option<String>,
 
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "limitpriv")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     /// Maximum set of privileges any process in this container can obtain.
-    pub limit_priv: Option<String>,
+    pub limitpriv: Option<String>,
 
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        rename = "maxShmMemory"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     /// The maximum amount of shared memory allowed for this container.
     pub max_shm_memory: Option<String>,
 
@@ -27,16 +24,13 @@ pub struct Solaris {
     /// Set limit on the amount of CPU time that can be used by container.
     pub capped_cpu: Option<SolarisCappedCPU>,
 
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        rename = "cappedMemory"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     /// The physical and swap caps on the memory that can be used by this container.
     pub capped_memory: Option<SolarisCappedMemory>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 /// SolarisAnet provides the specification for automatic creation of network resources for this
 /// container.
 pub struct SolarisAnet {
@@ -44,23 +38,15 @@ pub struct SolarisAnet {
     /// Specify a name for the automatically created VNIC datalink.
     pub linkname: Option<String>,
 
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "lowerLink")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     /// Specify the link over which the VNIC will be created.
-    pub lowerlink: Option<String>,
+    pub lower_link: Option<String>,
 
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        rename = "allowedAddress"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     /// The set of IP addresses that the container can use.
     pub allowed_address: Option<String>,
 
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        rename = "configureAllowedAddress"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     /// Specifies whether allowedAddress limitation is to be applied to the VNIC.
     pub configure_allowed_address: Option<String>,
 
@@ -68,19 +54,11 @@ pub struct SolarisAnet {
     /// The value of the optional default router.
     pub defrouter: Option<String>,
 
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        rename = "linkProtection"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     /// Enable one or more types of link protection.
     pub link_protection: Option<String>,
 
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        rename = "macAddress"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     /// Set the VNIC's macAddress.
     pub mac_address: Option<String>,
 }

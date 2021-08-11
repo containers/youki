@@ -54,7 +54,12 @@ impl<'a> ContainerBuilderImpl<'a> {
         let linux = self.spec.linux.as_ref().context("no linux in spec")?;
         let cgroups_path = utils::get_cgroup_path(&linux.cgroups_path, &self.container_id);
         let cmanager = cgroups::common::create_cgroup_manager(&cgroups_path, self.use_systemd)?;
-        let namespaces: Namespaces = linux.namespaces.clone().into();
+        let namespaces: Namespaces = linux
+            .namespaces
+            .as_ref()
+            .context("no namespaces in linux spec")?
+            .clone()
+            .into();
 
         // create the parent and child process structure so the parent and child process can sync with each other
         let (mut parent, parent_channel) = parent::ParentProcess::new(&self.rootless)?;

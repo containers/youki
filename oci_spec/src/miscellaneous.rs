@@ -1,145 +1,126 @@
-use super::*;
-use std::env;
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
-// os and architecture of computer
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct Platform {
-    #[serde(default)]
-    pub os: String,
-    #[serde(default)]
-    pub arch: String,
-}
-
-/// Gets os and arch of system by default
-impl Default for Platform {
-    fn default() -> Self {
-        Platform {
-            os: env::consts::OS.to_string(),
-            arch: env::consts::ARCH.to_string(),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Root contains information about the container's root filesystem on the host.
 pub struct Root {
-    // Path to the container's root filesystem
+    /// Path is the absolute path to the container's root filesystem.
     #[serde(default)]
     pub path: PathBuf,
-    // Makes container root file system readonly before process is executed
-    #[serde(default)]
-    pub readonly: bool,
+
+    /// Readonly makes the root filesystem for the container readonly before the process is
+    /// executed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub readonly: Option<bool>,
 }
 
-// Default path for container root is "./rootfs" from config.json, with readonly true
+/// Default path for container root is "./rootfs" from config.json, with readonly true
 impl Default for Root {
     fn default() -> Self {
         Root {
             path: PathBuf::from("rootfs"),
-            readonly: true,
+            readonly: true.into(),
         }
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Mount specifies a mount for a container.
 pub struct Mount {
-    // Path where mount will be placed in container
-    #[serde(default)]
+    /// Destination is the absolute path where the mount will be placed in the container.
     pub destination: PathBuf,
-    // Specifies mount type
-    #[serde(default, rename = "type")]
-    pub typ: String,
-    // source path of mount
-    #[serde(default)]
-    pub source: PathBuf,
-    // mount options (https://man7.org/linux/man-pages/man8/mount.8.html)
-    #[serde(default)]
-    pub options: Vec<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "type")]
+    /// Type specifies the mount kind.
+    pub typ: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Source specifies the source path of the mount.
+    pub source: Option<PathBuf>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Options are fstab style mount options.
+    pub options: Option<Vec<String>>,
 }
 
 // utility function to generate default config for mounts
 pub fn get_default_mounts() -> Vec<Mount> {
-    let mut default_mounts = Vec::new();
-    default_mounts.push(Mount {
-        destination: PathBuf::from("/proc"),
-        typ: String::from("proc"),
-        source: PathBuf::from("proc"),
-        options: Vec::new(),
-    });
-
-    default_mounts.push(Mount {
-        destination: PathBuf::from("/dev"),
-        typ: String::from("tmpfs"),
-        source: PathBuf::from("tmpfs"),
-        options: vec![
-            "nosuid".to_string(),
-            "strictatime".to_string(),
-            "mode=755".to_string(),
-            "size=65536k".to_string(),
-        ],
-    });
-
-    default_mounts.push(Mount {
-        destination: PathBuf::from("/dev/pts"),
-        typ: String::from("devpts"),
-        source: PathBuf::from("devpts"),
-        options: vec![
-            "nosuid".to_string(),
-            "noexec".to_string(),
-            "newinstance".to_string(),
-            "ptmxmode=0666".to_string(),
-            "mode=0620".to_string(),
-            "gid=5".to_string(),
-        ],
-    });
-
-    default_mounts.push(Mount {
-        destination: PathBuf::from("/dev/shm"),
-        typ: String::from("tmpfs"),
-        source: PathBuf::from("shm"),
-        options: vec![
-            "nosuid".to_string(),
-            "noexec".to_string(),
-            "nodev".to_string(),
-            "mode=1777".to_string(),
-            "size=65536k".to_string(),
-        ],
-    });
-
-    default_mounts.push(Mount {
-        destination: PathBuf::from("/dev/mqueue"),
-        typ: String::from("mqueue"),
-        source: PathBuf::from("mqueue"),
-        options: vec![
-            "nosuid".to_string(),
-            "noexec".to_string(),
-            "nodev".to_string(),
-        ],
-    });
-
-    default_mounts.push(Mount {
-        destination: PathBuf::from("/sys"),
-        typ: String::from("sysfs"),
-        source: PathBuf::from("sysfs"),
-        options: vec![
-            "nosuid".to_string(),
-            "noexec".to_string(),
-            "nodev".to_string(),
-            "ro".to_string(),
-        ],
-    });
-
-    default_mounts.push(Mount {
-        destination: PathBuf::from("/sys/fs/cgroup"),
-        typ: String::from("cgroup"),
-        source: PathBuf::from("cgroup"),
-        options: vec![
-            "nosuid".to_string(),
-            "noexec".to_string(),
-            "nodev".to_string(),
-            "relatime".to_string(),
-            "ro".to_string(),
-        ],
-    });
-
-    default_mounts
+    vec![
+        Mount {
+            destination: PathBuf::from("/proc"),
+            typ: "proc".to_string().into(),
+            source: PathBuf::from("proc").into(),
+            options: None,
+        },
+        Mount {
+            destination: PathBuf::from("/dev"),
+            typ: "tmpfs".to_string().into(),
+            source: PathBuf::from("tmpfs").into(),
+            options: vec![
+                "nosuid".into(),
+                "strictatime".into(),
+                "mode=755".into(),
+                "size=65536k".into(),
+            ]
+            .into(),
+        },
+        Mount {
+            destination: PathBuf::from("/dev/pts"),
+            typ: "devpts".to_string().into(),
+            source: PathBuf::from("devpts").into(),
+            options: vec![
+                "nosuid".into(),
+                "noexec".into(),
+                "newinstance".into(),
+                "ptmxmode=0666".into(),
+                "mode=0620".into(),
+                "gid=5".into(),
+            ]
+            .into(),
+        },
+        Mount {
+            destination: PathBuf::from("/dev/shm"),
+            typ: "tmpfs".to_string().into(),
+            source: PathBuf::from("shm").into(),
+            options: vec![
+                "nosuid".into(),
+                "noexec".into(),
+                "nodev".into(),
+                "mode=1777".into(),
+                "size=65536k".into(),
+            ]
+            .into(),
+        },
+        Mount {
+            destination: PathBuf::from("/dev/mqueue"),
+            typ: "mqueue".to_string().into(),
+            source: PathBuf::from("mqueue").into(),
+            options: vec!["nosuid".into(), "noexec".into(), "nodev".into()].into(),
+        },
+        Mount {
+            destination: PathBuf::from("/sys"),
+            typ: "sysfs".to_string().into(),
+            source: PathBuf::from("sysfs").into(),
+            options: vec![
+                "nosuid".into(),
+                "noexec".into(),
+                "nodev".into(),
+                "ro".into(),
+            ]
+            .into(),
+        },
+        Mount {
+            destination: PathBuf::from("/sys/fs/cgroup"),
+            typ: "cgroup".to_string().into(),
+            source: PathBuf::from("cgroup").into(),
+            options: vec![
+                "nosuid".into(),
+                "noexec".into(),
+                "nodev".into(),
+                "relatime".into(),
+                "ro".into(),
+            ]
+            .into(),
+        },
+    ]
 }

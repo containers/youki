@@ -2,10 +2,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 /// Windows defines the runtime configuration for Windows based containers, including Hyper-V
 /// containers.
 pub struct Windows {
-    #[serde(rename = "layerFolders")]
     /// LayerFolders contains a list of absolute paths to directories containing image layers.
     pub layer_folders: Vec<String>,
 
@@ -17,11 +17,7 @@ pub struct Windows {
     /// Resources contains information for handling resource constraints for the container.
     pub resources: Option<WindowsResources>,
 
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        rename = "credentialSpec"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     /// CredentialSpec contains a JSON object describing a group Managed Service Account (gMSA)
     /// specification.
     pub credential_spec: Option<HashMap<String, Option<serde_json::Value>>>,
@@ -31,11 +27,7 @@ pub struct Windows {
     /// servicing operation.
     pub servicing: Option<bool>,
 
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        rename = "ignoreFlushesDuringBoot"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     /// IgnoreFlushesDuringBoot indicates if the container is being started in a mode where disk
     /// writes are not flushed during its boot process.
     pub ignore_flushes_during_boot: Option<bool>,
@@ -50,12 +42,12 @@ pub struct Windows {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 /// WindowsDevice represents information about a host device to be mapped into the container.
 pub struct WindowsDevice {
     /// Device identifier: interface class GUID, etc..
     pub id: String,
 
-    #[serde(rename = "idType")]
     /// Device identifier type: "class", etc..
     pub id_type: String,
 }
@@ -101,6 +93,7 @@ pub struct WindowsCPUResources {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 /// WindowsStorageResources contains storage resource management settings.
 pub struct WindowsStorageResources {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -111,35 +104,25 @@ pub struct WindowsStorageResources {
     /// Specifies maximum bytes per second for the system drive.
     pub bps: Option<u64>,
 
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        rename = "sandboxSize"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     /// Sandbox size specifies the minimum size of the system drive in bytes.
     pub sandbox_size: Option<u64>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 /// WindowsHyperV contains information for configuring a container to run with Hyper-V isolation.
 pub struct WindowsHyperV {
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        rename = "utilityVMPath"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     /// UtilityVMPath is an optional path to the image used for the Utility VM.
     pub utility_vm_path: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 /// WindowsNetwork contains network settings for Windows containers.
 pub struct WindowsNetwork {
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        rename = "endpointList"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     /// List of HNS endpoints that the container should connect to.
     pub endpoint_list: Option<Vec<String>>,
 
@@ -159,19 +142,11 @@ pub struct WindowsNetwork {
     /// Comma separated list of DNS suffixes to use for name resolution.
     pub dns_search_list: Option<Vec<String>>,
 
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        rename = "networkSharedContainerName"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     /// Name (ID) of the container that we will share with the network stack.
     pub network_shared_container_name: Option<String>,
 
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        rename = "networkNamespace"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     /// name (ID) of the network namespace that will be used for the container.
     pub network_namespace: Option<String>,
 }

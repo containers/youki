@@ -22,7 +22,7 @@ impl Controller for NetworkClassifier {
     }
 
     fn needs_to_handle(linux_resources: &LinuxResources) -> Option<&Self::Resource> {
-        if let Some(network) = &linux_resources.network {
+        if let Some(network) = linux_resources.network.as_ref() {
             return Some(network);
         }
 
@@ -55,7 +55,7 @@ mod tests {
         let id = 0x100001;
         let network = LinuxNetwork {
             class_id: Some(id),
-            priorities: vec![],
+            priorities: Some(vec![]),
         };
 
         NetworkClassifier::apply(&tmp, &network).expect("apply network classID");

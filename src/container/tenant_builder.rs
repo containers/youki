@@ -208,7 +208,7 @@ impl TenantContainerBuilder {
             bail!("Container command was not specified")
         }
 
-        spec.process.as_mut().context("no process in spec")?.args = self.args.clone();
+        spec.process.as_mut().context("no process in spec")?.args = self.args.clone().into();
         Ok(())
     }
 
@@ -217,6 +217,8 @@ impl TenantContainerBuilder {
             .as_mut()
             .context("no process in spec")?
             .env
+            .as_mut()
+            .context("no env in process spec")?
             .append(
                 &mut self
                     .env
@@ -233,7 +235,7 @@ impl TenantContainerBuilder {
             spec.process
                 .as_mut()
                 .context("no process in spec")?
-                .no_new_privileges = no_new_privs;
+                .no_new_privileges = no_new_privs.into();
         }
         Ok(())
     }
@@ -251,21 +253,41 @@ impl TenantContainerBuilder {
                 .context("no process in spec")?
                 .capabilities
             {
-                spec_caps.ambient.append(&mut caps.clone());
-                spec_caps.bounding.append(&mut caps.clone());
-                spec_caps.effective.append(&mut caps.clone());
-                spec_caps.inheritable.append(&mut caps.clone());
-                spec_caps.permitted.append(&mut caps);
+                spec_caps
+                    .ambient
+                    .as_mut()
+                    .context("no ambient caps in process spec")?
+                    .append(&mut caps.clone());
+                spec_caps
+                    .bounding
+                    .as_mut()
+                    .context("no bounding caps in process spec")?
+                    .append(&mut caps.clone());
+                spec_caps
+                    .effective
+                    .as_mut()
+                    .context("no effective caps in process spec")?
+                    .append(&mut caps.clone());
+                spec_caps
+                    .inheritable
+                    .as_mut()
+                    .context("no inheritable caps in process spec")?
+                    .append(&mut caps.clone());
+                spec_caps
+                    .permitted
+                    .as_mut()
+                    .context("no permitted caps in process spec")?
+                    .append(&mut caps);
             } else {
                 spec.process
                     .as_mut()
                     .context("no process in spec")?
                     .capabilities = Some(LinuxCapabilities {
-                    ambient: caps.clone(),
-                    bounding: caps.clone(),
-                    effective: caps.clone(),
-                    inheritable: caps.clone(),
-                    permitted: caps,
+                    ambient: caps.clone().into(),
+                    bounding: caps.clone().into(),
+                    effective: caps.clone().into(),
+                    inheritable: caps.clone().into(),
+                    permitted: caps.into(),
                 })
             }
         }
@@ -287,7 +309,7 @@ impl TenantContainerBuilder {
         }
 
         let mut linux = &mut spec.linux.as_mut().context("no linux in spec")?;
-        linux.namespaces = tenant_namespaces;
+        linux.namespaces = tenant_namespaces.into();
         Ok(())
     }
 
