@@ -8,7 +8,7 @@ test_cases=("default/default.t" "linux_cgroups_devices/linux_cgroups_devices.t" 
 "linux_cgroups_cpus/linux_cgroups_cpus.t" "linux_cgroups_relative_cpus/linux_cgroups_relative_cpus.t" 
 "linux_cgroups_relative_devices/linux_cgroups_relative_devices.t" "linux_cgroups_relative_hugetlb/linux_cgroups_relative_hugetlb.t" 
 "linux_cgroups_relative_memory/linux_cgroups_relative_memory.t" "linux_cgroups_relative_network/linux_cgroups_relative_network.t" 
-"linux_cgroups_relative_pids/linux_cgroups_relative_pids.t" "create/create.t" "kill/kill.t" "delete/delete.t" "state/state.t")
+"linux_cgroups_relative_pids/linux_cgroups_relative_pids.t" "create/create.t" "kill/kill.t" "delete/delete.t" "state/state.t" "linux_sysctl/linux_sysctl.t")
 # Record the tests that runc also fails to pass below, maybe we will fix this by origin integration test, issue: https://github.com/containers/youki/issues/56
 # no_paas_test_case=("start/start.t")
 for case in "${test_cases[@]}"; do

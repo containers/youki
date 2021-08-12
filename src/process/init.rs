@@ -6,6 +6,7 @@ use nix::{
     unistd::{Gid, Uid},
 };
 use oci_spec::Spec;
+use std::collections::HashMap;
 use std::{
     env,
     os::unix::{io::AsRawFd, prelude::RawFd},
@@ -188,6 +189,10 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
         command
             .pivot_rootfs(rootfs)
             .with_context(|| format!("Failed to pivot root to {:?}", rootfs))?;
+
+        if let Some(kernel_params) = &linux.sysctl {
+            sysctl(kernel_params)?;
+        }
     }
 
     if let Some(paths) = &linux.readonly_paths {
@@ -261,6 +266,22 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     // After do_exec is called, the process is replaced with the container
     // payload through execvp, so it should never reach here.
     unreachable!();
+}
+
+fn sysctl(kernel_params: &HashMap<String, String>) -> Result<()> {
+    let sys = PathBuf::from("/proc/sys");
+    for (kernel_param, value) in kernel_params {
+        let path = sys.join(kernel_param.replace(".", "/"));
+        log::debug!(
+            "apply value {} to kernel parameter {}.",
+            value,
+            kernel_param
+        );
+        fs::write(path, value.as_bytes())
+            .with_context(|| format!("failed to set sysctl {}={}", kernel_param, value))?;
+    }
+
+    Ok(())
 }
 
 fn readonly_path(path: &str) -> Result<()> {
