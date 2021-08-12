@@ -5,9 +5,9 @@ use anyhow::{bail, Context, Result};
 use clap::Clap;
 use nix::sys::signal::Signal;
 
-use crate::cgroups;
 use crate::container::{Container, ContainerStatus};
 use crate::utils;
+use cgroups;
 use nix::sys::signal as nix_signal;
 
 #[derive(Clap, Debug)]

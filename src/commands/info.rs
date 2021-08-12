@@ -5,7 +5,7 @@ use anyhow::Result;
 use clap::Clap;
 use procfs::{CpuInfo, Meminfo};
 
-use crate::cgroups;
+use cgroups;
 
 #[derive(Clap, Debug)]
 pub struct Info {}

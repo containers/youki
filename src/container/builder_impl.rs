@@ -1,10 +1,12 @@
 use anyhow::{Context, Result};
 use nix::sched::CloneFlags;
+
+use cgroups;
+
 use oci_spec::Spec;
 use std::{fs, os::unix::prelude::RawFd, path::PathBuf};
 
 use crate::{
-    cgroups,
     namespaces::Namespaces,
     process::{child, fork, init, parent},
     rootless::Rootless,
