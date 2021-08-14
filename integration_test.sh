@@ -29,12 +29,12 @@ test_cases=(
   "prestart_fail/prestart_fail.t"
   "poststart_fail/poststart_fail.t"
   "poststop/poststop.t"
+  "hooks_stdin/hooks_stdin.t"
 )
 
 # Record the tests that runc also fails to pass below, maybe we will fix this by origin integration test, issue: https://github.com/containers/youki/issues/56
 # no_paas_test_case=(
 #   "start/start.t" 
-#   "hooks_stdin/hooks_stdin.t"
 # )
 for case in "${test_cases[@]}"; do
   echo "Running $case"
