@@ -50,7 +50,8 @@ impl Start {
 
         let mut notify_socket = NotifySocket::new(&container.root.join(NOTIFY_FILE));
         notify_socket.notify_container_start()?;
-        container.update_status(ContainerStatus::Running).save()?;
+        let container = container.update_status(ContainerStatus::Running);
+        container.save()?;
 
         // Run post start hooks. It runs after the container process is started.
         // It is called in the Runtime Namespace.
