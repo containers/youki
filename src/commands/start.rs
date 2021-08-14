@@ -36,6 +36,17 @@ impl Start {
             bail!(err_msg);
         }
 
+
+        let spec_path = container.root.join("config.json");
+        let spec = oci_spec::Spec::load(spec_path).context("failed to load spec")?;
+        if let Some(hooks) = spec.hooks.as_ref() {
+            // While prestart is marked as deprecated in the OCI spec, the docker and integration test still
+            // uses it.
+            #[allow(deprecated)]
+            hooks::run_hooks(hooks.prestart.as_ref(), Some(&container))
+                .with_context(|| "Failed to run pre start hooks")?;
+        }
+
         unistd::chdir(container.root.as_os_str())?;
 
         let mut notify_socket = NotifySocket::new(&container.root.join(NOTIFY_FILE));
@@ -44,8 +55,6 @@ impl Start {
 
         // Run post start hooks. It runs after the container process is started.
         // It is called in the Runtime Namespace.
-        let spec_path = container.root.join("config.json");
-        let spec = oci_spec::Spec::load(spec_path).context("failed to load spec")?;
         if let Some(hooks) = spec.hooks.as_ref() {
             hooks::run_hooks(hooks.poststart.as_ref(), Some(&container))
                 .with_context(|| "Failed to run post start hooks")?;
