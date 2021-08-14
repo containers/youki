@@ -44,7 +44,8 @@ impl InitContainerBuilder {
 
         let container_state = self
             .create_container_state(&container_dir)?
-            .set_systemd(self.use_systemd);
+            .set_systemd(self.use_systemd)
+            .set_annotations(spec.annotations.clone());
 
         unistd::chdir(&*container_dir)?;
         let notify_path = container_dir.join(NOTIFY_FILE);

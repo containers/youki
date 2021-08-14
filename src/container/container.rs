@@ -1,6 +1,7 @@
 use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::collections::HashMap;
 
 use anyhow::Result;
 use chrono::DateTime;
@@ -159,6 +160,11 @@ impl Container {
 
     pub fn set_systemd(mut self, should_use: bool) -> Self {
         self.state.use_systemd = Some(should_use);
+        self
+    }
+
+    pub fn set_annotations(mut self, annotations: Option<HashMap<String, String>>) -> Self {
+        self.state.annotations = annotations;
         self
     }
 

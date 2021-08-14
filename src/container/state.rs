@@ -86,7 +86,8 @@ pub struct State {
     // Bundle is the path to the container's bundle directory.
     pub bundle: String,
     // Annotations are key values associated with the container.
-    pub annotations: HashMap<String, String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub annotations: Option<HashMap<String, String>>,
     // Creation time of the container
     #[serde(skip_serializing_if = "Option::is_none")]
     pub created: Option<DateTime<Utc>>,
@@ -112,7 +113,7 @@ impl State {
             status,
             pid,
             bundle: bundle.to_string(),
-            annotations: HashMap::default(),
+            annotations: Some(HashMap::default()),
             created: None,
             creator: None,
             use_systemd: None,
