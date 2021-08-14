@@ -7,6 +7,7 @@ use oci_spec::Spec;
 use std::{fs, os::unix::prelude::RawFd, path::PathBuf};
 
 use crate::{
+    hooks,
     namespaces::Namespaces,
     process::{child, fork, init, parent},
     rootless::Rootless,

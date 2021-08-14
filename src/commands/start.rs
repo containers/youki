@@ -36,7 +36,6 @@ impl Start {
             bail!(err_msg);
         }
 
-
         let spec_path = container.root.join("config.json");
         let spec = oci_spec::Spec::load(spec_path).context("failed to load spec")?;
         if let Some(hooks) = spec.hooks.as_ref() {

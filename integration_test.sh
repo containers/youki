@@ -25,14 +25,17 @@ test_cases=(
   "linux_sysctl/linux_sysctl.t"
   "hooks/hooks.t"
   "prestart/prestart.t"
-  "prestart_fail/prestart_fail.t"
   "poststart/poststart.t"
+  "prestart_fail/prestart_fail.t"
   "poststart_fail/poststart_fail.t"
   "poststop/poststop.t"
-  "hooks_stdin/hooks_stdin.t"
 )
+
 # Record the tests that runc also fails to pass below, maybe we will fix this by origin integration test, issue: https://github.com/containers/youki/issues/56
-# no_paas_test_case=("start/start.t")
+# no_paas_test_case=(
+#   "start/start.t" 
+#   "hooks_stdin/hooks_stdin.t"
+# )
 for case in "${test_cases[@]}"; do
   echo "Running $case"
   if [ 0 -ne $(sudo RUST_BACKTRACE=1 YOUKI_LOG_LEVEL=debug RUNTIME=${RUNTIME} ${ROOT}/integration_test/src/github.com/opencontainers/runtime-tools/validation/$case | grep "not ok" | wc -l) ]; then

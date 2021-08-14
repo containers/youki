@@ -1,7 +1,6 @@
 use anyhow::{bail, Context, Result};
 use nix::mount::mount as nix_mount;
 use nix::mount::MsFlags;
-use crossbeam_channel::RecvTimeoutError;
 use nix::{
     fcntl, sched,
     sys::statfs,
@@ -14,11 +13,6 @@ use std::{
     os::unix::{io::AsRawFd, prelude::RawFd},
 };
 use std::{fs, io::Write, path::Path, path::PathBuf};
-use std::{
-    collections::HashMap, 
-    process, thread, time,
-    fmt,
-};
 
 use crate::{
     capabilities,
@@ -130,7 +124,6 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     let proc = spec.process.as_ref().context("no process in spec")?;
     let mut envs: Vec<String> = proc.env.as_ref().unwrap_or(&vec![]).clone();
     let rootfs = &args.rootfs;
-    let mut envs: Vec<String> = proc.env.clone();
     let hooks = spec.hooks.as_ref();
     let container = args.container.as_ref();
     let mut child = args.child;
@@ -292,9 +285,9 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     }
 
     if let Some(args) = proc.args.as_ref() {
-        utils::do_exec(&args[0], args, &envs)?;
+        utils::do_exec(&args[0], args)?;
     } else {
-        log::warn!("The command to be executed isn't set")
+        bail!("The command to be executed isn't set")
     }
 
     // After do_exec is called, the process is replaced with the container
