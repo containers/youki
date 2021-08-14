@@ -1,16 +1,19 @@
 use std::path::Path;
 
 use anyhow::Result;
+use async_trait::async_trait;
 use oci_spec::LinuxResources;
+use rio::Rio;
 
 use super::Controller;
 
 pub struct CpuAcct {}
 
+#[async_trait]
 impl Controller for CpuAcct {
     type Resource = ();
 
-    fn apply(_linux_resources: &LinuxResources, _cgroup_path: &Path) -> Result<()> {
+    async fn apply(_ring: &Rio, _linux_resources: &LinuxResources, _cgroup_path: &Path) -> Result<()> {
         Ok(())
     }
 

@@ -4,7 +4,10 @@ use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::bail;
 use anyhow::Result;
+use futures::executor::block_on;
+use futures::future::try_join_all;
 use nix::unistd::Pid;
+use rio::Rio;
 
 use procfs::process::Process;
 
@@ -22,6 +25,7 @@ use crate::{cgroups::common::CgroupManager, utils::PathBufExt};
 use oci_spec::LinuxResources;
 pub struct Manager {
     subsystems: HashMap<CtrlType, PathBuf>,
+    ring: Rio,
 }
 
 impl Manager {
@@ -36,7 +40,10 @@ impl Manager {
             }
         }
 
-        Ok(Manager { subsystems })
+        Ok(Manager {
+            subsystems,
+            ring: rio::new()?,
+        })
     }
 
     fn get_subsystem_path(cgroup_path: &Path, subsystem: &CtrlType) -> Result<PathBuf> {
@@ -120,23 +127,41 @@ impl CgroupManager for Manager {
     }
 
     fn apply(&self, linux_resources: &LinuxResources) -> Result<()> {
-        for subsys in self.get_required_controllers(linux_resources)? {
-            match subsys.0 {
-                CtrlType::Cpu => Cpu::apply(linux_resources, &subsys.1)?,
-                CtrlType::CpuAcct => CpuAcct::apply(linux_resources, &subsys.1)?,
-                CtrlType::CpuSet => CpuSet::apply(linux_resources, &subsys.1)?,
-                CtrlType::Devices => Devices::apply(linux_resources, &subsys.1)?,
-                CtrlType::HugeTlb => Hugetlb::apply(linux_resources, &subsys.1)?,
-                CtrlType::Memory => Memory::apply(linux_resources, &subsys.1)?,
-                CtrlType::Pids => Pids::apply(linux_resources, &subsys.1)?,
-                CtrlType::Blkio => Blkio::apply(linux_resources, &subsys.1)?,
-                CtrlType::NetworkPriority => NetworkPriority::apply(linux_resources, &subsys.1)?,
-                CtrlType::NetworkClassifier => {
-                    NetworkClassifier::apply(linux_resources, &subsys.1)?
+        // NOTE: A general idea of what's happening here is that we're going to call all of the
+        // subsystems that are available and need to run. Their `apply` method is `async` and
+        // therefore will return a `Future<Result<()>>`. We accumulate these futures into a Vector
+        // these Futures should be blocked on the first `awaitable` until they are passed to the
+        // async runtime and joined. This means that each Controller is running concurrently with
+        // the next controller, and therefore each controller has the ability to complete IO
+        // operations in whatever order it finds suitable. This should allow each contorller to be
+        // configured concurrently without blocking another controller.
+
+        // accumulate all of the Futures to run for each available subsystem
+        let tasks: Vec<_> = self
+            .get_required_controllers(linux_resources)?
+            .iter()
+            .map(|subsys| match subsys.0 {
+                CtrlType::Cpu => Cpu::apply(&self.ring, linux_resources, &subsys.1),
+                CtrlType::CpuAcct => CpuAcct::apply(&self.ring, linux_resources, &subsys.1),
+                CtrlType::CpuSet => CpuSet::apply(&self.ring, linux_resources, &subsys.1),
+                CtrlType::Devices => Devices::apply(&self.ring, linux_resources, &subsys.1),
+                CtrlType::HugeTlb => Hugetlb::apply(&self.ring, linux_resources, &subsys.1),
+                CtrlType::Memory => Memory::apply(&self.ring, linux_resources, &subsys.1),
+                CtrlType::Pids => Pids::apply(&self.ring, linux_resources, &subsys.1),
+                CtrlType::Blkio => Blkio::apply(&self.ring, linux_resources, &subsys.1),
+                CtrlType::NetworkPriority => {
+                    NetworkPriority::apply(&self.ring, linux_resources, &subsys.1)
                 }
-                CtrlType::Freezer => Freezer::apply(linux_resources, &subsys.1)?,
-            }
-        }
+                CtrlType::NetworkClassifier => {
+                    NetworkClassifier::apply(&self.ring, linux_resources, &subsys.1)
+                }
+                CtrlType::Freezer => Freezer::apply(&self.ring, linux_resources, &subsys.1),
+            })
+            .collect();
+
+        // This blocks and runs all Futures concurrently until completion or until an error is encountered.
+        // This will only return the first error encountered then cancel all other Futures.
+        block_on(try_join_all(tasks))?;
 
         Ok(())
     }

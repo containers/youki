@@ -14,6 +14,9 @@ pub trait Controller {
 
     /// Adds a new task specified by its pid to the cgroup
     fn add_task(pid: Pid, cgroup_path: &Path) -> Result<()> {
+        // NOTE: it might be worth making this async. I'll leave it as is until I get some
+        // benchmarks finished, and then determine if there's any worthwhile performance gains
+        // to be had.
         fs::create_dir_all(cgroup_path)?;
         common::write_cgroup_file(cgroup_path.join(CGROUP_PROCS), pid)?;
         Ok(())

@@ -80,7 +80,7 @@ impl Cpu {
 
         if let Some(rt_period) = cpu.realtime_period {
             if rt_period != 0 {
-                let rt_period_file = common::open_cgroup_file(root_path.join(CGROUP_CPU_RT_PERIOD));
+                let rt_period_file = common::open_cgroup_file(root_path.join(CGROUP_CPU_RT_PERIOD))?;
                 common::async_write_cgroup_file(ring, &rt_period_file, rt_period).await?;
             }
         }

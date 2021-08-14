@@ -38,36 +38,36 @@ impl Controller for Blkio {
 
 impl Blkio {
     async fn apply(ring: &Rio, root_path: &Path, blkio: &LinuxBlockIo) -> Result<()> {
-        let trbd_file = common::open_cgroup_file(&root_path.join(CGROUP_BLKIO_THROTTLE_READ_BPS));
+        let trbd_file = common::open_cgroup_file(&root_path.join(CGROUP_BLKIO_THROTTLE_READ_BPS))?;
         for trbd in &blkio.blkio_throttle_read_bps_device {
-            common::async_write_cgroup_file(
+            common::async_write_cgroup_file_str(
                 ring,
                 &trbd_file,
                 &format!("{}:{} {}", trbd.major, trbd.minor, trbd.rate),
             ).await?;
         }
 
-        let twbd_file = common::open_cgroup_file(&root_path.join(CGROUP_BLKIO_THROTTLE_WRITE_BPS));
+        let twbd_file = common::open_cgroup_file(&root_path.join(CGROUP_BLKIO_THROTTLE_WRITE_BPS))?;
         for twbd in &blkio.blkio_throttle_write_bps_device {
-            common::async_write_cgroup_file(
+            common::async_write_cgroup_file_str(
                 ring,
                 &twbd_file,
                 &format!("{}:{} {}", twbd.major, twbd.minor, twbd.rate),
             ).await?;
         }
 
-        let trid_file = common::open_cgroup_file(&root_path.join(CGROUP_BLKIO_THROTTLE_READ_IOPS));
+        let trid_file = common::open_cgroup_file(&root_path.join(CGROUP_BLKIO_THROTTLE_READ_IOPS))?;
         for trid in &blkio.blkio_throttle_read_iops_device {
-            common::async_write_cgroup_file(
+            common::async_write_cgroup_file_str(
                 ring,
                 &trid_file,
                 &format!("{}:{} {}", trid.major, trid.minor, trid.rate),
             ).await?;
         }
 
-        let twid_file = common::open_cgroup_file(&root_path.join(CGROUP_BLKIO_THROTTLE_WRITE_IOPS));
+        let twid_file = common::open_cgroup_file(&root_path.join(CGROUP_BLKIO_THROTTLE_WRITE_IOPS))?;
         for twid in &blkio.blkio_throttle_write_iops_device {
-            common::async_write_cgroup_file(
+            common::async_write_cgroup_file_str(
                 ring,
                 &twid_file,
                 &format!("{}:{} {}", twid.major, twid.minor, twid.rate),

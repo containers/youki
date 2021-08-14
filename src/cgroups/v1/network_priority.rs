@@ -1,6 +1,8 @@
 use std::path::Path;
 
 use anyhow::Result;
+use async_trait::async_trait;
+use rio::Rio;
 
 use crate::cgroups::common;
 use crate::cgroups::v1::Controller;
@@ -8,14 +10,15 @@ use oci_spec::{LinuxNetwork, LinuxResources};
 
 pub struct NetworkPriority {}
 
+#[async_trait]
 impl Controller for NetworkPriority {
     type Resource = LinuxNetwork;
 
-    fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
+    async fn apply(ring: &Rio, linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply NetworkPriority cgroup config");
 
         if let Some(network) = Self::needs_to_handle(linux_resources) {
-            Self::apply(cgroup_root, network)?;
+            Self::apply(ring, cgroup_root, network).await?;
         }
 
         Ok(())
@@ -31,9 +34,10 @@ impl Controller for NetworkPriority {
 }
 
 impl NetworkPriority {
-    fn apply(root_path: &Path, network: &LinuxNetwork) -> Result<()> {
+    async fn apply(ring: &Rio, root_path: &Path, network: &LinuxNetwork) -> Result<()> {
         let priorities: String = network.priorities.iter().map(|p| p.to_string()).collect();
-        common::write_cgroup_file_str(root_path.join("net_prio.ifpriomap"), &priorities.trim())?;
+        let file = common::open_cgroup_file(root_path.join("net_prio.ifpriomap"))?;
+        common::async_write_cgroup_file_str(ring, &file, &priorities.trim()).await?;
 
         Ok(())
     }
@@ -42,7 +46,7 @@ impl NetworkPriority {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cgroups::test::set_fixture;
+    use crate::cgroups::test::{set_fixture, aw};
     use crate::utils::create_temp_dir;
     use oci_spec::LinuxInterfacePriority;
 
@@ -51,6 +55,8 @@ mod tests {
         let tmp = create_temp_dir("test_apply_network_priorites")
             .expect("create temp directory for test");
         set_fixture(&tmp, "net_prio.ifpriomap", "").expect("set fixture for priority map");
+        let ring = rio::new().expect("start io_uring");
+
         let priorities = vec![
             LinuxInterfacePriority {
                 name: "a".to_owned(),
@@ -67,7 +73,7 @@ mod tests {
             priorities,
         };
 
-        NetworkPriority::apply(&tmp, &network).expect("apply network priorities");
+        aw!(NetworkPriority::apply(&ring, &tmp, &network)).expect("apply network priorities");
 
         let content =
             std::fs::read_to_string(tmp.join("net_prio.ifpriomap")).expect("Read classID contents");

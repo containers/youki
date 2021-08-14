@@ -1,9 +1,11 @@
 use std::{fs, path::Path};
 
 use anyhow::{bail, Result};
+use async_trait::async_trait;
 use nix::unistd;
 use oci_spec::{LinuxCpu, LinuxResources};
 use unistd::Pid;
+use rio::Rio;
 
 use crate::cgroups::common::{self, CGROUP_PROCS};
 
@@ -14,6 +16,7 @@ const CGROUP_CPUSET_MEMS: &str = "cpuset.mems";
 
 pub struct CpuSet {}
 
+#[async_trait]
 impl Controller for CpuSet {
     type Resource = LinuxCpu;
 
@@ -27,11 +30,11 @@ impl Controller for CpuSet {
         Ok(())
     }
 
-    fn apply(linux_resources: &LinuxResources, cgroup_path: &Path) -> Result<()> {
+    async fn apply(ring: &Rio, linux_resources: &LinuxResources, cgroup_path: &Path) -> Result<()> {
         log::debug!("Apply CpuSet cgroup config");
 
         if let Some(cpuset) = Self::needs_to_handle(linux_resources) {
-            Self::apply(cgroup_path, cpuset)?;
+            Self::apply(ring, cgroup_path, cpuset).await?;
         }
 
         Ok(())
@@ -49,13 +52,15 @@ impl Controller for CpuSet {
 }
 
 impl CpuSet {
-    fn apply(cgroup_path: &Path, cpuset: &LinuxCpu) -> Result<()> {
+    async fn apply(ring: &Rio, cgroup_path: &Path, cpuset: &LinuxCpu) -> Result<()> {
         if let Some(cpus) = &cpuset.cpus {
-            common::write_cgroup_file_str(cgroup_path.join(CGROUP_CPUSET_CPUS), cpus)?;
+            let cpus_file = common::open_cgroup_file(cgroup_path.join(CGROUP_CPUSET_CPUS))?;
+            common::async_write_cgroup_file_str(ring, &cpus_file,  cpus).await?;
         }
 
         if let Some(mems) = &cpuset.mems {
-            common::write_cgroup_file_str(cgroup_path.join(CGROUP_CPUSET_MEMS), mems)?;
+            let mems_file = common::open_cgroup_file(cgroup_path.join(CGROUP_CPUSET_MEMS))?;
+            common::async_write_cgroup_file_str(ring, &mems_file, mems).await?;
         }
 
         Ok(())
@@ -92,7 +97,7 @@ mod tests {
     use std::fs;
 
     use super::*;
-    use crate::cgroups::test::{setup, LinuxCpuBuilder};
+    use crate::cgroups::test::{setup, LinuxCpuBuilder, aw};
 
     #[test]
     fn test_set_cpus() {
@@ -101,7 +106,8 @@ mod tests {
         let cpuset = LinuxCpuBuilder::new().with_cpus("1-3".to_owned()).build();
 
         // act
-        CpuSet::apply(&tmp, &cpuset).expect("apply cpuset");
+        let ring = rio::new().expect("start io_uring");
+        aw!(CpuSet::apply(&ring, &tmp, &cpuset)).expect("apply cpuset");
 
         // assert
         let content = fs::read_to_string(&cpus)
@@ -116,7 +122,8 @@ mod tests {
         let cpuset = LinuxCpuBuilder::new().with_mems("1-3".to_owned()).build();
 
         // act
-        CpuSet::apply(&tmp, &cpuset).expect("apply cpuset");
+        let ring = rio::new().expect("start io_uring");
+        aw!(CpuSet::apply(&ring, &tmp, &cpuset)).expect("apply cpuset");
 
         // assert
         let content = fs::read_to_string(&mems)

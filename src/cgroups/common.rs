@@ -4,6 +4,7 @@ use std::{
     fs,
     io::Write,
     path::{Path, PathBuf},
+    str,
 };
 
 use anyhow::{bail, Context, Result};
@@ -86,6 +87,26 @@ pub fn open_cgroup_file<P: AsRef<Path>>(path: P) -> Result<fs::File> {
         .truncate(false)
         .open(path.as_ref())
         .with_context(|| format!("failed to open {:?}", path.as_ref()))
+}
+
+#[inline]
+pub async fn async_read_cgroup_file<P: AsRef<Path>>(ring: &Rio, path: P) -> Result<String> {
+    let file = fs::OpenOptions::new()
+        .create(false)
+        .read(true)
+        .open(path)?;
+
+    let mut buffer: Vec<u8> = Vec::new();
+    ring.read_at_ordered(
+        &file,
+        &mut buffer,
+        0,
+        Ordering::Link,
+    ).await?;
+
+    let string_slice = str::from_utf8(&buffer)?;
+
+    Ok(string_slice.to_string())
 }
 
 #[inline]

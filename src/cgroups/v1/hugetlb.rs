@@ -1,21 +1,24 @@
 use std::path::Path;
 
 use anyhow::{bail, Result};
+use async_trait::async_trait;
+use rio::Rio;
 
 use crate::cgroups::{common, v1::Controller};
 use oci_spec::{LinuxHugepageLimit, LinuxResources};
 
 pub struct Hugetlb {}
 
+#[async_trait]
 impl Controller for Hugetlb {
     type Resource = Vec<LinuxHugepageLimit>;
 
-    fn apply(linux_resources: &LinuxResources, cgroup_root: &std::path::Path) -> Result<()> {
+    async fn apply(ring: &Rio, linux_resources: &LinuxResources, cgroup_root: &std::path::Path) -> Result<()> {
         log::debug!("Apply Hugetlb cgroup config");
 
         if let Some(hugepage_limits) = Self::needs_to_handle(linux_resources) {
             for hugetlb in hugepage_limits {
-                Self::apply(cgroup_root, hugetlb)?
+                Self::apply(ring, cgroup_root, hugetlb).await?
             }
         }
 
@@ -32,7 +35,7 @@ impl Controller for Hugetlb {
 }
 
 impl Hugetlb {
-    fn apply(root_path: &Path, hugetlb: &LinuxHugepageLimit) -> Result<()> {
+    async fn apply(ring: &Rio, root_path: &Path, hugetlb: &LinuxHugepageLimit) -> Result<()> {
         let page_size: String = hugetlb
             .page_size
             .chars()
@@ -43,10 +46,9 @@ impl Hugetlb {
             bail!("page size must be in the format of 2^(integer)");
         }
 
-        common::write_cgroup_file(
-            root_path.join(format!("hugetlb.{}.limit_in_bytes", hugetlb.page_size)),
-            hugetlb.limit,
-        )?;
+        let file = common::open_cgroup_file(root_path.join(format!("hugetlb.{}.limit_in_bytes", hugetlb.page_size)))?;
+        common::async_write_cgroup_file(ring, &file, hugetlb.limit).await?;
+
         Ok(())
     }
 
@@ -58,7 +60,7 @@ impl Hugetlb {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cgroups::test::set_fixture;
+    use crate::cgroups::test::{set_fixture, aw};
     use crate::utils::create_temp_dir;
     use oci_spec::LinuxHugepageLimit;
     use std::fs::read_to_string;
@@ -73,7 +75,8 @@ mod tests {
             page_size: "2MB".to_owned(),
             limit: 16384,
         };
-        Hugetlb::apply(&tmp, &hugetlb).expect("apply hugetlb");
+        let ring = rio::new().expect("start io_uring");
+        aw!(Hugetlb::apply(&ring, &tmp, &hugetlb)).expect("apply hugetlb");
         let content = read_to_string(tmp.join(page_file_name)).expect("Read hugetlb file content");
         assert_eq!(hugetlb.limit.to_string(), content);
     }
@@ -88,7 +91,8 @@ mod tests {
             limit: 16384,
         };
 
-        let result = Hugetlb::apply(&tmp, &hugetlb);
+        let ring = rio::new().expect("start io_uring");
+        let result = aw!(Hugetlb::apply(&ring, &tmp, &hugetlb));
         assert!(
             result.is_err(),
             "page size that is not a power of two should be an error"
@@ -101,7 +105,8 @@ mod tests {
             let tmp = create_temp_dir("property_test_set_hugetlb").expect("create temp directory for test");
             set_fixture(&tmp, &page_file_name, "0").expect("Set fixture for page size");
 
-            let result = Hugetlb::apply(&tmp, &hugetlb);
+            let ring = rio::new().expect("start io_uring");
+            let result = aw!(Hugetlb::apply(&ring, &tmp, &hugetlb));
 
             let page_size: String = hugetlb
             .page_size
