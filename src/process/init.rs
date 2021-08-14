@@ -287,7 +287,7 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     if let Some(args) = proc.args.as_ref() {
         utils::do_exec(&args[0], args)?;
     } else {
-        bail!("The command to be executed isn't set")
+        bail!("On non-Windows, at least one process arg entry is required.")
     }
 
     // After do_exec is called, the process is replaced with the container
