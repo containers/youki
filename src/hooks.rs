@@ -24,42 +24,24 @@ pub fn run_hooks(hooks: Option<&Vec<Hook>>, container: Option<&Container>) -> Re
 
     if let Some(hooks) = hooks {
         for hook in hooks {
-            log::debug!("run_hooks: running {:?}", hook);
-            let envs: HashMap<String, String> = if let Some(env) = hook.env.as_ref() {
-                utils::parse_env(env)
+            let mut hook_command = process::Command::new(&hook.path);
+            if let Some((arg0, args)) = hook.args.as_ref().map(|a| a.split_first()).flatten() {
+                log::debug!("run_hooks arg0: {:?}, args: {:?}", arg0, args);
+                hook_command.arg0(arg0).args(args)
             } else {
-                HashMap::new()
+                hook_command.arg0(&hook.path.as_path().display().to_string())
             };
-            log::debug!("run_hooks envs: {:?}", envs);
 
-            // The hooks.arg follows the same semantics as argv, so the argv[0]
-            // is the path of the executable. By default, this is the same as
-            // the path of the executable being called, but it can be set to
-            // something different. Therefore, we have to take care of these
-            // special cases here. In addition, Rustlang process::Command
-            // doesn't provide us an API to pass argv directly. Instead, we have
-            // to seperate arg0 and the rest of the args.
-            let (arg0, args) = if let Some(mut args) = hook.args.clone() {
-                let arg0 = args.remove(0);
-                (arg0, args)
-            } else {
-                (hook.path.as_path().display().to_string(), vec![])
-            };
-            log::debug!("run_hooks args: {:?}", args);
-
-            let mut hook_command = process::Command::new(&hook.path)
-                .args(&args)
-                .arg0(&arg0)
+            let mut hook_process = hook_command
                 .env_clear()
                 .envs(envs)
                 .stdin(process::Stdio::piped())
                 .spawn()
                 .with_context(|| "Failed to execute hook")?;
-            let hook_command_pid = Pid::from_raw(hook_command.id() as i32);
+            let hook_process_pid = Pid::from_raw(hook_process.id() as i32);
             // Based on the OCI spec, we need to pipe the container state into
             // the hook command through stdin.
-            if hook_command.stdin.is_some() {
-                let stdin = hook_command.stdin.take().unwrap();
+            if let Some(stdin) = hook_process.stdin.as_ref() {
                 serde_json::to_writer(stdin, state)?;
             }
 
@@ -76,7 +58,7 @@ pub fn run_hooks(hooks: Option<&Vec<Hook>>, container: Option<&Container>) -> Re
                 // timeout, we have to kill the process and clean up properly.
                 let (s, r) = crossbeam_channel::unbounded();
                 thread::spawn(move || {
-                    let res = hook_command.wait();
+                    let res = hook_process.wait();
                     let _ = s.send(res);
                 });
                 match r.recv_timeout(time::Duration::from_secs(timeout_sec as u64)) {
@@ -84,7 +66,7 @@ pub fn run_hooks(hooks: Option<&Vec<Hook>>, container: Option<&Container>) -> Re
                     Err(crossbeam_channel::RecvTimeoutError::Timeout) => {
                         // Kill the process. There is no need to further clean
                         // up because we will be error out.
-                        let _ = signal::kill(hook_command_pid, signal::Signal::SIGKILL);
+                        let _ = signal::kill(hook_process_pid, signal::Signal::SIGKILL);
                         return Err(HookTimeoutError.into());
                     }
                     Err(_) => {
@@ -92,7 +74,7 @@ pub fn run_hooks(hooks: Option<&Vec<Hook>>, container: Option<&Container>) -> Re
                     }
                 }
             } else {
-                hook_command.wait()
+                hook_process.wait()
             };
 
             match res {
