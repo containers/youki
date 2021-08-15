@@ -32,6 +32,13 @@ pub fn run_hooks(hooks: Option<&Vec<Hook>>, container: Option<&Container>) -> Re
                 hook_command.arg0(&hook.path.as_path().display().to_string())
             };
 
+            let envs: HashMap<String, String> = if let Some(env) = hook.env.as_ref() {
+                utils::parse_env(env)
+            } else {
+                HashMap::new()
+            };
+            log::debug!("run_hooks envs: {:?}", envs);
+
             let mut hook_process = hook_command
                 .env_clear()
                 .envs(envs)
@@ -129,7 +136,7 @@ mod test {
             // Use `printenv` to make sure the environment is set correctly.
             let default_container: Container = Default::default();
             let hook = Hook {
-                path: PathBuf::from("/bin/printenv"),
+                path: PathBuf::from("/usr/bin/printenv"),
                 args: Some(vec!["printenv".to_string(), "key".to_string()]),
                 env: Some(vec!["key=value".to_string()]),
                 timeout: None,
