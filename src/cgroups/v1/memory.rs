@@ -171,13 +171,12 @@ impl Memory {
         }
     }
 
-    async fn set_swap(ring: &Rio, swap: i64, cgroup_root: &Path) -> Result<()> {
+    async fn set_swap(ring: &Rio, swap: i64, swap_limit_file: &File) -> Result<()> {
         if swap == 0 {
             return Ok(());
         }
 
-        let swap_limit_file = common::open_cgroup_file(cgroup_root.join(CGROUP_MEMORY_SWAP_LIMIT))?;
-        common::async_write_cgroup_file(ring, &swap_limit_file, swap).await?;
+        common::async_write_cgroup_file(ring, swap_limit_file, swap).await?;
         Ok(())
     }
 
@@ -187,6 +186,7 @@ impl Memory {
         swap: i64,
         is_updated: bool,
         memory_limit_file: &File,
+        swap_limit_file: &File,
         cgroup_root: &Path,
     ) -> Result<()> {
         // According to runc we need to change the write sequence of
@@ -195,11 +195,11 @@ impl Memory {
         // see:
         // https://github.com/opencontainers/runc/blob/3f6594675675d4e88901c782462f56497260b1d2/libcontainer/cgroups/fs/memory.go#L89
         if is_updated {
-            Self::set_swap(ring, swap, cgroup_root).await?;
+            Self::set_swap(ring, swap, swap_limit_file).await?;
             Self::set_memory(ring, limit, memory_limit_file, cgroup_root).await?;
         }
         Self::set_memory(ring, limit, memory_limit_file, cgroup_root).await?;
-        Self::set_swap(ring, swap, cgroup_root).await?;
+        Self::set_swap(ring, swap, swap_limit_file).await?;
         Ok(())
     }
 
@@ -210,27 +210,28 @@ impl Memory {
             .write(true)
             .truncate(true)
             .open(path)?;
+        let swap_limit_file = common::open_cgroup_file(cgroup_root.join(CGROUP_MEMORY_SWAP_LIMIT))?;
         match resource.limit {
             Some(limit) => {
                 let current_limit = Self::get_memory_limit(ring, &memory_limit_file).await?;
                 match resource.swap {
                     Some(swap) => {
                         let is_updated = swap == -1 || current_limit < swap;
-                        Self::set_memory_and_swap(ring, limit, swap, is_updated, &memory_limit_file, cgroup_root).await?;
+                        Self::set_memory_and_swap(ring, limit, swap, is_updated, &memory_limit_file, &swap_limit_file, cgroup_root).await?;
                     }
                     None => {
                         if limit == -1 {
-                            Self::set_memory_and_swap(ring, limit, -1, true, &memory_limit_file, cgroup_root).await?;
+                            Self::set_memory_and_swap(ring, limit, -1, true, &memory_limit_file, &swap_limit_file, cgroup_root).await?;
                         } else {
                             let is_updated = current_limit < 0;
-                            Self::set_memory_and_swap(ring, limit, 0, is_updated, &memory_limit_file, cgroup_root).await?;
+                            Self::set_memory_and_swap(ring, limit, 0, is_updated, &memory_limit_file, &swap_limit_file, cgroup_root).await?;
                         }
                     }
                 }
             }
             None => match resource.swap {
-                Some(swap) => Self::set_memory_and_swap(ring, 0, swap, false, &memory_limit_file, cgroup_root).await?,
-                None => Self::set_memory_and_swap(ring, 0, 0, false, &memory_limit_file, cgroup_root).await?,
+                Some(swap) => Self::set_memory_and_swap(ring, 0, swap, false, &memory_limit_file, &swap_limit_file, cgroup_root).await?,
+                None => Self::set_memory_and_swap(ring, 0, 0, false, &memory_limit_file, &swap_limit_file, cgroup_root).await?,
             },
         }
         Ok(())
@@ -281,7 +282,9 @@ mod tests {
         let tmp = create_temp_dir("test_set_swap").expect("create temp directory for test");
         set_fixture(&tmp, CGROUP_MEMORY_SWAP_LIMIT, "0").expect("Set fixure for swap limit");
         let ring = rio::new().expect("start io_uring");
-        aw!(Memory::set_swap(&ring, limit, &tmp)).expect("Set swap limit");
+        let swap_limit_file = common::open_cgroup_file(tmp.join(CGROUP_MEMORY_SWAP_LIMIT)).expect("open swap limit");
+
+        aw!(Memory::set_swap(&ring, limit, &swap_limit_file)).expect("Set swap limit");
         let content =
             std::fs::read_to_string(tmp.join(CGROUP_MEMORY_SWAP_LIMIT)).expect("Read to string");
         assert_eq!(limit.to_string(), content)

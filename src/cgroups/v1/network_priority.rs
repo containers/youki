@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::fs::File;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -16,9 +17,10 @@ impl Controller for NetworkPriority {
 
     async fn apply(ring: &Rio, linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply NetworkPriority cgroup config");
+        let file = common::open_cgroup_file(cgroup_root.join("net_prio.ifpriomap"))?;
 
         if let Some(network) = Self::needs_to_handle(linux_resources) {
-            Self::apply(ring, cgroup_root, network).await?;
+            Self::apply(ring, &file, network).await?;
         }
 
         Ok(())
@@ -34,9 +36,8 @@ impl Controller for NetworkPriority {
 }
 
 impl NetworkPriority {
-    async fn apply(ring: &Rio, root_path: &Path, network: &LinuxNetwork) -> Result<()> {
+    async fn apply(ring: &Rio, file: &File, network: &LinuxNetwork) -> Result<()> {
         let priorities: String = network.priorities.iter().map(|p| p.to_string()).collect();
-        let file = common::open_cgroup_file(root_path.join("net_prio.ifpriomap"))?;
         common::async_write_cgroup_file_str(ring, &file, &priorities.trim()).await?;
 
         Ok(())
@@ -73,10 +74,12 @@ mod tests {
             priorities,
         };
 
-        aw!(NetworkPriority::apply(&ring, &tmp, &network)).expect("apply network priorities");
+        let file = common::open_cgroup_file(tmp.join("net_prio.ifpriomap")).expect("open net prio file");
+        aw!(NetworkPriority::apply(&ring, &file, &network)).expect("apply network priorities");
 
         let content =
             std::fs::read_to_string(tmp.join("net_prio.ifpriomap")).expect("Read classID contents");
+        println!("File content: {}", content);
         assert_eq!(priorities_string.trim(), content);
     }
 }

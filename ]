@@ -120,7 +120,7 @@ pub async fn async_write_cgroup_file_str(ring: &Rio, file: &fs::File, data: &str
         Ordering::Link,
     ).await?;
 
-    // ring.fdatasync_ordered(file, Ordering::Link).await?;
+    ring.fdatasync_ordered(file, Ordering::Link).await?;
 
     Ok(())
 }
