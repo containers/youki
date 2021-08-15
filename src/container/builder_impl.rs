@@ -7,6 +7,7 @@ use oci_spec::Spec;
 use std::{fs, os::unix::prelude::RawFd, path::PathBuf};
 
 use crate::{
+    hooks,
     namespaces::Namespaces,
     process::{child, fork, init, parent},
     rootless::Rootless,
@@ -62,6 +63,12 @@ impl<'a> ContainerBuilderImpl<'a> {
         let (mut parent, parent_channel) = parent::ParentProcess::new(&self.rootless)?;
         let child = child::ChildProcess::new(parent_channel)?;
 
+        if self.init {
+            if let Some(hooks) = self.spec.hooks.as_ref() {
+                hooks::run_hooks(hooks.create_runtime.as_ref(), self.container.as_ref())?
+            }
+        }
+
         // This init_args will be passed to the container init process,
         // therefore we will have to move all the variable by value. Since self
         // is a shared reference, we have to clone these variables here.
@@ -74,6 +81,7 @@ impl<'a> ContainerBuilderImpl<'a> {
             is_rootless: self.rootless.is_some(),
             notify_path: self.notify_path.clone(),
             preserve_fds: self.preserve_fds,
+            container: self.container.clone(),
             child,
         };
 

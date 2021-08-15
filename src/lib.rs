@@ -2,6 +2,7 @@ pub mod capabilities;
 pub mod commands;
 pub mod container;
 pub mod dbus;
+pub mod hooks;
 pub mod logger;
 pub mod namespaces;
 pub mod notify_socket;

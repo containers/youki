@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -15,12 +16,21 @@ use crate::syscall::syscall::create_syscall;
 use crate::container::{ContainerStatus, State};
 
 /// Structure representing the container data
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Container {
     // State of the container
     pub state: State,
     // indicated the directory for the root path in the container
     pub root: PathBuf,
+}
+
+impl Default for Container {
+    fn default() -> Self {
+        Self {
+            state: State::default(),
+            root: PathBuf::from("/run/youki"),
+        }
+    }
 }
 
 impl Container {
@@ -150,6 +160,11 @@ impl Container {
 
     pub fn set_systemd(mut self, should_use: bool) -> Self {
         self.state.use_systemd = Some(should_use);
+        self
+    }
+
+    pub fn set_annotations(mut self, annotations: Option<HashMap<String, String>>) -> Self {
+        self.state.annotations = annotations;
         self
     }
 

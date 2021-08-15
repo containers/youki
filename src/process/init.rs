@@ -2,7 +2,8 @@ use anyhow::{bail, Context, Result};
 use nix::mount::mount as nix_mount;
 use nix::mount::MsFlags;
 use nix::{
-    fcntl, sched, sys,
+    fcntl, sched,
+    sys::statfs,
     unistd::{Gid, Uid},
 };
 use oci_spec::Spec;
@@ -15,6 +16,8 @@ use std::{fs, io::Write, path::Path, path::PathBuf};
 
 use crate::{
     capabilities,
+    container::Container,
+    hooks,
     namespaces::Namespaces,
     notify_socket::NotifyListener,
     process::child,
@@ -27,9 +30,9 @@ use crate::{
 // /proc path is mounted over. Ref: CVE-2019-16884
 fn ensure_procfs(path: &Path) -> Result<()> {
     let procfs_fd = fs::File::open(path)?;
-    let fstat_info = sys::statfs::fstatfs(&procfs_fd.as_raw_fd())?;
+    let fstat_info = statfs::fstatfs(&procfs_fd.as_raw_fd())?;
 
-    if fstat_info.filesystem_type() != sys::statfs::PROC_SUPER_MAGIC {
+    if fstat_info.filesystem_type() != statfs::PROC_SUPER_MAGIC {
         bail!(format!("{:?} is not on the procfs", path));
     }
 
@@ -105,6 +108,8 @@ pub struct ContainerInitArgs {
     pub notify_path: PathBuf,
     /// File descriptos preserved/passed to the container init process.
     pub preserve_fds: i32,
+    /// Container state
+    pub container: Option<Container>,
     /// Pipe used to communicate with the child process
     pub child: child::ChildProcess,
 }
@@ -113,13 +118,14 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     let command = &args.syscall;
     let spec = &args.spec;
     let linux = spec.linux.as_ref().context("no linux in spec")?;
-
     // need to create the notify socket before we pivot root, since the unix
     // domain socket used here is outside of the rootfs of container
     let mut notify_socket: NotifyListener = NotifyListener::new(&args.notify_path)?;
     let proc = spec.process.as_ref().context("no process in spec")?;
     let mut envs: Vec<String> = proc.env.as_ref().unwrap_or(&vec![]).clone();
     let rootfs = &args.rootfs;
+    let hooks = spec.hooks.as_ref();
+    let container = args.container.as_ref();
     let mut child = args.child;
 
     // if Out-of-memory score adjustment is set in specification.  set the score
@@ -182,6 +188,11 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     }
 
     if args.init {
+        // create_container hook needs to be called after the namespace setup, but
+        // before pivot_root is called. This runs in the container namespaces.
+        if let Some(hooks) = hooks {
+            hooks::run_hooks(hooks.create_container.as_ref(), container)?
+        }
         rootfs::prepare_rootfs(spec, rootfs, bind_service)
             .with_context(|| "Failed to prepare rootfs")?;
 
@@ -249,7 +260,15 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     };
 
     // clean up and handle perserved fds.
-    cleanup_file_descriptors(preserve_fds).with_context(|| "Failed to clean up extra fds")?;
+    if args.init {
+        cleanup_file_descriptors(preserve_fds).with_context(|| "Failed to clean up extra fds")?;
+    }
+
+    // Reset the process env based on oci spec.
+    env::vars().for_each(|(key, _value)| std::env::remove_var(key));
+    utils::parse_env(&envs)
+        .iter()
+        .for_each(|(key, value)| env::set_var(key, value));
 
     // notify parents that the init process is ready to execute the payload.
     child.notify_parent()?;
@@ -257,10 +276,18 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     // listing on the notify socket for container start command
     notify_socket.wait_for_container_start()?;
 
+    // create_container hook needs to be called after the namespace setup, but
+    // before pivot_root is called. This runs in the container namespaces.
+    if args.init {
+        if let Some(hooks) = hooks {
+            hooks::run_hooks(hooks.start_container.as_ref(), container)?
+        }
+    }
+
     if let Some(args) = proc.args.as_ref() {
-        utils::do_exec(&args[0], args, &envs)?;
+        utils::do_exec(&args[0], args)?;
     } else {
-        log::warn!("The command to be executed isn't set")
+        bail!("On non-Windows, at least one process arg entry is required.")
     }
 
     // After do_exec is called, the process is replaced with the container

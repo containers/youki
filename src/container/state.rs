@@ -24,6 +24,11 @@ pub enum ContainerStatus {
     // The container process has paused
     Paused,
 }
+impl Default for ContainerStatus {
+    fn default() -> Self {
+        ContainerStatus::Creating
+    }
+}
 
 impl ContainerStatus {
     pub fn can_start(&self) -> bool {
@@ -66,7 +71,7 @@ impl Display for ContainerStatus {
 }
 
 /// Stores the state information of the container
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct State {
     // Version is the version of the specification that is supported.
@@ -81,7 +86,8 @@ pub struct State {
     // Bundle is the path to the container's bundle directory.
     pub bundle: String,
     // Annotations are key values associated with the container.
-    pub annotations: HashMap<String, String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub annotations: Option<HashMap<String, String>>,
     // Creation time of the container
     #[serde(skip_serializing_if = "Option::is_none")]
     pub created: Option<DateTime<Utc>>,
@@ -107,7 +113,7 @@ impl State {
             status,
             pid,
             bundle: bundle.to_string(),
-            annotations: HashMap::default(),
+            annotations: Some(HashMap::default()),
             created: None,
             creator: None,
             use_systemd: None,
