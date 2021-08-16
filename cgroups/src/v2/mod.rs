@@ -9,6 +9,6 @@ pub mod manager;
 mod memory;
 mod pids;
 pub mod systemd_manager;
-pub mod util;
 mod unified;
+pub mod util;
 pub use systemd_manager::SystemDCGroupManager;
