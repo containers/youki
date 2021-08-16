@@ -15,7 +15,8 @@ impl Controller for NetworkPriority {
         log::debug!("Apply NetworkPriority cgroup config");
 
         if let Some(network) = Self::needs_to_handle(linux_resources) {
-            Self::apply(cgroup_root, network).context("failed to apply network priority resource restrictions")?;
+            Self::apply(cgroup_root, network)
+                .context("failed to apply network priority resource restrictions")?;
         }
 
         Ok(())

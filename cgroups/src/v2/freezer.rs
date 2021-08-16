@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use std::{
     fs::OpenOptions,
     io::{BufRead, BufReader, Read, Seek, SeekFrom, Write},

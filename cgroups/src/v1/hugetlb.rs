@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::Path};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 
 use crate::{
     common,
@@ -20,7 +20,8 @@ impl Controller for HugeTlb {
 
         if let Some(hugepage_limits) = Self::needs_to_handle(linux_resources) {
             for hugetlb in hugepage_limits {
-                Self::apply(cgroup_root, hugetlb).context("failed to apply hugetlb resource restrictions")?
+                Self::apply(cgroup_root, hugetlb)
+                    .context("failed to apply hugetlb resource restrictions")?
             }
         }
 
