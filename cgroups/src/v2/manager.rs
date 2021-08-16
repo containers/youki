@@ -1,18 +1,11 @@
-use std::{
-    fs::{self},
-    os::unix::fs::PermissionsExt,
-    path::{Path, PathBuf},
-};
+use std::{fs::{self}, os::unix::fs::PermissionsExt, path::{Path, PathBuf}};
 
 use anyhow::{bail, Result};
 
 use nix::unistd::Pid;
 use oci_spec::{FreezerState, LinuxResources};
 
-use super::{
-    controller::Controller, controller_type::ControllerType, cpu::Cpu, cpuset::CpuSet,
-    freezer::Freezer, hugetlb::HugeTlb, io::Io, memory::Memory, pids::Pids,
-};
+use super::{controller::Controller, controller_type::ControllerType, cpu::Cpu, cpuset::CpuSet, freezer::Freezer, hugetlb::HugeTlb, io::Io, memory::Memory, pids::Pids, unified::Unified};
 use crate::{
     common::{self, CgroupManager, PathBufExt, CGROUP_PROCS},
     stats::{Stats, StatsProvider},
@@ -133,6 +126,7 @@ impl CgroupManager for Manager {
             }
         }
 
+        Unified::apply(linux_resources, &self.full_path, self.get_available_controllers()?)?;
         Ok(())
     }
 
