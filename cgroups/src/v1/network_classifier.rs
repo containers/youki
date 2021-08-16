@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 use super::Controller;
 use crate::common;
@@ -15,7 +15,7 @@ impl Controller for NetworkClassifier {
         log::debug!("Apply NetworkClassifier cgroup config");
 
         if let Some(network) = Self::needs_to_handle(linux_resources) {
-            Self::apply(cgroup_root, network)?;
+            Self::apply(cgroup_root, network).context("failed to apply network classifier resource restrictions")?;
         }
 
         Ok(())

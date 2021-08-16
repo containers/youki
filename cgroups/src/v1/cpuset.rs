@@ -1,6 +1,6 @@
 use std::{fs, path::Path};
 
-use anyhow::{bail, Result};
+use anyhow::{Context, Result, bail};
 use nix::unistd;
 use oci_spec::{LinuxCpu, LinuxResources};
 use unistd::Pid;
@@ -31,7 +31,7 @@ impl Controller for CpuSet {
         log::debug!("Apply CpuSet cgroup config");
 
         if let Some(cpuset) = Self::needs_to_handle(linux_resources) {
-            Self::apply(cgroup_path, cpuset)?;
+            Self::apply(cgroup_path, cpuset).context("failed to apply cpuset resource restrictions")?;
         }
 
         Ok(())

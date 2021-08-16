@@ -26,7 +26,7 @@ impl Controller for Freezer {
         create_dir_all(&cgroup_root)?;
 
         if let Some(freezer_state) = Self::needs_to_handle(linux_resources) {
-            Self::apply(freezer_state, cgroup_root)?;
+            Self::apply(freezer_state, cgroup_root).context("failed to appyl freezer")?;
         }
 
         Ok(())
