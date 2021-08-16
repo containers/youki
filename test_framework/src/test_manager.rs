@@ -3,17 +3,17 @@ use crate::testable::{TestResult, TestableGroup};
 use std::collections::BTreeMap;
 
 /// This manages all test groups, and thus the tests
-pub struct TestManager<'a, T: TestableGroup> {
-    test_groups: BTreeMap<String, &'a T>,
+pub struct TestManager<'a> {
+    test_groups: BTreeMap<String, &'a dyn TestableGroup>,
 }
 
-impl<'a, T: TestableGroup> Default for TestManager<'a, T> {
+impl<'a> Default for TestManager<'a> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'a, T: TestableGroup> TestManager<'a, T> {
+impl<'a> TestManager<'a> {
     /// Create new TestManager
     pub fn new() -> Self {
         TestManager {
@@ -22,7 +22,7 @@ impl<'a, T: TestableGroup> TestManager<'a, T> {
     }
 
     /// add a test group to the test manager
-    pub fn add_test_group(&mut self, tg: &'a T) {
+    pub fn add_test_group(&mut self, tg: &'a dyn TestableGroup) {
         self.test_groups.insert(tg.get_name(), tg);
     }
 
@@ -49,7 +49,7 @@ impl<'a, T: TestableGroup> TestManager<'a, T> {
     }
 
     /// Run all tests from given group
-    fn run_test_group(&self, name: &str, tg: &'a T) {
+    fn run_test_group(&self, name: &str, tg: &'a dyn TestableGroup) {
         let results = tg.run_all();
         let mut test_vec = Vec::new();
         for (name, res) in results.iter() {
@@ -61,7 +61,7 @@ impl<'a, T: TestableGroup> TestManager<'a, T> {
     /// Run all tests from all tests group
     pub fn run_all(&self) {
         for (name, tg) in self.test_groups.iter() {
-            self.run_test_group(name, tg);
+            self.run_test_group(name, *tg);
         }
     }
 
@@ -70,7 +70,7 @@ impl<'a, T: TestableGroup> TestManager<'a, T> {
         for (test_group_name, tests) in tests.iter() {
             if let Some(tg) = self.test_groups.get(test_group_name) {
                 match tests {
-                    Option::None => self.run_test_group(test_group_name, tg),
+                    Option::None => self.run_test_group(test_group_name, *tg),
                     Option::Some(tests) => {
                         let results = tg.run_selected(tests);
                         let mut test_vec = Vec::new();

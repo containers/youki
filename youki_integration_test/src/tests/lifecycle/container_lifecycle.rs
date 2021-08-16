@@ -17,12 +17,6 @@ impl ContainerLifecycle {
             container_id: generate_uuid().to_string(),
         }
     }
-    pub fn with_container_id(project_path: &Path, container_id: &str) -> Self {
-        ContainerLifecycle {
-            project_path: project_path.to_owned(),
-            container_id: container_id.to_string(),
-        }
-    }
 
     pub fn create(&self) -> TestResult {
         create::create(&self.project_path, &self.container_id)
