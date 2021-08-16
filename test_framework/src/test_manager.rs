@@ -1,20 +1,19 @@
 ///! This exposes the main control wrapper to control the tests
-use crate::test_group::TestGroup;
-use crate::testable::TestResult;
+use crate::testable::{TestResult, TestableGroup};
 use std::collections::BTreeMap;
 
 /// This manages all test groups, and thus the tests
-pub struct TestManager {
-    test_groups: BTreeMap<String, TestGroup>,
+pub struct TestManager<'a, T: TestableGroup> {
+    test_groups: BTreeMap<String, &'a T>,
 }
 
-impl Default for TestManager {
+impl<'a, T: TestableGroup> Default for TestManager<'a, T> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl TestManager {
+impl<'a, T: TestableGroup> TestManager<'a, T> {
     /// Create new TestManager
     pub fn new() -> Self {
         TestManager {
@@ -23,7 +22,7 @@ impl TestManager {
     }
 
     /// add a test group to the test manager
-    pub fn add_test_group(&mut self, tg: TestGroup) {
+    pub fn add_test_group(&mut self, tg: &'a T) {
         self.test_groups.insert(tg.get_name(), tg);
     }
 
@@ -33,7 +32,7 @@ impl TestManager {
         println!("# Start group {}", name);
         let len = res.len();
         for (idx, (name, res)) in res.iter().enumerate() {
-            print!("{} / {} : {} : ", idx, len, name);
+            print!("{} / {} : {} : ", idx + 1, len, name);
             match res {
                 TestResult::Ok => {
                     println!("ok");
@@ -50,7 +49,7 @@ impl TestManager {
     }
 
     /// Run all tests from given group
-    fn run_test_group(&self, name: &str, tg: &TestGroup) {
+    fn run_test_group(&self, name: &str, tg: &'a T) {
         let results = tg.run_all();
         let mut test_vec = Vec::new();
         for (name, res) in results.iter() {

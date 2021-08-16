@@ -11,11 +11,4 @@ name = "test_framework"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "testanything",
 ]
-
-[[package]]
-name = "testanything"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d11c9f0b80f86baebe13b3555c1dc5e1824deae0f710b4df8277b80b707a0a84"

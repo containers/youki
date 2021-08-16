@@ -7,4 +7,4 @@ pub use conditional_test::ConditionalTest;
 pub use test::Test;
 pub use test_group::TestGroup;
 pub use test_manager::TestManager;
-pub use testable::{TestResult, Testable};
+pub use testable::{TestResult, Testable, TestableGroup};

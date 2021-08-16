@@ -1,5 +1,5 @@
 ///! Contains structure for a test group
-use crate::testable::{TestResult, Testable};
+use crate::testable::{TestResult, Testable, TestableGroup};
 use std::collections::BTreeMap;
 
 /// Stores tests belonging to a group
@@ -7,7 +7,7 @@ pub struct TestGroup {
     /// name of the test group
     name: String,
     /// tests belonging to this group
-    tests: BTreeMap<String, Box<dyn Testable>>,
+    tests: BTreeMap<String, Box<dyn Testable + 'static + Sync + Send>>,
 }
 
 impl TestGroup {
@@ -19,20 +19,21 @@ impl TestGroup {
         }
     }
 
-    /// get name of the test group
-    pub fn get_name(&self) -> String {
-        self.name.clone()
-    }
-
     /// add a test to the group
-    pub fn add(&mut self, tests: Vec<impl Testable + 'static>) {
+    pub fn add(&mut self, tests: Vec<impl Testable + 'static + Sync + Send>) {
         tests.into_iter().for_each(|t| {
             self.tests.insert(t.get_name(), Box::new(t));
         });
     }
+}
 
+impl TestableGroup for TestGroup {
+    /// get name of the test group
+    fn get_name(&self) -> String {
+        self.name.clone()
+    }
     /// run all the test from the test group
-    pub fn run_all(&self) -> Vec<(String, TestResult)> {
+    fn run_all(&self) -> Vec<(String, TestResult)> {
         self.tests
             .iter()
             .map(|(_, t)| {
@@ -46,7 +47,7 @@ impl TestGroup {
     }
 
     /// run selected test from the group
-    pub fn run_selected(&self, selected: &[&str]) -> Vec<(String, TestResult)> {
+    fn run_selected(&self, selected: &[&str]) -> Vec<(String, TestResult)> {
         self.tests
             .iter()
             .filter(|(name, _)| selected.contains(&name.as_str()))

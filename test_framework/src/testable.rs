@@ -1,6 +1,7 @@
 ///! Contains Basic setup for testing, testable trait and its result type
 use anyhow::{Error, Result};
 
+#[derive(Debug)]
 pub enum TestResult {
     /// Test was ok
     Ok,
@@ -25,4 +26,10 @@ pub trait Testable {
         true
     }
     fn run(&self) -> TestResult;
+}
+
+pub trait TestableGroup {
+    fn get_name(&self) -> String;
+    fn run_all(&self) -> Vec<(String, TestResult)>;
+    fn run_selected(&self, selected: &[&str]) -> Vec<(String, TestResult)>;
 }
