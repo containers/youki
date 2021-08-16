@@ -16,7 +16,7 @@ impl Controller for HugeTlb {
         log::debug!("Apply hugetlb cgroup v2 config");
         if let Some(hugepage_limits) = linux_resources.hugepage_limits.as_ref() {
             for hugetlb in hugepage_limits {
-                Self::apply(cgroup_root, hugetlb)?
+                Self::apply(cgroup_root, hugetlb).context("failed to apply hugetlb resource restrictions")?
             }
         }
         Ok(())

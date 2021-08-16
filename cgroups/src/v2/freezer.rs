@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{Context, Result, bail};
 use std::{
     fs::OpenOptions,
     io::{BufRead, BufReader, Read, Seek, SeekFrom, Write},
@@ -19,7 +19,7 @@ pub struct Freezer {}
 impl Controller for Freezer {
     fn apply(linux_resources: &LinuxResources, cgroup_path: &Path) -> Result<()> {
         if let Some(freezer_state) = linux_resources.freezer {
-            Self::apply(freezer_state, cgroup_path)?;
+            Self::apply(freezer_state, cgroup_path).context("failed to apply freezer")?;
         }
 
         Ok(())

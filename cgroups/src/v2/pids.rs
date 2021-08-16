@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 use crate::{
     common,
@@ -16,7 +16,7 @@ impl Controller for Pids {
     fn apply(linux_resource: &LinuxResources, cgroup_root: &std::path::Path) -> Result<()> {
         log::debug!("Apply pids cgroup v2 config");
         if let Some(pids) = &linux_resource.pids {
-            Self::apply(cgroup_root, pids)?;
+            Self::apply(cgroup_root, pids).context("failed to apply pids resource restrictions")?;
         }
         Ok(())
     }

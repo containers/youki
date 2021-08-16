@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{Context, Result, bail};
 use std::path::Path;
 
 use crate::{
@@ -22,7 +22,7 @@ pub struct Cpu {}
 impl Controller for Cpu {
     fn apply(linux_resources: &LinuxResources, path: &Path) -> Result<()> {
         if let Some(cpu) = &linux_resources.cpu {
-            Self::apply(path, cpu)?;
+            Self::apply(path, cpu).context("failed to apply cpu resource restrictions")?;
         }
 
         Ok(())

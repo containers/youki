@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Result};
+use anyhow::{Context, Result, bail};
 
 use crate::{
     common,
@@ -20,7 +20,7 @@ impl Controller for Io {
     fn apply(linux_resource: &LinuxResources, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply io cgrup v2 config");
         if let Some(io) = &linux_resource.block_io {
-            Self::apply(cgroup_root, io)?;
+            Self::apply(cgroup_root, io).context("failed to apply io resource restrictions")?;
         }
         Ok(())
     }

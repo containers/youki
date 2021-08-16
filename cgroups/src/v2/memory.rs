@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{Context, Result, bail};
 use std::path::Path;
 
 use oci_spec::{LinuxMemory, LinuxResources};
@@ -20,7 +20,7 @@ pub struct Memory {}
 impl Controller for Memory {
     fn apply(linux_resources: &LinuxResources, cgroup_path: &Path) -> Result<()> {
         if let Some(memory) = &linux_resources.memory {
-            Self::apply(cgroup_path, memory)?;
+            Self::apply(cgroup_path, memory).context("failed to apply memory resource restrictions")?;
         }
 
         Ok(())
