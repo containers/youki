@@ -234,11 +234,20 @@ pub(crate) trait StringExt {
 }
 
 impl StringExt for str {
-    fn split_one(&self, delimiter: &str) ->Option<(&str, &str)> {
+    fn split_one(&self, delimiter: &str) -> Option<(&str, &str)> {
         let mut splits = self.splitn(2, delimiter);
         let first = splits.next()?;
         let second = splits.next()?;
 
         Some((first, second))
     }
+}
+
+#[macro_export]
+macro_rules! hashmap {
+    ($( $key: expr => $val: expr ),*) => {{
+         let mut map = ::std::collections::HashMap::new();
+         $( map.insert($key, $val); )*
+         map
+    }}
 }
