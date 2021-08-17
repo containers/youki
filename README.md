@@ -25,6 +25,10 @@ Here is why I am rewriting a new container runtime in Rust.
 - The development of [railcar](https://github.com/oracle/railcar) has been suspended. This project was very nice but is no longer being developed. This project is inspired by it.
 - I have fun implementing this. In fact, this may be the most important.
 
+# Related project
+
+- [containers/oci-spec-rs](https://github.com/containers/oci-spec-rs) - OCI Runtime and Image Spec in Rust
+
 # Status of youki
 
 youki is not at the practical stage yet. However, it is getting closer to practical use, running with docker and passing all the default tests provided by [opencontainers/runtime-tools](https://github.com/opencontainers/runtime-tools).
@@ -32,18 +36,19 @@ youki is not at the practical stage yet. However, it is getting closer to practi
 
 ## Features
 
-- [x] run with docker
-- [ ] run with podman(WIP on [#24](https://github.com/containers/youki/issues/24))
-- [x] pivot root
-- [x] mount devices
-- [x] namespaces
-- [x] capabilities
-- [x] rlimits
-- [x] cgroups v1
-- [ ] cgroups v2(WIP on [#78](https://github.com/containers/youki/issues/78))
-- [ ] seccomp(WIP on [#25](https://github.com/containers/youki/issues/25))
-- [ ] hooks(WIP on [#13](https://github.com/containers/youki/issues/13))
-- [ ] rootless(WIP on [#77](https://github.com/containers/youki/issues/77))
+|   Feature    |                   Description                   |                                                State                                                |
+| :----------: | :---------------------------------------------: | :-------------------------------------------------------------------------------------------------: |
+|    Docker    |               Running via Docker                |                                                  ✅                                                  |
+|    Podman    |               Running via Podman                | It works, but cgroups isn't supported. WIP on [#24](https://github.com/containers/youki/issues/24)  |
+|  pivot_root  |            Change the root directory            |                                                  ✅                                                  |
+|    Mounts    |    Mount files and directories to container     |                                                  ✅                                                  |
+|  Namespaces  |    Mount files and directories to container     |                                                  ✅                                                  |
+| Capabilities |            Limiting root privileges             |                                                  ✅                                                  |
+|  Cgroups v1  |            Resource limitations, etc            |                                                  ✅                                                  |
+|  Cgroups v2  |             Improved version of v1              | Support is complete except for devices. WIP on [#78](https://github.com/containers/youki/issues/78) |
+|   Seccomp    |             Filtering system calls              |                     WIP on [#25](https://github.com/containers/youki/issues/25)                     |
+|    Hooks     | Add custom processing during container creation |                                                  ✅                                                  |
+|   Rootless   |   Running a container without root privileges   | It works, but cgroups isn't supported. WIP on [#77](https://github.com/containers/youki/issues/77)  |
 
 # Getting Started
 
