@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use oci_spec::LinuxResources;
 
 use super::controller_type::ControllerType;
-use crate::common::{self, StringExt};
+use crate::common;
 
 pub struct Unified {}
 
@@ -20,7 +20,7 @@ impl Unified {
                 common::write_cgroup_file_str(cgroup_path.join(cgroup_file), value).map_err(
                     |e| {
                         let (subsystem, _) = cgroup_file
-                            .split_one(".")
+                            .split_once(".")
                             .with_context(|| {
                                 format!("failed to split {} with {}", cgroup_file, ".")
                             })
@@ -46,9 +46,11 @@ impl Unified {
 
 #[cfg(test)]
 mod tests {
+    use std::array::IntoIter;
+    use std::collections::HashMap;
     use std::fs;
+    use std::iter::FromIterator;
 
-    use crate::hashmap;
     use crate::test::{create_temp_dir, set_fixture};
     use crate::v2::controller_type::ControllerType;
 
@@ -62,9 +64,13 @@ mod tests {
         let cpu_weight_path = set_fixture(&tmp, "cpu.weight", "").unwrap();
 
         let resources = LinuxResources {
-            unified: Some(
-                hashmap!["hugetlb.1GB.limit_in_bytes".to_owned() => "72348034".to_owned() , "cpu.weight".to_owned()  => "5000".to_owned() ],
-            ),
+            unified: Some(HashMap::<_, _>::from_iter(IntoIter::new([
+                (
+                    "hugetlb.1GB.limit_in_bytes".to_owned(),
+                    "72348034".to_owned(),
+                ),
+                ("cpu.weight".to_owned(), "5000".to_owned()),
+            ]))),
             ..Default::default()
         };
 
@@ -85,9 +91,13 @@ mod tests {
             create_temp_dir("test_set_unified_failed_to_write_subsystem_not_enabled").unwrap();
 
         let resources = LinuxResources {
-            unified: Some(
-                hashmap!["hugetlb.1GB.limit_in_bytes".to_owned() => "72348034".to_owned() , "cpu.weight".to_owned()  => "5000".to_owned() ],
-            ),
+            unified: Some(HashMap::<_, _>::from_iter(IntoIter::new([
+                (
+                    "hugetlb.1GB.limit_in_bytes".to_owned(),
+                    "72348034".to_owned(),
+                ),
+                ("cpu.weight".to_owned(), "5000".to_owned()),
+            ]))),
             ..Default::default()
         };
 
@@ -104,9 +114,13 @@ mod tests {
         let tmp = create_temp_dir("test_set_unified_failed_to_write_subsystem_enabled").unwrap();
 
         let resources = LinuxResources {
-            unified: Some(
-                hashmap!["hugetlb.1GB.limit_in_bytes".to_owned() => "72348034".to_owned() , "cpu.weight".to_owned()  => "5000".to_owned() ],
-            ),
+            unified: Some(HashMap::<_, _>::from_iter(IntoIter::new([
+                (
+                    "hugetlb.1GB.limit_in_bytes".to_owned(),
+                    "72348034".to_owned(),
+                ),
+                ("cpu.weight".to_owned(), "5000".to_owned()),
+            ]))),
             ..Default::default()
         };
 

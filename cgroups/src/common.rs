@@ -227,27 +227,3 @@ impl PathBufExt for PathBuf {
         Ok(PathBuf::from(format!("{}{}", self.display(), p.display())))
     }
 }
-
-pub(crate) trait StringExt {
-    // this should be replaced by split_once, when we switch to Rust 2021
-    fn split_one(&self, delimiter: &str) -> Option<(&str, &str)>;
-}
-
-impl StringExt for str {
-    fn split_one(&self, delimiter: &str) -> Option<(&str, &str)> {
-        let mut splits = self.splitn(2, delimiter);
-        let first = splits.next()?;
-        let second = splits.next()?;
-
-        Some((first, second))
-    }
-}
-
-#[macro_export]
-macro_rules! hashmap {
-    ($( $key: expr => $val: expr ),*) => {{
-         let mut map = ::std::collections::HashMap::new();
-         $( map.insert($key, $val); )*
-         map
-    }}
-}
