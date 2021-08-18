@@ -40,7 +40,7 @@ youki is not at the practical stage yet. However, it is getting closer to practi
 |     Podman     |               Running via Podman                | It works, but cgroups isn't supported. WIP on [#24](https://github.com/containers/youki/issues/24)  |
 |   pivot_root   |            Change the root directory            |                                                  ✅                                                  |
 |     Mounts     |    Mount files and directories to container     |                                                  ✅                                                  |
-|   Namespaces   |    Mount files and directories to container     |                                                  ✅                                                  |
+|   Namespaces   |         Isolation of various resources          |                                                  ✅                                                  |
 |  Capabilities  |            Limiting root privileges             |                                                  ✅                                                  |
 |   Cgroups v1   |            Resource limitations, etc            |                                                  ✅                                                  |
 |   Cgroups v2   |             Improved version of v1              | Support is complete except for devices. WIP on [#78](https://github.com/containers/youki/issues/78) |
