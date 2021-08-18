@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use std::path::Path;
 
 use crate::common;
@@ -14,7 +14,8 @@ pub struct CpuSet {}
 impl Controller for CpuSet {
     fn apply(linux_resources: &LinuxResources, cgroup_path: &Path) -> Result<()> {
         if let Some(cpuset) = &linux_resources.cpu {
-            Self::apply(cgroup_path, cpuset)?;
+            Self::apply(cgroup_path, cpuset)
+                .context("failed to apply cpuset resource restrictions")?;
         }
 
         Ok(())

@@ -212,7 +212,7 @@ where
     Ok(())
 }
 
-pub trait PathBufExt {
+pub(crate) trait PathBufExt {
     fn join_safely(&self, p: &Path) -> Result<PathBuf>;
 }
 
