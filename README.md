@@ -34,8 +34,6 @@ Here is why I am rewriting a new container runtime in Rust.
 youki is not at the practical stage yet. However, it is getting closer to practical use, running with docker and passing all the default tests provided by [opencontainers/runtime-tools](https://github.com/opencontainers/runtime-tools).
 ![youki demo](docs/demo.gif)
 
-## Features
-
 |    Feature     |                   Description                   |                                                State                                                |
 | :------------: | :---------------------------------------------: | :-------------------------------------------------------------------------------------------------: |
 |     Docker     |               Running via Docker                |                                                  ✅                                                  |
@@ -48,7 +46,6 @@ youki is not at the practical stage yet. However, it is getting closer to practi
 |   Cgroups v2   |             Improved version of v1              | Support is complete except for devices. WIP on [#78](https://github.com/containers/youki/issues/78) |
 |    Seccomp     |             Filtering system calls              |                     WIP on [#25](https://github.com/containers/youki/issues/25)                     |
 |     Hooks      | Add custom processing during container creation |                                                  ✅                                                  |
-|    Rootless    |   Running a container without root privileges   | It works, but cgroups isn't supported. WIP on [#77](https://github.com/containers/youki/issues/77)  |
 |    Rootless    |   Running a container without root privileges   | It works, but cgroups isn't supported. WIP on [#77](https://github.com/containers/youki/issues/77)  |
 | OCI Compliance |        Compliance with OCI Runtime Spec         |                                   37 out of 57 test cases passing                                   |
 
