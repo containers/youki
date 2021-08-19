@@ -1,8 +1,7 @@
 use std::{env, path::PathBuf};
 
 use anyhow::{bail, Context, Result};
-use nix::sched::CloneFlags;
-use oci_spec::{Linux, LinuxIdMapping, Mount, Spec};
+use oci_spec::{Linux, LinuxIdMapping, LinuxNamespaceType, Mount, Spec};
 
 use crate::namespaces::Namespaces;
 
@@ -84,14 +83,8 @@ pub fn validate(spec: &Spec) -> Result<()> {
         bail!("rootless containers require at least one gid mapping")
     }
 
-    let namespaces = Namespaces::from(
-        linux
-            .namespaces
-            .as_ref()
-            .context("rootless containers require the namespaces.")?,
-    );
-
-    if !namespaces.clone_flags.contains(CloneFlags::CLONE_NEWUSER) {
+    let namespaces = Namespaces::from(linux.namespaces.as_ref());
+    if namespaces.get(LinuxNamespaceType::User).is_none() {
         bail!("rootless containers require the specification of a user namespace");
     }
 

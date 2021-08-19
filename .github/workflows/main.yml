@@ -60,7 +60,7 @@ jobs:
       - name: Build
         run: ./build.sh --release
       - name: Run tests
-        run: cargo test
+        run: cargo test -- --nocapture
       - name: Run doc tests
         run: cargo test --doc
       - name: Run cgroup tests
