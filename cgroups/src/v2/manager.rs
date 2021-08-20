@@ -11,7 +11,8 @@ use oci_spec::{FreezerState, LinuxResources};
 
 use super::{
     controller::Controller, controller_type::ControllerType, cpu::Cpu, cpuset::CpuSet,
-    freezer::Freezer, hugetlb::HugeTlb, io::Io, memory::Memory, pids::Pids, unified::Unified,
+    devices::Devices, freezer::Freezer, hugetlb::HugeTlb, io::Io, memory::Memory, pids::Pids,
+    unified::Unified,
 };
 use crate::{
     common::{self, CgroupManager, PathBufExt, CGROUP_PROCS},
@@ -29,6 +30,7 @@ const CONTROLLER_TYPES: &[ControllerType] = &[
     ControllerType::Memory,
     ControllerType::Pids,
     ControllerType::Freezer,
+    ControllerType::Devices,
 ];
 
 pub struct Manager {
@@ -98,6 +100,7 @@ impl Manager {
                 "memory" => controllers.push(ControllerType::Memory),
                 "pids" => controllers.push(ControllerType::Pids),
                 "freezer" => controllers.push(ControllerType::Freezer),
+                "devices" => controllers.push(ControllerType::Devices),
                 tpe => log::warn!("Controller {} is not yet implemented.", tpe),
             }
         }
@@ -130,6 +133,7 @@ impl CgroupManager for Manager {
                 ControllerType::Memory => Memory::apply(linux_resources, &self.full_path)?,
                 ControllerType::Pids => Pids::apply(linux_resources, &self.full_path)?,
                 ControllerType::Freezer => Freezer::apply(linux_resources, &self.full_path)?,
+                ControllerType::Devices => Devices::apply(linux_resources, &self.full_path)?,
             }
         }
 

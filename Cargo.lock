@@ -24,6 +24,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28b2cd92db5cbd74e8e5028f7e27dd7aa3090e89e4f2a197cc7c8dfb69c7063b"
 
 [[package]]
+name = "ascii"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ae7d751998c189c1d4468cf0a39bb2eae052a9c58d50ebb3b9591ee3813ad50"
+
+[[package]]
 name = "autocfg"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -82,10 +88,14 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "dbus",
+ "errno",
+ "libbpf-sys",
+ "libc",
  "log",
  "nix",
  "oci_spec",
  "procfs",
+ "rbpf",
  "serde",
  "systemd",
 ]
@@ -132,6 +142,16 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "combine"
+version = "2.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1645a65a99c7c8d345761f4b75a6ffe5be3b3b27a93ee731fccc5050ba6be97c"
+dependencies = [
+ "ascii",
+ "byteorder",
 ]
 
 [[package]]
@@ -434,6 +454,16 @@ name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
+
+[[package]]
+name = "libbpf-sys"
+version = "0.4.0-2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1cb2a66e5ddf38dbe9ba76f32d5ac337cf03ce18d042cde35988522cf6c0f6d2"
+dependencies = [
+ "cc",
+ "pkg-config",
+]
 
 [[package]]
 name = "libc"
@@ -780,6 +810,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d51e9f596de227fda2ea6c84607f5558e196eeaf43c986b724ba4fb8fdf497e7"
 dependencies = [
  "rand_core",
+]
+
+[[package]]
+name = "rbpf"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c9c11162e7a92d2ede17ea2e5ef83025fd3e252638e43bf92294ea61791d1c4"
+dependencies = [
+ "byteorder",
+ "combine",
+ "libc",
+ "time",
 ]
 
 [[package]]

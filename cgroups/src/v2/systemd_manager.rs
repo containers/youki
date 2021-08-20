@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 
 use super::{
     controller::Controller, controller_type::ControllerType, cpu::Cpu, cpuset::CpuSet,
-    freezer::Freezer, hugetlb::HugeTlb, io::Io, memory::Memory, pids::Pids,
+    devices::Devices, freezer::Freezer, hugetlb::HugeTlb, io::Io, memory::Memory, pids::Pids,
 };
 use crate::common::{self, CgroupManager, PathBufExt};
 use crate::stats::Stats;
@@ -235,6 +235,7 @@ impl CgroupManager for SystemDCGroupManager {
                 ControllerType::Memory => Memory::apply(linux_resources, &self.full_path)?,
                 ControllerType::Pids => Pids::apply(linux_resources, &self.full_path)?,
                 ControllerType::Freezer => Freezer::apply(linux_resources, &self.full_path)?,
+                ControllerType::Devices => Devices::apply(linux_resources, &self.full_path)?,
             }
         }
 

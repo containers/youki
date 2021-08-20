@@ -4,8 +4,9 @@ version = "0.1.0"
 edition = "2018"
 
 [features]
-default = ["systemd_cgroups"]
+default = ["systemd_cgroups", "cgroupsv2_devices"]
 systemd_cgroups = ["systemd"]
+cgroupsv2_devices = []
 
 [dependencies]
 nix = "0.22.0"
@@ -16,7 +17,15 @@ oci_spec = { git = "https://github.com/containers/oci-spec-rs", rev = "e0de21b89
 systemd = { version = "0.8", default-features = false, optional = true }
 dbus = "0.9.2"
 serde = { version = "1.0", features = ["derive"] }
+rbpf = "0.1.0"
+libbpf-sys = "0.4.0-2"
+errno = "0.2.7"
+libc = "0.2.84"
 
 [dev-dependencies]
 oci_spec = { git = "https://github.com/containers/oci-spec-rs", rev = "e0de21b89dc1e65f69a5f45a08bbe426787c7fa1", features = ["proptests"]}
 quickcheck = "1"
+clap = "2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+env_logger = "0.9"
