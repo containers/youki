@@ -68,12 +68,11 @@ test_cases=(
 
 check_enviroment() {
   test_case=$1
-  if [[ $test_case =~ linux_cgroups* ]]; then
+  if [[ $test_case =~ .*(memory|hugetlb).t ]]; then
     if [[ ! -e "/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes" ]]; then
         return 1
     fi 
   fi
-
 }
 
 for case in "${test_cases[@]}"; do
