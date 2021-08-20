@@ -65,6 +65,16 @@ test_cases=(
   # "start/start.t"
   "state/state.t"
 )
+
+check_enviroment() {
+  test_case=$1
+  if [[ $test_case =~ .*(memory|hugetlb).t ]]; then
+    if [[ ! -e "/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes" ]]; then
+        return 1
+    fi 
+  fi
+}
+
 for case in "${test_cases[@]}"; do
   if [[ ! -e "${ROOT}/integration_test/src/github.com/opencontainers/runtime-tools/validation/$case" ]]; then
     GOPATH=${ROOT}/integration_test make runtimetest validation-executables
@@ -74,6 +84,11 @@ done
 
 
 for case in "${test_cases[@]}"; do
+  if ! check_enviroment $case; then
+    echo "Skip $case bacause your enviroment doesn't support this test case"
+    continue
+  fi
+
   echo "Running $case"
   if [ 0 -ne $(sudo RUST_BACKTRACE=1 YOUKI_LOG_LEVEL=debug RUNTIME=${RUNTIME} ${ROOT}/integration_test/src/github.com/opencontainers/runtime-tools/validation/$case | grep "not ok" | wc -l) ]; then
       exit 1
