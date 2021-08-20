@@ -39,8 +39,9 @@ impl InitContainerBuilder {
 
     /// Creates a new container
     pub fn build(self) -> Result<()> {
+        let spec = self.load_spec()?;
         let container_dir = self.create_container_dir()?;
-        let spec = self.load_and_safeguard_spec(&container_dir)?;
+        self.save_spec(&spec, &container_dir)?;
 
         let container_state = self
             .create_container_state(&container_dir)?
@@ -97,15 +98,17 @@ impl InitContainerBuilder {
         Ok(container_dir)
     }
 
-    fn load_and_safeguard_spec(&self, container_dir: &Path) -> Result<Spec> {
+    fn load_spec(&self) -> Result<Spec> {
         let source_spec_path = self.bundle.join("config.json");
-        let target_spec_path = container_dir.join("config.json");
-
         let mut spec = oci_spec::Spec::load(&source_spec_path)?;
         spec.canonicalize_rootfs(&self.bundle)?;
-        spec.save(target_spec_path)?;
-
         Ok(spec)
+    }
+
+    fn save_spec(&self, spec: &oci_spec::Spec, container_dir: &Path) -> Result<()> {
+        let target_spec_path = container_dir.join("config.json");
+        spec.save(target_spec_path)?;
+        Ok(())
     }
 
     fn create_container_state(&self, container_dir: &Path) -> Result<Container> {
