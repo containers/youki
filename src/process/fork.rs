@@ -12,6 +12,8 @@ use std::ptr;
 // to trasfer the ownership of related memory to the new process.
 type CloneCb = Box<dyn FnOnce() -> isize + Send>;
 
+const DEFAULT_STACK_SIZE: usize = 8 * 1024 * 1024; // 8M
+
 /// clone uses syscall clone(2) to create a new process for the container init
 /// process. Using clone syscall gives us better control over how to can create
 /// the new container process, where we can enter into namespaces directly instead
@@ -33,7 +35,14 @@ pub fn clone(cb: CloneCb, clone_flags: sched::CloneFlags) -> Result<Pid> {
         rlim_max: 0,
     };
     unsafe { Errno::result(libc::getrlimit(libc::RLIMIT_STACK, &mut rlimit))? };
-    let default_stack_size = rlimit.rlim_cur as usize;
+
+    // mmap will return ENOMEM if stack size is unlimited
+    let default_stack_size = if rlimit.rlim_cur != u64::MAX {
+        rlimit.rlim_cur as usize
+    } else {
+        log::info!("stack size returned by getrlimit() is unlimited, use DEFAULT_STACK_SIZE(8MB)");
+        DEFAULT_STACK_SIZE
+    };
 
     // Using the clone syscall requires us to create the stack space for the
     // child process instead of taken cared for us like fork call. We use mmap
