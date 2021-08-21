@@ -311,18 +311,16 @@ fn sysctl(kernel_params: &HashMap<String, String>) -> Result<()> {
     Ok(())
 }
 
+// make a read only path
+// The first time we bind mount, other flags are ignored,
+// so we need to mount it once and then remount it with the necessary flags specified.
+// https://man7.org/linux/man-pages/man2/mount.2.html
 fn readonly_path(path: &str) -> Result<()> {
     match nix_mount::<str, str, str, str>(
         Some(path),
         path,
         None::<&str>,
-        MsFlags::MS_BIND
-            | MsFlags::MS_REC
-            | MsFlags::MS_NOSUID
-            | MsFlags::MS_NODEV
-            | MsFlags::MS_NOEXEC
-            | MsFlags::MS_BIND
-            | MsFlags::MS_RDONLY,
+        MsFlags::MS_BIND | MsFlags::MS_REC,
         None::<&str>,
     ) {
         // ignore error if path is not exist.
@@ -333,6 +331,19 @@ fn readonly_path(path: &str) -> Result<()> {
         Err(err) => bail!(err),
         Ok(_) => {}
     }
+
+    nix_mount::<str, str, str, str>(
+        Some(path),
+        path,
+        None::<&str>,
+        MsFlags::MS_NOSUID
+            | MsFlags::MS_NODEV
+            | MsFlags::MS_NOEXEC
+            | MsFlags::MS_BIND
+            | MsFlags::MS_REMOUNT
+            | MsFlags::MS_RDONLY,
+        None::<&str>,
+    )?;
     log::debug!("readonly path {:?} mounted", path);
     Ok(())
 }
