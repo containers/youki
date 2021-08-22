@@ -216,7 +216,6 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     let mut do_chdir = !proc.cwd.is_empty();
     // change directory to process.cwd if process.cwd is not empty
     if do_chdir {
-        do_chdir = false;
         // This chdir must run before setting up the user.
         // This may allow the user running youki to access directories
         // that the container user cannot access.
