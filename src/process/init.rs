@@ -213,7 +213,6 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
         }
     }
 
-
     let mut do_chdir = !proc.cwd.is_empty();
     // change directory to process.cwd if process.cwd is not empty
     if do_chdir {
@@ -224,7 +223,7 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
         match unistd::chdir(&*proc.cwd) {
             Ok(_) => do_chdir = false,
             Err(nix::Error::EPERM) => {}
-            Err(e) => return Err(anyhow::anyhow!("Failed to chdir: {}", e))
+            Err(e) => return Err(anyhow::anyhow!("Failed to chdir: {}", e)),
         };
     }
 
