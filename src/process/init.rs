@@ -4,7 +4,7 @@ use nix::mount::MsFlags;
 use nix::{
     fcntl, sched,
     sys::statfs,
-    unistd::{Gid, Uid},
+    unistd::{self, Gid, Uid},
 };
 use oci_spec::Spec;
 use std::collections::HashMap;
@@ -213,6 +213,21 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
         }
     }
 
+
+    let mut do_chdir = !proc.cwd.is_empty();
+    // change directory to process.cwd if process.cwd is not empty
+    if do_chdir {
+        do_chdir = false;
+        // This chdir must run before setting up the user.
+        // This may allow the user running youki to access directories
+        // that the container user cannot access.
+        match unistd::chdir(&*proc.cwd) {
+            Ok(_) => do_chdir = false,
+            Err(nix::Error::EPERM) => {}
+            Err(e) => return Err(anyhow::anyhow!("Failed to chdir: {}", e))
+        };
+    }
+
     command.set_id(Uid::from_raw(proc.user.uid), Gid::from_raw(proc.user.gid))?;
     capabilities::reset_effective(command)?;
     if let Some(caps) = &proc.capabilities {
@@ -262,6 +277,11 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     // clean up and handle perserved fds.
     if args.init {
         cleanup_file_descriptors(preserve_fds).with_context(|| "Failed to clean up extra fds")?;
+    }
+
+    // change directory to process.cwd if process.cwd is not empty
+    if do_chdir {
+        unistd::chdir(&*proc.cwd).with_context(|| format!("Failed to chdir {}", proc.cwd))?;
     }
 
     // Reset the process env based on oci spec.
