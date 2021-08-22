@@ -213,7 +213,7 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
         }
     }
 
-   let do_chdir = if proc.cwd.is_empty() {
+    let do_chdir = if proc.cwd.is_empty() {
         false
     } else {
         // This chdir must run before setting up the user.
@@ -223,6 +223,7 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
             Ok(_) => false,
             Err(nix::Error::EPERM) => true,
             Err(e) => bail!("Failed to chdir: {}", e),
+        }
     };
 
     command.set_id(Uid::from_raw(proc.user.uid), Gid::from_raw(proc.user.gid))?;
