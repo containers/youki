@@ -53,7 +53,7 @@ test_cases=(
   "poststop_fail/poststop_fail.t"
   "prestart/prestart.t"
   "prestart_fail/prestart_fail.t"
-  # "process/process.t"
+  "process/process.t"
   "process_capabilities/process_capabilities.t"
   "process_capabilities_fail/process_capabilities_fail.t"
   # "process_oom_score_adj/process_oom_score_adj.t"
