@@ -213,18 +213,17 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
         }
     }
 
-    let mut do_chdir = !proc.cwd.is_empty();
-    // change directory to process.cwd if process.cwd is not empty
-    if do_chdir {
+   let do_chdir = if proc.cwd.is_empty() {
+        false
+    } else {
         // This chdir must run before setting up the user.
         // This may allow the user running youki to access directories
         // that the container user cannot access.
         match unistd::chdir(&*proc.cwd) {
-            Ok(_) => do_chdir = false,
-            Err(nix::Error::EPERM) => {}
-            Err(e) => return Err(anyhow::anyhow!("Failed to chdir: {}", e)),
-        };
-    }
+            Ok(_) => false,
+            Err(nix::Error::EPERM) => true,
+            Err(e) => bail!("Failed to chdir: {}", e),
+    };
 
     command.set_id(Uid::from_raw(proc.user.uid), Gid::from_raw(proc.user.gid))?;
     capabilities::reset_effective(command)?;
