@@ -1,8 +1,5 @@
 use crate::process::message::Message;
-use crate::rootless::Rootless;
-use crate::utils;
 use anyhow::bail;
-use anyhow::Context;
 use anyhow::Result;
 use mio::unix::pipe;
 use mio::unix::pipe::{Receiver, Sender};
@@ -11,8 +8,6 @@ use nix::unistd::Pid;
 use std::io::ErrorKind;
 use std::io::Read;
 use std::io::Write;
-use std::path::Path;
-use std::process::Command;
 use std::time::Duration;
 
 /// Maximum event capacity of polling
@@ -100,12 +95,7 @@ impl Channel {
         unreachable!("timed out waiting for mapping ack")
     }
 
-    pub fn wait_for_mapping_request(
-        &mut self,
-        child_pid: Pid,
-        rootless: Option<&Rootless>,
-        callback: &mut Channel,
-    ) -> Result<()> {
+    pub fn wait_for_mapping_request(&mut self) -> Result<()> {
         // Create collection with capacity to store up to MAX_EVENTS events
         let mut events = Events::with_capacity(MAX_EVENTS);
         loop {
@@ -127,11 +117,6 @@ impl Channel {
                     // convert to Message wrapper
                     match Message::from(u8::from_be_bytes(buf)) {
                         Message::WriteMapping => {
-                            log::debug!("write mapping for pid {:?}", child_pid);
-                            utils::write_file(format!("/proc/{}/setgroups", child_pid), "deny")?;
-                            write_uid_mapping(child_pid, rootless)?;
-                            write_gid_mapping(child_pid, rootless)?;
-                            callback.send_mapping_written()?;
                             return Ok(());
                         }
                         msg => bail!(
@@ -200,55 +185,6 @@ impl Channel {
         self.sender.write_all(&(msg as u8).to_be_bytes())?;
         Ok(())
     }
-}
-
-fn write_uid_mapping(target_pid: Pid, rootless: Option<&Rootless>) -> Result<()> {
-    if let Some(rootless) = rootless {
-        if let Some(uid_mappings) = rootless.gid_mappings {
-            return write_id_mapping(
-                &format!("/proc/{}/uid_map", target_pid),
-                uid_mappings,
-                rootless.newuidmap.as_deref(),
-            );
-        }
-    }
-
-    Ok(())
-}
-
-fn write_gid_mapping(target_pid: Pid, rootless: Option<&Rootless>) -> Result<()> {
-    if let Some(rootless) = rootless {
-        if let Some(gid_mappings) = rootless.gid_mappings {
-            return write_id_mapping(
-                &format!("/proc/{}/gid_map", target_pid),
-                gid_mappings,
-                rootless.newgidmap.as_deref(),
-            );
-        }
-    }
-
-    Ok(())
-}
-
-fn write_id_mapping(
-    map_file: &str,
-    mappings: &[oci_spec::LinuxIdMapping],
-    map_binary: Option<&Path>,
-) -> Result<()> {
-    let mappings: Vec<String> = mappings
-        .iter()
-        .map(|m| format!("{} {} {}", m.container_id, m.host_id, m.size))
-        .collect();
-    if mappings.len() == 1 {
-        utils::write_file(map_file, mappings.first().unwrap())?;
-    } else {
-        Command::new(map_binary.unwrap())
-            .args(mappings)
-            .output()
-            .with_context(|| format!("failed to execute {:?}", map_binary))?;
-    }
-
-    Ok(())
 }
 
 #[cfg(test)]
