@@ -94,10 +94,8 @@ for case in "${test_cases[@]}"; do
     continue
   fi
 
-  if [ $PATTERN != "." ]; then
-    if [[ ! $case =~ $PATTERN ]]; then
-      continue
-    fi
+  if [ $PATTERN != "." ] && [[ ! $case =~ $PATTERN ]]; then
+    continue    
   fi 
 
   echo "Running $case"
