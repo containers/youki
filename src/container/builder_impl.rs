@@ -1,19 +1,17 @@
-use anyhow::{Context, Result};
-use nix::sched::CloneFlags;
-
-use cgroups;
-
-use oci_spec::Spec;
-use std::{fs, os::unix::prelude::RawFd, path::PathBuf};
-
 use crate::{
     hooks,
-    namespaces::Namespaces,
-    process::{child, fork, init, parent},
+    process::{channel, fork, init},
     rootless::Rootless,
     syscall::linux::LinuxSyscall,
     utils,
 };
+use anyhow::{Context, Result};
+use cgroups;
+use nix::unistd::Pid;
+use oci_spec::Spec;
+use std::path::Path;
+use std::process::Command;
+use std::{fs, os::unix::prelude::RawFd, path::PathBuf};
 
 use super::{Container, ContainerStatus};
 
@@ -59,15 +57,15 @@ impl<'a> ContainerBuilderImpl<'a> {
         let cgroups_path = utils::get_cgroup_path(&linux.cgroups_path, &self.container_id);
         let cmanager = cgroups::common::create_cgroup_manager(&cgroups_path, self.use_systemd)?;
 
-        // create the parent and child process structure so the parent and child process can sync with each other
-        let (mut parent, parent_channel) = parent::ParentProcess::new(&self.rootless)?;
-        let child = child::ChildProcess::new(parent_channel)?;
-
         if self.init {
             if let Some(hooks) = self.spec.hooks.as_ref() {
                 hooks::run_hooks(hooks.create_runtime.as_ref(), self.container.as_ref())?
             }
         }
+
+        // We use a set of channels to communicate between parent and child process. Each channel is uni-directional.
+        let parent_to_child = &mut channel::Channel::new()?;
+        let child_to_parent = &mut channel::Channel::new()?;
 
         // This init_args will be passed to the container init process,
         // therefore we will have to move all the variable by value. Since self
@@ -82,29 +80,24 @@ impl<'a> ContainerBuilderImpl<'a> {
             notify_path: self.notify_path.clone(),
             preserve_fds: self.preserve_fds,
             container: self.container.clone(),
-            child,
         };
+        let intermediate_pid = fork::container_fork(|| {
+            init::container_intermidiate(init_args, parent_to_child, child_to_parent)
+        })?;
+        // If creating a rootless container, the intermediate process will ask
+        // the main process to set up uid and gid mapping, once the intermediate
+        // process enters into a new user namespace.
+        if self.rootless.is_some() {
+            child_to_parent.wait_for_mapping_request()?;
+            log::debug!("write mapping for pid {:?}", intermediate_pid);
+            utils::write_file(format!("/proc/{}/setgroups", intermediate_pid), "deny")?;
+            write_uid_mapping(intermediate_pid, self.rootless.as_ref())?;
+            write_gid_mapping(intermediate_pid, self.rootless.as_ref())?;
+            parent_to_child.send_mapping_written()?;
+        }
 
-        // We have to box up this closure to correctly pass to the init function
-        // of the new process.
-        let cb = Box::new(move || {
-            if let Err(error) = init::container_init(init_args) {
-                log::debug!("failed to run container_init: {:?}", error);
-                return -1;
-            }
-
-            0
-        });
-
-        let clone_flags = linux
-            .namespaces
-            .as_ref()
-            .map(|ns| Namespaces::from(ns).clone_flags)
-            .unwrap_or_else(CloneFlags::empty);
-        let init_pid = fork::clone(cb, clone_flags)?;
+        let init_pid = child_to_parent.wait_for_child_ready()?;
         log::debug!("init pid is {:?}", init_pid);
-
-        parent.wait_for_child_ready(init_pid)?;
 
         cmanager.add_task(init_pid)?;
         if self.rootless.is_none() && linux.resources.is_some() && self.init {
@@ -127,4 +120,53 @@ impl<'a> ContainerBuilderImpl<'a> {
 
         Ok(())
     }
+}
+
+fn write_uid_mapping(target_pid: Pid, rootless: Option<&Rootless>) -> Result<()> {
+    if let Some(rootless) = rootless {
+        if let Some(uid_mappings) = rootless.gid_mappings {
+            return write_id_mapping(
+                &format!("/proc/{}/uid_map", target_pid),
+                uid_mappings,
+                rootless.newuidmap.as_deref(),
+            );
+        }
+    }
+
+    Ok(())
+}
+
+fn write_gid_mapping(target_pid: Pid, rootless: Option<&Rootless>) -> Result<()> {
+    if let Some(rootless) = rootless {
+        if let Some(gid_mappings) = rootless.gid_mappings {
+            return write_id_mapping(
+                &format!("/proc/{}/gid_map", target_pid),
+                gid_mappings,
+                rootless.newgidmap.as_deref(),
+            );
+        }
+    }
+
+    Ok(())
+}
+
+fn write_id_mapping(
+    map_file: &str,
+    mappings: &[oci_spec::LinuxIdMapping],
+    map_binary: Option<&Path>,
+) -> Result<()> {
+    let mappings: Vec<String> = mappings
+        .iter()
+        .map(|m| format!("{} {} {}", m.container_id, m.host_id, m.size))
+        .collect();
+    if mappings.len() == 1 {
+        utils::write_file(map_file, mappings.first().unwrap())?;
+    } else {
+        Command::new(map_binary.unwrap())
+            .args(mappings)
+            .output()
+            .with_context(|| format!("failed to execute {:?}", map_binary))?;
+    }
+
+    Ok(())
 }

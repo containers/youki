@@ -43,7 +43,7 @@ test_cases=(
   # "linux_ns_path/linux_ns_path.t"
   # "linux_ns_path_type/linux_ns_path_type.t"
   # "linux_process_apparmor_profile/linux_process_apparmor_profile.t"
-  # "linux_readonly_paths/linux_readonly_paths.t"
+  "linux_readonly_paths/linux_readonly_paths.t"
   # "linux_rootfs_propagation/linux_rootfs_propagation.t"
   # "linux_seccomp/linux_seccomp.t"
   "linux_sysctl/linux_sysctl.t"
@@ -57,7 +57,7 @@ test_cases=(
   "poststop_fail/poststop_fail.t"
   "prestart/prestart.t"
   "prestart_fail/prestart_fail.t"
-  # "process/process.t"
+  "process/process.t"
   "process_capabilities/process_capabilities.t"
   "process_capabilities_fail/process_capabilities_fail.t"
   # "process_oom_score_adj/process_oom_score_adj.t"
@@ -81,7 +81,7 @@ check_enviroment() {
 
 for case in "${test_cases[@]}"; do
   if [[ ! -e "${ROOT}/integration_test/src/github.com/opencontainers/runtime-tools/validation/$case" ]]; then
-    GOPATH=${ROOT}/integration_test make runtimetest validation-executables
+    GO111MODULE=auto GOPATH=${ROOT}/integration_test make runtimetest validation-executables
     break
   fi
 done
@@ -94,7 +94,11 @@ for case in "${test_cases[@]}"; do
   fi
 
   echo "Running $case"
-  if [ 0 -ne $(sudo RUST_BACKTRACE=1 YOUKI_LOG_LEVEL=debug RUNTIME=${RUNTIME} ${ROOT}/integration_test/src/github.com/opencontainers/runtime-tools/validation/$case | grep "not ok" | wc -l) ]; then
+  logfile="./log/$case.log"
+  mkdir -p "$(dirname $logfile)"
+  sudo RUST_BACKTRACE=1 RUNTIME=${RUNTIME} ${ROOT}/integration_test/src/github.com/opencontainers/runtime-tools/validation/$case >$logfile 2>&1
+  if [ 0 -ne $(grep "not ok" $logfile | wc -l ) ]; then
+      cat $logfile
       exit 1
   fi
   sleep 1
