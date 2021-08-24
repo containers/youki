@@ -93,7 +93,7 @@ for case in "${test_cases[@]}"; do
   logfile="./log/$case.log"
   mkdir -p "$(dirname $logfile)"
   sudo RUST_BACKTRACE=1 RUNTIME=${RUNTIME} ${ROOT}/integration_test/src/github.com/opencontainers/runtime-tools/validation/$case >$logfile 2>&1
-  if [ 0 -ne $(cat $logfile | grep "not ok" | wc -l ) ]; then
+  if [ 0 -ne $(grep "not ok" $logfile | wc -l ) ]; then
       cat $logfile
       exit 1
   fi
