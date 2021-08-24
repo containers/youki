@@ -1,12 +1,13 @@
 use anyhow::{bail, Context, Result};
 use nix::mount::mount as nix_mount;
 use nix::mount::MsFlags;
+use nix::sched::CloneFlags;
 use nix::{
     fcntl, sched,
     sys::statfs,
-    unistd::{self, Gid, Uid},
+    unistd::{self, Gid, Pid, Uid},
 };
-use oci_spec::Spec;
+use oci_spec::{LinuxNamespaceType, Spec};
 use std::collections::HashMap;
 use std::{
     env,
@@ -20,7 +21,8 @@ use crate::{
     hooks,
     namespaces::Namespaces,
     notify_socket::NotifyListener,
-    process::child,
+    process::channel,
+    process::fork,
     rootfs,
     syscall::{linux::LinuxSyscall, Syscall},
     tty, utils,
@@ -91,6 +93,59 @@ fn cleanup_file_descriptors(preserve_fds: i32) -> Result<()> {
     Ok(())
 }
 
+fn sysctl(kernel_params: &HashMap<String, String>) -> Result<()> {
+    let sys = PathBuf::from("/proc/sys");
+    for (kernel_param, value) in kernel_params {
+        let path = sys.join(kernel_param.replace(".", "/"));
+        log::debug!(
+            "apply value {} to kernel parameter {}.",
+            value,
+            kernel_param
+        );
+        fs::write(path, value.as_bytes())
+            .with_context(|| format!("failed to set sysctl {}={}", kernel_param, value))?;
+    }
+
+    Ok(())
+}
+
+// make a read only path
+// The first time we bind mount, other flags are ignored,
+// so we need to mount it once and then remount it with the necessary flags specified.
+// https://man7.org/linux/man-pages/man2/mount.2.html
+fn readonly_path(path: &str) -> Result<()> {
+    match nix_mount::<str, str, str, str>(
+        Some(path),
+        path,
+        None::<&str>,
+        MsFlags::MS_BIND | MsFlags::MS_REC,
+        None::<&str>,
+    ) {
+        // ignore error if path is not exist.
+        Err(nix::errno::Errno::ENOENT) => {
+            log::warn!("readonly path {:?} not exist", path);
+            return Ok(());
+        }
+        Err(err) => bail!(err),
+        Ok(_) => {}
+    }
+
+    nix_mount::<str, str, str, str>(
+        Some(path),
+        path,
+        None::<&str>,
+        MsFlags::MS_NOSUID
+            | MsFlags::MS_NODEV
+            | MsFlags::MS_NOEXEC
+            | MsFlags::MS_BIND
+            | MsFlags::MS_REMOUNT
+            | MsFlags::MS_RDONLY,
+        None::<&str>,
+    )?;
+    log::debug!("readonly path {:?} mounted", path);
+    Ok(())
+}
+
 pub struct ContainerInitArgs {
     /// Flag indicating if an init or a tenant container should be created
     pub init: bool,
@@ -110,23 +165,16 @@ pub struct ContainerInitArgs {
     pub preserve_fds: i32,
     /// Container state
     pub container: Option<Container>,
-    /// Pipe used to communicate with the child process
-    pub child: child::ChildProcess,
 }
 
-pub fn container_init(args: ContainerInitArgs) -> Result<()> {
+pub fn container_intermidiate(
+    args: ContainerInitArgs,
+    main_to_intermediate: &mut channel::Channel,
+    intermediate_to_main: &mut channel::Channel,
+) -> Result<()> {
     let command = &args.syscall;
     let spec = &args.spec;
     let linux = spec.linux.as_ref().context("no linux in spec")?;
-    // need to create the notify socket before we pivot root, since the unix
-    // domain socket used here is outside of the rootfs of container
-    let mut notify_socket: NotifyListener = NotifyListener::new(&args.notify_path)?;
-    let proc = spec.process.as_ref().context("no process in spec")?;
-    let mut envs: Vec<String> = proc.env.as_ref().unwrap_or(&vec![]).clone();
-    let rootfs = &args.rootfs;
-    let hooks = spec.hooks.as_ref();
-    let container = args.container.as_ref();
-    let mut child = args.child;
 
     // if Out-of-memory score adjustment is set in specification.  set the score
     // value for the current process check
@@ -144,15 +192,18 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     // https://man7.org/linux/man-pages/man7/user_namespaces.7.html for more
     // information
     if args.is_rootless {
+        log::debug!("creating new user namespace");
+        sched::unshare(sched::CloneFlags::CLONE_NEWUSER)?;
         // child needs to be dumpable, otherwise the non root parent is not
         // allowed to write the uid/gid maps
         prctl::set_dumpable(true).unwrap();
-        child.request_identifier_mapping()?;
-        child.wait_for_mapping_ack()?;
+        intermediate_to_main.send_identifier_mapping_request()?;
+        main_to_intermediate.wait_for_mapping_ack()?;
         prctl::set_dumpable(false).unwrap();
     }
 
     // set limits and namespaces to the process
+    let proc = spec.process.as_ref().context("no process in spec")?;
     if let Some(rlimits) = proc.rlimits.as_ref() {
         for rlimit in rlimits.iter() {
             command.set_rlimit(rlimit).context("failed to set rlimit")?;
@@ -163,21 +214,72 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
         .set_id(Uid::from_raw(0), Gid::from_raw(0))
         .context("failed to become root")?;
 
-    // set up tty if specified
-    if let Some(csocketfd) = args.console_socket {
-        tty::setup_console(&csocketfd)?;
+    // Pid namespace requires an extra fork to enter, so we enter pid namespace now.
+    let namespaces = Namespaces::from(linux.namespaces.as_ref());
+    if let Some(pid_namespace) = namespaces.get(LinuxNamespaceType::Pid) {
+        namespaces
+            .unshare_or_setns(pid_namespace)
+            .with_context(|| format!("Failed to enter pid namespace: {:?}", pid_namespace))?;
     }
 
-    // join existing namespaces
-    let bind_service = if let Some(ns) = linux.namespaces.as_ref() {
-        let namespaces = Namespaces::from(ns);
-        namespaces.apply_setns()?;
+    // We only need for init process to send us the ChildReady.
+    let child_to_parent = &mut channel::Channel::new()?;
+    // We resued the args passed in, but replace with a new set of channels.
+    let init_args = ContainerInitArgs { ..args };
+    // We have to record the pid of the child (container init process), since
+    // the child will be inside the pid namespace. We can't rely on child_ready
+    // to send us the correct pid.
+    let pid = fork::container_fork(|| container_init(init_args, child_to_parent))?;
+    // There is no point using the pid returned here, since the child will be
+    // inside the pid namespace already.
+    child_to_parent.wait_for_child_ready()?;
+    // After the child (the container init process) becomes ready, we can signal
+    // the parent (the main process) that we are ready.
+    intermediate_to_main.send_child_ready(pid)?;
+
+    Ok(())
+}
+
+pub fn container_init(
+    args: ContainerInitArgs,
+    init_to_intermediate: &mut channel::Channel,
+) -> Result<()> {
+    let command = &args.syscall;
+    let spec = &args.spec;
+    let linux = spec.linux.as_ref().context("no linux in spec")?;
+    // Need to create the notify socket before we pivot root, since the unix
+    // domain socket used here is outside of the rootfs of container. During
+    // exec, need to create the socket before we exter into existing mount
+    // namespace.
+    let mut notify_socket: NotifyListener = NotifyListener::new(&args.notify_path)?;
+    let proc = spec.process.as_ref().context("no process in spec")?;
+    let mut envs: Vec<String> = proc.env.as_ref().unwrap_or(&vec![]).clone();
+    let rootfs = &args.rootfs;
+    let hooks = spec.hooks.as_ref();
+    let container = args.container.as_ref();
+    let namespaces = Namespaces::from(linux.namespaces.as_ref());
+
+    // set up tty if specified
+    if let Some(csocketfd) = args.console_socket {
+        tty::setup_console(&csocketfd).with_context(|| "Failed to set up tty")?;
+    }
+
+    // Enter into rest of namespace. Note, we already entered into user and pid
+    // namespace. We also have to enter into mount namespace last since
+    // namespace may be bind to /proc path. The /proc path will need to be
+    // accessed before pivot_root.
+    namespaces
+        .apply_namespaces(|ns_type| -> bool {
+            ns_type != CloneFlags::CLONE_NEWUSER
+                && ns_type != CloneFlags::CLONE_NEWPID
+                && ns_type != CloneFlags::CLONE_NEWNS
+        })
+        .with_context(|| "Failed to apply namespaces")?;
+    if let Some(mount_namespace) = namespaces.get(LinuxNamespaceType::Mount) {
         namespaces
-            .clone_flags
-            .contains(sched::CloneFlags::CLONE_NEWUSER)
-    } else {
-        false
-    };
+            .unshare_or_setns(mount_namespace)
+            .with_context(|| format!("Failed to enter mount namespace: {:?}", mount_namespace))?;
+    }
 
     if let Some(hostname) = spec.hostname.as_ref() {
         command.set_hostname(hostname)?;
@@ -193,6 +295,8 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
         if let Some(hooks) = hooks {
             hooks::run_hooks(hooks.create_container.as_ref(), container)?
         }
+
+        let bind_service = namespaces.get(LinuxNamespaceType::User).is_some();
         rootfs::prepare_rootfs(spec, rootfs, bind_service)
             .with_context(|| "Failed to prepare rootfs")?;
 
@@ -202,7 +306,8 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
             .with_context(|| format!("Failed to pivot root to {:?}", rootfs))?;
 
         if let Some(kernel_params) = &linux.sysctl {
-            sysctl(kernel_params)?;
+            sysctl(kernel_params)
+                .with_context(|| format!("Failed to sysctl: {:?}", kernel_params))?;
         }
     }
 
@@ -273,9 +378,7 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     };
 
     // clean up and handle perserved fds.
-    if args.init {
-        cleanup_file_descriptors(preserve_fds).with_context(|| "Failed to clean up extra fds")?;
-    }
+    cleanup_file_descriptors(preserve_fds).with_context(|| "Failed to clean up extra fds")?;
 
     // change directory to process.cwd if process.cwd is not empty
     if do_chdir {
@@ -289,7 +392,10 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
         .for_each(|(key, value)| env::set_var(key, value));
 
     // notify parents that the init process is ready to execute the payload.
-    child.notify_parent()?;
+    // Note, we pass -1 here because we are already inside the pid namespace.
+    // The pid outside the pid namespace should be recorded by the intermediate
+    // process.
+    init_to_intermediate.send_child_ready(Pid::from_raw(-1))?;
 
     // listing on the notify socket for container start command
     notify_socket.wait_for_container_start()?;
@@ -311,59 +417,6 @@ pub fn container_init(args: ContainerInitArgs) -> Result<()> {
     // After do_exec is called, the process is replaced with the container
     // payload through execvp, so it should never reach here.
     unreachable!();
-}
-
-fn sysctl(kernel_params: &HashMap<String, String>) -> Result<()> {
-    let sys = PathBuf::from("/proc/sys");
-    for (kernel_param, value) in kernel_params {
-        let path = sys.join(kernel_param.replace(".", "/"));
-        log::debug!(
-            "apply value {} to kernel parameter {}.",
-            value,
-            kernel_param
-        );
-        fs::write(path, value.as_bytes())
-            .with_context(|| format!("failed to set sysctl {}={}", kernel_param, value))?;
-    }
-
-    Ok(())
-}
-
-// make a read only path
-// The first time we bind mount, other flags are ignored,
-// so we need to mount it once and then remount it with the necessary flags specified.
-// https://man7.org/linux/man-pages/man2/mount.2.html
-fn readonly_path(path: &str) -> Result<()> {
-    match nix_mount::<str, str, str, str>(
-        Some(path),
-        path,
-        None::<&str>,
-        MsFlags::MS_BIND | MsFlags::MS_REC,
-        None::<&str>,
-    ) {
-        // ignore error if path is not exist.
-        Err(nix::errno::Errno::ENOENT) => {
-            log::warn!("readonly path {:?} not exist", path);
-            return Ok(());
-        }
-        Err(err) => bail!(err),
-        Ok(_) => {}
-    }
-
-    nix_mount::<str, str, str, str>(
-        Some(path),
-        path,
-        None::<&str>,
-        MsFlags::MS_NOSUID
-            | MsFlags::MS_NODEV
-            | MsFlags::MS_NOEXEC
-            | MsFlags::MS_BIND
-            | MsFlags::MS_REMOUNT
-            | MsFlags::MS_RDONLY,
-        None::<&str>,
-    )?;
-    log::debug!("readonly path {:?} mounted", path);
-    Ok(())
 }
 
 #[cfg(test)]
