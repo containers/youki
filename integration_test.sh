@@ -2,6 +2,7 @@
 
 ROOT=$(pwd)
 RUNTIME=${ROOT}/youki
+PATTERN=${1:-.}
 
 cd integration_test/src/github.com/opencontainers/runtime-tools
 
@@ -92,6 +93,12 @@ for case in "${test_cases[@]}"; do
     echo "Skip $case bacause your enviroment doesn't support this test case"
     continue
   fi
+
+  if [ $PATTERN != "." ]; then
+    if [[ ! $case =~ $PATTERN ]]; then
+      continue
+    fi
+  fi 
 
   echo "Running $case"
   logfile="./log/$case.log"
