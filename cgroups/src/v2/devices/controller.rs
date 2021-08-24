@@ -8,9 +8,21 @@ use nix::fcntl::OFlag;
 use nix::sys::stat::Mode;
 use oci_spec::{LinuxDevice, LinuxDeviceCgroup, LinuxDeviceType, LinuxResources};
 
-pub struct Devices {}
+use crate::v2::controller::Controller;
 
 const LICENSE: &'static str = &"Apache";
+
+pub struct Devices {}
+
+impl Controller for Devices {
+    fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
+        #[cfg(not(feature = "cgroupsv2_devices"))]
+        return Ok(());
+
+        #[cfg(feature = "cgroupsv2_devices")]
+        return controller::Devices::apply(linux_resources, cgroup_root);
+    }
+}
 
 impl Devices {
     pub fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
