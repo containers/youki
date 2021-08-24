@@ -9,11 +9,7 @@ use anyhow::{bail, Result};
 use nix::unistd::Pid;
 use oci_spec::{FreezerState, LinuxResources};
 
-use super::{
-    controller::Controller, controller_type::ControllerType, cpu::Cpu, cpuset::CpuSet,
-    devices::Devices, freezer::Freezer, hugetlb::HugeTlb, io::Io, memory::Memory, pids::Pids,
-    unified::Unified,
-};
+use super::{controller::Controller, controller_type::{ControllerType, PseudoControllerType, CONTROLLER_TYPES, PSEUDO_CONTROLLER_TYPES}, cpu::Cpu, cpuset::CpuSet, devices::Devices, freezer::Freezer, hugetlb::HugeTlb, io::Io, memory::Memory, pids::Pids, unified::Unified};
 use crate::{
     common::{self, CgroupManager, PathBufExt, CGROUP_PROCS},
     stats::{Stats, StatsProvider},
@@ -21,17 +17,6 @@ use crate::{
 
 const CGROUP_CONTROLLERS: &str = "cgroup.controllers";
 const CGROUP_SUBTREE_CONTROL: &str = "cgroup.subtree_control";
-
-const CONTROLLER_TYPES: &[ControllerType] = &[
-    ControllerType::Cpu,
-    ControllerType::CpuSet,
-    ControllerType::HugeTlb,
-    ControllerType::Io,
-    ControllerType::Memory,
-    ControllerType::Pids,
-    ControllerType::Freezer,
-    ControllerType::Devices,
-];
 
 pub struct Manager {
     root_path: PathBuf,
@@ -100,7 +85,6 @@ impl Manager {
                 "memory" => controllers.push(ControllerType::Memory),
                 "pids" => controllers.push(ControllerType::Pids),
                 "freezer" => controllers.push(ControllerType::Freezer),
-                "devices" => controllers.push(ControllerType::Devices),
                 tpe => log::warn!("Controller {} is not yet implemented.", tpe),
             }
         }
@@ -133,15 +117,16 @@ impl CgroupManager for Manager {
                 ControllerType::Memory => Memory::apply(linux_resources, &self.full_path)?,
                 ControllerType::Pids => Pids::apply(linux_resources, &self.full_path)?,
                 ControllerType::Freezer => Freezer::apply(linux_resources, &self.full_path)?,
-                ControllerType::Devices => Devices::apply(linux_resources, &self.full_path)?,
             }
         }
 
-        Unified::apply(
-            linux_resources,
-            &self.full_path,
-            self.get_available_controllers()?,
-        )?;
+        for pseudoctlr in PSEUDO_CONTROLLER_TYPES {
+            match pseudoctlr {
+                PseudoControllerType::Devices => Devices::apply(linux_resources, &self.full_path)?,
+                PseudoControllerType::Unified => Unified::apply(linux_resources, &self.cgroup_path, self.get_available_controllers()?)?,
+            }         
+        }
+
         Ok(())
     }
 

@@ -8,10 +8,7 @@ use nix::unistd::Pid;
 use oci_spec::{FreezerState, LinuxResources};
 use std::path::{Path, PathBuf};
 
-use super::{
-    controller::Controller, controller_type::ControllerType, cpu::Cpu, cpuset::CpuSet,
-    devices::Devices, freezer::Freezer, hugetlb::HugeTlb, io::Io, memory::Memory, pids::Pids,
-};
+use super::{controller::Controller, controller_type::{ControllerType, PseudoControllerType}, cpu::Cpu, cpuset::CpuSet, devices::Devices, freezer::Freezer, hugetlb::HugeTlb, io::Io, memory::Memory, pids::Pids, unified::Unified};
 use crate::common::{self, CgroupManager, PathBufExt};
 use crate::stats::Stats;
 
@@ -235,10 +232,10 @@ impl CgroupManager for SystemDCGroupManager {
                 ControllerType::Memory => Memory::apply(linux_resources, &self.full_path)?,
                 ControllerType::Pids => Pids::apply(linux_resources, &self.full_path)?,
                 ControllerType::Freezer => Freezer::apply(linux_resources, &self.full_path)?,
-                ControllerType::Devices => Devices::apply(linux_resources, &self.full_path)?,
             }
         }
 
+        Devices::apply(linux_resources, &self.full_path)?;
         Ok(())
     }
 
