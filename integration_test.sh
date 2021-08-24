@@ -17,6 +17,8 @@ test_cases=(
   "kill/kill.t"
   "kill_no_effect/kill_no_effect.t"
   "killsig/killsig.t"
+  # This case includes checking for features that are excluded from linux kernel 5.0, so even runc doesn't pass it.
+  # ref. https://github.com/docker/cli/pull/2908
   # "linux_cgroups_blkio/linux_cgroups_blkio.t"
   "linux_cgroups_cpus/linux_cgroups_cpus.t"
   "linux_cgroups_devices/linux_cgroups_devices.t"
@@ -24,6 +26,8 @@ test_cases=(
   "linux_cgroups_memory/linux_cgroups_memory.t"
   "linux_cgroups_network/linux_cgroups_network.t"
   "linux_cgroups_pids/linux_cgroups_pids.t"
+  # This case includes checking for features that are excluded from linux kernel 5.0, so even runc doesn't pass it.
+  # ref. https://github.com/docker/cli/pull/2908
   # "linux_cgroups_relative_blkio/linux_cgroups_relative_blkio.t"
   "linux_cgroups_relative_cpus/linux_cgroups_relative_cpus.t" 
   "linux_cgroups_relative_devices/linux_cgroups_relative_devices.t"
