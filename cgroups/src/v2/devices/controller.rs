@@ -10,7 +10,6 @@ use oci_spec::{LinuxDevice, LinuxDeviceCgroup, LinuxDeviceType, LinuxResources};
 
 pub struct Devices {}
 
-// FIXME: which license?
 const LICENSE: &'static str = &"Apache";
 
 impl Devices {
