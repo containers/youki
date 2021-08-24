@@ -73,7 +73,8 @@ $ sudo apt-get install   \
       pkg-config         \
       libsystemd-dev     \
       libdbus-glib-1-dev \
-      build-essential
+      build-essential    \
+      libelf-dev
 ```
 
 ### Fedora, Centos, RHEL and related distributions
@@ -82,7 +83,8 @@ $ sudo apt-get install   \
 $ sudo dnf install   \
       pkg-config     \
       systemd-devel  \
-      dbus-devel
+      dbus-devel     \
+      elfutils-libelf-devel \
 ```
 
 ## Build
