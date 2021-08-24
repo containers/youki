@@ -1,16 +1,13 @@
 use crate::{
     hooks,
     process::{channel, fork, init},
-    rootless::Rootless,
+    rootless::{self, Rootless},
     syscall::linux::LinuxSyscall,
     utils,
 };
 use anyhow::{Context, Result};
 use cgroups;
-use nix::unistd::Pid;
 use oci_spec::Spec;
-use std::path::Path;
-use std::process::Command;
 use std::{fs, os::unix::prelude::RawFd, path::PathBuf};
 
 use super::{Container, ContainerStatus};
@@ -91,8 +88,8 @@ impl<'a> ContainerBuilderImpl<'a> {
             child_to_parent.wait_for_mapping_request()?;
             log::debug!("write mapping for pid {:?}", intermediate_pid);
             utils::write_file(format!("/proc/{}/setgroups", intermediate_pid), "deny")?;
-            write_uid_mapping(intermediate_pid, self.rootless.as_ref())?;
-            write_gid_mapping(intermediate_pid, self.rootless.as_ref())?;
+            rootless::write_uid_mapping(intermediate_pid, self.rootless.as_ref())?;
+            rootless::write_gid_mapping(intermediate_pid, self.rootless.as_ref())?;
             parent_to_child.send_mapping_written()?;
         }
 
@@ -120,53 +117,4 @@ impl<'a> ContainerBuilderImpl<'a> {
 
         Ok(())
     }
-}
-
-fn write_uid_mapping(target_pid: Pid, rootless: Option<&Rootless>) -> Result<()> {
-    if let Some(rootless) = rootless {
-        if let Some(uid_mappings) = rootless.gid_mappings {
-            return write_id_mapping(
-                &format!("/proc/{}/uid_map", target_pid),
-                uid_mappings,
-                rootless.newuidmap.as_deref(),
-            );
-        }
-    }
-
-    Ok(())
-}
-
-fn write_gid_mapping(target_pid: Pid, rootless: Option<&Rootless>) -> Result<()> {
-    if let Some(rootless) = rootless {
-        if let Some(gid_mappings) = rootless.gid_mappings {
-            return write_id_mapping(
-                &format!("/proc/{}/gid_map", target_pid),
-                gid_mappings,
-                rootless.newgidmap.as_deref(),
-            );
-        }
-    }
-
-    Ok(())
-}
-
-fn write_id_mapping(
-    map_file: &str,
-    mappings: &[oci_spec::LinuxIdMapping],
-    map_binary: Option<&Path>,
-) -> Result<()> {
-    let mappings: Vec<String> = mappings
-        .iter()
-        .map(|m| format!("{} {} {}", m.container_id, m.host_id, m.size))
-        .collect();
-    if mappings.len() == 1 {
-        utils::write_file(map_file, mappings.first().unwrap())?;
-    } else {
-        Command::new(map_binary.unwrap())
-            .args(mappings)
-            .output()
-            .with_context(|| format!("failed to execute {:?}", map_binary))?;
-    }
-
-    Ok(())
 }

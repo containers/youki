@@ -1,9 +1,10 @@
-use std::{env, path::PathBuf};
-
+use crate::{namespaces::Namespaces, utils};
 use anyhow::{bail, Context, Result};
+use nix::unistd::Pid;
 use oci_spec::{Linux, LinuxIdMapping, LinuxNamespaceType, Mount, Spec};
-
-use crate::namespaces::Namespaces;
+use std::path::Path;
+use std::process::Command;
+use std::{env, path::PathBuf};
 
 #[derive(Debug, Clone)]
 pub struct Rootless<'a> {
@@ -28,19 +29,22 @@ impl<'a> From<&'a Linux> for Rootless<'a> {
     }
 }
 
+// If user namespace is detected, then we are going into rootless.
+// If we are not root, check if we are user namespace.
 pub fn detect_rootless(spec: &Spec) -> Result<Option<Rootless>> {
     let rootless = if should_use_rootless() {
         log::debug!("rootless container should be created");
         log::warn!(
             "resource constraints and multi id mapping is unimplemented for rootless containers"
         );
-        validate(spec)?;
+        validate(spec).context("The spec failed to comply to rootless requirement")?;
         let linux = spec.linux.as_ref().context("no linux in spec")?;
         let mut rootless = Rootless::from(linux);
         if let Some((uid_binary, gid_binary)) = lookup_map_binaries(linux)? {
             rootless.newuidmap = Some(uid_binary);
             rootless.newgidmap = Some(gid_binary);
         }
+
         Some(rootless)
     } else {
         None
@@ -152,4 +156,53 @@ fn lookup_map_binary(binary: &str) -> Result<Option<PathBuf>> {
         .split_terminator(':')
         .find(|p| PathBuf::from(p).join(binary).exists())
         .map(PathBuf::from))
+}
+
+pub fn write_uid_mapping(target_pid: Pid, rootless: Option<&Rootless>) -> Result<()> {
+    if let Some(rootless) = rootless {
+        if let Some(uid_mappings) = rootless.gid_mappings {
+            return write_id_mapping(
+                &format!("/proc/{}/uid_map", target_pid),
+                uid_mappings,
+                rootless.newuidmap.as_deref(),
+            );
+        }
+    }
+
+    Ok(())
+}
+
+pub fn write_gid_mapping(target_pid: Pid, rootless: Option<&Rootless>) -> Result<()> {
+    if let Some(rootless) = rootless {
+        if let Some(gid_mappings) = rootless.gid_mappings {
+            return write_id_mapping(
+                &format!("/proc/{}/gid_map", target_pid),
+                gid_mappings,
+                rootless.newgidmap.as_deref(),
+            );
+        }
+    }
+
+    Ok(())
+}
+
+fn write_id_mapping(
+    map_file: &str,
+    mappings: &[oci_spec::LinuxIdMapping],
+    map_binary: Option<&Path>,
+) -> Result<()> {
+    let mappings: Vec<String> = mappings
+        .iter()
+        .map(|m| format!("{} {} {}", m.container_id, m.host_id, m.size))
+        .collect();
+    if mappings.len() == 1 {
+        utils::write_file(map_file, mappings.first().unwrap())?;
+    } else {
+        Command::new(map_binary.unwrap())
+            .args(mappings)
+            .output()
+            .with_context(|| format!("failed to execute {:?}", map_binary))?;
+    }
+
+    Ok(())
 }

@@ -66,7 +66,6 @@ impl InitContainerBuilder {
         };
 
         let rootless = detect_rootless(&spec)?;
-
         let mut builder_impl = ContainerBuilderImpl {
             init: true,
             syscall: self.base.syscall,
