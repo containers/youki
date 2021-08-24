@@ -77,7 +77,7 @@ check_enviroment() {
 
 for case in "${test_cases[@]}"; do
   if [[ ! -e "${ROOT}/integration_test/src/github.com/opencontainers/runtime-tools/validation/$case" ]]; then
-    GOPATH=${ROOT}/integration_test make runtimetest validation-executables
+    GO111MODULE=auto GOPATH=${ROOT}/integration_test make runtimetest validation-executables
     break
   fi
 done
