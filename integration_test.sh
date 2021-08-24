@@ -90,7 +90,11 @@ for case in "${test_cases[@]}"; do
   fi
 
   echo "Running $case"
-  if [ 0 -ne $(sudo RUST_BACKTRACE=1 YOUKI_LOG_LEVEL=debug RUNTIME=${RUNTIME} ${ROOT}/integration_test/src/github.com/opencontainers/runtime-tools/validation/$case | grep "not ok" | wc -l) ]; then
+  logfile="./log/$case.log"
+  mkdir -p "$(dirname $logfile)"
+  sudo RUST_BACKTRACE=1 RUNTIME=${RUNTIME} ${ROOT}/integration_test/src/github.com/opencontainers/runtime-tools/validation/$case >$logfile 2>&1
+  if [ 0 -ne $(cat $logfile | grep "not ok" | wc -l ) ]; then
+      cat $logfile
       exit 1
   fi
   sleep 1
