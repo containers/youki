@@ -311,6 +311,16 @@ pub fn container_init(
         }
     }
 
+    if let Some(true) = spec.root.as_ref().map(|r| r.readonly.unwrap_or(false)) {
+        nix_mount(
+            None::<&str>,
+            "/",
+            None::<&str>,
+            MsFlags::MS_RDONLY | MsFlags::MS_REMOUNT | MsFlags::MS_BIND,
+            None::<&str>,
+        )?
+    }
+
     if let Some(paths) = &linux.readonly_paths {
         // mount readonly path
         for path in paths {
