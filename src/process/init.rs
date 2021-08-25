@@ -3,7 +3,7 @@ use nix::mount::mount as nix_mount;
 use nix::mount::MsFlags;
 use nix::sched::CloneFlags;
 use nix::{
-    fcntl, sched,
+    fcntl,
     sys::statfs,
     unistd::{self, Gid, Pid, Uid},
 };
@@ -157,8 +157,6 @@ pub struct ContainerInitArgs {
     pub rootfs: PathBuf,
     /// Socket to communicate the file descriptor of the ptty
     pub console_socket: Option<RawFd>,
-    /// Options for rootless containers
-    pub is_rootless: bool,
     /// Path to the Unix Domain Socket to communicate container start
     pub notify_path: PathBuf,
     /// File descriptos preserved/passed to the container init process.
@@ -175,6 +173,7 @@ pub fn container_intermidiate(
     let command = &args.syscall;
     let spec = &args.spec;
     let linux = spec.linux.as_ref().context("no linux in spec")?;
+    let namespaces = Namespaces::from(linux.namespaces.as_ref());
 
     // if Out-of-memory score adjustment is set in specification.  set the score
     // value for the current process check
@@ -191,15 +190,19 @@ pub fn container_intermidiate(
     // namespace will be created, check
     // https://man7.org/linux/man-pages/man7/user_namespaces.7.html for more
     // information
-    if args.is_rootless {
-        log::debug!("creating new user namespace");
-        sched::unshare(sched::CloneFlags::CLONE_NEWUSER)?;
-        // child needs to be dumpable, otherwise the non root parent is not
-        // allowed to write the uid/gid maps
-        prctl::set_dumpable(true).unwrap();
-        intermediate_to_main.send_identifier_mapping_request()?;
-        main_to_intermediate.wait_for_mapping_ack()?;
-        prctl::set_dumpable(false).unwrap();
+    if let Some(user_namespace) = namespaces.get(LinuxNamespaceType::User) {
+        namespaces
+            .unshare_or_setns(user_namespace)
+            .with_context(|| format!("Failed to enter pid namespace: {:?}", user_namespace))?;
+        if user_namespace.path.is_none() {
+            log::debug!("creating new user namespace");
+            // child needs to be dumpable, otherwise the non root parent is not
+            // allowed to write the uid/gid maps
+            prctl::set_dumpable(true).unwrap();
+            intermediate_to_main.send_identifier_mapping_request()?;
+            main_to_intermediate.wait_for_mapping_ack()?;
+            prctl::set_dumpable(false).unwrap();
+        }
     }
 
     // set limits and namespaces to the process
@@ -210,12 +213,7 @@ pub fn container_intermidiate(
         }
     }
 
-    command
-        .set_id(Uid::from_raw(0), Gid::from_raw(0))
-        .context("failed to become root")?;
-
     // Pid namespace requires an extra fork to enter, so we enter pid namespace now.
-    let namespaces = Namespaces::from(linux.namespaces.as_ref());
     if let Some(pid_namespace) = namespaces.get(LinuxNamespaceType::Pid) {
         namespaces
             .unshare_or_setns(pid_namespace)
@@ -331,7 +329,10 @@ pub fn container_init(
         }
     };
 
-    command.set_id(Uid::from_raw(proc.user.uid), Gid::from_raw(proc.user.gid))?;
+    command
+        .set_id(Uid::from_raw(proc.user.uid), Gid::from_raw(proc.user.gid))
+        .context("Failed to configure uid and gid")?;
+
     capabilities::reset_effective(command)?;
     if let Some(caps) = &proc.capabilities {
         capabilities::drop_privileges(caps, command)?;

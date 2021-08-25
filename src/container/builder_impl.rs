@@ -73,7 +73,6 @@ impl<'a> ContainerBuilderImpl<'a> {
             spec: self.spec.clone(),
             rootfs: self.rootfs.clone(),
             console_socket: self.console_socket,
-            is_rootless: self.rootless.is_some(),
             notify_path: self.notify_path.clone(),
             preserve_fds: self.preserve_fds,
             container: self.container.clone(),
@@ -96,14 +95,18 @@ impl<'a> ContainerBuilderImpl<'a> {
         let init_pid = child_to_parent.wait_for_child_ready()?;
         log::debug!("init pid is {:?}", init_pid);
 
-        cmanager.add_task(init_pid)?;
+        cmanager
+            .add_task(init_pid)
+            .context("Failed to add tasks to cgroup manager")?;
         if self.rootless.is_none() && linux.resources.is_some() && self.init {
-            cmanager.apply(linux.resources.as_ref().unwrap())?;
+            cmanager
+                .apply(linux.resources.as_ref().unwrap())
+                .context("Failed to apply resource limits through cgroup")?;
         }
 
         // if file to write the pid to is specified, write pid of the child
         if let Some(pid_file) = &self.pid_file {
-            fs::write(&pid_file, format!("{}", init_pid))?;
+            fs::write(&pid_file, format!("{}", init_pid)).context("Failed to write pid file")?;
         }
 
         if let Some(container) = &self.container {
@@ -112,7 +115,8 @@ impl<'a> ContainerBuilderImpl<'a> {
                 .update_status(ContainerStatus::Created)
                 .set_creator(nix::unistd::geteuid().as_raw())
                 .set_pid(init_pid.as_raw())
-                .save()?;
+                .save()
+                .context("Failed to save container state")?;
         }
 
         Ok(())
