@@ -8,9 +8,11 @@ use nix::unistd::Pid;
 use oci_spec::{FreezerState, LinuxResources};
 use std::path::{Path, PathBuf};
 
+#[cfg(feature = "cgroupsv2_devices")]
+use super::devices::Devices;
 use super::{
     controller::Controller, controller_type::ControllerType, cpu::Cpu, cpuset::CpuSet,
-    devices::Devices, freezer::Freezer, hugetlb::HugeTlb, io::Io, memory::Memory, pids::Pids,
+    freezer::Freezer, hugetlb::HugeTlb, io::Io, memory::Memory, pids::Pids,
 };
 use crate::common::{self, CgroupManager, PathBufExt};
 use crate::stats::Stats;
@@ -238,6 +240,7 @@ impl CgroupManager for SystemDCGroupManager {
             }
         }
 
+        #[cfg(feature = "cgroupsv2_devices")]
         Devices::apply(linux_resources, &self.full_path)?;
         Ok(())
     }

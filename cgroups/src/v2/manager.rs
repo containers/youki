@@ -9,6 +9,8 @@ use anyhow::{bail, Result};
 use nix::unistd::Pid;
 use oci_spec::{FreezerState, LinuxResources};
 
+#[cfg(feature = "cgroupsv2_devices")]
+use super::devices::Devices;
 use super::{
     controller::Controller,
     controller_type::{
@@ -16,7 +18,6 @@ use super::{
     },
     cpu::Cpu,
     cpuset::CpuSet,
-    devices::Devices,
     freezer::Freezer,
     hugetlb::HugeTlb,
     io::Io,
@@ -134,16 +135,17 @@ impl CgroupManager for Manager {
             }
         }
 
+        #[cfg(feature = "cgroupsv2_devices")]
+        Devices::apply(linux_resources, &self.cgroup_path)?;
+
         for pseudoctlr in PSEUDO_CONTROLLER_TYPES {
             match pseudoctlr {
-                PseudoControllerType::Devices => {
-                    Devices::apply(linux_resources, &self.cgroup_path)?
-                }
                 PseudoControllerType::Unified => Unified::apply(
                     linux_resources,
                     &self.cgroup_path,
                     self.get_available_controllers()?,
                 )?,
+                _ => {}
             }
         }
 

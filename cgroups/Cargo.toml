@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2018"
 
 [features]
-default = ["systemd_cgroups", "cgroupsv2_devices"]
+default = ["systemd_cgroups"]
 systemd_cgroups = ["systemd"]
 cgroupsv2_devices = ["rbpf", "libbpf-sys", "errno", "libc"]
 
