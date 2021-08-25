@@ -4,6 +4,3 @@ pub mod emulator;
 pub mod program;
 
 pub use controller::Devices;
-
-
-

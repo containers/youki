@@ -52,7 +52,5 @@ impl Display for PseudoControllerType {
     }
 }
 
-pub const PSEUDO_CONTROLLER_TYPES: &[PseudoControllerType] = &[
-    PseudoControllerType::Devices,
-    PseudoControllerType::Unified,
-];
+pub const PSEUDO_CONTROLLER_TYPES: &[PseudoControllerType] =
+    &[PseudoControllerType::Devices, PseudoControllerType::Unified];

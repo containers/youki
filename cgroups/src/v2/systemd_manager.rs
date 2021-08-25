@@ -8,7 +8,10 @@ use nix::unistd::Pid;
 use oci_spec::{FreezerState, LinuxResources};
 use std::path::{Path, PathBuf};
 
-use super::{controller::Controller, controller_type::{ControllerType, PseudoControllerType}, cpu::Cpu, cpuset::CpuSet, devices::Devices, freezer::Freezer, hugetlb::HugeTlb, io::Io, memory::Memory, pids::Pids, unified::Unified};
+use super::{
+    controller::Controller, controller_type::ControllerType, cpu::Cpu, cpuset::CpuSet,
+    devices::Devices, freezer::Freezer, hugetlb::HugeTlb, io::Io, memory::Memory, pids::Pids,
+};
 use crate::common::{self, CgroupManager, PathBufExt};
 use crate::stats::Stats;
 

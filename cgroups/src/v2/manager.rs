@@ -9,7 +9,21 @@ use anyhow::{bail, Result};
 use nix::unistd::Pid;
 use oci_spec::{FreezerState, LinuxResources};
 
-use super::{controller::Controller, controller_type::{ControllerType, PseudoControllerType, CONTROLLER_TYPES, PSEUDO_CONTROLLER_TYPES}, cpu::Cpu, cpuset::CpuSet, devices::Devices, freezer::Freezer, hugetlb::HugeTlb, io::Io, memory::Memory, pids::Pids, unified::Unified};
+use super::{
+    controller::Controller,
+    controller_type::{
+        ControllerType, PseudoControllerType, CONTROLLER_TYPES, PSEUDO_CONTROLLER_TYPES,
+    },
+    cpu::Cpu,
+    cpuset::CpuSet,
+    devices::Devices,
+    freezer::Freezer,
+    hugetlb::HugeTlb,
+    io::Io,
+    memory::Memory,
+    pids::Pids,
+    unified::Unified,
+};
 use crate::{
     common::{self, CgroupManager, PathBufExt, CGROUP_PROCS},
     stats::{Stats, StatsProvider},
@@ -122,9 +136,15 @@ impl CgroupManager for Manager {
 
         for pseudoctlr in PSEUDO_CONTROLLER_TYPES {
             match pseudoctlr {
-                PseudoControllerType::Devices => Devices::apply(linux_resources, &self.full_path)?,
-                PseudoControllerType::Unified => Unified::apply(linux_resources, &self.cgroup_path, self.get_available_controllers()?)?,
-            }         
+                PseudoControllerType::Devices => {
+                    Devices::apply(linux_resources, &self.cgroup_path)?
+                }
+                PseudoControllerType::Unified => Unified::apply(
+                    linux_resources,
+                    &self.cgroup_path,
+                    self.get_available_controllers()?,
+                )?,
+            }
         }
 
         Ok(())

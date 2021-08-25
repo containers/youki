@@ -1,13 +1,14 @@
 use std::os::unix::io::AsRawFd;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::Result;
 
 use super::*;
 use nix::fcntl::OFlag;
 use nix::sys::stat::Mode;
-use oci_spec::{LinuxDevice, LinuxDeviceCgroup, LinuxDeviceType, LinuxResources};
+use oci_spec::{LinuxDeviceCgroup, LinuxResources};
 
+use crate::common::{default_allow_devices, default_devices};
 use crate::v2::controller::Controller;
 
 const LICENSE: &'static str = &"Apache";
@@ -20,19 +21,22 @@ impl Controller for Devices {
         return Ok(());
 
         #[cfg(feature = "cgroupsv2_devices")]
-        return controller::Devices::apply(linux_resources, cgroup_root);
+        return Self::apply_devices(cgroup_root, &linux_resources.devices);
     }
 }
 
 impl Devices {
-    pub fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
+    pub fn apply_devices(
+        cgroup_root: &Path,
+        linux_devices: &Option<Vec<LinuxDeviceCgroup>>,
+    ) -> Result<()> {
         log::debug!("Apply Devices cgroup config");
 
         // FIXME: should we start as "deny all"?
         let mut emulator = emulator::Emulator::with_default_allow(false);
 
         // FIXME: apply user-defined and default rules in which order?
-        if let Some(devices) = linux_resources.devices.as_ref() {
+        if let Some(devices) = linux_devices {
             for d in devices {
                 log::debug!("apply user defined rule: {:?}", d);
                 emulator.add_rule(d)?;
@@ -40,8 +44,8 @@ impl Devices {
         }
 
         for d in [
-            Self::default_devices().iter().map(|d| d.into()).collect(),
-            Self::default_allow_devices(),
+            default_devices().iter().map(|d| d.into()).collect(),
+            default_allow_devices(),
         ]
         .concat()
         {
@@ -82,115 +86,6 @@ impl Devices {
         }
 
         Ok(())
-    }
-    // FIXME: move to common
-    fn default_allow_devices() -> Vec<LinuxDeviceCgroup> {
-        vec![
-            LinuxDeviceCgroup {
-                allow: true,
-                typ: Some(LinuxDeviceType::C),
-                major: None,
-                minor: None,
-                access: "m".to_string().into(),
-            },
-            LinuxDeviceCgroup {
-                allow: true,
-                typ: Some(LinuxDeviceType::B),
-                major: None,
-                minor: None,
-                access: "m".to_string().into(),
-            },
-            // /dev/console
-            LinuxDeviceCgroup {
-                allow: true,
-                typ: Some(LinuxDeviceType::C),
-                major: Some(5),
-                minor: Some(1),
-                access: "rwm".to_string().into(),
-            },
-            // /dev/pts
-            LinuxDeviceCgroup {
-                allow: true,
-                typ: Some(LinuxDeviceType::C),
-                major: Some(136),
-                minor: None,
-                access: "rwm".to_string().into(),
-            },
-            LinuxDeviceCgroup {
-                allow: true,
-                typ: Some(LinuxDeviceType::C),
-                major: Some(5),
-                minor: Some(2),
-                access: "rwm".to_string().into(),
-            },
-            // tun/tap
-            LinuxDeviceCgroup {
-                allow: true,
-                typ: Some(LinuxDeviceType::C),
-                major: Some(10),
-                minor: Some(200),
-                access: "rwm".to_string().into(),
-            },
-        ]
-    }
-
-    pub fn default_devices() -> Vec<LinuxDevice> {
-        vec![
-            LinuxDevice {
-                path: PathBuf::from("/dev/null"),
-                typ: LinuxDeviceType::C,
-                major: 1,
-                minor: 3,
-                file_mode: Some(0o066),
-                uid: None,
-                gid: None,
-            },
-            LinuxDevice {
-                path: PathBuf::from("/dev/zero"),
-                typ: LinuxDeviceType::C,
-                major: 1,
-                minor: 5,
-                file_mode: Some(0o066),
-                uid: None,
-                gid: None,
-            },
-            LinuxDevice {
-                path: PathBuf::from("/dev/full"),
-                typ: LinuxDeviceType::C,
-                major: 1,
-                minor: 7,
-                file_mode: Some(0o066),
-                uid: None,
-                gid: None,
-            },
-            LinuxDevice {
-                path: PathBuf::from("/dev/tty"),
-                typ: LinuxDeviceType::C,
-                major: 5,
-                minor: 0,
-                file_mode: Some(0o066),
-                uid: None,
-                gid: None,
-            },
-            LinuxDevice {
-                path: PathBuf::from("/dev/urandom"),
-                typ: LinuxDeviceType::C,
-                major: 1,
-                minor: 9,
-                file_mode: Some(0o066),
-                uid: None,
-                gid: None,
-            },
-            LinuxDevice {
-                path: PathBuf::from("/dev/random"),
-                typ: LinuxDeviceType::C,
-                major: 1,
-                minor: 8,
-                file_mode: Some(0o066),
-                uid: None,
-                gid: None,
-            },
-        ]
     }
 }
 
