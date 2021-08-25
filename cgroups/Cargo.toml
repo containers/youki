@@ -2,6 +2,7 @@
 name = "cgroups"
 version = "0.1.0"
 edition = "2018"
+autoexamples = false
 
 [features]
 default = ["systemd_cgroups"]
