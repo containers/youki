@@ -158,6 +158,8 @@ Go and node-tap are required to run integration test. See the [opencontainers/ru
 ```
 $ git submodule update --init --recursive
 $ ./integration_test.sh
+# run specific test_cases with pattern
+$ ./integration_test.sh linux_*
 ```
 
 ### Setting up Vagrant
