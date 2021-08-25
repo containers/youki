@@ -1,6 +1,8 @@
 youki
 
 /tutorial
+/rootfs
+
 .idea/
 
 **/target
@@ -9,4 +11,6 @@ youki
 tags
 tags.lock
 tags.temp
+/config.json
+
 
