@@ -49,6 +49,11 @@ youki is not at the practical stage yet. However, it is getting closer to practi
 |    Rootless    |   Running a container without root privileges   | It works, but cgroups isn't supported. WIP on [#77](https://github.com/containers/youki/issues/77)  |
 | OCI Compliance |        Compliance with OCI Runtime Spec         |                                   39 out of 55 test cases passing                                   |
 
+# Design and implementation of youki
+![sequence diagram of youki](docs/.drawio.svg)
+
+More details are in the works [#14](https://github.com/containers/youki/issues/14)
+
 # Getting Started
 
 Local build is only supported on linux.
@@ -177,10 +182,6 @@ $ ./build.sh
 # Community
 
 We also have an active [Discord](https://discord.gg/h7R3HgWUct) if you'd like to come and chat with us.
-
-# Design and implementation of youki
-
-TBD(WIP on [#14](https://github.com/containers/youki/issues/14))
 
 # Contribution
 
