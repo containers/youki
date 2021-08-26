@@ -61,11 +61,25 @@ jobs:
         run: ./build.sh --release
       - name: Run tests
         run: cargo test
+        env:
+          CARGO_INCREMENTAL: '0'
+          RUSTFLAGS: '-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zpanic_abort_tests'
+          RUSTDOCFLAGS: '-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zpanic_abort_tests'
       - name: Run doc tests
         run: cargo test --doc
       - name: Run cgroup tests
         working-directory: cgroups
         run: cargo test
+        env:
+          CARGO_INCREMENTAL: '0'
+          RUSTFLAGS: '-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zpanic_abort_tests'
+          RUSTDOCFLAGS: '-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zpanic_abort_tests'
+      - name: Coverage
+        uses: actions-rs/grcov@v0.1
+        with:
+          config: .github/grcov.yml
+      - name: Upload Results
+        uses: codecov/codecov-action@v2
   integration_tests:
     runs-on: ubuntu-latest
     strategy:
