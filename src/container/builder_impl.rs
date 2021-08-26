@@ -1,5 +1,6 @@
 use crate::{
     hooks,
+    notify_socket::NotifyListener,
     process::{channel, fork, init},
     rootless::{self, Rootless},
     syscall::linux::LinuxSyscall,
@@ -64,6 +65,12 @@ impl<'a> ContainerBuilderImpl<'a> {
         let parent_to_child = &mut channel::Channel::new()?;
         let child_to_parent = &mut channel::Channel::new()?;
 
+        // Need to create the notify socket before we pivot root, since the unix
+        // domain socket used here is outside of the rootfs of container. During
+        // exec, need to create the socket before we exter into existing mount
+        // namespace.
+        let notify_socket: NotifyListener = NotifyListener::new(&self.notify_path)?;
+
         // This init_args will be passed to the container init process,
         // therefore we will have to move all the variable by value. Since self
         // is a shared reference, we have to clone these variables here.
@@ -73,7 +80,7 @@ impl<'a> ContainerBuilderImpl<'a> {
             spec: self.spec.clone(),
             rootfs: self.rootfs.clone(),
             console_socket: self.console_socket,
-            notify_path: self.notify_path.clone(),
+            notify_socket,
             preserve_fds: self.preserve_fds,
             container: self.container.clone(),
         };

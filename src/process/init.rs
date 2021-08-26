@@ -157,8 +157,8 @@ pub struct ContainerInitArgs {
     pub rootfs: PathBuf,
     /// Socket to communicate the file descriptor of the ptty
     pub console_socket: Option<RawFd>,
-    /// Path to the Unix Domain Socket to communicate container start
-    pub notify_path: PathBuf,
+    /// The Unix Domain Socket to communicate container start
+    pub notify_socket: NotifyListener,
     /// File descriptos preserved/passed to the container init process.
     pub preserve_fds: i32,
     /// Container state
@@ -203,6 +203,16 @@ pub fn container_intermidiate(
             main_to_intermediate.wait_for_mapping_ack()?;
             prctl::set_dumpable(false).unwrap();
         }
+
+        // After UID and GID mapping is configured correctly in the Youki main
+        // process, We want to make sure continue as the root user inside the
+        // new user namespace. This is required because the process of
+        // configuring the container process will require root, even though the
+        // root in the user namespace likely is mapped to an non-priviliged user
+        // on the parent user namespace.
+        command.set_id(Uid::from_raw(0), Gid::from_raw(0)).context(
+            "Failed to configure uid and gid root in the beginning of a new user namespace",
+        )?;
     }
 
     // set limits and namespaces to the process
@@ -245,11 +255,6 @@ pub fn container_init(
     let command = &args.syscall;
     let spec = &args.spec;
     let linux = spec.linux.as_ref().context("no linux in spec")?;
-    // Need to create the notify socket before we pivot root, since the unix
-    // domain socket used here is outside of the rootfs of container. During
-    // exec, need to create the socket before we exter into existing mount
-    // namespace.
-    let mut notify_socket: NotifyListener = NotifyListener::new(&args.notify_path)?;
     let proc = spec.process.as_ref().context("no process in spec")?;
     let mut envs: Vec<String> = proc.env.as_ref().unwrap_or(&vec![]).clone();
     let rootfs = &args.rootfs;
@@ -291,7 +296,8 @@ pub fn container_init(
         // create_container hook needs to be called after the namespace setup, but
         // before pivot_root is called. This runs in the container namespaces.
         if let Some(hooks) = hooks {
-            hooks::run_hooks(hooks.create_container.as_ref(), container)?
+            hooks::run_hooks(hooks.create_container.as_ref(), container)
+                .context("Failed to run create container hooks")?;
         }
 
         let bind_service = namespaces.get(LinuxNamespaceType::User).is_some();
@@ -312,7 +318,7 @@ pub fn container_init(
     if let Some(paths) = &linux.readonly_paths {
         // mount readonly path
         for path in paths {
-            readonly_path(path)?;
+            readonly_path(path).context("Failed to set read only path")?;
         }
     }
 
@@ -333,9 +339,9 @@ pub fn container_init(
         .set_id(Uid::from_raw(proc.user.uid), Gid::from_raw(proc.user.gid))
         .context("Failed to configure uid and gid")?;
 
-    capabilities::reset_effective(command)?;
+    capabilities::reset_effective(command).context("Failed to reset effective capabilities")?;
     if let Some(caps) = &proc.capabilities {
-        capabilities::drop_privileges(caps, command)?;
+        capabilities::drop_privileges(caps, command).context("Failed to drop capabilities")?;
     }
 
     // Take care of LISTEN_FDS used for systemd-active-socket. If the value is
@@ -399,6 +405,7 @@ pub fn container_init(
     init_to_intermediate.send_child_ready(Pid::from_raw(-1))?;
 
     // listing on the notify socket for container start command
+    let notify_socket = args.notify_socket;
     notify_socket.wait_for_container_start()?;
 
     // create_container hook needs to be called after the namespace setup, but

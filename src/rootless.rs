@@ -1,7 +1,7 @@
 use crate::{namespaces::Namespaces, utils};
 use anyhow::{bail, Context, Result};
 use nix::unistd::Pid;
-use oci_spec::{Linux, LinuxIdMapping, LinuxNamespaceType, Mount, Spec};
+use oci_spec::{Linux, LinuxIdMapping, LinuxNamespace, LinuxNamespaceType, Mount, Spec};
 use std::path::Path;
 use std::process::Command;
 use std::{env, path::PathBuf};
@@ -16,23 +16,94 @@ pub struct Rootless<'a> {
     pub uid_mappings: Option<&'a Vec<LinuxIdMapping>>,
     /// Mappings for group ids
     pub gid_mappings: Option<&'a Vec<LinuxIdMapping>>,
+    /// Info on the user namespaces
+    user_namespace: Option<LinuxNamespace>,
 }
 
 impl<'a> From<&'a Linux> for Rootless<'a> {
     fn from(linux: &'a Linux) -> Self {
+        let namespaces = Namespaces::from(linux.namespaces.as_ref());
+        let user_namespace = namespaces.get(LinuxNamespaceType::User);
         Self {
             newuidmap: None,
             newgidmap: None,
             uid_mappings: linux.uid_mappings.as_ref(),
             gid_mappings: linux.gid_mappings.as_ref(),
+            user_namespace: user_namespace.cloned(),
         }
     }
+}
+
+impl<'a> Rootless<'a> {
+    // Get the container uid on the host
+    fn host_uid(self, container_uid: u32) -> Result<u32> {
+        let id = if self.user_namespace.is_some() {
+            if self.uid_mappings.is_none() {
+                bail!("User namespace enabled, but no uid mapping found.");
+            }
+            self::host_id_from_mapping(container_uid, self.uid_mappings.unwrap())?
+        } else {
+            container_uid
+        };
+
+        Ok(id)
+    }
+
+    // Get the container gid on the host
+    fn host_gid(self, container_gid: u32) -> Result<u32> {
+        let id = if self.user_namespace.is_some() {
+            if self.gid_mappings.is_none() {
+                bail!("User namespace enabled, but no gid mapping found.");
+            }
+            self::host_id_from_mapping(container_gid, self.gid_mappings.unwrap())?
+        } else {
+            container_gid
+        };
+
+        Ok(id)
+    }
+
+    // Get the root inside container corresponding uid on the host.
+    pub fn host_root_uid(self) -> Result<u32> {
+        self.host_uid(0)
+    }
+
+    // Get the root inside container corresponding gid on the host.
+    pub fn host_root_gid(self) -> Result<u32> {
+        self.host_gid(0)
+    }
+}
+
+fn host_id_from_mapping(container_id: u32, mappings: &[LinuxIdMapping]) -> Result<u32> {
+    for mapping in mappings {
+        if container_id >= mapping.container_id
+            && container_id < (mapping.container_id + mapping.size)
+        {
+            let host_id = mapping.host_id + (container_id - mapping.container_id);
+            return Ok(host_id);
+        }
+    }
+
+    bail!(format!(
+        "No container id mapping found for {}",
+        container_id,
+    ))
 }
 
 // If user namespace is detected, then we are going into rootless.
 // If we are not root, check if we are user namespace.
 pub fn detect_rootless(spec: &Spec) -> Result<Option<Rootless>> {
-    let rootless = if should_use_rootless() {
+    let linux = spec.linux.as_ref().context("no linux in spec")?;
+    let namespaces = Namespaces::from(linux.namespaces.as_ref());
+    let user_namespace = namespaces.get(LinuxNamespaceType::User);
+    // If conditions requires us to use rootless, we must either create a new
+    // user namespace or enter an exsiting.
+    if should_use_rootless() && user_namespace.is_none() {
+        bail!("Rootless container requires valid user namespace definition");
+    }
+
+    // Go through rootless procedure only when entering into a new user namespace
+    let rootless = if user_namespace.is_some() && user_namespace.unwrap().path.is_none() {
         log::debug!("rootless container should be created");
         log::warn!(
             "resource constraints and multi id mapping is unimplemented for rootless containers"
@@ -47,6 +118,7 @@ pub fn detect_rootless(spec: &Spec) -> Result<Option<Rootless>> {
 
         Some(rootless)
     } else {
+        log::debug!("This is NOT a rootless container");
         None
     };
 
@@ -68,8 +140,13 @@ pub fn should_use_rootless() -> bool {
 
 /// Validates that the spec contains the required information for
 /// running in rootless mode
-pub fn validate(spec: &Spec) -> Result<()> {
+fn validate(spec: &Spec) -> Result<()> {
     let linux = spec.linux.as_ref().context("no linux in spec")?;
+    let namespaces = Namespaces::from(linux.namespaces.as_ref());
+    if namespaces.get(LinuxNamespaceType::User).is_none() {
+        bail!("rootless containers require the specification of a user namespace");
+    }
+
     let gid_mappings = linux
         .gid_mappings
         .as_ref()
@@ -85,11 +162,6 @@ pub fn validate(spec: &Spec) -> Result<()> {
 
     if gid_mappings.is_empty() {
         bail!("rootless containers require at least one gid mapping")
-    }
-
-    let namespaces = Namespaces::from(linux.namespaces.as_ref());
-    if namespaces.get(LinuxNamespaceType::User).is_none() {
-        bail!("rootless containers require the specification of a user namespace");
     }
 
     validate_mounts(
@@ -159,6 +231,7 @@ fn lookup_map_binary(binary: &str) -> Result<Option<PathBuf>> {
 }
 
 pub fn write_uid_mapping(target_pid: Pid, rootless: Option<&Rootless>) -> Result<()> {
+    log::debug!("Write UID mapping for {:?}", target_pid);
     if let Some(rootless) = rootless {
         if let Some(uid_mappings) = rootless.gid_mappings {
             return write_id_mapping(
@@ -173,6 +246,7 @@ pub fn write_uid_mapping(target_pid: Pid, rootless: Option<&Rootless>) -> Result
 }
 
 pub fn write_gid_mapping(target_pid: Pid, rootless: Option<&Rootless>) -> Result<()> {
+    log::debug!("Write GID mapping for {:?}", target_pid);
     if let Some(rootless) = rootless {
         if let Some(gid_mappings) = rootless.gid_mappings {
             return write_id_mapping(
@@ -195,6 +269,7 @@ fn write_id_mapping(
         .iter()
         .map(|m| format!("{} {} {}", m.container_id, m.host_id, m.size))
         .collect();
+    log::debug!("Write ID mapping: {:?}", mappings);
     if mappings.len() == 1 {
         utils::write_file(map_file, mappings.first().unwrap())?;
     } else {
