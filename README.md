@@ -64,10 +64,8 @@ For other platforms, please use [Vagrantfile](#setting-up-vagrant) that we prepa
 ### Debian, Ubuntu and related distributions
 
 ```sh
-$ sudo apt-get install    \
-      pkg-config          \
-      libsystemd-dev      \
-      libdbus-glib-1-dev
+$ sudo apt-get install pkg-config build-essential libsystemd-dev \
+       libdbus-glib-1-dev
 ```
 
 ### Fedora, Centos, RHEL and related distributions
