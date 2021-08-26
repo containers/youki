@@ -4,14 +4,14 @@ _This is a draft for a high level documentation of Youki. After finished this is
 
 These are references to various documentations and specifications, which can be useful to understand commands and constraints.
 
-- [OCI runtime specification] : The specification for a container runtime. Any OCI complaisant runtime must follow this.
-- [runc man pages] : has information on various commandline options supported by runc, can be used to understand commands and their options.
-- [cgroups man page](https://man7.org/linux/man-pages/man7/cgroups.7.html) : contains information about cgroups, their creation, deletion etc.
+- [OCI runtime specification](https://github.com/opencontainers/runtime-spec/blob/master/runtime.md) : The specification for a container runtime. Any OCI complaisant runtime must follow this.
+- [runc man pages](https://github.com/opencontainers/runc/tree/master/man) : Has description on commands and their options in runc.
+- [cgroups man page](https://man7.org/linux/man-pages/man7/cgroups.7.html) : Contains information about cgroups, their creation, deletion etc.
 - [pseudoterminal man page](https://man7.org/linux/man-pages/man7/pty.7.html) : Information about the pseudoterminal system, useful to understand console_socket parameter in create subcommand
 - [Unix Sockets man page](https://man7.org/linux/man-pages/man7/unix.7.html) : Useful to understand sockets
 - [prctl man page](https://man7.org/linux/man-pages/man2/prctl.2.html) : Process control man pages
 - [OCI Linux spec](https://github.com/opencontainers/runtime-spec/blob/master/config-linux.md) : Linux specific section of OCI Spec
-- [pipe2 man page](https://man7.org/linux/man-pages/man2/pipe.2.html) : definition and usage of pipe2
+- [pipe2 man page](https://man7.org/linux/man-pages/man2/pipe.2.html) : Definition and usage of pipe2
 
 ---
 
@@ -57,11 +57,11 @@ From there it matches subcommand arg with possible subcommand and takes appropri
 
 ### create container
 
-One thing to note is that in the end, container is just another process in Linux. It has specific/different control group, namespace, using which program executing in it can be given impression that is is running on a complete system, but on the system which it is running, it is just another process, and has attributes such as pid, file descriptors, etc. associated with it like any other process.
+One thing to note is that in the end, container is just another process in Linux. It has specific/different control group, namespace, program executing in it can be given impression that is is running on a complete system, but on the host system's perspective, it is just another process, and has attributes such as pid, file descriptors, etc. associated with it like any other process.
 
-When given create command, Youki will load the specification, configuration, sockets etc., use clone syscall to create the container process (init process),applies the limits, namespaces, and etc. to the cloned container process. The container process will wait on a unix domain socket before exec into the command/program.
+When given create command, Youki will load the specification, configuration, sockets etc., use clone syscall to create the container process (init process), applies the limits, namespaces, and etc. to the cloned container process. The container process will wait on a unix domain socket before executing the command/program.
 
-The main youki process will setup pipes used to communicate and syncronize with the intermediate and init process. The init process will notify the intermediate process, and then intermediate process to the main youki process that it is ready and start to wait on a unix domain socket. The youki process will then write the container state and exit.
+The main youki process will setup pipes to communicate and syncronize with the intermediate and init process. The init process will notify the intermediate process, and then intermediate process to the main youki process that it is ready and start to wait on a unix domain socket. The youki process will then write the container state and exit.
 
 - [mio Token definition](https://docs.rs/mio/0.7.11/mio/struct.Token.html)
 - [oom-score-adj](https://dev.to/rrampage/surviving-the-linux-oom-killer-2ki9)
@@ -76,6 +76,7 @@ This handles creation of the container process. The main youki process creates t
 The main youki process will set up pipes used as message passing and synchronization mechanism with the init process. Youki needs to create/fork two process instead of one is because nuances for the user and pid namespaces. In rootless container, we need to first enter user namespace, since all other namespaces requires CAP_SYSADMIN. When unshare or set_ns into pid namespace, only the children of the current process will enter into a different pid namespace. As a result, we must first fork a process to enter into user namespace, call unshare or set_ns for pid namespace, then fork again to enter into the correct pid namespace.
 
 Note: clone(2) offers us the ability to enter into user and pid namespace by creatng only one process. However, clone(2) can only create new pid namespace, but cannot enter into existing pid namespaces. Therefore, to enter into existing pid namespaces, we would need to fork twice. Currently, there is no getting around this limitation.
+
 
 - [fork(2) man page](https://man7.org/linux/man-pages/man2/fork.2.html)
 - [clone(2) man page](https://man7.org/linux/man-pages/man2/clone.2.html)
@@ -116,8 +117,7 @@ This has functions related to setting of namespaces to the calling process
 
 ## Pause and Resume
 
-This contains functionality regarding pausing and resuming container. Pausing a container indicates suspending all processes in it.
-This can be done with signals SIGSTOP and SIGCONT, but these can be intercepted. Using cgroups to suspend and resume processes without letting tasks know.
+This contains functionality regarding pausing and resuming container. Pausing a container indicates suspending all processes in it. This can be done with signals SIGSTOP and SIGCONT, but these can be intercepted. Using cgroups to suspend and resume processes without letting tasks know.
 
 - [cgroups man page](https://man7.org/linux/man-pages/man7/cgroups.7.html)
 - [freezer cgroup kernel documentation](https://www.kernel.org/doc/Documentation/cgroup-v1/freezer-subsystem.txt)
