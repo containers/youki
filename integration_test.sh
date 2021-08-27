@@ -42,7 +42,7 @@ test_cases=(
   # "linux_ns_itype/linux_ns_itype.t"
   "linux_ns_nopath/linux_ns_nopath.t"
   "linux_ns_path/linux_ns_path.t"
-  # "linux_ns_path_type/linux_ns_path_type.t"
+  "linux_ns_path_type/linux_ns_path_type.t"
   # "linux_process_apparmor_profile/linux_process_apparmor_profile.t"
   "linux_readonly_paths/linux_readonly_paths.t"
   # "linux_rootfs_propagation/linux_rootfs_propagation.t"
