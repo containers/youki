@@ -121,13 +121,6 @@ impl Channel {
         Ok(())
     }
 
-    pub fn close(&self) -> Result<()> {
-        self.close_receiver().context("Failed to close receiver")?;
-        self.close_sender().context("Failed to close sender")?;
-
-        Ok(())
-    }
-
     #[inline]
     fn write_message(&mut self, msg: Message) -> Result<()> {
         self.sender.write_all(&(msg as u8).to_be_bytes())?;
