@@ -304,10 +304,20 @@ pub fn container_init(
         rootfs::prepare_rootfs(spec, rootfs, bind_service)
             .with_context(|| "Failed to prepare rootfs")?;
 
-        // change the root of filesystem of the process to the rootfs
-        command
-            .pivot_rootfs(rootfs)
-            .with_context(|| format!("Failed to pivot root to {:?}", rootfs))?;
+        // Entering into the rootfs jail. If mount namespace is specified, then
+        // we use pivot_root, but if we are on the host mount namespace, we will
+        // use simple chroot. Scary things will happen if you try to pivot_root
+        // in the host mount namespace...
+        if namespaces.get(LinuxNamespaceType::Mount).is_some() {
+            // change the root of filesystem of the process to the rootfs
+            command
+                .pivot_rootfs(rootfs)
+                .with_context(|| format!("Failed to pivot root to {:?}", rootfs))?;
+        } else {
+            command
+                .chroot(rootfs)
+                .with_context(|| format!("Failed to chroot to {:?}", rootfs))?;
+        }
 
         if let Some(kernel_params) = &linux.sysctl {
             sysctl(kernel_params)
