@@ -6,7 +6,6 @@ pub mod hooks;
 pub mod logger;
 pub mod namespaces;
 pub mod notify_socket;
-pub mod pipe;
 pub mod process;
 pub mod rootfs;
 pub mod rootless;
