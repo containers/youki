@@ -34,62 +34,6 @@ impl<'a> From<&'a Linux> for Rootless<'a> {
     }
 }
 
-impl<'a> Rootless<'a> {
-    // Get the container uid on the host
-    fn host_uid(self, container_uid: u32) -> Result<u32> {
-        let id = if self.user_namespace.is_some() {
-            if self.uid_mappings.is_none() {
-                bail!("User namespace enabled, but no uid mapping found.");
-            }
-            self::host_id_from_mapping(container_uid, self.uid_mappings.unwrap())?
-        } else {
-            container_uid
-        };
-
-        Ok(id)
-    }
-
-    // Get the container gid on the host
-    fn host_gid(self, container_gid: u32) -> Result<u32> {
-        let id = if self.user_namespace.is_some() {
-            if self.gid_mappings.is_none() {
-                bail!("User namespace enabled, but no gid mapping found.");
-            }
-            self::host_id_from_mapping(container_gid, self.gid_mappings.unwrap())?
-        } else {
-            container_gid
-        };
-
-        Ok(id)
-    }
-
-    // Get the root inside container corresponding uid on the host.
-    pub fn host_root_uid(self) -> Result<u32> {
-        self.host_uid(0)
-    }
-
-    // Get the root inside container corresponding gid on the host.
-    pub fn host_root_gid(self) -> Result<u32> {
-        self.host_gid(0)
-    }
-}
-
-fn host_id_from_mapping(container_id: u32, mappings: &[LinuxIdMapping]) -> Result<u32> {
-    for mapping in mappings {
-        if container_id >= mapping.container_id
-            && container_id < (mapping.container_id + mapping.size)
-        {
-            let host_id = mapping.host_id + (container_id - mapping.container_id);
-            return Ok(host_id);
-        }
-    }
-
-    bail!(format!(
-        "No container id mapping found for {}",
-        container_id,
-    ))
-}
-
 // If user namespace is detected, then we are going into rootless.
 // If we are not root, check if we are user namespace.
 pub fn detect_rootless(spec: &Spec) -> Result<Option<Rootless>> {
