@@ -284,8 +284,13 @@ pub fn container_init(
             .with_context(|| format!("Failed to enter mount namespace: {:?}", mount_namespace))?;
     }
 
-    if let Some(hostname) = spec.hostname.as_ref() {
-        command.set_hostname(hostname)?;
+    // Only set the host name if entering into a new uts namespace
+    if let Some(uts_namespace) = namespaces.get(LinuxNamespaceType::Uts) {
+        if uts_namespace.path.is_none() {
+            if let Some(hostname) = spec.hostname.as_ref() {
+                command.set_hostname(hostname)?;
+            }
+        }
     }
 
     if let Some(true) = proc.no_new_privileges {
