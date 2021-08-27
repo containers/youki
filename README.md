@@ -69,10 +69,11 @@ For other platforms, please use [Vagrantfile](#setting-up-vagrant) that we prepa
 ### Debian, Ubuntu and related distributions
 
 ```sh
-$ sudo apt-get install    \
-      pkg-config          \
-      libsystemd-dev      \
-      libdbus-glib-1-dev
+$ sudo apt-get install   \
+      pkg-config         \
+      libsystemd-dev     \
+      libdbus-glib-1-dev \
+      build-essential
 ```
 
 ### Fedora, Centos, RHEL and related distributions
@@ -95,32 +96,48 @@ $ ./youki -h # you can get information about youki command
 
 ## Tutorial
 
-Let's try to run a container that executes `sleep 5` using youki.
-Maybe this tutorial is need permission as root.
+Let's try to run a container that executes `sleep 30` with youki. This tutorial may need root permission.
 
 ```sh
 $ git clone git@github.com:containers/youki.git
 $ cd youki
 $ ./build.sh
-$ mkdir tutorial
+
+$ mkdir -p tutorial/rootfs
 $ cd tutorial
-$ mkdir rootfs
+# use docker to export busybox into the rootfs directory
 $ docker export $(docker create busybox) | tar -C rootfs -xvf -
 ```
 
-Prepare a configuration file for the container that will run `sleep 5`.
+Then, we need to prepare a configuration file. This file contains metadata and specs for a container, such as the process to run, environment variables to inject, sandboxing features to use, etc.
 
 ```sh
-$ curl https://gist.githubusercontent.com/utam0k/8ab419996633066eaf53ac9c66d962e7/raw/e81548f591f26ec03d85ce38b0443144573b4cf6/config.json -o config.json
-$ cd ../
-$ ./youki create -b tutorial tutorial_container
-$ ./youki state tutorial_container # You can see the state the container is in as it is being generate.
-$ ./youki start tutorial_container
-$ ./youki state tutorial_container # Run it within 5 seconds to see the running container.
-$ ./youki delete tutorial_container # Run it after the container is finished running.
+$ ../youki spec  # will generate a spec file named config.json
 ```
 
-Change the command to be executed in config.json and try something other than `sleep 5`.
+We can edit the `config.json` to add customized behaviors for container. Here, we modify the `process` field to run `sleep 30`.
+
+```json
+  "process": {
+    ...
+    "args": [
+      "sleep", "30"
+    ],
+
+  ...
+  }
+```
+
+Then we can explore the lifecycle of a container:
+```sh
+$ sudo ./youki create -b tutorial tutorial_container   # create a container with name `tutorial_container`
+$ sudo ./youki state tutorial_container                # you can see the state the container is `created`
+$ sudo ./youki start tutorial_container                # start the container
+$ sudo ./youki list                                    # will show the list of containers, the container is `running`
+$ sudo ./youki delete tutorial_container               # delete the container
+```
+
+Change the command to be executed in `config.json` and try something other than `sleep 30`.
 
 ## Usage
 
@@ -176,8 +193,9 @@ $ git clone git@github.com:containers/youki.git
 $ cd youki
 $ vagrant up
 $ vagrant ssh
+
 # in virtual machine
-$ cd youki # in virtual machine
+$ cd youki
 $ ./build.sh
 ```
 
