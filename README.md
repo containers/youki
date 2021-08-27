@@ -64,8 +64,11 @@ For other platforms, please use [Vagrantfile](#setting-up-vagrant) that we prepa
 ### Debian, Ubuntu and related distributions
 
 ```sh
-$ sudo apt-get install pkg-config build-essential libsystemd-dev \
-       libdbus-glib-1-dev
+$ sudo apt-get install   \
+      pkg-config         \
+      libsystemd-dev     \
+      libdbus-glib-1-dev \
+      build-essential
 ```
 
 ### Fedora, Centos, RHEL and related distributions
@@ -95,8 +98,8 @@ $ git clone git@github.com:containers/youki.git
 $ cd youki
 $ ./build.sh
 
-$ mkdir rootfs
-
+$ mkdir -p tutorial/rootfs
+$ cd tutorial
 # use docker to export busybox into the rootfs directory
 $ docker export $(docker create busybox) | tar -C rootfs -xvf -
 ```
@@ -104,18 +107,14 @@ $ docker export $(docker create busybox) | tar -C rootfs -xvf -
 Then, we need to prepare a configuration file. This file contains metadata and specs for a container, such as the process to run, environment variables to inject, sandboxing features to use, etc.
 
 ```sh
-$ ./youki spec  # will generate a spec file named config.json
+$ ../youki spec  # will generate a spec file named config.json
 ```
 
 We can edit the `config.json` to add customized behaviors for container. Here, we modify the `process` field to run `sleep 30`.
 
 ```json
   "process": {
-    "terminal": true,
-    "user": {
-      "uid": 0,
-      "gid": 0
-    },
+    ...
     "args": [
       "sleep", "30"
     ],
@@ -126,11 +125,11 @@ We can edit the `config.json` to add customized behaviors for container. Here, w
 
 Then we can explore the lifecycle of a container:
 ```sh
-$ sudo ./youki create first-container    # create a container with name `first-container`
-$ sudo ./youki state first-container     # you can see the state the container is `created`
-$ sudo ./youki start first-container     # start the container
-$ sudo ./youki list                      # will show the list of containers, the container is `running`
-$ sudo ./youki delete first-container    # delete the container
+$ sudo ./youki create -b tutorial tutorial_container   # create a container with name `tutorial_container`
+$ sudo ./youki state tutorial_container                # you can see the state the container is `created`
+$ sudo ./youki start tutorial_container                # start the container
+$ sudo ./youki list                                    # will show the list of containers, the container is `running`
+$ sudo ./youki delete tutorial_container               # delete the container
 ```
 
 Change the command to be executed in `config.json` and try something other than `sleep 30`.
