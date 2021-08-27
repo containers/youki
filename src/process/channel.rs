@@ -4,9 +4,11 @@ use anyhow::Context;
 use anyhow::Result;
 use mio::unix::pipe;
 use mio::unix::pipe::{Receiver, Sender};
+use nix::unistd;
 use nix::unistd::Pid;
 use std::io::Read;
 use std::io::Write;
+use std::os::unix::io::AsRawFd;
 
 pub struct Channel {
     sender: Sender,
@@ -107,6 +109,25 @@ impl Channel {
         }
     }
 
+    pub fn close_receiver(&self) -> Result<()> {
+        unistd::close(self.receiver.as_raw_fd())?;
+
+        Ok(())
+    }
+
+    pub fn close_sender(&self) -> Result<()> {
+        unistd::close(self.sender.as_raw_fd())?;
+
+        Ok(())
+    }
+
+    pub fn close(&self) -> Result<()> {
+        self.close_receiver().context("Failed to close receiver")?;
+        self.close_sender().context("Failed to close sender")?;
+
+        Ok(())
+    }
+
     #[inline]
     fn write_message(&mut self, msg: Message) -> Result<()> {
         self.sender.write_all(&(msg as u8).to_be_bytes())?;
@@ -155,6 +176,28 @@ mod tests {
             unistd::ForkResult::Child => {
                 ch.send_mapping_written()
                     .with_context(|| "Failed to send mapping written")?;
+                std::process::exit(0);
+            }
+        };
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_channel_graceful_exit() -> Result<()> {
+        let ch = &mut Channel::new()?;
+        match unsafe { unistd::fork()? } {
+            unistd::ForkResult::Parent { child } => {
+                ch.close_sender().context("Failed to close sender")?;
+                // The child process will exit without send the child ready
+                // message. This should cause the wait_for_child_ready to error
+                // out, instead of keep blocking.
+                let ret = ch.wait_for_child_ready();
+                assert!(ret.is_err());
+                wait::waitpid(child, None)?;
+            }
+            unistd::ForkResult::Child => {
+                ch.close_receiver().context("Failed to close receiver")?;
                 std::process::exit(0);
             }
         };

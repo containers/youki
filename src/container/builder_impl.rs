@@ -85,8 +85,25 @@ impl<'a> ContainerBuilderImpl<'a> {
             container: self.container.clone(),
         };
         let intermediate_pid = fork::container_fork(|| {
+            // The fds in the pipe is duplicated during fork, so we first close
+            // the unused fds. Note, this already runs in the child process.
+            parent_to_child
+                .close_sender()
+                .context("Failed to close unused sender")?;
+            child_to_parent
+                .close_receiver()
+                .context("Failed to close unused receiver")?;
+
             init::container_intermidiate(init_args, parent_to_child, child_to_parent)
         })?;
+        // Close down unused fds. The corresponding fds are duplicated to the
+        // child process during fork.
+        parent_to_child
+            .close_receiver()
+            .context("Failed to close parent to child receiver")?;
+        child_to_parent
+            .close_sender()
+            .context("Failed to close child to parent sender")?;
         // If creating a rootless container, the intermediate process will ask
         // the main process to set up uid and gid mapping, once the intermediate
         // process enters into a new user namespace.

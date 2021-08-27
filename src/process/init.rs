@@ -237,13 +237,27 @@ pub fn container_intermidiate(
     // We have to record the pid of the child (container init process), since
     // the child will be inside the pid namespace. We can't rely on child_ready
     // to send us the correct pid.
-    let pid = fork::container_fork(|| container_init(init_args, child_to_parent))?;
+    let pid = fork::container_fork(|| {
+        // First thing in the child process to close the unused fds in the channel/pipe.
+        child_to_parent
+            .close_receiver()
+            .context("Failed to close receiver in init process")?;
+        container_init(init_args, child_to_parent)
+    })?;
+    // Close unused fds in the parent process.
+    child_to_parent
+        .close_sender()
+        .context("Failed to close sender in the intermediate process")?;
     // There is no point using the pid returned here, since the child will be
     // inside the pid namespace already.
-    child_to_parent.wait_for_child_ready()?;
+    child_to_parent
+        .wait_for_child_ready()
+        .context("Failed to wait for the child")?;
     // After the child (the container init process) becomes ready, we can signal
     // the parent (the main process) that we are ready.
-    intermediate_to_main.send_child_ready(pid)?;
+    intermediate_to_main
+        .send_child_ready(pid)
+        .context("Failed to send child ready from intermediate process")?;
 
     Ok(())
 }
