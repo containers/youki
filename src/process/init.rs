@@ -169,7 +169,7 @@ pub struct ContainerInitArgs<'a> {
     pub rootless: Option<Rootless<'a>>,
 }
 
-pub fn container_intermidiate(
+pub fn container_intermediate(
     args: ContainerInitArgs,
     receiver_from_main: &mut channel::ReceiverFromMain,
     sender_to_main: &mut channel::SenderIntermediateToMain,

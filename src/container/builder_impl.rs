@@ -121,7 +121,7 @@ impl<'a> ContainerBuilderImpl<'a> {
                 .close()
                 .context("Failed to close unused receiver")?;
 
-            init::container_intermidiate(init_args, receiver_from_main, sender_to_main)
+            init::container_intermediate(init_args, receiver_from_main, sender_to_main)
         })?;
         // Close down unused fds. The corresponding fds are duplicated to the
         // child process during fork.
