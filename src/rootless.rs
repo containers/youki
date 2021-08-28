@@ -18,9 +18,9 @@ pub struct Rootless<'a> {
     pub gid_mappings: Option<&'a Vec<LinuxIdMapping>>,
     /// Info on the user namespaces
     user_namespace: Option<LinuxNamespace>,
-    /// Is rootless container requested by a priviledged
+    /// Is rootless container requested by a privileged
     /// user
-    pub priviledged: bool,
+    pub privileged: bool,
 }
 
 impl<'a> Rootless<'a> {
@@ -66,7 +66,7 @@ impl<'a> From<&'a Linux> for Rootless<'a> {
             uid_mappings: linux.uid_mappings.as_ref(),
             gid_mappings: linux.gid_mappings.as_ref(),
             user_namespace: user_namespace.cloned(),
-            priviledged: nix::unistd::geteuid().is_root(),
+            privileged: nix::unistd::geteuid().is_root(),
         }
     }
 }
@@ -118,19 +118,19 @@ fn validate(spec: &Spec) -> Result<()> {
 
     if let Some(process) = &spec.process {
         if let Some(additional_gids) = &process.user.additional_gids {
-            let priviledged = nix::unistd::geteuid().is_root();
+            let privileged = nix::unistd::geteuid().is_root();
 
-            match (priviledged, additional_gids.is_empty()) {
+            match (privileged, additional_gids.is_empty()) {
                 (true, false) => {
                     for gid in additional_gids {
-                        if !is_id_mapped(*gid, &gid_mappings) {
+                        if !is_id_mapped(*gid, gid_mappings) {
                             bail!("gid {} is specified as supplementary group, but is not mapped in the user namespace", gid);
                         }
                     }
                 }
                 (false, false) => {
                     bail!(
-                        "user is {} (unpriviledged). Supplementary groups cannot be set in \
+                        "user is {} (unprivileged). Supplementary groups cannot be set in \
                         a rootless container for this user due to CVE-2014-8989",
                         nix::unistd::geteuid()
                     )

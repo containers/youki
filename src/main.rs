@@ -88,7 +88,7 @@ enum SubCommand {
 fn main() -> Result<()> {
     let opts = Opts::parse();
 
-    if let Err(e) = youki::logger::init(PathBuf::from("/tmp/youki/container").into()) {
+    if let Err(e) = youki::logger::init(opts.log) {
         eprintln!("log init failed: {:?}", e);
     }
 

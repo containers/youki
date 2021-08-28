@@ -9,7 +9,7 @@ use nix::mount::mount as nix_mount;
 use nix::mount::MsFlags;
 use nix::sys::stat::Mode;
 use nix::sys::stat::{mknod, umask};
-use nix::unistd::{chdir, chown, close, getcwd};
+use nix::unistd::{chdir, chown, close};
 use nix::unistd::{Gid, Uid};
 use oci_spec::{LinuxDevice, LinuxDeviceType, Mount, Spec};
 use std::fs::OpenOptions;

@@ -480,7 +480,7 @@ fn set_supplementary_gids(user: &User, rootless: &Option<Rootless>) -> Result<()
             .collect();
 
         match rootless {
-            Some(r) if r.priviledged => {
+            Some(r) if r.privileged => {
                 nix::unistd::setgroups(&gids).context("failed to set supplementary gids")?;
             }
             None => {
@@ -488,7 +488,7 @@ fn set_supplementary_gids(user: &User, rootless: &Option<Rootless>) -> Result<()
             }
             // this should have been detected during validation
             _ => unreachable!(
-                "unpriviledged users cannot set supplementary gids in rootless container"
+                "unprivileged users cannot set supplementary gids in rootless container"
             ),
         }
     }

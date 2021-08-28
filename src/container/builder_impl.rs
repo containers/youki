@@ -139,8 +139,8 @@ impl<'a> ContainerBuilderImpl<'a> {
             receiver_from_intermediate.wait_for_mapping_request()?;
             log::debug!("write mapping for pid {:?}", intermediate_pid);
             let rootless = self.rootless.as_ref().unwrap();
-            if !rootless.priviledged {
-                // The main process is running as an unpriviledged user and cannot write the mapping
+            if !rootless.privileged {
+                // The main process is running as an unprivileged user and cannot write the mapping
                 // until "deny" has been written to setgroups. See CVE-2014-8989.
                 utils::write_file(format!("/proc/{}/setgroups", intermediate_pid), "deny")?;
             }
