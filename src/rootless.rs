@@ -123,7 +123,7 @@ fn validate(spec: &Spec) -> Result<()> {
             match (priviledged, additional_gids.is_empty()) {
                 (true, false) => {
                     for gid in additional_gids {
-                        if is_id_mapped(*gid, &gid_mappings).is_err() {
+                        if !is_id_mapped(*gid, &gid_mappings) {
                             bail!("gid {} is specified as supplementary group, but is not mapped in the user namespace", gid);
                         }
                     }
@@ -151,11 +151,11 @@ fn validate_mounts(
     for mount in mounts {
         if let Some(options) = &mount.options {
             for opt in options {
-                if opt.starts_with("uid=") && !is_id_mapped(opt[4..].parse()?, uid_mappings)? {
+                if opt.starts_with("uid=") && !is_id_mapped(opt[4..].parse()?, uid_mappings) {
                     bail!("Mount {:?} specifies option {} which is not mapped inside the rootless container", mount, opt);
                 }
 
-                if opt.starts_with("gid=") && !is_id_mapped(opt[4..].parse()?, gid_mappings)? {
+                if opt.starts_with("gid=") && !is_id_mapped(opt[4..].parse()?, gid_mappings) {
                     bail!("Mount {:?} specifies option {} which is not mapped inside the rootless container", mount, opt);
                 }
             }
@@ -165,10 +165,10 @@ fn validate_mounts(
     Ok(())
 }
 
-fn is_id_mapped(id: u32, mappings: &[LinuxIdMapping]) -> Result<bool> {
-    Ok(mappings
+fn is_id_mapped(id: u32, mappings: &[LinuxIdMapping]) -> bool {
+    mappings
         .iter()
-        .any(|m| id >= m.container_id && id <= m.container_id + m.size))
+        .any(|m| id >= m.container_id && id <= m.container_id + m.size)
 }
 
 /// Looks up the location of the newuidmap and newgidmap binaries which
