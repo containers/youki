@@ -152,10 +152,11 @@ impl<'a> ContainerBuilderImpl<'a> {
         let init_pid = receiver_from_intermediate.wait_for_intermediate_ready()?;
         log::debug!("init pid is {:?}", init_pid);
 
-        cmanager
-            .add_task(init_pid)
-            .context("Failed to add tasks to cgroup manager")?;
         if self.rootless.is_none() && linux.resources.is_some() && self.init {
+            cmanager
+                .add_task(init_pid)
+                .context("Failed to add tasks to cgroup manager")?;
+
             cmanager
                 .apply(linux.resources.as_ref().unwrap())
                 .context("Failed to apply resource limits through cgroup")?;
