@@ -68,17 +68,15 @@ pub fn prepare_rootfs(spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<
         }
     }
 
-    let olddir = getcwd()?;
-    chdir(rootfs)?;
+    chdir(rootfs).context("failed to set current directory to rootfs")?;
     setup_default_symlinks(rootfs).context("Failed to setup default symlinks")?;
     if let Some(added_devices) = linux.devices.as_ref() {
         create_devices(default_devices().iter().chain(added_devices), bind_devices)
     } else {
         create_devices(default_devices().iter(), bind_devices)
     }?;
-    setup_ptmx(rootfs)?;
-    chdir(&olddir)?;
 
+    setup_ptmx(rootfs)?;
     Ok(())
 }
 
