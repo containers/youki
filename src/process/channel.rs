@@ -110,15 +110,11 @@ impl Channel {
     }
 
     pub fn close_receiver(&self) -> Result<()> {
-        unistd::close(self.receiver.as_raw_fd())?;
-
-        Ok(())
+        unistd::close(self.receiver.as_raw_fd())
     }
 
     pub fn close_sender(&self) -> Result<()> {
-        unistd::close(self.sender.as_raw_fd())?;
-
-        Ok(())
+        unistd::close(self.sender.as_raw_fd())
     }
 
     #[inline]
