@@ -109,6 +109,7 @@ impl<'a> ContainerBuilderImpl<'a> {
             notify_socket,
             preserve_fds: self.preserve_fds,
             container: self.container.clone(),
+            rootless: self.rootless.clone(),
         };
         let intermediate_pid = fork::container_fork(|| {
             // The fds in the pipe is duplicated during fork, so we first close
@@ -137,7 +138,12 @@ impl<'a> ContainerBuilderImpl<'a> {
         if self.rootless.is_some() {
             receiver_from_intermediate.wait_for_mapping_request()?;
             log::debug!("write mapping for pid {:?}", intermediate_pid);
-            utils::write_file(format!("/proc/{}/setgroups", intermediate_pid), "deny")?;
+            let rootless = self.rootless.as_ref().unwrap();
+            if !rootless.priviledged {
+                // The main process is running as an unpriviledged user and cannot write the mapping
+                // until "deny" has been written to setgroups. See CVE-2014-8989.
+                utils::write_file(format!("/proc/{}/setgroups", intermediate_pid), "deny")?;
+            }
             rootless::write_uid_mapping(intermediate_pid, self.rootless.as_ref())?;
             rootless::write_gid_mapping(intermediate_pid, self.rootless.as_ref())?;
             sender_to_intermediate.mapping_written()?;

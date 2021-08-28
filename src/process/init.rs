@@ -7,6 +7,7 @@ use nix::{
     sys::statfs,
     unistd::{self, Gid, Uid},
 };
+use oci_spec::User;
 use oci_spec::{LinuxNamespaceType, Spec};
 use std::collections::HashMap;
 use std::{
@@ -15,6 +16,7 @@ use std::{
 };
 use std::{fs, path::Path, path::PathBuf};
 
+use crate::rootless::Rootless;
 use crate::{
     capabilities,
     container::Container,
@@ -146,7 +148,7 @@ fn readonly_path(path: &str) -> Result<()> {
     Ok(())
 }
 
-pub struct ContainerInitArgs {
+pub struct ContainerInitArgs<'a> {
     /// Flag indicating if an init or a tenant container should be created
     pub init: bool,
     /// Interface to operating system primitives
@@ -163,6 +165,8 @@ pub struct ContainerInitArgs {
     pub preserve_fds: i32,
     /// Container state
     pub container: Option<Container>,
+    /// Options for rootless containers
+    pub rootless: Option<Rootless<'a>>,
 }
 
 pub fn container_intermidiate(
@@ -364,6 +368,8 @@ pub fn container_init(
         }
     };
 
+    set_supplementary_gids(&proc.user, &args.rootless)?;
+
     command
         .set_id(Uid::from_raw(proc.user.uid), Gid::from_raw(proc.user.gid))
         .context("Failed to configure uid and gid")?;
@@ -454,6 +460,40 @@ pub fn container_init(
     // After do_exec is called, the process is replaced with the container
     // payload through execvp, so it should never reach here.
     unreachable!();
+}
+
+fn set_supplementary_gids(user: &User, rootless: &Option<Rootless>) -> Result<()> {
+    if let Some(additional_gids) = &user.additional_gids {
+        if additional_gids.is_empty() {
+            return Ok(());
+        }
+
+        let setgroups =
+            fs::read_to_string("/proc/self/setgroups").context("failed to read setgroups")?;
+        if setgroups.trim() == "deny" {
+            bail!("cannot set supplementary gids, setgroup is disabled");
+        }
+
+        let gids: Vec<Gid> = additional_gids
+            .iter()
+            .map(|gid| Gid::from_raw(*gid))
+            .collect();
+
+        match rootless {
+            Some(r) if r.priviledged => {
+                nix::unistd::setgroups(&gids).context("failed to set supplementary gids")?;
+            }
+            None => {
+                nix::unistd::setgroups(&gids).context("failed to set supplementary gids")?;
+            }
+            // this should have been detected during validation
+            _ => unreachable!(
+                "unpriviledged users cannot set supplementary gids in rootless container"
+            ),
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
