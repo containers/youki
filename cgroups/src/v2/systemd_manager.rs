@@ -8,6 +8,8 @@ use nix::unistd::Pid;
 use oci_spec::{FreezerState, LinuxResources};
 use std::path::{Path, PathBuf};
 
+#[cfg(feature = "cgroupsv2_devices")]
+use super::devices::Devices;
 use super::{
     controller::Controller, controller_type::ControllerType, cpu::Cpu, cpuset::CpuSet,
     freezer::Freezer, hugetlb::HugeTlb, io::Io, memory::Memory, pids::Pids,
@@ -238,6 +240,8 @@ impl CgroupManager for SystemDCGroupManager {
             }
         }
 
+        #[cfg(feature = "cgroupsv2_devices")]
+        Devices::apply(linux_resources, &self.full_path)?;
         Ok(())
     }
 

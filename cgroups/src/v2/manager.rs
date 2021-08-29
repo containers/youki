@@ -9,9 +9,21 @@ use anyhow::{bail, Result};
 use nix::unistd::Pid;
 use oci_spec::{FreezerState, LinuxResources};
 
+#[cfg(feature = "cgroupsv2_devices")]
+use super::devices::Devices;
 use super::{
-    controller::Controller, controller_type::ControllerType, cpu::Cpu, cpuset::CpuSet,
-    freezer::Freezer, hugetlb::HugeTlb, io::Io, memory::Memory, pids::Pids, unified::Unified,
+    controller::Controller,
+    controller_type::{
+        ControllerType, PseudoControllerType, CONTROLLER_TYPES, PSEUDO_CONTROLLER_TYPES,
+    },
+    cpu::Cpu,
+    cpuset::CpuSet,
+    freezer::Freezer,
+    hugetlb::HugeTlb,
+    io::Io,
+    memory::Memory,
+    pids::Pids,
+    unified::Unified,
 };
 use crate::{
     common::{self, CgroupManager, PathBufExt, CGROUP_PROCS},
@@ -20,16 +32,6 @@ use crate::{
 
 const CGROUP_CONTROLLERS: &str = "cgroup.controllers";
 const CGROUP_SUBTREE_CONTROL: &str = "cgroup.subtree_control";
-
-const CONTROLLER_TYPES: &[ControllerType] = &[
-    ControllerType::Cpu,
-    ControllerType::CpuSet,
-    ControllerType::HugeTlb,
-    ControllerType::Io,
-    ControllerType::Memory,
-    ControllerType::Pids,
-    ControllerType::Freezer,
-];
 
 pub struct Manager {
     root_path: PathBuf,
@@ -133,11 +135,20 @@ impl CgroupManager for Manager {
             }
         }
 
-        Unified::apply(
-            linux_resources,
-            &self.full_path,
-            self.get_available_controllers()?,
-        )?;
+        #[cfg(feature = "cgroupsv2_devices")]
+        Devices::apply(linux_resources, &self.cgroup_path)?;
+
+        for pseudoctlr in PSEUDO_CONTROLLER_TYPES {
+            match pseudoctlr {
+                PseudoControllerType::Unified => Unified::apply(
+                    linux_resources,
+                    &self.cgroup_path,
+                    self.get_available_controllers()?,
+                )?,
+                _ => {}
+            }
+        }
+
         Ok(())
     }
 

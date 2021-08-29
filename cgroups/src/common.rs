@@ -8,7 +8,7 @@ use std::{
 
 use anyhow::{bail, Context, Result};
 use nix::unistd::Pid;
-use oci_spec::{FreezerState, LinuxResources};
+use oci_spec::{FreezerState, LinuxDevice, LinuxDeviceCgroup, LinuxDeviceType, LinuxResources};
 use procfs::process::Process;
 #[cfg(feature = "systemd_cgroups")]
 use systemd::daemon::booted;
@@ -226,4 +226,113 @@ impl PathBufExt for PathBuf {
         }
         Ok(PathBuf::from(format!("{}{}", self.display(), p.display())))
     }
+}
+
+pub(crate) fn default_allow_devices() -> Vec<LinuxDeviceCgroup> {
+    vec![
+        LinuxDeviceCgroup {
+            allow: true,
+            typ: Some(LinuxDeviceType::C),
+            major: None,
+            minor: None,
+            access: "m".to_string().into(),
+        },
+        LinuxDeviceCgroup {
+            allow: true,
+            typ: Some(LinuxDeviceType::B),
+            major: None,
+            minor: None,
+            access: "m".to_string().into(),
+        },
+        // /dev/console
+        LinuxDeviceCgroup {
+            allow: true,
+            typ: Some(LinuxDeviceType::C),
+            major: Some(5),
+            minor: Some(1),
+            access: "rwm".to_string().into(),
+        },
+        // /dev/pts
+        LinuxDeviceCgroup {
+            allow: true,
+            typ: Some(LinuxDeviceType::C),
+            major: Some(136),
+            minor: None,
+            access: "rwm".to_string().into(),
+        },
+        LinuxDeviceCgroup {
+            allow: true,
+            typ: Some(LinuxDeviceType::C),
+            major: Some(5),
+            minor: Some(2),
+            access: "rwm".to_string().into(),
+        },
+        // tun/tap
+        LinuxDeviceCgroup {
+            allow: true,
+            typ: Some(LinuxDeviceType::C),
+            major: Some(10),
+            minor: Some(200),
+            access: "rwm".to_string().into(),
+        },
+    ]
+}
+
+pub(crate) fn default_devices() -> Vec<LinuxDevice> {
+    vec![
+        LinuxDevice {
+            path: PathBuf::from("/dev/null"),
+            typ: LinuxDeviceType::C,
+            major: 1,
+            minor: 3,
+            file_mode: Some(0o066),
+            uid: None,
+            gid: None,
+        },
+        LinuxDevice {
+            path: PathBuf::from("/dev/zero"),
+            typ: LinuxDeviceType::C,
+            major: 1,
+            minor: 5,
+            file_mode: Some(0o066),
+            uid: None,
+            gid: None,
+        },
+        LinuxDevice {
+            path: PathBuf::from("/dev/full"),
+            typ: LinuxDeviceType::C,
+            major: 1,
+            minor: 7,
+            file_mode: Some(0o066),
+            uid: None,
+            gid: None,
+        },
+        LinuxDevice {
+            path: PathBuf::from("/dev/tty"),
+            typ: LinuxDeviceType::C,
+            major: 5,
+            minor: 0,
+            file_mode: Some(0o066),
+            uid: None,
+            gid: None,
+        },
+        LinuxDevice {
+            path: PathBuf::from("/dev/urandom"),
+            typ: LinuxDeviceType::C,
+            major: 1,
+            minor: 9,
+            file_mode: Some(0o066),
+            uid: None,
+            gid: None,
+        },
+        LinuxDevice {
+            path: PathBuf::from("/dev/random"),
+            typ: LinuxDeviceType::C,
+            major: 1,
+            minor: 8,
+            file_mode: Some(0o066),
+            uid: None,
+            gid: None,
+        },
+    ]
 }
