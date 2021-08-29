@@ -1,4 +1,6 @@
-// reference: https://man7.org/linux/man-pages/man2/seccomp.2.html
+// reference: 
+// - init process with seccomp: https://github.com/opencontainers/runc/blob/654f3319762c896e1f0b23eef0d2cd70fdd6b9b1/libcontainer/standard_init_linux.go#L161
+// - definition on linux kernel: https://man7.org/linux/man-pages/man2/seccomp.2.html
 
 // 1. Define allowed system calls strings in SYSCALL_MAP
 //    - archs ref: https://chromium.googlesource.com/chromiumos/docs/+/master/constants/syscalls.md
