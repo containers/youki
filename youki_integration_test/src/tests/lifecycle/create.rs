@@ -1,5 +1,6 @@
+use crate::support::get_runtime_path;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Command, Stdio};
 use test_framework::TestResult;
 
@@ -8,7 +9,7 @@ use test_framework::TestResult;
 // the youki process created halts indefinitely
 // which is why we pass null, and use wait instead of wait_with_output
 pub fn create(project_path: &Path, id: &str) -> TestResult {
-    let res = Command::new(project_path.join(PathBuf::from("youki")))
+    let res = Command::new(get_runtime_path())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .arg("-r")

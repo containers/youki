@@ -1,10 +1,21 @@
 use flate2::read::GzDecoder;
+use once_cell::sync::OnceCell;
 use rand::Rng;
 use std::fs::File;
 use std::path::PathBuf;
 use std::{env, fs, path::Path};
 use tar::Archive;
 use uuid::Uuid;
+
+static RUNTIME_PATH: OnceCell<PathBuf> = OnceCell::new();
+
+pub fn set_runtime_path(path: &Path) {
+    RUNTIME_PATH.set(path.to_owned()).unwrap();
+}
+
+pub fn get_runtime_path() -> &'static PathBuf {
+    RUNTIME_PATH.get().expect("Runtime path is not set")
+}
 
 pub fn initialize_test(project_path: &Path) -> Result<(), std::io::Error> {
     prepare_test_workspace(project_path)

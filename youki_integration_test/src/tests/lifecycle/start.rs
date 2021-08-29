@@ -1,10 +1,11 @@
 use super::get_result_from_output;
-use std::path::{Path, PathBuf};
+use crate::support::get_runtime_path;
+use std::path::Path;
 use std::process::{Command, Stdio};
 use test_framework::TestResult;
 
 pub fn start(project_path: &Path, id: &str) -> TestResult {
-    let res = Command::new(project_path.join(PathBuf::from("youki")))
+    let res = Command::new(get_runtime_path())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .arg("-r")
