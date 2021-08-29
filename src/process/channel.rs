@@ -110,9 +110,9 @@ impl SenderIntermediateToMain {
     }
 
     pub fn intermediate_ready(&mut self, pid: Pid) -> Result<()> {
-        // Send over the ChildReady follow by the pid.
+        // Send over the IntermediateReady follow by the pid.
         log::debug!("sending init pid ({:?})", pid);
-        self.sender.write_message(Message::ChildReady)?;
+        self.sender.write_message(Message::IntermediateReady)?;
         self.sender.write_all(&(pid.as_raw()).to_be_bytes())?;
         Ok(())
     }
@@ -153,7 +153,7 @@ impl ReceiverFromIntermediate {
             .with_context(|| "Failed to receive a message from the intermediate process.")?;
 
         match Message::from(u8::from_be_bytes(buf)) {
-            Message::ChildReady => {
+            Message::IntermediateReady => {
                 log::debug!("received intermediate ready message");
                 // Read the Pid which will be i32 or 4 bytes.
                 let mut buf = [0; 4];
@@ -190,9 +190,9 @@ pub struct SenderInitToIntermediate {
 
 impl SenderInitToIntermediate {
     pub fn init_ready(&mut self, pid: Pid) -> Result<()> {
-        // Send over the ChildReady follow by the pid.
+        // Send over the InitReady follow by the pid.
         log::debug!("sending init pid ({:?})", pid);
-        self.sender.write_message(Message::ChildReady)?;
+        self.sender.write_message(Message::InitReady)?;
         self.sender.write_all(&(pid.as_raw()).to_be_bytes())?;
         Ok(())
     }
@@ -217,7 +217,7 @@ impl ReceiverFromInit {
             .with_context(|| "Failed to receive a message from the init process.")?;
 
         match Message::from(u8::from_be_bytes(buf)) {
-            Message::ChildReady => {
+            Message::InitReady => {
                 log::debug!("received init ready message");
                 // Read the Pid which will be i32 or 4 bytes.
                 let mut buf = [0; 4];
