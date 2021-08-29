@@ -1,14 +1,12 @@
-#[macro_use]
+// reference: https://man7.org/linux/man-pages/man2/seccomp.2.html
+
+// 1. Define allowed system calls strings in SYSCALL_MAP
+//    - archs ref: https://chromium.googlesource.com/chromiumos/docs/+/master/constants/syscalls.md
+
 use std::mem;
-
-// 3. Maps Actions
-// 4. Define allowed system calls
-
-use bindings::{
-  SECCOMP_RET_LOG, 
-  SYSCALL_MAP,
-};
 use nix::errno::Errno;
+
+const SYSCALL_MAP: [&str] = [];
 
 const SECCOMP_RET_KILL: u32 = 0;
 const SECCOMP_RET_ALLOW: u32 = 0x7fff_0000;
@@ -115,16 +113,13 @@ impl Filter {
   pub fn new() -> Self {
     let mut filter = Filter {
       allowlist: Vec::new(),
-      log_only: false,
     };
 
     // This ensures that a malicious process cannot configure a bad seccomp-BPF program and
     // then execve to a set-uid program, potentially permitting privilege escalation.
     use nix::libc::PR_SET_NO_NEW_PRIVS;
     let result = unsafe { nix::libc::prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) };
-    Errno::result(result)
-    .map(drop)
-    .expect("Failed to set seccomp filter")
+    Errno::result(result).expect("Failed to set no new privilege rule in seccomp filter")
 
     // Load architecture into accumulator
     filter.allowlist.push(bpf_stmt(
@@ -172,13 +167,6 @@ impl Filter {
     self.allow_syscall_nr(syscall_nr)
   }
 
-  /// Log syscall violations only
-  #[allow(unused)]
-  pub fn log_only(mut self) -> Filter {
-    self.log_only = true;
-    self
-  }
-
   /// Apply seccomp rules
   pub fn apply(mut self) {
     // use unix const
@@ -191,14 +179,13 @@ impl Filter {
     };
     let sf_prog_ptr = &sf_prog as *const sock_fprog;
     let result = unsafe { nix::libc::prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, sf_prog_ptr) };
-    Errno::result(result)
-      .map(drop)
-      .expect("Failed to set seccomp filter")
+    Errno::result(result).expect("Failed to set seccomp filter")
   }
 }
 
-/// Get number of systemcall for a name
+// Get number of systemcall for a name
 fn translate_syscall(name: &str) -> Option<u32> {
+  // TODO: define how to translate sys call string to u32 for every archs
   SYSCALL_MAP.get(name).cloned()
 }
 
