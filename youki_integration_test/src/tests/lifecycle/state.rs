@@ -8,7 +8,7 @@ pub fn state(project_path: &Path, id: &str) -> TestResult {
     let res = Command::new(get_runtime_path())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .arg("-r")
+        .arg("--root")
         .arg(project_path.join("integration-workspace").join("youki"))
         .arg("state")
         .arg(id)

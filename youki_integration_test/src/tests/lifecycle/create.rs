@@ -12,7 +12,7 @@ pub fn create(project_path: &Path, id: &str) -> TestResult {
     let res = Command::new(get_runtime_path())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
-        .arg("-r")
+        .arg("--root")
         .arg(project_path.join("integration-workspace").join("youki"))
         .arg("create")
         .arg(id)
