@@ -62,8 +62,8 @@ impl<'a> ContainerBuilderImpl<'a> {
         }
 
         // We use a set of channels to communicate between parent and child process. Each channel is uni-directional.
-        let parent_to_child = &mut channel::Channel::new()?;
-        let child_to_parent = &mut channel::Channel::new()?;
+        let (sender_to_intermediate, receiver_from_main) = &mut channel::main_to_intermediate()?;
+        let (sender_to_main, receiver_from_intermediate) = &mut channel::intermediate_to_main()?;
 
         // Need to create the notify socket before we pivot root, since the unix
         // domain socket used here is outside of the rootfs of container. During
@@ -87,36 +87,37 @@ impl<'a> ContainerBuilderImpl<'a> {
         let intermediate_pid = fork::container_fork(|| {
             // The fds in the pipe is duplicated during fork, so we first close
             // the unused fds. Note, this already runs in the child process.
-            parent_to_child
-                .close_sender()
+            sender_to_intermediate
+                .close()
                 .context("Failed to close unused sender")?;
-            child_to_parent
-                .close_receiver()
+            receiver_from_intermediate
+                .close()
                 .context("Failed to close unused receiver")?;
 
-            init::container_intermidiate(init_args, parent_to_child, child_to_parent)
+            init::container_intermidiate(init_args, receiver_from_main, sender_to_main)
         })?;
         // Close down unused fds. The corresponding fds are duplicated to the
         // child process during fork.
-        parent_to_child
-            .close_receiver()
+        receiver_from_main
+            .close()
             .context("Failed to close parent to child receiver")?;
-        child_to_parent
-            .close_sender()
+        sender_to_main
+            .close()
             .context("Failed to close child to parent sender")?;
+
         // If creating a rootless container, the intermediate process will ask
         // the main process to set up uid and gid mapping, once the intermediate
         // process enters into a new user namespace.
         if self.rootless.is_some() {
-            child_to_parent.wait_for_mapping_request()?;
+            receiver_from_intermediate.wait_for_mapping_request()?;
             log::debug!("write mapping for pid {:?}", intermediate_pid);
             utils::write_file(format!("/proc/{}/setgroups", intermediate_pid), "deny")?;
             rootless::write_uid_mapping(intermediate_pid, self.rootless.as_ref())?;
             rootless::write_gid_mapping(intermediate_pid, self.rootless.as_ref())?;
-            parent_to_child.send_mapping_written()?;
+            sender_to_intermediate.mapping_written()?;
         }
 
-        let init_pid = child_to_parent.wait_for_child_ready()?;
+        let init_pid = receiver_from_intermediate.wait_for_intermediate_ready()?;
         log::debug!("init pid is {:?}", init_pid);
 
         cmanager
