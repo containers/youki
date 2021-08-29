@@ -1,4 +1,4 @@
-use super::create;
+use super::{create, kill};
 use crate::support::generate_uuid;
 use std::path::{Path, PathBuf};
 use test_framework::{TestResult, TestableGroup};
@@ -28,12 +28,17 @@ impl ContainerCreate {
     }
 
     fn create_valid_id(&self) -> TestResult {
-        create::create(&self.project_path, &self.container_id)
+        let temp = create::create(&self.project_path, &self.container_id);
+        if let TestResult::Ok = temp {
+            kill::kill(&self.project_path, &self.container_id);
+        }
+        temp
     }
     fn create_duplicate_id(&self) -> TestResult {
         let id = generate_uuid().to_string();
         let _ = create::create(&self.project_path, &id);
         let temp = create::create(&self.project_path, &id);
+        kill::kill(&self.project_path, &id);
         match temp {
             TestResult::Ok => TestResult::Err(anyhow::anyhow!(
                 "Container should not have been created with same id, but was created."
