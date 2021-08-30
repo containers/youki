@@ -39,6 +39,8 @@ test_cases=(
   "linux_devices/linux_devices.t"
   # "linux_masked_paths/linux_masked_paths.t"
   "linux_mount_label/linux_mount_label.t"
+  # This test case hangs on the Github Action. Runtime-tools has an issue filed from 2019 that the clean up step hangs. Otherwise, the test case passes.
+  # Ref: https://github.com/opencontainers/runtime-tools/issues/698
   # "linux_ns_itype/linux_ns_itype.t"
   "linux_ns_nopath/linux_ns_nopath.t"
   "linux_ns_path/linux_ns_path.t"

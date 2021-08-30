@@ -195,4 +195,10 @@ impl Syscall for LinuxSyscall {
         let user = unsafe { Self::passwd_to_user(result.read()) };
         Some(user)
     }
+
+    fn chroot(&self, path: &Path) -> Result<()> {
+        unistd::chroot(path)?;
+
+        Ok(())
+    }
 }
