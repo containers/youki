@@ -17,7 +17,9 @@ trait SenderExt {
 impl SenderExt for Sender {
     #[inline]
     fn write_message(&mut self, msg: Message) -> Result<()> {
-        self.write_all(&(msg as u8).to_be_bytes())?;
+        let bytes = (msg as u8).to_be_bytes();
+        self.write_all(&bytes)
+            .with_context(|| format!("Failed to write message {:?} to the pipe", bytes))?;
         Ok(())
     }
 }
