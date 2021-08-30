@@ -5,7 +5,7 @@ use nix::sched::CloneFlags;
 use nix::{
     fcntl,
     sys::statfs,
-    unistd::{self, Gid, Pid, Uid},
+    unistd::{self, Gid, Uid},
 };
 use oci_spec::{LinuxNamespaceType, Spec};
 use std::collections::HashMap;
@@ -167,8 +167,8 @@ pub struct ContainerInitArgs {
 
 pub fn container_intermidiate(
     args: ContainerInitArgs,
-    main_to_intermediate: &mut channel::Channel,
-    intermediate_to_main: &mut channel::Channel,
+    receiver_from_main: &mut channel::ReceiverFromMain,
+    sender_to_main: &mut channel::SenderIntermediateToMain,
 ) -> Result<()> {
     let command = &args.syscall;
     let spec = &args.spec;
@@ -199,8 +199,8 @@ pub fn container_intermidiate(
             // child needs to be dumpable, otherwise the non root parent is not
             // allowed to write the uid/gid maps
             prctl::set_dumpable(true).unwrap();
-            intermediate_to_main.send_identifier_mapping_request()?;
-            main_to_intermediate.wait_for_mapping_ack()?;
+            sender_to_main.identifier_mapping_request()?;
+            receiver_from_main.wait_for_mapping_ack()?;
             prctl::set_dumpable(false).unwrap();
         }
 
@@ -231,7 +231,8 @@ pub fn container_intermidiate(
     }
 
     // We only need for init process to send us the ChildReady.
-    let child_to_parent = &mut channel::Channel::new()?;
+    let (sender_to_intermediate, receiver_from_init) = &mut channel::init_to_intermediate()?;
+
     // We resued the args passed in, but replace with a new set of channels.
     let init_args = ContainerInitArgs { ..args };
     // We have to record the pid of the child (container init process), since
@@ -239,24 +240,24 @@ pub fn container_intermidiate(
     // to send us the correct pid.
     let pid = fork::container_fork(|| {
         // First thing in the child process to close the unused fds in the channel/pipe.
-        child_to_parent
-            .close_receiver()
+        receiver_from_init
+            .close()
             .context("Failed to close receiver in init process")?;
-        container_init(init_args, child_to_parent)
+        container_init(init_args, sender_to_intermediate)
     })?;
     // Close unused fds in the parent process.
-    child_to_parent
-        .close_sender()
+    sender_to_intermediate
+        .close()
         .context("Failed to close sender in the intermediate process")?;
     // There is no point using the pid returned here, since the child will be
     // inside the pid namespace already.
-    child_to_parent
-        .wait_for_child_ready()
+    receiver_from_init
+        .wait_for_init_ready()
         .context("Failed to wait for the child")?;
     // After the child (the container init process) becomes ready, we can signal
     // the parent (the main process) that we are ready.
-    intermediate_to_main
-        .send_child_ready(pid)
+    sender_to_main
+        .intermediate_ready(pid)
         .context("Failed to send child ready from intermediate process")?;
 
     Ok(())
@@ -264,7 +265,7 @@ pub fn container_intermidiate(
 
 pub fn container_init(
     args: ContainerInitArgs,
-    init_to_intermediate: &mut channel::Channel,
+    sender_to_intermediate: &mut channel::SenderInitToIntermediate,
 ) -> Result<()> {
     let command = &args.syscall;
     let spec = &args.spec;
@@ -441,7 +442,7 @@ pub fn container_init(
     // Note, we pass -1 here because we are already inside the pid namespace.
     // The pid outside the pid namespace should be recorded by the intermediate
     // process.
-    init_to_intermediate.send_child_ready(Pid::from_raw(-1))?;
+    sender_to_intermediate.init_ready()?;
 
     // listing on the notify socket for container start command
     let notify_socket = args.notify_socket;
