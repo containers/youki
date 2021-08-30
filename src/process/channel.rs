@@ -24,12 +24,6 @@ impl SenderExt for Sender {
 
 pub fn main_to_intermediate() -> Result<(SenderMainToIntermediate, ReceiverFromMain)> {
     let (sender, receiver) = new_pipe()?;
-    // Our use case is for the process to wait for the communication to come
-    // through, so we set nonblocking to false here (double negative). It is
-    // expected that the waiting process will block and wait.
-    receiver
-        .set_nonblocking(false)
-        .with_context(|| "Failed to set channel receiver to blocking")?;
     Ok((
         SenderMainToIntermediate { sender },
         ReceiverFromMain { receiver },
@@ -84,12 +78,6 @@ impl ReceiverFromMain {
 
 pub fn intermediate_to_main() -> Result<(SenderIntermediateToMain, ReceiverFromIntermediate)> {
     let (sender, receiver) = new_pipe()?;
-    // Our use case is for the process to wait for the communication to come
-    // through, so we set nonblocking to false here (double negative). It is
-    // expected that the waiting process will block and wait.
-    receiver
-        .set_nonblocking(false)
-        .with_context(|| "Failed to set channel receiver to blocking")?;
     Ok((
         SenderIntermediateToMain { sender },
         ReceiverFromIntermediate { receiver },
