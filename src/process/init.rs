@@ -5,7 +5,7 @@ use nix::sched::CloneFlags;
 use nix::{
     fcntl,
     sys::statfs,
-    unistd::{self, Gid, Pid, Uid},
+    unistd::{self, Gid, Uid},
 };
 use oci_spec::{LinuxNamespaceType, Spec};
 use std::collections::HashMap;
@@ -432,7 +432,7 @@ pub fn container_init(
     // Note, we pass -1 here because we are already inside the pid namespace.
     // The pid outside the pid namespace should be recorded by the intermediate
     // process.
-    sender_to_intermediate.init_ready(Pid::from_raw(-1))?;
+    sender_to_intermediate.init_ready()?;
 
     // listing on the notify socket for container start command
     let notify_socket = args.notify_socket;

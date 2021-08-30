@@ -179,11 +179,8 @@ pub struct SenderInitToIntermediate {
 }
 
 impl SenderInitToIntermediate {
-    pub fn init_ready(&mut self, pid: Pid) -> Result<()> {
-        // Send over the InitReady follow by the pid.
-        log::debug!("sending init pid ({:?})", pid);
+    pub fn init_ready(&mut self) -> Result<()> {
         self.sender.write_message(Message::InitReady)?;
-        self.sender.write_all(&(pid.as_raw()).to_be_bytes())?;
         Ok(())
     }
 
@@ -200,23 +197,14 @@ pub struct ReceiverFromInit {
 impl ReceiverFromInit {
     /// Waits for associated init process to send ready message
     /// and return the pid of init process which is forked by init process
-    pub fn wait_for_init_ready(&mut self) -> Result<Pid> {
+    pub fn wait_for_init_ready(&mut self) -> Result<()> {
         let mut buf = [0; 1];
         self.receiver
             .read_exact(&mut buf)
             .with_context(|| "Failed to receive a message from the init process.")?;
 
         match Message::from(u8::from_be_bytes(buf)) {
-            Message::InitReady => {
-                log::debug!("received init ready message");
-                // Read the Pid which will be i32 or 4 bytes.
-                let mut buf = [0; 4];
-                self.receiver
-                    .read_exact(&mut buf)
-                    .with_context(|| "Failed to receive a message from the init process.")?;
-
-                Ok(Pid::from_raw(i32::from_be_bytes(buf)))
-            }
+            Message::InitReady => Ok(()),
             msg => bail!(
                 "receive unexpected message {:?} waiting for init ready",
                 msg
@@ -317,16 +305,14 @@ mod tests {
         let (sender, receiver) = &mut init_to_intermediate()?;
         match unsafe { unistd::fork()? } {
             unistd::ForkResult::Parent { child } => {
-                let pid = receiver
+                receiver
                     .wait_for_init_ready()
                     .with_context(|| "Failed to wait for init ready")?;
-                assert_eq!(pid, child);
                 wait::waitpid(child, None)?;
             }
             unistd::ForkResult::Child => {
-                let pid = unistd::getpid();
                 sender
-                    .init_ready(pid)
+                    .init_ready()
                     .with_context(|| "Failed to send init ready")?;
                 std::process::exit(0);
             }
