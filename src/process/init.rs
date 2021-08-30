@@ -368,7 +368,8 @@ pub fn container_init(
         }
     };
 
-    set_supplementary_gids(&proc.user, &args.rootless)?;
+    set_supplementary_gids(&proc.user, &args.rootless)
+        .context("failed to set supplementary gids")?;
 
     command
         .set_id(Uid::from_raw(proc.user.uid), Gid::from_raw(proc.user.gid))
@@ -462,6 +463,30 @@ pub fn container_init(
     unreachable!();
 }
 
+// Before 3.19 it was possible for an unprivileged user to enter an user namespace,
+// become root and then call setgroups in order to drop membership in supplementary
+// groups. This allowed access to files which blocked access based on being a member
+// of these groups (see CVE-2014-8989)
+//
+// This leaves us with three scenarios:
+//
+// Unprivileged user starting a rootless container: The main process is running as an
+// unprivileged user and therefore cannot write the mapping until "deny" has been written
+// to /proc/{pid}/setgroups. Once written /proc/{pid}/setgroups cannot be reset and the
+// setgroups system call will be disabled for all processes in this user namespace. This
+// also means that we should detect if the user is unprivileged and additional gids have
+// been specified and bail out early as this can never work. This is not handled here,
+// but during the validation for rootless containers.
+//
+// Privileged user starting a rootless container: It is not necessary to write "deny" to
+// /proc/setgroups in order to create the gid mapping and therefore we don't. This means
+// that setgroups could be used to drop groups, but this is fine as the user is privileged
+// and could do so anyway.
+// We already have checked during validation if the specified supplemental groups fall into
+// the range that are specified in the gid mapping and bail out early if they do not.
+//
+// Privileged user starting a normal container: Just add the supplementary groups.
+//
 fn set_supplementary_gids(user: &User, rootless: &Option<Rootless>) -> Result<()> {
     if let Some(additional_gids) = &user.additional_gids {
         if additional_gids.is_empty() {
