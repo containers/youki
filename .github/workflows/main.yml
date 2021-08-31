@@ -78,7 +78,7 @@ jobs:
       - name: Coverage
         uses: actions-rs/grcov@v0.1
         with:
-          config: .github/grcov.yml
+          config: .github/workflows/grcov.yml
       - name: Upload Results
         uses: codecov/codecov-action@v2
   integration_tests:
