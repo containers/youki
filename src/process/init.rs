@@ -13,7 +13,7 @@ use std::{
     env,
     os::unix::{io::AsRawFd, prelude::RawFd},
 };
-use std::{fs, io::Write, path::Path, path::PathBuf};
+use std::{fs, path::Path, path::PathBuf};
 
 use crate::{
     capabilities,
@@ -174,17 +174,6 @@ pub fn container_intermidiate(
     let spec = &args.spec;
     let linux = spec.linux.as_ref().context("no linux in spec")?;
     let namespaces = Namespaces::from(linux.namespaces.as_ref());
-
-    // if Out-of-memory score adjustment is set in specification.  set the score
-    // value for the current process check
-    // https://dev.to/rrampage/surviving-the-linux-oom-killer-2ki9 for some more
-    // information
-    if let Some(ref resource) = linux.resources {
-        if let Some(oom_score_adj) = resource.oom_score_adj {
-            let mut f = fs::File::create("/proc/self/oom_score_adj")?;
-            f.write_all(oom_score_adj.to_string().as_bytes())?;
-        }
-    }
 
     // if new user is specified in specification, this will be true and new
     // namespace will be created, check
