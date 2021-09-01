@@ -62,6 +62,7 @@ impl Namespaces {
     }
 
     pub fn unshare_or_setns(&self, namespace: &LinuxNamespace) -> Result<()> {
+        log::debug!("unshare or setns: {:?}", namespace);
         if namespace.path.is_none() {
             self.command.unshare(get_clone_flag(namespace.typ))?;
         } else {

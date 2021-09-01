@@ -1,0 +1,17 @@
+[
+    {
+        "allow": false,
+        "access": "rwm"
+    },
+    {
+        "allow": true,
+        "type": "c",
+        "access": "rwm"
+    },
+    {
+        "allow": true,
+        "type": "b",
+        "major": 8,
+        "access": "rm"
+    }
+]

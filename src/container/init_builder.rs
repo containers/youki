@@ -66,7 +66,6 @@ impl InitContainerBuilder {
         };
 
         let rootless = detect_rootless(&spec)?;
-
         let mut builder_impl = ContainerBuilderImpl {
             init: true,
             syscall: self.base.syscall,
@@ -101,6 +100,12 @@ impl InitContainerBuilder {
     fn load_spec(&self) -> Result<Spec> {
         let source_spec_path = self.bundle.join("config.json");
         let mut spec = oci_spec::Spec::load(&source_spec_path)?;
+        if !spec.version.starts_with("1.0") {
+            bail!(
+                "runtime spec has incompatible version '{}'. Only 1.0.X is supported",
+                spec.version
+            );
+        }
         spec.canonicalize_rootfs(&self.bundle)?;
         Ok(spec)
     }

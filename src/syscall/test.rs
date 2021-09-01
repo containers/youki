@@ -64,6 +64,10 @@ impl Syscall for TestHelperSyscall {
     fn get_pwuid(&self, _: u32) -> Option<Arc<OsStr>> {
         todo!()
     }
+
+    fn chroot(&self, _: &std::path::Path) -> anyhow::Result<()> {
+        todo!()
+    }
 }
 
 impl TestHelperSyscall {

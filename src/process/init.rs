@@ -3,9 +3,9 @@ use nix::mount::mount as nix_mount;
 use nix::mount::MsFlags;
 use nix::sched::CloneFlags;
 use nix::{
-    fcntl, sched,
+    fcntl,
     sys::statfs,
-    unistd::{self, Gid, Pid, Uid},
+    unistd::{self, Gid, Uid},
 };
 use oci_spec::{LinuxNamespaceType, Spec};
 use std::collections::HashMap;
@@ -157,10 +157,8 @@ pub struct ContainerInitArgs {
     pub rootfs: PathBuf,
     /// Socket to communicate the file descriptor of the ptty
     pub console_socket: Option<RawFd>,
-    /// Options for rootless containers
-    pub is_rootless: bool,
-    /// Path to the Unix Domain Socket to communicate container start
-    pub notify_path: PathBuf,
+    /// The Unix Domain Socket to communicate container start
+    pub notify_socket: NotifyListener,
     /// File descriptos preserved/passed to the container init process.
     pub preserve_fds: i32,
     /// Container state
@@ -169,12 +167,13 @@ pub struct ContainerInitArgs {
 
 pub fn container_intermidiate(
     args: ContainerInitArgs,
-    main_to_intermediate: &mut channel::Channel,
-    intermediate_to_main: &mut channel::Channel,
+    receiver_from_main: &mut channel::ReceiverFromMain,
+    sender_to_main: &mut channel::SenderIntermediateToMain,
 ) -> Result<()> {
     let command = &args.syscall;
     let spec = &args.spec;
     let linux = spec.linux.as_ref().context("no linux in spec")?;
+    let namespaces = Namespaces::from(linux.namespaces.as_ref());
 
     // if Out-of-memory score adjustment is set in specification.  set the score
     // value for the current process check
@@ -191,15 +190,29 @@ pub fn container_intermidiate(
     // namespace will be created, check
     // https://man7.org/linux/man-pages/man7/user_namespaces.7.html for more
     // information
-    if args.is_rootless {
-        log::debug!("creating new user namespace");
-        sched::unshare(sched::CloneFlags::CLONE_NEWUSER)?;
-        // child needs to be dumpable, otherwise the non root parent is not
-        // allowed to write the uid/gid maps
-        prctl::set_dumpable(true).unwrap();
-        intermediate_to_main.send_identifier_mapping_request()?;
-        main_to_intermediate.wait_for_mapping_ack()?;
-        prctl::set_dumpable(false).unwrap();
+    if let Some(user_namespace) = namespaces.get(LinuxNamespaceType::User) {
+        namespaces
+            .unshare_or_setns(user_namespace)
+            .with_context(|| format!("Failed to enter pid namespace: {:?}", user_namespace))?;
+        if user_namespace.path.is_none() {
+            log::debug!("creating new user namespace");
+            // child needs to be dumpable, otherwise the non root parent is not
+            // allowed to write the uid/gid maps
+            prctl::set_dumpable(true).unwrap();
+            sender_to_main.identifier_mapping_request()?;
+            receiver_from_main.wait_for_mapping_ack()?;
+            prctl::set_dumpable(false).unwrap();
+        }
+
+        // After UID and GID mapping is configured correctly in the Youki main
+        // process, We want to make sure continue as the root user inside the
+        // new user namespace. This is required because the process of
+        // configuring the container process will require root, even though the
+        // root in the user namespace likely is mapped to an non-priviliged user
+        // on the parent user namespace.
+        command.set_id(Uid::from_raw(0), Gid::from_raw(0)).context(
+            "Failed to configure uid and gid root in the beginning of a new user namespace",
+        )?;
     }
 
     // set limits and namespaces to the process
@@ -210,12 +223,7 @@ pub fn container_intermidiate(
         }
     }
 
-    command
-        .set_id(Uid::from_raw(0), Gid::from_raw(0))
-        .context("failed to become root")?;
-
     // Pid namespace requires an extra fork to enter, so we enter pid namespace now.
-    let namespaces = Namespaces::from(linux.namespaces.as_ref());
     if let Some(pid_namespace) = namespaces.get(LinuxNamespaceType::Pid) {
         namespaces
             .unshare_or_setns(pid_namespace)
@@ -223,35 +231,45 @@ pub fn container_intermidiate(
     }
 
     // We only need for init process to send us the ChildReady.
-    let child_to_parent = &mut channel::Channel::new()?;
+    let (sender_to_intermediate, receiver_from_init) = &mut channel::init_to_intermediate()?;
+
     // We resued the args passed in, but replace with a new set of channels.
     let init_args = ContainerInitArgs { ..args };
     // We have to record the pid of the child (container init process), since
     // the child will be inside the pid namespace. We can't rely on child_ready
     // to send us the correct pid.
-    let pid = fork::container_fork(|| container_init(init_args, child_to_parent))?;
+    let pid = fork::container_fork(|| {
+        // First thing in the child process to close the unused fds in the channel/pipe.
+        receiver_from_init
+            .close()
+            .context("Failed to close receiver in init process")?;
+        container_init(init_args, sender_to_intermediate)
+    })?;
+    // Close unused fds in the parent process.
+    sender_to_intermediate
+        .close()
+        .context("Failed to close sender in the intermediate process")?;
     // There is no point using the pid returned here, since the child will be
     // inside the pid namespace already.
-    child_to_parent.wait_for_child_ready()?;
+    receiver_from_init
+        .wait_for_init_ready()
+        .context("Failed to wait for the child")?;
     // After the child (the container init process) becomes ready, we can signal
     // the parent (the main process) that we are ready.
-    intermediate_to_main.send_child_ready(pid)?;
+    sender_to_main
+        .intermediate_ready(pid)
+        .context("Failed to send child ready from intermediate process")?;
 
     Ok(())
 }
 
 pub fn container_init(
     args: ContainerInitArgs,
-    init_to_intermediate: &mut channel::Channel,
+    sender_to_intermediate: &mut channel::SenderInitToIntermediate,
 ) -> Result<()> {
     let command = &args.syscall;
     let spec = &args.spec;
     let linux = spec.linux.as_ref().context("no linux in spec")?;
-    // Need to create the notify socket before we pivot root, since the unix
-    // domain socket used here is outside of the rootfs of container. During
-    // exec, need to create the socket before we exter into existing mount
-    // namespace.
-    let mut notify_socket: NotifyListener = NotifyListener::new(&args.notify_path)?;
     let proc = spec.process.as_ref().context("no process in spec")?;
     let mut envs: Vec<String> = proc.env.as_ref().unwrap_or(&vec![]).clone();
     let rootfs = &args.rootfs;
@@ -281,8 +299,13 @@ pub fn container_init(
             .with_context(|| format!("Failed to enter mount namespace: {:?}", mount_namespace))?;
     }
 
-    if let Some(hostname) = spec.hostname.as_ref() {
-        command.set_hostname(hostname)?;
+    // Only set the host name if entering into a new uts namespace
+    if let Some(uts_namespace) = namespaces.get(LinuxNamespaceType::Uts) {
+        if uts_namespace.path.is_none() {
+            if let Some(hostname) = spec.hostname.as_ref() {
+                command.set_hostname(hostname)?;
+            }
+        }
     }
 
     if let Some(true) = proc.no_new_privileges {
@@ -293,17 +316,28 @@ pub fn container_init(
         // create_container hook needs to be called after the namespace setup, but
         // before pivot_root is called. This runs in the container namespaces.
         if let Some(hooks) = hooks {
-            hooks::run_hooks(hooks.create_container.as_ref(), container)?
+            hooks::run_hooks(hooks.create_container.as_ref(), container)
+                .context("Failed to run create container hooks")?;
         }
 
         let bind_service = namespaces.get(LinuxNamespaceType::User).is_some();
         rootfs::prepare_rootfs(spec, rootfs, bind_service)
             .with_context(|| "Failed to prepare rootfs")?;
 
-        // change the root of filesystem of the process to the rootfs
-        command
-            .pivot_rootfs(rootfs)
-            .with_context(|| format!("Failed to pivot root to {:?}", rootfs))?;
+        // Entering into the rootfs jail. If mount namespace is specified, then
+        // we use pivot_root, but if we are on the host mount namespace, we will
+        // use simple chroot. Scary things will happen if you try to pivot_root
+        // in the host mount namespace...
+        if namespaces.get(LinuxNamespaceType::Mount).is_some() {
+            // change the root of filesystem of the process to the rootfs
+            command
+                .pivot_rootfs(rootfs)
+                .with_context(|| format!("Failed to pivot root to {:?}", rootfs))?;
+        } else {
+            command
+                .chroot(rootfs)
+                .with_context(|| format!("Failed to chroot to {:?}", rootfs))?;
+        }
 
         if let Some(kernel_params) = &linux.sysctl {
             sysctl(kernel_params)
@@ -324,7 +358,7 @@ pub fn container_init(
     if let Some(paths) = &linux.readonly_paths {
         // mount readonly path
         for path in paths {
-            readonly_path(path)?;
+            readonly_path(path).context("Failed to set read only path")?;
         }
     }
 
@@ -341,10 +375,13 @@ pub fn container_init(
         }
     };
 
-    command.set_id(Uid::from_raw(proc.user.uid), Gid::from_raw(proc.user.gid))?;
-    capabilities::reset_effective(command)?;
+    command
+        .set_id(Uid::from_raw(proc.user.uid), Gid::from_raw(proc.user.gid))
+        .context("Failed to configure uid and gid")?;
+
+    capabilities::reset_effective(command).context("Failed to reset effective capabilities")?;
     if let Some(caps) = &proc.capabilities {
-        capabilities::drop_privileges(caps, command)?;
+        capabilities::drop_privileges(caps, command).context("Failed to drop capabilities")?;
     }
 
     // Take care of LISTEN_FDS used for systemd-active-socket. If the value is
@@ -405,9 +442,10 @@ pub fn container_init(
     // Note, we pass -1 here because we are already inside the pid namespace.
     // The pid outside the pid namespace should be recorded by the intermediate
     // process.
-    init_to_intermediate.send_child_ready(Pid::from_raw(-1))?;
+    sender_to_intermediate.init_ready()?;
 
     // listing on the notify socket for container start command
+    let notify_socket = args.notify_socket;
     notify_socket.wait_for_container_start()?;
 
     // create_container hook needs to be called after the namespace setup, but
