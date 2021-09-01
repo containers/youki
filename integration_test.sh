@@ -63,7 +63,7 @@ test_cases=(
   "process/process.t"
   "process_capabilities/process_capabilities.t"
   "process_capabilities_fail/process_capabilities_fail.t"
-  # "process_oom_score_adj/process_oom_score_adj.t"
+  "process_oom_score_adj/process_oom_score_adj.t"
   "process_rlimits/process_rlimits.t"
   "process_rlimits_fail/process_rlimits_fail.t"
   # "process_user/process_user.t"

@@ -177,7 +177,7 @@ fn lookup_map_binary(binary: &str) -> Result<Option<PathBuf>> {
 pub fn write_uid_mapping(target_pid: Pid, rootless: Option<&Rootless>) -> Result<()> {
     log::debug!("Write UID mapping for {:?}", target_pid);
     if let Some(rootless) = rootless {
-        if let Some(uid_mappings) = rootless.gid_mappings {
+        if let Some(uid_mappings) = rootless.uid_mappings {
             return write_id_mapping(
                 &format!("/proc/{}/uid_map", target_pid),
                 uid_mappings,
