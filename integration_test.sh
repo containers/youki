@@ -66,7 +66,7 @@ test_cases=(
   "process_oom_score_adj/process_oom_score_adj.t"
   "process_rlimits/process_rlimits.t"
   "process_rlimits_fail/process_rlimits_fail.t"
-  # "process_user/process_user.t"
+  "process_user/process_user.t"
   "root_readonly_true/root_readonly_true.t"
   # Record the tests that runc also fails to pass below, maybe we will fix this by origin integration test, issue: https://github.com/containers/youki/issues/56
   # "start/start.t"

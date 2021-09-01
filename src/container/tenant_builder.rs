@@ -13,7 +13,7 @@ use std::{
     str::FromStr,
 };
 
-use crate::{notify_socket::NotifySocket, rootless::detect_rootless, tty, utils};
+use crate::{notify_socket::NotifySocket, rootless::Rootless, tty, utils};
 
 use super::{builder::ContainerBuilder, builder_impl::ContainerBuilderImpl, Container};
 
@@ -100,7 +100,7 @@ impl TenantContainerBuilder {
         let csocketfd = self.setup_tty_socket(&container_dir)?;
 
         let use_systemd = self.should_use_systemd(&container);
-        let rootless = detect_rootless(&spec)?;
+        let rootless = Rootless::new(&spec)?;
 
         let mut builder_impl = ContainerBuilderImpl {
             init: false,

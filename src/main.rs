@@ -25,7 +25,7 @@ use youki::commands::run;
 use youki::commands::spec_json;
 use youki::commands::start;
 use youki::commands::state;
-use youki::rootless::should_use_rootless;
+use youki::rootless::rootless_required;
 use youki::utils::{self, create_dir_all_with_mode};
 
 // High-level commandline option definition
@@ -118,7 +118,7 @@ fn determine_root_path(root_path: Option<PathBuf>) -> Result<PathBuf> {
         return Ok(path);
     }
 
-    if !should_use_rootless() {
+    if !rootless_required() {
         let default = PathBuf::from("/run/youki");
         utils::create_dir_all(&default)?;
         return Ok(default);

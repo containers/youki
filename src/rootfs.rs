@@ -9,7 +9,7 @@ use nix::mount::mount as nix_mount;
 use nix::mount::MsFlags;
 use nix::sys::stat::Mode;
 use nix::sys::stat::{mknod, umask};
-use nix::unistd::{chdir, chown, close, getcwd};
+use nix::unistd::{chown, close};
 use nix::unistd::{Gid, Uid};
 use oci_spec::{LinuxDevice, LinuxDeviceType, Mount, Spec};
 use std::fs::OpenOptions;
@@ -68,17 +68,18 @@ pub fn prepare_rootfs(spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<
         }
     }
 
-    let olddir = getcwd()?;
-    chdir(rootfs)?;
     setup_default_symlinks(rootfs).context("Failed to setup default symlinks")?;
     if let Some(added_devices) = linux.devices.as_ref() {
-        create_devices(default_devices().iter().chain(added_devices), bind_devices)
+        create_devices(
+            rootfs,
+            default_devices().iter().chain(added_devices),
+            bind_devices,
+        )
     } else {
-        create_devices(default_devices().iter(), bind_devices)
+        create_devices(rootfs, default_devices().iter(), bind_devices)
     }?;
-    setup_ptmx(rootfs)?;
-    chdir(&olddir)?;
 
+    setup_ptmx(rootfs)?;
     Ok(())
 }
 
@@ -89,8 +90,7 @@ fn setup_ptmx(rootfs: &Path) -> Result<()> {
         }
     }
 
-    symlink("pts/ptmx", "dev/ptmx").context("Failed to symlink ptmx")?;
-
+    symlink("pts/ptmx", rootfs.join("dev/ptmx")).context("failed to symlink ptmx")?;
     Ok(())
 }
 
@@ -171,7 +171,7 @@ pub fn default_devices() -> Vec<LinuxDevice> {
     ]
 }
 
-fn create_devices<'a, I>(devices: I, bind: bool) -> Result<()>
+fn create_devices<'a, I>(rootfs: &Path, devices: I, bind: bool) -> Result<()>
 where
     I: Iterator<Item = &'a LinuxDevice>,
 {
@@ -183,7 +183,7 @@ where
                     panic!("{} is not a valid device path", dev.path.display());
                 }
 
-                bind_dev(dev)
+                bind_dev(rootfs, dev)
             })
             .collect::<Result<Vec<_>>>()?;
     } else {
@@ -193,7 +193,7 @@ where
                     panic!("{} is not a valid device path", dev.path.display());
                 }
 
-                mknod_dev(dev)
+                mknod_dev(rootfs, dev)
             })
             .collect::<Result<Vec<_>>>()?;
     }
@@ -202,15 +202,17 @@ where
     Ok(())
 }
 
-fn bind_dev(dev: &LinuxDevice) -> Result<()> {
+fn bind_dev(rootfs: &Path, dev: &LinuxDevice) -> Result<()> {
+    let full_container_path = rootfs.join(dev.path.as_in_container()?);
+
     let fd = open(
-        &dev.path.as_in_container()?,
+        &full_container_path,
         OFlag::O_RDWR | OFlag::O_CREAT,
         Mode::from_bits_truncate(0o644),
     )?;
     close(fd)?;
     nix_mount(
-        Some(&*dev.path.as_in_container()?),
+        Some(&full_container_path),
         &dev.path,
         None::<&str>,
         MsFlags::MS_BIND,
@@ -220,21 +222,23 @@ fn bind_dev(dev: &LinuxDevice) -> Result<()> {
     Ok(())
 }
 
-fn mknod_dev(dev: &LinuxDevice) -> Result<()> {
+fn mknod_dev(rootfs: &Path, dev: &LinuxDevice) -> Result<()> {
     fn makedev(major: i64, minor: i64) -> u64 {
         ((minor & 0xff)
             | ((major & 0xfff) << 8)
             | ((minor & !0xff) << 12)
             | ((major & !0xfff) << 32)) as u64
     }
+
+    let full_container_path = rootfs.join(dev.path.as_in_container()?);
     mknod(
-        &dev.path.as_in_container()?,
+        &full_container_path,
         dev.typ.to_sflag()?,
         Mode::from_bits_truncate(dev.file_mode.unwrap_or(0)),
         makedev(dev.major, dev.minor),
     )?;
     chown(
-        &dev.path.as_in_container()?,
+        &full_container_path,
         dev.uid.map(Uid::from_raw),
         dev.gid.map(Gid::from_raw),
     )?;

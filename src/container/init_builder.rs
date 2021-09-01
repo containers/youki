@@ -1,7 +1,7 @@
 use anyhow::{bail, Context, Result};
 use nix::unistd;
 use oci_spec::Spec;
-use rootless::detect_rootless;
+use rootless::Rootless;
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -65,7 +65,7 @@ impl InitContainerBuilder {
             None
         };
 
-        let rootless = detect_rootless(&spec)?;
+        let rootless = Rootless::new(&spec)?;
         let mut builder_impl = ContainerBuilderImpl {
             init: true,
             syscall: self.base.syscall,
