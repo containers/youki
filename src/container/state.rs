@@ -84,7 +84,7 @@ pub struct State {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pid: Option<i32>,
     // Bundle is the path to the container's bundle directory.
-    pub bundle: String,
+    pub bundle: PathBuf,
     // Annotations are key values associated with the container.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub annotations: Option<HashMap<String, String>>,
@@ -105,14 +105,14 @@ impl State {
         container_id: &str,
         status: ContainerStatus,
         pid: Option<i32>,
-        bundle: &str,
+        bundle: PathBuf,
     ) -> Self {
         Self {
             oci_version: "v1.0.2".to_string(),
             id: container_id.to_string(),
             status,
             pid,
-            bundle: bundle.to_string(),
+            bundle,
             annotations: Some(HashMap::default()),
             created: None,
             creator: None,

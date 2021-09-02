@@ -38,11 +38,11 @@ impl Container {
         container_id: &str,
         status: ContainerStatus,
         pid: Option<i32>,
-        bundle: &str,
+        bundle: &Path,
         container_root: &Path,
     ) -> Result<Self> {
         let container_root = fs::canonicalize(container_root)?;
-        let state = State::new(container_id, status, pid, bundle);
+        let state = State::new(container_id, status, pid, bundle.to_path_buf());
         Ok(Self {
             state,
             root: container_root,
@@ -154,8 +154,8 @@ impl Container {
         None
     }
 
-    pub fn bundle(&self) -> String {
-        self.state.bundle.clone()
+    pub fn bundle(&self) -> &PathBuf {
+        &self.state.bundle
     }
 
     pub fn set_systemd(mut self, should_use: bool) -> Self {

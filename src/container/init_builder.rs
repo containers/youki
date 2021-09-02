@@ -121,7 +121,7 @@ impl InitContainerBuilder {
             &self.base.container_id,
             ContainerStatus::Creating,
             None,
-            self.bundle.as_path().to_str().unwrap(),
+            self.bundle.as_path(),
             container_dir,
         )?;
         container.save()?;
