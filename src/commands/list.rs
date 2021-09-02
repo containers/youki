@@ -55,7 +55,7 @@ impl List {
                 container.id(),
                 pid,
                 container.status(),
-                container.bundle(),
+                container.bundle().to_string_lossy(),
                 created,
                 user_name.to_string_lossy()
             ));
