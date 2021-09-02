@@ -56,6 +56,7 @@ impl Container {
     pub fn status(&self) -> ContainerStatus {
         self.state.status
     }
+
     pub fn refresh_status(&mut self) -> Result<Self> {
         let new_status = match self.pid() {
             Some(pid) => {
@@ -198,5 +199,37 @@ impl Container {
 
     pub fn spec(&self) -> Result<Spec> {
         Spec::load(self.root.join("config.json"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::env;
+
+    use super::*;
+    use anyhow::Result;
+
+    #[test]
+    fn test_set_id() -> Result<()> {
+        let dir = env::temp_dir();
+        let container = Container::new("container_id", ContainerStatus::Created, None, &dir, &dir)?;
+        let container = container.set_pid(1);
+        assert_eq!(container.pid(), Some(Pid::from_raw(1)));
+        Ok(())
+    }
+
+    #[test]
+    fn test_basic_getter() -> Result<()> {
+        let container = Container::new(
+            "container_id",
+            ContainerStatus::Created,
+            None,
+            &PathBuf::from("."),
+            &PathBuf::from("."),
+        )?;
+
+        assert_eq!(container.bundle(), &PathBuf::from("."));
+        assert_eq!(container.root, fs::canonicalize(PathBuf::from("."))?);
+        Ok(())
     }
 }
