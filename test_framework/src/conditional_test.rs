@@ -1,7 +1,9 @@
 ///! Contains definition for a tests which should be conditionally run
 use crate::testable::{TestResult, Testable};
 
+// type aliases for test function signature
 type TestFn = dyn Fn() -> TestResult;
+// type alias for function signature for function which checks if a test can be run or not
 type CheckFn = dyn Fn() -> bool;
 
 /// Basic Template structure for tests which need to be run conditionally

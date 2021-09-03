@@ -25,6 +25,7 @@ struct Opts {
     tests: Option<Vec<String>>,
 }
 
+// parse test string given in commandline option as pair of testgroup name and tests belonging to that
 fn parse_tests(tests: &[String]) -> Vec<(String, Option<Vec<&str>>)> {
     let mut ret = Vec::with_capacity(tests.len());
     for test in tests {

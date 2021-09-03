@@ -1,6 +1,7 @@
 ///! Contains definition for a simple and commonly usable test structure
 use crate::testable::{TestResult, Testable};
 
+// type alias for the test function
 type TestFn = dyn Sync + Send + Fn() -> TestResult;
 
 /// Basic Template structure for a test

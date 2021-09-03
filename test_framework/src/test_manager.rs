@@ -70,8 +70,8 @@ impl<'a> TestManager<'a> {
         for (test_group_name, tests) in tests.iter() {
             if let Some(tg) = self.test_groups.get(test_group_name) {
                 match tests {
-                    Option::None => self.run_test_group(test_group_name, *tg),
-                    Option::Some(tests) => {
+                    None => self.run_test_group(test_group_name, *tg),
+                    Some(tests) => {
                         let results = tg.run_selected(tests);
                         let mut test_vec = Vec::new();
                         for (name, res) in results.iter() {

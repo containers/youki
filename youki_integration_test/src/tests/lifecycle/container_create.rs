@@ -16,6 +16,7 @@ impl ContainerCreate {
         }
     }
 
+    // runtime should not create container with empty id
     fn create_empty_id(&self) -> TestResult {
         let temp = create::create(&self.project_path, "");
         match temp {
@@ -27,6 +28,7 @@ impl ContainerCreate {
         }
     }
 
+    // runtime should create container with valid id
     fn create_valid_id(&self) -> TestResult {
         let temp = create::create(&self.project_path, &self.container_id);
         if let TestResult::Ok = temp {
@@ -34,6 +36,8 @@ impl ContainerCreate {
         }
         temp
     }
+
+    // runtime should not create container with is that already exists
     fn create_duplicate_id(&self) -> TestResult {
         let id = generate_uuid().to_string();
         let _ = create::create(&self.project_path, &id);
