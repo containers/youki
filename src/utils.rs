@@ -1,14 +1,17 @@
 //! Utility functionality
 
-use std::env;
+use std::collections::HashMap;
 use std::ffi::CString;
-use std::fs::{self, File};
+use std::fs::{self, DirBuilder, File};
 use std::ops::Deref;
+use std::os::linux::fs::MetadataExt;
+use std::os::unix::fs::DirBuilderExt;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use anyhow::Context;
 use anyhow::{bail, Result};
+use nix::sys::stat::Mode;
 use nix::unistd;
 
 pub trait PathBufExt {
@@ -37,24 +40,27 @@ impl PathBufExt for PathBuf {
     }
 }
 
-pub fn do_exec(path: impl AsRef<Path>, args: &[String], envs: &[String]) -> Result<()> {
+pub fn parse_env(envs: &[String]) -> HashMap<String, String> {
+    envs.iter()
+        .filter_map(|e| {
+            let mut split = e.split('=');
+
+            if let Some(key) = split.next() {
+                let value: String = split.collect::<Vec<&str>>().join("=");
+                Some((String::from(key), value))
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+pub fn do_exec(path: impl AsRef<Path>, args: &[String]) -> Result<()> {
     let p = CString::new(path.as_ref().to_string_lossy().to_string())?;
     let a: Vec<CString> = args
         .iter()
         .map(|s| CString::new(s.to_string()).unwrap_or_default())
         .collect();
-
-    // clear env vars
-    env::vars().for_each(|(key, _value)| std::env::remove_var(key));
-    // set env vars
-    envs.iter().for_each(|e| {
-        let mut split = e.split('=');
-        if let Some(key) = split.next() {
-            let value: String = split.collect::<Vec<&str>>().join("=");
-            env::set_var(key, value)
-        };
-    });
-
     unistd::execvp(&p, &a)?;
     Ok(())
 }
@@ -106,6 +112,46 @@ pub fn open<P: AsRef<Path>>(path: P) -> Result<File> {
     File::open(path).with_context(|| format!("failed to open {:?}", path))
 }
 
+/// Creates the specified directory and all parent directories with the specified mode. Ensures
+/// that the directory has been created with the correct mode and that the owner of the directory
+/// is the owner that has been specified
+/// # Example
+/// ``` no_run
+/// use youki::utils::create_dir_all_with_mode;
+/// use nix::sys::stat::Mode;
+/// use std::path::Path;
+///
+/// let path = Path::new("/tmp/youki");
+/// create_dir_all_with_mode(&path, 1000, Mode::S_IRWXU).unwrap();
+/// assert!(path.exists())
+/// ```
+pub fn create_dir_all_with_mode<P: AsRef<Path>>(path: P, owner: u32, mode: Mode) -> Result<()> {
+    let path = path.as_ref();
+    if !path.exists() {
+        DirBuilder::new()
+            .recursive(true)
+            .mode(mode.bits())
+            .create(path)
+            .with_context(|| format!("failed to create directory {}", path.display()))?;
+    }
+
+    let metadata = path
+        .metadata()
+        .with_context(|| format!("failed to get metadata for {}", path.display()))?;
+
+    if metadata.is_dir()
+        && metadata.st_uid() == owner
+        && metadata.st_mode() & mode.bits() == mode.bits()
+    {
+        Ok(())
+    } else {
+        bail!(
+            "metadata for {} does not possess the expected attributes",
+            path.display()
+        );
+    }
+}
+
 pub struct TempDir {
     path: Option<PathBuf>,
 }
@@ -113,7 +159,8 @@ pub struct TempDir {
 impl TempDir {
     pub fn new<P: Into<PathBuf>>(path: P) -> Result<Self> {
         let p = path.into();
-        std::fs::create_dir_all(&p)?;
+        std::fs::create_dir_all(&p)
+            .with_context(|| format!("failed to create directory {}", p.display()))?;
         Ok(Self { path: Some(p) })
     }
 
@@ -188,5 +235,20 @@ mod tests {
             get_cgroup_path(&Some(PathBuf::from("/youki")), cid),
             PathBuf::from("/youki")
         );
+    }
+    #[test]
+    fn test_parse_env() -> Result<()> {
+        let key = "key".to_string();
+        let value = "value".to_string();
+        let env_input = vec![format!("{}={}", key, value)];
+        let env_output = parse_env(&env_input);
+        assert_eq!(
+            env_output.len(),
+            1,
+            "There should be exactly one entry inside"
+        );
+        assert_eq!(env_output.get_key_value(&key), Some((&key, &value)));
+
+        Ok(())
     }
 }

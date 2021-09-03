@@ -8,97 +8,96 @@
 //! Cgroup (Resource limits, execution priority etc.)
 
 use crate::syscall::{syscall::create_syscall, Syscall};
-use anyhow::Result;
-use nix::{
-    fcntl,
-    sched::{self, CloneFlags},
-    sys::stat,
-    unistd::{self, Gid, Uid},
-};
-use oci_spec::LinuxNamespace;
+use anyhow::{Context, Result};
+use nix::{fcntl, sched::CloneFlags, sys::stat, unistd};
+use oci_spec::{LinuxNamespace, LinuxNamespaceType};
+use std::collections;
 
 /// Holds information about namespaces
 pub struct Namespaces {
-    spaces: Vec<LinuxNamespace>,
     command: Box<dyn Syscall>,
-    pub clone_flags: CloneFlags,
+    namespace_map: collections::HashMap<CloneFlags, LinuxNamespace>,
 }
 
-impl From<Vec<LinuxNamespace>> for Namespaces {
-    fn from(namespaces: Vec<LinuxNamespace>) -> Self {
-        let clone_flags = namespaces.iter().filter(|ns| ns.path.is_none()).fold(
-            CloneFlags::empty(),
-            |mut cf, ns| {
-                cf |= CloneFlags::from_bits_truncate(ns.typ as i32);
-                cf
-            },
-        );
+fn get_clone_flag(namespace_type: LinuxNamespaceType) -> CloneFlags {
+    match namespace_type {
+        LinuxNamespaceType::Pid => CloneFlags::CLONE_NEWPID,
+        LinuxNamespaceType::User => CloneFlags::CLONE_NEWUSER,
+        LinuxNamespaceType::Uts => CloneFlags::CLONE_NEWUTS,
+        LinuxNamespaceType::Cgroup => CloneFlags::CLONE_NEWCGROUP,
+        LinuxNamespaceType::Ipc => CloneFlags::CLONE_NEWIPC,
+        LinuxNamespaceType::Network => CloneFlags::CLONE_NEWNET,
+        LinuxNamespaceType::Mount => CloneFlags::CLONE_NEWNS,
+    }
+}
+
+impl From<Option<&Vec<LinuxNamespace>>> for Namespaces {
+    fn from(namespaces: Option<&Vec<LinuxNamespace>>) -> Self {
         let command: Box<dyn Syscall> = create_syscall();
+        let namespace_map: collections::HashMap<CloneFlags, LinuxNamespace> = namespaces
+            .unwrap_or(&vec![])
+            .iter()
+            .map(|ns| (get_clone_flag(ns.typ), ns.clone()))
+            .collect();
 
         Namespaces {
-            spaces: namespaces,
             command,
-            clone_flags,
+            namespace_map,
         }
     }
 }
 
 impl Namespaces {
-    /// sets namespaces as defined in structure to calling process
-    pub fn apply_setns(&self) -> Result<()> {
-        let to_enter: Vec<(CloneFlags, i32)> = self
-            .spaces
+    pub fn apply_namespaces<F: Fn(CloneFlags) -> bool>(&self, filter: F) -> Result<()> {
+        let to_enter: collections::HashMap<&CloneFlags, &LinuxNamespace> = self
+            .namespace_map
             .iter()
-            .filter(|ns| ns.path.is_some()) // filter those which are actually present on the system
-            .map(|ns| {
-                let space = CloneFlags::from_bits_truncate(ns.typ as i32);
-                let fd = fcntl::open(
-                    &*ns.path.as_ref().unwrap().clone(),
-                    fcntl::OFlag::empty(),
-                    stat::Mode::empty(),
-                )
-                .unwrap();
-                (space, fd)
-            })
+            .filter(|(k, _)| filter(**k))
             .collect();
-
-        for &(space, fd) in &to_enter {
-            // set the namespace
-            self.command.set_ns(fd, space)?;
-            unistd::close(fd)?;
-            // if namespace is cloned with newuser flag, then it creates a new user namespace,
-            // and we need to set the user and group id to 0
-            // see https://man7.org/linux/man-pages/man2/clone.2.html for more info
-            if space == sched::CloneFlags::CLONE_NEWUSER {
-                self.command.set_id(Uid::from_raw(0), Gid::from_raw(0))?;
-            }
+        for (ns_type, ns) in to_enter {
+            self.unshare_or_setns(ns)
+                .with_context(|| format!("Failed to enter {:?} namespace: {:?}", ns_type, ns))?;
         }
         Ok(())
     }
 
-    /// disassociate given parts context of calling process from other process
-    // see https://man7.org/linux/man-pages/man2/unshare.2.html for more info
-    pub fn apply_unshare(&self, without: CloneFlags) -> Result<()> {
-        self.command.unshare(self.clone_flags & !without)?;
+    pub fn unshare_or_setns(&self, namespace: &LinuxNamespace) -> Result<()> {
+        log::debug!("unshare or setns: {:?}", namespace);
+        if namespace.path.is_none() {
+            self.command.unshare(get_clone_flag(namespace.typ))?;
+        } else {
+            let ns_path = namespace.path.as_ref().unwrap();
+            let fd = fcntl::open(ns_path, fcntl::OFlag::empty(), stat::Mode::empty())
+                .with_context(|| format!("Failed to open namespace fd: {:?}", ns_path))?;
+            self.command
+                .set_ns(fd, get_clone_flag(namespace.typ))
+                .with_context(|| "Failed to set namespace")?;
+            unistd::close(fd).with_context(|| "Failed to close namespace fd")?;
+        }
+
         Ok(())
     }
+
+    pub fn get(&self, k: LinuxNamespaceType) -> Option<&LinuxNamespace> {
+        self.namespace_map.get(&get_clone_flag(k))
+    }
 }
+
 #[cfg(test)]
 mod tests {
-    use oci_spec::LinuxNamespaceType;
-
     use super::*;
     use crate::syscall::test::TestHelperSyscall;
+    use oci_spec::LinuxNamespaceType;
 
     fn gen_sample_linux_namespaces() -> Vec<LinuxNamespace> {
         vec![
             LinuxNamespace {
                 typ: LinuxNamespaceType::Mount,
-                path: Some("/dev/null".to_string()),
+                path: Some("/dev/null".into()),
             },
             LinuxNamespace {
                 typ: LinuxNamespaceType::Network,
-                path: Some("/dev/null".to_string()),
+                path: Some("/dev/null".into()),
             },
             LinuxNamespace {
                 typ: LinuxNamespaceType::Pid,
@@ -116,11 +115,13 @@ mod tests {
     }
 
     #[test]
-    fn test_namespaces_set_ns() {
+    fn test_apply_namespaces() {
         let sample_linux_namespaces = gen_sample_linux_namespaces();
-        let namespaces: Namespaces = sample_linux_namespaces.into();
+        let namespaces = Namespaces::from(Some(&sample_linux_namespaces));
         let test_command: &TestHelperSyscall = namespaces.command.as_any().downcast_ref().unwrap();
-        assert!(namespaces.apply_setns().is_ok());
+        assert!(namespaces
+            .apply_namespaces(|ns_type| { ns_type != CloneFlags::CLONE_NEWIPC })
+            .is_ok());
 
         let mut setns_args: Vec<_> = test_command
             .get_setns_args()
@@ -131,18 +132,10 @@ mod tests {
         let mut expect = vec![CloneFlags::CLONE_NEWNS, CloneFlags::CLONE_NEWNET];
         expect.sort();
         assert_eq!(setns_args, expect);
-    }
 
-    #[test]
-    fn test_namespaces_unshare() {
-        let sample_linux_namespaces = gen_sample_linux_namespaces();
-        let namespaces: Namespaces = sample_linux_namespaces.into();
-        assert!(namespaces.apply_unshare(CloneFlags::CLONE_NEWIPC).is_ok());
-
-        let test_command: &TestHelperSyscall = namespaces.command.as_any().downcast_ref().unwrap();
         let mut unshare_args = test_command.get_unshare_args();
         unshare_args.sort();
-        let mut expect = vec![CloneFlags::CLONE_NEWUSER | CloneFlags::CLONE_NEWPID];
+        let mut expect = vec![CloneFlags::CLONE_NEWUSER, CloneFlags::CLONE_NEWPID];
         expect.sort();
         assert_eq!(unshare_args, expect)
     }

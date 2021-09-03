@@ -5,9 +5,10 @@ use anyhow::{bail, Context, Result};
 use clap::Clap;
 use nix::sys::signal::Signal;
 
-use crate::cgroups;
 use crate::container::{Container, ContainerStatus};
+use crate::hooks;
 use crate::utils;
+use cgroups;
 use nix::sys::signal as nix_signal;
 
 #[derive(Clap, Debug)]
@@ -61,6 +62,11 @@ impl Delete {
                 let cmanager =
                     cgroups::common::create_cgroup_manager(cgroups_path, systemd_cgroup)?;
                 cmanager.remove()?;
+
+                if let Some(hooks) = spec.hooks.as_ref() {
+                    hooks::run_hooks(hooks.poststop.as_ref(), Some(&container))
+                        .with_context(|| "Failed to run post stop hooks")?;
+                }
             }
             std::process::exit(0)
         } else {

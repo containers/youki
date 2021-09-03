@@ -4,6 +4,7 @@
 [![GitHub commit activity](https://img.shields.io/github/commit-activity/m/containers/youki)](https://github.com/containers/youki/graphs/commit-activity)
 [![GitHub contributors](https://img.shields.io/github/contributors/containers/youki)](https://github.com/containers/youki/graphs/contributors)
 [![Github CI](https://github.com/containers/youki/actions/workflows/main.yml/badge.svg?branch=main)](https://github.com/containers/youki/actions)
+[![codecov](https://codecov.io/gh/containers/youki/branch/main/graph/badge.svg)](https://codecov.io/gh/containers/youki)
 
 <p align="center">
   <img src="docs/youki.png" width="230" height="230">
@@ -25,25 +26,34 @@ Here is why I am rewriting a new container runtime in Rust.
 - The development of [railcar](https://github.com/oracle/railcar) has been suspended. This project was very nice but is no longer being developed. This project is inspired by it.
 - I have fun implementing this. In fact, this may be the most important.
 
+# Related project
+
+- [containers/oci-spec-rs](https://github.com/containers/oci-spec-rs) - OCI Runtime and Image Spec in Rust
+
 # Status of youki
 
 youki is not at the practical stage yet. However, it is getting closer to practical use, running with docker and passing all the default tests provided by [opencontainers/runtime-tools](https://github.com/opencontainers/runtime-tools).
 ![youki demo](docs/demo.gif)
 
-## Features
+|    Feature     |                   Description                   |                                                State                                                |
+| :------------: | :---------------------------------------------: | :-------------------------------------------------------------------------------------------------: |
+|     Docker     |               Running via Docker                |                                                  ✅                                                  |
+|     Podman     |               Running via Podman                | It works, but cgroups isn't supported. WIP on [#24](https://github.com/containers/youki/issues/24)  |
+|   pivot_root   |            Change the root directory            |                                                  ✅                                                  |
+|     Mounts     |    Mount files and directories to container     |                                                  ✅                                                  |
+|   Namespaces   |         Isolation of various resources          |                                                  ✅                                                  |
+|  Capabilities  |            Limiting root privileges             |                                                  ✅                                                  |
+|   Cgroups v1   |            Resource limitations, etc            |                                                  ✅                                                  |
+|   Cgroups v2   |             Improved version of v1              | Support is complete except for devices. WIP on [#78](https://github.com/containers/youki/issues/78) |
+|    Seccomp     |             Filtering system calls              |                     WIP on [#25](https://github.com/containers/youki/issues/25)                     |
+|     Hooks      | Add custom processing during container creation |                                                  ✅                                                  |
+|    Rootless    |   Running a container without root privileges   | It works, but cgroups isn't supported. WIP on [#77](https://github.com/containers/youki/issues/77)  |
+| OCI Compliance |        Compliance with OCI Runtime Spec         |                                   45 out of 55 test cases passing                                   |
 
-- [x] run with docker
-- [ ] run with podman(WIP on [#24](https://github.com/containers/youki/issues/24))
-- [x] pivot root
-- [x] mount devices
-- [x] namespaces
-- [x] capabilities
-- [x] rlimits
-- [ ] cgroups v1(WIP on [#9](https://github.com/containers/youki/issues/9))
-- [ ] cgroups v2(WIP on [#78](https://github.com/containers/youki/issues/78))
-- [ ] seccomp(WIP on [#25](https://github.com/containers/youki/issues/25))
-- [ ] hooks(WIP on [#13](https://github.com/containers/youki/issues/13))
-- [ ] rootless(WIP on [#77](https://github.com/containers/youki/issues/77))
+# Design and implementation of youki
+![sequence diagram of youki](docs/.drawio.svg)
+
+More details are in the works [#14](https://github.com/containers/youki/issues/14)
 
 # Getting Started
 
@@ -60,10 +70,12 @@ For other platforms, please use [Vagrantfile](#setting-up-vagrant) that we prepa
 ### Debian, Ubuntu and related distributions
 
 ```sh
-$ sudo apt-get install    \
-      pkg-config          \
-      libsystemd-dev      \
-      libdbus-glib-1-dev
+$ sudo apt-get install   \
+      pkg-config         \
+      libsystemd-dev     \
+      libdbus-glib-1-dev \
+      build-essential    \
+      libelf-dev
 ```
 
 ### Fedora, Centos, RHEL and related distributions
@@ -72,7 +84,8 @@ $ sudo apt-get install    \
 $ sudo dnf install   \
       pkg-config     \
       systemd-devel  \
-      dbus-devel
+      dbus-devel     \
+      elfutils-libelf-devel \
 ```
 
 ## Build
@@ -86,32 +99,48 @@ $ ./youki -h # you can get information about youki command
 
 ## Tutorial
 
-Let's try to run a container that executes `sleep 5` using youki.
-Maybe this tutorial is need permission as root.
+Let's try to run a container that executes `sleep 30` with youki. This tutorial may need root permission.
 
 ```sh
 $ git clone git@github.com:containers/youki.git
 $ cd youki
 $ ./build.sh
-$ mkdir tutorial
+
+$ mkdir -p tutorial/rootfs
 $ cd tutorial
-$ mkdir rootfs
+# use docker to export busybox into the rootfs directory
 $ docker export $(docker create busybox) | tar -C rootfs -xvf -
 ```
 
-Prepare a configuration file for the container that will run `sleep 5`.
+Then, we need to prepare a configuration file. This file contains metadata and specs for a container, such as the process to run, environment variables to inject, sandboxing features to use, etc.
 
 ```sh
-$ curl https://gist.githubusercontent.com/utam0k/8ab419996633066eaf53ac9c66d962e7/raw/e81548f591f26ec03d85ce38b0443144573b4cf6/config.json -o config.json
-$ cd ../
-$ ./youki create -b tutorial tutorial_container
-$ ./youki state tutorial_container # You can see the state the container is in as it is being generate.
-$ ./youki start tutorial_container
-$ ./youki state tutorial_container # Run it within 5 seconds to see the running container.
-$ ./youki delete tutorial_container # Run it after the container is finished running.
+$ ../youki spec  # will generate a spec file named config.json
 ```
 
-Change the command to be executed in config.json and try something other than `sleep 5`.
+We can edit the `config.json` to add customized behaviors for container. Here, we modify the `process` field to run `sleep 30`.
+
+```json
+  "process": {
+    ...
+    "args": [
+      "sleep", "30"
+    ],
+
+  ...
+  }
+```
+
+Then we can explore the lifecycle of a container:
+```sh
+$ sudo ./youki create -b tutorial tutorial_container   # create a container with name `tutorial_container`
+$ sudo ./youki state tutorial_container                # you can see the state the container is `created`
+$ sudo ./youki start tutorial_container                # start the container
+$ sudo ./youki list                                    # will show the list of containers, the container is `running`
+$ sudo ./youki delete tutorial_container               # delete the container
+```
+
+Change the command to be executed in `config.json` and try something other than `sleep 30`.
 
 ## Usage
 
@@ -154,6 +183,8 @@ Go and node-tap are required to run integration test. See the [opencontainers/ru
 ```
 $ git submodule update --init --recursive
 $ ./integration_test.sh
+# run specific test_cases with pattern
+$ ./integration_test.sh linux_*
 ```
 
 ### Setting up Vagrant
@@ -165,18 +196,15 @@ $ git clone git@github.com:containers/youki.git
 $ cd youki
 $ vagrant up
 $ vagrant ssh
+
 # in virtual machine
-$ cd youki # in virtual machine
+$ cd youki
 $ ./build.sh
 ```
 
 # Community
 
 We also have an active [Discord](https://discord.gg/h7R3HgWUct) if you'd like to come and chat with us.
-
-# Design and implementation of youki
-
-TBD(WIP on [#14](https://github.com/containers/youki/issues/14))
 
 # Contribution
 

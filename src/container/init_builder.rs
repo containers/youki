@@ -1,7 +1,7 @@
 use anyhow::{bail, Context, Result};
 use nix::unistd;
 use oci_spec::Spec;
-use rootless::detect_rootless;
+use rootless::Rootless;
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -39,12 +39,14 @@ impl InitContainerBuilder {
 
     /// Creates a new container
     pub fn build(self) -> Result<()> {
+        let spec = self.load_spec()?;
         let container_dir = self.create_container_dir()?;
-        let spec = self.load_and_safeguard_spec(&container_dir)?;
+        self.save_spec(&spec, &container_dir)?;
 
         let container_state = self
             .create_container_state(&container_dir)?
-            .set_systemd(self.use_systemd);
+            .set_systemd(self.use_systemd)
+            .set_annotations(spec.annotations.clone());
 
         unistd::chdir(&*container_dir)?;
         let notify_path = container_dir.join(NOTIFY_FILE);
@@ -63,8 +65,7 @@ impl InitContainerBuilder {
             None
         };
 
-        let rootless = detect_rootless(&spec)?;
-
+        let rootless = Rootless::new(&spec)?;
         let mut builder_impl = ContainerBuilderImpl {
             init: true,
             syscall: self.base.syscall,
@@ -72,7 +73,7 @@ impl InitContainerBuilder {
             pid_file: self.base.pid_file,
             console_socket: csocketfd,
             use_systemd: self.use_systemd,
-            spec,
+            spec: &spec,
             rootfs,
             rootless,
             notify_path,
@@ -96,15 +97,23 @@ impl InitContainerBuilder {
         Ok(container_dir)
     }
 
-    fn load_and_safeguard_spec(&self, container_dir: &Path) -> Result<Spec> {
+    fn load_spec(&self) -> Result<Spec> {
         let source_spec_path = self.bundle.join("config.json");
-        let target_spec_path = container_dir.join("config.json");
-
         let mut spec = oci_spec::Spec::load(&source_spec_path)?;
+        if !spec.version.starts_with("1.0") {
+            bail!(
+                "runtime spec has incompatible version '{}'. Only 1.0.X is supported",
+                spec.version
+            );
+        }
         spec.canonicalize_rootfs(&self.bundle)?;
-        spec.save(target_spec_path)?;
-
         Ok(spec)
+    }
+
+    fn save_spec(&self, spec: &oci_spec::Spec, container_dir: &Path) -> Result<()> {
+        let target_spec_path = container_dir.join("config.json");
+        spec.save(target_spec_path)?;
+        Ok(())
     }
 
     fn create_container_state(&self, container_dir: &Path) -> Result<Container> {
@@ -112,7 +121,7 @@ impl InitContainerBuilder {
             &self.base.container_id,
             ContainerStatus::Creating,
             None,
-            self.bundle.as_path().to_str().unwrap(),
+            self.bundle.as_path(),
             container_dir,
         )?;
         container.save()?;

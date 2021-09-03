@@ -1,5 +1,6 @@
-use crate::{cgroups, container::Container, utils};
+use crate::{container::Container, utils};
 use anyhow::{bail, Context, Result};
+use cgroups;
 use clap::{self, Clap};
 use std::{path::PathBuf, process::Command};
 
