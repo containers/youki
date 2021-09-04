@@ -7,7 +7,6 @@ on:
       - main
 
 jobs:
-  # get list of directories in which files are changed
   changes:
     runs-on: ubuntu-latest
     outputs:
@@ -16,9 +15,6 @@ jobs:
     - uses: dorny/paths-filter@v2
       id: filter
       with:
-        # format is  thing-to-output: path-pattern-to-match
-        # we need . if files in src folder have changed, ./test_framework if files in test_framework have changed
-        # and ./youki_integration_test if files in youki_integration_test have changed
         filters: |
           .: 'src/*'
           ./test_framework: test_framework/*
@@ -29,7 +25,6 @@ jobs:
     strategy:
       matrix:
         rust: [stable]
-        # directories to run the fmt and clippy in
         dirs:  ${{ fromJSON(needs.changes.outputs.dirs) }}
     steps:
       - uses: actions/checkout@v2
