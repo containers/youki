@@ -24,6 +24,7 @@ pub enum ContainerStatus {
     // The container process has paused
     Paused,
 }
+
 impl Default for ContainerStatus {
     fn default() -> Self {
         ContainerStatus::Creating
@@ -155,5 +156,60 @@ impl State {
     /// ```
     pub fn file_path(container_root: &Path) -> PathBuf {
         container_root.join(Self::STATE_FILE_PATH)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_creating_status() {
+        let cstatus = ContainerStatus::default();
+        assert!(!cstatus.can_start());
+        assert!(!cstatus.can_delete());
+        assert!(!cstatus.can_kill());
+        assert!(!cstatus.can_pause());
+        assert!(!cstatus.can_resume());
+    }
+
+    #[test]
+    fn test_create_status() {
+        let cstatus = ContainerStatus::Created;
+        assert!(cstatus.can_start());
+        assert!(!cstatus.can_delete());
+        assert!(cstatus.can_kill());
+        assert!(!cstatus.can_pause());
+        assert!(!cstatus.can_resume());
+    }
+
+    #[test]
+    fn test_running_status() {
+        let cstatus = ContainerStatus::Running;
+        assert!(!cstatus.can_start());
+        assert!(!cstatus.can_delete());
+        assert!(cstatus.can_kill());
+        assert!(cstatus.can_pause());
+        assert!(!cstatus.can_resume());
+    }
+
+    #[test]
+    fn test_stopped_status() {
+        let cstatus = ContainerStatus::Stopped;
+        assert!(!cstatus.can_start());
+        assert!(cstatus.can_delete());
+        assert!(!cstatus.can_kill());
+        assert!(!cstatus.can_pause());
+        assert!(!cstatus.can_resume());
+    }
+
+    #[test]
+    fn test_paused_status() {
+        let cstatus = ContainerStatus::Paused;
+        assert!(!cstatus.can_start());
+        assert!(!cstatus.can_delete());
+        assert!(cstatus.can_kill());
+        assert!(!cstatus.can_pause());
+        assert!(cstatus.can_resume());
     }
 }
