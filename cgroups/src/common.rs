@@ -1,5 +1,4 @@
 use std::{
-    env,
     fmt::{Debug, Display},
     fs::{self, File},
     io::{BufRead, BufReader, Write},
@@ -7,9 +6,11 @@ use std::{
 };
 
 use anyhow::{bail, Context, Result};
-use nix::unistd::Pid;
+use nix::{
+    sys::statfs::{statfs, CGROUP2_SUPER_MAGIC, TMPFS_MAGIC},
+    unistd::Pid,
+};
 use oci_spec::{FreezerState, LinuxDevice, LinuxDeviceCgroup, LinuxDeviceType, LinuxResources};
-use procfs::process::Process;
 #[cfg(feature = "systemd_cgroups")]
 use systemd::daemon::booted;
 #[cfg(not(feature = "systemd_cgroups"))]
@@ -41,16 +42,18 @@ pub trait CgroupManager {
 }
 
 #[derive(Debug)]
-pub enum Cgroup {
-    V1,
-    V2,
+pub enum CgroupSetup {
+    Hybrid,
+    Legacy,
+    Unified,
 }
 
-impl Display for Cgroup {
+impl Display for CgroupSetup {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let print = match *self {
-            Cgroup::V1 => "v1",
-            Cgroup::V2 => "v2",
+        let print = match self {
+            CgroupSetup::Hybrid => "hybrid",
+            CgroupSetup::Legacy => "legacy",
+            CgroupSetup::Unified => "unified",
         };
 
         write!(f, "{}", print)
@@ -91,92 +94,79 @@ pub fn read_cgroup_file<P: AsRef<Path>>(path: P) -> Result<String> {
     fs::read_to_string(path).with_context(|| format!("failed to open {:?}", path))
 }
 
-pub fn get_supported_cgroup_fs() -> Result<Vec<Cgroup>> {
-    let cgroup_mount = Process::myself()?
-        .mountinfo()?
-        .into_iter()
-        .find(|m| m.fs_type == "cgroup");
+/// Determines the cgroup setup of the system. Systems typically have one of
+/// three setups:
+/// - Unified: Pure cgroup v2 system.
+/// - Legacy: Pure cgroup v1 system.
+/// - Hybrid: Hybrid is basically a cgroup v1 system, except for
+///   an additional unified hierarchy which doesn't have any
+///   controllers attached. Resource control can purely be achieved
+///   through the cgroup v1 hierarchy, not through the cgroup v2 hierarchy.
+pub fn get_cgroup_setup() -> Result<CgroupSetup> {
+    let default_root = Path::new(DEFAULT_CGROUP_ROOT);
+    match default_root.exists() {
+        true => {
+            // If the filesystem is of type cgroup2, the system is in unified mode.
+            // If the filesystem is tmpfs instead the system is either in legacy or
+            // hybrid mode. If a cgroup2 filesystem has been mounted under the "unified"
+            // folder we are in hybrid mode, otherwise we are in legacy mode.
+            let stat = statfs(default_root).with_context(|| {
+                format!(
+                    "failed to stat default cgroup root {}",
+                    &default_root.display()
+                )
+            })?;
+            if stat.filesystem_type() == CGROUP2_SUPER_MAGIC {
+                return Ok(CgroupSetup::Unified);
+            }
 
-    let cgroup2_mount = Process::myself()?
-        .mountinfo()?
-        .into_iter()
-        .find(|m| m.fs_type == "cgroup2");
+            if stat.filesystem_type() == TMPFS_MAGIC {
+                let unified = Path::new("/sys/fs/cgroup/unified");
+                if Path::new(unified).exists() {
+                    let stat = statfs(unified)
+                        .with_context(|| format!("failed to stat {}", unified.display()))?;
+                    if stat.filesystem_type() == CGROUP2_SUPER_MAGIC {
+                        return Ok(CgroupSetup::Hybrid);
+                    }
+                }
 
-    let mut cgroups = vec![];
-    if cgroup_mount.is_some() {
-        cgroups.push(Cgroup::V1);
+                return Ok(CgroupSetup::Legacy);
+            }
+        }
+        false => bail!("non default cgroup root not supported"),
     }
 
-    if cgroup2_mount.is_some() {
-        cgroups.push(Cgroup::V2);
-    }
-
-    Ok(cgroups)
+    bail!("failed to detect cgroup setup");
 }
 
 pub fn create_cgroup_manager<P: Into<PathBuf>>(
     cgroup_path: P,
     systemd_cgroup: bool,
 ) -> Result<Box<dyn CgroupManager>> {
-    let cgroup_mount = Process::myself()?
-        .mountinfo()?
-        .into_iter()
-        .find(|m| m.fs_type == "cgroup");
+    let cgroup_setup = get_cgroup_setup()?;
 
-    let cgroup2_mount = Process::myself()?
-        .mountinfo()?
-        .into_iter()
-        .find(|m| m.fs_type == "cgroup2");
-
-    match (cgroup_mount, cgroup2_mount) {
-        (Some(_), None) => {
+    match cgroup_setup {
+        CgroupSetup::Legacy | CgroupSetup::Hybrid => {
             log::info!("cgroup manager V1 will be used");
             Ok(Box::new(v1::manager::Manager::new(cgroup_path.into())?))
         }
-        (None, Some(cgroup2)) => {
-            log::info!("cgroup manager V2 will be used");
+        CgroupSetup::Unified => {
             if systemd_cgroup {
                 if !booted()? {
                     bail!("systemd cgroup flag passed, but systemd support for managing cgroups is not available");
                 }
                 log::info!("systemd cgroup manager will be used");
                 return Ok(Box::new(v2::SystemDCGroupManager::new(
-                    cgroup2.mount_point,
+                    DEFAULT_CGROUP_ROOT.into(),
                     cgroup_path.into(),
                 )?));
             }
+            log::info!("cgroup manager V2 will be used");
             Ok(Box::new(v2::manager::Manager::new(
-                cgroup2.mount_point,
+                DEFAULT_CGROUP_ROOT.into(),
                 cgroup_path.into(),
             )?))
         }
-        (Some(_), Some(cgroup2)) => {
-            let cgroup_override = env::var("YOUKI_PREFER_CGROUPV2");
-            match cgroup_override {
-                Ok(v) if v == "true" => {
-                    log::info!("cgroup manager V2 will be used");
-                    if systemd_cgroup {
-                        if !booted()? {
-                            bail!("systemd cgroup flag passed, but systemd support for managing cgroups is not available");
-                        }
-                        log::info!("systemd cgroup manager will be used");
-                        return Ok(Box::new(v2::SystemDCGroupManager::new(
-                            cgroup2.mount_point,
-                            cgroup_path.into(),
-                        )?));
-                    }
-                    Ok(Box::new(v2::manager::Manager::new(
-                        cgroup2.mount_point,
-                        cgroup_path.into(),
-                    )?))
-                }
-                _ => {
-                    log::info!("cgroup manager V1 will be used");
-                    Ok(Box::new(v1::manager::Manager::new(cgroup_path.into())?))
-                }
-            }
-        }
-        _ => bail!("could not find cgroup filesystem"),
     }
 }
 

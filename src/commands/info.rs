@@ -106,9 +106,8 @@ pub fn print_hardware() {
 
 /// Print cgroups info of system
 pub fn print_cgroups() {
-    if let Ok(cgroup_fs) = cgroups::common::get_supported_cgroup_fs() {
-        let cgroup_fs: Vec<String> = cgroup_fs.into_iter().map(|c| c.to_string()).collect();
-        println!("{:<18}{}", "Cgroup version", cgroup_fs.join(" and "));
+    if let Ok(cgroup_setup) = cgroups::common::get_cgroup_setup() {
+        println!("{:<18}{}", "Cgroup setup", cgroup_setup);
     }
 
     println!("Cgroup mounts");
