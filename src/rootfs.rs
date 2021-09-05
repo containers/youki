@@ -49,7 +49,7 @@ pub fn prepare_rootfs(spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<
             log::debug!("Mount... {:?}", mount);
             let (flags, data) = parse_mount(mount);
             let mount_label = linux.mount_label.as_ref();
-            if mount.typ.as_ref().context("no type in mount spec")? == "cgroup" {
+            if mount.typ == Some("cgroup".to_string()) {
                 // skip
                 log::warn!("A feature of cgroup is unimplemented.");
             } else if mount.destination == PathBuf::from("/dev") {
@@ -253,7 +253,8 @@ fn mount_to_container(
     data: &str,
     label: Option<&String>,
 ) -> Result<()> {
-    let typ = m.typ.as_ref().context("no type in mount spec")?;
+    let none = "".to_string();
+    let typ: &str = m.typ.as_ref().unwrap_or(&none);
     let d = if let Some(l) = label {
         if typ != "proc" && typ != "sysfs" {
             if data.is_empty() {
@@ -297,12 +298,11 @@ fn mount_to_container(
         PathBuf::from(source)
     };
 
-    if let Err(errno) = nix_mount(Some(&*src), dest, Some(&*typ.as_str()), flags, Some(&*d)) {
+    if let Err(errno) = nix_mount(Some(&*src), dest, Some(typ), flags, Some(&*d)) {
         if !matches!(errno, Errno::EINVAL) {
             bail!("mount of {:?} failed", m.destination);
         }
-
-        nix_mount(Some(&*src), dest, Some(&*typ.as_str()), flags, Some(data))?;
+        nix_mount(Some(&*src), dest, Some(typ), flags, Some(data))?;
     }
 
     if flags.contains(MsFlags::MS_BIND)
@@ -355,15 +355,15 @@ fn parse_mount(m: &Mount) -> (MsFlags, String) {
                 "rbind" => Some((false, MsFlags::MS_BIND | MsFlags::MS_REC)),
                 "unbindable" => Some((false, MsFlags::MS_UNBINDABLE)),
                 "runbindable" => Some((false, MsFlags::MS_UNBINDABLE | MsFlags::MS_REC)),
-                "private" => Some((false, MsFlags::MS_PRIVATE)),
-                "rprivate" => Some((false, MsFlags::MS_PRIVATE | MsFlags::MS_REC)),
-                "shared" => Some((false, MsFlags::MS_SHARED)),
-                "rshared" => Some((false, MsFlags::MS_SHARED | MsFlags::MS_REC)),
-                "slave" => Some((false, MsFlags::MS_SLAVE)),
-                "rslave" => Some((false, MsFlags::MS_SLAVE | MsFlags::MS_REC)),
-                "relatime" => Some((false, MsFlags::MS_RELATIME)),
+                "private" => Some((true, MsFlags::MS_PRIVATE)),
+                "rprivate" => Some((true, MsFlags::MS_PRIVATE | MsFlags::MS_REC)),
+                "shared" => Some((true, MsFlags::MS_SHARED)),
+                "rshared" => Some((true, MsFlags::MS_SHARED | MsFlags::MS_REC)),
+                "slave" => Some((true, MsFlags::MS_SLAVE)),
+                "rslave" => Some((true, MsFlags::MS_SLAVE | MsFlags::MS_REC)),
+                "relatime" => Some((true, MsFlags::MS_RELATIME)),
                 "norelatime" => Some((true, MsFlags::MS_RELATIME)),
-                "strictatime" => Some((false, MsFlags::MS_STRICTATIME)),
+                "strictatime" => Some((true, MsFlags::MS_STRICTATIME)),
                 "nostrictatime" => Some((true, MsFlags::MS_STRICTATIME)),
                 _ => None,
             } {
