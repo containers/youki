@@ -90,12 +90,6 @@ jobs:
           CARGO_INCREMENTAL: "0"
           RUSTFLAGS: "-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zpanic_abort_tests"
           RUSTDOCFLAGS: "-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zpanic_abort_tests"
-      - name: Coverage
-        uses: actions-rs/grcov@v0.1
-        with:
-          config: .github/grcov.yml
-      - name: Upload Results
-        uses: codecov/codecov-action@v2
   integration_tests:
     runs-on: ubuntu-latest
     strategy:
