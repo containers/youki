@@ -66,7 +66,7 @@ impl<'a> ContainerBuilderImpl<'a> {
 
         // Need to create the notify socket before we pivot root, since the unix
         // domain socket used here is outside of the rootfs of container. During
-        // exec, need to create the socket before we exter into existing mount
+        // exec, need to create the socket before we enter into existing mount
         // namespace.
         let notify_socket: NotifyListener = NotifyListener::new(&self.notify_path)?;
 

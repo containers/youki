@@ -52,7 +52,7 @@ test_cases=(
   "linux_sysctl/linux_sysctl.t"
   # "linux_uid_mappings/linux_uid_mappings.t"
   "misc_props/misc_props.t"
-  # "mounts/mounts.t"
+  "mounts/mounts.t"
   # "pidfile/pidfile.t"
   "poststart/poststart.t"
   "poststart_fail/poststart_fail.t"
