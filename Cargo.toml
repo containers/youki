@@ -10,9 +10,9 @@ default = ["systemd_cgroups"]
 systemd_cgroups = ["systemd"]
 
 [dependencies.clap]
-version = "3.0.0-beta.2"
+version = "3.0.0-beta.4"
 default-features = false
-features = ["std", "suggestions", "derive"]
+features = ["std", "suggestions", "derive", "cargo"]
 
 [dependencies]
 nix = "0.22.0"
