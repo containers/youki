@@ -30,7 +30,7 @@ test_cases=(
   # This case includes checking for features that are excluded from linux kernel 5.0, so even runc doesn't pass it.
   # ref. https://github.com/docker/cli/pull/2908
   # "linux_cgroups_relative_blkio/linux_cgroups_relative_blkio.t"
-  "linux_cgroups_relative_cpus/linux_cgroups_relative_cpus.t" 
+  "linux_cgroups_relative_cpus/linux_cgroups_relative_cpus.t"
   "linux_cgroups_relative_devices/linux_cgroups_relative_devices.t"
   "linux_cgroups_relative_hugetlb/linux_cgroups_relative_hugetlb.t"
   "linux_cgroups_relative_memory/linux_cgroups_relative_memory.t"
@@ -78,7 +78,7 @@ check_enviroment() {
   if [[ $test_case =~ .*(memory|hugetlb).t ]]; then
     if [[ ! -e "/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes" ]]; then
         return 1
-    fi 
+    fi
   fi
 }
 
@@ -97,13 +97,13 @@ for case in "${test_cases[@]}"; do
   fi
 
   if [ $PATTERN != "." ] && [[ ! $case =~ $PATTERN ]]; then
-    continue    
-  fi 
+    continue
+  fi
 
   echo "Running $case"
   logfile="./log/$case.log"
   mkdir -p "$(dirname $logfile)"
-  sudo RUST_BACKTRACE=1 RUNTIME=${RUNTIME} ${ROOT}/integration_test/src/github.com/opencontainers/runtime-tools/validation/$case >$logfile 2>&1
+  sudo RUST_BACKTRACE=1 RUNTIME=${RUNTIME} ${ROOT}/integration_test/src/github.com/opencontainers/runtime-tools/validation/$case >$logfile 2>&1 || (cat $logfile && exit 1)
   if [ 0 -ne $(grep "not ok" $logfile | wc -l ) ]; then
       cat $logfile
       exit 1
