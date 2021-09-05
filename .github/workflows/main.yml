@@ -7,11 +7,26 @@ on:
       - main
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      dirs: ${{ steps.filter.outputs.changes }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            .: 'src/*'
+            ./test_framework: test_framework/*
+            ./youki_integration_test: youki_integration_test/*
   check:
+    needs: changes
     runs-on: ubuntu-latest
     strategy:
       matrix:
         rust: [stable]
+        dirs: ${{ fromJSON(needs.changes.outputs.dirs) }}
     steps:
       - uses: actions/checkout@v2
       - uses: actions/cache@v2
@@ -32,10 +47,10 @@ jobs:
       - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev
       - name: Check formatting
         run: cargo fmt --all -- --check
-      - uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-targets --all-features -- -D warnings
+        working-directory: ${{matrix.dirs}}
+      - name: Check clippy lints
+        working-directory: ${{matrix.dirs}}
+        run: cargo clippy --all-targets --all-features -- -D warnings
   tests:
     runs-on: ubuntu-latest
     strategy:
@@ -54,33 +69,33 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly
+          toolchain: ${{ matrix.rust }}
           override: true
       - run: sudo apt-get -y update
       - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev
       - name: Build
         run: ./build.sh --release
       - name: Run tests
-        run: cargo test
-        env:
-          CARGO_INCREMENTAL: "0"
-          RUSTFLAGS: "-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zpanic_abort_tests"
-          RUSTDOCFLAGS: "-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zpanic_abort_tests"
+        run: cargo test --no-fail-fast
+        # env:
+        #   CARGO_INCREMENTAL: "0"
+        #   RUSTFLAGS: "-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zpanic_abort_tests"
+        #   RUSTDOCFLAGS: "-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zpanic_abort_tests"
       - name: Run doc tests
         run: cargo test --doc
       - name: Run cgroup tests
         working-directory: cgroups
-        run: cargo test
-        env:
-          CARGO_INCREMENTAL: "0"
-          RUSTFLAGS: "-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zpanic_abort_tests"
-          RUSTDOCFLAGS: "-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zpanic_abort_tests"
-      - name: Coverage
-        uses: actions-rs/grcov@v0.1
-        with:
-          config: .github/grcov.yml
-      - name: Upload Results
-        uses: codecov/codecov-action@v2
+        run: cargo test --no-fail-fast
+        # env:
+        #   CARGO_INCREMENTAL: "0"
+        #   RUSTFLAGS: "-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zpanic_abort_tests"
+        #   RUSTDOCFLAGS: "-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zpanic_abort_tests"
+      # - name: Coverage
+      #   uses: actions-rs/grcov@v0.1
+      #   with:
+      #     config: .github/grcov.yml
+      # - name: Upload Results
+      #   uses: codecov/codecov-action@v2
   integration_tests:
     runs-on: ubuntu-latest
     strategy:

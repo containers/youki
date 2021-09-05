@@ -230,48 +230,53 @@ fn new_pipe() -> Result<(Sender, Receiver)> {
 }
 
 #[cfg(test)]
+// Tests become unstable if not serial. The cause is not known.
 mod tests {
     use super::*;
     use anyhow::Context;
     use nix::sys::wait;
     use nix::unistd;
+    use serial_test::serial;
 
     #[test]
+    #[serial]
     fn test_channel_intermadiate_ready() -> Result<()> {
         let (sender, receiver) = &mut intermediate_to_main()?;
         match unsafe { unistd::fork()? } {
             unistd::ForkResult::Parent { child } => {
+                wait::waitpid(child, None)?;
                 let pid = receiver
                     .wait_for_intermediate_ready()
                     .with_context(|| "Failed to wait for intermadiate ready")?;
+                receiver.close()?;
                 assert_eq!(pid, child);
-                wait::waitpid(child, None)?;
             }
             unistd::ForkResult::Child => {
                 let pid = unistd::getpid();
-                sender
-                    .intermediate_ready(pid)
-                    .with_context(|| "Failed to send intermadiate ready")?;
+                sender.intermediate_ready(pid)?;
+                sender.close()?;
                 std::process::exit(0);
             }
         };
+
         Ok(())
     }
 
     #[test]
+    #[serial]
     fn test_channel_id_mapping_request() -> Result<()> {
         let (sender, receiver) = &mut intermediate_to_main()?;
         match unsafe { unistd::fork()? } {
             unistd::ForkResult::Parent { child } => {
-                receiver
-                    .wait_for_mapping_request()
-                    .with_context(|| "Failed to wait for mapping ack")?;
                 wait::waitpid(child, None)?;
+                receiver.wait_for_mapping_request()?;
+                receiver.close()?;
             }
             unistd::ForkResult::Child => {
                 sender
                     .identifier_mapping_request()
                     .with_context(|| "Failed to send mapping written")?;
+                sender.close()?;
                 std::process::exit(0);
             }
         };
@@ -280,14 +285,13 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_channel_id_mapping_ack() -> Result<()> {
         let (sender, receiver) = &mut main_to_intermediate()?;
         match unsafe { unistd::fork()? } {
             unistd::ForkResult::Parent { child } => {
-                receiver
-                    .wait_for_mapping_ack()
-                    .with_context(|| "Failed to wait for mapping ack")?;
                 wait::waitpid(child, None)?;
+                receiver.wait_for_mapping_ack()?;
             }
             unistd::ForkResult::Child => {
                 sender
@@ -301,26 +305,29 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_channel_init_ready() -> Result<()> {
         let (sender, receiver) = &mut init_to_intermediate()?;
         match unsafe { unistd::fork()? } {
             unistd::ForkResult::Parent { child } => {
-                receiver
-                    .wait_for_init_ready()
-                    .with_context(|| "Failed to wait for init ready")?;
                 wait::waitpid(child, None)?;
+                receiver.wait_for_init_ready()?;
+                receiver.close()?;
             }
             unistd::ForkResult::Child => {
                 sender
                     .init_ready()
                     .with_context(|| "Failed to send init ready")?;
+                sender.close()?;
                 std::process::exit(0);
             }
         };
+
         Ok(())
     }
 
     #[test]
+    #[serial]
     fn test_channel_intermedaite_graceful_exit() -> Result<()> {
         let (sender, receiver) = &mut intermediate_to_main()?;
         match unsafe { unistd::fork()? } {
@@ -343,6 +350,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_channel_init_graceful_exit() -> Result<()> {
         let (sender, receiver) = &mut init_to_intermediate()?;
         match unsafe { unistd::fork()? } {
