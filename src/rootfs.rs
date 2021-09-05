@@ -253,10 +253,9 @@ fn mount_to_container(
     data: &str,
     label: Option<&String>,
 ) -> Result<()> {
-    let none = "".to_string();
-    let typ: &str = m.typ.as_ref().unwrap_or(&none);
+    let typ = m.typ.as_deref();
     let d = if let Some(l) = label {
-        if typ != "proc" && typ != "sysfs" {
+        if typ != Some("proc") && typ != Some("sysfs") {
             if data.is_empty() {
                 format!("context=\"{}\"", l)
             } else {
@@ -275,7 +274,7 @@ fn mount_to_container(
     );
     let dest = Path::new(&dest_for_host);
     let source = m.source.as_ref().context("no source in mount spec")?;
-    let src = if typ == "bind" {
+    let src = if typ == Some("bind") {
         let src = canonicalize(source)?;
         let dir = if src.is_file() {
             Path::new(&dest).parent().unwrap()
@@ -298,11 +297,11 @@ fn mount_to_container(
         PathBuf::from(source)
     };
 
-    if let Err(errno) = nix_mount(Some(&*src), dest, Some(typ), flags, Some(&*d)) {
+    if let Err(errno) = nix_mount(Some(&*src), dest, typ, flags, Some(&*d)) {
         if !matches!(errno, Errno::EINVAL) {
             bail!("mount of {:?} failed", m.destination);
         }
-        nix_mount(Some(&*src), dest, Some(typ), flags, Some(data))?;
+        nix_mount(Some(&*src), dest, typ, flags, Some(data))?;
     }
 
     if flags.contains(MsFlags::MS_BIND)
