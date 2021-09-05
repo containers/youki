@@ -1,10 +1,10 @@
 use std::path::Path;
 
 use anyhow::{bail, Context, Result};
-use oci_spec::{LinuxCpu, LinuxResources};
+use oci_spec::runtime::LinuxCpu;
 
 use crate::{
-    common,
+    common::{self, ControllerOpt},
     stats::{CpuThrottling, StatsProvider},
 };
 
@@ -22,18 +22,18 @@ pub struct Cpu {}
 impl Controller for Cpu {
     type Resource = LinuxCpu;
 
-    fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
+    fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply Cpu cgroup config");
 
-        if let Some(cpu) = Self::needs_to_handle(linux_resources) {
+        if let Some(cpu) = Self::needs_to_handle(&controller_opt) {
             Self::apply(cgroup_root, cpu).context("failed to apply cpu resource restrictions")?;
         }
 
         Ok(())
     }
 
-    fn needs_to_handle(linux_resources: &LinuxResources) -> Option<&Self::Resource> {
-        if let Some(cpu) = &linux_resources.cpu {
+    fn needs_to_handle(controller_opt: &ControllerOpt) -> Option<&Self::Resource> {
+        if let Some(cpu) = &controller_opt.resources.cpu {
             if cpu.shares.is_some()
                 || cpu.period.is_some()
                 || cpu.quota.is_some()

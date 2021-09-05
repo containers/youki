@@ -7,7 +7,6 @@ use std::{
 use anyhow::{bail, Result};
 
 use nix::unistd::Pid;
-use oci_spec::{FreezerState, LinuxResources};
 
 #[cfg(feature = "cgroupsv2_devices")]
 use super::devices::Devices;
@@ -26,7 +25,7 @@ use super::{
     unified::Unified,
 };
 use crate::{
-    common::{self, CgroupManager, PathBufExt, CGROUP_PROCS},
+    common::{self, CgroupManager, FreezerState, PathBufExt, CGROUP_PROCS, ControllerOpt},
     stats::{Stats, StatsProvider},
 };
 
@@ -122,26 +121,26 @@ impl CgroupManager for Manager {
         Ok(())
     }
 
-    fn apply(&self, linux_resources: &LinuxResources) -> Result<()> {
+    fn apply(&self, controller_opt: &ControllerOpt) -> Result<()> {
         for controller in CONTROLLER_TYPES {
             match controller {
-                ControllerType::Cpu => Cpu::apply(linux_resources, &self.full_path)?,
-                ControllerType::CpuSet => CpuSet::apply(linux_resources, &self.full_path)?,
-                ControllerType::HugeTlb => HugeTlb::apply(linux_resources, &self.full_path)?,
-                ControllerType::Io => Io::apply(linux_resources, &self.full_path)?,
-                ControllerType::Memory => Memory::apply(linux_resources, &self.full_path)?,
-                ControllerType::Pids => Pids::apply(linux_resources, &self.full_path)?,
-                ControllerType::Freezer => Freezer::apply(linux_resources, &self.full_path)?,
+                ControllerType::Cpu => Cpu::apply(controller_opt, &self.full_path)?,
+                ControllerType::CpuSet => CpuSet::apply(controller_opt, &self.full_path)?,
+                ControllerType::HugeTlb => HugeTlb::apply(controller_opt, &self.full_path)?,
+                ControllerType::Io => Io::apply(controller_opt, &self.full_path)?,
+                ControllerType::Memory => Memory::apply(controller_opt, &self.full_path)?,
+                ControllerType::Pids => Pids::apply(controller_opt, &self.full_path)?,
+                ControllerType::Freezer => Freezer::apply(controller_opt, &self.full_path)?,
             }
         }
 
         #[cfg(feature = "cgroupsv2_devices")]
-        Devices::apply(linux_resources, &self.cgroup_path)?;
+        Devices::apply(controller_opt, &self.cgroup_path)?;
 
         for pseudoctlr in PSEUDO_CONTROLLER_TYPES {
             match pseudoctlr {
                 PseudoControllerType::Unified => Unified::apply(
-                    linux_resources,
+                    controller_opt,
                     &self.cgroup_path,
                     self.get_available_controllers()?,
                 )?,
@@ -160,11 +159,12 @@ impl CgroupManager for Manager {
     }
 
     fn freeze(&self, state: FreezerState) -> Result<()> {
-        let linux_resources = LinuxResources {
-            freezer: Some(state),
+        let controller_opt = ControllerOpt {
+            resources: Default::default(),
+            freezer_state: Some(state),
             ..Default::default()
         };
-        Freezer::apply(&linux_resources, &self.full_path)
+        Freezer::apply(&controller_opt, &self.full_path)
     }
 
     fn stats(&self) -> Result<Stats> {

@@ -7,7 +7,7 @@ use std::{
     time::Duration,
 };
 
-use oci_spec::{FreezerState, LinuxResources};
+use crate::common::{FreezerState, ControllerOpt};
 
 use super::controller::Controller;
 
@@ -17,8 +17,8 @@ const CGROUP_EVENTS: &str = "cgroup.events";
 pub struct Freezer {}
 
 impl Controller for Freezer {
-    fn apply(linux_resources: &LinuxResources, cgroup_path: &Path) -> Result<()> {
-        if let Some(freezer_state) = linux_resources.freezer {
+    fn apply(controller_opt: &ControllerOpt, cgroup_path: &Path) -> Result<()> {
+        if let Some(freezer_state) = controller_opt.freezer_state{
             Self::apply(freezer_state, cgroup_path).context("failed to apply freezer")?;
         }
 
@@ -122,8 +122,8 @@ impl Freezer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common::FreezerState;
     use crate::test::{create_temp_dir, set_fixture};
-    use oci_spec::FreezerState;
     use std::sync::Arc;
 
     #[test]

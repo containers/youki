@@ -8,7 +8,7 @@ use std::{
 
 use anyhow::{bail, Context, Result};
 use nix::unistd::Pid;
-use oci_spec::{FreezerState, LinuxDevice, LinuxDeviceCgroup, LinuxDeviceType, LinuxResources};
+use oci_spec::runtime::{LinuxDevice, LinuxDeviceCgroup, LinuxDeviceType, LinuxResources};
 use procfs::process::Process;
 #[cfg(feature = "systemd_cgroups")]
 use systemd::daemon::booted;
@@ -29,7 +29,7 @@ pub trait CgroupManager {
     /// Adds a task specified by its pid to the cgroup
     fn add_task(&self, pid: Pid) -> Result<()>;
     /// Applies resource restrictions to the cgroup
-    fn apply(&self, linux_resources: &LinuxResources) -> Result<()>;
+    fn apply(&self, controller_opt: &ControllerOpt) -> Result<()>;
     /// Removes the cgroup
     fn remove(&self) -> Result<()>;
     // Sets the freezer cgroup to the specified state
@@ -55,6 +55,23 @@ impl Display for Cgroup {
 
         write!(f, "{}", print)
     }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FreezerState {
+    Undefined,
+    Frozen,
+    Thawed,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct ControllerOpt {
+    pub resources: LinuxResources,
+    // Diables the OOM killer for out of memory conditions
+    pub disable_oom_killer: bool,
+    // Specify an oom_score_adj for container
+    pub oom_score_adj: Option<i32>,
+    pub freezer_state: Option<FreezerState>,
 }
 
 #[inline]

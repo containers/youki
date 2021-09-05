@@ -8,7 +8,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use oci_spec::LinuxCpu;
+use oci_spec::runtime::LinuxCpu;
 
 pub struct TempDir {
     path: Option<PathBuf>,

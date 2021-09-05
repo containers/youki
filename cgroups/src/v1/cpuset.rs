@@ -2,10 +2,10 @@ use std::{fs, path::Path};
 
 use anyhow::{bail, Context, Result};
 use nix::unistd;
-use oci_spec::{LinuxCpu, LinuxResources};
+use oci_spec::runtime::LinuxCpu;
 use unistd::Pid;
 
-use crate::common::{self, CGROUP_PROCS};
+use crate::common::{self, ControllerOpt, CGROUP_PROCS};
 
 use super::{util, Controller, ControllerType};
 
@@ -27,10 +27,10 @@ impl Controller for CpuSet {
         Ok(())
     }
 
-    fn apply(linux_resources: &LinuxResources, cgroup_path: &Path) -> Result<()> {
+    fn apply(controller_opt: &ControllerOpt, cgroup_path: &Path) -> Result<()> {
         log::debug!("Apply CpuSet cgroup config");
 
-        if let Some(cpuset) = Self::needs_to_handle(linux_resources) {
+        if let Some(cpuset) = Self::needs_to_handle(&controller_opt) {
             Self::apply(cgroup_path, cpuset)
                 .context("failed to apply cpuset resource restrictions")?;
         }
@@ -38,8 +38,8 @@ impl Controller for CpuSet {
         Ok(())
     }
 
-    fn needs_to_handle(linux_resources: &LinuxResources) -> Option<&Self::Resource> {
-        if let Some(cpuset) = &linux_resources.cpu {
+    fn needs_to_handle(controller_opt: &ControllerOpt) -> Option<&Self::Resource> {
+        if let Some(cpuset) = &controller_opt.resources.cpu {
             if cpuset.cpus.is_some() || cpuset.mems.is_some() {
                 return Some(cpuset);
             }

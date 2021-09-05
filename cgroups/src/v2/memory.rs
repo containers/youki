@@ -1,10 +1,10 @@
 use anyhow::{bail, Context, Result};
 use std::path::Path;
 
-use oci_spec::{LinuxMemory, LinuxResources};
+use oci_spec::runtime::{LinuxMemory};
 
 use crate::{
-    common,
+    common::{self, ControllerOpt},
     stats::{self, MemoryData, MemoryStats, StatsProvider},
 };
 
@@ -18,8 +18,8 @@ const MEMORY_STAT: &str = "memory.stat";
 pub struct Memory {}
 
 impl Controller for Memory {
-    fn apply(linux_resources: &LinuxResources, cgroup_path: &Path) -> Result<()> {
-        if let Some(memory) = &linux_resources.memory {
+    fn apply(controller_opt: &ControllerOpt, cgroup_path: &Path) -> Result<()> {
+        if let Some(memory) = &controller_opt.resources.memory {
             Self::apply(cgroup_path, memory)
                 .context("failed to apply memory resource restrictions")?;
         }
@@ -129,7 +129,7 @@ impl Memory {
 mod tests {
     use super::*;
     use crate::test::{create_temp_dir, set_fixture};
-    use oci_spec::LinuxMemory;
+    use oci_spec::runtime::LinuxMemory;
     use std::fs::read_to_string;
 
     #[test]

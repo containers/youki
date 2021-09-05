@@ -3,18 +3,18 @@ use std::path::Path;
 use anyhow::Result;
 
 use super::controller::Controller;
-use crate::common::{self, default_allow_devices, default_devices};
-use oci_spec::{LinuxDeviceCgroup, LinuxResources};
+use crate::common::{self, default_allow_devices, default_devices, ControllerOpt};
+use oci_spec::runtime::LinuxDeviceCgroup;
 
 pub struct Devices {}
 
 impl Controller for Devices {
     type Resource = ();
 
-    fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
+    fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply Devices cgroup config");
 
-        if let Some(devices) = linux_resources.devices.as_ref() {
+        if let Some(devices) = controller_opt.resources.devices.as_ref() {
             for d in devices {
                 Self::apply_device(d, cgroup_root)?;
             }
@@ -33,7 +33,7 @@ impl Controller for Devices {
     }
 
     // always needs to be called due to default devices
-    fn needs_to_handle(_linux_resources: &LinuxResources) -> Option<&Self::Resource> {
+    fn needs_to_handle(_controller_opt: &ControllerOpt) -> Option<&Self::Resource> {
         Some(&())
     }
 }
@@ -56,7 +56,7 @@ mod tests {
     use super::*;
     use crate::test::create_temp_dir;
     use crate::test::set_fixture;
-    use oci_spec::{LinuxDeviceCgroup, LinuxDeviceType};
+    use oci_spec::runtime::{LinuxDeviceCgroup, LinuxDeviceType};
     use std::fs::read_to_string;
 
     #[test]
@@ -99,7 +99,7 @@ mod tests {
             },
             LinuxDeviceCgroup {
                 allow: true,
-                typ: Some(LinuxDeviceType::A),
+                typ: Some(LinuxDeviceType::B),
                 major: None,
                 minor: Some(200),
                 access: "rwm".to_string().into(),

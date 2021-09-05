@@ -16,9 +16,9 @@ use super::{
     perf_event::PerfEvent, pids::Pids, util, Controller,
 };
 
-use crate::common::{self, CgroupManager, PathBufExt, CGROUP_PROCS};
+use crate::common::{self, CgroupManager, ControllerOpt, FreezerState, PathBufExt, CGROUP_PROCS};
 use crate::stats::{Stats, StatsProvider};
-use oci_spec::{FreezerState, LinuxResources};
+
 pub struct Manager {
     subsystems: HashMap<CtrlType, PathBuf>,
 }
@@ -61,28 +61,28 @@ impl Manager {
 
     fn get_required_controllers(
         &self,
-        linux_resources: &LinuxResources,
+        controller_opt: &ControllerOpt,
     ) -> Result<HashMap<&CtrlType, &PathBuf>> {
         let mut required_controllers = HashMap::new();
 
         for controller in CONTROLLERS {
             let required = match controller {
-                CtrlType::Cpu => Cpu::needs_to_handle(linux_resources).is_some(),
-                CtrlType::CpuAcct => CpuAcct::needs_to_handle(linux_resources).is_some(),
-                CtrlType::CpuSet => CpuSet::needs_to_handle(linux_resources).is_some(),
-                CtrlType::Devices => Devices::needs_to_handle(linux_resources).is_some(),
-                CtrlType::HugeTlb => HugeTlb::needs_to_handle(linux_resources).is_some(),
-                CtrlType::Memory => Memory::needs_to_handle(linux_resources).is_some(),
-                CtrlType::Pids => Pids::needs_to_handle(linux_resources).is_some(),
-                CtrlType::PerfEvent => PerfEvent::needs_to_handle(linux_resources).is_some(),
-                CtrlType::Blkio => Blkio::needs_to_handle(linux_resources).is_some(),
+                CtrlType::Cpu => Cpu::needs_to_handle(controller_opt).is_some(),
+                CtrlType::CpuAcct => CpuAcct::needs_to_handle(controller_opt).is_some(),
+                CtrlType::CpuSet => CpuSet::needs_to_handle(controller_opt).is_some(),
+                CtrlType::Devices => Devices::needs_to_handle(controller_opt).is_some(),
+                CtrlType::HugeTlb => HugeTlb::needs_to_handle(controller_opt).is_some(),
+                CtrlType::Memory => Memory::needs_to_handle(controller_opt).is_some(),
+                CtrlType::Pids => Pids::needs_to_handle(controller_opt).is_some(),
+                CtrlType::PerfEvent => PerfEvent::needs_to_handle(controller_opt).is_some(),
+                CtrlType::Blkio => Blkio::needs_to_handle(controller_opt).is_some(),
                 CtrlType::NetworkPriority => {
-                    NetworkPriority::needs_to_handle(linux_resources).is_some()
+                    NetworkPriority::needs_to_handle(controller_opt).is_some()
                 }
                 CtrlType::NetworkClassifier => {
-                    NetworkClassifier::needs_to_handle(linux_resources).is_some()
+                    NetworkClassifier::needs_to_handle(controller_opt).is_some()
                 }
-                CtrlType::Freezer => Freezer::needs_to_handle(linux_resources).is_some(),
+                CtrlType::Freezer => Freezer::needs_to_handle(controller_opt).is_some(),
             };
 
             if required {
@@ -128,21 +128,21 @@ impl CgroupManager for Manager {
         Ok(())
     }
 
-    fn apply(&self, linux_resources: &LinuxResources) -> Result<()> {
-        for subsys in self.get_required_controllers(linux_resources)? {
+    fn apply(&self, controller_opt: &ControllerOpt) -> Result<()> {
+        for subsys in self.get_required_controllers(&controller_opt)? {
             match subsys.0 {
-                CtrlType::Cpu => Cpu::apply(linux_resources, subsys.1)?,
-                CtrlType::CpuAcct => CpuAcct::apply(linux_resources, subsys.1)?,
-                CtrlType::CpuSet => CpuSet::apply(linux_resources, subsys.1)?,
-                CtrlType::Devices => Devices::apply(linux_resources, subsys.1)?,
-                CtrlType::HugeTlb => HugeTlb::apply(linux_resources, subsys.1)?,
-                CtrlType::Memory => Memory::apply(linux_resources, subsys.1)?,
-                CtrlType::Pids => Pids::apply(linux_resources, subsys.1)?,
-                CtrlType::PerfEvent => PerfEvent::apply(linux_resources, subsys.1)?,
-                CtrlType::Blkio => Blkio::apply(linux_resources, subsys.1)?,
-                CtrlType::NetworkPriority => NetworkPriority::apply(linux_resources, subsys.1)?,
-                CtrlType::NetworkClassifier => NetworkClassifier::apply(linux_resources, subsys.1)?,
-                CtrlType::Freezer => Freezer::apply(linux_resources, subsys.1)?,
+                CtrlType::Cpu => Cpu::apply(controller_opt, subsys.1)?,
+                CtrlType::CpuAcct => CpuAcct::apply(controller_opt, subsys.1)?,
+                CtrlType::CpuSet => CpuSet::apply(controller_opt, subsys.1)?,
+                CtrlType::Devices => Devices::apply(controller_opt, subsys.1)?,
+                CtrlType::HugeTlb => HugeTlb::apply(controller_opt, subsys.1)?,
+                CtrlType::Memory => Memory::apply(controller_opt, subsys.1)?,
+                CtrlType::Pids => Pids::apply(controller_opt, subsys.1)?,
+                CtrlType::PerfEvent => PerfEvent::apply(controller_opt, subsys.1)?,
+                CtrlType::Blkio => Blkio::apply(controller_opt, subsys.1)?,
+                CtrlType::NetworkPriority => NetworkPriority::apply(controller_opt, subsys.1)?,
+                CtrlType::NetworkClassifier => NetworkClassifier::apply(controller_opt, subsys.1)?,
+                CtrlType::Freezer => Freezer::apply(controller_opt, subsys.1)?,
             }
         }
 
@@ -169,12 +169,13 @@ impl CgroupManager for Manager {
     }
 
     fn freeze(&self, state: FreezerState) -> Result<()> {
-        let linux_resources = LinuxResources {
-            freezer: Some(state),
+        let controller_opt = ControllerOpt {
+            resources: Default::default(),
+            freezer_state: Some(state),
             ..Default::default()
         };
         Freezer::apply(
-            &linux_resources,
+            &controller_opt,
             self.subsystems.get(&CtrlType::Freezer).unwrap(),
         )
     }

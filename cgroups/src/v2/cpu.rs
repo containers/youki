@@ -2,11 +2,11 @@ use anyhow::{bail, Context, Result};
 use std::path::Path;
 
 use crate::{
-    common,
+    common::{self, ControllerOpt},
     stats::{CpuUsage, StatsProvider},
 };
 
-use oci_spec::{LinuxCpu, LinuxResources};
+use oci_spec::runtime::{LinuxCpu};
 
 use super::controller::Controller;
 
@@ -20,8 +20,8 @@ const CPU_STAT: &str = "cpu.stat";
 pub struct Cpu {}
 
 impl Controller for Cpu {
-    fn apply(linux_resources: &LinuxResources, path: &Path) -> Result<()> {
-        if let Some(cpu) = &linux_resources.cpu {
+    fn apply(controller_opt: &ControllerOpt, path: &Path) -> Result<()> {
+        if let Some(cpu) = &controller_opt.resources.cpu {
             Self::apply(path, cpu).context("failed to apply cpu resource restrictions")?;
         }
 
