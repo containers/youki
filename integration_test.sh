@@ -37,7 +37,7 @@ test_cases=(
   "linux_cgroups_relative_network/linux_cgroups_relative_network.t"
   "linux_cgroups_relative_pids/linux_cgroups_relative_pids.t"
   "linux_devices/linux_devices.t"
-  # "linux_masked_paths/linux_masked_paths.t"
+  "linux_masked_paths/linux_masked_paths.t"
   "linux_mount_label/linux_mount_label.t"
   # This test case hangs on the Github Action. Runtime-tools has an issue filed from 2019 that the clean up step hangs. Otherwise, the test case passes.
   # Ref: https://github.com/opencontainers/runtime-tools/issues/698

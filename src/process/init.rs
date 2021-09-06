@@ -148,6 +148,40 @@ fn readonly_path(path: &str) -> Result<()> {
     Ok(())
 }
 
+// For files, bind mounts /dev/null over the top of the specified path.
+// For directories, mounts read-only tmpfs over the top of the specified path.
+fn masked_path(path: &str, mount_label: &Option<String>) -> Result<()> {
+    match nix_mount::<str, str, str, str>(
+        Some("/dev/null"),
+        path,
+        None::<&str>,
+        MsFlags::MS_BIND,
+        None::<&str>,
+    ) {
+        // ignore error if path is not exist.
+        Err(nix::errno::Errno::ENOENT) => {
+            log::warn!("masked path {:?} not exist", path);
+            return Ok(());
+        }
+        Err(nix::errno::Errno::ENOTDIR) => {
+            let label = match mount_label {
+                Some(label) => format!("context={}", label),
+                None => String::from(""),
+            };
+            let _ = nix_mount(
+                Some("tmpfs"),
+                path,
+                Some("tmpfs"),
+                MsFlags::MS_RDONLY,
+                Some(label.as_str()),
+            );
+        }
+        Err(err) => bail!(err),
+        Ok(_) => {}
+    };
+    Ok(())
+}
+
 pub struct ContainerInitArgs<'a> {
     /// Flag indicating if an init or a tenant container should be created
     pub init: bool,
@@ -352,6 +386,13 @@ pub fn container_init(
         // mount readonly path
         for path in paths {
             readonly_path(path).context("Failed to set read only path")?;
+        }
+    }
+
+    if let Some(paths) = &linux.masked_paths {
+        // mount masked path
+        for path in paths {
+            masked_path(path, &linux.mount_label).context("Failed to set masked path")?;
         }
     }
 
