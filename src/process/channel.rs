@@ -244,12 +244,12 @@ mod tests {
         let (sender, receiver) = &mut intermediate_to_main()?;
         match unsafe { unistd::fork()? } {
             unistd::ForkResult::Parent { child } => {
+                wait::waitpid(child, None)?;
                 let pid = receiver
                     .wait_for_intermediate_ready()
                     .with_context(|| "Failed to wait for intermadiate ready")?;
                 receiver.close()?;
                 assert_eq!(pid, child);
-                wait::waitpid(child, None)?;
             }
             unistd::ForkResult::Child => {
                 let pid = unistd::getpid();
@@ -268,9 +268,9 @@ mod tests {
         let (sender, receiver) = &mut intermediate_to_main()?;
         match unsafe { unistd::fork()? } {
             unistd::ForkResult::Parent { child } => {
+                wait::waitpid(child, None)?;
                 receiver.wait_for_mapping_request()?;
                 receiver.close()?;
-                wait::waitpid(child, None)?;
             }
             unistd::ForkResult::Child => {
                 sender
@@ -290,8 +290,8 @@ mod tests {
         let (sender, receiver) = &mut main_to_intermediate()?;
         match unsafe { unistd::fork()? } {
             unistd::ForkResult::Parent { child } => {
-                receiver.wait_for_mapping_ack()?;
                 wait::waitpid(child, None)?;
+                receiver.wait_for_mapping_ack()?;
             }
             unistd::ForkResult::Child => {
                 sender
@@ -310,9 +310,9 @@ mod tests {
         let (sender, receiver) = &mut init_to_intermediate()?;
         match unsafe { unistd::fork()? } {
             unistd::ForkResult::Parent { child } => {
+                wait::waitpid(child, None)?;
                 receiver.wait_for_init_ready()?;
                 receiver.close()?;
-                wait::waitpid(child, None)?;
             }
             unistd::ForkResult::Child => {
                 sender
