@@ -165,8 +165,8 @@ fn masked_path(path: &str, mount_label: &Option<String>) -> Result<()> {
         }
         Err(nix::errno::Errno::ENOTDIR) => {
             let label = match mount_label {
-                Some(label) => format!("context={}", label),
-                None => String::from(""),
+                Some(l) => format!("context={}", l),
+                None => "".to_string(),
             };
             let _ = nix_mount(
                 Some("tmpfs"),
