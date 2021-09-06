@@ -570,7 +570,13 @@ mod tests {
     use serial_test::serial;
     use std::fs;
 
+    // Note: We have to run these tests here as serial. The main issue is that
+    // these tests has a dependency on the system state. The
+    // cleanup_file_descriptors test is especially evil when running with other
+    // tests because it would ran around close down different fds.
+
     #[test]
+    #[serial]
     fn test_get_open_fds() -> Result<()> {
         let file = fs::File::open("/dev/null")?;
         let fd = file.as_raw_fd();
