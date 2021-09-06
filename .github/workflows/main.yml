@@ -20,8 +20,9 @@ jobs:
             .: 'src/*'
             ./test_framework: test_framework/*
             ./youki_integration_test: youki_integration_test/*
+            ./cgroups: cgroups/*
   check:
-    needs: changes
+    needs: [changes]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -83,8 +84,8 @@ jobs:
         working-directory: cgroups
         run: cargo test --no-fail-fast
   coverage:
-    name: Run test coverage
     runs-on: ubuntu-latest
+    name: Run test coverage
     steps:
       - uses: actions/checkout@v2
       - uses: actions/cache@v2
@@ -113,17 +114,25 @@ jobs:
           override: true
           profile: minimal
           components: llvm-tools-preview
-      - name: Run Test Coverage
-        env:
-          ALL_PACKAGES: youki
+      - name: Run Test Coverage for youki
         run: |
           cargo llvm-cov clean --workspace
-          cargo llvm-cov --package $ALL_PACKAGES --no-report
-          cargo llvm-cov --package $ALL_PACKAGES --no-run --lcov --output-path coverage.lcov
-      - name: Upload Results
+          cargo llvm-cov --no-report
+          cargo llvm-cov --no-run --lcov --output-path ./coverage.lcov
+      - name: Run Test Coverage for cgroups
+        working-directory: ./cgroups
+        run: |
+          cargo llvm-cov clean --workspace
+          cargo llvm-cov --no-report
+          cargo llvm-cov --no-run --lcov --output-path ./coverage.lcov
+      - name: Upload Youki Code Coverage Results
         uses: codecov/codecov-action@v2
         with:
-          file: coverage.lcov
+          file: ./coverage.lcov
+      - name: Upload Cgroups Code Coverage Results
+        uses: codecov/codecov-action@v2
+        with:
+          file: ./cgroups/coverage.lcov
   integration_tests:
     runs-on: ubuntu-latest
     strategy:
