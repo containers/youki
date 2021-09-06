@@ -115,7 +115,7 @@ jobs:
           components: llvm-tools-preview
       - name: Run Test Coverage
         env:
-          ALL_PACKAGES: youki cgroups
+          ALL_PACKAGES: youki
         run: |
           cargo llvm-cov clean --workspace
           cargo llvm-cov --package $ALL_PACKAGES --no-report
