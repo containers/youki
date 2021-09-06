@@ -11,7 +11,7 @@ cgroupsv2_devices = ["rbpf", "libbpf-sys", "errno", "libc"]
 
 [dependencies]
 nix = "0.22.0"
-procfs = "0.9.1"
+procfs = "0.10.1"
 log = "0.4"
 anyhow = "1.0"
 oci_spec = { git = "https://github.com/containers/oci-spec-rs", rev = "e0de21b89dc1e65f69a5f45a08bbe426787c7fa1"}

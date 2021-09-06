@@ -16,7 +16,7 @@ features = ["std", "suggestions", "derive"]
 
 [dependencies]
 nix = "0.22.0"
-procfs = "0.9.1"
+procfs = "0.10.1"
 # Waiting for new caps release, replace git with version on release
 caps = { git = "https://github.com/lucab/caps-rs", rev = "cb54844", features = ["serde_support"] }
 serde = { version = "1.0", features = ["derive"] }
