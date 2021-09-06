@@ -526,6 +526,7 @@ mod tests {
     use super::*;
     use anyhow::{bail, Result};
     use nix::{fcntl, sys, unistd};
+    use serial_test::serial;
     use std::fs;
 
     #[test]
@@ -553,6 +554,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_cleanup_file_descriptors() -> Result<()> {
         // Open a fd without the CLOEXEC flag. Rust automatically adds the flag,
         // so we use fcntl::open here for more control.
