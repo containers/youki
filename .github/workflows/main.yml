@@ -20,8 +20,9 @@ jobs:
             .: 'src/*'
             ./test_framework: test_framework/*
             ./youki_integration_test: youki_integration_test/*
+            ./cgroups: cgroups/*
   check:
-    needs: changes
+    needs: [changes]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -77,25 +78,61 @@ jobs:
         run: ./build.sh --release
       - name: Run tests
         run: cargo test --no-fail-fast
-        # env:
-        #   CARGO_INCREMENTAL: "0"
-        #   RUSTFLAGS: "-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zpanic_abort_tests"
-        #   RUSTDOCFLAGS: "-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zpanic_abort_tests"
       - name: Run doc tests
         run: cargo test --doc
       - name: Run cgroup tests
         working-directory: cgroups
         run: cargo test --no-fail-fast
-        # env:
-        #   CARGO_INCREMENTAL: "0"
-        #   RUSTFLAGS: "-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zpanic_abort_tests"
-        #   RUSTDOCFLAGS: "-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zpanic_abort_tests"
-      # - name: Coverage
-      #   uses: actions-rs/grcov@v0.1
-      #   with:
-      #     config: .github/grcov.yml
-      # - name: Upload Results
-      #   uses: codecov/codecov-action@v2
+  coverage:
+    runs-on: ubuntu-latest
+    name: Run test coverage
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        continue-on-error: true
+      - name: install cargo-llvm-cov
+        run: |
+          wget https://github.com/taiki-e/cargo-llvm-cov/releases/download/v${CARGO_LLVM_COV_VERSION}/cargo-llvm-cov-x86_64-unknown-linux-gnu.tar.gz -qO- | tar -xzvf -
+          mv cargo-llvm-cov ~/.cargo/bin
+        env:
+          CARGO_LLVM_COV_VERSION: 0.1.5
+      - name: Update System Libraries
+        run: sudo apt-get -y update
+      - name: Install System Libraries
+        run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev
+      - name: Toolchain setup
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+          profile: minimal
+          components: llvm-tools-preview
+      - name: Run Test Coverage for youki
+        run: |
+          cargo llvm-cov clean --workspace
+          cargo llvm-cov --no-report
+          cargo llvm-cov --no-run --lcov --output-path ./coverage.lcov
+      - name: Run Test Coverage for cgroups
+        working-directory: ./cgroups
+        run: |
+          cargo llvm-cov clean --workspace
+          cargo llvm-cov --no-report
+          cargo llvm-cov --no-run --lcov --output-path ./coverage.lcov
+      - name: Upload Youki Code Coverage Results
+        uses: codecov/codecov-action@v2
+        with:
+          file: ./coverage.lcov
+      - name: Upload Cgroups Code Coverage Results
+        uses: codecov/codecov-action@v2
+        with:
+          file: ./cgroups/coverage.lcov
   integration_tests:
     runs-on: ubuntu-latest
     strategy:
