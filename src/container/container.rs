@@ -8,7 +8,7 @@ use chrono::DateTime;
 use nix::unistd::Pid;
 
 use chrono::Utc;
-use oci_spec::Spec;
+use oci_spec::runtime::Spec;
 use procfs::process::Process;
 
 use crate::syscall::syscall::create_syscall;
@@ -197,6 +197,7 @@ impl Container {
     }
 
     pub fn spec(&self) -> Result<Spec> {
-        Spec::load(self.root.join("config.json"))
+        let spec = Spec::load(self.root.join("config.json"))?;
+        Ok(spec)
     }
 }

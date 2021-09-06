@@ -7,7 +7,7 @@ use nix::{
     sys::statfs,
     unistd::{self, Gid, Uid},
 };
-use oci_spec::{LinuxNamespaceType, Spec};
+use oci_spec::runtime::{LinuxNamespaceType, Spec};
 use std::collections::HashMap;
 use std::{
     env,
@@ -179,8 +179,8 @@ pub fn container_intermidiate(
     // value for the current process check
     // https://dev.to/rrampage/surviving-the-linux-oom-killer-2ki9 for some more
     // information
-    if let Some(ref resource) = linux.resources {
-        if let Some(oom_score_adj) = resource.oom_score_adj {
+    if let Some(ref process) = spec.process {
+        if let Some(oom_score_adj) = process.oom_score_adj {
             let mut f = fs::File::create("/proc/self/oom_score_adj")?;
             f.write_all(oom_score_adj.to_string().as_bytes())?;
         }
@@ -362,7 +362,8 @@ pub fn container_init(
         }
     }
 
-    let do_chdir = if proc.cwd.is_empty() {
+    let cwd = format!("{}", proc.cwd.display());
+    let do_chdir = if cwd.is_empty() {
         false
     } else {
         // This chdir must run before setting up the user.
@@ -429,7 +430,8 @@ pub fn container_init(
 
     // change directory to process.cwd if process.cwd is not empty
     if do_chdir {
-        unistd::chdir(&*proc.cwd).with_context(|| format!("Failed to chdir {}", proc.cwd))?;
+        unistd::chdir(&*proc.cwd)
+            .with_context(|| format!("Failed to chdir {}", proc.cwd.display()))?;
     }
 
     // Reset the process env based on oci spec.

@@ -8,7 +8,7 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use cgroups;
-use oci_spec::Spec;
+use oci_spec::runtime::Spec;
 use std::{fs, os::unix::prelude::RawFd, path::PathBuf};
 
 use super::{Container, ContainerStatus};
@@ -123,9 +123,14 @@ impl<'a> ContainerBuilderImpl<'a> {
         cmanager
             .add_task(init_pid)
             .context("Failed to add tasks to cgroup manager")?;
+
         if self.rootless.is_none() && linux.resources.is_some() && self.init {
+            let controller_opt = cgroups::common::ControllerOpt {
+                resources: linux.resources.clone().unwrap(),
+                ..Default::default()
+            };
             cmanager
-                .apply(linux.resources.as_ref().unwrap())
+                .apply(&controller_opt)
                 .context("Failed to apply resource limits through cgroup")?;
         }
 

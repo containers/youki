@@ -10,7 +10,7 @@
 use crate::syscall::{syscall::create_syscall, Syscall};
 use anyhow::{Context, Result};
 use nix::{fcntl, sched::CloneFlags, sys::stat, unistd};
-use oci_spec::{LinuxNamespace, LinuxNamespaceType};
+use oci_spec::runtime::{LinuxNamespace, LinuxNamespaceType};
 use std::collections;
 
 /// Holds information about namespaces
@@ -87,7 +87,7 @@ impl Namespaces {
 mod tests {
     use super::*;
     use crate::syscall::test::TestHelperSyscall;
-    use oci_spec::LinuxNamespaceType;
+    use oci_spec::runtime::LinuxNamespaceType;
 
     fn gen_sample_linux_namespaces() -> Vec<LinuxNamespace> {
         vec![

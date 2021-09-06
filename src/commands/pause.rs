@@ -9,7 +9,7 @@ use crate::container::Container;
 use crate::container::ContainerStatus;
 use crate::utils;
 use cgroups;
-use oci_spec::FreezerState;
+use cgroups::common::FreezerState;
 
 /// Structure to implement pause command
 #[derive(Clap, Debug)]

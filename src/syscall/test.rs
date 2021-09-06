@@ -2,7 +2,7 @@ use std::{any::Any, cell::RefCell, ffi::OsStr, sync::Arc};
 
 use caps::{errors::CapsError, CapSet, CapsHashSet};
 use nix::sched::CloneFlags;
-use oci_spec::LinuxRlimit;
+use oci_spec::runtime::LinuxRlimit;
 
 use super::Syscall;
 

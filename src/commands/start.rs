@@ -37,7 +37,7 @@ impl Start {
         }
 
         let spec_path = container.root.join("config.json");
-        let spec = oci_spec::Spec::load(spec_path).context("failed to load spec")?;
+        let spec = oci_spec::runtime::Spec::load(spec_path).context("failed to load spec")?;
         if let Some(hooks) = spec.hooks.as_ref() {
             // While prestart is marked as deprecated in the OCI spec, the docker and integration test still
             // uses it.

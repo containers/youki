@@ -7,11 +7,11 @@ use nix::errno::Errno;
 use nix::fcntl::{open, OFlag};
 use nix::mount::mount as nix_mount;
 use nix::mount::MsFlags;
-use nix::sys::stat::Mode;
 use nix::sys::stat::{mknod, umask};
+use nix::sys::stat::{Mode, SFlag};
 use nix::unistd::{chdir, chown, close, getcwd};
 use nix::unistd::{Gid, Uid};
-use oci_spec::{LinuxDevice, LinuxDeviceType, Mount, Spec};
+use oci_spec::runtime::{LinuxDevice, LinuxDeviceType, Mount, Spec};
 use std::fs::OpenOptions;
 use std::fs::{canonicalize, create_dir_all, remove_file};
 use std::os::unix::fs::symlink;
@@ -220,6 +220,14 @@ fn bind_dev(dev: &LinuxDevice) -> Result<()> {
     Ok(())
 }
 
+fn to_sflag(dev_type: LinuxDeviceType) -> SFlag {
+    match dev_type {
+        LinuxDeviceType::B => SFlag::S_IFBLK,
+        LinuxDeviceType::C | LinuxDeviceType::U => SFlag::S_IFCHR,
+        LinuxDeviceType::P => SFlag::S_IFIFO,
+    }
+}
+
 fn mknod_dev(dev: &LinuxDevice) -> Result<()> {
     fn makedev(major: i64, minor: i64) -> u64 {
         ((minor & 0xff)
@@ -229,7 +237,7 @@ fn mknod_dev(dev: &LinuxDevice) -> Result<()> {
     }
     mknod(
         &dev.path.as_in_container()?,
-        dev.typ.to_sflag()?,
+        to_sflag(dev.typ),
         Mode::from_bits_truncate(dev.file_mode.unwrap_or(0)),
         makedev(dev.major, dev.minor),
     )?;

@@ -1,7 +1,10 @@
 use anyhow::{bail, Context, Result};
 use caps::Capability;
 use nix::unistd;
-use oci_spec::{LinuxCapabilities, LinuxNamespace, LinuxNamespaceType, Process, Spec};
+use oci_spec::runtime::{
+    Capabilities as SpecCapabilities, LinuxCapabilities, LinuxNamespace, LinuxNamespaceType,
+    Process, Spec,
+};
 
 use std::{
     collections::HashMap,
@@ -13,6 +16,7 @@ use std::{
     str::FromStr,
 };
 
+use crate::capabilities::from_cap;
 use crate::{notify_socket::NotifySocket, rootless::detect_rootless, tty, utils};
 
 use super::{builder::ContainerBuilder, builder_impl::ContainerBuilderImpl, Container};
@@ -136,7 +140,7 @@ impl TenantContainerBuilder {
     fn load_init_spec(&self, container_dir: &Path) -> Result<Spec> {
         let spec_path = container_dir.join("config.json");
 
-        let spec = oci_spec::Spec::load(spec_path).context("failed to load spec")?;
+        let spec = Spec::load(spec_path).context("failed to load spec")?;
         Ok(spec)
     }
 
@@ -196,8 +200,7 @@ impl TenantContainerBuilder {
                 );
             }
 
-            spec.process.as_mut().context("no process in spec")?.cwd =
-                cwd.to_string_lossy().to_string();
+            spec.process.as_mut().context("no process in spec")?.cwd = cwd.to_path_buf();
         }
 
         Ok(())
@@ -247,6 +250,8 @@ impl TenantContainerBuilder {
                 caps.push(Capability::from_str(cap)?);
             }
 
+            let caps: SpecCapabilities = caps.iter().map(|c| from_cap(*c)).collect();
+
             if let Some(ref mut spec_caps) = spec
                 .process
                 .as_mut()
@@ -257,27 +262,27 @@ impl TenantContainerBuilder {
                     .ambient
                     .as_mut()
                     .context("no ambient caps in process spec")?
-                    .append(&mut caps.clone());
+                    .extend(&caps);
                 spec_caps
                     .bounding
                     .as_mut()
                     .context("no bounding caps in process spec")?
-                    .append(&mut caps.clone());
+                    .extend(&caps);
                 spec_caps
                     .effective
                     .as_mut()
                     .context("no effective caps in process spec")?
-                    .append(&mut caps.clone());
+                    .extend(&caps);
                 spec_caps
                     .inheritable
                     .as_mut()
                     .context("no inheritable caps in process spec")?
-                    .append(&mut caps.clone());
+                    .extend(&caps);
                 spec_caps
                     .permitted
                     .as_mut()
                     .context("no permitted caps in process spec")?
-                    .append(&mut caps);
+                    .extend(&caps);
             } else {
                 spec.process
                     .as_mut()
