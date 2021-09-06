@@ -45,7 +45,7 @@ jobs:
           override: true
       - run: rustup component add rustfmt clippy
       - run: sudo apt-get -y update
-      - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev
+      - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev
       - name: Check formatting
         run: cargo fmt --all -- --check
         working-directory: ${{matrix.dirs}}
@@ -74,8 +74,6 @@ jobs:
           override: true
       - run: sudo apt-get -y update
       - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev
-      - name: Build
-        run: ./build.sh --release
       - name: Run tests
         run: cargo test --no-fail-fast
       - name: Run doc tests
