@@ -137,9 +137,11 @@ pub fn run_hooks(hooks: Option<&Vec<Hook>>, container: Option<&Container>) -> Re
 mod test {
     use super::*;
     use anyhow::{bail, Result};
+    use serial_test::serial;
     use std::path::PathBuf;
 
     #[test]
+    #[serial]
     fn test_run_hook() -> Result<()> {
         {
             let default_container: Container = Default::default();
@@ -179,13 +181,14 @@ mod test {
     }
 
     #[test]
+    #[serial]
     #[ignore]
     // This will test executing hook with a timeout. Since the timeout is set in
     // secs, minimally, the test will run for 1 second to trigger the timeout.
     // Therefore, we leave this test in the normal execution.
     fn test_run_hook_timeout() -> Result<()> {
         let default_container: Container = Default::default();
-        // We use `/bin/cat` here to simulate a hook command that hangs.
+        // We use `tail -f /dev/null` here to simulate a hook command that hangs.
         let hook = Hook {
             path: PathBuf::from("tail"),
             args: Some(vec![
