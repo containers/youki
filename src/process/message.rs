@@ -14,7 +14,7 @@ impl From<u8> for Message {
             0x01 => Message::InitReady,
             0x02 => Message::WriteMapping,
             0x03 => Message::MappingWritten,
-            _ => panic!("unknown message."),
+            _ => panic!("unknown message: {:?}.", from),
         }
     }
 }
