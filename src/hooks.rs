@@ -136,9 +136,13 @@ mod test {
             // Use `printenv` to make sure the environment is set correctly.
             let default_container: Container = Default::default();
             let hook = Hook {
-                path: PathBuf::from("/usr/bin/printenv"),
-                args: Some(vec!["printenv".to_string(), "key".to_string()]),
-                env: Some(vec!["key=value".to_string()]),
+                path: PathBuf::from("/usr/bin/bash"),
+                args: Some(vec![
+                    String::from("bash"),
+                    String::from("-c"),
+                    String::from("/usr/bin/printenv key > /dev/null"),
+                ]),
+                env: Some(vec![String::from("key=value")]),
                 timeout: None,
             };
             let hooks = Some(vec![hook]);
