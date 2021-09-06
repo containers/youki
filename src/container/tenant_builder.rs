@@ -2,13 +2,13 @@ use anyhow::{bail, Context, Result};
 use caps::Capability;
 use nix::unistd;
 use oci_spec::{LinuxCapabilities, LinuxNamespace, LinuxNamespaceType, Process, Spec};
+use procfs::process::Namespace;
 
 use std::{
     collections::HashMap,
     convert::TryFrom,
-    ffi::{CString, OsString},
     fs,
-    os::unix::prelude::{OsStrExt, RawFd},
+    os::unix::prelude::{RawFd},
     path::{Path, PathBuf},
     str::FromStr,
 };
@@ -353,62 +353,3 @@ impl TenantContainerBuilder {
         }
     }
 }
-
-// Can be removed once https://github.com/eminence/procfs/pull/135 is available
-trait GetNamespace {
-    fn namespaces(&self) -> Result<Vec<Namespace>>;
-}
-
-impl GetNamespace for procfs::process::Process {
-    /// Describes namespaces to which the process with the corresponding PID belongs.
-    /// Doc reference: https://man7.org/linux/man-pages/man7/namespaces.7.html
-    fn namespaces(&self) -> Result<Vec<Namespace>> {
-        let proc_path = PathBuf::from(format!("/proc/{}", self.pid()));
-        let ns = proc_path.join("ns");
-        let mut namespaces = Vec::new();
-        for entry in fs::read_dir(ns)? {
-            let entry = entry?;
-            let path = entry.path();
-            let ns_type = entry.file_name();
-            let cstr = CString::new(path.as_os_str().as_bytes()).unwrap();
-
-            let mut stat = unsafe { std::mem::zeroed() };
-            if unsafe { libc::stat(cstr.as_ptr(), &mut stat) } != 0 {
-                bail!("Unable to stat {:?}", path);
-            }
-
-            namespaces.push(Namespace {
-                ns_type,
-                path,
-                identifier: stat.st_ino,
-                device_id: stat.st_dev,
-            })
-        }
-
-        Ok(namespaces)
-    }
-}
-
-/// Information about a namespace
-///
-/// See also the [Process::namespaces()] method
-#[derive(Debug, Clone)]
-pub struct Namespace {
-    /// Namespace type
-    pub ns_type: OsString,
-    /// Handle to the namespace
-    pub path: PathBuf,
-    /// Namespace identifier (inode number)
-    pub identifier: u64,
-    /// Device id of the namespace
-    pub device_id: u64,
-}
-
-impl PartialEq for Namespace {
-    fn eq(&self, other: &Self) -> bool {
-        // see https://lore.kernel.org/lkml/87poky5ca9.fsf@xmission.com/
-        self.identifier == other.identifier && self.device_id == other.device_id
-    }
-}
-
-impl Eq for Namespace {}
