@@ -51,7 +51,7 @@ impl Manager {
         let p = if cgroup_path.to_string_lossy().into_owned().is_empty() {
             mount_point.join_safely(Path::new(&cgroup.pathname))?
         } else if cgroup_path.is_absolute() {
-            mount_point.join_safely(&cgroup_path)?
+            mount_point.join_safely(cgroup_path)?
         } else {
             mount_point.join(cgroup_path)
         };

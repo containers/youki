@@ -1,5 +1,6 @@
 use anyhow::{bail, Result};
 use std::os::unix::io::RawFd;
+use std::ptr;
 
 // FIXME: add tests
 
@@ -14,7 +15,7 @@ pub fn prog_load(license: &str, insns: &[u8]) -> Result<RawFd> {
             insns_cnt as u64,
             license as *const _ as *const i8,
             0,
-            0 as *mut i8,
+            ptr::null_mut::<i8>(),
             0,
         )
     };
