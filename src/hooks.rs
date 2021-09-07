@@ -140,6 +140,13 @@ mod test {
     use serial_test::serial;
     use std::path::PathBuf;
 
+    // Note: the run_hook will require the use of pipe to write the container
+    // state into stdin of the hook command. When cargo test runs these tests in
+    // parallel with other tests, the pipe becomes flaky and often we will get
+    // broken pipe or bad file descriptors. There is not much we can do and we
+    // decide not to retry in the test. The most sensible way to test this is
+    // ask cargo test to run these tests in serial.
+
     #[test]
     #[serial]
     fn test_run_hook() -> Result<()> {

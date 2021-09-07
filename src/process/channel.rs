@@ -238,6 +238,13 @@ mod tests {
     use nix::unistd;
     use serial_test::serial;
 
+    // Note: due to cargo test by default runs tests in parallel using a single
+    // process, these tests should not be running in parallel with other tests.
+    // Because we run tests in the same process, other tests may decide to close
+    // down file descriptors or saturate the IOs in the OS.  The channel uses
+    // pipe to communicate and can potentially become flaky as a result. There
+    // is not much else we can do other than to run the tests in serial.
+
     #[test]
     #[serial]
     fn test_channel_intermadiate_ready() -> Result<()> {
