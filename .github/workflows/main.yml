@@ -34,7 +34,12 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
           override: true
-      - uses: Swatinem/rust-cache@v1
+      - name: Cache youki
+        uses: Swatinem/rust-cache@v1
+      - name: Cache Cgroups
+        uses: Swatinem/rust-cache@v1
+        with:
+          working-directory: ./cgroups
       - run: rustup component add rustfmt clippy
       - run: sudo apt-get -y update
       - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev
@@ -82,7 +87,12 @@ jobs:
           override: true
           profile: minimal
           components: llvm-tools-preview
-      - uses: Swatinem/rust-cache@v1
+      - name: Cache youki
+        uses: Swatinem/rust-cache@v1
+      - name: Cache Cgroups
+        uses: Swatinem/rust-cache@v1
+        with:
+          working-directory: ./cgroups
       - name: install cargo-llvm-cov
         env:
           CARGO_LLVM_COV_VERSION: 0.1.5
@@ -124,7 +134,12 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ matrix.rust }}
-      - uses: Swatinem/rust-cache@v1
+      - name: Cache youki
+        uses: Swatinem/rust-cache@v1
+      - name: Cache Cgroups
+        uses: Swatinem/rust-cache@v1
+        with:
+          working-directory: ./cgroups
       - run: sudo apt-get -y update
       - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev
       - name: Build
