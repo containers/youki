@@ -30,19 +30,11 @@ jobs:
         dirs: ${{ fromJSON(needs.changes.outputs.dirs) }}
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ matrix.rust }}
           override: true
+      - uses: Swatinem/rust-cache@v1
       - run: rustup component add rustfmt clippy
       - run: sudo apt-get -y update
       - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev
@@ -59,19 +51,11 @@ jobs:
         rust: [1.54.0]
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ matrix.rust }}
           override: true
+      - uses: Swatinem/rust-cache@v1
       - run: sudo apt-get -y update
       - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev
       - name: Run tests
@@ -86,25 +70,6 @@ jobs:
     name: Run test coverage
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry
-            ~/.cargo/git
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        continue-on-error: true
-      - name: install cargo-llvm-cov
-        run: |
-          wget https://github.com/taiki-e/cargo-llvm-cov/releases/download/v${CARGO_LLVM_COV_VERSION}/cargo-llvm-cov-x86_64-unknown-linux-gnu.tar.gz -qO- | tar -xzvf -
-          mv cargo-llvm-cov ~/.cargo/bin
-        env:
-          CARGO_LLVM_COV_VERSION: 0.1.5
-      - name: Update System Libraries
-        run: sudo apt-get -y update
-      - name: Install System Libraries
-        run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev
       - name: Toolchain setup
         uses: actions-rs/toolchain@v1
         with:
@@ -112,6 +77,17 @@ jobs:
           override: true
           profile: minimal
           components: llvm-tools-preview
+      - uses: Swatinem/rust-cache@v1
+      - name: install cargo-llvm-cov
+        env:
+          CARGO_LLVM_COV_VERSION: 0.1.5
+        run: |
+          wget https://github.com/taiki-e/cargo-llvm-cov/releases/download/v${CARGO_LLVM_COV_VERSION}/cargo-llvm-cov-x86_64-unknown-linux-gnu.tar.gz -qO- | tar -xzvf -
+          mv cargo-llvm-cov ~/.cargo/bin
+      - name: Update System Libraries
+        run: sudo apt-get -y update
+      - name: Install System Libraries
+        run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev
       - name: Run Test Coverage for youki
         run: |
           cargo llvm-cov clean --workspace
