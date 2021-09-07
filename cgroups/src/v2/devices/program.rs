@@ -10,7 +10,7 @@ pub struct Program {
 }
 
 impl Program {
-    pub fn from_rules(rules: &Vec<LinuxDeviceCgroup>, default_allow: bool) -> Result<Self> {
+    pub fn from_rules(rules: &[LinuxDeviceCgroup], default_allow: bool) -> Result<Self> {
         let mut prog = Program {
             prog: BpfCode::new(),
         };
@@ -90,7 +90,7 @@ impl Program {
     }
 
     fn add_rule(&mut self, rule: &LinuxDeviceCgroup) -> Result<()> {
-        let dev_type = bpf_dev_type(rule.typ.clone().unwrap_or_default())?;
+        let dev_type = bpf_dev_type(rule.typ.unwrap_or_default())?;
         let access = bpf_access(rule.access.clone().unwrap_or_default())?;
         let has_access = access
             != (libbpf_sys::BPF_DEVCG_ACC_READ
@@ -245,6 +245,7 @@ fn bpf_cgroup_dev_ctx(
     Ok(mem)
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
 
