@@ -6,7 +6,7 @@ use crate::{
     stats::{CpuUsage, StatsProvider},
 };
 
-use oci_spec::runtime::{LinuxCpu};
+use oci_spec::runtime::LinuxCpu;
 
 use super::controller::Controller;
 

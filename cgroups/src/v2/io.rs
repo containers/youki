@@ -8,7 +8,7 @@ use crate::{
 };
 
 use super::controller::Controller;
-use oci_spec::runtime::{LinuxBlockIo};
+use oci_spec::runtime::LinuxBlockIo;
 
 const CGROUP_BFQ_IO_WEIGHT: &str = "io.bfq.weight";
 const CGROUP_IO_WEIGHT: &str = "io.weight";

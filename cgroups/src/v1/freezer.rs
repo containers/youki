@@ -124,10 +124,10 @@ impl Freezer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::common::{CGROUP_PROCS, FreezerState};
+    use crate::common::{FreezerState, CGROUP_PROCS};
     use crate::test::{create_temp_dir, set_fixture};
     use nix::unistd::Pid;
-    use oci_spec::runtime::{LinuxResources};
+    use oci_spec::runtime::LinuxResources;
 
     #[test]
     fn test_set_freezer_state() {
@@ -187,14 +187,13 @@ mod tests {
                 rdma: None,
                 unified: None,
             };
-            let state =FreezerState::Thawed;
+            let state = FreezerState::Thawed;
 
-            let controller_opt = ControllerOpt{
+            let controller_opt = ControllerOpt {
                 resources: linux_resources,
                 freezer_state: Some(state),
                 ..Default::default()
             };
-
 
             let pid = Pid::from_raw(1000);
             Freezer::add_task(pid, &tmp).expect("freezer add task");
@@ -221,9 +220,9 @@ mod tests {
                 unified: None,
             };
 
-            let state =FreezerState::Frozen;
+            let state = FreezerState::Frozen;
 
-            let controller_opt = ControllerOpt{
+            let controller_opt = ControllerOpt {
                 resources: linux_resources,
                 freezer_state: Some(state),
                 ..Default::default()
@@ -254,9 +253,9 @@ mod tests {
                 unified: None,
             };
 
-            let state =FreezerState::Undefined;
+            let state = FreezerState::Undefined;
 
-            let controller_opt = ControllerOpt{
+            let controller_opt = ControllerOpt {
                 resources: linux_resources,
                 freezer_state: Some(state),
                 ..Default::default()

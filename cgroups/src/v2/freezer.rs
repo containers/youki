@@ -7,7 +7,7 @@ use std::{
     time::Duration,
 };
 
-use crate::common::{FreezerState, ControllerOpt};
+use crate::common::{ControllerOpt, FreezerState};
 
 use super::controller::Controller;
 
@@ -18,7 +18,7 @@ pub struct Freezer {}
 
 impl Controller for Freezer {
     fn apply(controller_opt: &ControllerOpt, cgroup_path: &Path) -> Result<()> {
-        if let Some(freezer_state) = controller_opt.freezer_state{
+        if let Some(freezer_state) = controller_opt.freezer_state {
             Self::apply(freezer_state, cgroup_path).context("failed to apply freezer")?;
         }
 

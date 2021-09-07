@@ -13,7 +13,7 @@ use super::{
     controller::Controller, controller_type::ControllerType, cpu::Cpu, cpuset::CpuSet,
     freezer::Freezer, hugetlb::HugeTlb, io::Io, memory::Memory, pids::Pids,
 };
-use crate::common::{self, CgroupManager, FreezerState, PathBufExt, ControllerOpt};
+use crate::common::{self, CgroupManager, ControllerOpt, FreezerState, PathBufExt};
 use crate::stats::Stats;
 
 const CGROUP_PROCS: &str = "cgroup.procs";

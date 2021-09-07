@@ -8,7 +8,7 @@ use crate::{
 };
 
 use super::controller::Controller;
-use oci_spec::runtime::{LinuxPids};
+use oci_spec::runtime::LinuxPids;
 
 pub struct Pids {}
 

@@ -1,7 +1,7 @@
 use anyhow::{bail, Context, Result};
 use std::path::Path;
 
-use oci_spec::runtime::{LinuxMemory};
+use oci_spec::runtime::LinuxMemory;
 
 use crate::{
     common::{self, ControllerOpt},

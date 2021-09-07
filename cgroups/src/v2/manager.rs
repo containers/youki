@@ -25,7 +25,7 @@ use super::{
     unified::Unified,
 };
 use crate::{
-    common::{self, CgroupManager, FreezerState, PathBufExt, CGROUP_PROCS, ControllerOpt},
+    common::{self, CgroupManager, ControllerOpt, FreezerState, PathBufExt, CGROUP_PROCS},
     stats::{Stats, StatsProvider},
 };
 

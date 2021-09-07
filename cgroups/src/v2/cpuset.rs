@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use std::path::Path;
 
 use crate::common::{self, ControllerOpt};
-use oci_spec::runtime::{LinuxCpu };
+use oci_spec::runtime::LinuxCpu;
 
 use super::controller::Controller;
 
