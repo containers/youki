@@ -7,14 +7,15 @@ use nix::{
     sys::statfs,
     unistd::{self, Gid, Uid},
 };
-use oci_spec::runtime::{LinuxNamespaceType, Spec};
+use oci_spec::runtime::{LinuxNamespaceType, Spec, User};
 use std::collections::HashMap;
 use std::{
     env,
     os::unix::{io::AsRawFd, prelude::RawFd},
 };
-use std::{fs, io::Write, path::Path, path::PathBuf};
+use std::{fs, path::Path, path::PathBuf};
 
+use crate::rootless::Rootless;
 use crate::{
     capabilities,
     container::Container,
@@ -146,7 +147,41 @@ fn readonly_path(path: &str) -> Result<()> {
     Ok(())
 }
 
-pub struct ContainerInitArgs {
+// For files, bind mounts /dev/null over the top of the specified path.
+// For directories, mounts read-only tmpfs over the top of the specified path.
+fn masked_path(path: &str, mount_label: &Option<String>) -> Result<()> {
+    match nix_mount::<str, str, str, str>(
+        Some("/dev/null"),
+        path,
+        None::<&str>,
+        MsFlags::MS_BIND,
+        None::<&str>,
+    ) {
+        // ignore error if path is not exist.
+        Err(nix::errno::Errno::ENOENT) => {
+            log::warn!("masked path {:?} not exist", path);
+            return Ok(());
+        }
+        Err(nix::errno::Errno::ENOTDIR) => {
+            let label = match mount_label {
+                Some(l) => format!("context={}", l),
+                None => "".to_string(),
+            };
+            let _ = nix_mount(
+                Some("tmpfs"),
+                path,
+                Some("tmpfs"),
+                MsFlags::MS_RDONLY,
+                Some(label.as_str()),
+            );
+        }
+        Err(err) => bail!(err),
+        Ok(_) => {}
+    };
+    Ok(())
+}
+
+pub struct ContainerInitArgs<'a> {
     /// Flag indicating if an init or a tenant container should be created
     pub init: bool,
     /// Interface to operating system primitives
@@ -163,9 +198,11 @@ pub struct ContainerInitArgs {
     pub preserve_fds: i32,
     /// Container state
     pub container: Option<Container>,
+    /// Options for rootless containers
+    pub rootless: Option<Rootless<'a>>,
 }
 
-pub fn container_intermidiate(
+pub fn container_intermediate(
     args: ContainerInitArgs,
     receiver_from_main: &mut channel::ReceiverFromMain,
     sender_to_main: &mut channel::SenderIntermediateToMain,
@@ -174,17 +211,6 @@ pub fn container_intermidiate(
     let spec = &args.spec;
     let linux = spec.linux.as_ref().context("no linux in spec")?;
     let namespaces = Namespaces::from(linux.namespaces.as_ref());
-
-    // if Out-of-memory score adjustment is set in specification.  set the score
-    // value for the current process check
-    // https://dev.to/rrampage/surviving-the-linux-oom-killer-2ki9 for some more
-    // information
-    if let Some(ref process) = spec.process {
-        if let Some(oom_score_adj) = process.oom_score_adj {
-            let mut f = fs::File::create("/proc/self/oom_score_adj")?;
-            f.write_all(oom_score_adj.to_string().as_bytes())?;
-        }
-    }
 
     // if new user is specified in specification, this will be true and new
     // namespace will be created, check
@@ -362,6 +388,13 @@ pub fn container_init(
         }
     }
 
+    if let Some(paths) = &linux.masked_paths {
+        // mount masked path
+        for path in paths {
+            masked_path(path, &linux.mount_label).context("Failed to set masked path")?;
+        }
+    }
+
     let cwd = format!("{}", proc.cwd.display());
     let do_chdir = if cwd.is_empty() {
         false
@@ -375,6 +408,9 @@ pub fn container_init(
             Err(e) => bail!("Failed to chdir: {}", e),
         }
     };
+
+    set_supplementary_gids(&proc.user, &args.rootless)
+        .context("failed to set supplementary gids")?;
 
     command
         .set_id(Uid::from_raw(proc.user.uid), Gid::from_raw(proc.user.gid))
@@ -469,11 +505,70 @@ pub fn container_init(
     unreachable!();
 }
 
+// Before 3.19 it was possible for an unprivileged user to enter an user namespace,
+// become root and then call setgroups in order to drop membership in supplementary
+// groups. This allowed access to files which blocked access based on being a member
+// of these groups (see CVE-2014-8989)
+//
+// This leaves us with three scenarios:
+//
+// Unprivileged user starting a rootless container: The main process is running as an
+// unprivileged user and therefore cannot write the mapping until "deny" has been written
+// to /proc/{pid}/setgroups. Once written /proc/{pid}/setgroups cannot be reset and the
+// setgroups system call will be disabled for all processes in this user namespace. This
+// also means that we should detect if the user is unprivileged and additional gids have
+// been specified and bail out early as this can never work. This is not handled here,
+// but during the validation for rootless containers.
+//
+// Privileged user starting a rootless container: It is not necessary to write "deny" to
+// /proc/setgroups in order to create the gid mapping and therefore we don't. This means
+// that setgroups could be used to drop groups, but this is fine as the user is privileged
+// and could do so anyway.
+// We already have checked during validation if the specified supplemental groups fall into
+// the range that are specified in the gid mapping and bail out early if they do not.
+//
+// Privileged user starting a normal container: Just add the supplementary groups.
+//
+fn set_supplementary_gids(user: &User, rootless: &Option<Rootless>) -> Result<()> {
+    if let Some(additional_gids) = &user.additional_gids {
+        if additional_gids.is_empty() {
+            return Ok(());
+        }
+
+        let setgroups =
+            fs::read_to_string("/proc/self/setgroups").context("failed to read setgroups")?;
+        if setgroups.trim() == "deny" {
+            bail!("cannot set supplementary gids, setgroup is disabled");
+        }
+
+        let gids: Vec<Gid> = additional_gids
+            .iter()
+            .map(|gid| Gid::from_raw(*gid))
+            .collect();
+
+        match rootless {
+            Some(r) if r.privileged => {
+                nix::unistd::setgroups(&gids).context("failed to set supplementary gids")?;
+            }
+            None => {
+                nix::unistd::setgroups(&gids).context("failed to set supplementary gids")?;
+            }
+            // this should have been detected during validation
+            _ => unreachable!(
+                "unprivileged users cannot set supplementary gids in rootless container"
+            ),
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use anyhow::{bail, Result};
     use nix::{fcntl, sys, unistd};
+    use serial_test::serial;
     use std::fs;
 
     #[test]
@@ -501,6 +596,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_cleanup_file_descriptors() -> Result<()> {
         // Open a fd without the CLOEXEC flag. Rust automatically adds the flag,
         // so we use fcntl::open here for more control.

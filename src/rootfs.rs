@@ -9,7 +9,7 @@ use nix::mount::mount as nix_mount;
 use nix::mount::MsFlags;
 use nix::sys::stat::{mknod, umask};
 use nix::sys::stat::{Mode, SFlag};
-use nix::unistd::{chdir, chown, close, getcwd};
+use nix::unistd::{chown, close};
 use nix::unistd::{Gid, Uid};
 use oci_spec::runtime::{LinuxDevice, LinuxDeviceType, Mount, Spec};
 use std::fs::OpenOptions;
@@ -49,7 +49,7 @@ pub fn prepare_rootfs(spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<
             log::debug!("Mount... {:?}", mount);
             let (flags, data) = parse_mount(mount);
             let mount_label = linux.mount_label.as_ref();
-            if mount.typ.as_ref().context("no type in mount spec")? == "cgroup" {
+            if mount.typ == Some("cgroup".to_string()) {
                 // skip
                 log::warn!("A feature of cgroup is unimplemented.");
             } else if mount.destination == PathBuf::from("/dev") {
@@ -68,17 +68,18 @@ pub fn prepare_rootfs(spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<
         }
     }
 
-    let olddir = getcwd()?;
-    chdir(rootfs)?;
     setup_default_symlinks(rootfs).context("Failed to setup default symlinks")?;
     if let Some(added_devices) = linux.devices.as_ref() {
-        create_devices(default_devices().iter().chain(added_devices), bind_devices)
+        create_devices(
+            rootfs,
+            default_devices().iter().chain(added_devices),
+            bind_devices,
+        )
     } else {
-        create_devices(default_devices().iter(), bind_devices)
+        create_devices(rootfs, default_devices().iter(), bind_devices)
     }?;
-    setup_ptmx(rootfs)?;
-    chdir(&olddir)?;
 
+    setup_ptmx(rootfs)?;
     Ok(())
 }
 
@@ -89,8 +90,7 @@ fn setup_ptmx(rootfs: &Path) -> Result<()> {
         }
     }
 
-    symlink("pts/ptmx", "dev/ptmx").context("Failed to symlink ptmx")?;
-
+    symlink("pts/ptmx", rootfs.join("dev/ptmx")).context("failed to symlink ptmx")?;
     Ok(())
 }
 
@@ -171,7 +171,7 @@ pub fn default_devices() -> Vec<LinuxDevice> {
     ]
 }
 
-fn create_devices<'a, I>(devices: I, bind: bool) -> Result<()>
+fn create_devices<'a, I>(rootfs: &Path, devices: I, bind: bool) -> Result<()>
 where
     I: Iterator<Item = &'a LinuxDevice>,
 {
@@ -183,7 +183,7 @@ where
                     panic!("{} is not a valid device path", dev.path.display());
                 }
 
-                bind_dev(dev)
+                bind_dev(rootfs, dev)
             })
             .collect::<Result<Vec<_>>>()?;
     } else {
@@ -193,7 +193,7 @@ where
                     panic!("{} is not a valid device path", dev.path.display());
                 }
 
-                mknod_dev(dev)
+                mknod_dev(rootfs, dev)
             })
             .collect::<Result<Vec<_>>>()?;
     }
@@ -202,15 +202,17 @@ where
     Ok(())
 }
 
-fn bind_dev(dev: &LinuxDevice) -> Result<()> {
+fn bind_dev(rootfs: &Path, dev: &LinuxDevice) -> Result<()> {
+    let full_container_path = rootfs.join(dev.path.as_in_container()?);
+
     let fd = open(
-        &dev.path.as_in_container()?,
+        &full_container_path,
         OFlag::O_RDWR | OFlag::O_CREAT,
         Mode::from_bits_truncate(0o644),
     )?;
     close(fd)?;
     nix_mount(
-        Some(&*dev.path.as_in_container()?),
+        Some(&full_container_path),
         &dev.path,
         None::<&str>,
         MsFlags::MS_BIND,
@@ -228,21 +230,23 @@ fn to_sflag(dev_type: LinuxDeviceType) -> SFlag {
     }
 }
 
-fn mknod_dev(dev: &LinuxDevice) -> Result<()> {
+fn mknod_dev(rootfs: &Path, dev: &LinuxDevice) -> Result<()> {
     fn makedev(major: i64, minor: i64) -> u64 {
         ((minor & 0xff)
             | ((major & 0xfff) << 8)
             | ((minor & !0xff) << 12)
             | ((major & !0xfff) << 32)) as u64
     }
+
+    let full_container_path = rootfs.join(dev.path.as_in_container()?);
     mknod(
-        &dev.path.as_in_container()?,
+        &full_container_path,
         to_sflag(dev.typ),
         Mode::from_bits_truncate(dev.file_mode.unwrap_or(0)),
         makedev(dev.major, dev.minor),
     )?;
     chown(
-        &dev.path.as_in_container()?,
+        &full_container_path,
         dev.uid.map(Uid::from_raw),
         dev.gid.map(Gid::from_raw),
     )?;
@@ -257,9 +261,9 @@ fn mount_to_container(
     data: &str,
     label: Option<&String>,
 ) -> Result<()> {
-    let typ = m.typ.as_ref().context("no type in mount spec")?;
+    let typ = m.typ.as_deref();
     let d = if let Some(l) = label {
-        if typ != "proc" && typ != "sysfs" {
+        if typ != Some("proc") && typ != Some("sysfs") {
             if data.is_empty() {
                 format!("context=\"{}\"", l)
             } else {
@@ -278,7 +282,7 @@ fn mount_to_container(
     );
     let dest = Path::new(&dest_for_host);
     let source = m.source.as_ref().context("no source in mount spec")?;
-    let src = if typ == "bind" {
+    let src = if typ == Some("bind") {
         let src = canonicalize(source)?;
         let dir = if src.is_file() {
             Path::new(&dest).parent().unwrap()
@@ -301,12 +305,11 @@ fn mount_to_container(
         PathBuf::from(source)
     };
 
-    if let Err(errno) = nix_mount(Some(&*src), dest, Some(&*typ.as_str()), flags, Some(&*d)) {
+    if let Err(errno) = nix_mount(Some(&*src), dest, typ, flags, Some(&*d)) {
         if !matches!(errno, Errno::EINVAL) {
             bail!("mount of {:?} failed", m.destination);
         }
-
-        nix_mount(Some(&*src), dest, Some(&*typ.as_str()), flags, Some(data))?;
+        nix_mount(Some(&*src), dest, typ, flags, Some(data))?;
     }
 
     if flags.contains(MsFlags::MS_BIND)
@@ -359,15 +362,15 @@ fn parse_mount(m: &Mount) -> (MsFlags, String) {
                 "rbind" => Some((false, MsFlags::MS_BIND | MsFlags::MS_REC)),
                 "unbindable" => Some((false, MsFlags::MS_UNBINDABLE)),
                 "runbindable" => Some((false, MsFlags::MS_UNBINDABLE | MsFlags::MS_REC)),
-                "private" => Some((false, MsFlags::MS_PRIVATE)),
-                "rprivate" => Some((false, MsFlags::MS_PRIVATE | MsFlags::MS_REC)),
-                "shared" => Some((false, MsFlags::MS_SHARED)),
-                "rshared" => Some((false, MsFlags::MS_SHARED | MsFlags::MS_REC)),
-                "slave" => Some((false, MsFlags::MS_SLAVE)),
-                "rslave" => Some((false, MsFlags::MS_SLAVE | MsFlags::MS_REC)),
-                "relatime" => Some((false, MsFlags::MS_RELATIME)),
+                "private" => Some((true, MsFlags::MS_PRIVATE)),
+                "rprivate" => Some((true, MsFlags::MS_PRIVATE | MsFlags::MS_REC)),
+                "shared" => Some((true, MsFlags::MS_SHARED)),
+                "rshared" => Some((true, MsFlags::MS_SHARED | MsFlags::MS_REC)),
+                "slave" => Some((true, MsFlags::MS_SLAVE)),
+                "rslave" => Some((true, MsFlags::MS_SLAVE | MsFlags::MS_REC)),
+                "relatime" => Some((true, MsFlags::MS_RELATIME)),
                 "norelatime" => Some((true, MsFlags::MS_RELATIME)),
-                "strictatime" => Some((false, MsFlags::MS_STRICTATIME)),
+                "strictatime" => Some((true, MsFlags::MS_STRICTATIME)),
                 "nostrictatime" => Some((true, MsFlags::MS_STRICTATIME)),
                 _ => None,
             } {

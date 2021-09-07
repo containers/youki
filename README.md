@@ -4,6 +4,7 @@
 [![GitHub commit activity](https://img.shields.io/github/commit-activity/m/containers/youki)](https://github.com/containers/youki/graphs/commit-activity)
 [![GitHub contributors](https://img.shields.io/github/contributors/containers/youki)](https://github.com/containers/youki/graphs/contributors)
 [![Github CI](https://github.com/containers/youki/actions/workflows/main.yml/badge.svg?branch=main)](https://github.com/containers/youki/actions)
+[![codecov](https://codecov.io/gh/containers/youki/branch/main/graph/badge.svg)](https://codecov.io/gh/containers/youki)
 
 <p align="center">
   <img src="docs/youki.png" width="230" height="230">
@@ -47,7 +48,7 @@ youki is not at the practical stage yet. However, it is getting closer to practi
 |    Seccomp     |             Filtering system calls              |                     WIP on [#25](https://github.com/containers/youki/issues/25)                     |
 |     Hooks      | Add custom processing during container creation |                                                  ✅                                                  |
 |    Rootless    |   Running a container without root privileges   | It works, but cgroups isn't supported. WIP on [#77](https://github.com/containers/youki/issues/77)  |
-| OCI Compliance |        Compliance with OCI Runtime Spec         |                                   44 out of 55 test cases passing                                   |
+| OCI Compliance |        Compliance with OCI Runtime Spec         |                                   47 out of 55 test cases passing                                   |
 
 # Design and implementation of youki
 ![sequence diagram of youki](docs/.drawio.svg)

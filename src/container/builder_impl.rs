@@ -9,7 +9,7 @@ use crate::{
 use anyhow::{Context, Result};
 use cgroups;
 use oci_spec::runtime::Spec;
-use std::{fs, os::unix::prelude::RawFd, path::PathBuf};
+use std::{fs, io::Write, os::unix::prelude::RawFd, path::PathBuf};
 
 use super::{Container, ContainerStatus};
 
@@ -49,11 +49,10 @@ impl<'a> ContainerBuilderImpl<'a> {
     }
 
     fn run_container(&mut self) -> Result<()> {
-        prctl::set_dumpable(false).unwrap();
-
         let linux = self.spec.linux.as_ref().context("no linux in spec")?;
         let cgroups_path = utils::get_cgroup_path(&linux.cgroups_path, &self.container_id);
         let cmanager = cgroups::common::create_cgroup_manager(&cgroups_path, self.use_systemd)?;
+        let process = self.spec.process.as_ref().context("No process in spec")?;
 
         if self.init {
             if let Some(hooks) = self.spec.hooks.as_ref() {
@@ -67,9 +66,36 @@ impl<'a> ContainerBuilderImpl<'a> {
 
         // Need to create the notify socket before we pivot root, since the unix
         // domain socket used here is outside of the rootfs of container. During
-        // exec, need to create the socket before we exter into existing mount
+        // exec, need to create the socket before we enter into existing mount
         // namespace.
         let notify_socket: NotifyListener = NotifyListener::new(&self.notify_path)?;
+
+        // If Out-of-memory score adjustment is set in specification.  set the score
+        // value for the current process check
+        // https://dev.to/rrampage/surviving-the-linux-oom-killer-2ki9 for some more
+        // information.
+        //
+        // This has to be done before !dumpable because /proc/self/oom_score_adj
+        // is not writeable unless you're an privileged user (if !dumpable is
+        // set). All children inherit their parent's oom_score_adj value on
+        // fork(2) so this will always be propagated properly.
+        if let Some(oom_score_adj) = process.oom_score_adj {
+            log::debug!("Set OOM score to {}", oom_score_adj);
+            let mut f = fs::File::create("/proc/self/oom_score_adj")?;
+            f.write_all(oom_score_adj.to_string().as_bytes())?;
+        }
+
+        // Make the process non-dumpable, to avoid various race conditions that
+        // could cause processes in namespaces we're joining to access host
+        // resources (or potentially execute code).
+        //
+        // However, if the number of namespaces we are joining is 0, we are not
+        // going to be switching to a different security context. Thus setting
+        // ourselves to be non-dumpable only breaks things (like rootless
+        // containers), which is the recommendation from the kernel folks.
+        if linux.namespaces.is_some() {
+            prctl::set_dumpable(false).unwrap();
+        }
 
         // This init_args will be passed to the container init process,
         // therefore we will have to move all the variable by value. Since self
@@ -83,6 +109,7 @@ impl<'a> ContainerBuilderImpl<'a> {
             notify_socket,
             preserve_fds: self.preserve_fds,
             container: self.container.clone(),
+            rootless: self.rootless.clone(),
         };
         let intermediate_pid = fork::container_fork(|| {
             // The fds in the pipe is duplicated during fork, so we first close
@@ -94,7 +121,7 @@ impl<'a> ContainerBuilderImpl<'a> {
                 .close()
                 .context("Failed to close unused receiver")?;
 
-            init::container_intermidiate(init_args, receiver_from_main, sender_to_main)
+            init::container_intermediate(init_args, receiver_from_main, sender_to_main)
         })?;
         // Close down unused fds. The corresponding fds are duplicated to the
         // child process during fork.
@@ -111,7 +138,12 @@ impl<'a> ContainerBuilderImpl<'a> {
         if self.rootless.is_some() {
             receiver_from_intermediate.wait_for_mapping_request()?;
             log::debug!("write mapping for pid {:?}", intermediate_pid);
-            utils::write_file(format!("/proc/{}/setgroups", intermediate_pid), "deny")?;
+            let rootless = self.rootless.as_ref().unwrap();
+            if !rootless.privileged {
+                // The main process is running as an unprivileged user and cannot write the mapping
+                // until "deny" has been written to setgroups. See CVE-2014-8989.
+                utils::write_file(format!("/proc/{}/setgroups", intermediate_pid), "deny")?;
+            }
             rootless::write_uid_mapping(intermediate_pid, self.rootless.as_ref())?;
             rootless::write_gid_mapping(intermediate_pid, self.rootless.as_ref())?;
             sender_to_intermediate.mapping_written()?;
@@ -120,15 +152,15 @@ impl<'a> ContainerBuilderImpl<'a> {
         let init_pid = receiver_from_intermediate.wait_for_intermediate_ready()?;
         log::debug!("init pid is {:?}", init_pid);
 
-        cmanager
-            .add_task(init_pid)
-            .context("Failed to add tasks to cgroup manager")?;
-
         if self.rootless.is_none() && linux.resources.is_some() && self.init {
             let controller_opt = cgroups::common::ControllerOpt {
                 resources: linux.resources.clone().unwrap(),
                 ..Default::default()
             };
+            cmanager
+                .add_task(init_pid)
+                .context("Failed to add tasks to cgroup manager")?;
+
             cmanager
                 .apply(&controller_opt)
                 .context("Failed to apply resource limits through cgroup")?;

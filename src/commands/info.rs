@@ -17,6 +17,7 @@ impl Info {
         print_os();
         print_hardware();
         print_cgroups();
+        print_namespaces();
 
         Ok(())
     }
@@ -105,12 +106,11 @@ pub fn print_hardware() {
 
 /// Print cgroups info of system
 pub fn print_cgroups() {
-    if let Ok(cgroup_fs) = cgroups::common::get_supported_cgroup_fs() {
-        let cgroup_fs: Vec<String> = cgroup_fs.into_iter().map(|c| c.to_string()).collect();
-        println!("{:<18}{}", "cgroup version", cgroup_fs.join(" and "));
+    if let Ok(cgroup_setup) = cgroups::common::get_cgroup_setup() {
+        println!("{:<18}{}", "Cgroup setup", cgroup_setup);
     }
 
-    println!("cgroup mounts");
+    println!("Cgroup mounts");
     if let Ok(v1_mounts) = cgroups::v1::util::list_subsystem_mount_points() {
         let mut v1_mounts: Vec<String> = v1_mounts
             .iter()
@@ -126,5 +126,46 @@ pub fn print_cgroups() {
     let unified = cgroups::v2::util::get_unified_mount_point();
     if let Ok(mount_point) = unified {
         println!("  {:<16}{}", "unified", mount_point.display());
+    }
+}
+
+pub fn print_namespaces() {
+    let uname = nix::sys::utsname::uname();
+    let kernel_config = Path::new("/boot").join(format!("config-{}", uname.release()));
+    if !kernel_config.exists() {
+        return;
+    }
+
+    if let Ok(content) = fs::read_to_string(kernel_config) {
+        if let Some(ns_enabled) = find_parameter(&content, "CONFIG_NAMESPACES") {
+            if ns_enabled == "y" {
+                println!("{:<18}enabled", "Namespaces");
+            } else {
+                println!("{:<18}disabled", "Namespaces");
+                return;
+            }
+        }
+
+        // mount namespace is always enabled if namespaces are enabled
+        println!("  {:<16}enabled", "mount");
+        print_feature_status(&content, "CONFIG_UTS_NS", "uts");
+        print_feature_status(&content, "CONFIG_IPC_NS", "ipc");
+        print_feature_status(&content, "CONFIG_USER_NS", "user");
+        print_feature_status(&content, "CONFIG_PID_NS", "pid");
+        print_feature_status(&content, "CONFIG_NET_NS", "network");
+    }
+}
+
+fn print_feature_status(config: &str, feature: &str, display: &str) {
+    if let Some(status_flag) = find_parameter(config, feature) {
+        let status = if status_flag == "y" {
+            "enabled"
+        } else {
+            "disabled"
+        };
+
+        println!("  {:<16}{}", display, status);
+    } else {
+        println!("  {:<16}disabled", display);
     }
 }
