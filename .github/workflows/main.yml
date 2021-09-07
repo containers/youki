@@ -36,7 +36,7 @@ jobs:
           override: true
       - name: Cache youki
         uses: Swatinem/rust-cache@v1
-      - name: Cache Cgroups
+      - name: Cache cgroups
         uses: Swatinem/rust-cache@v1
         with:
           working-directory: ./cgroups
@@ -62,7 +62,7 @@ jobs:
           override: true
       - name: Cache youki
         uses: Swatinem/rust-cache@v1
-      - name: Cache Cgroups
+      - name: Cache cgroups
         uses: Swatinem/rust-cache@v1
         with:
           working-directory: ./cgroups
@@ -89,7 +89,7 @@ jobs:
           components: llvm-tools-preview
       - name: Cache youki
         uses: Swatinem/rust-cache@v1
-      - name: Cache Cgroups
+      - name: Cache cgroups
         uses: Swatinem/rust-cache@v1
         with:
           working-directory: ./cgroups
@@ -136,7 +136,7 @@ jobs:
           toolchain: ${{ matrix.rust }}
       - name: Cache youki
         uses: Swatinem/rust-cache@v1
-      - name: Cache Cgroups
+      - name: Cache cgroups
         uses: Swatinem/rust-cache@v1
         with:
           working-directory: ./cgroups
