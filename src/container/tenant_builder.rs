@@ -8,7 +8,7 @@ use std::{
     collections::HashMap,
     convert::TryFrom,
     fs,
-    os::unix::prelude::{RawFd},
+    os::unix::prelude::RawFd,
     path::{Path, PathBuf},
     str::FromStr,
 };
