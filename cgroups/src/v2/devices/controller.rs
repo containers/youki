@@ -6,9 +6,9 @@ use anyhow::Result;
 use super::*;
 use nix::fcntl::OFlag;
 use nix::sys::stat::Mode;
-use oci_spec::{LinuxDeviceCgroup, LinuxResources};
+use oci_spec::runtime::LinuxDeviceCgroup;
 
-use crate::common::{default_allow_devices, default_devices};
+use crate::common::{default_allow_devices, default_devices, ControllerOpt};
 use crate::v2::controller::Controller;
 
 const LICENSE: &'static str = &"Apache";
@@ -16,12 +16,12 @@ const LICENSE: &'static str = &"Apache";
 pub struct Devices {}
 
 impl Controller for Devices {
-    fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
+    fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()> {
         #[cfg(not(feature = "cgroupsv2_devices"))]
         return Ok(());
 
         #[cfg(feature = "cgroupsv2_devices")]
-        return Self::apply_devices(cgroup_root, &linux_resources.devices);
+        return Self::apply_devices(cgroup_root, &controller_opt.resources.devices);
     }
 }
 

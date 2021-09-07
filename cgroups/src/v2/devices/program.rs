@@ -1,5 +1,5 @@
 use anyhow::{bail, Result};
-use oci_spec::*;
+use oci_spec::runtime::*;
 
 use rbpf::disassembler::disassemble;
 use rbpf::insn_builder::Arch as RbpfArch;
