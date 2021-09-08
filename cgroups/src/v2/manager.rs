@@ -130,7 +130,6 @@ impl CgroupManager for Manager {
                 ControllerType::Io => Io::apply(controller_opt, &self.full_path)?,
                 ControllerType::Memory => Memory::apply(controller_opt, &self.full_path)?,
                 ControllerType::Pids => Pids::apply(controller_opt, &self.full_path)?,
-                ControllerType::Freezer => Freezer::apply(controller_opt, &self.full_path)?,
             }
         }
 
