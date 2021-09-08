@@ -2,8 +2,8 @@ use anyhow::{bail, Context, Result};
 use caps::Capability;
 use nix::unistd;
 use oci_spec::runtime::{
-    Capabilities as SpecCapabilities, LinuxCapabilities, LinuxNamespace, LinuxNamespaceType,
-    Process, Spec,
+    Capabilities as SpecCapabilities, Capability as SpecCapability, LinuxCapabilities,
+    LinuxNamespace, LinuxNamespaceType, Process, Spec,
 };
 use procfs::process::Namespace;
 
@@ -16,7 +16,7 @@ use std::{
     str::FromStr,
 };
 
-use crate::capabilities::from_cap;
+use crate::capabilities::CapabilityExt;
 use crate::{notify_socket::NotifySocket, rootless::Rootless, tty, utils};
 
 use super::{builder::ContainerBuilder, builder_impl::ContainerBuilderImpl, Container};
@@ -250,7 +250,8 @@ impl TenantContainerBuilder {
                 caps.push(Capability::from_str(cap)?);
             }
 
-            let caps: SpecCapabilities = caps.iter().map(|c| from_cap(*c)).collect();
+            let caps: SpecCapabilities =
+                caps.iter().map(|c| SpecCapability::from_cap(*c)).collect();
 
             if let Some(ref mut spec_caps) = spec
                 .process
