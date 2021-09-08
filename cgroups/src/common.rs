@@ -11,7 +11,6 @@ use nix::{
     unistd::Pid,
 };
 use oci_spec::runtime::{LinuxDevice, LinuxDeviceCgroup, LinuxDeviceType, LinuxResources};
-use procfs::process::Process;
 #[cfg(feature = "systemd_cgroups")]
 use systemd::daemon::booted;
 #[cfg(not(feature = "systemd_cgroups"))]
@@ -61,20 +60,27 @@ impl Display for CgroupSetup {
     }
 }
 
+/// FreezerState is given freezer contoller
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FreezerState {
+    /// Tasks in cgroup are undefined
     Undefined,
+    /// Tasks in cgroup are suspended.
     Frozen,
+    /// Tasks in cgroup are resuming.
     Thawed,
 }
 
+/// ControllerOpt is given all cgroup controller for applying cgroup configuration.
 #[derive(Clone, Debug, Default)]
 pub struct ControllerOpt {
+    /// Resources contain cgroup information for handling resource constraints for the container.
     pub resources: LinuxResources,
-    // Diables the OOM killer for out of memory conditions
+    /// Disables the OOM killer for out of memory conditions.
     pub disable_oom_killer: bool,
-    // Specify an oom_score_adj for container
+    /// Specify an oom_score_adj for container.
     pub oom_score_adj: Option<i32>,
+    /// FreezerState is given to freezer contoller for suspending process.
     pub freezer_state: Option<FreezerState>,
 }
 
