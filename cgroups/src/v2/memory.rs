@@ -97,8 +97,22 @@ impl Memory {
                     bail!("invalid swap value: {}", swap);
                 }
                 Some(swap) => {
-                    Memory::set(path.join(CGROUP_MEMORY_SWAP), swap)?;
-                    Memory::set(path.join(CGROUP_MEMORY_MAX), limit)?;
+                    // -1 means max
+                    if swap == -1 || limit == -1 {
+                        Memory::set(path.join(CGROUP_MEMORY_SWAP), swap)?;
+                        Memory::set(path.join(CGROUP_MEMORY_MAX), limit)?;
+                    } else {
+                        if swap < limit {
+                            bail!("swap memory ({}) should be bigger than memory limit ({})", swap, limit);
+                        }
+    
+                        // In cgroup v1 swap is memory+swap, but in cgroup v2 swap is
+                        // a separate value, so the swap value in the runtime spec needs 
+                        // to be converted from the cgroup v1 value to the cgroup v2 value 
+                        // by subtracting limit from swap
+                        Memory::set(path.join(CGROUP_MEMORY_SWAP), swap - limit)?;
+                        Memory::set(path.join(CGROUP_MEMORY_MAX), limit)?;
+                    }               
                 }
                 None => {
                     if limit == -1 {
@@ -158,7 +172,7 @@ mod tests {
         assert_eq!(limit_content, limit.to_string());
 
         let swap_content = read_to_string(tmp.join(CGROUP_MEMORY_SWAP)).expect("read swap limit");
-        assert_eq!(swap_content, swap.to_string());
+        assert_eq!(swap_content, (swap - limit).to_string());
 
         let reservation_content =
             read_to_string(tmp.join(CGROUP_MEMORY_LOW)).expect("read memory reservation");
@@ -286,6 +300,11 @@ mod tests {
                 if linux_memory.limit.is_none() {
                     return result.is_err();
                 }
+                if let Some(limit) = linux_memory.limit {
+                    if limit != -1 && swap != -1 && swap < limit {
+                        return result.is_err();
+                    }
+                }
             }
 
             if let Some(reservation) = linux_memory.reservation {
@@ -306,7 +325,17 @@ mod tests {
             let swap_content = read_to_string(tmp.join(CGROUP_MEMORY_SWAP)).expect("read swap limit to string");
             let swap_check = match linux_memory.swap {
                 Some(swap) if swap == -1 => swap_content == "max",
-                Some(swap) => swap_content == swap.to_string(),
+                Some(swap) => {
+                    if let Some(limit) = linux_memory.limit {
+                        if limit == -1 {
+                            swap_content == swap.to_string()
+                        } else {
+                            swap_content == (swap - linux_memory.limit.unwrap()).to_string()
+                        }                     
+                    } else {
+                        false
+                    }
+                }
                 None => {
                     match linux_memory.limit {
                         Some(limit) if limit == -1 => swap_content == "max",
