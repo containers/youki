@@ -138,13 +138,12 @@ impl CgroupManager for Manager {
         Devices::apply(controller_opt, &self.cgroup_path)?;
 
         for pseudoctlr in PSEUDO_CONTROLLER_TYPES {
-            match pseudoctlr {
-                PseudoControllerType::Unified => Unified::apply(
+            if let PseudoControllerType::Unified = pseudoctlr {
+                Unified::apply(
                     controller_opt,
                     &self.cgroup_path,
                     self.get_available_controllers()?,
-                )?,
-                _ => {}
+                )?
             }
         }
 

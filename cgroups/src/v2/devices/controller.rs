@@ -11,7 +11,7 @@ use oci_spec::runtime::LinuxDeviceCgroup;
 use crate::common::{default_allow_devices, default_devices, ControllerOpt};
 use crate::v2::controller::Controller;
 
-const LICENSE: &'static str = &"Apache";
+const LICENSE: &str = "Apache";
 
 pub struct Devices {}
 

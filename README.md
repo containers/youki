@@ -133,6 +133,7 @@ We can edit the `config.json` to add customized behaviors for container. Here, w
 
 Then we can explore the lifecycle of a container:
 ```sh
+$ cd ..                                                # go back to the repository root
 $ sudo ./youki create -b tutorial tutorial_container   # create a container with name `tutorial_container`
 $ sudo ./youki state tutorial_container                # you can see the state the container is `created`
 $ sudo ./youki start tutorial_container                # start the container

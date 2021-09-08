@@ -46,9 +46,7 @@ impl Unified {
 #[cfg(test)]
 mod tests {
     use std::array::IntoIter;
-    use std::collections::HashMap;
     use std::fs;
-    use std::iter::FromIterator;
 
     use oci_spec::runtime::LinuxResources;
 
@@ -65,13 +63,16 @@ mod tests {
         let cpu_weight_path = set_fixture(&tmp, "cpu.weight", "").unwrap();
 
         let resources = LinuxResources {
-            unified: Some(HashMap::<_, _>::from_iter(IntoIter::new([
-                (
-                    "hugetlb.1GB.limit_in_bytes".to_owned(),
-                    "72348034".to_owned(),
-                ),
-                ("cpu.weight".to_owned(), "5000".to_owned()),
-            ]))),
+            unified: Some(
+                IntoIter::new([
+                    (
+                        "hugetlb.1GB.limit_in_bytes".to_owned(),
+                        "72348034".to_owned(),
+                    ),
+                    ("cpu.weight".to_owned(), "5000".to_owned()),
+                ])
+                .collect(),
+            ),
             ..Default::default()
         };
 
@@ -97,13 +98,16 @@ mod tests {
             create_temp_dir("test_set_unified_failed_to_write_subsystem_not_enabled").unwrap();
 
         let resources = LinuxResources {
-            unified: Some(HashMap::<_, _>::from_iter(IntoIter::new([
-                (
-                    "hugetlb.1GB.limit_in_bytes".to_owned(),
-                    "72348034".to_owned(),
-                ),
-                ("cpu.weight".to_owned(), "5000".to_owned()),
-            ]))),
+            unified: Some(
+                IntoIter::new([
+                    (
+                        "hugetlb.1GB.limit_in_bytes".to_owned(),
+                        "72348034".to_owned(),
+                    ),
+                    ("cpu.weight".to_owned(), "5000".to_owned()),
+                ])
+                .collect(),
+            ),
             ..Default::default()
         };
 
@@ -125,13 +129,16 @@ mod tests {
         let tmp = create_temp_dir("test_set_unified_failed_to_write_subsystem_enabled").unwrap();
 
         let resources = LinuxResources {
-            unified: Some(HashMap::<_, _>::from_iter(IntoIter::new([
-                (
-                    "hugetlb.1GB.limit_in_bytes".to_owned(),
-                    "72348034".to_owned(),
-                ),
-                ("cpu.weight".to_owned(), "5000".to_owned()),
-            ]))),
+            unified: Some(
+                IntoIter::new([
+                    (
+                        "hugetlb.1GB.limit_in_bytes".to_owned(),
+                        "72348034".to_owned(),
+                    ),
+                    ("cpu.weight".to_owned(), "5000".to_owned()),
+                ])
+                .collect(),
+            ),
             ..Default::default()
         };
 
