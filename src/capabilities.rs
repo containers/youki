@@ -180,7 +180,7 @@ mod tests {
     fn test_convert_oci_spec_to_caps_type() {
         let chown = oci_spec::runtime::Capability::Chown;
 
-        let cap = to_cap(chown);
+        let cap = chown.to_cap();
         assert_eq!(cap, Capability::CAP_CHOWN);
     }
 }
