@@ -100,19 +100,22 @@ impl Memory {
                     // -1 means max
                     if swap == -1 || limit == -1 {
                         Memory::set(path.join(CGROUP_MEMORY_SWAP), swap)?;
-                        Memory::set(path.join(CGROUP_MEMORY_MAX), limit)?;
                     } else {
                         if swap < limit {
-                            bail!("swap memory ({}) should be bigger than memory limit ({})", swap, limit);
+                            bail!(
+                                "swap memory ({}) should be bigger than memory limit ({})",
+                                swap,
+                                limit
+                            );
                         }
-    
+
                         // In cgroup v1 swap is memory+swap, but in cgroup v2 swap is
-                        // a separate value, so the swap value in the runtime spec needs 
-                        // to be converted from the cgroup v1 value to the cgroup v2 value 
+                        // a separate value, so the swap value in the runtime spec needs
+                        // to be converted from the cgroup v1 value to the cgroup v2 value
                         // by subtracting limit from swap
                         Memory::set(path.join(CGROUP_MEMORY_SWAP), swap - limit)?;
-                        Memory::set(path.join(CGROUP_MEMORY_MAX), limit)?;
-                    }               
+                    }
+                    Memory::set(path.join(CGROUP_MEMORY_MAX), limit)?;
                 }
                 None => {
                     if limit == -1 {
@@ -331,7 +334,7 @@ mod tests {
                             swap_content == swap.to_string()
                         } else {
                             swap_content == (swap - linux_memory.limit.unwrap()).to_string()
-                        }                     
+                        }
                     } else {
                         false
                     }
