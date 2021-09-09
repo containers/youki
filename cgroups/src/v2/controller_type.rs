@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ControllerType {
     Cpu,
     CpuSet,
@@ -33,6 +34,7 @@ pub const CONTROLLER_TYPES: &[ControllerType] = &[
     ControllerType::Pids,
 ];
 
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PseudoControllerType {
     Devices,
     Freezer,
