@@ -212,9 +212,9 @@ fn bind_dev(rootfs: &Path, dev: &LinuxDevice) -> Result<()> {
     )?;
     close(fd)?;
     nix_mount(
-        Some(&full_container_path),
-        &dev.path,
-        None::<&str>,
+        Some(&dev.path),
+        &full_container_path,
+        Some("bind"),
         MsFlags::MS_BIND,
         None::<&str>,
     )?;
