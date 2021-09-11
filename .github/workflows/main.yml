@@ -23,6 +23,7 @@ jobs:
             ./cgroups: cgroups/*
   check:
     needs: [changes]
+    if: ${{ !contains(needs.changes.outputs.dirs, '[]') }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
