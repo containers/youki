@@ -179,179 +179,359 @@ mod tests {
     #[test]
     fn test_convert_oci_spec_to_caps_type() {
         struct Testcase {
-            want: CapsCapability,
             input: SpecCapability,
+            want: CapsCapability,
         }
 
         let tests = vec![
             Testcase {
-                input: oci_spec::runtime::Capability::AuditControl,
+                input: SpecCapability::AuditControl,
                 want: CapsCapability::CAP_AUDIT_CONTROL,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::AuditRead,
+                input: SpecCapability::AuditRead,
                 want: CapsCapability::CAP_AUDIT_READ,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::AuditWrite,
+                input: SpecCapability::AuditWrite,
                 want: CapsCapability::CAP_AUDIT_WRITE,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::BlockSuspend,
+                input: SpecCapability::BlockSuspend,
                 want: CapsCapability::CAP_BLOCK_SUSPEND,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::Bpf,
+                input: SpecCapability::Bpf,
                 want: CapsCapability::CAP_BPF,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::CheckpointRestore,
+                input: SpecCapability::CheckpointRestore,
                 want: CapsCapability::CAP_CHECKPOINT_RESTORE,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::Chown,
+                input: SpecCapability::Chown,
                 want: Capability::CAP_CHOWN,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::DacOverride,
+                input: SpecCapability::DacOverride,
                 want: CapsCapability::CAP_DAC_OVERRIDE,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::DacReadSearch,
+                input: SpecCapability::DacReadSearch,
                 want: CapsCapability::CAP_DAC_READ_SEARCH,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::Fowner,
+                input: SpecCapability::Fowner,
                 want: CapsCapability::CAP_FOWNER,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::Fsetid,
+                input: SpecCapability::Fsetid,
                 want: CapsCapability::CAP_FSETID,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::IpcLock,
+                input: SpecCapability::IpcLock,
                 want: CapsCapability::CAP_IPC_LOCK,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::IpcOwner,
+                input: SpecCapability::IpcOwner,
                 want: CapsCapability::CAP_IPC_OWNER,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::Kill,
+                input: SpecCapability::Kill,
                 want: CapsCapability::CAP_KILL,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::Lease,
+                input: SpecCapability::Lease,
                 want: CapsCapability::CAP_LEASE,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::LinuxImmutable,
+                input: SpecCapability::LinuxImmutable,
                 want: CapsCapability::CAP_LINUX_IMMUTABLE,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::MacAdmin,
+                input: SpecCapability::MacAdmin,
                 want: CapsCapability::CAP_MAC_ADMIN,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::MacOverride,
+                input: SpecCapability::MacOverride,
                 want: CapsCapability::CAP_MAC_OVERRIDE,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::Mknod,
+                input: SpecCapability::Mknod,
                 want: CapsCapability::CAP_MKNOD,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::NetAdmin,
+                input: SpecCapability::NetAdmin,
                 want: CapsCapability::CAP_NET_ADMIN,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::NetBindService,
+                input: SpecCapability::NetBindService,
                 want: CapsCapability::CAP_NET_BIND_SERVICE,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::NetBroadcast,
+                input: SpecCapability::NetBroadcast,
                 want: CapsCapability::CAP_NET_BROADCAST,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::NetRaw,
+                input: SpecCapability::NetRaw,
                 want: CapsCapability::CAP_NET_RAW,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::Perfmon,
+                input: SpecCapability::Perfmon,
                 want: CapsCapability::CAP_PERFMON,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::Setgid,
+                input: SpecCapability::Setgid,
                 want: CapsCapability::CAP_SETGID,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::Setfcap,
+                input: SpecCapability::Setfcap,
                 want: CapsCapability::CAP_SETFCAP,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::Setpcap,
+                input: SpecCapability::Setpcap,
                 want: CapsCapability::CAP_SETPCAP,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::Setuid,
+                input: SpecCapability::Setuid,
                 want: CapsCapability::CAP_SETUID,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::SysAdmin,
+                input: SpecCapability::SysAdmin,
                 want: CapsCapability::CAP_SYS_ADMIN,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::SysBoot,
+                input: SpecCapability::SysBoot,
                 want: CapsCapability::CAP_SYS_BOOT,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::SysChroot,
+                input: SpecCapability::SysChroot,
                 want: CapsCapability::CAP_SYS_CHROOT,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::SysModule,
+                input: SpecCapability::SysModule,
                 want: CapsCapability::CAP_SYS_MODULE,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::SysNice,
+                input: SpecCapability::SysNice,
                 want: CapsCapability::CAP_SYS_NICE,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::SysPacct,
+                input: SpecCapability::SysPacct,
                 want: CapsCapability::CAP_SYS_PACCT,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::SysPtrace,
+                input: SpecCapability::SysPtrace,
                 want: CapsCapability::CAP_SYS_PTRACE,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::SysRawio,
+                input: SpecCapability::SysRawio,
                 want: CapsCapability::CAP_SYS_RAWIO,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::SysResource,
+                input: SpecCapability::SysResource,
                 want: CapsCapability::CAP_SYS_RESOURCE,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::SysTime,
+                input: SpecCapability::SysTime,
                 want: CapsCapability::CAP_SYS_TIME,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::SysTtyConfig,
+                input: SpecCapability::SysTtyConfig,
                 want: CapsCapability::CAP_SYS_TTY_CONFIG,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::Syslog,
+                input: SpecCapability::Syslog,
                 want: CapsCapability::CAP_SYSLOG,
             },
             Testcase {
-                input: oci_spec::runtime::Capability::WakeAlarm,
+                input: SpecCapability::WakeAlarm,
                 want: CapsCapability::CAP_WAKE_ALARM,
             },
         ];
 
         for test in tests {
             let got = test.input.to_cap();
+            assert_eq!(got, test.want);
+        }
+    }
+
+    #[test]
+    fn test_convert_caps_type_to_oci_spec() {
+        struct Testcase {
+            input: CapsCapability,
+            want: SpecCapability,
+        }
+
+        let tests = vec![
+            Testcase {
+                input: CapsCapability::CAP_AUDIT_CONTROL,
+                want: SpecCapability::AuditControl,
+            },
+            Testcase {
+                input: CapsCapability::CAP_AUDIT_READ,
+                want: SpecCapability::AuditRead,
+            },
+            Testcase {
+                input: CapsCapability::CAP_AUDIT_WRITE,
+                want: SpecCapability::AuditWrite,
+            },
+            Testcase {
+                input: CapsCapability::CAP_BLOCK_SUSPEND,
+                want: SpecCapability::BlockSuspend,
+            },
+            Testcase {
+                input: CapsCapability::CAP_BPF,
+                want: SpecCapability::Bpf,
+            },
+            Testcase {
+                input: CapsCapability::CAP_CHECKPOINT_RESTORE,
+                want: SpecCapability::CheckpointRestore,
+            },
+            Testcase {
+                input: CapsCapability::CAP_CHOWN,
+                want: SpecCapability::Chown,
+            },
+            Testcase {
+                input: CapsCapability::CAP_DAC_OVERRIDE,
+                want: SpecCapability::DacOverride,
+            },
+            Testcase {
+                input: CapsCapability::CAP_DAC_READ_SEARCH,
+                want: SpecCapability::DacReadSearch,
+            },
+            Testcase {
+                input: CapsCapability::CAP_FOWNER,
+                want: SpecCapability::Fowner,
+            },
+            Testcase {
+                input: CapsCapability::CAP_FSETID,
+                want: SpecCapability::Fsetid,
+            },
+            Testcase {
+                input: CapsCapability::CAP_IPC_LOCK,
+                want: SpecCapability::IpcLock,
+            },
+            Testcase {
+                input: CapsCapability::CAP_IPC_OWNER,
+                want: SpecCapability::IpcOwner,
+            },
+            Testcase {
+                input: CapsCapability::CAP_KILL,
+                want: SpecCapability::Kill,
+            },
+            Testcase {
+                input: CapsCapability::CAP_LEASE,
+                want: SpecCapability::Lease,
+            },
+            Testcase {
+                input: CapsCapability::CAP_LINUX_IMMUTABLE,
+                want: SpecCapability::LinuxImmutable,
+            },
+            Testcase {
+                input: CapsCapability::CAP_MAC_ADMIN,
+                want: SpecCapability::MacAdmin,
+            },
+            Testcase {
+                input: CapsCapability::CAP_MAC_OVERRIDE,
+                want: SpecCapability::MacOverride,
+            },
+            Testcase {
+                input: CapsCapability::CAP_MKNOD,
+                want: SpecCapability::Mknod,
+            },
+            Testcase {
+                input: CapsCapability::CAP_NET_ADMIN,
+                want: SpecCapability::NetAdmin,
+            },
+            Testcase {
+                input: CapsCapability::CAP_NET_BIND_SERVICE,
+                want: SpecCapability::NetBindService,
+            },
+            Testcase {
+                input: CapsCapability::CAP_NET_BROADCAST,
+                want: SpecCapability::NetBroadcast,
+            },
+            Testcase {
+                input: CapsCapability::CAP_NET_RAW,
+                want: SpecCapability::NetRaw,
+            },
+            Testcase {
+                input: CapsCapability::CAP_PERFMON,
+                want: SpecCapability::Perfmon,
+            },
+            Testcase {
+                input: CapsCapability::CAP_SETGID,
+                want: SpecCapability::Setgid,
+            },
+            Testcase {
+                input: CapsCapability::CAP_SETFCAP,
+                want: SpecCapability::Setfcap,
+            },
+            Testcase {
+                input: CapsCapability::CAP_SETPCAP,
+                want: SpecCapability::Setpcap,
+            },
+            Testcase {
+                input: CapsCapability::CAP_SETUID,
+                want: SpecCapability::Setuid,
+            },
+            Testcase {
+                input: CapsCapability::CAP_SYS_ADMIN,
+                want: SpecCapability::SysAdmin,
+            },
+            Testcase {
+                input: CapsCapability::CAP_SYS_BOOT,
+                want: SpecCapability::SysBoot,
+            },
+            Testcase {
+                input: CapsCapability::CAP_SYS_CHROOT,
+                want: SpecCapability::SysChroot,
+            },
+            Testcase {
+                input: CapsCapability::CAP_SYS_MODULE,
+                want: SpecCapability::SysModule,
+            },
+            Testcase {
+                input: CapsCapability::CAP_SYS_NICE,
+                want: SpecCapability::SysNice,
+            },
+            Testcase {
+                input: CapsCapability::CAP_SYS_PACCT,
+                want: SpecCapability::SysPacct,
+            },
+            Testcase {
+                input: CapsCapability::CAP_SYS_PTRACE,
+                want: SpecCapability::SysPtrace,
+            },
+            Testcase {
+                input: CapsCapability::CAP_SYS_RAWIO,
+                want: SpecCapability::SysRawio,
+            },
+            Testcase {
+                input: CapsCapability::CAP_SYS_RESOURCE,
+                want: SpecCapability::SysResource,
+            },
+            Testcase {
+                input: CapsCapability::CAP_SYS_TIME,
+                want: SpecCapability::SysTime,
+            },
+            Testcase {
+                input: CapsCapability::CAP_SYS_TTY_CONFIG,
+                want: SpecCapability::SysTtyConfig,
+            },
+            Testcase {
+                input: CapsCapability::CAP_SYSLOG,
+                want: SpecCapability::Syslog,
+            },
+            Testcase {
+                input: CapsCapability::CAP_WAKE_ALARM,
+                want: SpecCapability::WakeAlarm,
+            },
+        ];
+
+        for test in tests {
+            let got = SpecCapability::from_cap(test.input);
             assert_eq!(got, test.want);
         }
     }
