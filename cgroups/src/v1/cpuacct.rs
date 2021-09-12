@@ -1,10 +1,9 @@
 use std::path::Path;
 
 use anyhow::{bail, Context, Result};
-use oci_spec::LinuxResources;
 
 use crate::{
-    common,
+    common::{self, ControllerOpt},
     stats::{CpuUsage, StatsProvider},
 };
 
@@ -24,11 +23,11 @@ pub struct CpuAcct {}
 impl Controller for CpuAcct {
     type Resource = ();
 
-    fn apply(_linux_resources: &LinuxResources, _cgroup_path: &Path) -> Result<()> {
+    fn apply(_controller_opt: &ControllerOpt, _cgroup_path: &Path) -> Result<()> {
         Ok(())
     }
 
-    fn needs_to_handle(_linux_resources: &LinuxResources) -> Option<&Self::Resource> {
+    fn needs_to_handle(_controller_opt: &ControllerOpt) -> Option<&Self::Resource> {
         None
     }
 }

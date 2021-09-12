@@ -1,20 +1,19 @@
 use std::path::Path;
 
 use anyhow::{Context, Result};
-use oci_spec::LinuxResources;
 
 use super::controller_type::ControllerType;
-use crate::common;
+use crate::common::{self, ControllerOpt};
 
 pub struct Unified {}
 
 impl Unified {
     pub fn apply(
-        linux_resources: &LinuxResources,
+        controller_opt: &ControllerOpt,
         cgroup_path: &Path,
         controllers: Vec<ControllerType>,
     ) -> Result<()> {
-        if let Some(unified) = &linux_resources.unified {
+        if let Some(unified) = &controller_opt.resources.unified {
             log::debug!("Apply unified cgroup config");
             for (cgroup_file, value) in unified {
                 common::write_cgroup_file_str(cgroup_path.join(cgroup_file), value).map_err(
@@ -49,6 +48,8 @@ mod tests {
     use std::array::IntoIter;
     use std::fs;
 
+    use oci_spec::runtime::LinuxResources;
+
     use crate::test::{create_temp_dir, set_fixture};
     use crate::v2::controller_type::ControllerType;
 
@@ -75,8 +76,13 @@ mod tests {
             ..Default::default()
         };
 
+        let controller_opt = ControllerOpt {
+            resources,
+            ..Default::default()
+        };
+
         // act
-        Unified::apply(&resources, &tmp, vec![]).expect("apply unified");
+        Unified::apply(&controller_opt, &tmp, vec![]).expect("apply unified");
 
         // assert
         let hugetlb_limit = fs::read_to_string(hugetlb_limit_path).expect("read hugetlb limit");
@@ -105,8 +111,13 @@ mod tests {
             ..Default::default()
         };
 
+        let controller_opt = ControllerOpt {
+            resources,
+            ..Default::default()
+        };
+
         // act
-        let result = Unified::apply(&resources, &tmp, vec![]);
+        let result = Unified::apply(&controller_opt, &tmp, vec![]);
 
         // assert
         assert!(result.is_err());
@@ -131,9 +142,14 @@ mod tests {
             ..Default::default()
         };
 
+        let controller_opt = ControllerOpt {
+            resources,
+            ..Default::default()
+        };
+
         // act
         let result = Unified::apply(
-            &resources,
+            &controller_opt,
             &tmp,
             vec![ControllerType::HugeTlb, ControllerType::Cpu],
         );

@@ -3,18 +3,18 @@ use std::path::Path;
 use anyhow::{Context, Result};
 
 use super::Controller;
-use crate::common;
-use oci_spec::{LinuxNetwork, LinuxResources};
+use crate::common::{self, ControllerOpt};
+use oci_spec::runtime::LinuxNetwork;
 
 pub struct NetworkClassifier {}
 
 impl Controller for NetworkClassifier {
     type Resource = LinuxNetwork;
 
-    fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
+    fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply NetworkClassifier cgroup config");
 
-        if let Some(network) = Self::needs_to_handle(linux_resources) {
+        if let Some(network) = Self::needs_to_handle(controller_opt) {
             Self::apply(cgroup_root, network)
                 .context("failed to apply network classifier resource restrictions")?;
         }
@@ -22,8 +22,8 @@ impl Controller for NetworkClassifier {
         Ok(())
     }
 
-    fn needs_to_handle(linux_resources: &LinuxResources) -> Option<&Self::Resource> {
-        if let Some(network) = linux_resources.network.as_ref() {
+    fn needs_to_handle(controller_opt: &ControllerOpt) -> Option<&Self::Resource> {
+        if let Some(network) = controller_opt.resources.network.as_ref() {
             return Some(network);
         }
 

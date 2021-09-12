@@ -10,7 +10,7 @@ use nix::{
     unistd::{Gid, Uid},
 };
 
-use oci_spec::LinuxRlimit;
+use oci_spec::runtime::LinuxRlimit;
 
 use crate::syscall::{linux::LinuxSyscall, test::TestHelperSyscall};
 

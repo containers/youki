@@ -7,8 +7,7 @@ use nix::{
     sys::statfs,
     unistd::{self, Gid, Uid},
 };
-use oci_spec::User;
-use oci_spec::{LinuxNamespaceType, Spec};
+use oci_spec::runtime::{LinuxNamespaceType, Spec, User};
 use std::collections::HashMap;
 use std::{
     env,
@@ -396,7 +395,8 @@ pub fn container_init(
         }
     }
 
-    let do_chdir = if proc.cwd.is_empty() {
+    let cwd = format!("{}", proc.cwd.display());
+    let do_chdir = if cwd.is_empty() {
         false
     } else {
         // This chdir must run before setting up the user.
@@ -466,7 +466,8 @@ pub fn container_init(
 
     // change directory to process.cwd if process.cwd is not empty
     if do_chdir {
-        unistd::chdir(&*proc.cwd).with_context(|| format!("Failed to chdir {}", proc.cwd))?;
+        unistd::chdir(&*proc.cwd)
+            .with_context(|| format!("Failed to chdir {}", proc.cwd.display()))?;
     }
 
     // Reset the process env based on oci spec.

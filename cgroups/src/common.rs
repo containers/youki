@@ -10,7 +10,7 @@ use nix::{
     sys::statfs::{statfs, CGROUP2_SUPER_MAGIC, TMPFS_MAGIC},
     unistd::Pid,
 };
-use oci_spec::{FreezerState, LinuxDevice, LinuxDeviceCgroup, LinuxDeviceType, LinuxResources};
+use oci_spec::runtime::{LinuxDevice, LinuxDeviceCgroup, LinuxDeviceType, LinuxResources};
 #[cfg(feature = "systemd_cgroups")]
 use systemd::daemon::booted;
 #[cfg(not(feature = "systemd_cgroups"))]
@@ -30,7 +30,7 @@ pub trait CgroupManager {
     /// Adds a task specified by its pid to the cgroup
     fn add_task(&self, pid: Pid) -> Result<()>;
     /// Applies resource restrictions to the cgroup
-    fn apply(&self, linux_resources: &LinuxResources) -> Result<()>;
+    fn apply(&self, controller_opt: &ControllerOpt) -> Result<()>;
     /// Removes the cgroup
     fn remove(&self) -> Result<()>;
     // Sets the freezer cgroup to the specified state
@@ -58,6 +58,30 @@ impl Display for CgroupSetup {
 
         write!(f, "{}", print)
     }
+}
+
+/// FreezerState is given freezer contoller
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FreezerState {
+    /// Tasks in cgroup are undefined
+    Undefined,
+    /// Tasks in cgroup are suspended.
+    Frozen,
+    /// Tasks in cgroup are resuming.
+    Thawed,
+}
+
+/// ControllerOpt is given all cgroup controller for applying cgroup configuration.
+#[derive(Clone, Debug, Default)]
+pub struct ControllerOpt {
+    /// Resources contain cgroup information for handling resource constraints for the container.
+    pub resources: LinuxResources,
+    /// Disables the OOM killer for out of memory conditions.
+    pub disable_oom_killer: bool,
+    /// Specify an oom_score_adj for container.
+    pub oom_score_adj: Option<i32>,
+    /// FreezerState is given to freezer contoller for suspending process.
+    pub freezer_state: Option<FreezerState>,
 }
 
 #[inline]

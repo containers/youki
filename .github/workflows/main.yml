@@ -23,10 +23,11 @@ jobs:
             ./cgroups: cgroups/*
   check:
     needs: [changes]
+    if: ${{ !contains(needs.changes.outputs.dirs, '[]') }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust: [stable]
+        rust: [1.55.0, 1.54.0]
         dirs: ${{ fromJSON(needs.changes.outputs.dirs) }}
     steps:
       - uses: actions/checkout@v2
@@ -53,7 +54,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust: [1.54.0]
+        rust: [1.55.0, 1.54.0]
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -121,7 +122,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust: [1.54.0]
+        rust: [1.55.0, 1.54.0]
     steps:
       - uses: actions/checkout@v2
         with:

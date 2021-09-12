@@ -6,10 +6,10 @@ use anyhow::{anyhow, bail, Result};
 use nix::errno::Errno;
 
 use super::Controller;
-use crate::common::{self};
+use crate::common::{self, ControllerOpt};
 use crate::stats::{self, parse_single_value, MemoryData, MemoryStats, StatsProvider};
 
-use oci_spec::{LinuxMemory, LinuxResources};
+use oci_spec::runtime::LinuxMemory;
 
 const CGROUP_MEMORY_SWAP_LIMIT: &str = "memory.memsw.limit_in_bytes";
 const CGROUP_MEMORY_LIMIT: &str = "memory.limit_in_bytes";
@@ -48,10 +48,10 @@ pub struct Memory {}
 impl Controller for Memory {
     type Resource = LinuxMemory;
 
-    fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
+    fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply Memory cgroup config");
 
-        if let Some(memory) = Self::needs_to_handle(linux_resources) {
+        if let Some(memory) = Self::needs_to_handle(controller_opt) {
             let reservation = memory.reservation.unwrap_or(0);
 
             Self::apply(memory, cgroup_root)?;
@@ -63,7 +63,7 @@ impl Controller for Memory {
                 )?;
             }
 
-            if linux_resources.disable_oom_killer {
+            if controller_opt.disable_oom_killer {
                 common::write_cgroup_file(cgroup_root.join(CGROUP_MEMORY_OOM_CONTROL), 0)?;
             } else {
                 common::write_cgroup_file(cgroup_root.join(CGROUP_MEMORY_OOM_CONTROL), 1)?;
@@ -101,8 +101,8 @@ impl Controller for Memory {
         Ok(())
     }
 
-    fn needs_to_handle(linux_resources: &LinuxResources) -> Option<&Self::Resource> {
-        if let Some(memory) = &linux_resources.memory {
+    fn needs_to_handle(controller_opt: &ControllerOpt) -> Option<&Self::Resource> {
+        if let Some(memory) = &controller_opt.resources.memory {
             return Some(memory);
         }
 
@@ -324,7 +324,7 @@ mod tests {
     use super::*;
     use crate::common::CGROUP_PROCS;
     use crate::test::{create_temp_dir, set_fixture};
-    use oci_spec::LinuxMemory;
+    use oci_spec::runtime::{LinuxMemory, LinuxResources};
 
     #[test]
     fn test_set_memory() {
@@ -440,24 +440,28 @@ mod tests {
 
 
             // clone to avoid use of moved value later on
-            let memory_limits = linux_memory.clone();
+            let memory_limits = linux_memory;
 
             let linux_resources = LinuxResources {
                 devices: Some(vec![]),
-                disable_oom_killer,
-                oom_score_adj: None, // current unused
                 memory: Some(linux_memory),
                 cpu: None,
                 pids: None,
                 block_io: None,
                 hugepage_limits: Some(vec![]),
                 network: None,
-                freezer: None,
                 rdma: None,
                 unified: None,
             };
 
-            let result = <Memory as Controller>::apply(&linux_resources, &tmp);
+        let controller_opt = ControllerOpt {
+            resources: linux_resources,
+            disable_oom_killer,
+            ..Default::default()
+        };
+
+            let result = <Memory as Controller>::apply(&controller_opt, &tmp);
+
 
             if result.is_err() {
                 if let Some(swappiness) = memory_limits.swappiness {

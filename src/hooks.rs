@@ -1,6 +1,6 @@
 use anyhow::{bail, Context, Result};
 use nix::{sys::signal, unistd::Pid};
-use oci_spec::Hook;
+use oci_spec::runtime::Hook;
 use std::{
     collections::HashMap, fmt, io::ErrorKind, io::Write, os::unix::prelude::CommandExt, process,
     thread, time,
@@ -138,7 +138,19 @@ mod test {
     use super::*;
     use anyhow::{bail, Result};
     use serial_test::serial;
-    use std::path::PathBuf;
+    use std::{env, fs, path::PathBuf};
+
+    fn is_command_in_path(program: &str) -> bool {
+        if let Ok(path) = env::var("PATH") {
+            for p in path.split(':') {
+                let p_str = format!("{}/{}", p, program);
+                if fs::metadata(p_str).is_ok() {
+                    return true;
+                }
+            }
+        }
+        false
+    }
 
     // Note: the run_hook will require the use of pipe to write the container
     // state into stdin of the hook command. When cargo test runs these tests in
@@ -156,26 +168,31 @@ mod test {
         }
 
         {
+            assert!(is_command_in_path("true"), "The true was not found.");
             let default_container: Container = Default::default();
             let hook = Hook {
-                path: PathBuf::from("/bin/true"),
+                path: PathBuf::from("true"),
                 args: None,
                 env: None,
                 timeout: None,
             };
             let hooks = Some(vec![hook]);
-            run_hooks(hooks.as_ref(), Some(&default_container)).context("Failed /bin/true")?;
+            run_hooks(hooks.as_ref(), Some(&default_container)).context("Failed true")?;
         }
 
         {
+            assert!(
+                is_command_in_path("printenv"),
+                "The printenv was not found."
+            );
             // Use `printenv` to make sure the environment is set correctly.
             let default_container: Container = Default::default();
             let hook = Hook {
-                path: PathBuf::from("/usr/bin/bash"),
+                path: PathBuf::from("bash"),
                 args: Some(vec![
                     String::from("bash"),
                     String::from("-c"),
-                    String::from("/usr/bin/printenv key > /dev/null"),
+                    String::from("printenv key > /dev/null"),
                 ]),
                 env: Some(vec![String::from("key=value")]),
                 timeout: None,

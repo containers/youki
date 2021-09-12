@@ -1,5 +1,5 @@
 use anyhow::Result;
-use oci_spec::*;
+use oci_spec::runtime::{LinuxDeviceCgroup, LinuxDeviceType};
 
 // For cgroup v1 compatiblity, runc implements a device emulator to caculate the final rules given
 // a list of user-defined rules.
@@ -28,17 +28,17 @@ impl Emulator {
         }
     }
 
-    pub fn add_rules(&mut self, rules: &[oci_spec::LinuxDeviceCgroup]) -> Result<()> {
+    pub fn add_rules(&mut self, rules: &[LinuxDeviceCgroup]) -> Result<()> {
         for rule in rules {
             self.add_rule(rule)?;
         }
         Ok(())
     }
 
-    pub fn add_rule(&mut self, rule: &oci_spec::LinuxDeviceCgroup) -> Result<()> {
+    pub fn add_rule(&mut self, rule: &LinuxDeviceCgroup) -> Result<()> {
         // special case, switch to blacklist or whitelist and clear all existing rules
         // NOTE: we ignore other fields when type='a', this is same as cgroup v1 and runc
-        if rule.typ.unwrap_or_default() == oci_spec::LinuxDeviceType::A {
+        if rule.typ.unwrap_or_default() == LinuxDeviceType::A {
             self.default_allow = rule.allow;
             self.rules.clear();
             return Ok(());
