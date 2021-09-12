@@ -1,7 +1,7 @@
 use crate::{
     hooks,
     notify_socket::NotifyListener,
-    process::{channel, fork, init},
+    process::{args::ContainerArgs, channel, fork, intermediate},
     rootless::{self, Rootless},
     syscall::linux::LinuxSyscall,
     utils,
@@ -97,10 +97,10 @@ impl<'a> ContainerBuilderImpl<'a> {
             prctl::set_dumpable(false).unwrap();
         }
 
-        // This init_args will be passed to the container init process,
+        // This intermediate_args will be passed to the container intermediate process,
         // therefore we will have to move all the variable by value. Since self
         // is a shared reference, we have to clone these variables here.
-        let init_args = init::ContainerInitArgs {
+        let intermediate_args = ContainerArgs {
             init: self.init,
             syscall: self.syscall.clone(),
             spec: self.spec.clone(),
@@ -121,7 +121,11 @@ impl<'a> ContainerBuilderImpl<'a> {
                 .close()
                 .context("Failed to close unused receiver")?;
 
-            init::container_intermediate(init_args, receiver_from_main, sender_to_main)
+            intermediate::container_intermediate(
+                intermediate_args,
+                receiver_from_main,
+                sender_to_main,
+            )
         })?;
         // Close down unused fds. The corresponding fds are duplicated to the
         // child process during fork.
