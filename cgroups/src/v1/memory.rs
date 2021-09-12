@@ -51,7 +51,7 @@ impl Controller for Memory {
     fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply Memory cgroup config");
 
-        if let Some(memory) = Self::needs_to_handle(&controller_opt) {
+        if let Some(memory) = Self::needs_to_handle(controller_opt) {
             let reservation = memory.reservation.unwrap_or(0);
 
             Self::apply(memory, cgroup_root)?;
@@ -440,7 +440,7 @@ mod tests {
 
 
             // clone to avoid use of moved value later on
-            let memory_limits = linux_memory.clone();
+            let memory_limits = linux_memory;
 
             let linux_resources = LinuxResources {
                 devices: Some(vec![]),
@@ -456,7 +456,7 @@ mod tests {
 
         let controller_opt = ControllerOpt {
             resources: linux_resources,
-            disable_oom_killer: disable_oom_killer,
+            disable_oom_killer,
             ..Default::default()
         };
 

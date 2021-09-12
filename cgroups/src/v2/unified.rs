@@ -77,7 +77,7 @@ mod tests {
         };
 
         let controller_opt = ControllerOpt {
-            resources: resources,
+            resources,
             ..Default::default()
         };
 
@@ -112,7 +112,7 @@ mod tests {
         };
 
         let controller_opt = ControllerOpt {
-            resources: resources,
+            resources,
             ..Default::default()
         };
 
@@ -143,7 +143,7 @@ mod tests {
         };
 
         let controller_opt = ControllerOpt {
-            resources: resources,
+            resources,
             ..Default::default()
         };
 

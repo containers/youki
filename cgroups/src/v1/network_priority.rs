@@ -14,7 +14,7 @@ impl Controller for NetworkPriority {
     fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply NetworkPriority cgroup config");
 
-        if let Some(network) = Self::needs_to_handle(&controller_opt) {
+        if let Some(network) = Self::needs_to_handle(controller_opt) {
             Self::apply(cgroup_root, network)
                 .context("failed to apply network priority resource restrictions")?;
         }

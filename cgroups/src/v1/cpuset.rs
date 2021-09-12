@@ -30,7 +30,7 @@ impl Controller for CpuSet {
     fn apply(controller_opt: &ControllerOpt, cgroup_path: &Path) -> Result<()> {
         log::debug!("Apply CpuSet cgroup config");
 
-        if let Some(cpuset) = Self::needs_to_handle(&controller_opt) {
+        if let Some(cpuset) = Self::needs_to_handle(controller_opt) {
             Self::apply(cgroup_path, cpuset)
                 .context("failed to apply cpuset resource restrictions")?;
         }

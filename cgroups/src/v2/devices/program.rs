@@ -249,7 +249,7 @@ fn bpf_cgroup_dev_ctx(
 mod tests {
     use super::*;
 
-    fn build_bpf_program(rules: &Option<Vec<oci_spec::LinuxDeviceCgroup>>) -> Result<Program> {
+    fn build_bpf_program(rules: &Option<Vec<LinuxDeviceCgroup>>) -> Result<Program> {
         let mut em = crate::v2::devices::emulator::Emulator::with_default_allow(false);
         if let Some(rules) = rules {
             em.add_rules(rules)?;

@@ -77,7 +77,7 @@ impl Controller for Blkio {
     fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply blkio cgroup config");
 
-        if let Some(blkio) = Self::needs_to_handle(&controller_opt) {
+        if let Some(blkio) = Self::needs_to_handle(controller_opt) {
             Self::apply(cgroup_root, blkio)?;
         }
 

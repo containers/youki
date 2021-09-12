@@ -18,7 +18,7 @@ impl Controller for HugeTlb {
     fn apply(controller_opt: &ControllerOpt, cgroup_root: &std::path::Path) -> Result<()> {
         log::debug!("Apply Hugetlb cgroup config");
 
-        if let Some(hugepage_limits) = Self::needs_to_handle(&controller_opt) {
+        if let Some(hugepage_limits) = Self::needs_to_handle(controller_opt) {
             for hugetlb in hugepage_limits {
                 Self::apply(cgroup_root, hugetlb)
                     .context("failed to apply hugetlb resource restrictions")?

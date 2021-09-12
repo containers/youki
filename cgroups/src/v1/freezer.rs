@@ -25,7 +25,7 @@ impl Controller for Freezer {
         log::debug!("Apply Freezer cgroup config");
         create_dir_all(&cgroup_root)?;
 
-        if let Some(freezer_state) = Self::needs_to_handle(&controller_opt) {
+        if let Some(freezer_state) = Self::needs_to_handle(controller_opt) {
             Self::apply(freezer_state, cgroup_root).context("failed to appyl freezer")?;
         }
 

@@ -129,7 +129,7 @@ impl CgroupManager for Manager {
     }
 
     fn apply(&self, controller_opt: &ControllerOpt) -> Result<()> {
-        for subsys in self.get_required_controllers(&controller_opt)? {
+        for subsys in self.get_required_controllers(controller_opt)? {
             match subsys.0 {
                 CtrlType::Cpu => Cpu::apply(controller_opt, subsys.1)?,
                 CtrlType::CpuAcct => CpuAcct::apply(controller_opt, subsys.1)?,

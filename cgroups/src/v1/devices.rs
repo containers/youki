@@ -99,7 +99,7 @@ mod tests {
             },
             LinuxDeviceCgroup {
                 allow: true,
-                typ: Some(LinuxDeviceType::B),
+                typ: Some(LinuxDeviceType::A),
                 major: None,
                 minor: Some(200),
                 access: "rwm".to_string().into(),
