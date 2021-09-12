@@ -44,7 +44,7 @@ impl Delete {
             if container.root.exists() {
                 let config_absolute_path = container.root.join("config.json");
                 log::debug!("load spec from {:?}", config_absolute_path);
-                let spec = oci_spec::Spec::load(config_absolute_path)?;
+                let spec = oci_spec::runtime::Spec::load(config_absolute_path)?;
                 log::debug!("spec: {:?}", spec);
 
                 // remove the directory storing container state

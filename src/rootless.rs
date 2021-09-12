@@ -1,7 +1,7 @@
 use crate::{namespaces::Namespaces, utils};
 use anyhow::{bail, Context, Result};
 use nix::unistd::Pid;
-use oci_spec::{Linux, LinuxIdMapping, LinuxNamespace, LinuxNamespaceType, Mount, Spec};
+use oci_spec::runtime::{Linux, LinuxIdMapping, LinuxNamespace, LinuxNamespaceType, Mount, Spec};
 use std::path::Path;
 use std::process::Command;
 use std::{env, path::PathBuf};
@@ -231,7 +231,7 @@ pub fn write_gid_mapping(target_pid: Pid, rootless: Option<&Rootless>) -> Result
 
 fn write_id_mapping(
     map_file: &str,
-    mappings: &[oci_spec::LinuxIdMapping],
+    mappings: &[LinuxIdMapping],
     map_binary: Option<&Path>,
 ) -> Result<()> {
     let mappings: Vec<String> = mappings

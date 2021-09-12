@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::Clap;
-use oci_spec::Spec;
+use oci_spec::runtime::Spec;
 use serde_json::to_writer_pretty;
 use std::fs::File;
 

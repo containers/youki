@@ -1,13 +1,13 @@
 use std::path::Path;
 
 use crate::{
-    common,
+    common::{self, ControllerOpt},
     stats::{self, BlkioDeviceStat, BlkioStats, StatsProvider},
     v1::Controller,
 };
 
 use anyhow::{Context, Result};
-use oci_spec::{LinuxBlockIo, LinuxResources};
+use oci_spec::runtime::LinuxBlockIo;
 
 // Throttling/upper limit policy
 // ---------------------------------------
@@ -74,18 +74,18 @@ pub struct Blkio {}
 impl Controller for Blkio {
     type Resource = LinuxBlockIo;
 
-    fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
+    fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply blkio cgroup config");
 
-        if let Some(blkio) = Self::needs_to_handle(linux_resources) {
+        if let Some(blkio) = Self::needs_to_handle(controller_opt) {
             Self::apply(cgroup_root, blkio)?;
         }
 
         Ok(())
     }
 
-    fn needs_to_handle(linux_resources: &LinuxResources) -> Option<&Self::Resource> {
-        if let Some(blkio) = &linux_resources.block_io {
+    fn needs_to_handle(controller_opt: &ControllerOpt) -> Option<&Self::Resource> {
+        if let Some(blkio) = &controller_opt.resources.block_io {
             return Some(blkio);
         }
 
@@ -228,7 +228,7 @@ mod tests {
     use crate::test::{create_temp_dir, set_fixture, setup};
 
     use anyhow::Result;
-    use oci_spec::{LinuxBlockIo, LinuxThrottleDevice};
+    use oci_spec::runtime::{LinuxBlockIo, LinuxThrottleDevice};
 
     struct BlockIoBuilder {
         block_io: LinuxBlockIo,

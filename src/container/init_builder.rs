@@ -1,6 +1,6 @@
 use anyhow::{bail, Context, Result};
 use nix::unistd;
-use oci_spec::Spec;
+use oci_spec::runtime::Spec;
 use rootless::Rootless;
 use std::{
     fs,
@@ -99,7 +99,7 @@ impl InitContainerBuilder {
 
     fn load_spec(&self) -> Result<Spec> {
         let source_spec_path = self.bundle.join("config.json");
-        let mut spec = oci_spec::Spec::load(&source_spec_path)?;
+        let mut spec = Spec::load(&source_spec_path)?;
         if !spec.version.starts_with("1.0") {
             bail!(
                 "runtime spec has incompatible version '{}'. Only 1.0.X is supported",
@@ -110,7 +110,7 @@ impl InitContainerBuilder {
         Ok(spec)
     }
 
-    fn save_spec(&self, spec: &oci_spec::Spec, container_dir: &Path) -> Result<()> {
+    fn save_spec(&self, spec: &Spec, container_dir: &Path) -> Result<()> {
         let target_spec_path = container_dir.join("config.json");
         spec.save(target_spec_path)?;
         Ok(())

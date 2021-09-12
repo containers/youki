@@ -4,10 +4,10 @@ use anyhow::{Context, Result};
 
 use super::Controller;
 use crate::{
-    common,
+    common::{self, ControllerOpt},
     stats::{self, PidStats, StatsProvider},
 };
-use oci_spec::{LinuxPids, LinuxResources};
+use oci_spec::runtime::LinuxPids;
 
 // Contains the maximum allowed number of active pids
 const CGROUP_PIDS_MAX: &str = "pids.max";
@@ -17,18 +17,18 @@ pub struct Pids {}
 impl Controller for Pids {
     type Resource = LinuxPids;
 
-    fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
+    fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply pids cgroup config");
 
-        if let Some(pids) = &linux_resources.pids {
+        if let Some(pids) = &controller_opt.resources.pids {
             Self::apply(cgroup_root, pids).context("failed to apply pids resource restrictions")?;
         }
 
         Ok(())
     }
 
-    fn needs_to_handle(linux_resources: &LinuxResources) -> Option<&Self::Resource> {
-        if let Some(pids) = &linux_resources.pids {
+    fn needs_to_handle(controller_opt: &ControllerOpt) -> Option<&Self::Resource> {
+        if let Some(pids) = &controller_opt.resources.pids {
             return Some(pids);
         }
 
@@ -61,7 +61,7 @@ impl Pids {
 mod tests {
     use super::*;
     use crate::test::{create_temp_dir, set_fixture};
-    use oci_spec::LinuxPids;
+    use oci_spec::runtime::LinuxPids;
 
     // Contains the current number of active pids
     const CGROUP_PIDS_CURRENT: &str = "pids.current";

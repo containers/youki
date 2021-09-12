@@ -3,19 +3,19 @@ use std::path::Path;
 use anyhow::{Context, Result};
 
 use crate::{
-    common,
+    common::{self, ControllerOpt},
     stats::{self, PidStats, StatsProvider},
 };
 
 use super::controller::Controller;
-use oci_spec::{LinuxPids, LinuxResources};
+use oci_spec::runtime::LinuxPids;
 
 pub struct Pids {}
 
 impl Controller for Pids {
-    fn apply(linux_resource: &LinuxResources, cgroup_root: &std::path::Path) -> Result<()> {
+    fn apply(controller_opt: &ControllerOpt, cgroup_root: &std::path::Path) -> Result<()> {
         log::debug!("Apply pids cgroup v2 config");
-        if let Some(pids) = &linux_resource.pids {
+        if let Some(pids) = &controller_opt.resources.pids {
             Self::apply(cgroup_root, pids).context("failed to apply pids resource restrictions")?;
         }
         Ok(())
@@ -45,7 +45,7 @@ impl Pids {
 mod tests {
     use super::*;
     use crate::test::{create_temp_dir, set_fixture};
-    use oci_spec::LinuxPids;
+    use oci_spec::runtime::LinuxPids;
 
     #[test]
     fn test_set_pids() {

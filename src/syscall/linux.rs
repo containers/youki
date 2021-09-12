@@ -22,7 +22,7 @@ use nix::{
 };
 use nix::{sched::unshare, sys::stat::Mode};
 
-use oci_spec::LinuxRlimit;
+use oci_spec::runtime::LinuxRlimit;
 
 use super::Syscall;
 use crate::capabilities;

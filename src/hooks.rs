@@ -1,6 +1,6 @@
 use anyhow::{bail, Context, Result};
 use nix::{sys::signal, unistd::Pid};
-use oci_spec::Hook;
+use oci_spec::runtime::Hook;
 use std::{
     collections::HashMap, fmt, io::ErrorKind, io::Write, os::unix::prelude::CommandExt, process,
     thread, time,

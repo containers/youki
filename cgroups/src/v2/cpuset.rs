@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
 use std::path::Path;
 
-use crate::common;
-use oci_spec::{LinuxCpu, LinuxResources};
+use crate::common::{self, ControllerOpt};
+use oci_spec::runtime::LinuxCpu;
 
 use super::controller::Controller;
 
@@ -12,8 +12,8 @@ const CGROUP_CPUSET_MEMS: &str = "cpuset.mems";
 pub struct CpuSet {}
 
 impl Controller for CpuSet {
-    fn apply(linux_resources: &LinuxResources, cgroup_path: &Path) -> Result<()> {
-        if let Some(cpuset) = &linux_resources.cpu {
+    fn apply(controller_opt: &ControllerOpt, cgroup_path: &Path) -> Result<()> {
+        if let Some(cpuset) = &controller_opt.resources.cpu {
             Self::apply(cgroup_path, cpuset)
                 .context("failed to apply cpuset resource restrictions")?;
         }

@@ -3,22 +3,22 @@ use std::{collections::HashMap, path::Path};
 use anyhow::{bail, Context, Result};
 
 use crate::{
-    common,
+    common::{self, ControllerOpt},
     stats::{supported_page_sizes, HugeTlbStats, StatsProvider},
 };
 
 use super::Controller;
-use oci_spec::{LinuxHugepageLimit, LinuxResources};
+use oci_spec::runtime::LinuxHugepageLimit;
 
 pub struct HugeTlb {}
 
 impl Controller for HugeTlb {
     type Resource = Vec<LinuxHugepageLimit>;
 
-    fn apply(linux_resources: &LinuxResources, cgroup_root: &std::path::Path) -> Result<()> {
+    fn apply(controller_opt: &ControllerOpt, cgroup_root: &std::path::Path) -> Result<()> {
         log::debug!("Apply Hugetlb cgroup config");
 
-        if let Some(hugepage_limits) = Self::needs_to_handle(linux_resources) {
+        if let Some(hugepage_limits) = Self::needs_to_handle(controller_opt) {
             for hugetlb in hugepage_limits {
                 Self::apply(cgroup_root, hugetlb)
                     .context("failed to apply hugetlb resource restrictions")?
@@ -28,10 +28,10 @@ impl Controller for HugeTlb {
         Ok(())
     }
 
-    fn needs_to_handle(linux_resources: &LinuxResources) -> Option<&Self::Resource> {
-        if let Some(hugepage_limits) = linux_resources.hugepage_limits.as_ref() {
+    fn needs_to_handle(controller_opt: &ControllerOpt) -> Option<&Self::Resource> {
+        if let Some(hugepage_limits) = controller_opt.resources.hugepage_limits.as_ref() {
             if !hugepage_limits.is_empty() {
-                return linux_resources.hugepage_limits.as_ref();
+                return controller_opt.resources.hugepage_limits.as_ref();
             }
         }
 
@@ -101,7 +101,7 @@ impl HugeTlb {
 mod tests {
     use super::*;
     use crate::test::{create_temp_dir, set_fixture};
-    use oci_spec::LinuxHugepageLimit;
+    use oci_spec::runtime::LinuxHugepageLimit;
     use std::fs::read_to_string;
 
     #[test]
