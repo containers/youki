@@ -38,7 +38,6 @@ fastrand = "1.4.1"
 crossbeam-channel = "0.5"
 
 [dev-dependencies]
-# oci-spec = { version = "0.4.0", features = ["proptests"] }
 oci-spec = { git = "https://github.com/utam0k/oci-spec-rs/", tag = "v0.4.0-with-bugfix", features = ["proptests"] }
 quickcheck = "1"
 serial_test = "0.5.1"
