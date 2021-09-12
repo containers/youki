@@ -419,8 +419,7 @@ dependencies = [
 [[package]]
 name = "oci-spec"
 version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "648c6fbe66119beec0480447679616806a100de8b8818c7458052222660b6188"
+source = "git+https://github.com/utam0k/oci-spec-rs/?tag=v0.4.0-with-bugfix#73540d3183136d0188b9c3a40f24b08295bbc92e"
 dependencies = [
  "cfg-if 1.0.0",
  "quickcheck",

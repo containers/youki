@@ -224,6 +224,7 @@ fn bind_dev(rootfs: &Path, dev: &LinuxDevice) -> Result<()> {
 
 fn to_sflag(dev_type: LinuxDeviceType) -> SFlag {
     match dev_type {
+        LinuxDeviceType::A => SFlag::S_IFBLK | SFlag::S_IFCHR | SFlag::S_IFIFO,
         LinuxDeviceType::B => SFlag::S_IFBLK,
         LinuxDeviceType::C | LinuxDeviceType::U => SFlag::S_IFCHR,
         LinuxDeviceType::P => SFlag::S_IFIFO,

@@ -14,7 +14,8 @@ nix = "0.22.0"
 procfs = "0.10.1"
 log = "0.4"
 anyhow = "1.0"
-oci-spec = "0.4.0"
+# oci-spec = "0.4.0"
+oci-spec = { git="https://github.com/utam0k/oci-spec-rs/", tag = "v0.4.0-with-bugfix"}
 systemd = { version = "0.8", default-features = false, optional = true }
 dbus = "0.9.2"
 serde = { version = "1.0", features = ["derive"] }
@@ -24,7 +25,8 @@ errno = { version = "0.2.7", optional = true }
 libc = { version = "0.2.84", optional = true }
 
 [dev-dependencies]
-oci-spec = { version = "0.4.0", features = ["proptests"] }
+# oci-spec = { version = "0.4.0", features = ["proptests"] }
+oci-spec = { git = "https://github.com/utam0k/oci-spec-rs/", tag = "v0.4.0-with-bugfix", features = ["proptests"] }
 quickcheck = "1"
 clap = "2"
 serde = { version = "1.0", features = ["derive"] }
