@@ -535,4 +535,121 @@ mod tests {
             assert_eq!(got, test.want);
         }
     }
+
+    #[test]
+    fn test_drop_privileges() {
+        struct Testcase {
+            name: String,
+            input: LinuxCapabilities,
+            // be awared of that calling sequence in the drop_privileges function
+            // will affect the output sequence from test_command.get_set_capability_args()
+            want: Vec<(CapSet, Vec<SpecCapability>)>,
+        }
+
+        let cps = vec![
+            SpecCapability::AuditWrite,
+            SpecCapability::Kill,
+            SpecCapability::NetBindService,
+        ];
+
+        let tests = vec![
+            Testcase {
+                name: format!("all LinuxCapabilities fields with caps: {:?}", cps),
+                input: LinuxCapabilities {
+                    bounding: cps.clone().into_iter().collect::<Capabilities>().into(),
+                    effective: cps.clone().into_iter().collect::<Capabilities>().into(),
+                    inheritable: cps.clone().into_iter().collect::<Capabilities>().into(),
+                    permitted: cps.clone().into_iter().collect::<Capabilities>().into(),
+                    ambient: cps.clone().into_iter().collect::<Capabilities>().into(),
+                },
+                want: vec![
+                    (CapSet::Bounding, cps.clone()),
+                    (CapSet::Effective, cps.clone()),
+                    (CapSet::Permitted, cps.clone()),
+                    (CapSet::Inheritable, cps.clone()),
+                    (CapSet::Ambient, cps.clone()),
+                ],
+            },
+            Testcase {
+                name: format!("partial LinuxCapabilities fields with caps: {:?}", cps),
+                input: LinuxCapabilities {
+                    bounding: cps.clone().into_iter().collect::<Capabilities>().into(),
+                    effective: cps.clone().into_iter().collect::<Capabilities>().into(),
+                    inheritable: None,
+                    permitted: cps.clone().into_iter().collect::<Capabilities>().into(),
+                    ambient: None,
+                },
+                want: vec![
+                    (CapSet::Bounding, cps.clone()),
+                    (CapSet::Effective, cps.clone()),
+                    (CapSet::Permitted, cps.clone()),
+                ],
+            },
+            Testcase {
+                name: format!("empty LinuxCapabilities fields with caps: {:?}", cps),
+                input: LinuxCapabilities {
+                    bounding: None,
+                    effective: None,
+                    inheritable: None,
+                    permitted: None,
+                    ambient: None,
+                },
+                want: vec![],
+            },
+        ];
+
+        for test in tests {
+            let test_command = TestHelperSyscall::default();
+            assert!(
+                drop_privileges(&test.input, &test_command).is_ok(),
+                "{}, drop_privileges is not ok",
+                test.name
+            );
+
+            let got: Vec<(CapSet, Vec<_>)> = test_command
+                .get_set_capability_args()
+                .into_iter()
+                .map(|(capset, caps)| {
+                    (
+                        capset,
+                        caps.into_iter()
+                            .map(|cap| SpecCapability::from_cap(cap))
+                            .collect(),
+                    )
+                })
+                .collect();
+            assert_eq!(
+                got.len(),
+                test.want.len(),
+                "{}, len of got:{}, want:{}",
+                test.name,
+                got.len(),
+                test.want.len(),
+            );
+
+            for i in 0..test.want.len() {
+                // because CapSet has no Eq, PartialEq attributes,
+                // so using String to do the comparsion.
+                let want_cap_set = format!("{:?}", test.want[i].0);
+                let got_cap_set = format!("{:?}", got[i].0);
+                let want_caps = &test.want[i].1;
+                let got_caps = &got[i].1;
+
+                assert_eq!(
+                    got_cap_set, want_cap_set,
+                    "{}, capset of got:{}, want:{}",
+                    test.name, got_cap_set, want_cap_set,
+                );
+                // because get_set_capability_args returns a HasSet of capabilities,
+                // so the ordering is randomized.
+                assert!(
+                    got_caps.iter().all(|cap| want_caps.contains(cap)),
+                    "{}, caps of got:{:?}, want:{:?}",
+                    test.name,
+                    got_caps,
+                    want_caps
+                );
+            }
+        }
+    }
 }
