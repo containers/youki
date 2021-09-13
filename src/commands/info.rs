@@ -1,11 +1,11 @@
 //! Contains functions related to printing information about system running Youki
-use std::{fs, path::Path};
+use std::{collections::HashSet, fs, path::Path};
 
 use anyhow::Result;
 use clap::Clap;
 use procfs::{CpuInfo, Meminfo};
 
-use cgroups;
+use cgroups::{self, common::CgroupSetup, v2::controller_type::ControllerType};
 
 #[derive(Clap, Debug)]
 pub struct Info {}
@@ -106,7 +106,8 @@ pub fn print_hardware() {
 
 /// Print cgroups info of system
 pub fn print_cgroups() {
-    if let Ok(cgroup_setup) = cgroups::common::get_cgroup_setup() {
+    let cgroup_setup = cgroups::common::get_cgroup_setup();
+    if let Ok(cgroup_setup) = &cgroup_setup {
         println!("{:<18}{}", "Cgroup setup", cgroup_setup);
     }
 
@@ -124,19 +125,49 @@ pub fn print_cgroups() {
     }
 
     let unified = cgroups::v2::util::get_unified_mount_point();
-    if let Ok(mount_point) = unified {
+    if let Ok(mount_point) = &unified {
         println!("  {:<16}{}", "unified", mount_point.display());
+    }
+
+    if let Ok(cgroup_setup) = cgroup_setup {
+        if let Ok(unified) = &unified {
+            if matches!(cgroup_setup, CgroupSetup::Hybrid | CgroupSetup::Unified) {
+                if let Ok(controllers) = cgroups::v2::util::get_available_controllers(unified) {
+                    println!("CGroup v2 controllers");
+                    let active_controllers: HashSet<ControllerType> =
+                        controllers.into_iter().collect();
+                    for controller in cgroups::v2::controller_type::CONTROLLER_TYPES {
+                        let status = if active_controllers.contains(controller) {
+                            "attached"
+                        } else {
+                            "detached"
+                        };
+
+                        println!("  {:<16}{}", controller.to_string(), status);
+                    }
+                }
+
+                if let Some(config) = read_kernel_config() {
+                    let display = FeatureDisplay::with_status("device", "attached", "detached");
+                    print_feature_status(&config, "CONFIG_CGROUP_BPF", display);
+                }
+            }
+        }
     }
 }
 
-pub fn print_namespaces() {
+fn read_kernel_config() -> Option<String> {
     let uname = nix::sys::utsname::uname();
     let kernel_config = Path::new("/boot").join(format!("config-{}", uname.release()));
     if !kernel_config.exists() {
-        return;
+        return None;
     }
 
-    if let Ok(content) = fs::read_to_string(kernel_config) {
+    fs::read_to_string(kernel_config).ok()
+}
+
+pub fn print_namespaces() {
+    if let Some(content) = read_kernel_config() {
         if let Some(ns_enabled) = find_parameter(&content, "CONFIG_NAMESPACES") {
             if ns_enabled == "y" {
                 println!("{:<18}enabled", "Namespaces");
@@ -148,24 +179,48 @@ pub fn print_namespaces() {
 
         // mount namespace is always enabled if namespaces are enabled
         println!("  {:<16}enabled", "mount");
-        print_feature_status(&content, "CONFIG_UTS_NS", "uts");
-        print_feature_status(&content, "CONFIG_IPC_NS", "ipc");
-        print_feature_status(&content, "CONFIG_USER_NS", "user");
-        print_feature_status(&content, "CONFIG_PID_NS", "pid");
-        print_feature_status(&content, "CONFIG_NET_NS", "network");
+        print_feature_status(&content, "CONFIG_UTS_NS", FeatureDisplay::new("uts"));
+        print_feature_status(&content, "CONFIG_IPC_NS", FeatureDisplay::new("ipc"));
+        print_feature_status(&content, "CONFIG_USER_NS", FeatureDisplay::new("user"));
+        print_feature_status(&content, "CONFIG_PID_NS", FeatureDisplay::new("pid"));
+        print_feature_status(&content, "CONFIG_NET_NS", FeatureDisplay::new("network"));
     }
 }
 
-fn print_feature_status(config: &str, feature: &str, display: &str) {
+fn print_feature_status(config: &str, feature: &str, display: FeatureDisplay) {
     if let Some(status_flag) = find_parameter(config, feature) {
         let status = if status_flag == "y" {
-            "enabled"
+            display.enabled
         } else {
-            "disabled"
+            display.disabled
         };
 
-        println!("  {:<16}{}", display, status);
+        println!("  {:<16}{}", display.name, status);
     } else {
-        println!("  {:<16}disabled", display);
+        println!("  {:<16}{}", display.name, display.disabled);
+    }
+}
+
+struct FeatureDisplay<'a> {
+    name: &'a str,
+    enabled: &'a str,
+    disabled: &'a str,
+}
+
+impl<'a> FeatureDisplay<'a> {
+    fn new(name: &'a str) -> Self {
+        Self {
+            name,
+            enabled: "enabled",
+            disabled: "disabled",
+        }
+    }
+
+    fn with_status(name: &'a str, enabled: &'a str, disabled: &'a str) -> Self {
+        Self {
+            name,
+            enabled,
+            disabled,
+        }
     }
 }

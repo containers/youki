@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 
 use nix::unistd::Pid;
 
@@ -23,15 +23,12 @@ use super::{
     memory::Memory,
     pids::Pids,
     unified::Unified,
+    util::{self, CGROUP_SUBTREE_CONTROL},
 };
 use crate::{
     common::{self, CgroupManager, ControllerOpt, FreezerState, PathBufExt, CGROUP_PROCS},
     stats::{Stats, StatsProvider},
 };
-
-const CGROUP_CONTROLLERS: &str = "cgroup.controllers";
-const CGROUP_SUBTREE_CONTROL: &str = "cgroup.subtree_control";
-
 pub struct Manager {
     root_path: PathBuf,
     cgroup_path: PathBuf,
@@ -52,8 +49,7 @@ impl Manager {
     }
 
     fn create_unified_cgroup(&self, pid: Pid) -> Result<()> {
-        let controllers: Vec<String> = self
-            .get_available_controllers()?
+        let controllers: Vec<String> = util::get_available_controllers(&self.root_path)?
             .iter()
             .map(|c| format!("{}{}", "+", c.to_string()))
             .collect();
@@ -80,32 +76,6 @@ impl Manager {
         Ok(())
     }
 
-    fn get_available_controllers(&self) -> Result<Vec<ControllerType>> {
-        let controllers_path = self.root_path.join(CGROUP_CONTROLLERS);
-        if !controllers_path.exists() {
-            bail!(
-                "cannot get available controllers. {:?} does not exist",
-                controllers_path
-            )
-        }
-
-        let mut controllers = Vec::new();
-        for controller in fs::read_to_string(&controllers_path)?.split_whitespace() {
-            match controller {
-                "cpu" => controllers.push(ControllerType::Cpu),
-                "cpuset" => controllers.push(ControllerType::CpuSet),
-                "hugetlb" => controllers.push(ControllerType::HugeTlb),
-                "io" => controllers.push(ControllerType::Io),
-                "memory" => controllers.push(ControllerType::Memory),
-                "pids" => controllers.push(ControllerType::Pids),
-                "freezer" => controllers.push(ControllerType::Freezer),
-                tpe => log::warn!("Controller {} is not yet implemented.", tpe),
-            }
-        }
-
-        Ok(controllers)
-    }
-
     fn write_controllers(path: &Path, controllers: &[String]) -> Result<()> {
         for controller in controllers {
             common::write_cgroup_file_str(path.join(CGROUP_SUBTREE_CONTROL), controller)?;
@@ -130,7 +100,6 @@ impl CgroupManager for Manager {
                 ControllerType::Io => Io::apply(controller_opt, &self.full_path)?,
                 ControllerType::Memory => Memory::apply(controller_opt, &self.full_path)?,
                 ControllerType::Pids => Pids::apply(controller_opt, &self.full_path)?,
-                ControllerType::Freezer => Freezer::apply(controller_opt, &self.full_path)?,
             }
         }
 
@@ -142,8 +111,8 @@ impl CgroupManager for Manager {
                 Unified::apply(
                     controller_opt,
                     &self.cgroup_path,
-                    self.get_available_controllers()?,
-                )?
+                    util::get_available_controllers(&self.root_path)?,
+                )?;
             }
         }
 

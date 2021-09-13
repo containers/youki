@@ -1,5 +1,5 @@
 mod controller;
-mod controller_type;
+pub mod controller_type;
 mod cpu;
 mod cpuset;
 mod freezer;
