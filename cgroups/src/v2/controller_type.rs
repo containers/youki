@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ControllerType {
     Cpu,
     CpuSet,
@@ -7,7 +8,6 @@ pub enum ControllerType {
     Memory,
     HugeTlb,
     Pids,
-    Freezer,
 }
 
 impl Display for ControllerType {
@@ -19,7 +19,6 @@ impl Display for ControllerType {
             Self::Memory => "memory",
             Self::HugeTlb => "hugetlb",
             Self::Pids => "pids",
-            Self::Freezer => "freezer",
         };
 
         write!(f, "{}", print)
@@ -33,11 +32,12 @@ pub const CONTROLLER_TYPES: &[ControllerType] = &[
     ControllerType::Io,
     ControllerType::Memory,
     ControllerType::Pids,
-    ControllerType::Freezer,
 ];
 
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PseudoControllerType {
     Devices,
+    Freezer,
     Unified,
 }
 
@@ -45,6 +45,7 @@ impl Display for PseudoControllerType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let print = match self {
             Self::Devices => "devices",
+            Self::Freezer => "freezer",
             Self::Unified => "unified",
         };
 
@@ -52,5 +53,8 @@ impl Display for PseudoControllerType {
     }
 }
 
-pub const PSEUDO_CONTROLLER_TYPES: &[PseudoControllerType] =
-    &[PseudoControllerType::Devices, PseudoControllerType::Unified];
+pub const PSEUDO_CONTROLLER_TYPES: &[PseudoControllerType] = &[
+    PseudoControllerType::Devices,
+    PseudoControllerType::Freezer,
+    PseudoControllerType::Unified,
+];
