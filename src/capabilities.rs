@@ -612,9 +612,7 @@ mod tests {
                 .map(|(capset, caps)| {
                     (
                         capset,
-                        caps.into_iter()
-                            .map(|cap| SpecCapability::from_cap(cap))
-                            .collect(),
+                        caps.into_iter().map(SpecCapability::from_cap).collect(),
                     )
                 })
                 .collect();
@@ -627,12 +625,12 @@ mod tests {
                 test.want.len(),
             );
 
-            for i in 0..test.want.len() {
+            for (i, want) in test.want.iter().enumerate().take(test.want.len()) {
                 // because CapSet has no Eq, PartialEq attributes,
                 // so using String to do the comparsion.
-                let want_cap_set = format!("{:?}", test.want[i].0);
+                let want_cap_set = format!("{:?}", want.0);
                 let got_cap_set = format!("{:?}", got[i].0);
-                let want_caps = &test.want[i].1;
+                let want_caps = &want.1;
                 let got_caps = &got[i].1;
 
                 assert_eq!(
