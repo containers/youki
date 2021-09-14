@@ -891,6 +891,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d29ab0c6d3fc0ee92fe66e2d99f700eab17a8d57d1c1d3b748380fb20baa78cd"
 
 [[package]]
+name = "seccomp-sys"
+version = "0.1.3"
+source = "git+https://github.com/polachok/seccomp-sys.git?rev=9d89b10f9faa19e8f4e952663697ec126f2e2121#9d89b10f9faa19e8f4e952663697ec126f2e2121"
+dependencies = [
+ "libc",
+ "pkg-config",
+]
+
+[[package]]
 name = "serde"
 version = "1.0.130"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1151,6 +1160,7 @@ dependencies = [
  "prctl",
  "procfs",
  "quickcheck",
+ "seccomp-sys",
  "serde",
  "serde_json",
  "serial_test",

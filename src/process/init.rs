@@ -1,3 +1,8 @@
+use super::args::ContainerArgs;
+use crate::{
+    capabilities, hooks, namespaces::Namespaces, process::channel, rootfs, rootless::Rootless,
+    seccomp, syscall::Syscall, tty, utils,
+};
 use anyhow::{bail, Context, Result};
 use nix::mount::mount as nix_mount;
 use nix::mount::MsFlags;
@@ -9,16 +14,11 @@ use nix::{
 };
 use oci_spec::runtime::{LinuxNamespaceType, User};
 use std::collections::HashMap;
-use std::{env, os::unix::io::AsRawFd};
-use std::{fs, path::Path, path::PathBuf};
-
-use crate::rootless::Rootless;
-use crate::{
-    capabilities, hooks, namespaces::Namespaces, process::channel, rootfs, syscall::Syscall, tty,
-    utils,
+use std::{
+    env, fs,
+    os::unix::io::AsRawFd,
+    path::{Path, PathBuf},
 };
-
-use super::args::ContainerArgs;
 
 // Make sure a given path is on procfs. This is to avoid the security risk that
 // /proc path is mounted over. Ref: CVE-2019-16884
@@ -376,6 +376,10 @@ pub fn container_init(
             hooks::run_hooks(hooks.start_container.as_ref(), container)?
         }
     }
+
+    // Initialize seccomp profile right before we are ready to execute the
+    // payload. The notify socket will still need network related syscalls.
+    seccomp::initialize_seccomp(linux.seccomp.as_ref()).context("Failed to execute seccomp")?;
 
     if let Some(args) = proc.args.as_ref() {
         utils::do_exec(&args[0], args)?;
