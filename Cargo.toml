@@ -5,6 +5,11 @@ authors = ["utam0k <k0ma@utam0k.jp>"]
 edition = "2018"
 description = "A container runtime written in Rust"
 
+[workspace]
+members = [
+    "cgroups",
+]
+
 [features]
 default = ["systemd_cgroups"]
 systemd_cgroups = ["systemd"]

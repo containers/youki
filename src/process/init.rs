@@ -20,7 +20,6 @@ use crate::{
 
 use super::args::ContainerArgs;
 
-
 // Make sure a given path is on procfs. This is to avoid the security risk that
 // /proc path is mounted over. Ref: CVE-2019-16884
 fn ensure_procfs(path: &Path) -> Result<()> {
