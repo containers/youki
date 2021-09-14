@@ -299,6 +299,13 @@ pub fn container_init(
         .set_id(Uid::from_raw(proc.user.uid), Gid::from_raw(proc.user.gid))
         .context("Failed to configure uid and gid")?;
 
+    // Without no new privileges, seccomp is a privileged operation. We have to
+    // do this before dropping capabilities. Otherwise, we should do it later,
+    // as close to exec as possible.
+    if linux.seccomp.is_some() && proc.no_new_privileges.is_none() {
+        seccomp::initialize_seccomp(linux.seccomp.as_ref()).context("Failed to execute seccomp")?;
+    }
+
     capabilities::reset_effective(command).context("Failed to reset effective capabilities")?;
     if let Some(caps) = &proc.capabilities {
         capabilities::drop_privileges(caps, command).context("Failed to drop capabilities")?;
@@ -377,9 +384,11 @@ pub fn container_init(
         }
     }
 
-    // Initialize seccomp profile right before we are ready to execute the
-    // payload. The notify socket will still need network related syscalls.
-    seccomp::initialize_seccomp(linux.seccomp.as_ref()).context("Failed to execute seccomp")?;
+    if linux.seccomp.is_some() && proc.no_new_privileges.is_some() {
+        // Initialize seccomp profile right before we are ready to execute the
+        // payload. The notify socket will still need network related syscalls.
+        seccomp::initialize_seccomp(linux.seccomp.as_ref()).context("Failed to execute seccomp")?;
+    }
 
     if let Some(args) = proc.args.as_ref() {
         utils::do_exec(&args[0], args)?;
