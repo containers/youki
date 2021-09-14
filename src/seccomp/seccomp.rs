@@ -224,6 +224,21 @@ pub fn initialize_seccomp(seccomp: Option<&LinuxSeccomp>) -> Result<()> {
         }
     }
 
+    // The SCMP_FLTATR_CTL_NNP controls if the seccomp load function will set
+    // the new privilege bit automatically in prctl. Normally this is a good
+    // thing, but for us we need better control. Based on the spec, if OCI
+    // runtime spec doesn't set the no new privileges in Process, we should not
+    // set it here.  If the seccomp load operation fails without enough
+    // privilege, so be it. To prevent this automatic behavior, we unset the
+    // value here.
+    let ret = unsafe { seccomp_attr_set(ctx.ctx, scmp_filter_attr::SCMP_FLTATR_CTL_NNP, 0) };
+    if ret != 0 {
+        bail!(
+            "Failed to unset the no new privileges bit for seccomp: {}",
+            ret
+        );
+    }
+
     if let Some(syscalls) = seccomp.syscalls.as_ref() {
         for syscall in syscalls {
             let action = translate_action(&syscall.action, syscall.errno_ret);
@@ -286,7 +301,10 @@ pub fn initialize_seccomp(seccomp: Option<&LinuxSeccomp>) -> Result<()> {
         }
     }
 
-    let _ = prctl::set_no_new_privileges(true);
+    // In order to use the SECCOMP_SET_MODE_FILTER operation, either the calling
+    // thread must have the CAP_SYS_ADMIN capability in its user namespace, or
+    // the thread must already have the no_new_privs bit set.
+    // Ref: https://man7.org/linux/man-pages/man2/seccomp.2.html
     ctx.load().context("Failed to load seccomp context")?;
 
     Ok(())
@@ -349,6 +367,7 @@ mod tests {
             }
             nix::unistd::ForkResult::Child => {
                 nix::unistd::close(receiver.as_raw_fd())?;
+                let _ = prctl::set_no_new_privileges(true);
                 initialize_seccomp(Some(&seccomp_profile))?;
                 let ret = nix::unistd::getcwd();
                 let errno: i32 = if ret.is_err() {
@@ -390,6 +409,7 @@ mod tests {
                 }
             }
             nix::unistd::ForkResult::Child => {
+                let _ = prctl::set_no_new_privileges(true);
                 let ret = initialize_seccomp(Some(&seccomp_profile));
                 let exit_code = if ret.is_ok() { 0 } else { -1 };
                 std::process::exit(exit_code);
