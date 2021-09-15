@@ -53,6 +53,10 @@ impl Compare {
                 arg: self.arg,
                 op,
                 datum_a,
+                // datum_b is optional for a number of op, since these op only
+                // requires one value. For example, the SCMP_OP_EQ or equal op
+                // requires only one value. We set the datum_b to 0 in the case
+                // that only one value is required.
                 datum_b: self.datum_b.unwrap_or(0),
             })
         } else {
@@ -244,18 +248,18 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<()> {
             }
 
             for name in &syscall.names {
-                let ret = translate_syscall(name);
-                if ret.is_err() {
-                    // If we failed to resolve the syscall by name, likely the kernel
-                    // doeesn't support this syscall. So it is safe to skip...
-                    log::warn!(
-                        "Failed to resolve syscall, likely kernel doesn't support this. {:?}",
-                        name
-                    );
-                    continue;
-                }
-
-                let syscall_number = translate_syscall(name)?;
+                let syscall_number = match translate_syscall(name) {
+                    Ok(x) => x,
+                    Err(_) => {
+                        // If we failed to resolve the syscall by name, likely the kernel
+                        // doeesn't support this syscall. So it is safe to skip...
+                        log::warn!(
+                            "Failed to resolve syscall, likely kernel doesn't support this. {:?}",
+                            name
+                        );
+                        continue;
+                    }
+                };
                 // Not clear why but if there are multiple arg attached to one
                 // syscall rule, we have to add them seperatly. add_rule will
                 // return EINVAL. runc does the same but doesn't explain why.
@@ -319,10 +323,11 @@ mod tests {
     fn test_basic() -> Result<()> {
         // Note: seccomp profile is really hard to write unit test for. First,
         // we can't really test default error or kill action, since rust test
-        // actually replies on certain syscalls. Second, some of the syscall
-        // will not return errorno. These syscalls will just send an abort
-        // signal or even just segfaults.  Here we choose to use `getcwd`
-        // syscall for testing. This is more of a sanity check.
+        // actually relies on certain syscalls. Second, some of the syscall will
+        // not return errorno. These syscalls will just send an abort signal or
+        // even just segfaults.  Here we choose to use `getcwd` syscall for
+        // testing, since it will correctly return an error under seccomp rule.
+        // This is more of a sanity check.
 
         // Here, we choose an error that getcwd call would never return on its own, so
         // we can make sure that getcwd failed because of seccomp rule.
@@ -333,7 +338,7 @@ mod tests {
             architectures: Some(vec![Arch::ScmpArchNative]),
             flags: None,
             syscalls: Some(vec![LinuxSyscall {
-                names: vec![String::from("getcwd"), String::from("setuid")],
+                names: vec![String::from("getcwd")],
                 action: LinuxSeccompAction::ScmpActErrno,
                 errno_ret: Some(expect_error as u32),
                 args: None,
