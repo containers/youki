@@ -206,10 +206,8 @@ mod test {
 
     #[test]
     #[serial]
-    #[ignore]
     // This will test executing hook with a timeout. Since the timeout is set in
     // secs, minimally, the test will run for 1 second to trigger the timeout.
-    // Therefore, we leave this test in the normal execution.
     fn test_run_hook_timeout() -> Result<()> {
         let default_container: Container = Default::default();
         // We use `tail -f /dev/null` here to simulate a hook command that hangs.
