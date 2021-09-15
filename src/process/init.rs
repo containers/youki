@@ -303,7 +303,8 @@ pub fn container_init(
     // do this before dropping capabilities. Otherwise, we should do it later,
     // as close to exec as possible.
     if linux.seccomp.is_some() && proc.no_new_privileges.is_none() {
-        seccomp::initialize_seccomp(linux.seccomp.as_ref()).context("Failed to execute seccomp")?;
+        seccomp::initialize_seccomp(linux.seccomp.as_ref().unwrap())
+            .context("Failed to execute seccomp")?;
     }
 
     capabilities::reset_effective(command).context("Failed to reset effective capabilities")?;
@@ -387,7 +388,8 @@ pub fn container_init(
     if linux.seccomp.is_some() && proc.no_new_privileges.is_some() {
         // Initialize seccomp profile right before we are ready to execute the
         // payload. The notify socket will still need network related syscalls.
-        seccomp::initialize_seccomp(linux.seccomp.as_ref()).context("Failed to execute seccomp")?;
+        seccomp::initialize_seccomp(linux.seccomp.as_ref().unwrap())
+            .context("Failed to execute seccomp")?;
     }
 
     if let Some(args) = proc.args.as_ref() {

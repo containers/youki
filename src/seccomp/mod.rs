@@ -48,11 +48,11 @@ impl Compare {
     }
 
     pub fn build(self) -> Result<scmp_arg_cmp> {
-        if self.op.is_some() && self.datum_a.is_some() {
+        if let (Some(op), Some(datum_a)) = (self.op, self.datum_a) {
             Ok(scmp_arg_cmp {
                 arg: self.arg,
-                op: self.op.unwrap(),
-                datum_a: self.datum_a.unwrap(),
+                op,
+                datum_a,
                 datum_b: self.datum_b.unwrap_or(0),
             })
         } else {
@@ -138,8 +138,8 @@ impl FilterContext {
     }
 }
 
-fn translate_syscall(syscall_name: String) -> Result<i32> {
-    let c_syscall_name = CString::new(syscall_name.as_str())
+fn translate_syscall(syscall_name: &str) -> Result<i32> {
+    let c_syscall_name = CString::new(syscall_name)
         .with_context(|| format!("Failed to convert syscall {:?} to cstring", syscall_name))?;
     let res = unsafe { seccomp_syscall_resolve_name(c_syscall_name.as_ptr()) };
     if res == __NR_SCMP_ERROR {
@@ -197,18 +197,11 @@ fn translate_arch(arch: &Arch) -> scmp_arch {
     }
 }
 
-pub fn initialize_seccomp(seccomp: Option<&LinuxSeccomp>) -> Result<()> {
-    if seccomp.is_none() {
-        return Ok(());
-    }
-
-    let seccomp = seccomp.unwrap();
+pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<()> {
     if seccomp.flags.is_some() {
         // runc did not support this, so let's skip it for now.
         bail!("seccomp flags are not yet supported");
     }
-
-    // log::debug!("XXX seccomp: {:?}", seccomp);
 
     // TODO: fix default action error number. The spec repo doesn't have it yet.
     let default_action = translate_action(&seccomp.default_action, None);
@@ -251,7 +244,7 @@ pub fn initialize_seccomp(seccomp: Option<&LinuxSeccomp>) -> Result<()> {
             }
 
             for name in &syscall.names {
-                let ret = translate_syscall(name.clone());
+                let ret = translate_syscall(name);
                 if ret.is_err() {
                     // If we failed to resolve the syscall by name, likely the kernel
                     // doeesn't support this syscall. So it is safe to skip...
@@ -262,7 +255,7 @@ pub fn initialize_seccomp(seccomp: Option<&LinuxSeccomp>) -> Result<()> {
                     continue;
                 }
 
-                let syscall_number = translate_syscall(name.clone())?;
+                let syscall_number = translate_syscall(name)?;
                 // Not clear why but if there are multiple arg attached to one
                 // syscall rule, we have to add them seperatly. add_rule will
                 // return EINVAL. runc does the same but doesn't explain why.
@@ -370,7 +363,7 @@ mod tests {
             nix::unistd::ForkResult::Child => {
                 nix::unistd::close(receiver.as_raw_fd())?;
                 let _ = prctl::set_no_new_privileges(true);
-                initialize_seccomp(Some(&seccomp_profile))?;
+                initialize_seccomp(&seccomp_profile)?;
                 let ret = nix::unistd::getcwd();
                 let errno: i32 = if ret.is_err() {
                     ret.err().unwrap() as i32
@@ -412,7 +405,7 @@ mod tests {
             }
             nix::unistd::ForkResult::Child => {
                 let _ = prctl::set_no_new_privileges(true);
-                let ret = initialize_seccomp(Some(&seccomp_profile));
+                let ret = initialize_seccomp(&seccomp_profile);
                 let exit_code = if ret.is_ok() { 0 } else { -1 };
                 std::process::exit(exit_code);
             }
