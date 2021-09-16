@@ -5,9 +5,9 @@ use oci_spec::runtime::Arch;
 use oci_spec::runtime::LinuxSeccomp;
 use oci_spec::runtime::LinuxSeccompAction;
 use oci_spec::runtime::LinuxSeccompOperator;
-use seccomp_sys::scmp_arch::*;
-use seccomp_sys::scmp_compare::*;
-use seccomp_sys::*;
+use seccomp::scmp_arch::*;
+use seccomp::scmp_compare::*;
+use seccomp::*;
 use std::ffi::CString;
 
 #[derive(Debug)]
@@ -88,7 +88,7 @@ impl Rule {
 
 #[derive(Debug)]
 struct FilterContext {
-    ctx: *mut scmp_filter_ctx,
+    ctx: scmp_filter_ctx,
 }
 
 impl FilterContext {
