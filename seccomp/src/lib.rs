@@ -25,30 +25,27 @@ pub const __NR_SCMP_ERROR: i32 = -1;
 pub const __NR_SCMP_UNDEF: i32 = -2;
 
 #[allow(non_camel_case_types)]
-#[derive(Debug, Clone, Copy)]
-#[repr(C)]
-pub enum scmp_arch {
-    SCMP_ARCH_NATIVE = 0,
-    SCMP_ARCH_X86 = 1073741827,
-    SCMP_ARCH_X86_64 = 3221225534,
-    SCMP_ARCH_X32 = 1073741886,
-    SCMP_ARCH_ARM = 1073741864,
-    SCMP_ARCH_AARCH64 = 3221225655,
-    SCMP_ARCH_MIPS = 8,
-    SCMP_ARCH_MIPS64 = 2147483656,
-    SCMP_ARCH_MIPS64N32 = 2684354568,
-    SCMP_ARCH_MIPSEL = 1073741832,
-    SCMP_ARCH_MIPSEL64 = 3221225480,
-    SCMP_ARCH_MIPSEL64N32 = 3758096392,
-    SCMP_ARCH_PPC = 20,
-    SCMP_ARCH_PPC64 = 2147483669,
-    SCMP_ARCH_PPC64LE = 3221225493,
-    SCMP_ARCH_S390 = 22,
-    SCMP_ARCH_S390X = 2147483670,
-    SCMP_ARCH_PARISC = 15,
-    SCMP_ARCH_PARISC64 = 2147483663,
-    SCMP_ARCH_RISCV64 = 3221225715,
-}
+pub type scmp_arch = u32;
+pub const SCMP_ARCH_NATIVE: scmp_arch = 0;
+pub const SCMP_ARCH_X86: scmp_arch = 1073741827;
+pub const SCMP_ARCH_X86_64: scmp_arch = 3221225534;
+pub const SCMP_ARCH_X32: scmp_arch = 1073741886;
+pub const SCMP_ARCH_ARM: scmp_arch = 1073741864;
+pub const SCMP_ARCH_AARCH64: scmp_arch = 3221225655;
+pub const SCMP_ARCH_MIPS: scmp_arch = 8;
+pub const SCMP_ARCH_MIPS64: scmp_arch = 2147483656;
+pub const SCMP_ARCH_MIPS64N32: scmp_arch = 2684354568;
+pub const SCMP_ARCH_MIPSEL: scmp_arch = 1073741832;
+pub const SCMP_ARCH_MIPSEL64: scmp_arch = 3221225480;
+pub const SCMP_ARCH_MIPSEL64N32: scmp_arch = 3758096392;
+pub const SCMP_ARCH_PPC: scmp_arch = 20;
+pub const SCMP_ARCH_PPC64: scmp_arch = 2147483669;
+pub const SCMP_ARCH_PPC64LE: scmp_arch = 3221225493;
+pub const SCMP_ARCH_S390: scmp_arch = 22;
+pub const SCMP_ARCH_S390X: scmp_arch = 2147483670;
+pub const SCMP_ARCH_PARISC: scmp_arch = 15;
+pub const SCMP_ARCH_PARISC64: scmp_arch = 2147483663;
+pub const SCMP_ARCH_RISCV64: scmp_arch = 3221225715;
 
 pub const SCMP_ACT_KILL_PROCESS: u32 = 2147483648;
 pub const SCMP_ACT_KILL_THREAD: u32 = 0;

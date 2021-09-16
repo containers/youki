@@ -5,7 +5,6 @@ use oci_spec::runtime::Arch;
 use oci_spec::runtime::LinuxSeccomp;
 use oci_spec::runtime::LinuxSeccompAction;
 use oci_spec::runtime::LinuxSeccompOperator;
-use seccomp::scmp_arch::*;
 use seccomp::scmp_compare::*;
 use seccomp::*;
 use std::ffi::CString;
