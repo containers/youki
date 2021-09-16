@@ -1,3 +1,8 @@
+use super::args::ContainerArgs;
+use crate::{
+    capabilities, hooks, namespaces::Namespaces, process::channel, rootfs, rootless::Rootless,
+    seccomp, syscall::Syscall, tty, utils,
+};
 use anyhow::{bail, Context, Result};
 use nix::mount::mount as nix_mount;
 use nix::mount::MsFlags;
@@ -9,16 +14,11 @@ use nix::{
 };
 use oci_spec::runtime::{LinuxNamespaceType, User};
 use std::collections::HashMap;
-use std::{env, os::unix::io::AsRawFd};
-use std::{fs, path::Path, path::PathBuf};
-
-use crate::rootless::Rootless;
-use crate::{
-    capabilities, hooks, namespaces::Namespaces, process::channel, rootfs, syscall::Syscall, tty,
-    utils,
+use std::{
+    env, fs,
+    os::unix::io::AsRawFd,
+    path::{Path, PathBuf},
 };
-
-use super::args::ContainerArgs;
 
 // Make sure a given path is on procfs. This is to avoid the security risk that
 // /proc path is mounted over. Ref: CVE-2019-16884
@@ -299,6 +299,14 @@ pub fn container_init(
         .set_id(Uid::from_raw(proc.user.uid), Gid::from_raw(proc.user.gid))
         .context("Failed to configure uid and gid")?;
 
+    // Without no new privileges, seccomp is a privileged operation. We have to
+    // do this before dropping capabilities. Otherwise, we should do it later,
+    // as close to exec as possible.
+    if linux.seccomp.is_some() && proc.no_new_privileges.is_none() {
+        seccomp::initialize_seccomp(linux.seccomp.as_ref().unwrap())
+            .context("Failed to execute seccomp")?;
+    }
+
     capabilities::reset_effective(command).context("Failed to reset effective capabilities")?;
     if let Some(caps) = &proc.capabilities {
         capabilities::drop_privileges(caps, command).context("Failed to drop capabilities")?;
@@ -375,6 +383,13 @@ pub fn container_init(
         if let Some(hooks) = hooks {
             hooks::run_hooks(hooks.start_container.as_ref(), container)?
         }
+    }
+
+    if linux.seccomp.is_some() && proc.no_new_privileges.is_some() {
+        // Initialize seccomp profile right before we are ready to execute the
+        // payload. The notify socket will still need network related syscalls.
+        seccomp::initialize_seccomp(linux.seccomp.as_ref().unwrap())
+            .context("Failed to execute seccomp")?;
     }
 
     if let Some(args) = proc.args.as_ref() {

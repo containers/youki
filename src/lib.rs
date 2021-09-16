@@ -9,6 +9,7 @@ pub mod notify_socket;
 pub mod process;
 pub mod rootfs;
 pub mod rootless;
+pub mod seccomp;
 pub mod signal;
 pub mod syscall;
 pub mod tty;
