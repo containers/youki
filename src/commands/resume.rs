@@ -14,6 +14,7 @@ use cgroups::common::FreezerState;
 /// Structure to implement resume command
 #[derive(Clap, Debug)]
 pub struct Resume {
+    #[clap(forbid_empty_values = true, required = true)]
     pub container_id: String,
 }
 

@@ -13,6 +13,7 @@ use nix::sys::signal as nix_signal;
 
 #[derive(Clap, Debug)]
 pub struct Delete {
+    #[clap(forbid_empty_values = true, required = true)]
     container_id: String,
     /// forces deletion of the container if it is still running (using SIGKILL)
     #[clap(short, long)]

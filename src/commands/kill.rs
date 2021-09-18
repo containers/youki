@@ -12,6 +12,7 @@ use crate::{
 
 #[derive(Clap, Debug)]
 pub struct Kill {
+    #[clap(forbid_empty_values = true, required = true)]
     container_id: String,
     signal: String,
 }

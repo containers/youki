@@ -12,6 +12,7 @@ use crate::notify_socket::{NotifySocket, NOTIFY_FILE};
 
 #[derive(Clap, Debug)]
 pub struct Start {
+    #[clap(forbid_empty_values = true, required = true)]
     pub container_id: String,
 }
 
