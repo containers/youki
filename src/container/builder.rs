@@ -133,8 +133,8 @@ impl ContainerBuilder {
         self
     }
 
-    /// Sets the console socket, which will be used to send the file descriptor
-    /// of the pseudoterminal
+    /// Sets the number of additional file descriptors which will be passed into
+    /// the container process.
     /// # Example
     ///
     /// ```no_run
