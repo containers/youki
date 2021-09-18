@@ -3,7 +3,7 @@ use crate::{
     notify_socket::NotifyListener,
     process::{args::ContainerArgs, channel, fork, intermediate},
     rootless::{self, Rootless},
-    syscall::linux::LinuxSyscall,
+    syscall::Syscall,
     utils,
 };
 use anyhow::{Context, Result};
@@ -17,7 +17,7 @@ pub(super) struct ContainerBuilderImpl<'a> {
     /// Flag indicating if an init or a tenant container should be created
     pub init: bool,
     /// Interface to operating system primitives
-    pub syscall: LinuxSyscall,
+    pub syscall: &'a dyn Syscall,
     /// Flag indicating if systemd should be used for cgroup management
     pub use_systemd: bool,
     /// Id of the container
@@ -102,7 +102,7 @@ impl<'a> ContainerBuilderImpl<'a> {
         // is a shared reference, we have to clone these variables here.
         let intermediate_args = ContainerArgs {
             init: self.init,
-            syscall: self.syscall.clone(),
+            syscall: self.syscall,
             spec: self.spec.clone(),
             rootfs: self.rootfs.clone(),
             console_socket: self.console_socket,
