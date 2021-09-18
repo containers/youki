@@ -13,7 +13,7 @@ impl Unified {
         cgroup_path: &Path,
         controllers: Vec<ControllerType>,
     ) -> Result<()> {
-        if let Some(unified) = &controller_opt.resources.unified {
+        if let Some(unified) = &controller_opt.resources.unified() {
             log::debug!("Apply unified cgroup config");
             for (cgroup_file, value) in unified {
                 common::write_cgroup_file_str(cgroup_path.join(cgroup_file), value).map_err(

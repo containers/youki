@@ -19,7 +19,7 @@ pub struct Io {}
 impl Controller for Io {
     fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply io cgroup v2 config");
-        if let Some(io) = &controller_opt.resources.block_io {
+        if let Some(io) = &controller_opt.resources.block_io() {
             Self::apply(cgroup_root, io).context("failed to apply io resource restrictions")?;
         }
         Ok(())
@@ -85,20 +85,20 @@ impl Io {
 
     // linux kernel doc: https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html#io
     fn apply(root_path: &Path, blkio: &LinuxBlockIo) -> Result<()> {
-        if let Some(weight_device) = blkio.weight_device.as_ref() {
+        if let Some(weight_device) = blkio.weight_device().as_ref() {
             for wd in weight_device {
                 common::write_cgroup_file(
                     root_path.join(CGROUP_BFQ_IO_WEIGHT),
-                    &format!("{}:{} {}", wd.major, wd.minor, wd.weight.unwrap()),
+                    &format!("{}:{} {}", wd.major(), wd.minor(), wd.weight().unwrap()),
                 )?;
             }
         }
-        if let Some(leaf_weight) = blkio.leaf_weight {
+        if let Some(leaf_weight) = blkio.leaf_weight() {
             if leaf_weight > 0 {
                 bail!("cannot set leaf_weight with cgroupv2");
             }
         }
-        if let Some(io_weight) = blkio.weight {
+        if let Some(io_weight) = blkio.weight() {
             if io_weight > 0 {
                 common::write_cgroup_file(
                     root_path.join(CGROUP_IO_WEIGHT),
@@ -107,38 +107,38 @@ impl Io {
             }
         }
 
-        if let Some(throttle_read_bps_device) = blkio.throttle_read_bps_device.as_ref() {
+        if let Some(throttle_read_bps_device) = blkio.throttle_read_bps_device().as_ref() {
             for trbd in throttle_read_bps_device {
                 common::write_cgroup_file(
                     Self::io_max_path(root_path),
-                    &format!("{}:{} rbps={}", trbd.major, trbd.minor, trbd.rate),
+                    &format!("{}:{} rbps={}", trbd.major(), trbd.minor(), trbd.rate()),
                 )?;
             }
         }
 
-        if let Some(throttle_write_bps_device) = blkio.throttle_write_bps_device.as_ref() {
+        if let Some(throttle_write_bps_device) = blkio.throttle_write_bps_device().as_ref() {
             for twbd in throttle_write_bps_device {
                 common::write_cgroup_file(
                     Self::io_max_path(root_path),
-                    format!("{}:{} wbps={}", twbd.major, twbd.minor, twbd.rate),
+                    format!("{}:{} wbps={}", twbd.major(), twbd.minor(), twbd.rate()),
                 )?;
             }
         }
 
-        if let Some(throttle_read_iops_device) = blkio.throttle_read_iops_device.as_ref() {
+        if let Some(throttle_read_iops_device) = blkio.throttle_read_iops_device().as_ref() {
             for trid in throttle_read_iops_device {
                 common::write_cgroup_file(
                     Self::io_max_path(root_path),
-                    format!("{}:{} riops={}", trid.major, trid.minor, trid.rate),
+                    format!("{}:{} riops={}", trid.major(), trid.minor(), trid.rate()),
                 )?;
             }
         }
 
-        if let Some(throttle_write_iops_device) = blkio.throttle_write_iops_device.as_ref() {
+        if let Some(throttle_write_iops_device) = blkio.throttle_write_iops_device().as_ref() {
             for twid in throttle_write_iops_device {
                 common::write_cgroup_file(
                     Self::io_max_path(root_path),
-                    format!("{}:{} wiops={}", twid.major, twid.minor, twid.rate),
+                    format!("{}:{} wiops={}", twid.major(), twid.minor(), twid.rate()),
                 )?;
             }
         }

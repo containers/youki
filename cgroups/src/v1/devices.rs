@@ -14,7 +14,7 @@ impl Controller for Devices {
     fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply Devices cgroup config");
 
-        if let Some(devices) = controller_opt.resources.devices.as_ref() {
+        if let Some(devices) = controller_opt.resources.devices().as_ref() {
             for d in devices {
                 Self::apply_device(d, cgroup_root)?;
             }
@@ -40,7 +40,7 @@ impl Controller for Devices {
 
 impl Devices {
     fn apply_device(device: &LinuxDeviceCgroup, cgroup_root: &Path) -> Result<()> {
-        let path = if device.allow {
+        let path = if device.allow() {
             cgroup_root.join("devices.allow")
         } else {
             cgroup_root.join("devices.deny")
@@ -74,7 +74,7 @@ mod tests {
 
             Devices::apply_device(d, &tmp).expect("Apply default device");
             println!("Device: {}", d.to_string());
-            if d.allow {
+            if d.allow() {
                 let allowed_content =
                     read_to_string(tmp.join("devices.allow")).expect("read to string");
                 assert_eq!(allowed_content, d.to_string());
@@ -126,7 +126,7 @@ mod tests {
 
             Devices::apply_device(d, &tmp).expect("Apply default device");
             println!("Device: {}", d.to_string());
-            if d.allow {
+            if d.allow() {
                 let allowed_content =
                     read_to_string(tmp.join("devices.allow")).expect("read to string");
                 assert_eq!(allowed_content, d.to_string());
@@ -144,7 +144,7 @@ mod tests {
             set_fixture(&tmp, "devices.allow", "").expect("create allowed devices list");
             set_fixture(&tmp, "devices.deny", "").expect("create denied devices list");
             Devices::apply_device(&device, &tmp).expect("Apply default device");
-            if device.allow {
+            if device.allow() {
                 let allowed_content =
                     read_to_string(tmp.join("devices.allow")).expect("read to string");
                 allowed_content == device.to_string()
@@ -162,7 +162,7 @@ mod tests {
                     set_fixture(&tmp, "devices.allow", "").expect("create allowed devices list");
                     set_fixture(&tmp, "devices.deny", "").expect("create denied devices list");
                     Devices::apply_device(device, &tmp).expect("Apply default device");
-                    if device.allow {
+                    if device.allow() {
                         let allowed_content =
                             read_to_string(tmp.join("devices.allow")).expect("read to string");
                         allowed_content == device.to_string()

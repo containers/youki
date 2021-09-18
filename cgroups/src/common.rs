@@ -10,7 +10,10 @@ use nix::{
     sys::statfs::{statfs, CGROUP2_SUPER_MAGIC, TMPFS_MAGIC},
     unistd::Pid,
 };
-use oci_spec::runtime::{LinuxDevice, LinuxDeviceCgroup, LinuxDeviceType, LinuxResources};
+use oci_spec::runtime::{
+    LinuxDevice, LinuxDeviceBuilder, LinuxDeviceCgroup, LinuxDeviceCgroupBuilder, LinuxDeviceType,
+    LinuxResources,
+};
 #[cfg(feature = "systemd_cgroups")]
 use systemd::daemon::booted;
 #[cfg(not(feature = "systemd_cgroups"))]
@@ -244,109 +247,104 @@ impl PathBufExt for PathBuf {
 
 pub(crate) fn default_allow_devices() -> Vec<LinuxDeviceCgroup> {
     vec![
-        LinuxDeviceCgroup {
-            allow: true,
-            typ: Some(LinuxDeviceType::C),
-            major: None,
-            minor: None,
-            access: "m".to_string().into(),
-        },
-        LinuxDeviceCgroup {
-            allow: true,
-            typ: Some(LinuxDeviceType::B),
-            major: None,
-            minor: None,
-            access: "m".to_string().into(),
-        },
+        LinuxDeviceCgroupBuilder::default()
+            .allow(true)
+            .typ(LinuxDeviceType::C)
+            .access("m")
+            .build()
+            .unwrap(),
+        LinuxDeviceCgroupBuilder::default()
+            .allow(true)
+            .typ(LinuxDeviceType::B)
+            .access("m")
+            .build()
+            .unwrap(),
         // /dev/console
-        LinuxDeviceCgroup {
-            allow: true,
-            typ: Some(LinuxDeviceType::C),
-            major: Some(5),
-            minor: Some(1),
-            access: "rwm".to_string().into(),
-        },
+        LinuxDeviceCgroupBuilder::default()
+            .allow(true)
+            .typ(LinuxDeviceType::C)
+            .major(5)
+            .minor(1)
+            .access("rwm")
+            .build()
+            .unwrap(),
         // /dev/pts
-        LinuxDeviceCgroup {
-            allow: true,
-            typ: Some(LinuxDeviceType::C),
-            major: Some(136),
-            minor: None,
-            access: "rwm".to_string().into(),
-        },
-        LinuxDeviceCgroup {
-            allow: true,
-            typ: Some(LinuxDeviceType::C),
-            major: Some(5),
-            minor: Some(2),
-            access: "rwm".to_string().into(),
-        },
+        LinuxDeviceCgroupBuilder::default()
+            .allow(true)
+            .typ(LinuxDeviceType::C)
+            .major(136)
+            .access("rwm")
+            .build()
+            .unwrap(),
+        LinuxDeviceCgroupBuilder::default()
+            .allow(true)
+            .typ(LinuxDeviceType::C)
+            .major(5)
+            .minor(2)
+            .access("rwm")
+            .build()
+            .unwrap(),
         // tun/tap
-        LinuxDeviceCgroup {
-            allow: true,
-            typ: Some(LinuxDeviceType::C),
-            major: Some(10),
-            minor: Some(200),
-            access: "rwm".to_string().into(),
-        },
+        LinuxDeviceCgroupBuilder::default()
+            .allow(true)
+            .typ(LinuxDeviceType::C)
+            .major(10)
+            .minor(200)
+            .access("rwm")
+            .build()
+            .unwrap(),
     ]
 }
 
 pub(crate) fn default_devices() -> Vec<LinuxDevice> {
     vec![
-        LinuxDevice {
-            path: PathBuf::from("/dev/null"),
-            typ: LinuxDeviceType::C,
-            major: 1,
-            minor: 3,
-            file_mode: Some(0o066),
-            uid: None,
-            gid: None,
-        },
-        LinuxDevice {
-            path: PathBuf::from("/dev/zero"),
-            typ: LinuxDeviceType::C,
-            major: 1,
-            minor: 5,
-            file_mode: Some(0o066),
-            uid: None,
-            gid: None,
-        },
-        LinuxDevice {
-            path: PathBuf::from("/dev/full"),
-            typ: LinuxDeviceType::C,
-            major: 1,
-            minor: 7,
-            file_mode: Some(0o066),
-            uid: None,
-            gid: None,
-        },
-        LinuxDevice {
-            path: PathBuf::from("/dev/tty"),
-            typ: LinuxDeviceType::C,
-            major: 5,
-            minor: 0,
-            file_mode: Some(0o066),
-            uid: None,
-            gid: None,
-        },
-        LinuxDevice {
-            path: PathBuf::from("/dev/urandom"),
-            typ: LinuxDeviceType::C,
-            major: 1,
-            minor: 9,
-            file_mode: Some(0o066),
-            uid: None,
-            gid: None,
-        },
-        LinuxDevice {
-            path: PathBuf::from("/dev/random"),
-            typ: LinuxDeviceType::C,
-            major: 1,
-            minor: 8,
-            file_mode: Some(0o066),
-            uid: None,
-            gid: None,
-        },
+        LinuxDeviceBuilder::default()
+            .path(PathBuf::from("/dev/null"))
+            .typ(LinuxDeviceType::C)
+            .major(1)
+            .minor(3)
+            .file_mode(0o066u32)
+            .build()
+            .unwrap(),
+        LinuxDeviceBuilder::default()
+            .path(PathBuf::from("/dev/zero"))
+            .typ(LinuxDeviceType::C)
+            .major(1)
+            .minor(5)
+            .file_mode(0o066u32)
+            .build()
+            .unwrap(),
+        LinuxDeviceBuilder::default()
+            .path(PathBuf::from("/dev/full"))
+            .typ(LinuxDeviceType::C)
+            .major(1)
+            .minor(7)
+            .file_mode(0o066u32)
+            .build()
+            .unwrap(),
+        LinuxDeviceBuilder::default()
+            .path(PathBuf::from("/dev/tty"))
+            .typ(LinuxDeviceType::C)
+            .major(5)
+            .minor(0)
+            .file_mode(0o066u32)
+            .build()
+            .unwrap(),
+        LinuxDeviceBuilder::default()
+            .path(PathBuf::from("/dev/urandom"))
+            .typ(LinuxDeviceType::C)
+            .major(1)
+            .minor(9)
+            .file_mode(0o066u32)
+            .build()
+            .unwrap(),
+        LinuxDeviceBuilder::default()
+            .path(PathBuf::from("/dev/random"))
+            .typ(LinuxDeviceType::C)
+            .major(1)
+            .minor(8)
+            .file_mode(0o066u32)
+            .build()
+            .unwrap(),
     ]
 }

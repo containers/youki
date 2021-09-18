@@ -13,7 +13,7 @@ pub struct CpuSet {}
 
 impl Controller for CpuSet {
     fn apply(controller_opt: &ControllerOpt, cgroup_path: &Path) -> Result<()> {
-        if let Some(cpuset) = &controller_opt.resources.cpu {
+        if let Some(cpuset) = &controller_opt.resources.cpu() {
             Self::apply(cgroup_path, cpuset)
                 .context("failed to apply cpuset resource restrictions")?;
         }
@@ -24,11 +24,11 @@ impl Controller for CpuSet {
 
 impl CpuSet {
     fn apply(path: &Path, cpuset: &LinuxCpu) -> Result<()> {
-        if let Some(cpus) = &cpuset.cpus {
+        if let Some(cpus) = &cpuset.cpus() {
             common::write_cgroup_file_str(path.join(CGROUP_CPUSET_CPUS), cpus)?;
         }
 
-        if let Some(mems) = &cpuset.mems {
+        if let Some(mems) = &cpuset.mems() {
             common::write_cgroup_file_str(path.join(CGROUP_CPUSET_MEMS), mems)?;
         }
 

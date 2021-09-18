@@ -19,7 +19,7 @@ pub struct Memory {}
 
 impl Controller for Memory {
     fn apply(controller_opt: &ControllerOpt, cgroup_path: &Path) -> Result<()> {
-        if let Some(memory) = &controller_opt.resources.memory {
+        if let Some(memory) = &controller_opt.resources.memory() {
             Self::apply(cgroup_path, memory)
                 .context("failed to apply memory resource restrictions")?;
         }
@@ -84,15 +84,15 @@ impl Memory {
 
     fn apply(path: &Path, memory: &LinuxMemory) -> Result<()> {
         // if nothing is set just exit right away
-        if memory.reservation.is_none() && memory.limit.is_none() && memory.swap.is_none() {
+        if memory.reservation().is_none() && memory.limit().is_none() && memory.swap().is_none() {
             return Ok(());
         }
 
-        match memory.limit {
+        match memory.limit() {
             Some(limit) if limit < -1 => {
                 bail!("invalid memory value: {}", limit);
             }
-            Some(limit) => match memory.swap {
+            Some(limit) => match memory.swap() {
                 Some(swap) if swap < -1 => {
                     bail!("invalid swap value: {}", swap);
                 }
@@ -125,13 +125,13 @@ impl Memory {
                 }
             },
             None => {
-                if memory.swap.is_some() {
+                if memory.swap().is_some() {
                     bail!("unable to set swap limit without memory limit");
                 }
             }
         };
 
-        if let Some(reservation) = memory.reservation {
+        if let Some(reservation) = memory.reservation() {
             if reservation < -1 {
                 bail!("invalid memory reservation value: {}", reservation);
             }
@@ -290,27 +290,27 @@ mod tests {
 
             // we need to check for expected errors first and foremost or we'll get false negatives
             // later
-            if let Some(limit) = linux_memory.limit {
+            if let Some(limit) = linux_memory.limit() {
                 if limit < -1 {
                     return result.is_err();
                 }
             }
 
-            if let Some(swap) = linux_memory.swap {
+            if let Some(swap) = linux_memory.swap() {
                 if swap < -1 {
                     return result.is_err();
                 }
-                if linux_memory.limit.is_none() {
+                if linux_memory.limit().is_none() {
                     return result.is_err();
                 }
-                if let Some(limit) = linux_memory.limit {
+                if let Some(limit) = linux_memory.limit() {
                     if limit != -1 && swap != -1 && swap < limit {
                         return result.is_err();
                     }
                 }
             }
 
-            if let Some(reservation) = linux_memory.reservation {
+            if let Some(reservation) = linux_memory.reservation() {
                 if reservation < -1 {
                     return result.is_err();
                 }
@@ -318,7 +318,7 @@ mod tests {
 
             // check the limit file is set as expected
             let limit_content = read_to_string(tmp.join(CGROUP_MEMORY_MAX)).expect("read memory limit to string");
-            let limit_check = match linux_memory.limit {
+            let limit_check = match linux_memory.limit() {
                 Some(limit) if limit == -1 => limit_content == "max",
                 Some(limit) => limit_content == limit.to_string(),
                 None => limit_content == "0",
@@ -326,21 +326,21 @@ mod tests {
 
             // check the swap file is set as expected
             let swap_content = read_to_string(tmp.join(CGROUP_MEMORY_SWAP)).expect("read swap limit to string");
-            let swap_check = match linux_memory.swap {
+            let swap_check = match linux_memory.swap() {
                 Some(swap) if swap == -1 => swap_content == "max",
                 Some(swap) => {
-                    if let Some(limit) = linux_memory.limit {
+                    if let Some(limit) = linux_memory.limit() {
                         if limit == -1 {
                             swap_content == swap.to_string()
                         } else {
-                            swap_content == (swap - linux_memory.limit.unwrap()).to_string()
+                            swap_content == (swap - linux_memory.limit().unwrap()).to_string()
                         }
                     } else {
                         false
                     }
                 }
                 None => {
-                    match linux_memory.limit {
+                    match linux_memory.limit() {
                         Some(limit) if limit == -1 => swap_content == "max",
                         _ => swap_content == "0",
                     }
@@ -350,7 +350,7 @@ mod tests {
 
             // check the resevation file is set as expected
             let reservation_content = read_to_string(tmp.join(CGROUP_MEMORY_LOW)).expect("read memory reservation to string");
-            let reservation_check = match linux_memory.reservation {
+            let reservation_check = match linux_memory.reservation() {
                 Some(reservation) if reservation == -1 => reservation_content == "max",
                 Some(reservation) => reservation_content == reservation.to_string(),
                 None => reservation_content == "0",

@@ -15,7 +15,7 @@ pub struct Pids {}
 impl Controller for Pids {
     fn apply(controller_opt: &ControllerOpt, cgroup_root: &std::path::Path) -> Result<()> {
         log::debug!("Apply pids cgroup v2 config");
-        if let Some(pids) = &controller_opt.resources.pids {
+        if let Some(pids) = &controller_opt.resources.pids() {
             Self::apply(cgroup_root, pids).context("failed to apply pids resource restrictions")?;
         }
         Ok(())
@@ -32,8 +32,8 @@ impl StatsProvider for Pids {
 
 impl Pids {
     fn apply(root_path: &Path, pids: &LinuxPids) -> Result<()> {
-        let limit = if pids.limit > 0 {
-            pids.limit.to_string()
+        let limit = if pids.limit() > 0 {
+            pids.limit().to_string()
         } else {
             "max".to_string()
         };
@@ -58,7 +58,7 @@ mod tests {
         Pids::apply(&tmp, &pids).expect("apply pids");
         let content =
             std::fs::read_to_string(tmp.join(pids_file_name)).expect("Read pids contents");
-        assert_eq!(pids.limit.to_string(), content);
+        assert_eq!(pids.limit().to_string(), content);
     }
 
     #[test]

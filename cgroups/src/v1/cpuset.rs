@@ -39,8 +39,8 @@ impl Controller for CpuSet {
     }
 
     fn needs_to_handle(controller_opt: &ControllerOpt) -> Option<&Self::Resource> {
-        if let Some(cpuset) = &controller_opt.resources.cpu {
-            if cpuset.cpus.is_some() || cpuset.mems.is_some() {
+        if let Some(cpuset) = &controller_opt.resources.cpu() {
+            if cpuset.cpus().is_some() || cpuset.mems().is_some() {
                 return Some(cpuset);
             }
         }
@@ -51,11 +51,11 @@ impl Controller for CpuSet {
 
 impl CpuSet {
     fn apply(cgroup_path: &Path, cpuset: &LinuxCpu) -> Result<()> {
-        if let Some(cpus) = &cpuset.cpus {
+        if let Some(cpus) = &cpuset.cpus() {
             common::write_cgroup_file_str(cgroup_path.join(CGROUP_CPUSET_CPUS), cpus)?;
         }
 
-        if let Some(mems) = &cpuset.mems {
+        if let Some(mems) = &cpuset.mems() {
             common::write_cgroup_file_str(cgroup_path.join(CGROUP_CPUSET_MEMS), mems)?;
         }
 

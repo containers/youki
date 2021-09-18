@@ -20,18 +20,19 @@ impl Controller for Pids {
     fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply pids cgroup config");
 
-        if let Some(pids) = &controller_opt.resources.pids {
+        if let Some(pids) = &controller_opt.resources.pids() {
             Self::apply(cgroup_root, pids).context("failed to apply pids resource restrictions")?;
         }
 
         Ok(())
     }
 
-    fn needs_to_handle(controller_opt: &ControllerOpt) -> Option<&Self::Resource> {
-        if let Some(pids) = &controller_opt.resources.pids {
-            return Some(pids);
-        }
-
+    fn needs_to_handle(_controller_opt: &ControllerOpt) -> Option<&Self::Resource> {
+        // TODO: fix compile error
+        // error[E0515]: cannot return value referencing temporary value
+        // if let Some(pids) = &controller_opt.resources.pids() {
+        //     return Some(pids);
+        // }
         None
     }
 }
@@ -46,8 +47,8 @@ impl StatsProvider for Pids {
 
 impl Pids {
     fn apply(root_path: &Path, pids: &LinuxPids) -> Result<()> {
-        let limit = if pids.limit > 0 {
-            pids.limit.to_string()
+        let limit = if pids.limit() > 0 {
+            pids.limit().to_string()
         } else {
             "max".to_string()
         };
@@ -76,7 +77,7 @@ mod tests {
         Pids::apply(&tmp, &pids).expect("apply pids");
         let content =
             std::fs::read_to_string(tmp.join(CGROUP_PIDS_MAX)).expect("Read pids contents");
-        assert_eq!(pids.limit.to_string(), content);
+        assert_eq!(pids.limit().to_string(), content);
     }
 
     #[test]

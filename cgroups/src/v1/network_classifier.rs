@@ -23,7 +23,7 @@ impl Controller for NetworkClassifier {
     }
 
     fn needs_to_handle(controller_opt: &ControllerOpt) -> Option<&Self::Resource> {
-        if let Some(network) = controller_opt.resources.network.as_ref() {
+        if let Some(network) = controller_opt.resources.network().as_ref() {
             return Some(network);
         }
 
@@ -33,7 +33,7 @@ impl Controller for NetworkClassifier {
 
 impl NetworkClassifier {
     fn apply(root_path: &Path, network: &LinuxNetwork) -> Result<()> {
-        if let Some(class_id) = network.class_id {
+        if let Some(class_id) = network.class_id() {
             common::write_cgroup_file(root_path.join("net_cls.classid"), class_id)?;
         }
 

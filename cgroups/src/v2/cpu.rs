@@ -21,7 +21,7 @@ pub struct Cpu {}
 
 impl Controller for Cpu {
     fn apply(controller_opt: &ControllerOpt, path: &Path) -> Result<()> {
-        if let Some(cpu) = &controller_opt.resources.cpu {
+        if let Some(cpu) = &controller_opt.resources.cpu() {
             Self::apply(path, cpu).context("failed to apply cpu resource restrictions")?;
         }
 
@@ -61,7 +61,7 @@ impl Cpu {
             bail!("realtime is not supported on cgroup v2 yet");
         }
 
-        if let Some(mut shares) = cpu.shares {
+        if let Some(mut shares) = cpu.shares() {
             shares = Self::convert_shares_to_cgroup2(shares);
             if shares != 0 {
                 // will result in Erno 34 (numerical result out of range) otherwise
@@ -71,14 +71,14 @@ impl Cpu {
 
         // if quota is unrestricted set to 'max'
         let mut quota_string = UNRESTRICTED_QUOTA.to_owned();
-        if let Some(quota) = cpu.quota {
+        if let Some(quota) = cpu.quota() {
             if quota > 0 {
                 quota_string = quota.to_string();
             }
         }
 
         let mut period_string: String = DEFAULT_PERIOD.to_owned();
-        if let Some(period) = cpu.period {
+        if let Some(period) = cpu.period() {
             if period > 0 {
                 period_string = period.to_string();
             }
@@ -103,11 +103,11 @@ impl Cpu {
     }
 
     fn is_realtime_requested(cpu: &LinuxCpu) -> bool {
-        if cpu.realtime_period.is_some() {
+        if cpu.realtime_period().is_some() {
             return true;
         }
 
-        if cpu.realtime_runtime.is_some() {
+        if cpu.realtime_runtime().is_some() {
             return true;
         }
 

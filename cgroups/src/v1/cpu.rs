@@ -33,12 +33,12 @@ impl Controller for Cpu {
     }
 
     fn needs_to_handle(controller_opt: &ControllerOpt) -> Option<&Self::Resource> {
-        if let Some(cpu) = &controller_opt.resources.cpu {
-            if cpu.shares.is_some()
-                || cpu.period.is_some()
-                || cpu.quota.is_some()
-                || cpu.realtime_period.is_some()
-                || cpu.realtime_runtime.is_some()
+        if let Some(cpu) = &controller_opt.resources.cpu() {
+            if cpu.shares().is_some()
+                || cpu.period().is_some()
+                || cpu.quota().is_some()
+                || cpu.realtime_period().is_some()
+                || cpu.realtime_runtime().is_some()
             {
                 return Some(cpu);
             }
@@ -95,31 +95,31 @@ impl StatsProvider for Cpu {
 
 impl Cpu {
     fn apply(root_path: &Path, cpu: &LinuxCpu) -> Result<()> {
-        if let Some(cpu_shares) = cpu.shares {
+        if let Some(cpu_shares) = cpu.shares() {
             if cpu_shares != 0 {
                 common::write_cgroup_file(root_path.join(CGROUP_CPU_SHARES), cpu_shares)?;
             }
         }
 
-        if let Some(cpu_period) = cpu.period {
+        if let Some(cpu_period) = cpu.period() {
             if cpu_period != 0 {
                 common::write_cgroup_file(root_path.join(CGROUP_CPU_PERIOD), cpu_period)?;
             }
         }
 
-        if let Some(cpu_quota) = cpu.quota {
+        if let Some(cpu_quota) = cpu.quota() {
             if cpu_quota != 0 {
                 common::write_cgroup_file(root_path.join(CGROUP_CPU_QUOTA), cpu_quota)?;
             }
         }
 
-        if let Some(rt_runtime) = cpu.realtime_runtime {
+        if let Some(rt_runtime) = cpu.realtime_runtime() {
             if rt_runtime != 0 {
                 common::write_cgroup_file(root_path.join(CGROUP_CPU_RT_RUNTIME), rt_runtime)?;
             }
         }
 
-        if let Some(rt_period) = cpu.realtime_period {
+        if let Some(rt_period) = cpu.realtime_period() {
             if rt_period != 0 {
                 common::write_cgroup_file(root_path.join(CGROUP_CPU_RT_PERIOD), rt_period)?;
             }
