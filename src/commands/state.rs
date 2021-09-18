@@ -8,6 +8,7 @@ use crate::container::Container;
 
 #[derive(Clap, Debug)]
 pub struct State {
+    #[clap(forbid_empty_values = true, required = true)]
     pub container_id: String,
 }
 
