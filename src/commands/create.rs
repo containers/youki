@@ -3,7 +3,7 @@ use anyhow::Result;
 use clap::Clap;
 use std::path::PathBuf;
 
-use crate::container::builder::ContainerBuilder;
+use crate::{container::builder::ContainerBuilder, syscall::syscall::create_syscall};
 
 /// This is the main structure which stores various commandline options given by
 /// high-level container runtime
@@ -51,7 +51,8 @@ impl Create {
     }
     /// Starts a new container process
     pub fn exec(&self, root_path: PathBuf, systemd_cgroup: bool) -> Result<()> {
-        ContainerBuilder::new(self.container_id.clone())
+        let syscall = create_syscall();
+        ContainerBuilder::new(self.container_id.clone(), syscall.as_ref())
             .with_pid_file(self.pid_file.as_ref())
             .with_console_socket(self.console_socket.as_ref())
             .with_root_path(root_path)

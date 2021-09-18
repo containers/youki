@@ -1,7 +1,7 @@
 use super::args::ContainerArgs;
 use crate::{
     capabilities, hooks, namespaces::Namespaces, process::channel, rootfs, rootless::Rootless,
-    seccomp, syscall::Syscall, tty, utils,
+    seccomp, tty, utils,
 };
 use anyhow::{bail, Context, Result};
 use nix::mount::mount as nix_mount;
@@ -176,7 +176,7 @@ pub fn container_init(
     args: ContainerArgs,
     sender_to_intermediate: &mut channel::SenderInitToIntermediate,
 ) -> Result<()> {
-    let command = &args.syscall;
+    let command = args.syscall;
     let spec = &args.spec;
     let linux = spec.linux.as_ref().context("no linux in spec")?;
     let proc = spec.process.as_ref().context("no process in spec")?;
