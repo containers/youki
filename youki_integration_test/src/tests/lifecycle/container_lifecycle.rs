@@ -1,7 +1,14 @@
 use crate::utils::{generate_uuid, prepare_bundle, TempDir};
+use std::thread::sleep;
+use std::time::Duration;
 use test_framework::{TestResult, TestableGroup};
 
 use super::{create, delete, kill, start, state};
+
+// By experimenting, somewhere around 50 is enough for youki process
+// to get the kill signal and shut down
+// here we add a little buffer time as well
+const SLEEP_TIME: u64 = 75;
 
 pub struct ContainerLifecycle {
     project_path: TempDir,
@@ -37,7 +44,11 @@ impl ContainerLifecycle {
     }
 
     pub fn kill(&self) -> TestResult {
-        kill::kill(&self.project_path, &self.container_id)
+        let ret = kill::kill(&self.project_path, &self.container_id);
+        // sleep a little, so the youki process actually gets the signal and shuts down
+        // otherwise, the tester moves on to next tests before the youki has gotten signal, and delete test can fail
+        sleep(Duration::from_millis(SLEEP_TIME));
+        ret
     }
 
     pub fn delete(&self) -> TestResult {
