@@ -13,7 +13,7 @@ pub fn create(project_path: &Path, id: &str) -> TestResult {
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .arg("--root")
-        .arg(project_path.join("integration-workspace").join("youki"))
+        .arg(project_path.join("integration-workspace").join("runtime"))
         .arg("create")
         .arg(id)
         .arg("--bundle")

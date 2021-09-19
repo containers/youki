@@ -9,7 +9,7 @@ pub fn delete(project_path: &Path, id: &str) -> TestResult {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .arg("--root")
-        .arg(project_path.join("integration-workspace").join("youki"))
+        .arg(project_path.join("integration-workspace").join("runtime"))
         .arg("delete")
         .arg(id)
         .spawn()
