@@ -2,7 +2,7 @@
 //! Most systems mount another filesystem over it
 
 use crate::utils::PathBufExt;
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use nix::errno::Errno;
 use nix::fcntl::{open, OFlag};
 use nix::mount::mount as nix_mount;
@@ -11,7 +11,9 @@ use nix::sys::stat::{mknod, umask};
 use nix::sys::stat::{Mode, SFlag};
 use nix::unistd::{chown, close};
 use nix::unistd::{Gid, Uid};
+use nix::NixPath;
 use oci_spec::runtime::{LinuxDevice, LinuxDeviceType, Mount, Spec};
+use procfs::process::{MountInfo, MountOptFields, Process};
 use std::fs::OpenOptions;
 use std::fs::{canonicalize, create_dir_all, remove_file};
 use std::os::unix::fs::symlink;
@@ -26,6 +28,7 @@ pub fn prepare_rootfs(spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<
             "shared" => flags |= MsFlags::MS_SHARED,
             "private" => flags |= MsFlags::MS_PRIVATE,
             "slave" => flags |= MsFlags::MS_SLAVE,
+            "unbindable" => flags |= MsFlags::MS_SLAVE, // set unbindable after pivot_root
             uknown => bail!("unknown rootfs_propagation: {}", uknown),
         }
     } else {
@@ -34,6 +37,8 @@ pub fn prepare_rootfs(spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<
 
     nix_mount(None::<&str>, "/", None::<&str>, flags, None::<&str>)
         .context("Failed to mount rootfs")?;
+
+    make_parent_mount_private(rootfs)?;
 
     log::debug!("mount root fs {:?}", rootfs);
     nix_mount::<Path, Path, str, str>(
@@ -386,4 +391,56 @@ fn parse_mount(m: &Mount) -> (MsFlags, String) {
         }
     }
     (flags, data.join(","))
+}
+
+fn get_parent_mount(rootfs: &Path) -> Result<MountInfo> {
+    let mount_infos = Process::myself()?.mountinfo()?;
+    // find the longest mount point
+    let parent_mount_info = mount_infos
+        .into_iter()
+        .filter(|mi| rootfs.starts_with(&mi.mount_point))
+        .max_by(|mi1, mi2| mi1.mount_point.len().cmp(&mi2.mount_point.len()))
+        .ok_or_else(|| anyhow!("couldn't find parent mount of {}", rootfs.display()))?;
+    Ok(parent_mount_info)
+}
+
+/// Make parent mount of rootfs private if it was shared, which is required by pivot_root.
+/// It also makes sure following bind mount does not propagate in other namespaces.
+fn make_parent_mount_private(rootfs: &Path) -> Result<()> {
+    let parent_mount = get_parent_mount(rootfs)?;
+
+    // check parent mount has 'shared' propagation type
+    if parent_mount
+        .opt_fields
+        .iter()
+        .any(|field| matches!(field, MountOptFields::Shared(_)))
+    {
+        nix_mount(
+            None::<&str>,
+            &parent_mount.mount_point,
+            None::<&str>,
+            MsFlags::MS_PRIVATE,
+            None::<&str>,
+        )?;
+    }
+
+    Ok(())
+}
+
+/// Change propagation type of rootfs as specified in spec.
+pub fn adjust_root_mount_propagation(spec: &Spec) -> Result<()> {
+    let linux = spec.linux.as_ref().context("no linux in spec")?;
+    let rootfs_propagation = linux.rootfs_propagation.as_deref();
+    let flags = match rootfs_propagation {
+        Some("shared") => Some(MsFlags::MS_SHARED),
+        Some("unbindable") => Some(MsFlags::MS_UNBINDABLE),
+        _ => None,
+    };
+
+    if let Some(flags) = flags {
+        log::debug!("make root mount {:?}", flags);
+        nix_mount(None::<&str>, "/", None::<&str>, flags, None::<&str>)?;
+    }
+
+    Ok(())
 }

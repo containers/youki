@@ -17,7 +17,7 @@ use nix::{
     unistd::{Gid, Uid},
 };
 use nix::{
-    mount::{umount2, MntFlags},
+    mount::{mount, umount2, MntFlags, MsFlags},
     unistd,
 };
 use nix::{sched::unshare, sys::stat::Mode};
@@ -67,6 +67,16 @@ impl Syscall for LinuxSyscall {
         // so we can move the original root there, and then unmount that. This way saves the creation of the temporary
         // directory to put original root directory.
         pivot_root(path, path)?;
+
+        // Make the original root directory rslave to avoid propagating unmount event to the host mount namespace.
+        // We should use MS_SLAVE not MS_PRIVATE according to https://github.com/opencontainers/runc/pull/1500.
+        mount(
+            None::<&str>,
+            "/",
+            None::<&str>,
+            MsFlags::MS_SLAVE | MsFlags::MS_REC,
+            None::<&str>,
+        )?;
 
         // Unmount the original root directory which was stacked on top of new root directory
         // MNT_DETACH makes the mount point unavailable to new accesses, but waits till the original mount point
