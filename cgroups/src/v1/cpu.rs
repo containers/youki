@@ -132,7 +132,8 @@ impl Cpu {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test::{create_temp_dir, set_fixture, setup, LinuxCpuBuilder};
+    use crate::test::{create_temp_dir, set_fixture, setup};
+    use oci_spec::runtime::LinuxCpuBuilder;
     use std::fs;
 
     #[test]
@@ -141,7 +142,7 @@ mod tests {
         let (tmp, shares) = setup("test_set_shares", CGROUP_CPU_SHARES);
         let _ = set_fixture(&tmp, CGROUP_CPU_SHARES, "")
             .unwrap_or_else(|_| panic!("set test fixture for {}", CGROUP_CPU_SHARES));
-        let cpu = LinuxCpuBuilder::new().with_shares(2048).build();
+        let cpu = LinuxCpuBuilder::default().shares(2048u64).build().unwrap();
 
         // act
         Cpu::apply(&tmp, &cpu).expect("apply cpu");
@@ -157,7 +158,7 @@ mod tests {
         // arrange
         const QUOTA: i64 = 200000;
         let (tmp, max) = setup("test_set_quota", CGROUP_CPU_QUOTA);
-        let cpu = LinuxCpuBuilder::new().with_quota(QUOTA).build();
+        let cpu = LinuxCpuBuilder::default().quota(QUOTA).build().unwrap();
 
         // act
         Cpu::apply(&tmp, &cpu).expect("apply cpu");
@@ -173,7 +174,7 @@ mod tests {
         // arrange
         const PERIOD: u64 = 100000;
         let (tmp, max) = setup("test_set_period", CGROUP_CPU_PERIOD);
-        let cpu = LinuxCpuBuilder::new().with_period(PERIOD).build();
+        let cpu = LinuxCpuBuilder::default().period(PERIOD).build().unwrap();
 
         // act
         Cpu::apply(&tmp, &cpu).expect("apply cpu");
@@ -189,9 +190,10 @@ mod tests {
         // arrange
         const RUNTIME: i64 = 100000;
         let (tmp, max) = setup("test_set_rt_runtime", CGROUP_CPU_RT_RUNTIME);
-        let cpu = LinuxCpuBuilder::new()
-            .with_realtime_runtime(RUNTIME)
-            .build();
+        let cpu = LinuxCpuBuilder::default()
+            .realtime_runtime(RUNTIME)
+            .build()
+            .unwrap();
 
         // act
         Cpu::apply(&tmp, &cpu).expect("apply cpu");
@@ -207,7 +209,10 @@ mod tests {
         // arrange
         const PERIOD: u64 = 100000;
         let (tmp, max) = setup("test_set_rt_period", CGROUP_CPU_RT_PERIOD);
-        let cpu = LinuxCpuBuilder::new().with_realtime_period(PERIOD).build();
+        let cpu = LinuxCpuBuilder::default()
+            .realtime_period(PERIOD)
+            .build()
+            .unwrap();
 
         // act
         Cpu::apply(&tmp, &cpu).expect("apply cpu");

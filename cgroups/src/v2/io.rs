@@ -151,70 +151,24 @@ mod test {
     use super::*;
     use crate::test::{create_temp_dir, set_fixture, setup};
 
-    use oci_spec::runtime::{LinuxBlockIo, LinuxThrottleDevice, LinuxWeightDevice};
+    use oci_spec::runtime::{
+        LinuxBlockIoBuilder, LinuxThrottleDeviceBuilder, LinuxWeightDeviceBuilder,
+    };
     use std::fs;
-    struct BlockIoBuilder {
-        block_io: LinuxBlockIo,
-    }
-    impl BlockIoBuilder {
-        fn new() -> Self {
-            let block_io = LinuxBlockIo {
-                weight: Some(0),
-                leaf_weight: Some(0),
-                weight_device: vec![].into(),
-                throttle_read_bps_device: vec![].into(),
-                throttle_write_bps_device: vec![].into(),
-                throttle_read_iops_device: vec![].into(),
-                throttle_write_iops_device: vec![].into(),
-            };
-
-            Self { block_io }
-        }
-        fn with_write_weight_device(mut self, throttle: Vec<LinuxWeightDevice>) -> Self {
-            self.block_io.weight_device = throttle.into();
-            self
-        }
-        fn with_write_io_weight(mut self, iow: u16) -> Self {
-            self.block_io.weight = Some(iow);
-            self
-        }
-
-        fn with_read_bps(mut self, throttle: Vec<LinuxThrottleDevice>) -> Self {
-            self.block_io.throttle_read_bps_device = throttle.into();
-            self
-        }
-
-        fn with_write_bps(mut self, throttle: Vec<LinuxThrottleDevice>) -> Self {
-            self.block_io.throttle_write_bps_device = throttle.into();
-            self
-        }
-
-        fn with_read_iops(mut self, throttle: Vec<LinuxThrottleDevice>) -> Self {
-            self.block_io.throttle_read_iops_device = throttle.into();
-            self
-        }
-
-        fn with_write_iops(mut self, throttle: Vec<LinuxThrottleDevice>) -> Self {
-            self.block_io.throttle_write_iops_device = throttle.into();
-            self
-        }
-
-        fn build(self) -> LinuxBlockIo {
-            self.block_io
-        }
-    }
 
     #[test]
     fn test_set_io_read_bps() {
         let (tmp, throttle) = setup("test_set_io_read_bps", "io.max");
 
-        let blkio = BlockIoBuilder::new()
-            .with_read_bps(vec![LinuxThrottleDevice {
-                major: 8,
-                minor: 0,
-                rate: 102400,
-            }])
-            .build();
+        let blkio = LinuxBlockIoBuilder::default()
+            .throttle_read_bps_device(vec![LinuxThrottleDeviceBuilder::default()
+                .major(8)
+                .minor(0)
+                .rate(102400u64)
+                .build()
+                .unwrap()])
+            .build()
+            .unwrap();
 
         Io::apply(&tmp, &blkio).expect("apply blkio");
         let content = fs::read_to_string(throttle).unwrap_or_else(|_| panic!("read rbps content"));
@@ -226,13 +180,15 @@ mod test {
     fn test_set_io_write_bps() {
         let (tmp, throttle) = setup("test_set_io_write_bps", "io.max");
 
-        let blkio = BlockIoBuilder::new()
-            .with_write_bps(vec![LinuxThrottleDevice {
-                major: 8,
-                minor: 0,
-                rate: 102400,
-            }])
-            .build();
+        let blkio = LinuxBlockIoBuilder::default()
+            .throttle_write_bps_device(vec![LinuxThrottleDeviceBuilder::default()
+                .major(8)
+                .minor(0)
+                .rate(102400u64)
+                .build()
+                .unwrap()])
+            .build()
+            .unwrap();
 
         Io::apply(&tmp, &blkio).expect("apply blkio");
         let content = fs::read_to_string(throttle).unwrap_or_else(|_| panic!("read rbps content"));
@@ -244,13 +200,15 @@ mod test {
     fn test_set_io_read_iops() {
         let (tmp, throttle) = setup("test_set_io_read_iops", "io.max");
 
-        let blkio = BlockIoBuilder::new()
-            .with_read_iops(vec![LinuxThrottleDevice {
-                major: 8,
-                minor: 0,
-                rate: 102400,
-            }])
-            .build();
+        let blkio = LinuxBlockIoBuilder::default()
+            .throttle_read_iops_device(vec![LinuxThrottleDeviceBuilder::default()
+                .major(8)
+                .minor(0)
+                .rate(102400u64)
+                .build()
+                .unwrap()])
+            .build()
+            .unwrap();
 
         Io::apply(&tmp, &blkio).expect("apply blkio");
         let content = fs::read_to_string(throttle).unwrap_or_else(|_| panic!("read riops content"));
@@ -262,13 +220,15 @@ mod test {
     fn test_set_io_write_iops() {
         let (tmp, throttle) = setup("test_set_io_write_iops", "io.max");
 
-        let blkio = BlockIoBuilder::new()
-            .with_write_iops(vec![LinuxThrottleDevice {
-                major: 8,
-                minor: 0,
-                rate: 102400,
-            }])
-            .build();
+        let blkio = LinuxBlockIoBuilder::default()
+            .throttle_write_iops_device(vec![LinuxThrottleDeviceBuilder::default()
+                .major(8)
+                .minor(0)
+                .rate(102400u64)
+                .build()
+                .unwrap()])
+            .build()
+            .unwrap();
 
         Io::apply(&tmp, &blkio).expect("apply blkio");
         let content = fs::read_to_string(throttle).unwrap_or_else(|_| panic!("read wiops content"));
@@ -279,14 +239,17 @@ mod test {
     #[test]
     fn test_set_ioweight_device() {
         let (tmp, throttle) = setup("test_set_io_weight_device", CGROUP_BFQ_IO_WEIGHT);
-        let blkio = BlockIoBuilder::new()
-            .with_write_weight_device(vec![LinuxWeightDevice {
-                major: 8,
-                minor: 0,
-                weight: Some(80),
-                leaf_weight: Some(0),
-            }])
-            .build();
+        let blkio = LinuxBlockIoBuilder::default()
+            .weight_device(vec![LinuxWeightDeviceBuilder::default()
+                .major(8)
+                .minor(0)
+                .weight(80u16)
+                .leaf_weight(0u16)
+                .build()
+                .unwrap()])
+            .build()
+            .unwrap();
+
         Io::apply(&tmp, &blkio).expect("apply blkio");
         let content =
             fs::read_to_string(throttle).unwrap_or_else(|_| panic!("read bfq_io_weight content"));
@@ -297,7 +260,11 @@ mod test {
     #[test]
     fn test_set_ioweight() {
         let (tmp, throttle) = setup("test_set_io_weight", CGROUP_IO_WEIGHT);
-        let blkio = BlockIoBuilder::new().with_write_io_weight(100).build();
+        let blkio = LinuxBlockIoBuilder::default()
+            .weight(100u16)
+            .build()
+            .unwrap();
+
         Io::apply(&tmp, &blkio).expect("apply blkio");
         let content =
             fs::read_to_string(throttle).unwrap_or_else(|_| panic!("read bfq_io_weight content"));

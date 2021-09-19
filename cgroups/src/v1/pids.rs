@@ -62,7 +62,7 @@ impl Pids {
 mod tests {
     use super::*;
     use crate::test::{create_temp_dir, set_fixture};
-    use oci_spec::runtime::LinuxPids;
+    use oci_spec::runtime::LinuxPidsBuilder;
 
     // Contains the current number of active pids
     const CGROUP_PIDS_CURRENT: &str = "pids.current";
@@ -72,7 +72,7 @@ mod tests {
         let tmp = create_temp_dir("test_set_pids").expect("create temp directory for test");
         set_fixture(&tmp, CGROUP_PIDS_MAX, "1000").expect("Set fixture for 1000 pids");
 
-        let pids = LinuxPids { limit: 1000 };
+        let pids = LinuxPidsBuilder::default().limit(1000).build().unwrap();
 
         Pids::apply(&tmp, &pids).expect("apply pids");
         let content =
@@ -85,7 +85,7 @@ mod tests {
         let tmp = create_temp_dir("test_set_pids_max").expect("create temp directory for test");
         set_fixture(&tmp, CGROUP_PIDS_MAX, "0").expect("set fixture for 0 pids");
 
-        let pids = LinuxPids { limit: 0 };
+        let pids = LinuxPidsBuilder::default().limit(0).build().unwrap();
 
         Pids::apply(&tmp, &pids).expect("apply pids");
 

@@ -90,15 +90,15 @@ impl Program {
     }
 
     fn add_rule(&mut self, rule: &LinuxDeviceCgroup) -> Result<()> {
-        let dev_type = bpf_dev_type(rule.typ.unwrap_or_default())?;
-        let access = bpf_access(rule.access.clone().unwrap_or_default())?;
+        let dev_type = bpf_dev_type(rule.typ().unwrap_or_default())?;
+        let access = bpf_access(rule.access().clone().unwrap_or_default())?;
         let has_access = access
             != (libbpf_sys::BPF_DEVCG_ACC_READ
                 | libbpf_sys::BPF_DEVCG_ACC_WRITE
                 | libbpf_sys::BPF_DEVCG_ACC_MKNOD);
 
-        let has_major = rule.major.is_some() && rule.major.unwrap() >= 0;
-        let has_minor = rule.minor.is_some() && rule.minor.unwrap() >= 0;
+        let has_major = rule.major().is_some() && rule.major().unwrap() >= 0;
+        let has_minor = rule.minor().is_some() && rule.minor().unwrap() >= 0;
 
         // count of instructions of this rule
         let mut instruction_count = 1; // execute dev_type
@@ -151,7 +151,7 @@ impl Program {
             self.prog
                 .jump_conditional(Cond::NotEquals, Source::Imm)
                 .set_dst(4)
-                .set_imm(rule.major.unwrap() as i32)
+                .set_imm(rule.major().unwrap() as i32)
                 .set_off(next_rule_offset)
                 .push();
         }
@@ -162,7 +162,7 @@ impl Program {
             self.prog
                 .jump_conditional(Cond::NotEquals, Source::Imm)
                 .set_dst(5)
-                .set_imm(rule.minor.unwrap() as i32)
+                .set_imm(rule.minor().unwrap() as i32)
                 .set_off(next_rule_offset)
                 .push();
         }
@@ -171,7 +171,7 @@ impl Program {
         self.prog
             .mov(Source::Imm, RbpfArch::X32)
             .set_dst(0)
-            .set_imm(rule.allow as i32)
+            .set_imm(rule.allow() as i32)
             .push();
         self.prog.exit().push();
 

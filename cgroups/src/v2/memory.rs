@@ -146,7 +146,7 @@ impl Memory {
 mod tests {
     use super::*;
     use crate::test::{create_temp_dir, set_fixture};
-    use oci_spec::runtime::LinuxMemory;
+    use oci_spec::runtime::LinuxMemoryBuilder;
     use std::fs::read_to_string;
 
     #[test]
@@ -159,17 +159,15 @@ mod tests {
         let limit = 1024;
         let reservation = 512;
         let swap = 2048;
-        let memory_limits = &LinuxMemory {
-            limit: Some(limit),
-            reservation: Some(reservation),
-            swap: Some(swap),
-            kernel: None,
-            kernel_tcp: None,
-            swappiness: None,
-            disable_oom_killer: None,
-            use_hierarchy: None,
-        };
-        Memory::apply(&tmp, memory_limits).expect("apply memory limits");
+
+        let memory_limits = LinuxMemoryBuilder::default()
+            .limit(limit)
+            .reservation(reservation)
+            .swap(swap)
+            .build()
+            .unwrap();
+
+        Memory::apply(&tmp, &memory_limits).expect("apply memory limits");
 
         let limit_content = read_to_string(tmp.join(CGROUP_MEMORY_MAX)).expect("read memory limit");
         assert_eq!(limit_content, limit.to_string());
@@ -190,17 +188,9 @@ mod tests {
         set_fixture(&tmp, CGROUP_MEMORY_LOW, "0").expect("set fixture for memory reservation");
         set_fixture(&tmp, CGROUP_MEMORY_SWAP, "0").expect("set fixture for swap limit");
 
-        let memory_limits = &LinuxMemory {
-            limit: Some(-1),
-            reservation: None,
-            swap: None,
-            kernel: None,
-            kernel_tcp: None,
-            swappiness: None,
-            disable_oom_killer: None,
-            use_hierarchy: None,
-        };
-        Memory::apply(&tmp, memory_limits).expect("apply memory limits");
+        let memory_limits = LinuxMemoryBuilder::default().limit(-1).build().unwrap();
+
+        Memory::apply(&tmp, &memory_limits).expect("apply memory limits");
 
         let limit_content = read_to_string(tmp.join(CGROUP_MEMORY_MAX)).expect("read memory limit");
         assert_eq!(limit_content, "max");
@@ -217,18 +207,9 @@ mod tests {
         set_fixture(&tmp, CGROUP_MEMORY_LOW, "0").expect("set fixture for memory reservation");
         set_fixture(&tmp, CGROUP_MEMORY_SWAP, "0").expect("set fixture for swap limit");
 
-        let memory_limits = &LinuxMemory {
-            limit: None,
-            swap: Some(512),
-            reservation: None,
-            kernel: None,
-            kernel_tcp: None,
-            swappiness: None,
-            disable_oom_killer: None,
-            use_hierarchy: None,
-        };
+        let memory_limits = LinuxMemoryBuilder::default().swap(512).build().unwrap();
 
-        let result = Memory::apply(&tmp, memory_limits);
+        let result = Memory::apply(&tmp, &memory_limits);
 
         assert!(result.is_err());
     }
@@ -240,18 +221,9 @@ mod tests {
         set_fixture(&tmp, CGROUP_MEMORY_LOW, "0").expect("set fixture for memory reservation");
         set_fixture(&tmp, CGROUP_MEMORY_SWAP, "0").expect("set fixture for swap limit");
 
-        let memory_limits = &LinuxMemory {
-            limit: Some(-2),
-            swap: None,
-            reservation: None,
-            kernel: None,
-            kernel_tcp: None,
-            swappiness: None,
-            disable_oom_killer: None,
-            use_hierarchy: None,
-        };
+        let memory_limits = LinuxMemoryBuilder::default().limit(-2).build().unwrap();
 
-        let result = Memory::apply(&tmp, memory_limits);
+        let result = Memory::apply(&tmp, &memory_limits);
 
         assert!(result.is_err());
     }
@@ -263,18 +235,13 @@ mod tests {
         set_fixture(&tmp, CGROUP_MEMORY_LOW, "0").expect("set fixture for memory reservation");
         set_fixture(&tmp, CGROUP_MEMORY_SWAP, "0").expect("set fixture for swap limit");
 
-        let memory_limits = &LinuxMemory {
-            limit: Some(512),
-            swap: Some(-3),
-            reservation: None,
-            kernel: None,
-            kernel_tcp: None,
-            swappiness: None,
-            disable_oom_killer: None,
-            use_hierarchy: None,
-        };
+        let memory_limits = LinuxMemoryBuilder::default()
+            .limit(512)
+            .swap(-3)
+            .build()
+            .unwrap();
 
-        let result = Memory::apply(&tmp, memory_limits);
+        let result = Memory::apply(&tmp, &memory_limits);
 
         assert!(result.is_err());
     }

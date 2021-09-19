@@ -41,13 +41,17 @@ mod tests {
     use std::fs;
 
     use super::*;
-    use crate::test::{setup, LinuxCpuBuilder};
+    use crate::test::setup;
+    use oci_spec::runtime::LinuxCpuBuilder;
 
     #[test]
     fn test_set_cpus() {
         // arrange
         let (tmp, cpus) = setup("test_set_cpus", CGROUP_CPUSET_CPUS);
-        let cpuset = LinuxCpuBuilder::new().with_cpus("1-3".to_owned()).build();
+        let cpuset = LinuxCpuBuilder::default()
+            .cpus("1-3".to_owned())
+            .build()
+            .unwrap();
 
         // act
         CpuSet::apply(&tmp, &cpuset).expect("apply cpuset");
@@ -62,7 +66,10 @@ mod tests {
     fn test_set_mems() {
         // arrange
         let (tmp, mems) = setup("test_set_mems", CGROUP_CPUSET_MEMS);
-        let cpuset = LinuxCpuBuilder::new().with_mems("1-3".to_owned()).build();
+        let cpuset = LinuxCpuBuilder::default()
+            .mems("1-3".to_owned())
+            .build()
+            .unwrap();
 
         // act
         CpuSet::apply(&tmp, &cpuset).expect("apply cpuset");

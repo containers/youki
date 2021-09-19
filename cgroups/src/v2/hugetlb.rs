@@ -88,7 +88,7 @@ impl HugeTlb {
 mod tests {
     use super::*;
     use crate::test::{create_temp_dir, set_fixture};
-    use oci_spec::runtime::LinuxHugepageLimit;
+    use oci_spec::runtime::LinuxHugepageLimitBuilder;
     use std::fs::read_to_string;
 
     #[test]
@@ -97,10 +97,11 @@ mod tests {
         let tmp = create_temp_dir("test_set_hugetlbv2").expect("create temp directory for test");
         set_fixture(&tmp, page_file_name, "0").expect("Set fixture for 2 MB page size");
 
-        let hugetlb = LinuxHugepageLimit {
-            page_size: "2MB".to_owned(),
-            limit: 16384,
-        };
+        let hugetlb = LinuxHugepageLimitBuilder::default()
+            .page_size("2MB")
+            .limit(16384)
+            .build()
+            .unwrap();
         HugeTlb::apply(&tmp, &hugetlb).expect("apply hugetlb");
         let content = read_to_string(tmp.join(page_file_name)).expect("Read hugetlb file content");
         assert_eq!(hugetlb.limit().to_string(), content);
@@ -111,10 +112,11 @@ mod tests {
         let tmp = create_temp_dir("test_set_hugetlbv2_with_invalid_page_size")
             .expect("create temp directory for test");
 
-        let hugetlb = LinuxHugepageLimit {
-            page_size: "3MB".to_owned(),
-            limit: 16384,
-        };
+        let hugetlb = LinuxHugepageLimitBuilder::default()
+            .page_size("3MB")
+            .limit(16384)
+            .build()
+            .unwrap();
 
         let result = HugeTlb::apply(&tmp, &hugetlb);
         assert!(

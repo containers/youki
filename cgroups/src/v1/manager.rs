@@ -72,8 +72,8 @@ impl Manager {
                 CtrlType::CpuSet => CpuSet::needs_to_handle(controller_opt).is_some(),
                 CtrlType::Devices => Devices::needs_to_handle(controller_opt).is_some(),
                 CtrlType::HugeTlb => HugeTlb::needs_to_handle(controller_opt).is_some(),
-                CtrlType::Memory => Memory::needs_to_handle(controller_opt).is_some(),
-                CtrlType::Pids => Pids::needs_to_handle(controller_opt).is_some(),
+                CtrlType::Memory => controller_opt.resources.memory().is_some(), // TODO: Fix Memory::need_to_handle
+                CtrlType::Pids => controller_opt.resources.pids().is_some(), // TODO: Fix Pids::need_to_handle
                 CtrlType::PerfEvent => PerfEvent::needs_to_handle(controller_opt).is_some(),
                 CtrlType::Blkio => Blkio::needs_to_handle(controller_opt).is_some(),
                 CtrlType::NetworkPriority => {

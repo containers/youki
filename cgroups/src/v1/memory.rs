@@ -325,7 +325,7 @@ mod tests {
     use super::*;
     use crate::common::CGROUP_PROCS;
     use crate::test::{create_temp_dir, set_fixture};
-    use oci_spec::runtime::{LinuxMemory, LinuxResources};
+    use oci_spec::runtime::{LinuxMemoryBuilder, LinuxResourcesBuilder};
 
     #[test]
     fn test_set_memory() {
@@ -376,17 +376,8 @@ mod tests {
         // test unlimited memory with no set swap
         {
             let limit = -1;
-            let linux_memory = &LinuxMemory {
-                limit: Some(limit),
-                swap: None, // Some(0) gives the same outcome
-                reservation: None,
-                kernel: None,
-                kernel_tcp: None,
-                swappiness: None,
-                disable_oom_killer: None,
-                use_hierarchy: None,
-            };
-            Memory::apply(linux_memory, &tmp).expect("Set memory and swap");
+            let linux_memory = LinuxMemoryBuilder::default().limit(limit).build().unwrap();
+            Memory::apply(&linux_memory, &tmp).expect("Set memory and swap");
 
             let limit_content =
                 std::fs::read_to_string(tmp.join(CGROUP_MEMORY_LIMIT)).expect("Read to string");
@@ -402,17 +393,12 @@ mod tests {
         {
             let limit = 1024 * 1024 * 1024;
             let swap = 1024;
-            let linux_memory = &LinuxMemory {
-                limit: Some(limit),
-                swap: Some(swap),
-                reservation: None,
-                kernel: None,
-                kernel_tcp: None,
-                swappiness: None,
-                disable_oom_killer: None,
-                use_hierarchy: None,
-            };
-            Memory::apply(linux_memory, &tmp).expect("Set memory and swap");
+            let linux_memory = LinuxMemoryBuilder::default()
+                .limit(limit)
+                .swap(swap)
+                .build()
+                .unwrap();
+            Memory::apply(&linux_memory, &tmp).expect("Set memory and swap");
 
             let limit_content =
                 std::fs::read_to_string(tmp.join(CGROUP_MEMORY_LIMIT)).expect("Read to string");
@@ -443,17 +429,7 @@ mod tests {
             // clone to avoid use of moved value later on
             let memory_limits = linux_memory;
 
-            let linux_resources = LinuxResources {
-                devices: Some(vec![]),
-                memory: Some(linux_memory),
-                cpu: None,
-                pids: None,
-                block_io: None,
-                hugepage_limits: Some(vec![]),
-                network: None,
-                rdma: None,
-                unified: None,
-            };
+            let linux_resources = LinuxResourcesBuilder::default().devices(vec![]).memory(linux_memory).hugepage_limits(vec![]).build().unwrap();
 
             let controller_opt = ControllerOpt {
                 resources: linux_resources,

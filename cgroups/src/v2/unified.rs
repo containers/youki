@@ -45,10 +45,10 @@ impl Unified {
 
 #[cfg(test)]
 mod tests {
-    use std::array::IntoIter;
+    use std::collections::HashMap;
     use std::fs;
 
-    use oci_spec::runtime::LinuxResources;
+    use oci_spec::runtime::LinuxResourcesBuilder;
 
     use crate::test::{create_temp_dir, set_fixture};
     use crate::v2::controller_type::ControllerType;
@@ -62,19 +62,20 @@ mod tests {
         let hugetlb_limit_path = set_fixture(&tmp, "hugetlb.1GB.limit_in_bytes", "").unwrap();
         let cpu_weight_path = set_fixture(&tmp, "cpu.weight", "").unwrap();
 
-        let resources = LinuxResources {
-            unified: Some(
-                IntoIter::new([
-                    (
-                        "hugetlb.1GB.limit_in_bytes".to_owned(),
-                        "72348034".to_owned(),
-                    ),
-                    ("cpu.weight".to_owned(), "5000".to_owned()),
-                ])
-                .collect(),
-            ),
-            ..Default::default()
+        let unified = {
+            let mut u = HashMap::new();
+            u.insert(
+                "hugetlb.1GB.limit_in_bytes".to_owned(),
+                "72348034".to_owned(),
+            );
+            u.insert("cpu.weight".to_owned(), "5000".to_owned());
+            u
         };
+
+        let resources = LinuxResourcesBuilder::default()
+            .unified(unified)
+            .build()
+            .unwrap();
 
         let controller_opt = ControllerOpt {
             resources,
@@ -97,19 +98,20 @@ mod tests {
         let tmp =
             create_temp_dir("test_set_unified_failed_to_write_subsystem_not_enabled").unwrap();
 
-        let resources = LinuxResources {
-            unified: Some(
-                IntoIter::new([
-                    (
-                        "hugetlb.1GB.limit_in_bytes".to_owned(),
-                        "72348034".to_owned(),
-                    ),
-                    ("cpu.weight".to_owned(), "5000".to_owned()),
-                ])
-                .collect(),
-            ),
-            ..Default::default()
+        let unified = {
+            let mut u = HashMap::new();
+            u.insert(
+                "hugetlb.1GB.limit_in_bytes".to_owned(),
+                "72348034".to_owned(),
+            );
+            u.insert("cpu.weight".to_owned(), "5000".to_owned());
+            u
         };
+
+        let resources = LinuxResourcesBuilder::default()
+            .unified(unified)
+            .build()
+            .unwrap();
 
         let controller_opt = ControllerOpt {
             resources,
@@ -128,19 +130,20 @@ mod tests {
         // arrange
         let tmp = create_temp_dir("test_set_unified_failed_to_write_subsystem_enabled").unwrap();
 
-        let resources = LinuxResources {
-            unified: Some(
-                IntoIter::new([
-                    (
-                        "hugetlb.1GB.limit_in_bytes".to_owned(),
-                        "72348034".to_owned(),
-                    ),
-                    ("cpu.weight".to_owned(), "5000".to_owned()),
-                ])
-                .collect(),
-            ),
-            ..Default::default()
+        let unified = {
+            let mut u = HashMap::new();
+            u.insert(
+                "hugetlb.1GB.limit_in_bytes".to_owned(),
+                "72348034".to_owned(),
+            );
+            u.insert("cpu.weight".to_owned(), "5000".to_owned());
+            u
         };
+
+        let resources = LinuxResourcesBuilder::default()
+            .unified(unified)
+            .build()
+            .unwrap();
 
         let controller_opt = ControllerOpt {
             resources,
