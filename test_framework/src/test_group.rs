@@ -3,37 +3,38 @@ use crate::testable::{TestResult, Testable, TestableGroup};
 use std::collections::BTreeMap;
 
 /// Stores tests belonging to a group
-pub struct TestGroup {
+pub struct TestGroup<'a> {
     /// name of the test group
-    name: String,
+    name: &'a str,
     /// tests belonging to this group
-    tests: BTreeMap<String, Box<dyn Testable + 'static + Sync + Send>>,
+    tests: BTreeMap<&'a str, Box<dyn Testable<'a> + 'static + Sync + Send>>,
 }
 
-impl TestGroup {
+impl<'a> TestGroup<'a> {
     /// create a new test group
-    pub fn new(name: &str) -> Self {
+    pub fn new(name: &'a str) -> Self {
         TestGroup {
-            name: name.to_string(),
+            name,
             tests: BTreeMap::new(),
         }
     }
 
     /// add a test to the group
-    pub fn add(&mut self, tests: Vec<impl Testable + 'static + Sync + Send>) {
+    pub fn add(&mut self, tests: Vec<impl Testable<'a> + 'static + Sync + Send>) {
         tests.into_iter().for_each(|t| {
             self.tests.insert(t.get_name(), Box::new(t));
         });
     }
 }
 
-impl TestableGroup for TestGroup {
+impl<'a> TestableGroup<'a> for TestGroup<'a> {
     /// get name of the test group
-    fn get_name(&self) -> String {
-        self.name.clone()
+    fn get_name(&self) -> &'a str {
+        self.name
     }
+
     /// run all the test from the test group
-    fn run_all(&self) -> Vec<(String, TestResult)> {
+    fn run_all(&'a self) -> Vec<(&'a str, TestResult)> {
         self.tests
             .iter()
             .map(|(_, t)| {
@@ -47,10 +48,10 @@ impl TestableGroup for TestGroup {
     }
 
     /// run selected test from the group
-    fn run_selected(&self, selected: &[&str]) -> Vec<(String, TestResult)> {
+    fn run_selected(&'a self, selected: &[&str]) -> Vec<(&'a str, TestResult)> {
         self.tests
             .iter()
-            .filter(|(name, _)| selected.contains(&name.as_str()))
+            .filter(|(name, _)| selected.contains(name))
             .map(|(_, t)| {
                 if t.can_run() {
                     (t.get_name(), t.run())
