@@ -1,20 +1,26 @@
-use std::path::{Path, PathBuf};
-
-use crate::support::generate_uuid;
+use crate::utils::{generate_uuid, prepare_bundle, TempDir};
 use test_framework::{TestResult, TestableGroup};
 
 use super::{create, delete, kill, start, state};
 
 pub struct ContainerLifecycle {
-    project_path: PathBuf,
+    project_path: TempDir,
     container_id: String,
 }
 
+impl Default for ContainerLifecycle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ContainerLifecycle {
-    pub fn new(project_path: &Path) -> Self {
+    pub fn new() -> Self {
+        let id = generate_uuid();
+        let temp_dir = prepare_bundle(&id).unwrap();
         ContainerLifecycle {
-            project_path: project_path.to_owned(),
-            container_id: generate_uuid().to_string(),
+            project_path: temp_dir,
+            container_id: id.to_string(),
         }
     }
 

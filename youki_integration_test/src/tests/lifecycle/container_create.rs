@@ -1,18 +1,26 @@
 use super::{create, kill};
-use crate::support::generate_uuid;
-use std::path::{Path, PathBuf};
+use crate::utils::TempDir;
+use crate::utils::{generate_uuid, prepare_bundle};
 use test_framework::{TestResult, TestableGroup};
 
 pub struct ContainerCreate {
-    project_path: PathBuf,
+    project_path: TempDir,
     container_id: String,
 }
 
+impl<'a> Default for ContainerCreate {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<'a> ContainerCreate {
-    pub fn new(project_path: &Path) -> Self {
+    pub fn new() -> Self {
+        let id = generate_uuid();
+        let temp_dir = prepare_bundle(&id).unwrap();
         ContainerCreate {
-            project_path: project_path.to_owned(),
-            container_id: generate_uuid().to_string(),
+            project_path: temp_dir,
+            container_id: id.to_string(),
         }
     }
 

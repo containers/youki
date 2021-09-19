@@ -1,4 +1,4 @@
-use crate::support::get_runtime_path;
+use crate::utils::get_runtime_path;
 use std::io;
 use std::path::Path;
 use std::process::{Command, Stdio};
@@ -9,7 +9,7 @@ pub fn state(project_path: &Path, id: &str) -> TestResult {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .arg("--root")
-        .arg(project_path.join("integration-workspace").join("runtime"))
+        .arg(project_path.join("runtime"))
         .arg("state")
         .arg(id)
         .spawn()

@@ -1,5 +1,5 @@
 use super::get_result_from_output;
-use crate::support::get_runtime_path;
+use crate::utils::get_runtime_path;
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::thread::sleep;
@@ -16,7 +16,7 @@ pub fn kill(project_path: &Path, id: &str) -> TestResult {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .arg("--root")
-        .arg(project_path.join("integration-workspace").join("runtime"))
+        .arg(project_path.join("runtime"))
         .arg("kill")
         .arg(id)
         .arg("9")

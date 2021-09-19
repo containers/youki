@@ -1,16 +1,12 @@
-mod support;
 mod tests;
+mod utils;
 
-use anyhow::{bail, Result};
+use crate::tests::lifecycle::{ContainerCreate, ContainerLifecycle};
+use crate::utils::support::set_runtime_path;
+use anyhow::Result;
 use clap::Clap;
 use std::path::PathBuf;
 use test_framework::TestManager;
-
-use crate::support::cleanup_test;
-use crate::support::get_project_path;
-use crate::support::initialize_test;
-use crate::support::set_runtime_path;
-use crate::tests::lifecycle::{ContainerCreate, ContainerLifecycle};
 
 #[derive(Clap, Debug)]
 #[clap(version = "0.0.1", author = "youki team")]
@@ -47,18 +43,12 @@ fn main() -> Result<()> {
     set_runtime_path(&path);
 
     let mut tm = TestManager::new();
-    let project_path = get_project_path();
 
-    let cl = ContainerLifecycle::new(&project_path);
-    let cc = ContainerCreate::new(&project_path);
+    let cl = ContainerLifecycle::new();
+    let cc = ContainerCreate::new();
 
     tm.add_test_group(&cl);
     tm.add_test_group(&cc);
-
-    if initialize_test(&project_path).is_err() {
-        bail!("Can not initilize test.")
-    }
-
     if let Some(tests) = opts.tests {
         let tests_to_run = parse_tests(&tests);
         tm.run_selected(tests_to_run);
@@ -66,8 +56,5 @@ fn main() -> Result<()> {
         tm.run_all();
     }
 
-    if cleanup_test(&project_path).is_err() {
-        bail!("Can not cleanup test.")
-    }
     Ok(())
 }
