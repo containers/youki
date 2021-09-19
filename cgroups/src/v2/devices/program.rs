@@ -248,6 +248,7 @@ fn bpf_cgroup_dev_ctx(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use oci_spec::runtime::LinuxDeviceCgroupBuilder;
 
     fn build_bpf_program(rules: &Option<Vec<LinuxDeviceCgroup>>) -> Result<Program> {
         let mut em = crate::v2::devices::emulator::Emulator::with_default_allow(false);
@@ -260,13 +261,14 @@ mod tests {
 
     #[test]
     fn test_devices_allow_single() {
-        let rules = vec![LinuxDeviceCgroup {
-            allow: true,
-            typ: Some(LinuxDeviceType::C),
-            major: Some(10),
-            minor: Some(20),
-            access: "r".to_string().into(),
-        }];
+        let rules = vec![LinuxDeviceCgroupBuilder::default()
+            .allow(true)
+            .typ(LinuxDeviceType::C)
+            .major(10)
+            .minor(20)
+            .access("r")
+            .build()
+            .unwrap()];
 
         let prog = build_bpf_program(&Some(rules)).unwrap();
         let ty_list = vec![
@@ -333,13 +335,11 @@ mod tests {
 
     #[test]
     fn test_devices_allow_all() {
-        let rules = vec![LinuxDeviceCgroup {
-            allow: true,
-            typ: Some(LinuxDeviceType::A),
-            major: None,
-            minor: None,
-            access: None,
-        }];
+        let rules = vec![LinuxDeviceCgroupBuilder::default()
+            .allow(true)
+            .typ(LinuxDeviceType::A)
+            .build()
+            .unwrap()];
 
         let prog = build_bpf_program(&Some(rules)).unwrap();
         let ty_list = vec![
@@ -371,13 +371,13 @@ mod tests {
 
     #[test]
     fn test_devices_allow_wildcard() {
-        let rules = vec![LinuxDeviceCgroup {
-            allow: true,
-            typ: Some(LinuxDeviceType::C),
-            major: None,
-            minor: Some(20),
-            access: "r".to_string().into(),
-        }];
+        let rules = vec![LinuxDeviceCgroupBuilder::default()
+            .allow(true)
+            .typ(LinuxDeviceType::C)
+            .minor(20)
+            .access("r")
+            .build()
+            .unwrap()];
 
         let prog = build_bpf_program(&Some(rules)).unwrap();
         let ty_list = vec![
@@ -414,20 +414,20 @@ mod tests {
     #[test]
     fn test_devices_allow_and_deny() {
         let rules = vec![
-            LinuxDeviceCgroup {
-                allow: true,
-                typ: Some(LinuxDeviceType::C),
-                major: None,
-                minor: Some(20),
-                access: "rw".to_string().into(),
-            },
-            LinuxDeviceCgroup {
-                allow: false,
-                typ: Some(LinuxDeviceType::C),
-                major: Some(10),
-                minor: None,
-                access: "r".to_string().into(),
-            },
+            LinuxDeviceCgroupBuilder::default()
+                .allow(true)
+                .typ(LinuxDeviceType::C)
+                .minor(20)
+                .access("rw")
+                .build()
+                .unwrap(),
+            LinuxDeviceCgroupBuilder::default()
+                .allow(false)
+                .typ(LinuxDeviceType::C)
+                .major(10)
+                .access("r")
+                .build()
+                .unwrap(),
         ];
 
         let prog = build_bpf_program(&Some(rules)).unwrap();

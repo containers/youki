@@ -21,7 +21,7 @@ impl Controller for Devices {
         return Ok(());
 
         #[cfg(feature = "cgroupsv2_devices")]
-        return Self::apply_devices(cgroup_root, &controller_opt.resources.devices);
+        return Self::apply_devices(cgroup_root, &controller_opt.resources.devices());
     }
 }
 
