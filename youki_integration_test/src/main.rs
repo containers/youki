@@ -26,15 +26,15 @@ struct Opts {
 }
 
 // parse test string given in commandline option as pair of testgroup name and tests belonging to that
-fn parse_tests(tests: &[String]) -> Vec<(String, Option<Vec<&str>>)> {
+fn parse_tests(tests: &[String]) -> Vec<(&str, Option<Vec<&str>>)> {
     let mut ret = Vec::with_capacity(tests.len());
     for test in tests {
         if test.contains("::") {
             let (mod_name, test_names) = test.split_once("::").unwrap();
             let _tests = test_names.split(',').collect();
-            ret.push((mod_name.to_owned(), Some(_tests)));
+            ret.push((mod_name, Some(_tests)));
         } else {
-            ret.push((test.to_owned(), None));
+            ret.push((test, None));
         }
     }
     ret

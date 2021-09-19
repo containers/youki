@@ -8,7 +8,7 @@ pub struct ContainerCreate {
     container_id: String,
 }
 
-impl ContainerCreate {
+impl<'a> ContainerCreate {
     pub fn new(project_path: &Path) -> Self {
         ContainerCreate {
             project_path: project_path.to_owned(),
@@ -53,24 +53,26 @@ impl ContainerCreate {
     }
 }
 
-impl TestableGroup for ContainerCreate {
-    fn get_name(&self) -> String {
-        "create".to_owned()
+impl<'a> TestableGroup<'a> for ContainerCreate {
+    fn get_name(&self) -> &'a str {
+        "create"
     }
-    fn run_all(&self) -> Vec<(String, TestResult)> {
+
+    fn run_all(&self) -> Vec<(&'a str, TestResult)> {
         vec![
-            ("empty_id".to_owned(), self.create_empty_id()),
-            ("valid_id".to_owned(), self.create_valid_id()),
-            ("duplicate_id".to_owned(), self.create_duplicate_id()),
+            ("empty_id", self.create_empty_id()),
+            ("valid_id", self.create_valid_id()),
+            ("duplicate_id", self.create_duplicate_id()),
         ]
     }
-    fn run_selected(&self, selected: &[&str]) -> Vec<(String, TestResult)> {
+
+    fn run_selected(&self, selected: &[&str]) -> Vec<(&'a str, TestResult)> {
         let mut ret = Vec::new();
         for name in selected {
             match *name {
-                "empty_id" => ret.push(("empty_id".to_owned(), self.create_empty_id())),
-                "valid_id" => ret.push(("valid_id".to_owned(), self.create_valid_id())),
-                "duplicate_id" => ret.push(("duplicate_id".to_owned(), self.create_duplicate_id())),
+                "empty_id" => ret.push(("empty_id", self.create_empty_id())),
+                "valid_id" => ret.push(("valid_id", self.create_valid_id())),
+                "duplicate_id" => ret.push(("duplicate_id", self.create_duplicate_id())),
                 _ => eprintln!("No test named {} in lifecycle", name),
             };
         }

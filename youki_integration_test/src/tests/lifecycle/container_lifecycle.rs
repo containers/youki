@@ -39,28 +39,28 @@ impl ContainerLifecycle {
     }
 }
 
-impl TestableGroup for ContainerLifecycle {
-    fn get_name(&self) -> String {
-        "lifecycle".to_owned()
+impl<'a> TestableGroup<'a> for ContainerLifecycle {
+    fn get_name(&self) -> &'a str {
+        "lifecycle"
     }
-    fn run_all(&self) -> Vec<(String, TestResult)> {
+    fn run_all(&self) -> Vec<(&'a str, TestResult)> {
         vec![
-            ("create".to_owned(), self.create()),
-            ("start".to_owned(), self.start()),
-            ("kill".to_owned(), self.kill()),
-            ("state".to_owned(), self.state()),
-            ("delete".to_owned(), self.delete()),
+            ("create", self.create()),
+            ("start", self.start()),
+            ("kill", self.kill()),
+            ("state", self.state()),
+            ("delete", self.delete()),
         ]
     }
-    fn run_selected(&self, selected: &[&str]) -> Vec<(String, TestResult)> {
+    fn run_selected(&self, selected: &[&str]) -> Vec<(&'a str, TestResult)> {
         let mut ret = Vec::new();
         for name in selected {
             match *name {
-                "create" => ret.push(("create".to_owned(), self.create())),
-                "start" => ret.push(("start".to_owned(), self.start())),
-                "kill" => ret.push(("kill".to_owned(), self.kill())),
-                "state" => ret.push(("state".to_owned(), self.state())),
-                "delete" => ret.push(("delete".to_owned(), self.delete())),
+                "create" => ret.push(("create", self.create())),
+                "start" => ret.push(("start", self.start())),
+                "kill" => ret.push(("kill", self.kill())),
+                "state" => ret.push(("state", self.state())),
+                "delete" => ret.push(("delete", self.delete())),
                 _ => eprintln!("No test named {} in lifecycle", name),
             };
         }

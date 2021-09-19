@@ -12,6 +12,7 @@ members = [
 ]
 exclude = [
     "test_framework",
+    "youki_integration_test",
 ]
 
 [features]
