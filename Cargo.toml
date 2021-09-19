@@ -10,6 +10,9 @@ members = [
     "cgroups",
     "seccomp",
 ]
+exclude = [
+    "test_framework",
+]
 
 [features]
 default = ["systemd_cgroups"]
