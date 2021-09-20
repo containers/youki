@@ -106,7 +106,7 @@ fn main() -> Result<()> {
         SubCommand::Info(info) => info.exec(),
         SubCommand::List(list) => list.exec(root_path),
         SubCommand::Spec(spec) => spec.exec(),
-        SubCommand::Pause(pause) => pause.exec(root_path, systemd_cgroup),
+        SubCommand::Pause(pause) => pause.exec(root_path),
         SubCommand::Resume(resume) => resume.exec(root_path, systemd_cgroup),
         SubCommand::Events(events) => events.exec(root_path),
         SubCommand::Ps(ps) => ps.exec(root_path),

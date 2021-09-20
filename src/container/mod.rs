@@ -10,6 +10,7 @@ mod builder_impl;
 mod container;
 pub mod container_delete;
 pub mod container_kill;
+pub mod container_pause;
 pub mod init_builder;
 pub mod state;
 pub mod tenant_builder;
