@@ -39,8 +39,18 @@ fn parse_tests(tests: &[String]) -> Vec<(&str, Option<Vec<&str>>)> {
 fn main() -> Result<()> {
     let opts: Opts = Opts::parse();
 
-    let path = std::fs::canonicalize(opts.runtime).expect("Invalid runtime path");
-    set_runtime_path(&path);
+    match std::fs::canonicalize(opts.runtime.clone()) {
+        // runtime path is relative or resolved correctly
+        Ok(path) => set_runtime_path(&path),
+        // runtime path is name of program which probably exists in $PATH
+        Err(_) => match which::which(opts.runtime) {
+            Ok(path) => set_runtime_path(&path),
+            Err(e) => {
+                eprintln!("Error in finding runtime : {}\nexiting.", e);
+                std::process::exit(66);
+            }
+        },
+    }
 
     let mut tm = TestManager::new();
 
