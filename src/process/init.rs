@@ -248,6 +248,9 @@ pub fn container_init(
                 .with_context(|| format!("Failed to chroot to {:?}", rootfs))?;
         }
 
+        rootfs::adjust_root_mount_propagation(linux)
+            .context("Failed to set propagation type of root mount")?;
+
         if let Some(kernel_params) = &linux.sysctl {
             sysctl(kernel_params)
                 .with_context(|| format!("Failed to sysctl: {:?}", kernel_params))?;
