@@ -1,14 +1,10 @@
 //! Contains functionality of kill container command
 use std::{fs, path::PathBuf};
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use clap::Clap;
-use nix::sys::signal as nix_signal;
 
-use crate::{
-    container::{Container, ContainerStatus},
-    signal::ToSignal,
-};
+use crate::{container::Container, signal::ToSignal};
 
 #[derive(Clap, Debug)]
 pub struct Kill {
@@ -31,18 +27,10 @@ impl Kill {
         // load container state from json file, and check status of the container
         // it might be possible that kill is invoked on a already stopped container etc.
         let container = Container::load(container_root)?.refresh_status()?;
-        if container.can_kill() {
-            let sig = self.signal.to_signal()?;
-            log::debug!("kill signal {} to {}", sig, container.pid().unwrap());
-            nix_signal::kill(container.pid().unwrap(), sig)?;
-            container.update_status(ContainerStatus::Stopped).save()?;
-            std::process::exit(0)
-        } else {
-            bail!(
-                "{} could not be killed because it was {:?}",
-                container.id(),
-                container.status()
-            )
-        }
+        let signal = self
+            .signal
+            .to_signal()
+            .with_context(|| format!("signal {} is unknown", self.signal))?;
+        container.kill(signal)
     }
 }
