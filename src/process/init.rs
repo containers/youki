@@ -1,4 +1,5 @@
 use super::args::ContainerArgs;
+use crate::apparmor;
 use crate::{
     capabilities, hooks, namespaces::Namespaces, process::channel, rootfs, rootless::Rootless,
     seccomp, tty, utils,
@@ -9,34 +10,19 @@ use nix::mount::MsFlags;
 use nix::sched::CloneFlags;
 use nix::{
     fcntl,
-    sys::statfs,
     unistd::{self, Gid, Uid},
 };
 use oci_spec::runtime::{LinuxNamespaceType, User};
 use std::collections::HashMap;
 use std::{
     env, fs,
-    os::unix::io::AsRawFd,
     path::{Path, PathBuf},
 };
-
-// Make sure a given path is on procfs. This is to avoid the security risk that
-// /proc path is mounted over. Ref: CVE-2019-16884
-fn ensure_procfs(path: &Path) -> Result<()> {
-    let procfs_fd = fs::File::open(path)?;
-    let fstat_info = statfs::fstatfs(&procfs_fd.as_raw_fd())?;
-
-    if fstat_info.filesystem_type() != statfs::PROC_SUPER_MAGIC {
-        bail!(format!("{:?} is not on the procfs", path));
-    }
-
-    Ok(())
-}
 
 // Get a list of open fds for the calling process.
 fn get_open_fds() -> Result<Vec<i32>> {
     const PROCFS_FD_PATH: &str = "/proc/self/fd";
-    ensure_procfs(Path::new(PROCFS_FD_PATH))
+    utils::ensure_procfs(Path::new(PROCFS_FD_PATH))
         .with_context(|| format!("{} is not the actual procfs", PROCFS_FD_PATH))?;
 
     let fds: Vec<i32> = fs::read_dir(PROCFS_FD_PATH)?
@@ -254,6 +240,11 @@ pub fn container_init(
         }
     }
 
+    if let Some(profile) = &proc.apparmor_profile {
+        apparmor::apply_profile(profile)
+            .with_context(|| format!("failed to apply apparmor profile {}", profile))?;
+    }
+
     if let Some(true) = spec.root.as_ref().map(|r| r.readonly.unwrap_or(false)) {
         nix_mount(
             None::<&str>,
@@ -467,7 +458,7 @@ mod tests {
     use anyhow::{bail, Result};
     use nix::{fcntl, sys, unistd};
     use serial_test::serial;
-    use std::fs;
+    use std::{fs, os::unix::prelude::AsRawFd};
 
     // Note: We have to run these tests here as serial. The main issue is that
     // these tests has a dependency on the system state. The

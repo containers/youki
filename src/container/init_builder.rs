@@ -7,7 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{notify_socket::NOTIFY_FILE, rootless, tty, utils};
+use crate::{apparmor, notify_socket::NOTIFY_FILE, rootless, tty, utils};
 
 use super::{
     builder::ContainerBuilder, builder_impl::ContainerBuilderImpl, Container, ContainerStatus,
@@ -100,14 +100,33 @@ impl<'a> InitContainerBuilder<'a> {
     fn load_spec(&self) -> Result<Spec> {
         let source_spec_path = self.bundle.join("config.json");
         let mut spec = Spec::load(&source_spec_path)?;
+        Self::validate_spec(&spec).context("failed to validate runtime spec")?;
+
+        spec.canonicalize_rootfs(&self.bundle)?;
+        Ok(spec)
+    }
+
+    fn validate_spec(spec: &Spec) -> Result<()> {
         if !spec.version.starts_with("1.0") {
             bail!(
                 "runtime spec has incompatible version '{}'. Only 1.0.X is supported",
                 spec.version
             );
         }
-        spec.canonicalize_rootfs(&self.bundle)?;
-        Ok(spec)
+
+        if let Some(process) = &spec.process {
+            if let Some(profile) = &process.apparmor_profile {
+                if !apparmor::is_enabled()? {
+                    bail!(
+                        "apparmor profile {} is specified in runtime spec, \
+                    but apparmor is not activated on this system",
+                        profile
+                    );
+                }
+            }
+        }
+
+        Ok(())
     }
 
     fn save_spec(&self, spec: &Spec, container_dir: &Path) -> Result<()> {

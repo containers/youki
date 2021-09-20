@@ -1,3 +1,4 @@
+pub mod apparmor;
 pub mod capabilities;
 pub mod commands;
 pub mod container;
