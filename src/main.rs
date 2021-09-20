@@ -101,7 +101,7 @@ fn main() -> Result<()> {
         SubCommand::Run(run) => run.exec(root_path, systemd_cgroup),
         SubCommand::Exec(exec) => exec.exec(root_path),
         SubCommand::Kill(kill) => kill.exec(root_path),
-        SubCommand::Delete(delete) => delete.exec(root_path, systemd_cgroup),
+        SubCommand::Delete(delete) => delete.exec(root_path),
         SubCommand::State(state) => state.exec(root_path),
         SubCommand::Info(info) => info.exec(),
         SubCommand::List(list) => list.exec(root_path),
