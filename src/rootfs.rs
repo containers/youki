@@ -12,7 +12,7 @@ use nix::sys::stat::{Mode, SFlag};
 use nix::unistd::{chown, close};
 use nix::unistd::{Gid, Uid};
 use nix::NixPath;
-use oci_spec::runtime::{LinuxDevice, LinuxDeviceType, Mount, Spec};
+use oci_spec::runtime::{Linux, LinuxDevice, LinuxDeviceType, Mount, Spec};
 use procfs::process::{MountInfo, MountOptFields, Process};
 use std::fs::OpenOptions;
 use std::fs::{canonicalize, create_dir_all, remove_file};
@@ -38,7 +38,7 @@ pub fn prepare_rootfs(spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<
     nix_mount(None::<&str>, "/", None::<&str>, flags, None::<&str>)
         .context("Failed to mount rootfs")?;
 
-    make_parent_mount_private(rootfs)?;
+    make_parent_mount_private(rootfs).context("Failed to change parent mount of rootfs private")?;
 
     log::debug!("mount root fs {:?}", rootfs);
     nix_mount::<Path, Path, str, str>(
@@ -428,8 +428,7 @@ fn make_parent_mount_private(rootfs: &Path) -> Result<()> {
 }
 
 /// Change propagation type of rootfs as specified in spec.
-pub fn adjust_root_mount_propagation(spec: &Spec) -> Result<()> {
-    let linux = spec.linux.as_ref().context("no linux in spec")?;
+pub fn adjust_root_mount_propagation(linux: &Linux) -> Result<()> {
     let rootfs_propagation = linux.rootfs_propagation.as_deref();
     let flags = match rootfs_propagation {
         Some("shared") => Some(MsFlags::MS_SHARED),
