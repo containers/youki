@@ -6,10 +6,6 @@ use anyhow::{bail, Context, Result};
 use clap::Clap;
 
 use crate::container::Container;
-use crate::container::ContainerStatus;
-use crate::utils;
-use cgroups;
-use cgroups::common::FreezerState;
 
 /// Structure to implement resume command
 #[derive(Clap, Debug)]
@@ -24,7 +20,7 @@ pub struct Resume {
 // https://man7.org/linux/man-pages/man7/cgroups.7.html
 // https://www.kernel.org/doc/Documentation/cgroup-v1/freezer-subsystem.txt
 impl Resume {
-    pub fn exec(&self, root_path: PathBuf, systemd_cgroup: bool) -> Result<()> {
+    pub fn exec(&self, root_path: PathBuf) -> Result<()> {
         log::debug!("start resuming container {}", self.container_id);
         let root_path = canonicalize(root_path)?;
         let container_root = root_path.join(&self.container_id);
@@ -32,31 +28,9 @@ impl Resume {
             bail!("{} doesn't exist.", self.container_id)
         }
 
-        let container = Container::load(container_root)?.refresh_status()?;
-        // check if container can be resumed :
-        // for example, a running process cannot be resumed
-        if !container.can_resume() {
-            bail!(
-                "{} could not be resumed because it was {:?}",
-                self.container_id,
-                container.status()
-            );
-        }
-
-        let spec = container.spec()?;
-        let cgroups_path = utils::get_cgroup_path(
-            &spec.linux.context("no linux in spec")?.cgroups_path,
-            &self.container_id,
-        );
-        // create cgroup manager structure from the config at the path
-        let cmanager = cgroups::common::create_cgroup_manager(cgroups_path, systemd_cgroup)?;
-        // resume the frozen container
-        cmanager.freeze(FreezerState::Thawed)?;
-
-        log::debug!("saving running status");
-        container.update_status(ContainerStatus::Running).save()?;
-
-        log::debug!("container {} resumed", self.container_id);
-        Ok(())
+        let mut container = Container::load(container_root)?;
+        container
+            .resume()
+            .with_context(|| format!("failed to resume container {}", self.container_id))
     }
 }
