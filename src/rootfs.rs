@@ -393,11 +393,11 @@ fn parse_mount(m: &Mount) -> (MsFlags, String) {
     (flags, data.join(","))
 }
 
-fn get_parent_mount(rootfs: &Path) -> Result<MountInfo> {
-    let mount_infos = Process::myself()?.mountinfo()?;
+/// Find parent mount of rootfs in given mount infos
+fn find_parent_mount<'a>(rootfs: &Path, mount_infos: &'a [MountInfo]) -> Result<&'a MountInfo> {
     // find the longest mount point
     let parent_mount_info = mount_infos
-        .into_iter()
+        .iter()
         .filter(|mi| rootfs.starts_with(&mi.mount_point))
         .max_by(|mi1, mi2| mi1.mount_point.len().cmp(&mi2.mount_point.len()))
         .ok_or_else(|| anyhow!("couldn't find parent mount of {}", rootfs.display()))?;
@@ -407,7 +407,8 @@ fn get_parent_mount(rootfs: &Path) -> Result<MountInfo> {
 /// Make parent mount of rootfs private if it was shared, which is required by pivot_root.
 /// It also makes sure following bind mount does not propagate in other namespaces.
 fn make_parent_mount_private(rootfs: &Path) -> Result<()> {
-    let parent_mount = get_parent_mount(rootfs)?;
+    let mount_infos = Process::myself()?.mountinfo()?;
+    let parent_mount = find_parent_mount(rootfs, &mount_infos)?;
 
     // check parent mount has 'shared' propagation type
     if parent_mount
@@ -442,4 +443,53 @@ pub fn adjust_root_mount_propagation(linux: &Linux) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::{Context, Result};
+    use procfs::process::MountInfo;
+    use std::path::{Path, PathBuf};
+
+    #[test]
+    fn test_find_parent_mount() -> Result<()> {
+        let mount_infos = vec![
+            MountInfo {
+                mnt_id: 11,
+                pid: 10,
+                majmin: "".to_string(),
+                root: "/".to_string(),
+                mount_point: PathBuf::from("/"),
+                mount_options: Default::default(),
+                opt_fields: vec![],
+                fs_type: "ext4".to_string(),
+                mount_source: Some("/dev/sda1".to_string()),
+                super_options: Default::default(),
+            },
+            MountInfo {
+                mnt_id: 12,
+                pid: 11,
+                majmin: "".to_string(),
+                root: "/".to_string(),
+                mount_point: PathBuf::from("/proc"),
+                mount_options: Default::default(),
+                opt_fields: vec![],
+                fs_type: "proc".to_string(),
+                mount_source: Some("proc".to_string()),
+                super_options: Default::default(),
+            },
+        ];
+
+        let res = super::find_parent_mount(Path::new("/path/to/rootfs"), &mount_infos)
+            .context("Failed to get parent mount")?;
+        assert_eq!(res.mnt_id, 11);
+        Ok(())
+    }
+
+    #[test]
+    fn test_find_parent_mount_with_empty_mount_infos() {
+        let mount_infos = vec![];
+        let res = super::find_parent_mount(Path::new("/path/to/rootfs"), &mount_infos);
+        assert!(res.is_err());
+    }
 }
