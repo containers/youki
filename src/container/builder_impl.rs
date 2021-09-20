@@ -193,3 +193,98 @@ fn setup_mapping(rootless: &Rootless, pid: Pid) -> Result<()> {
     rootless.write_gid_mapping(pid)?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use nix::{
+        sched::{unshare, CloneFlags},
+        unistd::{self, getgid, getuid},
+    };
+    use oci_spec::runtime::LinuxIdMapping;
+    use serial_test::serial;
+
+    use crate::process::channel::intermediate_to_main;
+
+    use super::*;
+
+    #[test]
+    #[serial]
+    fn setup_uid_mapping_should_succeed() -> Result<()> {
+        let uid_mapping = LinuxIdMapping {
+            host_id: u32::from(getuid()),
+            container_id: 0,
+            size: 1,
+        };
+        let uid_mappings = vec![uid_mapping];
+        let rootless = Rootless {
+            uid_mappings: Some(&uid_mappings),
+            privileged: true,
+            ..Default::default()
+        };
+        let (mut sender, mut receiver) = intermediate_to_main()?;
+        match unsafe { unistd::fork()? } {
+            unistd::ForkResult::Parent { child } => {
+                receiver.wait_for_mapping_request()?;
+                setup_mapping(&rootless, child)?;
+                let line = fs::read_to_string(format!("/proc/{}/uid_map", child.as_raw()))?;
+                let line_splited = line.split_whitespace();
+                for (act, expect) in line_splited.zip([
+                    uid_mapping.container_id.to_string().as_str(),
+                    uid_mapping.host_id.to_string().as_str(),
+                    uid_mapping.size.to_string().as_str(),
+                ]) {
+                    assert_eq!(act, expect);
+                }
+                Ok(())
+            }
+            unistd::ForkResult::Child => {
+                unshare(CloneFlags::CLONE_NEWUSER)?;
+                prctl::set_dumpable(true).unwrap();
+                sender.identifier_mapping_request()?;
+                Ok(())
+            }
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn setup_gid_mapping_should_successed() -> Result<()> {
+        let gid_mapping = LinuxIdMapping {
+            host_id: u32::from(getgid()),
+            container_id: 0,
+            size: 1,
+        };
+        let gid_mappings = vec![gid_mapping];
+        let rootless = Rootless {
+            gid_mappings: Some(&gid_mappings),
+            ..Default::default()
+        };
+        let (mut sender, mut receiver) = intermediate_to_main()?;
+        match unsafe { unistd::fork()? } {
+            unistd::ForkResult::Parent { child } => {
+                receiver.wait_for_mapping_request()?;
+                setup_mapping(&rootless, child)?;
+                let line = fs::read_to_string(format!("/proc/{}/gid_map", child.as_raw()))?;
+                let line_splited = line.split_whitespace();
+                for (act, expect) in line_splited.zip([
+                    gid_mapping.container_id.to_string().as_str(),
+                    gid_mapping.host_id.to_string().as_str(),
+                    gid_mapping.size.to_string().as_str(),
+                ]) {
+                    assert_eq!(act, expect);
+                }
+                assert_eq!(
+                    fs::read_to_string(format!("/proc/{}/setgroups", child.as_raw()))?,
+                    "deny\n",
+                );
+                Ok(())
+            }
+            unistd::ForkResult::Child => {
+                unshare(CloneFlags::CLONE_NEWUSER)?;
+                prctl::set_dumpable(true).unwrap();
+                sender.identifier_mapping_request()?;
+                Ok(())
+            }
+        }
+    }
+}
