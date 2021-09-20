@@ -1,20 +1,33 @@
-use std::path::{Path, PathBuf};
-
-use crate::support::generate_uuid;
+use crate::utils::{generate_uuid, prepare_bundle, TempDir};
+use std::thread::sleep;
+use std::time::Duration;
 use test_framework::{TestResult, TestableGroup};
 
 use super::{create, delete, kill, start, state};
 
+// By experimenting, somewhere around 50 is enough for youki process
+// to get the kill signal and shut down
+// here we add a little buffer time as well
+const SLEEP_TIME: Duration = Duration::from_millis(75);
+
 pub struct ContainerLifecycle {
-    project_path: PathBuf,
+    project_path: TempDir,
     container_id: String,
 }
 
+impl Default for ContainerLifecycle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ContainerLifecycle {
-    pub fn new(project_path: &Path) -> Self {
+    pub fn new() -> Self {
+        let id = generate_uuid();
+        let temp_dir = prepare_bundle(&id).unwrap();
         ContainerLifecycle {
-            project_path: project_path.to_owned(),
-            container_id: generate_uuid().to_string(),
+            project_path: temp_dir,
+            container_id: id.to_string(),
         }
     }
 
@@ -31,7 +44,11 @@ impl ContainerLifecycle {
     }
 
     pub fn kill(&self) -> TestResult {
-        kill::kill(&self.project_path, &self.container_id)
+        let ret = kill::kill(&self.project_path, &self.container_id);
+        // sleep a little, so the youki process actually gets the signal and shuts down
+        // otherwise, the tester moves on to next tests before the youki has gotten signal, and delete test can fail
+        sleep(SLEEP_TIME);
+        ret
     }
 
     pub fn delete(&self) -> TestResult {
