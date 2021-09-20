@@ -2,12 +2,13 @@ use crate::{
     hooks,
     notify_socket::NotifyListener,
     process::{args::ContainerArgs, channel, fork, intermediate},
-    rootless::{self, Rootless},
+    rootless::Rootless,
     syscall::Syscall,
     utils,
 };
 use anyhow::{Context, Result};
 use cgroups;
+use nix::unistd::Pid;
 use oci_spec::runtime::Spec;
 use std::{fs, io::Write, os::unix::prelude::RawFd, path::PathBuf};
 
@@ -139,17 +140,9 @@ impl<'a> ContainerBuilderImpl<'a> {
         // If creating a rootless container, the intermediate process will ask
         // the main process to set up uid and gid mapping, once the intermediate
         // process enters into a new user namespace.
-        if self.rootless.is_some() {
+        if let Some(rootless) = self.rootless.as_ref() {
             receiver_from_intermediate.wait_for_mapping_request()?;
-            log::debug!("write mapping for pid {:?}", intermediate_pid);
-            let rootless = self.rootless.as_ref().unwrap();
-            if !rootless.privileged {
-                // The main process is running as an unprivileged user and cannot write the mapping
-                // until "deny" has been written to setgroups. See CVE-2014-8989.
-                utils::write_file(format!("/proc/{}/setgroups", intermediate_pid), "deny")?;
-            }
-            rootless::write_uid_mapping(intermediate_pid, self.rootless.as_ref())?;
-            rootless::write_gid_mapping(intermediate_pid, self.rootless.as_ref())?;
+            setup_mapping(rootless, intermediate_pid)?;
             sender_to_intermediate.mapping_written()?;
         }
 
@@ -187,4 +180,16 @@ impl<'a> ContainerBuilderImpl<'a> {
 
         Ok(())
     }
+}
+
+fn setup_mapping(rootless: &Rootless, pid: Pid) -> Result<()> {
+    log::debug!("write mapping for pid {:?}", pid);
+    if !rootless.privileged {
+        // The main process is running as an unprivileged user and cannot write the mapping
+        // until "deny" has been written to setgroups. See CVE-2014-8989.
+        utils::write_file(format!("/proc/{}/setgroups", pid), "deny")?;
+    }
+    rootless.write_uid_mapping(pid)?;
+    rootless.write_gid_mapping(pid)?;
+    Ok(())
 }
