@@ -21,6 +21,17 @@ pub struct Delete {
 }
 
 impl Delete {
+    /// instant Delete Command
+    ///
+    /// This method is provided for those using `youki` as a library to enable the use of the
+    /// Delete command to remove containers.
+    pub fn new(container_id: String, force: bool) -> Self {
+        Self {
+            container_id,
+            force,
+        }
+    }
+
     pub fn exec(&self, root_path: PathBuf, systemd_cgroup: bool) -> Result<()> {
         log::debug!("start deleting {}", self.container_id);
         // state of container is stored in a directory named as container id inside
