@@ -208,9 +208,9 @@ pub fn lookup_map_binaries(spec: &Linux) -> Result<Option<(PathBuf, PathBuf)>> {
         let gidmap = lookup_map_binary("newgidmap")?;
 
         match (uidmap, gidmap) {
-        (Some(newuidmap), Some(newgidmap)) => Ok(Some((newuidmap, newgidmap))),
-        _ => bail!("newuidmap/newgidmap binaries could not be found in path. This is required if multiple id mappings are specified"),
-    }
+            (Some(newuidmap), Some(newgidmap)) => Ok(Some((newuidmap, newgidmap))),
+            _ => bail!("newuidmap/newgidmap binaries could not be found in path. This is required if multiple id mappings are specified"),
+        }
     } else {
         Ok(None)
     }
