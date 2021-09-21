@@ -100,7 +100,7 @@ fn validate(spec: &Spec) -> Result<()> {
     let uid_mappings = linux
         .uid_mappings
         .as_ref()
-        .context("rootless containers require LinuxIdMapping in spec")?;
+        .context("rootless containers require uid_mappings in spec")?;
 
     if uid_mappings.is_empty() {
         bail!("rootless containers require at least one uid mapping");
