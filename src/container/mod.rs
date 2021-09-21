@@ -13,6 +13,7 @@ pub mod container_events;
 pub mod container_kill;
 pub mod container_pause;
 pub mod container_resume;
+pub mod container_start;
 pub mod init_builder;
 pub mod state;
 pub mod tenant_builder;
