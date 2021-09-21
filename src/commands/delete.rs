@@ -1,5 +1,5 @@
-use crate::container::Container;
-use anyhow::{bail, Context, Result};
+use crate::commands::load_container;
+use anyhow::{Context, Result};
 use clap::Clap;
 use std::path::PathBuf;
 
@@ -15,16 +15,7 @@ pub struct Delete {
 impl Delete {
     pub fn exec(&self, root_path: PathBuf) -> Result<()> {
         log::debug!("start deleting {}", self.container_id);
-        // state of container is stored in a directory named as container id inside
-        // root directory given in commandline options
-        let container_root = root_path.join(&self.container_id);
-        if !container_root.exists() {
-            bail!("{} doesn't exist.", self.container_id)
-        }
-        // load container state from json file, and check status of the container
-        // it might be possible that delete is invoked on a running container.
-        log::debug!("load the container from {:?}", container_root);
-        let mut container = Container::load(container_root)?;
+        let mut container = load_container(root_path, self.container_id.as_str())?;
         container
             .delete(self.force)
             .with_context(|| format!("failed to delete container {}", self.container_id))

@@ -8,7 +8,7 @@ use cgroups::common::FreezerState;
 impl Container {
     pub fn resume(&mut self) -> Result<()> {
         self.refresh_status()
-            .with_context(|| format!("failed to refresh status of container"))?;
+            .with_context(|| format!("failed to refresh container status"))?;
         // check if container can be resumed :
         // for example, a running process cannot be resumed
         if !self.can_resume() {

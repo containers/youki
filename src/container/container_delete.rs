@@ -4,13 +4,12 @@ use crate::utils;
 use anyhow::{bail, Context, Result};
 use cgroups;
 use nix::sys::signal;
-use oci_spec::runtime::Spec;
 use std::fs;
 
 impl Container {
     pub fn delete(&mut self, force: bool) -> Result<()> {
         self.refresh_status()
-            .with_context(|| format!("failed to refresh status of container {}", self.state.id))?;
+            .context("failed to refresh container status")?;
         if self.can_kill() && force {
             let sig = signal::Signal::SIGKILL;
             log::debug!("kill signal {} to {}", sig, self.pid().unwrap());
@@ -21,9 +20,9 @@ impl Container {
         log::debug!("container status: {:?}", self.status());
         if self.can_delete() {
             if self.root.exists() {
-                let config_absolute_path = self.root.join("config.json");
-                log::debug!("load spec from {:?}", config_absolute_path);
-                let spec = Spec::load(config_absolute_path)?;
+                let spec = self.spec().with_context(|| {
+                    format!("failed to load runtime spec for container {}", self.id())
+                })?;
                 log::debug!("spec: {:?}", spec);
 
                 // remove the directory storing container state
@@ -41,8 +40,7 @@ impl Container {
                 // check https://man7.org/linux/man-pages/man7/cgroups.7.html
                 // creating and removing cgroups section for more information on cgroups
                 let use_systemd = self
-                    .state
-                    .use_systemd
+                    .systemd()
                     .context("container state does not contain cgroup manager")?;
                 let cmanager = cgroups::common::create_cgroup_manager(&cgroups_path, use_systemd)
                     .with_context(|| format!("failed to create cgroup manager"))?;

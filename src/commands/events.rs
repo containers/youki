@@ -1,9 +1,9 @@
 use clap::Clap;
 use std::path::PathBuf;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 
-use crate::container::Container;
+use crate::commands::load_container;
 
 #[derive(Clap, Debug)]
 pub struct Events {
@@ -20,13 +20,7 @@ pub struct Events {
 
 impl Events {
     pub fn exec(&self, root_path: PathBuf) -> Result<()> {
-        let container_dir = root_path.join(&self.container_id);
-        if !container_dir.exists() {
-            log::debug!("{:?}", container_dir);
-            bail!("{} doesn't exist.", self.container_id)
-        }
-
-        let mut container = Container::load(container_dir)?;
+        let mut container = load_container(root_path, &self.container_id)?;
         container
             .events(self.interval, self.stats)
             .with_context(|| format!("failed to get events from container {}", self.container_id))

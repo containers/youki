@@ -1,9 +1,8 @@
 //! Contains functionality of pause container command
-use crate::container::Container;
-use std::fs::canonicalize;
+use crate::commands::load_container;
 use std::path::PathBuf;
 
-use anyhow::{bail, Result};
+use anyhow::{Context, Result};
 use clap::Clap;
 
 /// Structure to implement pause command
@@ -21,14 +20,9 @@ pub struct Pause {
 impl Pause {
     pub fn exec(&self, root_path: PathBuf) -> Result<()> {
         log::debug!("start pausing container {}", self.container_id);
-        let root_path = canonicalize(root_path)?;
-        let container_root = root_path.join(&self.container_id);
-        if !container_root.exists() {
-            bail!("{} doesn't exist.", self.container_id)
-        }
-
-        // populate data in a container structure from its file
-        let mut container = Container::load(container_root)?;
-        container.pause()
+        let mut container = load_container(root_path, &self.container_id)?;
+        container
+            .pause()
+            .with_context(|| format!("failed to pause container {}", self.container_id))
     }
 }

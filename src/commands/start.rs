@@ -2,10 +2,10 @@
 
 use std::path::PathBuf;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use clap::Clap;
 
-use crate::container::Container;
+use crate::commands::load_container;
 
 #[derive(Clap, Debug)]
 pub struct Start {
@@ -14,16 +14,8 @@ pub struct Start {
 }
 
 impl Start {
-    pub fn new(container_id: String) -> Self {
-        Self { container_id }
-    }
-
     pub fn exec(&self, root_path: PathBuf) -> Result<()> {
-        let container_root = root_path.join(&self.container_id);
-        if !container_root.exists() {
-            bail!("{} doesn't exist.", self.container_id)
-        }
-        let mut container = Container::load(container_root)?.refresh_status()?;
+        let mut container = load_container(root_path, &self.container_id)?;
         container
             .start()
             .with_context(|| format!("failed to start container {}", self.container_id))
