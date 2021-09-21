@@ -6,20 +6,19 @@ use std::path::Path;
 use std::process::Command;
 use std::{env, path::PathBuf};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Rootless<'a> {
     /// Location of the newuidmap binary
     pub newuidmap: Option<PathBuf>,
     /// Location of the newgidmap binary
     pub newgidmap: Option<PathBuf>,
     /// Mappings for user ids
-    pub uid_mappings: Option<&'a Vec<LinuxIdMapping>>,
+    pub(crate) uid_mappings: Option<&'a Vec<LinuxIdMapping>>,
     /// Mappings for group ids
-    pub gid_mappings: Option<&'a Vec<LinuxIdMapping>>,
+    pub(crate) gid_mappings: Option<&'a Vec<LinuxIdMapping>>,
     /// Info on the user namespaces
-    user_namespace: Option<LinuxNamespace>,
-    /// Is rootless container requested by a privileged
-    /// user
+    pub(crate) user_namespace: Option<LinuxNamespace>,
+    /// Is rootless container requested by a privileged user
     pub privileged: bool,
 }
 
@@ -52,6 +51,32 @@ impl<'a> Rootless<'a> {
         } else {
             log::debug!("This is NOT a rootless container");
             Ok(None)
+        }
+    }
+
+    pub fn write_uid_mapping(&self, target_pid: Pid) -> Result<()> {
+        log::debug!("Write UID mapping for {:?}", target_pid);
+        if let Some(uid_mappings) = self.uid_mappings {
+            write_id_mapping(
+                &format!("/proc/{}/uid_map", target_pid),
+                uid_mappings,
+                self.newuidmap.as_deref(),
+            )
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn write_gid_mapping(&self, target_pid: Pid) -> Result<()> {
+        log::debug!("Write GID mapping for {:?}", target_pid);
+        if let Some(gid_mappings) = self.gid_mappings {
+            return write_id_mapping(
+                &format!("/proc/{}/gid_map", target_pid),
+                gid_mappings,
+                self.newgidmap.as_deref(),
+            );
+        } else {
+            Ok(())
         }
     }
 }
@@ -197,36 +222,6 @@ fn lookup_map_binary(binary: &str) -> Result<Option<PathBuf>> {
         .split_terminator(':')
         .find(|p| PathBuf::from(p).join(binary).exists())
         .map(PathBuf::from))
-}
-
-pub fn write_uid_mapping(target_pid: Pid, rootless: Option<&Rootless>) -> Result<()> {
-    log::debug!("Write UID mapping for {:?}", target_pid);
-    if let Some(rootless) = rootless {
-        if let Some(uid_mappings) = rootless.uid_mappings {
-            return write_id_mapping(
-                &format!("/proc/{}/uid_map", target_pid),
-                uid_mappings,
-                rootless.newuidmap.as_deref(),
-            );
-        }
-    }
-
-    Ok(())
-}
-
-pub fn write_gid_mapping(target_pid: Pid, rootless: Option<&Rootless>) -> Result<()> {
-    log::debug!("Write GID mapping for {:?}", target_pid);
-    if let Some(rootless) = rootless {
-        if let Some(gid_mappings) = rootless.gid_mappings {
-            return write_id_mapping(
-                &format!("/proc/{}/gid_map", target_pid),
-                gid_mappings,
-                rootless.newgidmap.as_deref(),
-            );
-        }
-    }
-
-    Ok(())
 }
 
 fn write_id_mapping(
