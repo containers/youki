@@ -12,7 +12,7 @@ impl Controller for PerfEvent {
         Ok(())
     }
     //no need to handle any case
-    fn needs_to_handle(_controller_opt: &ControllerOpt) -> Option<&Self::Resource> {
+    fn needs_to_handle<'a>(_controller_opt: &'a ControllerOpt) -> Option<&'a Self::Resource> {
         None
     }
 }

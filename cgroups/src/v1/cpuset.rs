@@ -38,7 +38,7 @@ impl Controller for CpuSet {
         Ok(())
     }
 
-    fn needs_to_handle(controller_opt: &ControllerOpt) -> Option<&Self::Resource> {
+    fn needs_to_handle<'a>(controller_opt: &'a ControllerOpt) -> Option<&'a Self::Resource> {
         if let Some(cpuset) = &controller_opt.resources.cpu {
             if cpuset.cpus.is_some() || cpuset.mems.is_some() {
                 return Some(cpuset);

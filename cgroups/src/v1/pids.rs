@@ -27,7 +27,7 @@ impl Controller for Pids {
         Ok(())
     }
 
-    fn needs_to_handle(controller_opt: &ControllerOpt) -> Option<&Self::Resource> {
+    fn needs_to_handle<'a>(controller_opt: &'a ControllerOpt) -> Option<&'a Self::Resource> {
         if let Some(pids) = &controller_opt.resources.pids {
             return Some(pids);
         }

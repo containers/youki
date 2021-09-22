@@ -101,7 +101,7 @@ impl Controller for Memory {
         Ok(())
     }
 
-    fn needs_to_handle(controller_opt: &ControllerOpt) -> Option<&Self::Resource> {
+    fn needs_to_handle<'a>(controller_opt: &'a ControllerOpt) -> Option<&'a Self::Resource> {
         if let Some(memory) = &controller_opt.resources.memory {
             return Some(memory);
         }
@@ -455,9 +455,10 @@ mod tests {
             };
 
         let controller_opt = ControllerOpt {
-            resources: linux_resources,
+            resources: &linux_resources,
             disable_oom_killer,
-            ..Default::default()
+            oom_score_adj: None,
+            freezer_state: None,
         };
 
             let result = <Memory as Controller>::apply(&controller_opt, &tmp);
