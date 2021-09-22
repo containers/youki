@@ -19,5 +19,5 @@ pub trait Controller {
     fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()>;
 
     /// Checks if the controller needs to handle this request
-    fn needs_to_handle(controller_opt: &ControllerOpt) -> Option<&Self::Resource>;
+    fn needs_to_handle<'a>(controller_opt: &'a ControllerOpt) -> Option<&'a Self::Resource>;
 }

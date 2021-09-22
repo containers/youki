@@ -150,17 +150,21 @@ impl<'a> ContainerBuilderImpl<'a> {
         log::debug!("init pid is {:?}", init_pid);
 
         if self.rootless.is_none() && linux.resources.is_some() && self.init {
-            let controller_opt = cgroups::common::ControllerOpt {
-                resources: linux.resources.clone().unwrap(),
-                ..Default::default()
-            };
-            cmanager
-                .add_task(init_pid)
-                .context("Failed to add tasks to cgroup manager")?;
+            if let Some(resources) = linux.resources.as_ref() {
+                let controller_opt = cgroups::common::ControllerOpt {
+                    resources,
+                    freezer_state: None,
+                    oom_score_adj: None,
+                    disable_oom_killer: false,
+                };
+                cmanager
+                    .add_task(init_pid)
+                    .context("Failed to add tasks to cgroup manager")?;
 
-            cmanager
-                .apply(&controller_opt)
-                .context("Failed to apply resource limits through cgroup")?;
+                cmanager
+                    .apply(&controller_opt)
+                    .context("Failed to apply resource limits through cgroup")?;
+            }
         }
 
         // if file to write the pid to is specified, write pid of the child
