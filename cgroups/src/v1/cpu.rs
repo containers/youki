@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use anyhow::{bail, Context, Result};
+use async_trait::async_trait;
 use oci_spec::{LinuxCpu, LinuxResources};
 
 use crate::{
@@ -19,14 +20,15 @@ const CGROUP_CPU_STAT: &str = "cpu.stat";
 
 pub struct Cpu {}
 
+#[async_trait(?Send)]
 impl Controller for Cpu {
     type Resource = LinuxCpu;
 
-    fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
+    async fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply Cpu cgroup config");
 
         if let Some(cpu) = Self::needs_to_handle(linux_resources) {
-            Self::apply(cgroup_root, cpu)?;
+            Self::apply(cgroup_root, cpu).await?;
         }
 
         Ok(())
@@ -94,34 +96,39 @@ impl StatsProvider for Cpu {
 }
 
 impl Cpu {
-    fn apply(root_path: &Path, cpu: &LinuxCpu) -> Result<()> {
+    async fn apply(root_path: &Path, cpu: &LinuxCpu) -> Result<()> {
         if let Some(cpu_shares) = cpu.shares {
             if cpu_shares != 0 {
-                common::write_cgroup_file(root_path.join(CGROUP_CPU_SHARES), cpu_shares)?;
+                common::async_write_cgroup_file(root_path.join(CGROUP_CPU_SHARES), cpu_shares)
+                    .await?;
             }
         }
 
         if let Some(cpu_period) = cpu.period {
             if cpu_period != 0 {
-                common::write_cgroup_file(root_path.join(CGROUP_CPU_PERIOD), cpu_period)?;
+                common::async_write_cgroup_file(root_path.join(CGROUP_CPU_PERIOD), cpu_period)
+                    .await?;
             }
         }
 
         if let Some(cpu_quota) = cpu.quota {
             if cpu_quota != 0 {
-                common::write_cgroup_file(root_path.join(CGROUP_CPU_QUOTA), cpu_quota)?;
+                common::async_write_cgroup_file(root_path.join(CGROUP_CPU_QUOTA), cpu_quota)
+                    .await?;
             }
         }
 
         if let Some(rt_runtime) = cpu.realtime_runtime {
             if rt_runtime != 0 {
-                common::write_cgroup_file(root_path.join(CGROUP_CPU_RT_RUNTIME), rt_runtime)?;
+                common::async_write_cgroup_file(root_path.join(CGROUP_CPU_RT_RUNTIME), rt_runtime)
+                    .await?;
             }
         }
 
         if let Some(rt_period) = cpu.realtime_period {
             if rt_period != 0 {
-                common::write_cgroup_file(root_path.join(CGROUP_CPU_RT_PERIOD), rt_period)?;
+                common::async_write_cgroup_file(root_path.join(CGROUP_CPU_RT_PERIOD), rt_period)
+                    .await?;
             }
         }
 
@@ -132,7 +139,7 @@ impl Cpu {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test::{create_temp_dir, set_fixture, setup, LinuxCpuBuilder};
+    use crate::test::{aw, create_temp_dir, set_fixture, setup, LinuxCpuBuilder};
     use std::fs;
 
     #[test]
@@ -144,7 +151,7 @@ mod tests {
         let cpu = LinuxCpuBuilder::new().with_shares(2048).build();
 
         // act
-        Cpu::apply(&tmp, &cpu).expect("apply cpu");
+        aw!(Cpu::apply(&tmp, &cpu)).expect("apply cpu");
 
         // assert
         let content = fs::read_to_string(shares)
@@ -160,7 +167,7 @@ mod tests {
         let cpu = LinuxCpuBuilder::new().with_quota(QUOTA).build();
 
         // act
-        Cpu::apply(&tmp, &cpu).expect("apply cpu");
+        aw!(Cpu::apply(&tmp, &cpu)).expect("apply cpu");
 
         // assert
         let content = fs::read_to_string(max)
@@ -176,7 +183,7 @@ mod tests {
         let cpu = LinuxCpuBuilder::new().with_period(PERIOD).build();
 
         // act
-        Cpu::apply(&tmp, &cpu).expect("apply cpu");
+        aw!(Cpu::apply(&tmp, &cpu)).expect("apply cpu");
 
         // assert
         let content = fs::read_to_string(max)
@@ -194,7 +201,7 @@ mod tests {
             .build();
 
         // act
-        Cpu::apply(&tmp, &cpu).expect("apply cpu");
+        aw!(Cpu::apply(&tmp, &cpu)).expect("apply cpu");
 
         // assert
         let content = fs::read_to_string(max)
@@ -210,7 +217,7 @@ mod tests {
         let cpu = LinuxCpuBuilder::new().with_realtime_period(PERIOD).build();
 
         // act
-        Cpu::apply(&tmp, &cpu).expect("apply cpu");
+        aw!(Cpu::apply(&tmp, &cpu)).expect("apply cpu");
 
         // assert
         let content = fs::read_to_string(max)

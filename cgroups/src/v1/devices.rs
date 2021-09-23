@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
+use async_trait::async_trait;
 
 use super::controller::Controller;
 use crate::common;
@@ -8,15 +9,16 @@ use oci_spec::{LinuxDevice, LinuxDeviceCgroup, LinuxDeviceType, LinuxResources};
 
 pub struct Devices {}
 
+#[async_trait(?Send)]
 impl Controller for Devices {
     type Resource = ();
 
-    fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
+    async fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply Devices cgroup config");
 
         if let Some(devices) = linux_resources.devices.as_ref() {
             for d in devices {
-                Self::apply_device(d, cgroup_root)?;
+                Self::apply_device(d, cgroup_root).await?;
             }
         }
 
@@ -26,7 +28,7 @@ impl Controller for Devices {
         ]
         .concat()
         {
-            Self::apply_device(&d, cgroup_root)?;
+            Self::apply_device(&d, cgroup_root).await?;
         }
 
         Ok(())
@@ -39,14 +41,14 @@ impl Controller for Devices {
 }
 
 impl Devices {
-    fn apply_device(device: &LinuxDeviceCgroup, cgroup_root: &Path) -> Result<()> {
+    async fn apply_device(device: &LinuxDeviceCgroup, cgroup_root: &Path) -> Result<()> {
         let path = if device.allow {
             cgroup_root.join("devices.allow")
         } else {
             cgroup_root.join("devices.deny")
         };
 
-        common::write_cgroup_file_str(path, &device.to_string())?;
+        common::async_write_cgroup_file_str(path, &device.to_string()).await?;
         Ok(())
     }
 
@@ -164,7 +166,7 @@ impl Devices {
 mod tests {
     use super::*;
     use crate::test::create_temp_dir;
-    use crate::test::set_fixture;
+    use crate::test::{aw, set_fixture};
     use oci_spec::{LinuxDeviceCgroup, LinuxDeviceType};
     use std::fs::read_to_string;
 
@@ -181,7 +183,7 @@ mod tests {
             set_fixture(&tmp, "devices.allow", "").expect("create allowed devices list");
             set_fixture(&tmp, "devices.deny", "").expect("create denied devices list");
 
-            Devices::apply_device(d, &tmp).expect("Apply default device");
+            aw!(Devices::apply_device(d, &tmp)).expect("Apply default device");
             println!("Device: {}", d.to_string());
             if d.allow {
                 let allowed_content =
@@ -233,7 +235,7 @@ mod tests {
             set_fixture(&tmp, "devices.allow", "").expect("create allowed devices list");
             set_fixture(&tmp, "devices.deny", "").expect("create denied devices list");
 
-            Devices::apply_device(d, &tmp).expect("Apply default device");
+            aw!(Devices::apply_device(d, &tmp)).expect("Apply default device");
             println!("Device: {}", d.to_string());
             if d.allow {
                 let allowed_content =
@@ -252,7 +254,7 @@ mod tests {
             let tmp = create_temp_dir("property_test_apply_device").expect("create temp directory for test");
             set_fixture(&tmp, "devices.allow", "").expect("create allowed devices list");
             set_fixture(&tmp, "devices.deny", "").expect("create denied devices list");
-            Devices::apply_device(&device, &tmp).expect("Apply default device");
+            aw!(Devices::apply_device(&device, &tmp)).expect("Apply default device");
             if device.allow {
                 let allowed_content =
                     read_to_string(tmp.join("devices.allow")).expect("read to string");
@@ -270,7 +272,7 @@ mod tests {
                 .map(|device| {
                     set_fixture(&tmp, "devices.allow", "").expect("create allowed devices list");
                     set_fixture(&tmp, "devices.deny", "").expect("create denied devices list");
-                    Devices::apply_device(device, &tmp).expect("Apply default device");
+                    aw!(Devices::apply_device(device, &tmp)).expect("Apply default device");
                     if device.allow {
                         let allowed_content =
                             read_to_string(tmp.join("devices.allow")).expect("read to string");

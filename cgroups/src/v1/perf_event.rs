@@ -1,14 +1,16 @@
 use super::Controller;
 use anyhow::Result;
+use async_trait::async_trait;
 use oci_spec::LinuxResources;
 use std::path::Path;
 
 pub struct PerfEvent {}
 
+#[async_trait(?Send)]
 impl Controller for PerfEvent {
     type Resource = ();
 
-    fn apply(_linux_resources: &LinuxResources, _cgroup_root: &Path) -> Result<()> {
+    async fn apply(_linux_resources: &LinuxResources, _cgroup_root: &Path) -> Result<()> {
         Ok(())
     }
     //no need to handle any case

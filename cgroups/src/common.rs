@@ -16,6 +16,10 @@ use systemd::daemon::booted;
 fn booted() -> Result<bool> {
     bail!("This build does not include the systemd cgroups feature")
 }
+use tokio_uring::{
+    buf::IoBuf,
+    fs::OpenOptions,
+};
 
 use super::v1;
 use super::v2;
@@ -24,6 +28,12 @@ use super::stats::Stats;
 
 pub const CGROUP_PROCS: &str = "cgroup.procs";
 pub const DEFAULT_CGROUP_ROOT: &str = "/sys/fs/cgroup";
+
+// This can probably be fine tuned. Any bytes in a buffer not read to are wasted space, but too
+// small of a chunk means we need to do more read operations. I baselessly assume 4096 will read in
+// most cgroup files in a single operation, and that wasting bytes to kilobytes of memory is worth a
+// faster read.
+const CHUNK_SIZE: usize = 4096;
 
 pub trait CgroupManager {
     /// Adds a task specified by its pid to the cgroup
@@ -73,14 +83,53 @@ pub fn write_cgroup_file_str<P: AsRef<Path>>(path: P, data: &str) -> Result<()> 
 
 #[inline]
 pub fn write_cgroup_file<P: AsRef<Path>, T: ToString>(path: P, data: T) -> Result<()> {
-    fs::OpenOptions::new()
+    write_cgroup_file_str(path, &data.to_string())?;
+
+    Ok(())
+}
+
+#[inline]
+pub async fn async_write_cgroup_file<P: AsRef<Path>, T: ToString>(path: P, data: T) -> Result<()> {
+    async_write_cgroup_file_str(path, &data.to_string()).await?;
+
+    Ok(())
+}
+
+#[inline]
+pub async fn async_write_cgroup_file_str<P: AsRef<Path>>(path: P, data: &str) -> Result<()> {
+    let file = OpenOptions::new()
         .create(false)
         .write(true)
         .truncate(false)
         .open(path.as_ref())
-        .with_context(|| format!("failed to open {:?}", path.as_ref()))?
-        .write_all(data.to_string().as_bytes())
-        .with_context(|| format!("failed to write to {:?}", path.as_ref()))?;
+        .await
+        .with_context(|| format!("failed to open {:?}", path.as_ref()))?;
+
+    // NOTE: this code won't need to exist once tokio_uring implements write_all_at
+    let mut buf = data.as_bytes().to_vec();
+    let buf_len = buf.len();
+    let mut bytes_written = 0;
+    while bytes_written < buf_len {
+        let (res, slice) = file
+            .write_at(buf.slice(bytes_written..), bytes_written as u64)
+            .await;
+        buf = slice.into_inner();
+        match res {
+            Ok(0) => {
+                bail!(format!(
+                    "failed to write whole buffer to cgroup file: {:?}",
+                    path.as_ref()
+                ));
+            }
+            Ok(n) => {
+                bytes_written += n;
+            }
+            Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => {}
+            Err(e) => bail!(e),
+        };
+    }
+
+    file.sync_data().await?;
 
     Ok(())
 }
@@ -89,6 +138,42 @@ pub fn write_cgroup_file<P: AsRef<Path>, T: ToString>(path: P, data: T) -> Resul
 pub fn read_cgroup_file<P: AsRef<Path>>(path: P) -> Result<String> {
     let path = path.as_ref();
     fs::read_to_string(path).with_context(|| format!("failed to open {:?}", path))
+}
+
+#[inline]
+pub async fn async_read_cgroup_file<P: AsRef<Path>>(path: P) -> Result<String> {
+    let file = OpenOptions::new()
+        .create(false)
+        .read(true)
+        .open(path)
+        .await?;
+
+    // assuming the chunk size is big enough to read in most files, seems reasonable to just
+    // allocate the resulting string to that size
+    let mut result = String::with_capacity(CHUNK_SIZE);
+
+    // this is fun... Should probably coordinate with tokio_uring maintainers to see if we can get
+    // this added as a feature instead of implementing ourselves
+    let buffer = vec![0; CHUNK_SIZE];
+    let (res, buffer) = file.read_at(buffer, 0).await;
+    let mut bytes_read = res?;
+    let s = std::str::from_utf8(&buffer[..bytes_read])?;
+    result.push_str(&s);
+    // if the amount of bytes read is equal to the chunk size there may be more bytes to read
+    while bytes_read == CHUNK_SIZE {
+        let buffer = vec![0; CHUNK_SIZE];
+        // read the next chunk of bytes
+        let (res, buffer) = file.read_at(buffer, bytes_read as u64).await;
+        bytes_read = res?;
+        // short circuit the read loop, we don't need to do anything if nothing was read
+        if bytes_read == 0 {
+            break;
+        }
+        let s = std::str::from_utf8(&buffer[..bytes_read])?;
+        result.push_str(&s);
+    }
+
+    Ok(result)
 }
 
 pub fn get_supported_cgroup_fs() -> Result<Vec<Cgroup>> {

@@ -1,6 +1,7 @@
 use std::{fs, path::Path};
 
 use anyhow::{bail, Result};
+use async_trait::async_trait;
 use nix::unistd;
 use oci_spec::{LinuxCpu, LinuxResources};
 use unistd::Pid;
@@ -14,6 +15,7 @@ const CGROUP_CPUSET_MEMS: &str = "cpuset.mems";
 
 pub struct CpuSet {}
 
+#[async_trait(?Send)]
 impl Controller for CpuSet {
     type Resource = LinuxCpu;
 
@@ -27,11 +29,11 @@ impl Controller for CpuSet {
         Ok(())
     }
 
-    fn apply(linux_resources: &LinuxResources, cgroup_path: &Path) -> Result<()> {
+    async fn apply(linux_resources: &LinuxResources, cgroup_path: &Path) -> Result<()> {
         log::debug!("Apply CpuSet cgroup config");
 
         if let Some(cpuset) = Self::needs_to_handle(linux_resources) {
-            Self::apply(cgroup_path, cpuset)?;
+            Self::apply(cgroup_path, cpuset).await?;
         }
 
         Ok(())
@@ -49,13 +51,13 @@ impl Controller for CpuSet {
 }
 
 impl CpuSet {
-    fn apply(cgroup_path: &Path, cpuset: &LinuxCpu) -> Result<()> {
+    async fn apply(cgroup_path: &Path, cpuset: &LinuxCpu) -> Result<()> {
         if let Some(cpus) = &cpuset.cpus {
-            common::write_cgroup_file_str(cgroup_path.join(CGROUP_CPUSET_CPUS), cpus)?;
+            common::async_write_cgroup_file(cgroup_path.join(CGROUP_CPUSET_CPUS), cpus).await?;
         }
 
         if let Some(mems) = &cpuset.mems {
-            common::write_cgroup_file_str(cgroup_path.join(CGROUP_CPUSET_MEMS), mems)?;
+            common::async_write_cgroup_file(cgroup_path.join(CGROUP_CPUSET_MEMS), mems).await?;
         }
 
         Ok(())
@@ -92,7 +94,7 @@ mod tests {
     use std::fs;
 
     use super::*;
-    use crate::test::{setup, LinuxCpuBuilder};
+    use crate::test::{aw, setup, LinuxCpuBuilder};
 
     #[test]
     fn test_set_cpus() {
@@ -101,7 +103,7 @@ mod tests {
         let cpuset = LinuxCpuBuilder::new().with_cpus("1-3".to_owned()).build();
 
         // act
-        CpuSet::apply(&tmp, &cpuset).expect("apply cpuset");
+        aw!(CpuSet::apply(&tmp, &cpuset)).expect("apply cpuset");
 
         // assert
         let content = fs::read_to_string(&cpus)
@@ -116,7 +118,7 @@ mod tests {
         let cpuset = LinuxCpuBuilder::new().with_mems("1-3".to_owned()).build();
 
         // act
-        CpuSet::apply(&tmp, &cpuset).expect("apply cpuset");
+        aw!(CpuSet::apply(&tmp, &cpuset)).expect("apply cpuset");
 
         // assert
         let content = fs::read_to_string(&mems)

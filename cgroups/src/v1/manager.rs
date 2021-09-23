@@ -5,6 +5,7 @@ use std::{collections::HashMap, path::PathBuf};
 use anyhow::bail;
 use anyhow::Result;
 use nix::unistd::Pid;
+use tokio_uring;
 
 use procfs::process::Process;
 
@@ -129,24 +130,30 @@ impl CgroupManager for Manager {
     }
 
     fn apply(&self, linux_resources: &LinuxResources) -> Result<()> {
-        for subsys in self.get_required_controllers(linux_resources)? {
-            match subsys.0 {
-                CtrlType::Cpu => Cpu::apply(linux_resources, subsys.1)?,
-                CtrlType::CpuAcct => CpuAcct::apply(linux_resources, subsys.1)?,
-                CtrlType::CpuSet => CpuSet::apply(linux_resources, subsys.1)?,
-                CtrlType::Devices => Devices::apply(linux_resources, subsys.1)?,
-                CtrlType::HugeTlb => HugeTlb::apply(linux_resources, subsys.1)?,
-                CtrlType::Memory => Memory::apply(linux_resources, subsys.1)?,
-                CtrlType::Pids => Pids::apply(linux_resources, subsys.1)?,
-                CtrlType::PerfEvent => PerfEvent::apply(linux_resources, subsys.1)?,
-                CtrlType::Blkio => Blkio::apply(linux_resources, subsys.1)?,
-                CtrlType::NetworkPriority => NetworkPriority::apply(linux_resources, subsys.1)?,
-                CtrlType::NetworkClassifier => NetworkClassifier::apply(linux_resources, subsys.1)?,
-                CtrlType::Freezer => Freezer::apply(linux_resources, subsys.1)?,
+        tokio_uring::start(async {
+            for subsys in self.get_required_controllers(linux_resources)? {
+                match subsys.0 {
+                    CtrlType::Cpu => Cpu::apply(linux_resources, subsys.1).await?,
+                    CtrlType::CpuAcct => CpuAcct::apply(linux_resources, subsys.1).await?,
+                    CtrlType::CpuSet => CpuSet::apply(linux_resources, subsys.1).await?,
+                    CtrlType::Devices => Devices::apply(linux_resources, subsys.1).await?,
+                    CtrlType::HugeTlb => HugeTlb::apply(linux_resources, subsys.1).await?,
+                    CtrlType::Memory => Memory::apply(linux_resources, subsys.1).await?,
+                    CtrlType::Pids => Pids::apply(linux_resources, subsys.1).await?,
+                    CtrlType::PerfEvent => PerfEvent::apply(linux_resources, subsys.1).await?,
+                    CtrlType::Blkio => Blkio::apply(linux_resources, subsys.1).await?,
+                    CtrlType::NetworkPriority => {
+                        NetworkPriority::apply(linux_resources, subsys.1).await?
+                    }
+                    CtrlType::NetworkClassifier => {
+                        NetworkClassifier::apply(linux_resources, subsys.1).await?
+                    }
+                    CtrlType::Freezer => Freezer::apply(linux_resources, subsys.1).await?,
+                }
             }
-        }
 
-        Ok(())
+            Ok(())
+        })
     }
 
     fn remove(&self) -> Result<()> {
@@ -173,10 +180,10 @@ impl CgroupManager for Manager {
             freezer: Some(state),
             ..Default::default()
         };
-        Freezer::apply(
+        tokio_uring::start(Freezer::apply(
             &linux_resources,
             self.subsystems.get(&CtrlType::Freezer).unwrap(),
-        )
+        ))
     }
 
     fn stats(&self) -> Result<Stats> {

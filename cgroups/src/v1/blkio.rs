@@ -7,6 +7,7 @@ use crate::{
 };
 
 use anyhow::{Context, Result};
+use async_trait::async_trait;
 use oci_spec::{LinuxBlockIo, LinuxResources};
 
 // Throttling/upper limit policy
@@ -71,14 +72,15 @@ const BLKIO_MERGED: &str = "blkio.io_merged_recursive";
 
 pub struct Blkio {}
 
+#[async_trait(?Send)]
 impl Controller for Blkio {
     type Resource = LinuxBlockIo;
 
-    fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
+    async fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply blkio cgroup config");
 
         if let Some(blkio) = Self::needs_to_handle(linux_resources) {
-            Self::apply(cgroup_root, blkio)?;
+            Self::apply(cgroup_root, blkio).await?;
         }
 
         Ok(())
@@ -106,40 +108,44 @@ impl StatsProvider for Blkio {
 }
 
 impl Blkio {
-    fn apply(root_path: &Path, blkio: &LinuxBlockIo) -> Result<()> {
+    async fn apply(root_path: &Path, blkio: &LinuxBlockIo) -> Result<()> {
         if let Some(throttle_read_bps_device) = blkio.throttle_read_bps_device.as_ref() {
             for trbd in throttle_read_bps_device {
-                common::write_cgroup_file_str(
+                common::async_write_cgroup_file_str(
                     &root_path.join(BLKIO_THROTTLE_READ_BPS),
                     &format!("{}:{} {}", trbd.major, trbd.minor, trbd.rate),
-                )?;
+                )
+                .await?;
             }
         }
 
         if let Some(throttle_write_bps_device) = blkio.throttle_write_bps_device.as_ref() {
             for twbd in throttle_write_bps_device {
-                common::write_cgroup_file_str(
+                common::async_write_cgroup_file_str(
                     &root_path.join(BLKIO_THROTTLE_WRITE_BPS),
                     &format!("{}:{} {}", twbd.major, twbd.minor, twbd.rate),
-                )?;
+                )
+                .await?;
             }
         }
 
         if let Some(throttle_read_iops_device) = blkio.throttle_read_iops_device.as_ref() {
             for trid in throttle_read_iops_device {
-                common::write_cgroup_file_str(
+                common::async_write_cgroup_file_str(
                     &root_path.join(BLKIO_THROTTLE_READ_IOPS),
                     &format!("{}:{} {}", trid.major, trid.minor, trid.rate),
-                )?;
+                )
+                .await?;
             }
         }
 
         if let Some(throttle_write_iops_device) = blkio.throttle_write_iops_device.as_ref() {
             for twid in throttle_write_iops_device {
-                common::write_cgroup_file_str(
+                common::async_write_cgroup_file_str(
                     &root_path.join(BLKIO_THROTTLE_WRITE_IOPS),
                     &format!("{}:{} {}", twid.major, twid.minor, twid.rate),
-                )?;
+                )
+                .await?;
             }
         }
 
@@ -225,7 +231,7 @@ mod tests {
     use std::fs;
 
     use super::*;
-    use crate::test::{create_temp_dir, set_fixture, setup};
+    use crate::test::{aw, create_temp_dir, set_fixture, setup};
 
     use anyhow::Result;
     use oci_spec::{LinuxBlockIo, LinuxThrottleDevice};
@@ -286,7 +292,7 @@ mod tests {
             }])
             .build();
 
-        Blkio::apply(&tmp, &blkio).expect("apply blkio");
+        aw!(Blkio::apply(&tmp, &blkio)).expect("apply blkio");
         let content = fs::read_to_string(throttle)
             .unwrap_or_else(|_| panic!("read {} content", BLKIO_THROTTLE_READ_BPS));
 
@@ -305,7 +311,7 @@ mod tests {
             }])
             .build();
 
-        Blkio::apply(&tmp, &blkio).expect("apply blkio");
+        aw!(Blkio::apply(&tmp, &blkio)).expect("apply blkio");
         let content = fs::read_to_string(throttle)
             .unwrap_or_else(|_| panic!("read {} content", BLKIO_THROTTLE_WRITE_BPS));
 
@@ -324,7 +330,7 @@ mod tests {
             }])
             .build();
 
-        Blkio::apply(&tmp, &blkio).expect("apply blkio");
+        aw!(Blkio::apply(&tmp, &blkio)).expect("apply blkio");
         let content = fs::read_to_string(throttle)
             .unwrap_or_else(|_| panic!("read {} content", BLKIO_THROTTLE_READ_IOPS));
 
@@ -343,7 +349,7 @@ mod tests {
             }])
             .build();
 
-        Blkio::apply(&tmp, &blkio).expect("apply blkio");
+        aw!(Blkio::apply(&tmp, &blkio)).expect("apply blkio");
         let content = fs::read_to_string(throttle)
             .unwrap_or_else(|_| panic!("read {} content", BLKIO_THROTTLE_WRITE_IOPS));
 

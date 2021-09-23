@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use anyhow::{bail, Context, Result};
+use async_trait::async_trait;
 use oci_spec::LinuxResources;
 
 use crate::{
@@ -21,10 +22,11 @@ const CGROUP_CPUACCT_PERCPU: &str = "cpuacct.usage_percpu";
 
 pub struct CpuAcct {}
 
+#[async_trait(?Send)]
 impl Controller for CpuAcct {
     type Resource = ();
 
-    fn apply(_linux_resources: &LinuxResources, _cgroup_path: &Path) -> Result<()> {
+    async fn apply(_linux_resources: &LinuxResources, _cgroup_path: &Path) -> Result<()> {
         Ok(())
     }
 

@@ -1,11 +1,7 @@
-use std::io::prelude::*;
-use std::{
-    fs::{create_dir_all, OpenOptions},
-    path::Path,
-    thread, time,
-};
+use std::{fs::create_dir_all, path::Path, thread, time};
 
 use anyhow::{Result, *};
+use async_trait::async_trait;
 
 use super::Controller;
 use crate::common;
@@ -18,15 +14,16 @@ const FREEZER_STATE_FREEZING: &str = "FREEZING";
 
 pub struct Freezer {}
 
+#[async_trait(?Send)]
 impl Controller for Freezer {
     type Resource = FreezerState;
 
-    fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
+    async fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply Freezer cgroup config");
         create_dir_all(&cgroup_root)?;
 
         if let Some(freezer_state) = Self::needs_to_handle(linux_resources) {
-            Self::apply(freezer_state, cgroup_root)?;
+            Self::apply(freezer_state, cgroup_root).await?;
         }
 
         Ok(())
@@ -42,7 +39,7 @@ impl Controller for Freezer {
 }
 
 impl Freezer {
-    fn apply(freezer_state: &FreezerState, cgroup_root: &Path) -> Result<()> {
+    async fn apply(freezer_state: &FreezerState, cgroup_root: &Path) -> Result<()> {
         match freezer_state {
             FreezerState::Undefined => {}
             FreezerState::Thawed => {
@@ -52,56 +49,16 @@ impl Freezer {
                 )?;
             }
             FreezerState::Frozen => {
-                let r = || -> Result<()> {
-                    // We should do our best to retry if FREEZING is seen until it becomes FROZEN.
-                    // Add sleep between retries occasionally helped when system is extremely slow.
-                    // see:
-                    // https://github.com/opencontainers/runc/blob/b9ee9c6314599f1b4a7f497e1f1f856fe433d3b7/libcontainer/cgroups/fs/freezer.go#L42
-                    for i in 0..1000 {
-                        if i % 50 == 49 {
-                            let _ = common::write_cgroup_file(
-                                cgroup_root.join(CGROUP_FREEZER_STATE),
-                                FREEZER_STATE_THAWED,
-                            );
-                            thread::sleep(time::Duration::from_millis(10));
-                        }
-
-                        common::write_cgroup_file(
-                            cgroup_root.join(CGROUP_FREEZER_STATE),
-                            FREEZER_STATE_FROZEN,
-                        )?;
-
-                        if i % 25 == 24 {
-                            thread::sleep(time::Duration::from_millis(10));
-                        }
-
-                        let r = Self::read_freezer_state(cgroup_root)?;
-                        match r.trim() {
-                            FREEZER_STATE_FREEZING => {
-                                continue;
-                            }
-                            FREEZER_STATE_FROZEN => {
-                                if i > 1 {
-                                    log::debug!("frozen after {} retries", i)
-                                }
-                                return Ok(());
-                            }
-                            _ => {
-                                // should not reach here.
-                                bail!("unexpected state {} while freezing", r.trim());
-                            }
-                        }
-                    }
-                    bail!("unbale to freeze");
-                }();
+                let r = Freezer::retry_freeze(cgroup_root).await;
 
                 if r.is_err() {
                     // Freezing failed, and it is bad and dangerous to leave the cgroup in FROZEN or
                     // FREEZING, so try to thaw it back.
-                    let _ = common::write_cgroup_file(
+                    let _ = common::async_write_cgroup_file(
                         cgroup_root.join(CGROUP_FREEZER_STATE),
                         FREEZER_STATE_THAWED,
-                    );
+                    )
+                    .await;
                 }
                 return r;
             }
@@ -109,15 +66,54 @@ impl Freezer {
         Ok(())
     }
 
-    fn read_freezer_state(cgroup_root: &Path) -> Result<String> {
+    async fn retry_freeze(cgroup_root: &Path) -> Result<()> {
+        // We should do our best to retry if FREEZING is seen until it becomes FROZEN.
+        // Add sleep between retries occasionally helped when system is extremely slow.
+        // see:
+        // https://github.com/opencontainers/runc/blob/b9ee9c6314599f1b4a7f497e1f1f856fe433d3b7/libcontainer/cgroups/fs/freezer.go#L42
+        for i in 0..1000 {
+            if i % 50 == 49 {
+                let _ = common::async_write_cgroup_file(
+                    cgroup_root.join(CGROUP_FREEZER_STATE),
+                    FREEZER_STATE_THAWED,
+                )
+                    .await;
+                thread::sleep(time::Duration::from_millis(10));
+            }
+
+            common::async_write_cgroup_file(
+                cgroup_root.join(CGROUP_FREEZER_STATE),
+                FREEZER_STATE_FROZEN,
+            )
+                .await?;
+
+            if i % 25 == 24 {
+                thread::sleep(time::Duration::from_millis(10));
+            }
+
+            let r = Self::read_freezer_state(cgroup_root).await?;
+            match r.trim() {
+                FREEZER_STATE_FREEZING => {
+                    continue;
+                }
+                FREEZER_STATE_FROZEN => {
+                    if i > 1 {
+                        log::debug!("frozen after {} retries", i)
+                    }
+                    return Ok(());
+                }
+                _ => {
+                    // should not reach here.
+                    bail!("unexpected state {} while freezing", r.trim());
+                }
+            }
+        }
+        bail!("unbale to freeze");
+    }
+
+    async fn read_freezer_state(cgroup_root: &Path) -> Result<String> {
         let path = cgroup_root.join(CGROUP_FREEZER_STATE);
-        let mut content = String::new();
-        OpenOptions::new()
-            .create(false)
-            .read(true)
-            .open(path)?
-            .read_to_string(&mut content)?;
-        Ok(content)
+        common::async_read_cgroup_file(path).await
     }
 }
 
@@ -125,7 +121,7 @@ impl Freezer {
 mod tests {
     use super::*;
     use crate::common::CGROUP_PROCS;
-    use crate::test::{create_temp_dir, set_fixture};
+    use crate::test::{create_temp_dir, set_fixture, aw};
     use nix::unistd::Pid;
     use oci_spec::FreezerState;
 
@@ -138,7 +134,7 @@ mod tests {
         // set Frozen state.
         {
             let freezer_state = FreezerState::Frozen;
-            Freezer::apply(&freezer_state, &tmp).expect("Set freezer state");
+            aw!(Freezer::apply(&freezer_state, &tmp)).expect("Set freezer state");
 
             let state_content =
                 std::fs::read_to_string(tmp.join(CGROUP_FREEZER_STATE)).expect("Read to string");
@@ -148,7 +144,7 @@ mod tests {
         // set Thawed state.
         {
             let freezer_state = FreezerState::Thawed;
-            Freezer::apply(&freezer_state, &tmp).expect("Set freezer state");
+            aw!(Freezer::apply(&freezer_state, &tmp)).expect("Set freezer state");
 
             let state_content =
                 std::fs::read_to_string(tmp.join(CGROUP_FREEZER_STATE)).expect("Read to string");
@@ -160,7 +156,7 @@ mod tests {
             let old_state_content =
                 std::fs::read_to_string(tmp.join(CGROUP_FREEZER_STATE)).expect("Read to string");
             let freezer_state = FreezerState::Undefined;
-            Freezer::apply(&freezer_state, &tmp).expect("Set freezer state");
+            aw!(Freezer::apply(&freezer_state, &tmp)).expect("Set freezer state");
 
             let state_content =
                 std::fs::read_to_string(tmp.join(CGROUP_FREEZER_STATE)).expect("Read to string");
@@ -193,7 +189,7 @@ mod tests {
 
             let pid = Pid::from_raw(1000);
             Freezer::add_task(pid, &tmp).expect("freezer add task");
-            <Freezer as Controller>::apply(&linux_resources, &tmp).expect("freezer apply");
+            aw!(<Freezer as Controller>::apply(&linux_resources, &tmp)).expect("freezer apply");
             let state_content =
                 std::fs::read_to_string(tmp.join(CGROUP_FREEZER_STATE)).expect("read to string");
             assert_eq!(FREEZER_STATE_THAWED, state_content);
@@ -221,7 +217,7 @@ mod tests {
 
             let pid = Pid::from_raw(1001);
             Freezer::add_task(pid, &tmp).expect("freezer add task");
-            <Freezer as Controller>::apply(&linux_resources, &tmp).expect("freezer apply");
+            aw!(<Freezer as Controller>::apply(&linux_resources, &tmp)).expect("freezer apply");
             let state_content =
                 std::fs::read_to_string(tmp.join(CGROUP_FREEZER_STATE)).expect("read to string");
             assert_eq!(FREEZER_STATE_FROZEN, state_content);
@@ -251,7 +247,7 @@ mod tests {
             let old_state_content =
                 std::fs::read_to_string(tmp.join(CGROUP_FREEZER_STATE)).expect("read to string");
             Freezer::add_task(pid, &tmp).expect("freezer add task");
-            <Freezer as Controller>::apply(&linux_resources, &tmp).expect("freezer apply");
+            aw!(<Freezer as Controller>::apply(&linux_resources, &tmp)).expect("freezer apply");
             let state_content =
                 std::fs::read_to_string(tmp.join(CGROUP_FREEZER_STATE)).expect("read to string");
             assert_eq!(old_state_content, state_content);

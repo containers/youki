@@ -10,6 +10,14 @@ use std::{
 
 use oci_spec::LinuxCpu;
 
+// helper macro for testing async operations
+macro_rules! aw {
+    ($e:expr) => {
+        tokio_uring::start($e)
+    };
+}
+pub(crate) use aw;
+
 pub struct TempDir {
     path: Option<PathBuf>,
 }

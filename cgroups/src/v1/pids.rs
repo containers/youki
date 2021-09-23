@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use anyhow::Result;
+use async_trait::async_trait;
 
 use super::Controller;
 use crate::{
@@ -14,14 +15,15 @@ const CGROUP_PIDS_MAX: &str = "pids.max";
 
 pub struct Pids {}
 
+#[async_trait(?Send)]
 impl Controller for Pids {
     type Resource = LinuxPids;
 
-    fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
+    async fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply pids cgroup config");
 
         if let Some(pids) = &linux_resources.pids {
-            Self::apply(cgroup_root, pids)?;
+            Self::apply(cgroup_root, pids).await?;
         }
 
         Ok(())
@@ -45,14 +47,14 @@ impl StatsProvider for Pids {
 }
 
 impl Pids {
-    fn apply(root_path: &Path, pids: &LinuxPids) -> Result<()> {
+    async fn apply(root_path: &Path, pids: &LinuxPids) -> Result<()> {
         let limit = if pids.limit > 0 {
             pids.limit.to_string()
         } else {
             "max".to_string()
         };
 
-        common::write_cgroup_file_str(&root_path.join(CGROUP_PIDS_MAX), &limit)?;
+        common::async_write_cgroup_file_str(&root_path.join(CGROUP_PIDS_MAX), &limit).await?;
         Ok(())
     }
 }
@@ -60,7 +62,7 @@ impl Pids {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test::{create_temp_dir, set_fixture};
+    use crate::test::{aw, create_temp_dir, set_fixture};
     use oci_spec::LinuxPids;
 
     // Contains the current number of active pids
@@ -73,7 +75,7 @@ mod tests {
 
         let pids = LinuxPids { limit: 1000 };
 
-        Pids::apply(&tmp, &pids).expect("apply pids");
+        aw!(Pids::apply(&tmp, &pids)).expect("apply pids");
         let content =
             std::fs::read_to_string(tmp.join(CGROUP_PIDS_MAX)).expect("Read pids contents");
         assert_eq!(pids.limit.to_string(), content);
@@ -86,7 +88,7 @@ mod tests {
 
         let pids = LinuxPids { limit: 0 };
 
-        Pids::apply(&tmp, &pids).expect("apply pids");
+        aw!(Pids::apply(&tmp, &pids)).expect("apply pids");
 
         let content =
             std::fs::read_to_string(tmp.join(CGROUP_PIDS_MAX)).expect("Read pids contents");

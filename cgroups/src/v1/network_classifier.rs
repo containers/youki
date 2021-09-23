@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use anyhow::Result;
+use async_trait::async_trait;
 
 use super::Controller;
 use crate::common;
@@ -8,14 +9,15 @@ use oci_spec::{LinuxNetwork, LinuxResources};
 
 pub struct NetworkClassifier {}
 
+#[async_trait(?Send)]
 impl Controller for NetworkClassifier {
     type Resource = LinuxNetwork;
 
-    fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
+    async fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply NetworkClassifier cgroup config");
 
         if let Some(network) = Self::needs_to_handle(linux_resources) {
-            Self::apply(cgroup_root, network)?;
+            Self::apply(cgroup_root, network).await?;
         }
 
         Ok(())
@@ -31,9 +33,9 @@ impl Controller for NetworkClassifier {
 }
 
 impl NetworkClassifier {
-    fn apply(root_path: &Path, network: &LinuxNetwork) -> Result<()> {
+    async fn apply(root_path: &Path, network: &LinuxNetwork) -> Result<()> {
         if let Some(class_id) = network.class_id {
-            common::write_cgroup_file(root_path.join("net_cls.classid"), class_id)?;
+            common::async_write_cgroup_file(root_path.join("net_cls.classid"), class_id).await?;
         }
 
         Ok(())
@@ -43,7 +45,7 @@ impl NetworkClassifier {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test::{create_temp_dir, set_fixture};
+    use crate::test::{aw, create_temp_dir, set_fixture};
 
     #[test]
     fn test_apply_network_classifier() {
@@ -57,7 +59,7 @@ mod tests {
             priorities: Some(vec![]),
         };
 
-        NetworkClassifier::apply(&tmp, &network).expect("apply network classID");
+        aw!(NetworkClassifier::apply(&tmp, &network)).expect("apply network classID");
 
         let content =
             std::fs::read_to_string(tmp.join("net_cls.classid")).expect("Read classID contents");

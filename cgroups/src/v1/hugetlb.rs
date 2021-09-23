@@ -1,6 +1,7 @@
 use std::{collections::HashMap, path::Path};
 
 use anyhow::{bail, Result};
+use async_trait::async_trait;
 
 use crate::{
     common,
@@ -12,15 +13,16 @@ use oci_spec::{LinuxHugepageLimit, LinuxResources};
 
 pub struct HugeTlb {}
 
+#[async_trait(?Send)]
 impl Controller for HugeTlb {
     type Resource = Vec<LinuxHugepageLimit>;
 
-    fn apply(linux_resources: &LinuxResources, cgroup_root: &std::path::Path) -> Result<()> {
+    async fn apply(linux_resources: &LinuxResources, cgroup_root: &std::path::Path) -> Result<()> {
         log::debug!("Apply Hugetlb cgroup config");
 
         if let Some(hugepage_limits) = Self::needs_to_handle(linux_resources) {
             for hugetlb in hugepage_limits {
-                Self::apply(cgroup_root, hugetlb)?
+                Self::apply(cgroup_root, hugetlb).await?
             }
         }
 
@@ -55,7 +57,7 @@ impl StatsProvider for HugeTlb {
 }
 
 impl HugeTlb {
-    fn apply(root_path: &Path, hugetlb: &LinuxHugepageLimit) -> Result<()> {
+    async fn apply(root_path: &Path, hugetlb: &LinuxHugepageLimit) -> Result<()> {
         let page_size: String = hugetlb
             .page_size
             .chars()
@@ -66,10 +68,11 @@ impl HugeTlb {
             bail!("page size must be in the format of 2^(integer)");
         }
 
-        common::write_cgroup_file(
+        common::async_write_cgroup_file(
             root_path.join(format!("hugetlb.{}.limit_in_bytes", hugetlb.page_size)),
             hugetlb.limit,
-        )?;
+        )
+        .await?;
         Ok(())
     }
 
@@ -99,7 +102,7 @@ impl HugeTlb {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test::{create_temp_dir, set_fixture};
+    use crate::test::{aw, create_temp_dir, set_fixture};
     use oci_spec::LinuxHugepageLimit;
     use std::fs::read_to_string;
 
@@ -113,7 +116,7 @@ mod tests {
             page_size: "2MB".to_owned(),
             limit: 16384,
         };
-        HugeTlb::apply(&tmp, &hugetlb).expect("apply hugetlb");
+        aw!(HugeTlb::apply(&tmp, &hugetlb)).expect("apply hugetlb");
         let content = read_to_string(tmp.join(page_file_name)).expect("Read hugetlb file content");
         assert_eq!(hugetlb.limit.to_string(), content);
     }
@@ -128,7 +131,7 @@ mod tests {
             limit: 16384,
         };
 
-        let result = HugeTlb::apply(&tmp, &hugetlb);
+        let result = aw!(HugeTlb::apply(&tmp, &hugetlb));
         assert!(
             result.is_err(),
             "page size that is not a power of two should be an error"
@@ -141,7 +144,7 @@ mod tests {
             let tmp = create_temp_dir("property_test_set_hugetlb").expect("create temp directory for test");
             set_fixture(&tmp, &page_file_name, "0").expect("Set fixture for page size");
 
-            let result = HugeTlb::apply(&tmp, &hugetlb);
+            let result = aw!(HugeTlb::apply(&tmp, &hugetlb));
 
             let page_size: String = hugetlb
             .page_size
