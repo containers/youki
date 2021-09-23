@@ -3,9 +3,8 @@ use cgroups::common;
 use clap::Clap;
 use std::{path::PathBuf, thread, time::Duration};
 
-use anyhow::{bail, Context, Result};
-
 use crate::container::{Container, ContainerStatus};
+use anyhow::{bail, Context, Result};
 
 #[derive(Clap, Debug)]
 pub struct Events {
@@ -35,9 +34,10 @@ impl Events {
         let cgroups_path = utils::get_cgroup_path(
             &container
                 .spec()?
-                .linux
+                .linux()
+                .as_ref()
                 .context("no linux in spec")?
-                .cgroups_path,
+                .cgroups_path(),
             &self.container_id,
         );
         let use_systemd = container

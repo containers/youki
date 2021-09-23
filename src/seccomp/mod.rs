@@ -201,16 +201,16 @@ fn translate_arch(arch: &Arch) -> scmp_arch {
 }
 
 pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<()> {
-    if seccomp.flags.is_some() {
+    if seccomp.flags().is_some() {
         // runc did not support this, so let's skip it for now.
         bail!("seccomp flags are not yet supported");
     }
 
     // TODO: fix default action error number. The spec repo doesn't have it yet.
-    let default_action = translate_action(&seccomp.default_action, None);
+    let default_action = translate_action(&seccomp.default_action(), None);
     let mut ctx = FilterContext::default(default_action)?;
 
-    if let Some(architectures) = seccomp.architectures.as_ref() {
+    if let Some(architectures) = seccomp.architectures().as_ref() {
         for arch in architectures {
             let arch_token = translate_arch(arch);
             ctx.add_arch(arch_token as u32)
@@ -233,9 +233,9 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<()> {
         );
     }
 
-    if let Some(syscalls) = seccomp.syscalls.as_ref() {
+    if let Some(syscalls) = seccomp.syscalls().as_ref() {
         for syscall in syscalls {
-            let action = translate_action(&syscall.action, syscall.errno_ret);
+            let action = translate_action(&syscall.action(), syscall.errno_ret());
             if action == default_action {
                 // When the action is the same as the default action, the rule is redundent. We can
                 // skip this here to avoid failing when we add the rules.
@@ -246,7 +246,7 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<()> {
                 continue;
             }
 
-            for name in &syscall.names {
+            for name in syscall.names().iter() {
                 let syscall_number = match translate_syscall(name) {
                     Ok(x) => x,
                     Err(_) => {
@@ -262,14 +262,14 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<()> {
                 // Not clear why but if there are multiple arg attached to one
                 // syscall rule, we have to add them seperatly. add_rule will
                 // return EINVAL. runc does the same but doesn't explain why.
-                match syscall.args.as_ref() {
+                match syscall.args().as_ref() {
                     Some(args) => {
                         for arg in args {
                             let mut rule = Rule::new(action, syscall_number);
-                            let cmp = Compare::new(arg.index as u32)
-                                .op(translate_op(&arg.op))
-                                .datum_a(arg.value)
-                                .datum_b(arg.value_two.unwrap_or(0))
+                            let cmp = Compare::new(arg.index() as u32)
+                                .op(translate_op(&arg.op()))
+                                .datum_a(arg.value())
+                                .datum_b(arg.value_two().unwrap_or(0))
                                 .build()
                                 .context("Failed to build a seccomp compare rule")?;
                             rule.add_comparator(cmp);
@@ -310,7 +310,8 @@ mod tests {
     use anyhow::Result;
     use mio::unix::pipe;
     use nix::sys::wait;
-    use oci_spec::runtime::{Arch, LinuxSeccomp, LinuxSyscall};
+    use oci_spec::runtime::Arch;
+    use oci_spec::runtime::{LinuxSeccompBuilder, LinuxSyscallBuilder};
     use serial_test::serial;
     use std::io::Read;
     use std::io::Write;
@@ -332,17 +333,16 @@ mod tests {
         // we can make sure that getcwd failed because of seccomp rule.
         let expect_error = libc::EAGAIN;
 
-        let seccomp_profile = LinuxSeccomp {
-            default_action: LinuxSeccompAction::ScmpActAllow,
-            architectures: Some(vec![Arch::ScmpArchNative]),
-            flags: None,
-            syscalls: Some(vec![LinuxSyscall {
-                names: vec![String::from("getcwd")],
-                action: LinuxSeccompAction::ScmpActErrno,
-                errno_ret: Some(expect_error as u32),
-                args: None,
-            }]),
-        };
+        let syscall = LinuxSyscallBuilder::default()
+            .names(vec![String::from("getcwd")])
+            .action(LinuxSeccompAction::ScmpActErrno)
+            .errno_ret(expect_error as u32)
+            .build()?;
+        let seccomp_profile = LinuxSeccompBuilder::default()
+            .default_action(LinuxSeccompAction::ScmpActAllow)
+            .architectures(vec![Arch::ScmpArchNative])
+            .syscalls(vec![syscall])
+            .build()?;
 
         // Since Rust cargo test uses a single process to execute all tests, it
         // is a good idea to fork a child process to test the seccomp profile,
@@ -391,7 +391,7 @@ mod tests {
             .context("Failed to load test spec for seccomp")?;
 
         // We know linux and seccomp exist, so let's just unwrap.
-        let seccomp_profile = spec.linux.unwrap().seccomp.unwrap();
+        let seccomp_profile = spec.linux().as_ref().unwrap().seccomp().as_ref().unwrap();
         match unsafe { nix::unistd::fork()? } {
             nix::unistd::ForkResult::Parent { child } => {
                 let status = wait::waitpid(child, None)?;

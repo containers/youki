@@ -152,12 +152,12 @@ impl Syscall for LinuxSyscall {
     /// Sets resource limit for process
     fn set_rlimit(&self, rlimit: &LinuxRlimit) -> Result<()> {
         let rlim = &libc::rlimit {
-            rlim_cur: rlimit.soft,
-            rlim_max: rlimit.hard,
+            rlim_cur: rlimit.soft(),
+            rlim_max: rlimit.hard(),
         };
-        let res = unsafe { libc::setrlimit(rlimit.typ as u32, rlim) };
+        let res = unsafe { libc::setrlimit(rlimit.typ() as u32, rlim) };
         if let Err(e) = Errno::result(res).map(drop) {
-            bail!("Failed to set {:?}. {:?}", rlimit.typ, e)
+            bail!("Failed to set {:?}. {:?}", rlimit.typ(), e)
         }
         Ok(())
     }

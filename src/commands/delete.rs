@@ -52,7 +52,11 @@ impl Delete {
                 fs::remove_dir_all(&container.root)?;
 
                 let cgroups_path = utils::get_cgroup_path(
-                    &spec.linux.context("no linux in spec")?.cgroups_path,
+                    &spec
+                        .linux()
+                        .as_ref()
+                        .context("no linux in spec")?
+                        .cgroups_path(),
                     container.id(),
                 );
 
@@ -63,8 +67,8 @@ impl Delete {
                     cgroups::common::create_cgroup_manager(cgroups_path, systemd_cgroup)?;
                 cmanager.remove()?;
 
-                if let Some(hooks) = spec.hooks.as_ref() {
-                    hooks::run_hooks(hooks.poststop.as_ref(), Some(&container))
+                if let Some(hooks) = spec.hooks().as_ref() {
+                    hooks::run_hooks(hooks.poststop().as_ref(), Some(&container))
                         .with_context(|| "Failed to run post stop hooks")?;
                 }
             }

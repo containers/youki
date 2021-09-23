@@ -28,7 +28,11 @@ impl Ps {
             let spec = oci_spec::runtime::Spec::load(config_absolute_path)?;
             log::debug!("spec: {:?}", spec);
             let cgroups_path = utils::get_cgroup_path(
-                &spec.linux.context("no linux in spec")?.cgroups_path,
+                &spec
+                    .linux()
+                    .as_ref()
+                    .context("no linux in spec")?
+                    .cgroups_path(),
                 container.id(),
             );
             let systemd_cgroup = container

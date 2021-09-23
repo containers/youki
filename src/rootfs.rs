@@ -11,7 +11,7 @@ use nix::sys::stat::{mknod, umask};
 use nix::sys::stat::{Mode, SFlag};
 use nix::unistd::{chown, close};
 use nix::unistd::{Gid, Uid};
-use oci_spec::runtime::{LinuxDevice, LinuxDeviceType, Mount, Spec};
+use oci_spec::runtime::{LinuxDevice, LinuxDeviceBuilder, LinuxDeviceType, Mount, Spec};
 use std::fs::OpenOptions;
 use std::fs::{canonicalize, create_dir_all, remove_file};
 use std::os::unix::fs::symlink;
@@ -20,8 +20,8 @@ use std::path::{Path, PathBuf};
 pub fn prepare_rootfs(spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<()> {
     log::debug!("Prepare rootfs: {:?}", rootfs);
     let mut flags = MsFlags::MS_REC;
-    let linux = spec.linux.as_ref().context("no linux in spec")?;
-    if let Some(roofs_propagation) = linux.rootfs_propagation.as_ref() {
+    let linux = spec.linux().as_ref().context("no linux in spec")?;
+    if let Some(roofs_propagation) = linux.rootfs_propagation().as_ref() {
         match roofs_propagation.as_str() {
             "shared" => flags |= MsFlags::MS_SHARED,
             "private" => flags |= MsFlags::MS_PRIVATE,
@@ -44,15 +44,15 @@ pub fn prepare_rootfs(spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<
         None::<&str>,
     )?;
 
-    if let Some(mounts) = spec.mounts.as_ref() {
+    if let Some(mounts) = spec.mounts().as_ref() {
         for mount in mounts.iter() {
             log::debug!("Mount... {:?}", mount);
             let (flags, data) = parse_mount(mount);
-            let mount_label = linux.mount_label.as_ref();
-            if mount.typ == Some("cgroup".to_string()) {
+            let mount_label = linux.mount_label().as_ref();
+            if *mount.typ() == Some("cgroup".to_string()) {
                 // skip
                 log::warn!("A feature of cgroup is unimplemented.");
-            } else if mount.destination == PathBuf::from("/dev") {
+            } else if *mount.destination() == PathBuf::from("/dev") {
                 mount_to_container(
                     mount,
                     rootfs,
@@ -69,7 +69,7 @@ pub fn prepare_rootfs(spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<
     }
 
     setup_default_symlinks(rootfs).context("Failed to setup default symlinks")?;
-    if let Some(added_devices) = linux.devices.as_ref() {
+    if let Some(added_devices) = linux.devices().as_ref() {
         create_devices(
             rootfs,
             default_devices().iter().chain(added_devices),
@@ -114,60 +114,54 @@ fn setup_default_symlinks(rootfs: &Path) -> Result<()> {
 
 pub fn default_devices() -> Vec<LinuxDevice> {
     vec![
-        LinuxDevice {
-            path: PathBuf::from("/dev/null"),
-            typ: LinuxDeviceType::C,
-            major: 1,
-            minor: 3,
-            file_mode: Some(0o066),
-            uid: None,
-            gid: None,
-        },
-        LinuxDevice {
-            path: PathBuf::from("/dev/zero"),
-            typ: LinuxDeviceType::C,
-            major: 1,
-            minor: 5,
-            file_mode: Some(0o066),
-            uid: None,
-            gid: None,
-        },
-        LinuxDevice {
-            path: PathBuf::from("/dev/full"),
-            typ: LinuxDeviceType::C,
-            major: 1,
-            minor: 7,
-            file_mode: Some(0o066),
-            uid: None,
-            gid: None,
-        },
-        LinuxDevice {
-            path: PathBuf::from("/dev/tty"),
-            typ: LinuxDeviceType::C,
-            major: 5,
-            minor: 0,
-            file_mode: Some(0o066),
-            uid: None,
-            gid: None,
-        },
-        LinuxDevice {
-            path: PathBuf::from("/dev/urandom"),
-            typ: LinuxDeviceType::C,
-            major: 1,
-            minor: 9,
-            file_mode: Some(0o066),
-            uid: None,
-            gid: None,
-        },
-        LinuxDevice {
-            path: PathBuf::from("/dev/random"),
-            typ: LinuxDeviceType::C,
-            major: 1,
-            minor: 8,
-            file_mode: Some(0o066),
-            uid: None,
-            gid: None,
-        },
+        LinuxDeviceBuilder::default()
+            .path(PathBuf::from("/dev/null"))
+            .typ(LinuxDeviceType::C)
+            .major(1)
+            .minor(3)
+            .file_mode(0o066u32)
+            .build()
+            .unwrap(),
+        LinuxDeviceBuilder::default()
+            .path(PathBuf::from("/dev/zero"))
+            .typ(LinuxDeviceType::C)
+            .major(1)
+            .minor(5)
+            .file_mode(0o066u32)
+            .build()
+            .unwrap(),
+        LinuxDeviceBuilder::default()
+            .path(PathBuf::from("/dev/full"))
+            .typ(LinuxDeviceType::C)
+            .major(1)
+            .minor(7)
+            .file_mode(0o066u32)
+            .build()
+            .unwrap(),
+        LinuxDeviceBuilder::default()
+            .path(PathBuf::from("/dev/tty"))
+            .typ(LinuxDeviceType::C)
+            .major(5)
+            .minor(0)
+            .file_mode(0o066u32)
+            .build()
+            .unwrap(),
+        LinuxDeviceBuilder::default()
+            .path(PathBuf::from("/dev/urandom"))
+            .typ(LinuxDeviceType::C)
+            .major(1)
+            .minor(9)
+            .file_mode(0o066u32)
+            .build()
+            .unwrap(),
+        LinuxDeviceBuilder::default()
+            .path(PathBuf::from("/dev/random"))
+            .typ(LinuxDeviceType::C)
+            .major(1)
+            .minor(8)
+            .file_mode(0o066u32)
+            .build()
+            .unwrap(),
     ]
 }
 
@@ -179,8 +173,8 @@ where
     if bind {
         let _ = devices
             .map(|dev| {
-                if !dev.path.starts_with("/dev") {
-                    panic!("{} is not a valid device path", dev.path.display());
+                if !dev.path().starts_with("/dev") {
+                    panic!("{} is not a valid device path", dev.path().display());
                 }
 
                 bind_dev(rootfs, dev)
@@ -189,8 +183,8 @@ where
     } else {
         devices
             .map(|dev| {
-                if !dev.path.starts_with("/dev") {
-                    panic!("{} is not a valid device path", dev.path.display());
+                if !dev.path().starts_with("/dev") {
+                    panic!("{} is not a valid device path", dev.path().display());
                 }
 
                 mknod_dev(rootfs, dev)
@@ -203,7 +197,7 @@ where
 }
 
 fn bind_dev(rootfs: &Path, dev: &LinuxDevice) -> Result<()> {
-    let full_container_path = rootfs.join(dev.path.as_in_container()?);
+    let full_container_path = rootfs.join(dev.path().as_in_container()?);
 
     let fd = open(
         &full_container_path,
@@ -212,7 +206,7 @@ fn bind_dev(rootfs: &Path, dev: &LinuxDevice) -> Result<()> {
     )?;
     close(fd)?;
     nix_mount(
-        Some(&dev.path),
+        Some(dev.path()),
         &full_container_path,
         Some("bind"),
         MsFlags::MS_BIND,
@@ -239,17 +233,17 @@ fn mknod_dev(rootfs: &Path, dev: &LinuxDevice) -> Result<()> {
             | ((major & !0xfff) << 32)) as u64
     }
 
-    let full_container_path = rootfs.join(dev.path.as_in_container()?);
+    let full_container_path = rootfs.join(dev.path().as_in_container()?);
     mknod(
         &full_container_path,
-        to_sflag(dev.typ),
-        Mode::from_bits_truncate(dev.file_mode.unwrap_or(0)),
-        makedev(dev.major, dev.minor),
+        to_sflag(dev.typ()),
+        Mode::from_bits_truncate(dev.file_mode().unwrap_or(0)),
+        makedev(dev.major(), dev.minor()),
     )?;
     chown(
         &full_container_path,
-        dev.uid.map(Uid::from_raw),
-        dev.gid.map(Gid::from_raw),
+        dev.uid().map(Uid::from_raw),
+        dev.gid().map(Gid::from_raw),
     )?;
 
     Ok(())
@@ -262,7 +256,7 @@ fn mount_to_container(
     data: &str,
     label: Option<&String>,
 ) -> Result<()> {
-    let typ = m.typ.as_deref();
+    let typ = m.typ().as_deref();
     let d = if let Some(l) = label {
         if typ != Some("proc") && typ != Some("sysfs") {
             if data.is_empty() {
@@ -279,10 +273,10 @@ fn mount_to_container(
     let dest_for_host = format!(
         "{}{}",
         rootfs.to_string_lossy().into_owned(),
-        m.destination.display()
+        m.destination().display()
     );
     let dest = Path::new(&dest_for_host);
-    let source = m.source.as_ref().context("no source in mount spec")?;
+    let source = m.source().as_ref().context("no source in mount spec")?;
     let src = if typ == Some("bind") {
         let src = canonicalize(source)?;
         let dir = if src.is_file() {
@@ -308,7 +302,7 @@ fn mount_to_container(
 
     if let Err(errno) = nix_mount(Some(&*src), dest, typ, flags, Some(&*d)) {
         if !matches!(errno, Errno::EINVAL) {
-            bail!("mount of {:?} failed", m.destination);
+            bail!("mount of {:?} failed", m.destination());
         }
         nix_mount(Some(&*src), dest, typ, flags, Some(data))?;
     }
@@ -337,7 +331,7 @@ fn mount_to_container(
 fn parse_mount(m: &Mount) -> (MsFlags, String) {
     let mut flags = MsFlags::empty();
     let mut data = Vec::new();
-    if let Some(options) = &m.options {
+    if let Some(options) = &m.options() {
         for s in options {
             if let Some((is_clear, flag)) = match s.as_str() {
                 "defaults" => Some((false, MsFlags::empty())),

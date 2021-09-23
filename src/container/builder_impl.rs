@@ -49,14 +49,14 @@ impl<'a> ContainerBuilderImpl<'a> {
     }
 
     fn run_container(&mut self) -> Result<()> {
-        let linux = self.spec.linux.as_ref().context("no linux in spec")?;
-        let cgroups_path = utils::get_cgroup_path(&linux.cgroups_path, &self.container_id);
+        let linux = self.spec.linux().as_ref().context("no linux in spec")?;
+        let cgroups_path = utils::get_cgroup_path(&linux.cgroups_path(), &self.container_id);
         let cmanager = cgroups::common::create_cgroup_manager(&cgroups_path, self.use_systemd)?;
-        let process = self.spec.process.as_ref().context("No process in spec")?;
+        let process = self.spec.process().as_ref().context("No process in spec")?;
 
         if self.init {
-            if let Some(hooks) = self.spec.hooks.as_ref() {
-                hooks::run_hooks(hooks.create_runtime.as_ref(), self.container.as_ref())?
+            if let Some(hooks) = self.spec.hooks().as_ref() {
+                hooks::run_hooks(hooks.create_runtime().as_ref(), self.container.as_ref())?
             }
         }
 
@@ -79,7 +79,7 @@ impl<'a> ContainerBuilderImpl<'a> {
         // is not writeable unless you're an privileged user (if !dumpable is
         // set). All children inherit their parent's oom_score_adj value on
         // fork(2) so this will always be propagated properly.
-        if let Some(oom_score_adj) = process.oom_score_adj {
+        if let Some(oom_score_adj) = process.oom_score_adj() {
             log::debug!("Set OOM score to {}", oom_score_adj);
             let mut f = fs::File::create("/proc/self/oom_score_adj")?;
             f.write_all(oom_score_adj.to_string().as_bytes())?;
@@ -93,7 +93,7 @@ impl<'a> ContainerBuilderImpl<'a> {
         // going to be switching to a different security context. Thus setting
         // ourselves to be non-dumpable only breaks things (like rootless
         // containers), which is the recommendation from the kernel folks.
-        if linux.namespaces.is_some() {
+        if linux.namespaces().is_some() {
             prctl::set_dumpable(false).unwrap();
         }
 
@@ -156,9 +156,9 @@ impl<'a> ContainerBuilderImpl<'a> {
         let init_pid = receiver_from_intermediate.wait_for_intermediate_ready()?;
         log::debug!("init pid is {:?}", init_pid);
 
-        if self.rootless.is_none() && linux.resources.is_some() && self.init {
+        if self.rootless.is_none() && linux.resources().is_some() && self.init {
             let controller_opt = cgroups::common::ControllerOpt {
-                resources: linux.resources.clone().unwrap(),
+                resources: linux.resources().clone().unwrap(),
                 ..Default::default()
             };
             cmanager

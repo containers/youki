@@ -13,8 +13,8 @@ pub fn container_intermediate(
 ) -> Result<()> {
     let command = &args.syscall;
     let spec = &args.spec;
-    let linux = spec.linux.as_ref().context("no linux in spec")?;
-    let namespaces = Namespaces::from(linux.namespaces.as_ref());
+    let linux = spec.linux().as_ref().context("no linux in spec")?;
+    let namespaces = Namespaces::from(linux.namespaces().as_ref());
 
     // if new user is specified in specification, this will be true and new
     // namespace will be created, check
@@ -24,7 +24,7 @@ pub fn container_intermediate(
         namespaces
             .unshare_or_setns(user_namespace)
             .with_context(|| format!("Failed to enter pid namespace: {:?}", user_namespace))?;
-        if user_namespace.path.is_none() {
+        if user_namespace.path().is_none() {
             log::debug!("creating new user namespace");
             // child needs to be dumpable, otherwise the non root parent is not
             // allowed to write the uid/gid maps
@@ -46,8 +46,8 @@ pub fn container_intermediate(
     }
 
     // set limits and namespaces to the process
-    let proc = spec.process.as_ref().context("no process in spec")?;
-    if let Some(rlimits) = proc.rlimits.as_ref() {
+    let proc = spec.process().as_ref().context("no process in spec")?;
+    if let Some(rlimits) = proc.rlimits().as_ref() {
         for rlimit in rlimits.iter() {
             command.set_rlimit(rlimit).context("failed to set rlimit")?;
         }

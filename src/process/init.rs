@@ -178,13 +178,13 @@ pub fn container_init(
 ) -> Result<()> {
     let command = &args.syscall;
     let spec = &args.spec;
-    let linux = spec.linux.as_ref().context("no linux in spec")?;
-    let proc = spec.process.as_ref().context("no process in spec")?;
-    let mut envs: Vec<String> = proc.env.as_ref().unwrap_or(&vec![]).clone();
+    let linux = spec.linux().as_ref().context("no linux in spec")?;
+    let proc = spec.process().as_ref().context("no process in spec")?;
+    let mut envs: Vec<String> = proc.env().as_ref().unwrap_or(&vec![]).clone();
     let rootfs = &args.rootfs;
-    let hooks = spec.hooks.as_ref();
+    let hooks = spec.hooks().as_ref();
     let container = args.container.as_ref();
-    let namespaces = Namespaces::from(linux.namespaces.as_ref());
+    let namespaces = Namespaces::from(linux.namespaces().as_ref());
 
     // set up tty if specified
     if let Some(csocketfd) = args.console_socket {
@@ -210,14 +210,14 @@ pub fn container_init(
 
     // Only set the host name if entering into a new uts namespace
     if let Some(uts_namespace) = namespaces.get(LinuxNamespaceType::Uts) {
-        if uts_namespace.path.is_none() {
-            if let Some(hostname) = spec.hostname.as_ref() {
+        if uts_namespace.path().is_none() {
+            if let Some(hostname) = spec.hostname().as_ref() {
                 command.set_hostname(hostname)?;
             }
         }
     }
 
-    if let Some(true) = proc.no_new_privileges {
+    if let Some(true) = proc.no_new_privileges() {
         let _ = prctl::set_no_new_privileges(true);
     }
 
@@ -225,7 +225,7 @@ pub fn container_init(
         // create_container hook needs to be called after the namespace setup, but
         // before pivot_root is called. This runs in the container namespaces.
         if let Some(hooks) = hooks {
-            hooks::run_hooks(hooks.create_container.as_ref(), container)
+            hooks::run_hooks(hooks.create_container().as_ref(), container)
                 .context("Failed to run create container hooks")?;
         }
 
@@ -248,13 +248,13 @@ pub fn container_init(
                 .with_context(|| format!("Failed to chroot to {:?}", rootfs))?;
         }
 
-        if let Some(kernel_params) = &linux.sysctl {
+        if let Some(kernel_params) = &linux.sysctl() {
             sysctl(kernel_params)
                 .with_context(|| format!("Failed to sysctl: {:?}", kernel_params))?;
         }
     }
 
-    if let Some(true) = spec.root.as_ref().map(|r| r.readonly.unwrap_or(false)) {
+    if let Some(true) = spec.root().as_ref().map(|r| r.readonly().unwrap_or(false)) {
         nix_mount(
             None::<&str>,
             "/",
@@ -264,51 +264,54 @@ pub fn container_init(
         )?
     }
 
-    if let Some(paths) = &linux.readonly_paths {
+    if let Some(paths) = &linux.readonly_paths() {
         // mount readonly path
         for path in paths {
             readonly_path(path).context("Failed to set read only path")?;
         }
     }
 
-    if let Some(paths) = &linux.masked_paths {
+    if let Some(paths) = &linux.masked_paths() {
         // mount masked path
         for path in paths {
-            masked_path(path, &linux.mount_label).context("Failed to set masked path")?;
+            masked_path(path, &linux.mount_label()).context("Failed to set masked path")?;
         }
     }
 
-    let cwd = format!("{}", proc.cwd.display());
+    let cwd = format!("{}", proc.cwd().display());
     let do_chdir = if cwd.is_empty() {
         false
     } else {
         // This chdir must run before setting up the user.
         // This may allow the user running youki to access directories
         // that the container user cannot access.
-        match unistd::chdir(&*proc.cwd) {
+        match unistd::chdir(&*proc.cwd()) {
             Ok(_) => false,
             Err(nix::Error::EPERM) => true,
             Err(e) => bail!("Failed to chdir: {}", e),
         }
     };
 
-    set_supplementary_gids(&proc.user, &args.rootless)
+    set_supplementary_gids(&proc.user(), &args.rootless)
         .context("failed to set supplementary gids")?;
 
     command
-        .set_id(Uid::from_raw(proc.user.uid), Gid::from_raw(proc.user.gid))
+        .set_id(
+            Uid::from_raw(proc.user().uid()),
+            Gid::from_raw(proc.user().gid()),
+        )
         .context("Failed to configure uid and gid")?;
 
     // Without no new privileges, seccomp is a privileged operation. We have to
     // do this before dropping capabilities. Otherwise, we should do it later,
     // as close to exec as possible.
-    if linux.seccomp.is_some() && proc.no_new_privileges.is_none() {
-        seccomp::initialize_seccomp(linux.seccomp.as_ref().unwrap())
+    if linux.seccomp().is_some() && proc.no_new_privileges().is_none() {
+        seccomp::initialize_seccomp(linux.seccomp().as_ref().unwrap())
             .context("Failed to execute seccomp")?;
     }
 
     capabilities::reset_effective(command).context("Failed to reset effective capabilities")?;
-    if let Some(caps) = &proc.capabilities {
+    if let Some(caps) = &proc.capabilities() {
         capabilities::drop_privileges(caps, command).context("Failed to drop capabilities")?;
     }
 
@@ -357,8 +360,8 @@ pub fn container_init(
 
     // change directory to process.cwd if process.cwd is not empty
     if do_chdir {
-        unistd::chdir(&*proc.cwd)
-            .with_context(|| format!("Failed to chdir {}", proc.cwd.display()))?;
+        unistd::chdir(&*proc.cwd())
+            .with_context(|| format!("Failed to chdir {}", proc.cwd().display()))?;
     }
 
     // Reset the process env based on oci spec.
@@ -381,18 +384,18 @@ pub fn container_init(
     // before pivot_root is called. This runs in the container namespaces.
     if args.init {
         if let Some(hooks) = hooks {
-            hooks::run_hooks(hooks.start_container.as_ref(), container)?
+            hooks::run_hooks(hooks.start_container().as_ref(), container)?
         }
     }
 
-    if linux.seccomp.is_some() && proc.no_new_privileges.is_some() {
+    if linux.seccomp().is_some() && proc.no_new_privileges().is_some() {
         // Initialize seccomp profile right before we are ready to execute the
         // payload. The notify socket will still need network related syscalls.
-        seccomp::initialize_seccomp(linux.seccomp.as_ref().unwrap())
+        seccomp::initialize_seccomp(linux.seccomp().as_ref().unwrap())
             .context("Failed to execute seccomp")?;
     }
 
-    if let Some(args) = proc.args.as_ref() {
+    if let Some(args) = proc.args().as_ref() {
         utils::do_exec(&args[0], args)?;
     } else {
         bail!("On non-Windows, at least one process arg entry is required.")
@@ -428,7 +431,7 @@ pub fn container_init(
 // Privileged user starting a normal container: Just add the supplementary groups.
 //
 fn set_supplementary_gids(user: &User, rootless: &Option<Rootless>) -> Result<()> {
-    if let Some(additional_gids) = &user.additional_gids {
+    if let Some(additional_gids) = &user.additional_gids() {
         if additional_gids.is_empty() {
             return Ok(());
         }

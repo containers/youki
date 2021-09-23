@@ -46,12 +46,12 @@ impl InitContainerBuilder {
         let container_state = self
             .create_container_state(&container_dir)?
             .set_systemd(self.use_systemd)
-            .set_annotations(spec.annotations.clone());
+            .set_annotations(spec.annotations().clone());
 
         unistd::chdir(&*container_dir)?;
         let notify_path = container_dir.join(NOTIFY_FILE);
         // convert path of root file system of the container to absolute path
-        let rootfs = fs::canonicalize(&spec.root.as_ref().context("no root in spec")?.path)?;
+        let rootfs = fs::canonicalize(&spec.root().as_ref().context("no root in spec")?.path())?;
 
         // if socket file path is given in commandline options,
         // get file descriptors of console socket
@@ -100,10 +100,10 @@ impl InitContainerBuilder {
     fn load_spec(&self) -> Result<Spec> {
         let source_spec_path = self.bundle.join("config.json");
         let mut spec = Spec::load(&source_spec_path)?;
-        if !spec.version.starts_with("1.0") {
+        if !spec.version().starts_with("1.0") {
             bail!(
                 "runtime spec has incompatible version '{}'. Only 1.0.X is supported",
-                spec.version
+                spec.version()
             );
         }
         spec.canonicalize_rootfs(&self.bundle)?;

@@ -25,8 +25,8 @@ pub struct Rootless<'a> {
 
 impl<'a> Rootless<'a> {
     pub fn new(spec: &'a Spec) -> Result<Option<Rootless<'a>>> {
-        let linux = spec.linux.as_ref().context("no linux in spec")?;
-        let namespaces = Namespaces::from(linux.namespaces.as_ref());
+        let linux = spec.linux().as_ref().context("no linux in spec")?;
+        let namespaces = Namespaces::from(linux.namespaces().as_ref());
         let user_namespace = namespaces.get(LinuxNamespaceType::User);
 
         // If conditions requires us to use rootless, we must either create a new
@@ -35,7 +35,7 @@ impl<'a> Rootless<'a> {
             bail!("rootless container requires valid user namespace definition");
         }
 
-        if user_namespace.is_some() && user_namespace.unwrap().path.is_none() {
+        if user_namespace.is_some() && user_namespace.unwrap().path().is_none() {
             log::debug!("rootless container should be created");
             log::warn!(
                 "resource constraints and multi id mapping is unimplemented for rootless containers"
@@ -58,13 +58,13 @@ impl<'a> Rootless<'a> {
 
 impl<'a> From<&'a Linux> for Rootless<'a> {
     fn from(linux: &'a Linux) -> Self {
-        let namespaces = Namespaces::from(linux.namespaces.as_ref());
+        let namespaces = Namespaces::from(linux.namespaces().as_ref());
         let user_namespace = namespaces.get(LinuxNamespaceType::User);
         Self {
             newuidmap: None,
             newgidmap: None,
-            uid_mappings: linux.uid_mappings.as_ref(),
-            gid_mappings: linux.gid_mappings.as_ref(),
+            uid_mappings: linux.uid_mappings().as_ref(),
+            gid_mappings: linux.gid_mappings().as_ref(),
             user_namespace: user_namespace.cloned(),
             privileged: nix::unistd::geteuid().is_root(),
         }
@@ -87,18 +87,18 @@ pub fn rootless_required() -> bool {
 /// Validates that the spec contains the required information for
 /// running in rootless mode
 fn validate(spec: &Spec) -> Result<()> {
-    let linux = spec.linux.as_ref().context("no linux in spec")?;
-    let namespaces = Namespaces::from(linux.namespaces.as_ref());
+    let linux = spec.linux().as_ref().context("no linux in spec")?;
+    let namespaces = Namespaces::from(linux.namespaces().as_ref());
     if namespaces.get(LinuxNamespaceType::User).is_none() {
         bail!("rootless containers require the specification of a user namespace");
     }
 
     let gid_mappings = linux
-        .gid_mappings
+        .gid_mappings()
         .as_ref()
         .context("rootless containers require gid_mappings in spec")?;
     let uid_mappings = linux
-        .uid_mappings
+        .uid_mappings()
         .as_ref()
         .context("rootless containers require LinuxIdMapping in spec")?;
 
@@ -111,13 +111,13 @@ fn validate(spec: &Spec) -> Result<()> {
     }
 
     validate_mounts(
-        spec.mounts.as_ref().context("no mounts in spec")?,
+        spec.mounts().as_ref().context("no mounts in spec")?,
         uid_mappings,
         gid_mappings,
     )?;
 
-    if let Some(process) = &spec.process {
-        if let Some(additional_gids) = &process.user.additional_gids {
+    if let Some(process) = &spec.process() {
+        if let Some(additional_gids) = &process.user().additional_gids() {
             let privileged = nix::unistd::geteuid().is_root();
 
             match (privileged, additional_gids.is_empty()) {
@@ -149,7 +149,7 @@ fn validate_mounts(
     gid_mappings: &[LinuxIdMapping],
 ) -> Result<()> {
     for mount in mounts {
-        if let Some(options) = &mount.options {
+        if let Some(options) = &mount.options() {
             for opt in options {
                 if opt.starts_with("uid=") && !is_id_mapped(opt[4..].parse()?, uid_mappings) {
                     bail!("Mount {:?} specifies option {} which is not mapped inside the rootless container", mount, opt);
@@ -168,13 +168,13 @@ fn validate_mounts(
 fn is_id_mapped(id: u32, mappings: &[LinuxIdMapping]) -> bool {
     mappings
         .iter()
-        .any(|m| id >= m.container_id && id <= m.container_id + m.size)
+        .any(|m| id >= m.container_id() && id <= m.container_id() + m.size())
 }
 
 /// Looks up the location of the newuidmap and newgidmap binaries which
 /// are required to write multiple user/group mappings
 pub fn lookup_map_binaries(spec: &Linux) -> Result<Option<(PathBuf, PathBuf)>> {
-    if let Some(uid_mappings) = spec.uid_mappings.as_ref() {
+    if let Some(uid_mappings) = spec.uid_mappings().as_ref() {
         if uid_mappings.len() == 1 && uid_mappings.len() == 1 {
             return Ok(None);
         }
@@ -236,7 +236,7 @@ fn write_id_mapping(
 ) -> Result<()> {
     let mappings: Vec<String> = mappings
         .iter()
-        .map(|m| format!("{} {} {}", m.container_id, m.host_id, m.size))
+        .map(|m| format!("{} {} {}", m.container_id(), m.host_id(), m.size()))
         .collect();
     log::debug!("Write ID mapping: {:?}", mappings);
     if mappings.len() == 1 {
