@@ -193,8 +193,12 @@ fn setup_mapping(rootless: &Rootless, pid: Pid) -> Result<()> {
         // until "deny" has been written to setgroups. See CVE-2014-8989.
         utils::write_file(format!("/proc/{}/setgroups", pid), "deny")?;
     }
-    rootless.write_uid_mapping(pid)?;
-    rootless.write_gid_mapping(pid)?;
+    rootless
+        .write_uid_mapping(pid)
+        .context(format!("failed to map uid of pid {}", pid))?;
+    rootless
+        .write_gid_mapping(pid)
+        .context(format!("failed to map gid of pid {}", pid))?;
     Ok(())
 }
 
@@ -207,7 +211,7 @@ mod tests {
     use oci_spec::runtime::LinuxIdMapping;
     use serial_test::serial;
 
-    use crate::process::channel::intermediate_to_main;
+    use crate::process::channel::{intermediate_to_main, main_to_intermediate};
 
     use super::*;
 
@@ -225,10 +229,12 @@ mod tests {
             privileged: true,
             ..Default::default()
         };
-        let (mut sender, mut receiver) = intermediate_to_main()?;
+        let (mut sender_to_parent, mut receiver_from_child) = intermediate_to_main()?;
+        let (mut sender_to_child, mut receiver_from_parent) = main_to_intermediate()?;
         match unsafe { unistd::fork()? } {
             unistd::ForkResult::Parent { child } => {
-                receiver.wait_for_mapping_request()?;
+                receiver_from_child.wait_for_mapping_request()?;
+                receiver_from_child.close()?;
                 setup_mapping(&rootless, child)?;
                 let line = fs::read_to_string(format!("/proc/{}/uid_map", child.as_raw()))?;
                 let line_splited = line.split_whitespace();
@@ -239,15 +245,20 @@ mod tests {
                 ]) {
                     assert_eq!(act, expect);
                 }
-                Ok(())
+                sender_to_child.mapping_written()?;
+                sender_to_child.close()?;
             }
             unistd::ForkResult::Child => {
-                unshare(CloneFlags::CLONE_NEWUSER)?;
                 prctl::set_dumpable(true).unwrap();
-                sender.identifier_mapping_request()?;
-                Ok(())
+                unshare(CloneFlags::CLONE_NEWUSER)?;
+                sender_to_parent.identifier_mapping_request()?;
+                sender_to_parent.close()?;
+                receiver_from_parent.wait_for_mapping_ack()?;
+                receiver_from_child.close()?;
+                std::process::exit(0);
             }
         }
+        Ok(())
     }
 
     #[test]
@@ -263,10 +274,12 @@ mod tests {
             gid_mappings: Some(&gid_mappings),
             ..Default::default()
         };
-        let (mut sender, mut receiver) = intermediate_to_main()?;
+        let (mut sender_to_parent, mut receiver_from_child) = intermediate_to_main()?;
+        let (mut sender_to_child, mut receiver_from_parent) = main_to_intermediate()?;
         match unsafe { unistd::fork()? } {
             unistd::ForkResult::Parent { child } => {
-                receiver.wait_for_mapping_request()?;
+                receiver_from_child.wait_for_mapping_request()?;
+                receiver_from_child.close()?;
                 setup_mapping(&rootless, child)?;
                 let line = fs::read_to_string(format!("/proc/{}/gid_map", child.as_raw()))?;
                 let line_splited = line.split_whitespace();
@@ -281,14 +294,19 @@ mod tests {
                     fs::read_to_string(format!("/proc/{}/setgroups", child.as_raw()))?,
                     "deny\n",
                 );
-                Ok(())
+                sender_to_child.mapping_written()?;
+                sender_to_child.close()?;
             }
             unistd::ForkResult::Child => {
-                unshare(CloneFlags::CLONE_NEWUSER)?;
                 prctl::set_dumpable(true).unwrap();
-                sender.identifier_mapping_request()?;
-                Ok(())
+                unshare(CloneFlags::CLONE_NEWUSER)?;
+                sender_to_parent.identifier_mapping_request()?;
+                sender_to_parent.close()?;
+                receiver_from_parent.wait_for_mapping_ack()?;
+                receiver_from_child.close()?;
+                std::process::exit(0);
             }
         }
+        Ok(())
     }
 }
