@@ -11,8 +11,8 @@ Vagrant.configure("2") do |config|
     end
     config.vm.provision "shell", inline: <<-SHELL
       set -e -u -o pipefail
-      yum update
-      yum install -y git gcc docker systemd-devel dbus-devel
+      yum update -y
+      yum install -y git gcc docker systemd-devel dbus-devel libseccomp-devel
       grubby --update-kernel=ALL --args="systemd.unified_cgroup_hierarchy=0"
       service docker start
     SHELL
