@@ -129,8 +129,8 @@ impl State {
             .append(false)
             .create(true)
             .truncate(true)
-            .open(state_file_path)
-            .expect("Unable to open");
+            .open(&state_file_path)
+            .with_context(|| format!("failed to open {}", state_file_path.display()))?;
         serde_json::to_writer(&file, self)?;
         Ok(())
     }

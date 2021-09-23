@@ -14,8 +14,7 @@ impl Container {
             let sig = signal::Signal::SIGKILL;
             log::debug!("kill signal {} to {}", sig, self.pid().unwrap());
             signal::kill(self.pid().unwrap(), sig)?;
-            self.update_status(ContainerStatus::Stopped);
-            self.save()?;
+            self.set_status(ContainerStatus::Stopped).save()?;
         }
         log::debug!("container status: {:?}", self.status());
         if self.can_delete() {

@@ -37,8 +37,9 @@ impl Container {
 
         let mut notify_socket = NotifySocket::new(&self.root.join(NOTIFY_FILE));
         notify_socket.notify_container_start()?;
-        self.update_status(ContainerStatus::Running);
-        self.save()?;
+        self.set_status(ContainerStatus::Running)
+            .save()
+            .with_context(|| format!("could not save state for container {}", self.id()))?;
 
         // Run post start hooks. It runs after the container process is started.
         // It is called in the runtime namespace.

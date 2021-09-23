@@ -9,7 +9,7 @@ impl Container {
         if self.can_kill() {
             log::debug!("kill signal {} to {}", signal, self.pid().unwrap());
             signal::kill(self.pid().unwrap(), signal)?;
-            self.update_status(ContainerStatus::Stopped).save()?;
+            self.set_status(ContainerStatus::Stopped).save()?;
             std::process::exit(0)
         } else {
             bail!(

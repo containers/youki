@@ -30,7 +30,7 @@ impl List {
                 continue;
             }
 
-            let container = Container::load(container_dir)?.refresh_status()?;
+            let container = Container::load(container_dir)?;
             let pid = if let Some(pid) = container.pid() {
                 pid.to_string()
             } else {

@@ -175,10 +175,10 @@ impl<'a> ContainerBuilderImpl<'a> {
             fs::write(&pid_file, format!("{}", init_pid)).context("Failed to write pid file")?;
         }
 
-        if let Some(container) = &self.container {
+        if let Some(container) = &mut self.container {
             // update status and pid of the container process
             container
-                .update_status(ContainerStatus::Created)
+                .set_status(ContainerStatus::Created)
                 .set_creator(nix::unistd::geteuid().as_raw())
                 .set_pid(init_pid.as_raw())
                 .save()

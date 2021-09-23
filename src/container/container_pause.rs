@@ -30,7 +30,7 @@ impl Container {
         cmanager.freeze(FreezerState::Frozen)?;
 
         log::debug!("saving paused status");
-        self.update_status(ContainerStatus::Paused).save()?;
+        self.set_status(ContainerStatus::Paused).save()?;
 
         log::debug!("container {} paused", self.id());
         Ok(())

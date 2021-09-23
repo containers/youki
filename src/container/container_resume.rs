@@ -34,7 +34,7 @@ impl Container {
         cmanager.freeze(FreezerState::Thawed)?;
 
         log::debug!("saving running status");
-        self.update_status(ContainerStatus::Running).save()?;
+        self.set_status(ContainerStatus::Running).save()?;
 
         log::debug!("container {} resumed", self.id());
         Ok(())
