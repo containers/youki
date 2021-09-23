@@ -8,7 +8,7 @@ use cgroups::common::FreezerState;
 impl Container {
     pub fn resume(&mut self) -> Result<()> {
         self.refresh_status()
-            .with_context(|| format!("failed to refresh container status"))?;
+            .context("failed to refresh container status")?;
         // check if container can be resumed :
         // for example, a running process cannot be resumed
         if !self.can_resume() {
@@ -22,7 +22,7 @@ impl Container {
         let spec = self.spec()?;
         let cgroups_path = utils::get_cgroup_path(
             &spec.linux.context("no linux in spec")?.cgroups_path,
-            &self.id(),
+            self.id(),
         );
 
         // create cgroup manager structure from the config at the path
