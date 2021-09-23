@@ -192,13 +192,19 @@ $ ./integration_test.sh linux_*
 
 ### Setting up Vagrant
 
-You can try youki on platforms other than linux by using the Vagrantfile we have prepared.
+You can try youki on platforms other than linux by using the Vagrantfile we have prepared. We have prepared two environments for vagrant, namely rootless mode and rootful mode
 
 ```
 $ git clone git@github.com:containers/youki.git
 $ cd youki
+
+# If you want to develop in rootless mode, and this is the default mode
 $ vagrant up
 $ vagrant ssh
+
+# or if you want to develop in rootful mode
+$ VAGRANT_VAGRANTFILE=Vagrantfile.root vagrant up
+$ VAGRANT_VAGRANTFILE=Vagrantfile.root vagrant ssh
 
 # in virtual machine
 $ cd youki
