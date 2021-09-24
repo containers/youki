@@ -32,7 +32,7 @@ impl Events {
         }
 
         let cgroups_path = utils::get_cgroup_path(
-            &container
+            container
                 .spec()?
                 .linux()
                 .as_ref()

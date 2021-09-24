@@ -28,8 +28,7 @@ impl Ps {
             let spec = oci_spec::runtime::Spec::load(config_absolute_path)?;
             log::debug!("spec: {:?}", spec);
             let cgroups_path = utils::get_cgroup_path(
-                &spec
-                    .linux()
+                spec.linux()
                     .as_ref()
                     .context("no linux in spec")?
                     .cgroups_path(),

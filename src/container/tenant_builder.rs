@@ -93,8 +93,8 @@ impl TenantContainerBuilder {
         let container = self.load_container_state(container_dir.clone())?;
 
         // TODO: spec extend from load_init_spec()
-        // let spec = self.load_init_spec(&container_dir)?;
-        let spec = self.adapt_spec_for_tenant(&container)?;
+        let spec = self.load_init_spec(&container_dir)?;
+        let spec = self.adapt_spec_for_tenant(&spec, &container)?;
 
         log::debug!("{:#?}", spec);
 
@@ -160,7 +160,7 @@ impl TenantContainerBuilder {
         Ok(container)
     }
 
-    fn adapt_spec_for_tenant(&self, container: &Container) -> Result<Spec> {
+    fn adapt_spec_for_tenant(&self, spec: &Spec, container: &Container) -> Result<Spec> {
         let process = if let Some(ref process) = self.process {
             self.set_process(process)?
         } else {
@@ -179,7 +179,7 @@ impl TenantContainerBuilder {
                 None => process_builder,
             };
 
-            process_builder = match self.set_capabilities()? {
+            process_builder = match self.set_capabilities(spec)? {
                 Some(caps) => process_builder.capabilities(caps),
                 None => process_builder,
             };
@@ -195,11 +195,33 @@ impl TenantContainerBuilder {
         let ns = self.set_namespaces(init_process.namespaces()?)?;
         let linux = LinuxBuilder::default().namespaces(ns).build()?;
 
-        let spec = SpecBuilder::default()
+        let mut spec_builder = SpecBuilder::default()
             .process(process)
-            .linux(linux)
-            .build()?;
+            .version(spec.version())
+            .linux(linux);
 
+        spec_builder = match spec.root() {
+            Some(root) => spec_builder.root(root.clone()),
+            None => spec_builder,
+        };
+        spec_builder = match spec.mounts() {
+            Some(mounts) => spec_builder.mounts(mounts.clone()),
+            None => spec_builder,
+        };
+        spec_builder = match spec.hostname() {
+            Some(hostname) => spec_builder.hostname(hostname.clone()),
+            None => spec_builder,
+        };
+        spec_builder = match spec.hooks() {
+            Some(hooks) => spec_builder.hooks(hooks.clone()),
+            None => spec_builder,
+        };
+        spec_builder = match spec.annotations() {
+            Some(annotations) => spec_builder.annotations(annotations.clone()),
+            None => spec_builder,
+        };
+
+        let spec = spec_builder.build()?;
         Ok(spec)
     }
 
@@ -249,7 +271,7 @@ impl TenantContainerBuilder {
         self.no_new_privs
     }
 
-    fn set_capabilities(&self) -> Result<Option<LinuxCapabilities>> {
+    fn set_capabilities(&self, spec: &Spec) -> Result<Option<LinuxCapabilities>> {
         if !self.capabilities.is_empty() {
             let mut caps: Vec<Capability> = Vec::with_capacity(self.capabilities.len());
             for cap in &self.capabilities {
@@ -259,59 +281,63 @@ impl TenantContainerBuilder {
             let caps: SpecCapabilities =
                 caps.iter().map(|c| SpecCapability::from_cap(*c)).collect();
 
+            if let Some(ref spec_caps) = spec
+                .process()
+                .as_ref()
+                .context("no process in spec")?
+                .capabilities()
+            {
+                let mut cb = LinuxCapabilitiesBuilder::default();
+                cb = match spec_caps.ambient() {
+                    Some(ambient) => {
+                        let ambient: SpecCapabilities = ambient.union(&caps).copied().collect();
+                        cb.ambient(ambient)
+                    }
+                    None => cb,
+                };
+                cb = match spec_caps.bounding() {
+                    Some(bounding) => {
+                        let bounding: SpecCapabilities = bounding.union(&caps).copied().collect();
+                        cb.bounding(bounding)
+                    }
+                    None => cb,
+                };
+                cb = match spec_caps.effective() {
+                    Some(effective) => {
+                        let effective: SpecCapabilities = effective.union(&caps).copied().collect();
+                        cb.effective(effective)
+                    }
+                    None => cb,
+                };
+                cb = match spec_caps.inheritable() {
+                    Some(inheritable) => {
+                        let inheritable: SpecCapabilities =
+                            inheritable.union(&caps).copied().collect();
+                        cb.inheritable(inheritable)
+                    }
+                    None => cb,
+                };
+                cb = match spec_caps.permitted() {
+                    Some(permitted) => {
+                        let permitted: SpecCapabilities = permitted.union(&caps).copied().collect();
+                        cb.permitted(permitted)
+                    }
+                    None => cb,
+                };
+
+                let c = cb.build()?;
+                return Ok(Some(c));
+            }
+
             return Ok(Some(
                 LinuxCapabilitiesBuilder::default()
                     .bounding(caps.clone())
                     .effective(caps.clone())
                     .inheritable(caps.clone())
                     .permitted(caps.clone())
-                    .ambient(caps.clone())
+                    .ambient(caps)
                     .build()?,
             ));
-
-            // if let Some(ref mut spec_caps) = spec
-            //     .process
-            //     .as_mut()
-            //     .context("no process in spec")?
-            //     .capabilities
-            // {
-            //     spec_caps
-            //         .ambient
-            //         .as_mut()
-            //         .context("no ambient caps in process spec")?
-            //         .extend(&caps);
-            //     spec_caps
-            //         .bounding
-            //         .as_mut()
-            //         .context("no bounding caps in process spec")?
-            //         .extend(&caps);
-            //     spec_caps
-            //         .effective
-            //         .as_mut()
-            //         .context("no effective caps in process spec")?
-            //         .extend(&caps);
-            //     spec_caps
-            //         .inheritable
-            //         .as_mut()
-            //         .context("no inheritable caps in process spec")?
-            //         .extend(&caps);
-            //     spec_caps
-            //         .permitted
-            //         .as_mut()
-            //         .context("no permitted caps in process spec")?
-            //         .extend(&caps);
-            // } else {
-            //     spec.process
-            //         .as_mut()
-            //         .context("no process in spec")?
-            //         .capabilities = Some(LinuxCapabilities {
-            //         ambient: caps.clone().into(),
-            //         bounding: caps.clone().into(),
-            //         effective: caps.clone().into(),
-            //         inheritable: caps.clone().into(),
-            //         permitted: caps.into(),
-            //     })
-            // }
         }
 
         Ok(None)

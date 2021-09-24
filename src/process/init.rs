@@ -274,7 +274,7 @@ pub fn container_init(
     if let Some(paths) = &linux.masked_paths() {
         // mount masked path
         for path in paths {
-            masked_path(path, &linux.mount_label()).context("Failed to set masked path")?;
+            masked_path(path, linux.mount_label()).context("Failed to set masked path")?;
         }
     }
 
@@ -292,7 +292,7 @@ pub fn container_init(
         }
     };
 
-    set_supplementary_gids(&proc.user(), &args.rootless)
+    set_supplementary_gids(proc.user(), &args.rootless)
         .context("failed to set supplementary gids")?;
 
     command

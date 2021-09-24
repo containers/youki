@@ -44,8 +44,7 @@ impl Resume {
 
         let spec = container.spec()?;
         let cgroups_path = utils::get_cgroup_path(
-            &spec
-                .linux()
+            spec.linux()
                 .as_ref()
                 .context("no linux in spec")?
                 .cgroups_path(),
