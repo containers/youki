@@ -22,7 +22,7 @@ impl Ps {
         if !container_root.exists() {
             bail!("{} doesn't exist.", self.container_id)
         }
-        let container = Container::load(container_root)?.refresh_status()?;
+        let container = Container::load(container_root)?;
         if container.root.exists() {
             let config_absolute_path = container.root.join("config.json");
             log::debug!("load spec from {:?}", config_absolute_path);

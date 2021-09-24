@@ -145,7 +145,7 @@ impl<'a> TenantContainerBuilder<'a> {
     }
 
     fn load_container_state(&self, container_dir: PathBuf) -> Result<Container> {
-        let container = Container::load(container_dir)?.refresh_status()?;
+        let container = Container::load(container_dir)?;
         if !container.can_exec() {
             bail!(
                 "Cannot exec as container is in state {}",

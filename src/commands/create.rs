@@ -33,23 +33,6 @@ pub struct Create {
 // it is running, it is just another process, and has attributes such as pid, file descriptors, etc.
 // associated with it like any other process.
 impl Create {
-    /// instant Create Command
-    pub fn new(
-        container_id: String,
-        pid_file: Option<PathBuf>,
-        bundle: PathBuf,
-        console_socket: Option<PathBuf>,
-        preserve_fds: i32,
-    ) -> Self {
-        Self {
-            pid_file,
-            bundle,
-            console_socket,
-            container_id,
-            preserve_fds,
-        }
-    }
-    /// Starts a new container process
     pub fn exec(&self, root_path: PathBuf, systemd_cgroup: bool) -> Result<()> {
         let syscall = create_syscall();
         ContainerBuilder::new(self.container_id.clone(), syscall.as_ref())
@@ -59,6 +42,8 @@ impl Create {
             .with_preserved_fds(self.preserve_fds)
             .as_init(&self.bundle)
             .with_systemd(systemd_cgroup)
-            .build()
+            .build()?;
+
+        Ok(())
     }
 }

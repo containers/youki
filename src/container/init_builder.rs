@@ -38,13 +38,13 @@ impl<'a> InitContainerBuilder<'a> {
     }
 
     /// Creates a new container
-    pub fn build(self) -> Result<()> {
+    pub fn build(self) -> Result<Container> {
         let spec = self.load_spec()?;
         let container_dir = self.create_container_dir()?;
         self.save_spec(&spec, &container_dir)?;
 
-        let container_state = self
-            .create_container_state(&container_dir)?
+        let mut container = self.create_container_state(&container_dir)?;
+        container
             .set_systemd(self.use_systemd)
             .set_annotations(spec.annotations.clone());
 
@@ -77,12 +77,14 @@ impl<'a> InitContainerBuilder<'a> {
             rootfs,
             rootless,
             notify_path,
-            container: Some(container_state),
+            container: Some(container.clone()),
             preserve_fds: self.base.preserve_fds,
         };
 
         builder_impl.create()?;
-        Ok(())
+        container.refresh_state()?;
+
+        Ok(container)
     }
 
     fn create_container_dir(&self) -> Result<PathBuf> {

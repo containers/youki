@@ -1,15 +1,7 @@
-use std::fs;
-use std::path::PathBuf;
-
-use anyhow::{bail, Context, Result};
+use crate::commands::load_container;
+use anyhow::{Context, Result};
 use clap::Clap;
-use nix::sys::signal::Signal;
-
-use crate::container::{Container, ContainerStatus};
-use crate::hooks;
-use crate::utils;
-use cgroups;
-use nix::sys::signal as nix_signal;
+use std::path::PathBuf;
 
 #[derive(Clap, Debug)]
 pub struct Delete {
@@ -21,72 +13,11 @@ pub struct Delete {
 }
 
 impl Delete {
-    /// instant Delete Command
-    ///
-    /// This method is provided for those using `youki` as a library to enable the use of the
-    /// Delete command to remove containers.
-    pub fn new(container_id: String, force: bool) -> Self {
-        Self {
-            container_id,
-            force,
-        }
-    }
-
-    pub fn exec(&self, root_path: PathBuf, systemd_cgroup: bool) -> Result<()> {
+    pub fn exec(&self, root_path: PathBuf) -> Result<()> {
         log::debug!("start deleting {}", self.container_id);
-        // state of container is stored in a directory named as container id inside
-        // root directory given in commandline options
-        let container_root = root_path.join(&self.container_id);
-        if !container_root.exists() {
-            bail!("{} doesn't exist.", self.container_id)
-        }
-        // load container state from json file, and check status of the container
-        // it might be possible that delete is invoked on a running container.
-        log::debug!("load the container from {:?}", container_root);
-        let mut container = Container::load(container_root)?.refresh_status()?;
-        if container.can_kill() && self.force {
-            let sig = Signal::SIGKILL;
-            log::debug!("kill signal {} to {}", sig, container.pid().unwrap());
-            nix_signal::kill(container.pid().unwrap(), sig)?;
-            container = container.update_status(ContainerStatus::Stopped);
-            container.save()?;
-        }
-        log::debug!("container status: {:?}", container.status());
-        if container.can_delete() {
-            if container.root.exists() {
-                let config_absolute_path = container.root.join("config.json");
-                log::debug!("load spec from {:?}", config_absolute_path);
-                let spec = oci_spec::runtime::Spec::load(config_absolute_path)?;
-                log::debug!("spec: {:?}", spec);
-
-                // remove the directory storing container state
-                log::debug!("remove dir {:?}", container.root);
-                fs::remove_dir_all(&container.root)?;
-
-                let cgroups_path = utils::get_cgroup_path(
-                    &spec.linux.context("no linux in spec")?.cgroups_path,
-                    container.id(),
-                );
-
-                // remove the cgroup created for the container
-                // check https://man7.org/linux/man-pages/man7/cgroups.7.html
-                // creating and removing cgroups section for more information on cgroups
-                let cmanager =
-                    cgroups::common::create_cgroup_manager(cgroups_path, systemd_cgroup)?;
-                cmanager.remove()?;
-
-                if let Some(hooks) = spec.hooks.as_ref() {
-                    hooks::run_hooks(hooks.poststop.as_ref(), Some(&container))
-                        .with_context(|| "Failed to run post stop hooks")?;
-                }
-            }
-            std::process::exit(0)
-        } else {
-            bail!(
-                "{} could not be deleted because it was {:?}",
-                container.id(),
-                container.status()
-            )
-        }
+        let mut container = load_container(root_path, self.container_id.as_str())?;
+        container
+            .delete(self.force)
+            .with_context(|| format!("failed to delete container {}", self.container_id))
     }
 }
