@@ -6,6 +6,23 @@ use anyhow::{bail, Context, Result};
 use cgroups::common::FreezerState;
 
 impl Container {
+    /// Resumes all processes within the container
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use youki::container::builder::ContainerBuilder;
+    /// use youki::syscall::syscall::create_syscall;;
+    ///
+    /// # fn main() -> anyhow::Result<()> {
+    /// let mut container = ContainerBuilder::new("74f1a4cb3801".to_owned(), create_syscall().as_ref())
+    /// .as_init("/var/run/docker/bundle")
+    /// .build()?;
+    ///
+    /// container.resume()?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn resume(&mut self) -> Result<()> {
         self.refresh_status()
             .context("failed to refresh container status")?;
