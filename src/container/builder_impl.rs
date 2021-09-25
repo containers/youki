@@ -7,9 +7,9 @@ use crate::{
     utils,
 };
 use anyhow::{Context, Result};
-use cgroups;
+use cgroups::{self, common::CgroupManager};
 use nix::unistd::Pid;
-use oci_spec::runtime::Spec;
+use oci_spec::runtime::{LinuxResources, Spec};
 use std::{fs, io::Write, os::unix::prelude::RawFd, path::PathBuf};
 
 use super::{Container, ContainerStatus};
@@ -44,9 +44,7 @@ pub(super) struct ContainerBuilderImpl<'a> {
 
 impl<'a> ContainerBuilderImpl<'a> {
     pub(super) fn create(&mut self) -> Result<()> {
-        self.run_container()?;
-
-        Ok(())
+        self.run_container()
     }
 
     fn run_container(&mut self) -> Result<()> {
@@ -151,19 +149,7 @@ impl<'a> ContainerBuilderImpl<'a> {
 
         if self.rootless.is_none() && linux.resources().is_some() && self.init {
             if let Some(resources) = linux.resources().as_ref() {
-                let controller_opt = cgroups::common::ControllerOpt {
-                    resources,
-                    freezer_state: None,
-                    oom_score_adj: None,
-                    disable_oom_killer: false,
-                };
-                cmanager
-                    .add_task(init_pid)
-                    .context("Failed to add tasks to cgroup manager")?;
-
-                cmanager
-                    .apply(&controller_opt)
-                    .context("Failed to apply resource limits through cgroup")?;
+                apply_cgroups(resources, init_pid, cmanager.as_ref())?;
             }
         }
 
@@ -202,8 +188,29 @@ fn setup_mapping(rootless: &Rootless, pid: Pid) -> Result<()> {
     Ok(())
 }
 
+fn apply_cgroups<C: CgroupManager + ?Sized>(
+    resources: &LinuxResources,
+    pid: Pid,
+    cmanager: &C,
+) -> Result<()> {
+    let controller_opt = cgroups::common::ControllerOpt {
+        resources,
+        freezer_state: None,
+        oom_score_adj: None,
+        disable_oom_killer: false,
+    };
+    cmanager
+        .add_task(pid)
+        .context("Failed to add tasks to cgroup manager")?;
+    cmanager
+        .apply(&controller_opt)
+        .context("Failed to apply resource limits through cgroup")?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
+    use cgroups::test_manager::TestManager;
     use nix::{
         sched::{unshare, CloneFlags},
         unistd::{self, getgid, getuid},
@@ -307,6 +314,16 @@ mod tests {
                 std::process::exit(0);
             }
         }
+        Ok(())
+    }
+
+    #[test]
+    fn apply_cgroup_successed() -> Result<()> {
+        let cmanager = TestManager::default();
+        let sample_pid = Pid::from_raw(1000);
+        let resources = LinuxResources::default();
+        apply_cgroups(&resources, sample_pid, &cmanager)?;
+        assert_eq!(cmanager.get_add_task_args(), vec![sample_pid]);
         Ok(())
     }
 }
