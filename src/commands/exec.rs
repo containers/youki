@@ -2,7 +2,7 @@ use anyhow::Result;
 use clap::Clap;
 use std::{error::Error, path::PathBuf};
 
-use crate::container::builder::ContainerBuilder;
+use crate::{container::builder::ContainerBuilder, syscall::syscall::create_syscall};
 
 #[derive(Clap, Debug)]
 pub struct Exec {
@@ -30,6 +30,7 @@ pub struct Exec {
     #[clap(short, long)]
     pub detach: bool,
     /// Identifier of the container
+    #[clap(forbid_empty_values = true, required = true)]
     pub container_id: String,
     /// Command that should be executed in the container
     #[clap(required = false)]
@@ -38,7 +39,8 @@ pub struct Exec {
 
 impl Exec {
     pub fn exec(&self, root_path: PathBuf) -> Result<()> {
-        ContainerBuilder::new(self.container_id.clone())
+        let syscall = create_syscall();
+        ContainerBuilder::new(self.container_id.clone(), syscall.as_ref())
             .with_root_path(root_path)
             .with_console_socket(self.console_socket.as_ref())
             .with_pid_file(self.pid_file.as_ref())

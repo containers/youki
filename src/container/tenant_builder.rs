@@ -17,10 +17,10 @@ use std::{
     str::FromStr,
 };
 
-use crate::capabilities::CapabilityExt;
+use crate::{capabilities::CapabilityExt, container::builder_impl::ContainerBuilderImpl};
 use crate::{notify_socket::NotifySocket, rootless::Rootless, tty, utils};
 
-use super::{builder::ContainerBuilder, builder_impl::ContainerBuilderImpl, Container};
+use super::{builder::ContainerBuilder, Container};
 
 const NAMESPACE_TYPES: &[&str] = &["ipc", "uts", "net", "pid", "mnt", "cgroup"];
 const TENANT_NOTIFY: &str = "tenant-notify-";
@@ -28,8 +28,8 @@ const TENANT_TTY: &str = "tenant-tty-";
 
 /// Builder that can be used to configure the properties of a process
 /// that will join an existing container sandbox
-pub struct TenantContainerBuilder {
-    base: ContainerBuilder,
+pub struct TenantContainerBuilder<'a> {
+    base: ContainerBuilder<'a>,
     env: HashMap<String, String>,
     cwd: Option<PathBuf>,
     args: Vec<String>,
@@ -38,11 +38,11 @@ pub struct TenantContainerBuilder {
     process: Option<PathBuf>,
 }
 
-impl TenantContainerBuilder {
+impl<'a> TenantContainerBuilder<'a> {
     /// Generates the base configuration for a process that will join
     /// an existing container sandbox from which configuration methods
     /// can be chained
-    pub(super) fn new(builder: ContainerBuilder) -> Self {
+    pub(super) fn new(builder: ContainerBuilder<'a>) -> Self {
         Self {
             base: builder,
             env: HashMap::new(),
@@ -149,7 +149,7 @@ impl TenantContainerBuilder {
     }
 
     fn load_container_state(&self, container_dir: PathBuf) -> Result<Container> {
-        let container = Container::load(container_dir)?.refresh_status()?;
+        let container = Container::load(container_dir)?;
         if !container.can_exec() {
             bail!(
                 "Cannot exec as container is in state {}",

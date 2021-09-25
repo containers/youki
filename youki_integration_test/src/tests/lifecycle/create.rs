@@ -1,4 +1,4 @@
-use crate::support::get_runtime_path;
+use crate::utils::get_runtime_path;
 use std::io;
 use std::path::Path;
 use std::process::{Command, Stdio};
@@ -13,11 +13,11 @@ pub fn create(project_path: &Path, id: &str) -> TestResult {
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .arg("--root")
-        .arg(project_path.join("integration-workspace").join("youki"))
+        .arg(project_path.join("runtime"))
         .arg("create")
-        .arg(id)
         .arg("--bundle")
-        .arg(project_path.join("integration-workspace").join("bundle"))
+        .arg(project_path.join("bundle"))
+        .arg(id)
         .spawn()
         .expect("Cannot execute create command")
         .wait();

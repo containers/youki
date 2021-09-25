@@ -75,10 +75,10 @@ pub enum FreezerState {
 }
 
 /// ControllerOpt is given all cgroup controller for applying cgroup configuration.
-#[derive(Clone, Debug, Default)]
-pub struct ControllerOpt {
+#[derive(Clone, Debug)]
+pub struct ControllerOpt<'a> {
     /// Resources contain cgroup information for handling resource constraints for the container.
-    pub resources: LinuxResources,
+    pub resources: &'a LinuxResources,
     /// Disables the OOM killer for out of memory conditions.
     pub disable_oom_killer: bool,
     /// Specify an oom_score_adj for container.

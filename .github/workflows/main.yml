@@ -17,10 +17,11 @@ jobs:
         id: filter
         with:
           filters: |
-            .: 'src/*'
-            ./test_framework: test_framework/*
-            ./youki_integration_test: youki_integration_test/*
-            ./cgroups: cgroups/*
+            .: src/**
+            ./test_framework: test_framework/**
+            ./youki_integration_test: youki_integration_test/**
+            ./cgroups: cgroups/**
+            ./seccomp: seccomp/**
   check:
     needs: [changes]
     if: ${{ !contains(needs.changes.outputs.dirs, '[]') }}
@@ -148,6 +149,6 @@ jobs:
         run: ./build.sh --release
       - uses: actions/setup-go@v2
         with:
-          go-version: "1.11.0"
+          go-version: '1.11.0'
       - name: Run intetgration tests
         run: ./integration_test.sh

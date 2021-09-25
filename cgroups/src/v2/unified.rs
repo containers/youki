@@ -78,8 +78,10 @@ mod tests {
             .unwrap();
 
         let controller_opt = ControllerOpt {
-            resources,
-            ..Default::default()
+            resources: &resources,
+            freezer_state: None,
+            oom_score_adj: None,
+            disable_oom_killer: false,
         };
 
         // act
@@ -114,8 +116,10 @@ mod tests {
             .unwrap();
 
         let controller_opt = ControllerOpt {
-            resources,
-            ..Default::default()
+            resources: &resources,
+            freezer_state: None,
+            oom_score_adj: None,
+            disable_oom_killer: false,
         };
 
         // act
@@ -146,8 +150,10 @@ mod tests {
             .unwrap();
 
         let controller_opt = ControllerOpt {
-            resources,
-            ..Default::default()
+            resources: &resources,
+            oom_score_adj: None,
+            disable_oom_killer: false,
+            freezer_state: None,
         };
 
         // act

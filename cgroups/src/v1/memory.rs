@@ -101,7 +101,7 @@ impl Controller for Memory {
         Ok(())
     }
 
-    fn needs_to_handle(_controller_opt: &ControllerOpt) -> Option<&Self::Resource> {
+    fn needs_to_handle<'a>(_controller_opt: &'a ControllerOpt) -> Option<&'a Self::Resource> {
         // TODO: fix compile error
         // error[E0515]: cannot return value referencing temporary value
         // if let Some(memory) = &controller_opt.resources.memory() {
@@ -411,130 +411,139 @@ mod tests {
     }
 
     quickcheck! {
-        fn property_test_set_memory(linux_memory: LinuxMemory, disable_oom_killer: bool) -> bool {
-            let tmp =
-                create_temp_dir("property_test_set_memory").expect("create temp directory for test");
-            set_fixture(&tmp, CGROUP_MEMORY_USAGE, "0").expect("Set fixure for memory usage");
-            set_fixture(&tmp, CGROUP_MEMORY_MAX_USAGE, "0").expect("Set fixure for max memory usage");
-            set_fixture(&tmp, CGROUP_MEMORY_LIMIT, "0").expect("Set fixure for memory limit");
-            set_fixture(&tmp, CGROUP_MEMORY_SWAP_LIMIT, "0").expect("Set fixure for swap limit");
-            set_fixture(&tmp, CGROUP_MEMORY_SWAPPINESS, "0").expect("Set fixure for swappiness");
-            set_fixture(&tmp, CGROUP_MEMORY_RESERVATION, "0").expect("Set fixture for memory reservation");
-            set_fixture(&tmp, CGROUP_MEMORY_OOM_CONTROL, "0").expect("Set fixture for oom control");
-            set_fixture(&tmp, CGROUP_KERNEL_MEMORY_LIMIT, "0").expect("Set fixture for kernel memory limit");
-            set_fixture(&tmp, CGROUP_KERNEL_TCP_MEMORY_LIMIT, "0").expect("Set fixture for kernel tcp memory limit");
-            set_fixture(&tmp, CGROUP_PROCS, "").expect("set fixture for proc file");
+            fn property_test_set_memory(linux_memory: LinuxMemory, disable_oom_killer: bool) -> bool {
+                let tmp =
+                    create_temp_dir("property_test_set_memory").expect("create temp directory for test");
+                set_fixture(&tmp, CGROUP_MEMORY_USAGE, "0").expect("Set fixure for memory usage");
+                set_fixture(&tmp, CGROUP_MEMORY_MAX_USAGE, "0").expect("Set fixure for max memory usage");
+                set_fixture(&tmp, CGROUP_MEMORY_LIMIT, "0").expect("Set fixure for memory limit");
+                set_fixture(&tmp, CGROUP_MEMORY_SWAP_LIMIT, "0").expect("Set fixure for swap limit");
+                set_fixture(&tmp, CGROUP_MEMORY_SWAPPINESS, "0").expect("Set fixure for swappiness");
+                set_fixture(&tmp, CGROUP_MEMORY_RESERVATION, "0").expect("Set fixture for memory reservation");
+                set_fixture(&tmp, CGROUP_MEMORY_OOM_CONTROL, "0").expect("Set fixture for oom control");
+                set_fixture(&tmp, CGROUP_KERNEL_MEMORY_LIMIT, "0").expect("Set fixture for kernel memory limit");
+                set_fixture(&tmp, CGROUP_KERNEL_TCP_MEMORY_LIMIT, "0").expect("Set fixture for kernel tcp memory limit");
+                set_fixture(&tmp, CGROUP_PROCS, "").expect("set fixture for proc file");
 
 
-            // clone to avoid use of moved value later on
-            let memory_limits = linux_memory;
+                // clone to avoid use of moved value later on
+                let memory_limits = linux_memory;
 
-            let linux_resources = LinuxResourcesBuilder::default().devices(vec![]).memory(linux_memory).hugepage_limits(vec![]).build().unwrap();
+                let linux_resources = LinuxResourcesBuilder::default().devices(vec![]).memory(linux_memory).hugepage_limits(vec![]).build().unwrap();
 
+    <<<<<<< HEAD
+                let controller_opt = ControllerOpt {
+                    resources: linux_resources,
+                    disable_oom_killer,
+                    ..Default::default()
+                };
+    =======
             let controller_opt = ControllerOpt {
-                resources: linux_resources,
+                resources: &linux_resources,
                 disable_oom_killer,
-                ..Default::default()
+                oom_score_adj: None,
+                freezer_state: None,
             };
+    >>>>>>> upstream/main
 
-            let result = <Memory as Controller>::apply(&controller_opt, &tmp);
+                let result = <Memory as Controller>::apply(&controller_opt, &tmp);
 
 
-            if result.is_err() {
-                if let Some(swappiness) = memory_limits.swappiness() {
-                    // error is expected if swappiness is greater than 100
-                    if swappiness > 100 {
-                        return true;
-                    }
-                } else {
-                    // useful for debugging
-                    println!("Some unexpected error: {:?}", result.unwrap_err());
-                    // any other error should be considered unexpected
-                    return false;
-                }
-            }
-
-            // check memory reservation
-            let reservation_content = std::fs::read_to_string(tmp.join(CGROUP_MEMORY_RESERVATION)).expect("read memory reservation");
-            let reservation_check = match memory_limits.reservation() {
-                Some(reservation) => {
-                    reservation_content == reservation.to_string()
-                }
-                None => reservation_content == "0",
-            };
-
-            // check kernel memory limit
-            let kernel_content = std::fs::read_to_string(tmp.join(CGROUP_KERNEL_MEMORY_LIMIT)).expect("read kernel memory limit");
-            let kernel_check = match memory_limits.kernel() {
-                Some(kernel) => {
-                    kernel_content == kernel.to_string()
-                }
-                None => kernel_content == "0",
-            };
-
-            // check kernel tcp memory limit
-            let kernel_tcp_content = std::fs::read_to_string(tmp.join(CGROUP_KERNEL_TCP_MEMORY_LIMIT)).expect("read kernel tcp memory limit");
-            let kernel_tcp_check = match memory_limits.kernel_tcp() {
-                Some(kernel_tcp) => {
-                    kernel_tcp_content == kernel_tcp.to_string()
-                }
-                None => kernel_tcp_content == "0",
-            };
-
-            // check swappiness
-            let swappiness_content = std::fs::read_to_string(tmp.join(CGROUP_MEMORY_SWAPPINESS)).expect("read swappiness");
-            let swappiness_check = match memory_limits.swappiness() {
-                Some(swappiness) if swappiness <= 100 => {
-                    swappiness_content == swappiness.to_string()
-                }
-                None => swappiness_content == "0",
-                // everything else is a failure
-                _ => false,
-            };
-
-            // check limit and swap
-            let limit_content = std::fs::read_to_string(tmp.join(CGROUP_MEMORY_LIMIT)).expect("read memory limit");
-            let swap_content = std::fs::read_to_string(tmp.join(CGROUP_MEMORY_SWAP_LIMIT)).expect("read swap memory limit");
-            let limit_swap_check = match memory_limits.limit() {
-                Some(limit) => {
-                    match memory_limits.swap() {
-                        Some(swap) => {
-                            limit_content == limit.to_string()
-                                && swap_content == swap.to_string()
+                if result.is_err() {
+                    if let Some(swappiness) = memory_limits.swappiness() {
+                        // error is expected if swappiness is greater than 100
+                        if swappiness > 100 {
+                            return true;
                         }
-                        None => {
-                            if limit == -1 {
+                    } else {
+                        // useful for debugging
+                        println!("Some unexpected error: {:?}", result.unwrap_err());
+                        // any other error should be considered unexpected
+                        return false;
+                    }
+                }
+
+                // check memory reservation
+                let reservation_content = std::fs::read_to_string(tmp.join(CGROUP_MEMORY_RESERVATION)).expect("read memory reservation");
+                let reservation_check = match memory_limits.reservation() {
+                    Some(reservation) => {
+                        reservation_content == reservation.to_string()
+                    }
+                    None => reservation_content == "0",
+                };
+
+                // check kernel memory limit
+                let kernel_content = std::fs::read_to_string(tmp.join(CGROUP_KERNEL_MEMORY_LIMIT)).expect("read kernel memory limit");
+                let kernel_check = match memory_limits.kernel() {
+                    Some(kernel) => {
+                        kernel_content == kernel.to_string()
+                    }
+                    None => kernel_content == "0",
+                };
+
+                // check kernel tcp memory limit
+                let kernel_tcp_content = std::fs::read_to_string(tmp.join(CGROUP_KERNEL_TCP_MEMORY_LIMIT)).expect("read kernel tcp memory limit");
+                let kernel_tcp_check = match memory_limits.kernel_tcp() {
+                    Some(kernel_tcp) => {
+                        kernel_tcp_content == kernel_tcp.to_string()
+                    }
+                    None => kernel_tcp_content == "0",
+                };
+
+                // check swappiness
+                let swappiness_content = std::fs::read_to_string(tmp.join(CGROUP_MEMORY_SWAPPINESS)).expect("read swappiness");
+                let swappiness_check = match memory_limits.swappiness() {
+                    Some(swappiness) if swappiness <= 100 => {
+                        swappiness_content == swappiness.to_string()
+                    }
+                    None => swappiness_content == "0",
+                    // everything else is a failure
+                    _ => false,
+                };
+
+                // check limit and swap
+                let limit_content = std::fs::read_to_string(tmp.join(CGROUP_MEMORY_LIMIT)).expect("read memory limit");
+                let swap_content = std::fs::read_to_string(tmp.join(CGROUP_MEMORY_SWAP_LIMIT)).expect("read swap memory limit");
+                let limit_swap_check = match memory_limits.limit() {
+                    Some(limit) => {
+                        match memory_limits.swap() {
+                            Some(swap) => {
                                 limit_content == limit.to_string()
-                                    && swap_content == "-1"
-                            } else {
-                                limit_content == limit.to_string()
-                                    && swap_content == "0"
+                                    && swap_content == swap.to_string()
+                            }
+                            None => {
+                                if limit == -1 {
+                                    limit_content == limit.to_string()
+                                        && swap_content == "-1"
+                                } else {
+                                    limit_content == limit.to_string()
+                                        && swap_content == "0"
+                                }
                             }
                         }
                     }
-                }
-                None => {
-                    match memory_limits.swap() {
-                        Some(swap) => {
-                            limit_content == "0"
-                                && swap_content == swap.to_string()
+                    None => {
+                        match memory_limits.swap() {
+                            Some(swap) => {
+                                limit_content == "0"
+                                    && swap_content == swap.to_string()
+                            }
+                            None => limit_content == "0" && swap_content == "0"
                         }
-                        None => limit_content == "0" && swap_content == "0"
                     }
-                }
-            };
+                };
 
-            // useful for debugging
-            println!("reservation_check: {:?}", reservation_check);
-            println!("kernel_check: {:?}", kernel_check);
-            println!("kernel_tcp_check: {:?}", kernel_tcp_check);
-            println!("swappiness_check: {:?}", swappiness_check);
-            println!("limit_swap_check: {:?}", limit_swap_check);
+                // useful for debugging
+                println!("reservation_check: {:?}", reservation_check);
+                println!("kernel_check: {:?}", kernel_check);
+                println!("kernel_tcp_check: {:?}", kernel_tcp_check);
+                println!("swappiness_check: {:?}", swappiness_check);
+                println!("limit_swap_check: {:?}", limit_swap_check);
 
-            // combine all the checks
-            reservation_check && kernel_check && kernel_tcp_check && swappiness_check && limit_swap_check
+                // combine all the checks
+                reservation_check && kernel_check && kernel_tcp_check && swappiness_check && limit_swap_check
+            }
         }
-    }
 
     #[test]
     fn test_stat_memory_data() {

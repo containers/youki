@@ -45,9 +45,11 @@ test_cases=(
   "linux_ns_nopath/linux_ns_nopath.t"
   "linux_ns_path/linux_ns_path.t"
   "linux_ns_path_type/linux_ns_path_type.t"
+  # This test case requires that an apparmor profile named 'acme_secure_profile' has been installed on the system. It needs to allow the capabilites
+  # validated by runtime-tools otherwise the test case will fail despite the profile being available.
   # "linux_process_apparmor_profile/linux_process_apparmor_profile.t"
   "linux_readonly_paths/linux_readonly_paths.t"
-  # "linux_rootfs_propagation/linux_rootfs_propagation.t"
+  "linux_rootfs_propagation/linux_rootfs_propagation.t"
   "linux_seccomp/linux_seccomp.t"
   "linux_sysctl/linux_sysctl.t"
   "linux_uid_mappings/linux_uid_mappings.t"

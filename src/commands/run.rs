@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
-use crate::commands::create::Create;
-use crate::commands::start::Start;
-use anyhow::Result;
+use crate::container::builder::ContainerBuilder;
+use crate::syscall::syscall::create_syscall;
+use anyhow::{Context, Result};
 use clap::Clap;
 /// Create and start a container.
 /// a shortcut for create followed by start.
@@ -22,22 +22,24 @@ pub struct Run {
     #[clap(long, default_value = "0")]
     preserve_fds: i32,
     /// name of the container instance to be started
+    #[clap(forbid_empty_values = true, required = true)]
     pub container_id: String,
 }
 
 impl Run {
     pub fn exec(&self, root_path: PathBuf, systemd_cgroup: bool) -> Result<()> {
-        Create::new(
-            self.container_id.clone(),
-            self.pid_file.clone(),
-            self.bundle.clone(),
-            self.console_socket.clone(),
-            self.preserve_fds,
-        )
-        .exec(root_path.clone(), systemd_cgroup)?;
+        let syscall = create_syscall();
+        let mut container = ContainerBuilder::new(self.container_id.clone(), syscall.as_ref())
+            .with_pid_file(self.pid_file.as_ref())
+            .with_console_socket(self.console_socket.as_ref())
+            .with_root_path(root_path)
+            .with_preserved_fds(self.preserve_fds)
+            .as_init(&self.bundle)
+            .with_systemd(systemd_cgroup)
+            .build()?;
 
-        Start::new(self.container_id.clone()).exec(root_path)?;
-
-        Ok(())
+        container
+            .start()
+            .with_context(|| format!("failed to start container {}", self.container_id))
     }
 }

@@ -32,8 +32,8 @@ impl Controller for Freezer {
         Ok(())
     }
 
-    fn needs_to_handle(controller: &ControllerOpt) -> Option<&Self::Resource> {
-        if let Some(freezer_state) = &controller.freezer_state {
+    fn needs_to_handle<'a>(controller_opt: &'a ControllerOpt) -> Option<&'a Self::Resource> {
+        if let Some(freezer_state) = &controller_opt.freezer_state {
             return Some(freezer_state);
         }
 
@@ -184,9 +184,10 @@ mod tests {
             let state = FreezerState::Thawed;
 
             let controller_opt = ControllerOpt {
-                resources: linux_resources,
+                resources: &linux_resources,
                 freezer_state: Some(state),
-                ..Default::default()
+                oom_score_adj: None,
+                disable_oom_killer: false,
             };
 
             let pid = Pid::from_raw(1000);
@@ -210,9 +211,10 @@ mod tests {
             let state = FreezerState::Frozen;
 
             let controller_opt = ControllerOpt {
-                resources: linux_resources,
+                resources: &linux_resources,
                 freezer_state: Some(state),
-                ..Default::default()
+                oom_score_adj: None,
+                disable_oom_killer: false,
             };
 
             let pid = Pid::from_raw(1001);
@@ -237,9 +239,10 @@ mod tests {
             let state = FreezerState::Undefined;
 
             let controller_opt = ControllerOpt {
-                resources: linux_resources,
+                resources: &linux_resources,
                 freezer_state: Some(state),
-                ..Default::default()
+                oom_score_adj: None,
+                disable_oom_killer: false,
             };
 
             let pid = Pid::from_raw(1002);

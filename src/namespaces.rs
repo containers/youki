@@ -88,6 +88,7 @@ mod tests {
     use super::*;
     use crate::syscall::test::TestHelperSyscall;
     use oci_spec::runtime::{LinuxNamespaceBuilder, LinuxNamespaceType};
+    use serial_test::serial;
 
     fn gen_sample_linux_namespaces() -> Vec<LinuxNamespace> {
         vec![
@@ -117,6 +118,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_apply_namespaces() {
         let sample_linux_namespaces = gen_sample_linux_namespaces();
         let namespaces = Namespaces::from(Some(&sample_linux_namespaces));

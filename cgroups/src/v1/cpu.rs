@@ -32,7 +32,7 @@ impl Controller for Cpu {
         Ok(())
     }
 
-    fn needs_to_handle(controller_opt: &ControllerOpt) -> Option<&Self::Resource> {
+    fn needs_to_handle<'a>(controller_opt: &'a ControllerOpt) -> Option<&'a Self::Resource> {
         if let Some(cpu) = &controller_opt.resources.cpu() {
             if cpu.shares().is_some()
                 || cpu.period().is_some()

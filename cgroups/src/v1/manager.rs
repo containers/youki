@@ -170,9 +170,10 @@ impl CgroupManager for Manager {
 
     fn freeze(&self, state: FreezerState) -> Result<()> {
         let controller_opt = ControllerOpt {
-            resources: Default::default(),
+            resources: &Default::default(),
             freezer_state: Some(state),
-            ..Default::default()
+            oom_score_adj: None,
+            disable_oom_killer: false,
         };
         Freezer::apply(
             &controller_opt,

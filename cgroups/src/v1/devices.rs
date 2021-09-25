@@ -33,7 +33,7 @@ impl Controller for Devices {
     }
 
     // always needs to be called due to default devices
-    fn needs_to_handle(_controller_opt: &ControllerOpt) -> Option<&Self::Resource> {
+    fn needs_to_handle<'a>(_controller_opt: &'a ControllerOpt) -> Option<&'a Self::Resource> {
         Some(&())
     }
 }

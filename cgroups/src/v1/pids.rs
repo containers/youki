@@ -27,12 +27,13 @@ impl Controller for Pids {
         Ok(())
     }
 
-    fn needs_to_handle(_controller_opt: &ControllerOpt) -> Option<&Self::Resource> {
+    fn needs_to_handle<'a>(_controller_opt: &'a ControllerOpt) -> Option<&'a Self::Resource> {
         // TODO: fix compile error
         // error[E0515]: cannot return value referencing temporary value
         // if let Some(pids) = &controller_opt.resources.pids() {
         //     return Some(pids);
         // }
+
         None
     }
 }

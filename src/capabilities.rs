@@ -124,14 +124,14 @@ impl CapabilityExt for SpecCapability {
 /// reset capabilities of process calling this to effective capabilities
 /// effective capability set is set of capabilities used by kernel to perform checks
 /// see https://man7.org/linux/man-pages/man7/capabilities.7.html for more information
-pub fn reset_effective(syscall: &impl Syscall) -> Result<()> {
+pub fn reset_effective<S: Syscall + ?Sized>(syscall: &S) -> Result<()> {
     log::debug!("reset all caps");
     syscall.set_capability(CapSet::Effective, &caps::all())?;
     Ok(())
 }
 
 /// Drop any extra granted capabilities, and reset to defaults which are in oci specification
-pub fn drop_privileges(cs: &LinuxCapabilities, syscall: &impl Syscall) -> Result<()> {
+pub fn drop_privileges<S: Syscall + ?Sized>(cs: &LinuxCapabilities, syscall: &S) -> Result<()> {
     log::debug!("dropping bounding capabilities to {:?}", cs.bounding());
     if let Some(bounding) = cs.bounding().as_ref() {
         syscall.set_capability(CapSet::Bounding, &to_set(bounding))?;

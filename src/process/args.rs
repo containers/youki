@@ -3,13 +3,13 @@ use std::os::unix::prelude::RawFd;
 use std::path::PathBuf;
 
 use crate::rootless::Rootless;
-use crate::{container::Container, notify_socket::NotifyListener, syscall::linux::LinuxSyscall};
+use crate::{container::Container, notify_socket::NotifyListener, syscall::Syscall};
 
 pub struct ContainerArgs<'a> {
     /// Flag indicating if an init or a tenant container should be created
     pub init: bool,
     /// Interface to operating system primitives
-    pub syscall: LinuxSyscall,
+    pub syscall: &'a dyn Syscall,
     /// OCI complient runtime spec
     pub spec: Spec,
     /// Root filesystem of the container

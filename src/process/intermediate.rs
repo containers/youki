@@ -1,4 +1,4 @@
-use crate::{namespaces::Namespaces, process::channel, process::fork, syscall::Syscall};
+use crate::{namespaces::Namespaces, process::channel, process::fork};
 use anyhow::{Context, Result};
 use nix::unistd::{Gid, Uid};
 use oci_spec::runtime::LinuxNamespaceType;

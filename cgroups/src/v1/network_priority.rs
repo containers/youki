@@ -22,7 +22,7 @@ impl Controller for NetworkPriority {
         Ok(())
     }
 
-    fn needs_to_handle(controller_opt: &ControllerOpt) -> Option<&Self::Resource> {
+    fn needs_to_handle<'a>(controller_opt: &'a ControllerOpt) -> Option<&'a Self::Resource> {
         if let Some(network) = &controller_opt.resources.network() {
             return Some(network);
         }

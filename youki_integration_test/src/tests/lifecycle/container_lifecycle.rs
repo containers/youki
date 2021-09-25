@@ -1,20 +1,33 @@
-use std::path::{Path, PathBuf};
-
-use crate::support::generate_uuid;
+use crate::utils::{generate_uuid, prepare_bundle, TempDir};
+use std::thread::sleep;
+use std::time::Duration;
 use test_framework::{TestResult, TestableGroup};
 
 use super::{create, delete, kill, start, state};
 
+// By experimenting, somewhere around 50 is enough for youki process
+// to get the kill signal and shut down
+// here we add a little buffer time as well
+const SLEEP_TIME: Duration = Duration::from_millis(75);
+
 pub struct ContainerLifecycle {
-    project_path: PathBuf,
+    project_path: TempDir,
     container_id: String,
 }
 
+impl Default for ContainerLifecycle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ContainerLifecycle {
-    pub fn new(project_path: &Path) -> Self {
+    pub fn new() -> Self {
+        let id = generate_uuid();
+        let temp_dir = prepare_bundle(&id).unwrap();
         ContainerLifecycle {
-            project_path: project_path.to_owned(),
-            container_id: generate_uuid().to_string(),
+            project_path: temp_dir,
+            container_id: id.to_string(),
         }
     }
 
@@ -31,7 +44,11 @@ impl ContainerLifecycle {
     }
 
     pub fn kill(&self) -> TestResult {
-        kill::kill(&self.project_path, &self.container_id)
+        let ret = kill::kill(&self.project_path, &self.container_id);
+        // sleep a little, so the youki process actually gets the signal and shuts down
+        // otherwise, the tester moves on to next tests before the youki has gotten signal, and delete test can fail
+        sleep(SLEEP_TIME);
+        ret
     }
 
     pub fn delete(&self) -> TestResult {
@@ -39,28 +56,28 @@ impl ContainerLifecycle {
     }
 }
 
-impl TestableGroup for ContainerLifecycle {
-    fn get_name(&self) -> String {
-        "lifecycle".to_owned()
+impl<'a> TestableGroup<'a> for ContainerLifecycle {
+    fn get_name(&self) -> &'a str {
+        "lifecycle"
     }
-    fn run_all(&self) -> Vec<(String, TestResult)> {
+    fn run_all(&self) -> Vec<(&'a str, TestResult)> {
         vec![
-            ("create".to_owned(), self.create()),
-            ("start".to_owned(), self.start()),
-            ("kill".to_owned(), self.kill()),
-            ("state".to_owned(), self.state()),
-            ("delete".to_owned(), self.delete()),
+            ("create", self.create()),
+            ("start", self.start()),
+            ("kill", self.kill()),
+            ("state", self.state()),
+            ("delete", self.delete()),
         ]
     }
-    fn run_selected(&self, selected: &[&str]) -> Vec<(String, TestResult)> {
+    fn run_selected(&self, selected: &[&str]) -> Vec<(&'a str, TestResult)> {
         let mut ret = Vec::new();
         for name in selected {
             match *name {
-                "create" => ret.push(("create".to_owned(), self.create())),
-                "start" => ret.push(("start".to_owned(), self.start())),
-                "kill" => ret.push(("kill".to_owned(), self.kill())),
-                "state" => ret.push(("state".to_owned(), self.state())),
-                "delete" => ret.push(("delete".to_owned(), self.delete())),
+                "create" => ret.push(("create", self.create())),
+                "start" => ret.push(("start", self.start())),
+                "kill" => ret.push(("kill", self.kill())),
+                "state" => ret.push(("state", self.state())),
+                "delete" => ret.push(("delete", self.delete())),
                 _ => eprintln!("No test named {} in lifecycle", name),
             };
         }

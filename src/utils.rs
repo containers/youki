@@ -6,12 +6,14 @@ use std::fs::{self, DirBuilder, File};
 use std::ops::Deref;
 use std::os::linux::fs::MetadataExt;
 use std::os::unix::fs::DirBuilderExt;
+use std::os::unix::prelude::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use anyhow::Context;
 use anyhow::{bail, Result};
 use nix::sys::stat::Mode;
+use nix::sys::statfs;
 use nix::unistd;
 
 pub trait PathBufExt {
@@ -150,6 +152,19 @@ pub fn create_dir_all_with_mode<P: AsRef<Path>>(path: P, owner: u32, mode: Mode)
             path.display()
         );
     }
+}
+
+// Make sure a given path is on procfs. This is to avoid the security risk that
+// /proc path is mounted over. Ref: CVE-2019-16884
+pub fn ensure_procfs(path: &Path) -> Result<()> {
+    let procfs_fd = fs::File::open(path)?;
+    let fstat_info = statfs::fstatfs(&procfs_fd.as_raw_fd())?;
+
+    if fstat_info.filesystem_type() != statfs::PROC_SUPER_MAGIC {
+        bail!(format!("{:?} is not on the procfs", path));
+    }
+
+    Ok(())
 }
 
 pub struct TempDir {
