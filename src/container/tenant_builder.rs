@@ -92,7 +92,6 @@ impl<'a> TenantContainerBuilder<'a> {
         let container_dir = self.lookup_container_dir()?;
         let container = self.load_container_state(container_dir.clone())?;
 
-        // TODO: spec extend from load_init_spec()
         let spec = self.load_init_spec(&container_dir)?;
         let spec = self.adapt_spec_for_tenant(&spec, &container)?;
 
