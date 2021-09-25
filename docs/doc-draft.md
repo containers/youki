@@ -1,4 +1,4 @@
-_This is a draft for a high level documentation of Youki. After finished this is intended to provide how control flow and high level functioning of Youki happens for development purposes._
+_This is a draft for a high level documentation of Youki. After it is finished this is intended to explain how control flow and high level functioning of Youki happens for development purposes.
 
 ## Some reference links
 
@@ -57,11 +57,11 @@ From there it matches subcommand arg with possible subcommand and takes appropri
 
 ### create container
 
-One thing to note is that in the end, container is just another process in Linux. It has specific/different control group, namespace, program executing in it can be given impression that is is running on a complete system, but on the host system's perspective, it is just another process, and has attributes such as pid, file descriptors, etc. associated with it like any other process.
+One thing to note is that in the end, a container is just another process in Linux, which has control groups, namespaces, pivot_root and other mechanisms applied to it. The program executing has the impression that is is running on a complete system, but from the host system's perspective, it is just another process, and has attributes such as pid, file descriptors, etc. associated with it like any other process.
 
-When given create command, Youki will load the specification, configuration, sockets etc., use clone syscall to create the container process (init process), applies the limits, namespaces, and etc. to the cloned container process. The container process will wait on a unix domain socket before executing the command/program.
+When given the create command, Youki will load the specification, configuration, sockets etc., use clone syscall to create the container process (init process), applies the limits, namespaces, and etc. to the cloned container process. The container process will wait on a unix domain socket before executing the command/program.
 
-The main youki process will setup pipes to communicate and syncronize with the intermediate and init process. The init process will notify the intermediate process, and then intermediate process to the main youki process that it is ready and start to wait on a unix domain socket. The youki process will then write the container state and exit.
+The main youki process will setup pipes to communicate and synchronize with the intermediate and init process. The init process will notify the intermediate process, and then intermediate process to the main youki process that it is ready and start to wait on a unix domain socket. The youki process will then write the container state and exit.
 
 - [mio Token definition](https://docs.rs/mio/0.7.11/mio/struct.Token.html)
 - [oom-score-adj](https://dev.to/rrampage/surviving-the-linux-oom-killer-2ki9)
@@ -73,7 +73,7 @@ The main youki process will setup pipes to communicate and syncronize with the i
 
 This handles creation of the container process. The main youki process creates the intermediate process and the intermediate process creates the container process (init process). The hierarchy is: `main youki process -> intermediate process -> init process`
 
-The main youki process will set up pipes used as message passing and synchronization mechanism with the init process. Youki needs to create/fork two process instead of one is because nuances for the user and pid namespaces. In rootless container, we need to first enter user namespace, since all other namespaces requires CAP_SYSADMIN. When unshare or set_ns into pid namespace, only the children of the current process will enter into a different pid namespace. As a result, we must first fork a process to enter into user namespace, call unshare or set_ns for pid namespace, then fork again to enter into the correct pid namespace.
+The main youki process will set up pipes used as message passing and synchronization mechanism with the init process. The reason youki needs to create/fork two process instead of one is due to the user and pid namespaces. In rootless container, we need to first enter user namespace, since all other namespaces requires CAP_SYSADMIN. When unshare or set_ns into pid namespace, only the children of the current process will enter into a different pid namespace. As a result, we must first fork a process to enter into user namespace, call unshare or set_ns for pid namespace, then fork again to enter into the correct pid namespace.
 
 Note: clone(2) offers us the ability to enter into user and pid namespace by creatng only one process. However, clone(2) can only create new pid namespace, but cannot enter into existing pid namespaces. Therefore, to enter into existing pid namespaces, we would need to fork twice. Currently, there is no getting around this limitation.
 
@@ -84,7 +84,7 @@ Note: clone(2) offers us the ability to enter into user and pid namespace by cre
 
 ### Container
 
-This contains structure represent and functions related to container process and its state and status.
+This structure contains functions related to container process and its state and status.
 
 ### Command
 
