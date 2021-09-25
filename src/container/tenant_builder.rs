@@ -286,45 +286,45 @@ impl<'a> TenantContainerBuilder<'a> {
                 .context("no process in spec")?
                 .capabilities()
             {
-                let mut cb = LinuxCapabilitiesBuilder::default();
-                cb = match spec_caps.ambient() {
+                let mut capabilities_builder = LinuxCapabilitiesBuilder::default();
+                capabilities_builder = match spec_caps.ambient() {
                     Some(ambient) => {
                         let ambient: SpecCapabilities = ambient.union(&caps).copied().collect();
-                        cb.ambient(ambient)
+                        capabilities_builder.ambient(ambient)
                     }
-                    None => cb,
+                    None => capabilities_builder,
                 };
-                cb = match spec_caps.bounding() {
+                capabilities_builder = match spec_caps.bounding() {
                     Some(bounding) => {
                         let bounding: SpecCapabilities = bounding.union(&caps).copied().collect();
-                        cb.bounding(bounding)
+                        capabilities_builder.bounding(bounding)
                     }
-                    None => cb,
+                    None => capabilities_builder,
                 };
-                cb = match spec_caps.effective() {
+                capabilities_builder = match spec_caps.effective() {
                     Some(effective) => {
                         let effective: SpecCapabilities = effective.union(&caps).copied().collect();
-                        cb.effective(effective)
+                        capabilities_builder.effective(effective)
                     }
-                    None => cb,
+                    None => capabilities_builder,
                 };
-                cb = match spec_caps.inheritable() {
+                capabilities_builder = match spec_caps.inheritable() {
                     Some(inheritable) => {
                         let inheritable: SpecCapabilities =
                             inheritable.union(&caps).copied().collect();
-                        cb.inheritable(inheritable)
+                        capabilities_builder.inheritable(inheritable)
                     }
-                    None => cb,
+                    None => capabilities_builder,
                 };
-                cb = match spec_caps.permitted() {
+                capabilities_builder = match spec_caps.permitted() {
                     Some(permitted) => {
                         let permitted: SpecCapabilities = permitted.union(&caps).copied().collect();
-                        cb.permitted(permitted)
+                        capabilities_builder.permitted(permitted)
                     }
-                    None => cb,
+                    None => capabilities_builder,
                 };
 
-                let c = cb.build()?;
+                let c = capabilities_builder.build()?;
                 return Ok(Some(c));
             }
 
