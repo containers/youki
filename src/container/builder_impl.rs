@@ -208,7 +208,7 @@ mod tests {
         sched::{unshare, CloneFlags},
         unistd::{self, getgid, getuid},
     };
-    use oci_spec::runtime::LinuxIdMapping;
+    use oci_spec::runtime::LinuxIdMappingBuilder;
     use serial_test::serial;
 
     use crate::process::channel::{intermediate_to_main, main_to_intermediate};
@@ -218,11 +218,11 @@ mod tests {
     #[test]
     #[serial]
     fn setup_uid_mapping_should_succeed() -> Result<()> {
-        let uid_mapping = LinuxIdMapping {
-            host_id: u32::from(getuid()),
-            container_id: 0,
-            size: 1,
-        };
+        let uid_mapping = LinuxIdMappingBuilder::default()
+            .host_id(getuid())
+            .container_id(0u32)
+            .size(1u32)
+            .build()?;
         let uid_mappings = vec![uid_mapping];
         let rootless = Rootless {
             uid_mappings: Some(&uid_mappings),
@@ -239,9 +239,9 @@ mod tests {
                 let line = fs::read_to_string(format!("/proc/{}/uid_map", child.as_raw()))?;
                 let line_splited = line.split_whitespace();
                 for (act, expect) in line_splited.zip([
-                    uid_mapping.container_id.to_string().as_str(),
-                    uid_mapping.host_id.to_string().as_str(),
-                    uid_mapping.size.to_string().as_str(),
+                    uid_mapping.container_id().to_string().as_str(),
+                    uid_mapping.host_id().to_string().as_str(),
+                    uid_mapping.size().to_string().as_str(),
                 ]) {
                     assert_eq!(act, expect);
                 }
@@ -264,11 +264,11 @@ mod tests {
     #[test]
     #[serial]
     fn setup_gid_mapping_should_successed() -> Result<()> {
-        let gid_mapping = LinuxIdMapping {
-            host_id: u32::from(getgid()),
-            container_id: 0,
-            size: 1,
-        };
+        let gid_mapping = LinuxIdMappingBuilder::default()
+            .host_id(getgid())
+            .container_id(0u32)
+            .size(1u32)
+            .build()?;
         let gid_mappings = vec![gid_mapping];
         let rootless = Rootless {
             gid_mappings: Some(&gid_mappings),
@@ -284,9 +284,9 @@ mod tests {
                 let line = fs::read_to_string(format!("/proc/{}/gid_map", child.as_raw()))?;
                 let line_splited = line.split_whitespace();
                 for (act, expect) in line_splited.zip([
-                    gid_mapping.container_id.to_string().as_str(),
-                    gid_mapping.host_id.to_string().as_str(),
-                    gid_mapping.size.to_string().as_str(),
+                    gid_mapping.container_id().to_string().as_str(),
+                    gid_mapping.host_id().to_string().as_str(),
+                    gid_mapping.size().to_string().as_str(),
                 ]) {
                     assert_eq!(act, expect);
                 }
