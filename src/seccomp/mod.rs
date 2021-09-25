@@ -409,7 +409,7 @@ mod tests {
             }
             nix::unistd::ForkResult::Child => {
                 let _ = prctl::set_no_new_privileges(true);
-                let ret = initialize_seccomp(&seccomp_profile);
+                let ret = initialize_seccomp(seccomp_profile);
                 let exit_code = if ret.is_ok() { 0 } else { -1 };
                 std::process::exit(exit_code);
             }

@@ -605,7 +605,7 @@ mod tests {
                     (CapSet::Effective, cps.clone()),
                     (CapSet::Permitted, cps.clone()),
                     (CapSet::Inheritable, cps.clone()),
-                    (CapSet::Ambient, cps.clone()),
+                    (CapSet::Ambient, cps),
                 ],
             },
         ];
