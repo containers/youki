@@ -6,6 +6,7 @@ use std::{any::Any, ffi::OsStr, path::Path, sync::Arc};
 use anyhow::Result;
 use caps::{errors::CapsError, CapSet, CapsHashSet};
 use nix::{
+    mount::MsFlags,
     sched::CloneFlags,
     unistd::{Gid, Uid},
 };
@@ -27,6 +28,16 @@ pub trait Syscall {
     fn set_hostname(&self, hostname: &str) -> Result<()>;
     fn set_rlimit(&self, rlimit: &LinuxRlimit) -> Result<()>;
     fn get_pwuid(&self, uid: u32) -> Option<Arc<OsStr>>;
+    // TODO: method signature (have to use a concrete type such as Path, but is it ok?
+    fn mount(
+        &self,
+        // FIXME: this is not always path (such as 'tmpfs')...
+        source: Option<&Path>,
+        target: &Path,
+        fstype: Option<&str>,
+        flags: MsFlags,
+        data: Option<&str>,
+    ) -> Result<(), nix::errno::Errno>;
 }
 
 pub fn create_syscall() -> Box<dyn Syscall> {

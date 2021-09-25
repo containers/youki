@@ -211,4 +211,15 @@ impl Syscall for LinuxSyscall {
 
         Ok(())
     }
+
+    fn mount(
+        &self,
+        source: Option<&Path>,
+        target: &Path,
+        fstype: Option<&str>,
+        flags: MsFlags,
+        data: Option<&str>,
+    ) -> Result<(), nix::errno::Errno> {
+        mount(source, target, fstype, flags, data)
+    }
 }

@@ -1,11 +1,11 @@
 //! During kernel initialization, a minimal replica of the ramfs filesystem is loaded, called rootfs.
 //! Most systems mount another filesystem over it
 
+use crate::syscall::Syscall;
 use crate::utils::PathBufExt;
 use anyhow::{anyhow, bail, Context, Result};
 use nix::errno::Errno;
 use nix::fcntl::{open, OFlag};
-use nix::mount::mount as nix_mount;
 use nix::mount::MsFlags;
 use nix::sys::stat::{mknod, umask};
 use nix::sys::stat::{Mode, SFlag};
@@ -19,7 +19,12 @@ use std::fs::{canonicalize, create_dir_all, remove_file};
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 
-pub fn prepare_rootfs(spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<()> {
+pub fn prepare_rootfs(
+    spec: &Spec,
+    rootfs: &Path,
+    bind_devices: bool,
+    command: &dyn Syscall,
+) -> Result<()> {
     log::debug!("Prepare rootfs: {:?}", rootfs);
     let mut flags = MsFlags::MS_REC;
     let linux = spec.linux().as_ref().context("no linux in spec")?;
@@ -31,18 +36,20 @@ pub fn prepare_rootfs(spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<
         Some(uknown) => bail!("unknown rootfs_propagation: {}", uknown),
     }
 
-    nix_mount(None::<&str>, "/", None::<&str>, flags, None::<&str>)
-        .context("Failed to mount rootfs")?;
+    command
+        .mount(None, Path::new("/"), None, flags, None)
+        .context("failed to mount rootfs")?;
 
-    make_parent_mount_private(rootfs).context("Failed to change parent mount of rootfs private")?;
+    make_parent_mount_private(rootfs, command)
+        .context("failed to change parent mount of rootfs private")?;
 
     log::debug!("mount root fs {:?}", rootfs);
-    nix_mount::<Path, Path, str, str>(
+    command.mount(
         Some(rootfs),
         rootfs,
-        None::<&str>,
+        None,
         MsFlags::MS_BIND | MsFlags::MS_REC,
-        None::<&str>,
+        None,
     )?;
 
     if let Some(mounts) = spec.mounts() {
@@ -60,10 +67,11 @@ pub fn prepare_rootfs(spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<
                     flags & !MsFlags::MS_RDONLY,
                     &data,
                     mount_label,
+                    command,
                 )
                 .with_context(|| format!("Failed to mount /dev: {:?}", mount))?;
             } else {
-                mount_to_container(mount, rootfs, flags, &data, mount_label)
+                mount_to_container(mount, rootfs, flags, &data, mount_label, command)
                     .with_context(|| format!("Failed to mount: {:?}", mount))?;
             }
         }
@@ -75,9 +83,10 @@ pub fn prepare_rootfs(spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<
             rootfs,
             default_devices().iter().chain(added_devices),
             bind_devices,
+            command,
         )
     } else {
-        create_devices(rootfs, &default_devices(), bind_devices)
+        create_devices(rootfs, &default_devices(), bind_devices, command)
     }?;
 
     setup_ptmx(rootfs)?;
@@ -166,7 +175,7 @@ pub fn default_devices() -> Vec<LinuxDevice> {
     ]
 }
 
-fn create_devices<'a, I>(rootfs: &Path, devices: I, bind: bool) -> Result<()>
+fn create_devices<'a, I>(rootfs: &Path, devices: I, bind: bool, command: &dyn Syscall) -> Result<()>
 where
     I: IntoIterator<Item = &'a LinuxDevice>,
 {
@@ -179,7 +188,7 @@ where
                     panic!("{} is not a valid device path", dev.path().display());
                 }
 
-                bind_dev(rootfs, dev)
+                bind_dev(rootfs, dev, command)
             })
             .collect::<Result<Vec<_>>>()?;
     } else {
@@ -199,7 +208,7 @@ where
     Ok(())
 }
 
-fn bind_dev(rootfs: &Path, dev: &LinuxDevice) -> Result<()> {
+fn bind_dev(rootfs: &Path, dev: &LinuxDevice, command: &dyn Syscall) -> Result<()> {
     let full_container_path = rootfs.join(dev.path().as_in_container()?);
 
     let fd = open(
@@ -208,12 +217,12 @@ fn bind_dev(rootfs: &Path, dev: &LinuxDevice) -> Result<()> {
         Mode::from_bits_truncate(0o644),
     )?;
     close(fd)?;
-    nix_mount(
+    command.mount(
         Some(dev.path()),
         &full_container_path,
         Some("bind"),
         MsFlags::MS_BIND,
-        None::<&str>,
+        None,
     )?;
 
     Ok(())
@@ -258,6 +267,7 @@ fn mount_to_container(
     flags: MsFlags,
     data: &str,
     label: Option<&String>,
+    command: &dyn Syscall,
 ) -> Result<()> {
     let typ = m.typ().as_deref();
     let d = if let Some(l) = label {
@@ -303,11 +313,11 @@ fn mount_to_container(
         PathBuf::from(source)
     };
 
-    if let Err(errno) = nix_mount(Some(&*src), dest, typ, flags, Some(&*d)) {
+    if let Err(errno) = command.mount(Some(&*src), dest, typ, flags, Some(&*d)) {
         if !matches!(errno, Errno::EINVAL) {
             bail!("mount of {:?} failed", m.destination());
         }
-        nix_mount(Some(&*src), dest, typ, flags, Some(data))?;
+        command.mount(Some(&*src), dest, typ, flags, Some(data))?;
     }
 
     if flags.contains(MsFlags::MS_BIND)
@@ -320,12 +330,12 @@ fn mount_to_container(
                 | MsFlags::MS_SLAVE),
         )
     {
-        nix_mount(
+        command.mount(
             Some(dest),
             dest,
-            None::<&str>,
+            None,
             flags | MsFlags::MS_REMOUNT,
-            None::<&str>,
+            None,
         )?;
     }
     Ok(())
@@ -398,7 +408,7 @@ fn find_parent_mount<'a>(rootfs: &Path, mount_infos: &'a [MountInfo]) -> Result<
 
 /// Make parent mount of rootfs private if it was shared, which is required by pivot_root.
 /// It also makes sure following bind mount does not propagate in other namespaces.
-fn make_parent_mount_private(rootfs: &Path) -> Result<()> {
+fn make_parent_mount_private(rootfs: &Path, command: &dyn Syscall) -> Result<()> {
     let mount_infos = Process::myself()?.mountinfo()?;
     let parent_mount = find_parent_mount(rootfs, &mount_infos)?;
 
@@ -408,12 +418,12 @@ fn make_parent_mount_private(rootfs: &Path) -> Result<()> {
         .iter()
         .any(|field| matches!(field, MountOptFields::Shared(_)))
     {
-        nix_mount(
-            None::<&str>,
+        command.mount(
+            None,
             &parent_mount.mount_point,
-            None::<&str>,
+            None,
             MsFlags::MS_PRIVATE,
-            None::<&str>,
+            None,
         )?;
     }
 
@@ -421,7 +431,7 @@ fn make_parent_mount_private(rootfs: &Path) -> Result<()> {
 }
 
 /// Change propagation type of rootfs as specified in spec.
-pub fn adjust_root_mount_propagation(linux: &Linux) -> Result<()> {
+pub fn adjust_root_mount_propagation(linux: &Linux, command: &dyn Syscall) -> Result<()> {
     let rootfs_propagation = linux.rootfs_propagation().as_deref();
     let flags = match rootfs_propagation {
         Some("shared") => Some(MsFlags::MS_SHARED),
@@ -431,7 +441,7 @@ pub fn adjust_root_mount_propagation(linux: &Linux) -> Result<()> {
 
     if let Some(flags) = flags {
         log::debug!("make root mount {:?}", flags);
-        nix_mount(None::<&str>, "/", None::<&str>, flags, None::<&str>)?;
+        command.mount(None, Path::new("/"), None, flags, None)?;
     }
 
     Ok(())

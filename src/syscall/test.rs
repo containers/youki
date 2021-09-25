@@ -5,12 +5,24 @@ use nix::sched::CloneFlags;
 use oci_spec::runtime::LinuxRlimit;
 
 use super::Syscall;
+use nix::mount::MsFlags;
+use std::path::{Path, PathBuf};
 
 #[derive(Clone)]
 pub struct TestHelperSyscall {
     set_ns_args: RefCell<Vec<(i32, CloneFlags)>>,
     unshare_args: RefCell<Vec<CloneFlags>>,
     set_capability_args: RefCell<Vec<(CapSet, CapsHashSet)>>,
+    mount_args: RefCell<Vec<MountArgs>>,
+}
+
+#[derive(Clone)]
+pub struct MountArgs {
+    source: Option<PathBuf>,
+    target: PathBuf,
+    fstype: Option<String>,
+    flags: MsFlags,
+    data: Option<String>,
 }
 
 impl Default for TestHelperSyscall {
@@ -19,6 +31,7 @@ impl Default for TestHelperSyscall {
             set_ns_args: RefCell::new(vec![]),
             unshare_args: RefCell::new(vec![]),
             set_capability_args: RefCell::new(vec![]),
+            mount_args: RefCell::new(vec![]),
         }
     }
 }
@@ -67,6 +80,25 @@ impl Syscall for TestHelperSyscall {
 
     fn chroot(&self, _: &std::path::Path) -> anyhow::Result<()> {
         todo!()
+    }
+
+    fn mount(
+        &self,
+        source: Option<&Path>,
+        target: &Path,
+        fstype: Option<&str>,
+        flags: MsFlags,
+        data: Option<&str>,
+    ) -> Result<(), nix::errno::Errno> {
+        let args = MountArgs {
+            source: source.map(|x| x.to_owned()),
+            target: target.to_owned(),
+            fstype: fstype.map(|x| x.to_owned()),
+            flags,
+            data: data.map(|x| x.to_owned()),
+        };
+        self.mount_args.borrow_mut().push(args);
+        Ok(())
     }
 }
 

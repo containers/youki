@@ -1,11 +1,11 @@
 use super::args::ContainerArgs;
 use crate::apparmor;
+use crate::syscall::Syscall;
 use crate::{
     capabilities, hooks, namespaces::Namespaces, process::channel, rootfs, rootless::Rootless,
     seccomp, tty, utils,
 };
 use anyhow::{bail, Context, Result};
-use nix::mount::mount as nix_mount;
 use nix::mount::MsFlags;
 use nix::sched::CloneFlags;
 use nix::{
@@ -91,13 +91,13 @@ fn sysctl(kernel_params: &HashMap<String, String>) -> Result<()> {
 // The first time we bind mount, other flags are ignored,
 // so we need to mount it once and then remount it with the necessary flags specified.
 // https://man7.org/linux/man-pages/man2/mount.2.html
-fn readonly_path(path: &str) -> Result<()> {
-    match nix_mount::<str, str, str, str>(
+fn readonly_path(path: &Path, command: &dyn Syscall) -> Result<()> {
+    match command.mount(
         Some(path),
         path,
-        None::<&str>,
+        None,
         MsFlags::MS_BIND | MsFlags::MS_REC,
-        None::<&str>,
+        None,
     ) {
         // ignore error if path is not exist.
         Err(nix::errno::Errno::ENOENT) => {
@@ -108,17 +108,17 @@ fn readonly_path(path: &str) -> Result<()> {
         Ok(_) => {}
     }
 
-    nix_mount::<str, str, str, str>(
+    command.mount(
         Some(path),
         path,
-        None::<&str>,
+        None,
         MsFlags::MS_NOSUID
             | MsFlags::MS_NODEV
             | MsFlags::MS_NOEXEC
             | MsFlags::MS_BIND
             | MsFlags::MS_REMOUNT
             | MsFlags::MS_RDONLY,
-        None::<&str>,
+        None,
     )?;
     log::debug!("readonly path {:?} mounted", path);
     Ok(())
@@ -126,13 +126,13 @@ fn readonly_path(path: &str) -> Result<()> {
 
 // For files, bind mounts /dev/null over the top of the specified path.
 // For directories, mounts read-only tmpfs over the top of the specified path.
-fn masked_path(path: &str, mount_label: &Option<String>) -> Result<()> {
-    match nix_mount::<str, str, str, str>(
-        Some("/dev/null"),
+fn masked_path(path: &Path, mount_label: &Option<String>, command: &dyn Syscall) -> Result<()> {
+    match command.mount(
+        Some(Path::new("/dev/null")),
         path,
-        None::<&str>,
+        None,
         MsFlags::MS_BIND,
-        None::<&str>,
+        None,
     ) {
         // ignore error if path is not exist.
         Err(nix::errno::Errno::ENOENT) => {
@@ -144,8 +144,8 @@ fn masked_path(path: &str, mount_label: &Option<String>) -> Result<()> {
                 Some(l) => format!("context={}", l),
                 None => "".to_string(),
             };
-            let _ = nix_mount(
-                Some("tmpfs"),
+            let _ = command.mount(
+                Some(Path::new("tmpfs")),
                 path,
                 Some("tmpfs"),
                 MsFlags::MS_RDONLY,
@@ -216,7 +216,7 @@ pub fn container_init(
         }
 
         let bind_service = namespaces.get(LinuxNamespaceType::User).is_some();
-        rootfs::prepare_rootfs(spec, rootfs, bind_service)
+        rootfs::prepare_rootfs(spec, rootfs, bind_service, command)
             .with_context(|| "Failed to prepare rootfs")?;
 
         // Entering into the rootfs jail. If mount namespace is specified, then
@@ -234,7 +234,7 @@ pub fn container_init(
                 .with_context(|| format!("Failed to chroot to {:?}", rootfs))?;
         }
 
-        rootfs::adjust_root_mount_propagation(linux)
+        rootfs::adjust_root_mount_propagation(linux, command)
             .context("Failed to set propagation type of root mount")?;
 
         if let Some(kernel_params) = linux.sysctl() {
@@ -249,26 +249,27 @@ pub fn container_init(
     }
 
     if let Some(true) = spec.root().as_ref().map(|r| r.readonly().unwrap_or(false)) {
-        nix_mount(
-            None::<&str>,
-            "/",
-            None::<&str>,
+        command.mount(
+            None,
+            Path::new("/"),
+            None,
             MsFlags::MS_RDONLY | MsFlags::MS_REMOUNT | MsFlags::MS_BIND,
-            None::<&str>,
+            None,
         )?
     }
 
     if let Some(paths) = linux.readonly_paths() {
         // mount readonly path
         for path in paths {
-            readonly_path(path).context("Failed to set read only path")?;
+            readonly_path(Path::new(path), command).context("failed to set read only path")?;
         }
     }
 
     if let Some(paths) = linux.masked_paths() {
         // mount masked path
         for path in paths {
-            masked_path(path, linux.mount_label()).context("Failed to set masked path")?;
+            masked_path(Path::new(path), linux.mount_label(), command)
+                .context("failed to set masked path")?;
         }
     }
 
