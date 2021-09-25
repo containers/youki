@@ -431,20 +431,12 @@ mod tests {
 
                 let linux_resources = LinuxResourcesBuilder::default().devices(vec![]).memory(linux_memory).hugepage_limits(vec![]).build().unwrap();
 
-    <<<<<<< HEAD
                 let controller_opt = ControllerOpt {
-                    resources: linux_resources,
+                    resources: &linux_resources,
                     disable_oom_killer,
-                    ..Default::default()
+                    oom_score_adj: None,
+                    freezer_state: None,
                 };
-    =======
-            let controller_opt = ControllerOpt {
-                resources: &linux_resources,
-                disable_oom_killer,
-                oom_score_adj: None,
-                freezer_state: None,
-            };
-    >>>>>>> upstream/main
 
                 let result = <Memory as Controller>::apply(&controller_opt, &tmp);
 
@@ -543,7 +535,7 @@ mod tests {
                 // combine all the checks
                 reservation_check && kernel_check && kernel_tcp_check && swappiness_check && limit_swap_check
             }
-        }
+    }
 
     #[test]
     fn test_stat_memory_data() {
