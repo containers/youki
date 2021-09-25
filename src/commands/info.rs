@@ -7,6 +7,7 @@ use procfs::{CpuInfo, Meminfo};
 
 use cgroups::{self, common::CgroupSetup, v2::controller_type::ControllerType};
 
+/// Show information about the system
 #[derive(Clap, Debug)]
 pub struct Info {}
 

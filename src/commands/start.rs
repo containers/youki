@@ -7,6 +7,7 @@ use clap::Clap;
 
 use crate::commands::load_container;
 
+/// Start a previously created container
 #[derive(Clap, Debug)]
 pub struct Start {
     #[clap(forbid_empty_values = true, required = true)]

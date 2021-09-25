@@ -4,7 +4,7 @@ use cgroups;
 use clap::{self, Clap};
 use std::{path::PathBuf, process::Command};
 
-/// display the processes inside a container
+/// Display the processes inside the container
 #[derive(Clap, Debug)]
 pub struct Ps {
     /// format to display processes: table or json (default: "table")

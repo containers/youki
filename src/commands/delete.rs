@@ -3,6 +3,7 @@ use anyhow::{Context, Result};
 use clap::Clap;
 use std::path::PathBuf;
 
+/// Release any resources held by the container
 #[derive(Clap, Debug)]
 pub struct Delete {
     #[clap(forbid_empty_values = true, required = true)]

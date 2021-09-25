@@ -6,6 +6,7 @@ use clap::Clap;
 
 use crate::{commands::load_container, signal::ToSignal};
 
+/// Send the specified signal to the container
 #[derive(Clap, Debug)]
 pub struct Kill {
     #[clap(forbid_empty_values = true, required = true)]

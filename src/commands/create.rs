@@ -5,8 +5,7 @@ use std::path::PathBuf;
 
 use crate::{container::builder::ContainerBuilder, syscall::syscall::create_syscall};
 
-/// This is the main structure which stores various commandline options given by
-/// high-level container runtime
+/// Create a container
 #[derive(Clap, Debug)]
 pub struct Create {
     /// File to write pid of the container created
