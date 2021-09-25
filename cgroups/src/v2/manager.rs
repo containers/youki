@@ -2,6 +2,7 @@ use std::{
     fs::{self},
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
+    time::Duration,
 };
 
 use anyhow::Result;
@@ -130,7 +131,7 @@ impl CgroupManager for Manager {
                 let _ = nix::sys::signal::kill(Pid::from_raw(pid), nix::sys::signal::SIGKILL);
             }
 
-            common::delete_with_retry(&self.full_path)?;
+            common::delete_with_retry(&self.full_path, 4, Duration::from_millis(100))?;
         }
 
         Ok(())

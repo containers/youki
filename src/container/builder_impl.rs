@@ -6,7 +6,7 @@ use crate::{
     syscall::Syscall,
     utils,
 };
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use cgroups::{self, common::CgroupManager};
 use nix::unistd::Pid;
 use oci_spec::runtime::{LinuxResources, Spec};
@@ -44,7 +44,15 @@ pub(super) struct ContainerBuilderImpl<'a> {
 
 impl<'a> ContainerBuilderImpl<'a> {
     pub(super) fn create(&mut self) -> Result<()> {
-        self.run_container()
+        if let Err(outer) = self.run_container().context("failed to create container") {
+            if let Err(inner) = self.cleanup_container() {
+                return Err(outer.context(inner));
+            }
+
+            return Err(outer);
+        }
+
+        Ok(())
     }
 
     fn run_container(&mut self) -> Result<()> {
@@ -170,6 +178,33 @@ impl<'a> ContainerBuilderImpl<'a> {
 
         Ok(())
     }
+
+    fn cleanup_container(&self) -> Result<()> {
+        let linux = self.spec.linux.as_ref().context("no linux in spec")?;
+        let cgroups_path = utils::get_cgroup_path(&linux.cgroups_path, &self.container_id);
+        let cmanager = cgroups::common::create_cgroup_manager(&cgroups_path, self.use_systemd)?;
+
+        let mut errors = Vec::new();
+        if let Err(e) = cmanager.remove().context("failed to remove cgroup") {
+            errors.push(e.to_string());
+        }
+
+        if let Some(container) = &self.container {
+            if container.root.exists() {
+                if let Err(e) = fs::remove_dir_all(&container.root)
+                    .with_context(|| format!("could not delete {}", container.root.display()))
+                {
+                    errors.push(e.to_string());
+                }
+            }
+        }
+
+        if !errors.is_empty() {
+            bail!("failed to cleanup container: {}", errors.join(";"));
+        }
+
+        Ok(())
+    }
 }
 
 fn setup_mapping(rootless: &Rootless, pid: Pid) -> Result<()> {
@@ -201,10 +236,12 @@ fn apply_cgroups<C: CgroupManager + ?Sized>(
     };
     cmanager
         .add_task(pid)
-        .context("Failed to add tasks to cgroup manager")?;
+        .with_context(|| format!("failed to add task {} to cgroup manager", pid))?;
+
     cmanager
         .apply(&controller_opt)
-        .context("Failed to apply resource limits through cgroup")?;
+        .context("failed to apply resource limits to cgroup")?;
+
     Ok(())
 }
 
