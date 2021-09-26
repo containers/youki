@@ -365,9 +365,7 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
         .syscalls()
         .iter()
         .flatten()
-        .fold(false, |ret, syscall| {
-            ret || syscall.action() == LinuxSeccompAction::ScmpActNotify
-        });
+        .any(|syscall| syscall.action() == LinuxSeccompAction::ScmpActNotify);
 
     let fd = if is_seccomp_notify {
         ctx.notify_fd().context("failed to get seccomp notify fd")?
@@ -521,7 +519,6 @@ mod tests {
                 }
             }
             nix::unistd::ForkResult::Child => {
-                let _ = prctl::set_no_new_privileges(true);
                 let _ = prctl::set_no_new_privileges(true);
                 let fd = initialize_seccomp(&seccomp_profile)?;
 
