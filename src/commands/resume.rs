@@ -6,7 +6,7 @@ use clap::Clap;
 
 use crate::commands::load_container;
 
-/// Structure to implement resume command
+/// Resume the processes within the container
 #[derive(Clap, Debug)]
 pub struct Resume {
     #[clap(forbid_empty_values = true, required = true)]

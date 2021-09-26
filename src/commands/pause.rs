@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use clap::Clap;
 
-/// Structure to implement pause command
+/// Suspend the processes within the container
 #[derive(Clap, Debug)]
 pub struct Pause {
     #[clap(forbid_empty_values = true, required = true)]

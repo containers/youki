@@ -5,6 +5,7 @@ use anyhow::{Context, Result};
 
 use crate::commands::load_container;
 
+/// Show resource statistics for the container
 #[derive(Clap, Debug)]
 pub struct Events {
     /// Sets the stats collection interval in seconds (default: 5s)

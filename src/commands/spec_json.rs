@@ -4,7 +4,7 @@ use oci_spec::runtime::Spec;
 use serde_json::to_writer_pretty;
 use std::fs::File;
 
-/// Command generates a config.json
+/// Create a new runtime specification
 #[derive(Clap, Debug)]
 pub struct SpecJson;
 

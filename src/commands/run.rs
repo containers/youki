@@ -4,8 +4,8 @@ use crate::container::builder::ContainerBuilder;
 use crate::syscall::syscall::create_syscall;
 use anyhow::{Context, Result};
 use clap::Clap;
-/// Create and start a container.
-/// a shortcut for create followed by start.
+
+/// Create a container and immediately start it
 #[derive(Clap, Debug)]
 pub struct Run {
     /// File to write pid of the container created

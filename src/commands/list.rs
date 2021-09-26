@@ -12,7 +12,7 @@ use tabwriter::TabWriter;
 
 use crate::container::{state::State, Container};
 
-/// Empty struct for list command
+/// List created containers
 #[derive(Clap, Debug)]
 pub struct List {}
 

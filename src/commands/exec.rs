@@ -4,6 +4,7 @@ use std::{error::Error, path::PathBuf};
 
 use crate::{container::builder::ContainerBuilder, syscall::syscall::create_syscall};
 
+/// Execute a process within an existing container
 #[derive(Clap, Debug)]
 pub struct Exec {
     /// Unix socket (file) path , which will receive file descriptor of the writing end of the pseudoterminal
