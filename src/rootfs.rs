@@ -442,6 +442,8 @@ pub fn adjust_root_mount_propagation(linux: &Linux) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use anyhow::{Context, Result};
+    use nix::sys::stat::SFlag;
+    use oci_spec::runtime::LinuxDeviceType;
     use procfs::process::MountInfo;
     use std::path::{Path, PathBuf};
 
@@ -485,5 +487,17 @@ mod tests {
         let mount_infos = vec![];
         let res = super::find_parent_mount(Path::new("/path/to/rootfs"), &mount_infos);
         assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_to_sflag() {
+        assert_eq!(
+            SFlag::S_IFBLK | SFlag::S_IFCHR | SFlag::S_IFIFO,
+            super::to_sflag(LinuxDeviceType::A)
+        );
+        assert_eq!(SFlag::S_IFBLK, super::to_sflag(LinuxDeviceType::B));
+        assert_eq!(SFlag::S_IFCHR, super::to_sflag(LinuxDeviceType::C));
+        assert_eq!(SFlag::S_IFCHR, super::to_sflag(LinuxDeviceType::U));
+        assert_eq!(SFlag::S_IFIFO, super::to_sflag(LinuxDeviceType::P));
     }
 }
