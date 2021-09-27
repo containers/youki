@@ -3,6 +3,7 @@ use std::{
     fs::{self, File},
     io::{BufRead, BufReader, Write},
     path::{Path, PathBuf},
+    time::Duration,
 };
 
 use anyhow::{bail, Context, Result};
@@ -352,4 +353,35 @@ pub(crate) fn default_devices() -> Vec<LinuxDevice> {
             .build()
             .unwrap(),
     ]
+}
+
+/// Attempts to delete the path the requested number of times.
+pub(crate) fn delete_with_retry<P: AsRef<Path>, L: Into<Option<Duration>>>(
+    path: P,
+    retries: u32,
+    limit_backoff: L,
+) -> Result<()> {
+    let mut attempts = 0;
+    let mut delay = Duration::from_millis(10);
+    let path = path.as_ref();
+    let limit = if let Some(backoff) = limit_backoff.into() {
+        backoff
+    } else {
+        Duration::MAX
+    };
+
+    while attempts < retries {
+        if fs::remove_dir(path).is_ok() {
+            return Ok(());
+        }
+
+        std::thread::sleep(delay);
+        attempts += attempts;
+        delay *= attempts;
+        if delay > limit {
+            delay = limit;
+        }
+    }
+
+    bail!("could not delete {:?}", path)
 }
