@@ -1,58 +1,43 @@
 ///! Contains utility functions for testing
 ///! Similar to https://github.com/opencontainers/runtime-tools/blob/master/validation/util/test.go
 use super::get_runtime_path;
-use super::{create_temp_dir, TempDir};
+use super::{generate_uuid, prepare_bundle, set_config};
 use anyhow::Result;
-use flate2::read::GzDecoder;
 use oci_spec::runtime::Spec;
-use rand::Rng;
-use std::fs::File;
-use std::process::{Child, Command, Stdio};
-use std::{fs, path::Path};
-use tar::Archive;
-use uuid::Uuid;
-
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::process::{Child, Command, ExitStatus, Stdio};
 use std::thread::sleep;
 use std::time::Duration;
+use test_framework::TestResult;
+use uuid::Uuid;
+
 const SLEEP_TIME: Duration = Duration::from_millis(150);
 
-/// This will generate the UUID needed when creating the container.
-pub fn generate_uuid() -> Uuid {
-    let mut rng = rand::thread_rng();
-    const CHARSET: &[u8] = b"0123456789abcdefABCDEF";
-
-    let rand_string: String = (0..32)
-        .map(|_| {
-            let idx = rng.gen_range(0..CHARSET.len());
-            CHARSET[idx] as char
-        })
-        .collect();
-
-    match Uuid::parse_str(&rand_string) {
-        Ok(uuid) => uuid,
-        Err(e) => panic!("can not parse uuid, {}", e),
-    }
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct State {
+    pub oci_version: String,
+    pub id: String,
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pid: Option<i32>,
+    pub bundle: PathBuf,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub annotations: Option<HashMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub created: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub creator: Option<u32>,
+    pub use_systemd: Option<bool>,
 }
 
-/// Creates a bundle directory in a temp directory
-pub fn prepare_bundle(id: &Uuid) -> Result<TempDir> {
-    let temp_dir = create_temp_dir(id)?;
-    let tar_file_name = "bundle.tar.gz";
-    let tar_path = std::env::current_dir()?.join(tar_file_name);
-    fs::copy(tar_path.clone(), (&temp_dir).join(tar_file_name))?;
-    let tar_gz = File::open(tar_path)?;
-    let tar = GzDecoder::new(tar_gz);
-    let mut archive = Archive::new(tar);
-    archive.unpack(&temp_dir)?;
-    Ok(temp_dir)
-}
-
-/// Sets the config.json file as per given spec
-#[allow(dead_code)]
-pub fn set_config<P: AsRef<Path>>(project_path: P, config: &Spec) -> Result<()> {
-    let path = project_path.as_ref().join("bundle").join("config.json");
-    config.save(path)?;
-    Ok(())
+pub struct ContainerData {
+    pub id: String,
+    pub state: Option<State>,
+    pub state_err: String,
+    pub exit_status: std::io::Result<ExitStatus>,
 }
 
 /// Starts the runtime with given directory as root directory
@@ -114,4 +99,26 @@ pub fn get_state<P: AsRef<Path>>(id: &Uuid, dir: P) -> Result<(String, String)> 
     let stderr = String::from_utf8(output.stderr).unwrap();
     let stdout = String::from_utf8(output.stdout).unwrap();
     Ok((stdout, stderr))
+}
+
+pub fn test_outside_container(spec: Spec, f: &dyn Fn(ContainerData) -> TestResult) -> TestResult {
+    let id = generate_uuid();
+    let bundle = prepare_bundle(&id).unwrap();
+    set_config(&bundle, &spec).unwrap();
+    let r = start_runtime(&id, &bundle).unwrap().wait();
+    let (out, err) = get_state(&id, &bundle).unwrap();
+    let state: Option<State> = match serde_json::from_str(&out) {
+        Ok(v) => Some(v),
+        Err(_) => None,
+    };
+    let data = ContainerData {
+        id: id.to_string(),
+        state,
+        state_err: err,
+        exit_status: r,
+    };
+    let ret = f(data);
+    stop_runtime(&id, &bundle).unwrap().wait().unwrap();
+    delete_container(&id, &bundle).unwrap().wait().unwrap();
+    ret
 }

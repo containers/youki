@@ -1,22 +1,10 @@
-use crate::utils::{
-    delete_container, generate_uuid, get_state, prepare_bundle, set_config, start_runtime,
-    stop_runtime,
-};
+use crate::utils::test_outside_container;
 use anyhow::anyhow;
 use oci_spec::runtime::LinuxBuilder;
 use oci_spec::runtime::{LinuxHugepageLimitBuilder, LinuxResourcesBuilder};
 use oci_spec::runtime::{Spec, SpecBuilder};
-use std::io::Result;
 use std::path::PathBuf;
-use std::process::ExitStatus;
 use test_framework::{ConditionalTest, TestGroup, TestResult};
-
-struct RunData {
-    id: uuid::Uuid,
-    result: Result<ExitStatus>,
-    stdout: String,
-    stderr: String,
-}
 
 fn check_hugetlb() -> bool {
     PathBuf::from("/sys/fs/cgroup/hugetlb").exists()
@@ -43,50 +31,33 @@ fn make_hugetlb_spec(page_size: &str, limit: i64) -> Spec {
         .unwrap()
 }
 
-fn run_tlb_test(page: &str, limit: i64) -> RunData {
-    let spec = make_hugetlb_spec(page, limit);
-
-    let id = generate_uuid();
-    let bundle = prepare_bundle(&id).unwrap();
-    set_config(&bundle, &spec).unwrap();
-
-    let r = start_runtime(&id, &bundle).unwrap().wait();
-    let (out, err) = get_state(&id, &bundle).unwrap();
-    stop_runtime(&id, &bundle).unwrap().wait().unwrap();
-    delete_container(&id, &bundle).unwrap().wait().unwrap();
-    RunData {
-        id: id,
-        result: r,
-        stdout: out,
-        stderr: err,
-    }
-}
-
 fn test_wrong_tlb() -> TestResult {
     // 3 MB pagesize is wrong, as valid values must be a power of 2
     let page = "3MB";
     let limit = 100 * 3 * 1024 * 1024;
-    let rdata = run_tlb_test(&page, limit);
-    match rdata.result {
-        Err(e) => TestResult::Err(anyhow!(e)),
-        Ok(res) => {
-            if !rdata.stdout.is_empty() {
-                return TestResult::Err(anyhow!(
-                    "stdout of state command was non-empty : {}",
-                    rdata.stdout
-                ));
-            }
-            if rdata.stderr.is_empty() {
-                return TestResult::Err(anyhow!("stderr of state command was empty"));
-            }
-            if res.success() {
-                // The operation should not have succeeded as pagesize was not power of 2
-                TestResult::Err(anyhow!("Invalid page size of {} was allowed", page))
-            } else {
-                TestResult::Ok
+    let spec = make_hugetlb_spec(page, limit);
+    test_outside_container(spec, &|data| {
+        match data.exit_status {
+            Err(e) => TestResult::Err(anyhow!(e)),
+            Ok(res) => {
+                if data.state.is_some() {
+                    return TestResult::Err(anyhow!(
+                        "stdout of state command was non-empty : {:?}",
+                        data.state
+                    ));
+                }
+                if data.state_err.is_empty() {
+                    return TestResult::Err(anyhow!("stderr of state command was empty"));
+                }
+                if res.success() {
+                    // The operation should not have succeeded as pagesize was not power of 2
+                    TestResult::Err(anyhow!("Invalid page size of {} was allowed", page))
+                } else {
+                    TestResult::Ok
+                }
             }
         }
-    }
+    })
 }
 
 fn extract_page_size(dir_name: &str) -> String {
@@ -94,14 +65,13 @@ fn extract_page_size(dir_name: &str) -> String {
     let size = name_stripped.strip_suffix("kB").unwrap();
     let size: u64 = size.parse().unwrap();
 
-    let size_moniker = if size >= (1 << 20) {
+    if size >= (1 << 20) {
         (size >> 20).to_string() + "GB"
     } else if size >= (1 << 10) {
         (size >> 10).to_string() + "MB"
     } else {
         size.to_string() + "KB"
-    };
-    return size_moniker;
+    }
 }
 
 fn get_tlb_sizes() -> Vec<String> {
@@ -145,51 +115,40 @@ fn test_valid_tlb() -> TestResult {
     let tlb_sizes = get_tlb_sizes();
     for size in tlb_sizes.iter() {
         let spec = make_hugetlb_spec(size, limit);
-
-        let id = generate_uuid();
-        let bundle = prepare_bundle(&id).unwrap();
-        set_config(&bundle, &spec).unwrap();
-
-        let r = start_runtime(&id, &bundle).unwrap().wait();
-        let (out, err) = get_state(&id, &bundle).unwrap();
-        stop_runtime(&id, &bundle).unwrap().wait().unwrap();
-        let rdata = RunData {
-            id: id,
-            result: r,
-            stdout: out,
-            stderr: err,
-        };
-        match rdata.result {
-            Err(e) => return TestResult::Err(anyhow!(e)),
-            Ok(res) => {
-                if !rdata.stderr.is_empty() {
-                    return TestResult::Err(anyhow!(
-                        "stderr of state command was not-empty : {}",
-                        rdata.stderr
-                    ));
-                }
-                if rdata.stdout.is_empty() {
-                    return TestResult::Err(anyhow!("stdout of state command was empty"));
-                }
-                if !rdata.stdout.contains(&format!(r#""id": "{}""#, rdata.id))
-                    || !rdata.stdout.contains(r#""status": "created""#)
-                {
-                    todo!();
-                    return TestResult::Err(anyhow!(""));
-                }
-                if !res.success() {
-                    return TestResult::Err(anyhow!(
-                        "Setting valid page size of {} was gave error",
-                        size
-                    ));
+        let res = test_outside_container(spec, &|data| {
+            match data.exit_status {
+                Err(e) => return TestResult::Err(anyhow!(e)),
+                Ok(res) => {
+                    if !data.state_err.is_empty() {
+                        return TestResult::Err(anyhow!(
+                            "stderr of state command was not-empty : {}",
+                            data.state_err
+                        ));
+                    }
+                    if data.state.is_none() {
+                        return TestResult::Err(anyhow!("stdout of state command was invalid"));
+                    }
+                    let state = data.state.unwrap();
+                    if state.id != data.id || state.status != "created" {
+                        return TestResult::Err(anyhow!("invalid container state : expected id {} and status created, got id {} and state {}",data.id,state.id,state.status));
+                    }
+                    if !res.success() {
+                        return TestResult::Err(anyhow!(
+                            "Setting valid page size of {} was gave error",
+                            size
+                        ));
+                    }
                 }
             }
+            let r = validate_tlb(&data.id, size, limit);
+            if matches!(r, TestResult::Err(_)) {
+                return r;
+            }
+            TestResult::Ok
+        });
+        if matches!(res, TestResult::Err(_)) {
+            return res;
         }
-        let r = validate_tlb(&rdata.id.to_string(), size, limit);
-        if matches!(r, TestResult::Err(_)) {
-            return r;
-        }
-        delete_container(&id, &bundle).unwrap().wait().unwrap();
     }
     TestResult::Ok
 }
