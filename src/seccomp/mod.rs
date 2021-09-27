@@ -154,7 +154,7 @@ impl FilterContext {
             return Ok(None);
         }
 
-        match nix::errno::from_i32(-res) {
+        match nix::errno::from_i32(res.abs()) {
             Errno::EINVAL => {
                 bail!("invalid seccomp context used to call notify fd");
             }
@@ -183,7 +183,7 @@ fn translate_syscall(syscall_name: &str) -> Result<i32> {
     Ok(res)
 }
 
-fn translate_action(action: &LinuxSeccompAction, errno: Option<u32>) -> u32 {
+fn translate_action(action: LinuxSeccompAction, errno: Option<u32>) -> u32 {
     let errno = errno.unwrap_or(libc::EPERM as u32);
     match action {
         LinuxSeccompAction::ScmpActKill => SCMP_ACT_KILL,
@@ -197,7 +197,7 @@ fn translate_action(action: &LinuxSeccompAction, errno: Option<u32>) -> u32 {
     }
 }
 
-fn translate_op(op: &LinuxSeccompOperator) -> scmp_compare {
+fn translate_op(op: LinuxSeccompOperator) -> scmp_compare {
     match op {
         LinuxSeccompOperator::ScmpCmpNe => SCMP_CMP_NE,
         LinuxSeccompOperator::ScmpCmpLt => SCMP_CMP_LT,
@@ -209,7 +209,7 @@ fn translate_op(op: &LinuxSeccompOperator) -> scmp_compare {
     }
 }
 
-fn translate_arch(arch: &Arch) -> scmp_arch {
+fn translate_arch(arch: Arch) -> scmp_arch {
     match arch {
         Arch::ScmpArchNative => SCMP_ARCH_NATIVE,
         Arch::ScmpArchX86 => SCMP_ARCH_X86,
@@ -246,7 +246,7 @@ fn check_seccomp(seccomp: &LinuxSeccomp) -> Result<()> {
         bail!("SCMP_ACT_NOTIFY cannot be used as default action");
     }
 
-    if let Some(syscalls) = seccomp.syscalls().as_ref() {
+    if let Some(syscalls) = seccomp.syscalls() {
         for syscall in syscalls {
             if syscall.action() == LinuxSeccompAction::ScmpActNotify {
                 for name in syscall.names() {
@@ -270,11 +270,11 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
     check_seccomp(seccomp)?;
 
     // TODO: fix default action error number. The spec repo doesn't have it yet.
-    let default_action = translate_action(&seccomp.default_action(), None);
+    let default_action = translate_action(seccomp.default_action(), None);
     let mut ctx = FilterContext::default(default_action)?;
 
     if let Some(architectures) = seccomp.architectures() {
-        for arch in architectures {
+        for &arch in architectures {
             let arch_token = translate_arch(arch);
             ctx.add_arch(arch_token as u32)
                 .context("failed to add arch to seccomp")?;
@@ -298,7 +298,7 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
 
     if let Some(syscalls) = seccomp.syscalls() {
         for syscall in syscalls {
-            let action = translate_action(&syscall.action(), syscall.errno_ret());
+            let action = translate_action(syscall.action(), syscall.errno_ret());
             if action == default_action {
                 // When the action is the same as the default action, the rule is redundent. We can
                 // skip this here to avoid failing when we add the rules.
@@ -330,7 +330,7 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
                         for arg in args {
                             let mut rule = Rule::new(action, syscall_number);
                             let cmp = Compare::new(arg.index() as u32)
-                                .op(translate_op(&arg.op()))
+                                .op(translate_op(arg.op()))
                                 .datum_a(arg.value())
                                 .datum_b(arg.value_two().unwrap_or(0))
                                 .build()
