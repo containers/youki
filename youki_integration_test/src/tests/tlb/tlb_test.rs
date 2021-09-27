@@ -1,5 +1,6 @@
 use crate::utils::{
-    generate_uuid, get_state, prepare_bundle, set_config, start_runtime, stop_runtime,
+    delete_container, generate_uuid, get_state, prepare_bundle, set_config, start_runtime,
+    stop_runtime,
 };
 use anyhow::anyhow;
 use oci_spec::runtime::LinuxBuilder;

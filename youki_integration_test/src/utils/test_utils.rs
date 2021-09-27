@@ -87,6 +87,18 @@ pub fn stop_runtime<P: AsRef<Path>>(id: &Uuid, dir: P) -> Result<Child> {
     Ok(res)
 }
 
+pub fn delete_container<P: AsRef<Path>>(id: &Uuid, dir: P) -> Result<Child> {
+    let res = Command::new(get_runtime_path())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .arg("--root")
+        .arg(dir.as_ref().join("runtime"))
+        .arg("delete")
+        .arg(id.to_string())
+        .spawn()?;
+    Ok(res)
+}
+
 #[allow(dead_code)]
 pub fn get_state<P: AsRef<Path>>(id: &Uuid, dir: P) -> Result<(String, String)> {
     sleep(SLEEP_TIME);
