@@ -50,7 +50,7 @@ impl Container {
     }
 
     pub fn id(&self) -> &str {
-        self.state.id.as_str()
+        &self.state.id
     }
 
     pub fn can_start(&self) -> bool {

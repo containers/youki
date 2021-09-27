@@ -14,7 +14,7 @@ pub struct HugeTlb {}
 impl Controller for HugeTlb {
     fn apply(controller_opt: &ControllerOpt, cgroup_root: &std::path::Path) -> Result<()> {
         log::debug!("Apply hugetlb cgroup v2 config");
-        if let Some(hugepage_limits) = controller_opt.resources.hugepage_limits().as_ref() {
+        if let Some(hugepage_limits) = controller_opt.resources.hugepage_limits() {
             for hugetlb in hugepage_limits {
                 Self::apply(cgroup_root, hugetlb)
                     .context("failed to apply hugetlb resource restrictions")?

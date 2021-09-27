@@ -23,16 +23,12 @@ pub fn prepare_rootfs(spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<
     log::debug!("Prepare rootfs: {:?}", rootfs);
     let mut flags = MsFlags::MS_REC;
     let linux = spec.linux().as_ref().context("no linux in spec")?;
-    if let Some(roofs_propagation) = linux.rootfs_propagation().as_ref() {
-        match roofs_propagation.as_str() {
-            "shared" => flags |= MsFlags::MS_SHARED,
-            "private" => flags |= MsFlags::MS_PRIVATE,
-            "slave" => flags |= MsFlags::MS_SLAVE,
-            "unbindable" => flags |= MsFlags::MS_SLAVE, // set unbindable after pivot_root
-            uknown => bail!("unknown rootfs_propagation: {}", uknown),
-        }
-    } else {
-        flags |= MsFlags::MS_SLAVE;
+
+    match linux.rootfs_propagation().as_deref() {
+        Some("shared") => flags |= MsFlags::MS_SHARED,
+        Some("private") => flags |= MsFlags::MS_PRIVATE,
+        Some("slave" | "unbindable") | None => flags |= MsFlags::MS_SLAVE,
+        Some(uknown) => bail!("unknown rootfs_propagation: {}", uknown),
     }
 
     nix_mount(None::<&str>, "/", None::<&str>, flags, None::<&str>)
@@ -49,8 +45,8 @@ pub fn prepare_rootfs(spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<
         None::<&str>,
     )?;
 
-    if let Some(mounts) = spec.mounts().as_ref() {
-        for mount in mounts.iter() {
+    if let Some(mounts) = spec.mounts() {
+        for mount in mounts {
             log::debug!("Mount... {:?}", mount);
             let (flags, data) = parse_mount(mount);
             let mount_label = linux.mount_label().as_ref();
@@ -74,14 +70,14 @@ pub fn prepare_rootfs(spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<
     }
 
     setup_default_symlinks(rootfs).context("Failed to setup default symlinks")?;
-    if let Some(added_devices) = linux.devices().as_ref() {
+    if let Some(added_devices) = linux.devices() {
         create_devices(
             rootfs,
             default_devices().iter().chain(added_devices),
             bind_devices,
         )
     } else {
-        create_devices(rootfs, default_devices().iter(), bind_devices)
+        create_devices(rootfs, &default_devices(), bind_devices)
     }?;
 
     setup_ptmx(rootfs)?;
@@ -110,7 +106,7 @@ fn setup_default_symlinks(rootfs: &Path) -> Result<()> {
         ("/proc/self/fd/1", "dev/stdout"),
         ("/proc/self/fd/2", "dev/stderr"),
     ];
-    for &(src, dst) in defaults.iter() {
+    for (src, dst) in defaults {
         symlink(src, rootfs.join(dst)).context("Fail to symlink defaults")?;
     }
 
@@ -172,11 +168,12 @@ pub fn default_devices() -> Vec<LinuxDevice> {
 
 fn create_devices<'a, I>(rootfs: &Path, devices: I, bind: bool) -> Result<()>
 where
-    I: Iterator<Item = &'a LinuxDevice>,
+    I: IntoIterator<Item = &'a LinuxDevice>,
 {
     let old_mode = umask(Mode::from_bits_truncate(0o000));
     if bind {
         let _ = devices
+            .into_iter()
             .map(|dev| {
                 if !dev.path().starts_with("/dev") {
                     panic!("{} is not a valid device path", dev.path().display());
@@ -187,6 +184,7 @@ where
             .collect::<Result<Vec<_>>>()?;
     } else {
         devices
+            .into_iter()
             .map(|dev| {
                 if !dev.path().starts_with("/dev") {
                     panic!("{} is not a valid device path", dev.path().display());
@@ -323,8 +321,8 @@ fn mount_to_container(
         )
     {
         nix_mount(
-            Some(&*dest),
-            &*dest,
+            Some(dest),
+            dest,
             None::<&str>,
             flags | MsFlags::MS_REMOUNT,
             None::<&str>,

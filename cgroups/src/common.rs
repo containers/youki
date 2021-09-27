@@ -364,11 +364,7 @@ pub(crate) fn delete_with_retry<P: AsRef<Path>, L: Into<Option<Duration>>>(
     let mut attempts = 0;
     let mut delay = Duration::from_millis(10);
     let path = path.as_ref();
-    let limit = if let Some(backoff) = limit_backoff.into() {
-        backoff
-    } else {
-        Duration::MAX
-    };
+    let limit = limit_backoff.into().unwrap_or(Duration::MAX);
 
     while attempts < retries {
         if fs::remove_dir(path).is_ok() {

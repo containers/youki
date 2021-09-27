@@ -62,7 +62,7 @@ impl<'a> ContainerBuilderImpl<'a> {
         let process = self.spec.process().as_ref().context("No process in spec")?;
 
         if self.init {
-            if let Some(hooks) = self.spec.hooks().as_ref() {
+            if let Some(hooks) = self.spec.hooks() {
                 hooks::run_hooks(hooks.create_runtime().as_ref(), self.container.as_ref())?
             }
         }
@@ -146,7 +146,7 @@ impl<'a> ContainerBuilderImpl<'a> {
         // If creating a rootless container, the intermediate process will ask
         // the main process to set up uid and gid mapping, once the intermediate
         // process enters into a new user namespace.
-        if let Some(rootless) = self.rootless.as_ref() {
+        if let Some(rootless) = &self.rootless {
             receiver_from_intermediate.wait_for_mapping_request()?;
             setup_mapping(rootless, intermediate_pid)?;
             sender_to_intermediate.mapping_written()?;
@@ -156,7 +156,7 @@ impl<'a> ContainerBuilderImpl<'a> {
         log::debug!("init pid is {:?}", init_pid);
 
         if self.rootless.is_none() && linux.resources().is_some() && self.init {
-            if let Some(resources) = linux.resources().as_ref() {
+            if let Some(resources) = linux.resources() {
                 apply_cgroups(resources, init_pid, cmanager.as_ref())?;
             }
         }
@@ -283,9 +283,9 @@ mod tests {
                 let line = fs::read_to_string(format!("/proc/{}/uid_map", child.as_raw()))?;
                 let line_splited = line.split_whitespace();
                 for (act, expect) in line_splited.zip([
-                    uid_mapping.container_id().to_string().as_str(),
-                    uid_mapping.host_id().to_string().as_str(),
-                    uid_mapping.size().to_string().as_str(),
+                    uid_mapping.container_id().to_string(),
+                    uid_mapping.host_id().to_string(),
+                    uid_mapping.size().to_string(),
                 ]) {
                     assert_eq!(act, expect);
                 }
@@ -328,9 +328,9 @@ mod tests {
                 let line = fs::read_to_string(format!("/proc/{}/gid_map", child.as_raw()))?;
                 let line_splited = line.split_whitespace();
                 for (act, expect) in line_splited.zip([
-                    gid_mapping.container_id().to_string().as_str(),
-                    gid_mapping.host_id().to_string().as_str(),
-                    gid_mapping.size().to_string().as_str(),
+                    gid_mapping.container_id().to_string(),
+                    gid_mapping.host_id().to_string(),
+                    gid_mapping.size().to_string(),
                 ]) {
                     assert_eq!(act, expect);
                 }

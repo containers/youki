@@ -197,7 +197,7 @@ pub fn container_init(
     // Only set the host name if entering into a new uts namespace
     if let Some(uts_namespace) = namespaces.get(LinuxNamespaceType::Uts) {
         if uts_namespace.path().is_none() {
-            if let Some(hostname) = spec.hostname().as_ref() {
+            if let Some(hostname) = spec.hostname() {
                 command.set_hostname(hostname)?;
             }
         }
@@ -237,13 +237,13 @@ pub fn container_init(
         rootfs::adjust_root_mount_propagation(linux)
             .context("Failed to set propagation type of root mount")?;
 
-        if let Some(kernel_params) = &linux.sysctl() {
+        if let Some(kernel_params) = linux.sysctl() {
             sysctl(kernel_params)
                 .with_context(|| format!("Failed to sysctl: {:?}", kernel_params))?;
         }
     }
 
-    if let Some(profile) = &proc.apparmor_profile() {
+    if let Some(profile) = proc.apparmor_profile() {
         apparmor::apply_profile(profile)
             .with_context(|| format!("failed to apply apparmor profile {}", profile))?;
     }
@@ -258,14 +258,14 @@ pub fn container_init(
         )?
     }
 
-    if let Some(paths) = &linux.readonly_paths() {
+    if let Some(paths) = linux.readonly_paths() {
         // mount readonly path
         for path in paths {
             readonly_path(path).context("Failed to set read only path")?;
         }
     }
 
-    if let Some(paths) = &linux.masked_paths() {
+    if let Some(paths) = linux.masked_paths() {
         // mount masked path
         for path in paths {
             masked_path(path, linux.mount_label()).context("Failed to set masked path")?;
@@ -279,7 +279,7 @@ pub fn container_init(
         // This chdir must run before setting up the user.
         // This may allow the user running youki to access directories
         // that the container user cannot access.
-        match unistd::chdir(&*proc.cwd()) {
+        match unistd::chdir(proc.cwd()) {
             Ok(_) => false,
             Err(nix::Error::EPERM) => true,
             Err(e) => bail!("Failed to chdir: {}", e),
@@ -305,7 +305,7 @@ pub fn container_init(
     }
 
     capabilities::reset_effective(command).context("Failed to reset effective capabilities")?;
-    if let Some(caps) = &proc.capabilities() {
+    if let Some(caps) = proc.capabilities() {
         capabilities::drop_privileges(caps, command).context("Failed to drop capabilities")?;
     }
 
@@ -354,7 +354,7 @@ pub fn container_init(
 
     // change directory to process.cwd if process.cwd is not empty
     if do_chdir {
-        unistd::chdir(&*proc.cwd())
+        unistd::chdir(proc.cwd())
             .with_context(|| format!("Failed to chdir {}", proc.cwd().display()))?;
     }
 
@@ -389,7 +389,7 @@ pub fn container_init(
             .context("Failed to execute seccomp")?;
     }
 
-    if let Some(args) = proc.args().as_ref() {
+    if let Some(args) = proc.args() {
         utils::do_exec(&args[0], args)?;
     } else {
         bail!("On non-Windows, at least one process arg entry is required.")
@@ -425,7 +425,7 @@ pub fn container_init(
 // Privileged user starting a normal container: Just add the supplementary groups.
 //
 fn set_supplementary_gids(user: &User, rootless: &Option<Rootless>) -> Result<()> {
-    if let Some(additional_gids) = &user.additional_gids() {
+    if let Some(additional_gids) = user.additional_gids() {
         if additional_gids.is_empty() {
             return Ok(());
         }

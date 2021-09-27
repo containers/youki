@@ -16,7 +16,7 @@ pub struct Delete {
 impl Delete {
     pub fn exec(&self, root_path: PathBuf) -> Result<()> {
         log::debug!("start deleting {}", self.container_id);
-        let mut container = load_container(root_path, self.container_id.as_str())?;
+        let mut container = load_container(root_path, &self.container_id)?;
         container
             .delete(self.force)
             .with_context(|| format!("failed to delete container {}", self.container_id))

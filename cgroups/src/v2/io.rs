@@ -85,7 +85,7 @@ impl Io {
 
     // linux kernel doc: https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html#io
     fn apply(root_path: &Path, blkio: &LinuxBlockIo) -> Result<()> {
-        if let Some(weight_device) = blkio.weight_device().as_ref() {
+        if let Some(weight_device) = blkio.weight_device() {
             for wd in weight_device {
                 common::write_cgroup_file(
                     root_path.join(CGROUP_BFQ_IO_WEIGHT),
@@ -107,7 +107,7 @@ impl Io {
             }
         }
 
-        if let Some(throttle_read_bps_device) = blkio.throttle_read_bps_device().as_ref() {
+        if let Some(throttle_read_bps_device) = blkio.throttle_read_bps_device() {
             for trbd in throttle_read_bps_device {
                 common::write_cgroup_file(
                     Self::io_max_path(root_path),
@@ -116,7 +116,7 @@ impl Io {
             }
         }
 
-        if let Some(throttle_write_bps_device) = blkio.throttle_write_bps_device().as_ref() {
+        if let Some(throttle_write_bps_device) = blkio.throttle_write_bps_device() {
             for twbd in throttle_write_bps_device {
                 common::write_cgroup_file(
                     Self::io_max_path(root_path),
@@ -125,7 +125,7 @@ impl Io {
             }
         }
 
-        if let Some(throttle_read_iops_device) = blkio.throttle_read_iops_device().as_ref() {
+        if let Some(throttle_read_iops_device) = blkio.throttle_read_iops_device() {
             for trid in throttle_read_iops_device {
                 common::write_cgroup_file(
                     Self::io_max_path(root_path),
@@ -134,7 +134,7 @@ impl Io {
             }
         }
 
-        if let Some(throttle_write_iops_device) = blkio.throttle_write_iops_device().as_ref() {
+        if let Some(throttle_write_iops_device) = blkio.throttle_write_iops_device() {
             for twid in throttle_write_iops_device {
                 common::write_cgroup_file(
                     Self::io_max_path(root_path),

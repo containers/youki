@@ -23,11 +23,7 @@ impl Controller for NetworkClassifier {
     }
 
     fn needs_to_handle<'a>(controller_opt: &'a ControllerOpt) -> Option<&'a Self::Resource> {
-        if let Some(network) = controller_opt.resources.network().as_ref() {
-            return Some(network);
-        }
-
-        None
+        controller_opt.resources.network().as_ref()
     }
 }
 

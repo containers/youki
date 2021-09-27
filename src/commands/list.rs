@@ -1,5 +1,4 @@
 //! Contains Functionality of list container command
-use std::ffi::OsString;
 use std::fs;
 use std::io;
 use std::io::Write;
@@ -37,11 +36,7 @@ impl List {
                 "".to_owned()
             };
 
-            let user_name = if let Some(creator) = container.creator() {
-                creator
-            } else {
-                OsString::new()
-            };
+            let user_name = container.creator().unwrap_or_default();
 
             let created = if let Some(utc) = container.created() {
                 let local: DateTime<Local> = DateTime::from(utc);

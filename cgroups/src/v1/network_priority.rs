@@ -23,17 +23,13 @@ impl Controller for NetworkPriority {
     }
 
     fn needs_to_handle<'a>(controller_opt: &'a ControllerOpt) -> Option<&'a Self::Resource> {
-        if let Some(network) = &controller_opt.resources.network() {
-            return Some(network);
-        }
-
-        None
+        controller_opt.resources.network().as_ref()
     }
 }
 
 impl NetworkPriority {
     fn apply(root_path: &Path, network: &LinuxNetwork) -> Result<()> {
-        if let Some(ni_priorities) = network.priorities().as_ref() {
+        if let Some(ni_priorities) = network.priorities() {
             let priorities: String = ni_priorities.iter().map(|p| p.to_string()).collect();
             common::write_cgroup_file_str(root_path.join("net_prio.ifpriomap"), priorities.trim())?;
         }
