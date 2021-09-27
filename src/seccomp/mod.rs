@@ -1,6 +1,7 @@
 use anyhow::bail;
 use anyhow::Context;
 use anyhow::Result;
+use nix::errno::Errno;
 use oci_spec::runtime::Arch;
 use oci_spec::runtime::LinuxSeccomp;
 use oci_spec::runtime::LinuxSeccompAction;
@@ -143,29 +144,31 @@ impl FilterContext {
 
     pub fn notify_fd(&self) -> Result<Option<i32>> {
         let res = unsafe { seccomp_notify_fd(self.ctx) };
+        if res > 0 {
+            return Ok(Some(res));
+        }
+
         // -1 indicates the notify fd is not set. This can happen if no seccomp
         // notify filter is set.
         if res == -1 {
             return Ok(None);
         }
 
-        if res == -(libc::EINVAL as i32) {
-            bail!("invalid seccomp context used to call notify fd");
-        }
+        match nix::errno::from_i32(-res) {
+            Errno::EINVAL => {
+                bail!("invalid seccomp context used to call notify fd");
+            }
+            Errno::EFAULT => {
+                bail!("internal libseccomp fault; likely no seccomp filter is loaded");
+            }
+            Errno::EOPNOTSUPP => {
+                bail!("seccomp notify filter not supported");
+            }
 
-        if res == -(libc::EFAULT as i32) {
-            bail!("internal libseccomp fault; likely no seccomp filter is loaded");
-        }
-
-        if res == -(libc::EOPNOTSUPP as i32) {
-            bail!("seccomp notify filter not supported");
-        }
-
-        if res > 0 {
-            return Ok(Some(res));
-        }
-
-        unreachable!();
+            _ => {
+                bail!("unknown error from return code: {}", res);
+            }
+        };
     }
 }
 
