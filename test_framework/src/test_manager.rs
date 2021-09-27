@@ -56,14 +56,14 @@ impl<'a> TestManager<'a> {
 
     /// Run all tests from all tests group
     pub fn run_all(&self) {
-        for (name, tg) in self.test_groups.iter() {
+        for (name, tg) in &self.test_groups {
             self.run_test_group(name, *tg);
         }
     }
 
     /// Run only selected tests
     pub fn run_selected(&self, tests: Vec<(&str, Option<Vec<&str>>)>) {
-        for (test_group_name, tests) in tests.iter() {
+        for (test_group_name, tests) in &tests {
             if let Some(tg) = self.test_groups.get(test_group_name) {
                 match tests {
                     None => self.run_test_group(test_group_name, *tg),

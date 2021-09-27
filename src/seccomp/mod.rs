@@ -47,7 +47,7 @@ impl Compare {
     }
 
     pub fn build(self) -> Result<scmp_arg_cmp> {
-        if let (Some(op), Some(datum_a)) = (self.op, self.datum_a) {
+        if let Some((op, datum_a)) = self.op.zip(self.datum_a) {
             Ok(scmp_arg_cmp {
                 arg: self.arg,
                 op,
@@ -109,7 +109,7 @@ impl FilterContext {
                     rule.action,
                     rule.syscall_nr,
                     rule.comparators.len() as u32,
-                    rule.comparators.as_slice().as_ptr(),
+                    rule.comparators.as_ptr(),
                 )
             },
         };
@@ -210,7 +210,7 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<()> {
     let default_action = translate_action(&seccomp.default_action(), None);
     let mut ctx = FilterContext::default(default_action)?;
 
-    if let Some(architectures) = seccomp.architectures().as_ref() {
+    if let Some(architectures) = seccomp.architectures() {
         for arch in architectures {
             let arch_token = translate_arch(arch);
             ctx.add_arch(arch_token as u32)
@@ -233,7 +233,7 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<()> {
         );
     }
 
-    if let Some(syscalls) = seccomp.syscalls().as_ref() {
+    if let Some(syscalls) = seccomp.syscalls() {
         for syscall in syscalls {
             let action = translate_action(&syscall.action(), syscall.errno_ret());
             if action == default_action {
@@ -246,7 +246,7 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<()> {
                 continue;
             }
 
-            for name in syscall.names().iter() {
+            for name in syscall.names() {
                 let syscall_number = match translate_syscall(name) {
                     Ok(x) => x,
                     Err(_) => {
@@ -262,7 +262,7 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<()> {
                 // Not clear why but if there are multiple arg attached to one
                 // syscall rule, we have to add them seperatly. add_rule will
                 // return EINVAL. runc does the same but doesn't explain why.
-                match syscall.args().as_ref() {
+                match syscall.args() {
                     Some(args) => {
                         for arg in args {
                             let mut rule = Rule::new(action, syscall_number);

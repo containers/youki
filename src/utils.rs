@@ -47,12 +47,10 @@ pub fn parse_env(envs: &[String]) -> HashMap<String, String> {
         .filter_map(|e| {
             let mut split = e.split('=');
 
-            if let Some(key) = split.next() {
-                let value: String = split.collect::<Vec<&str>>().join("=");
-                Some((String::from(key), value))
-            } else {
-                None
-            }
+            split.next().map(|key| {
+                let value = split.collect::<Vec<&str>>().join("=");
+                (key.into(), value)
+            })
         })
         .collect()
 }

@@ -137,8 +137,7 @@ fn determine_root_path(root_path: Option<PathBuf>) -> Result<PathBuf> {
     }
 
     if let Ok(path) = std::env::var("HOME") {
-        let home = PathBuf::from(path);
-        if let Ok(resolved) = fs::canonicalize(home) {
+        if let Ok(resolved) = fs::canonicalize(path) {
             let run_dir = resolved.join(".youki/run");
             if create_dir_all_with_mode(&run_dir, uid, Mode::S_IRWXU).is_ok() {
                 return Ok(run_dir);

@@ -33,11 +33,7 @@ impl Controller for Freezer {
     }
 
     fn needs_to_handle<'a>(controller_opt: &'a ControllerOpt) -> Option<&'a Self::Resource> {
-        if let Some(freezer_state) = &controller_opt.freezer_state {
-            return Some(freezer_state);
-        }
-
-        None
+        controller_opt.freezer_state.as_ref()
     }
 }
 

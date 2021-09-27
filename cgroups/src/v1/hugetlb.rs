@@ -29,7 +29,7 @@ impl Controller for HugeTlb {
     }
 
     fn needs_to_handle<'a>(controller_opt: &'a ControllerOpt) -> Option<&'a Self::Resource> {
-        if let Some(hugepage_limits) = controller_opt.resources.hugepage_limits().as_ref() {
+        if let Some(hugepage_limits) = controller_opt.resources.hugepage_limits() {
             if !hugepage_limits.is_empty() {
                 return controller_opt.resources.hugepage_limits().as_ref();
             }
