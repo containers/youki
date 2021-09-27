@@ -1,5 +1,6 @@
 ///! Contains structure for a test group
 use crate::testable::{TestResult, Testable, TestableGroup};
+use crossbeam::thread;
 use std::collections::BTreeMap;
 
 /// Stores tests belonging to a group
@@ -35,30 +36,51 @@ impl<'a> TestableGroup<'a> for TestGroup<'a> {
 
     /// run all the test from the test group
     fn run_all(&'a self) -> Vec<(&'a str, TestResult)> {
-        self.tests
-            .iter()
-            .map(|(_, t)| {
-                if t.can_run() {
-                    (t.get_name(), t.run())
-                } else {
-                    (t.get_name(), TestResult::Skip)
-                }
-            })
-            .collect()
+        let mut ret = Vec::with_capacity(self.tests.len());
+        thread::scope(|s| {
+            let mut collector = Vec::with_capacity(self.tests.len());
+            for (_, t) in self.tests.iter() {
+                let _t = s.spawn(move |_| {
+                    if t.can_run() {
+                        (t.get_name(), t.run())
+                    } else {
+                        (t.get_name(), TestResult::Skip)
+                    }
+                });
+                collector.push(_t);
+            }
+            for handle in collector {
+                ret.push(handle.join().unwrap());
+            }
+        })
+        .unwrap();
+        ret
     }
 
     /// run selected test from the group
     fn run_selected(&'a self, selected: &[&str]) -> Vec<(&'a str, TestResult)> {
-        self.tests
+        let selected_tests = self
+            .tests
             .iter()
-            .filter(|(name, _)| selected.contains(name))
-            .map(|(_, t)| {
-                if t.can_run() {
-                    (t.get_name(), t.run())
-                } else {
-                    (t.get_name(), TestResult::Skip)
-                }
-            })
-            .collect()
+            .filter(|(name, _)| selected.contains(name));
+        let mut ret = Vec::with_capacity(selected.len());
+        thread::scope(|s| {
+            let mut collector = Vec::with_capacity(selected.len());
+            for (_, t) in selected_tests {
+                let _t = s.spawn(move |_| {
+                    if t.can_run() {
+                        (t.get_name(), t.run())
+                    } else {
+                        (t.get_name(), TestResult::Skip)
+                    }
+                });
+                collector.push(_t);
+            }
+            for handle in collector {
+                ret.push(handle.join().unwrap());
+            }
+        })
+        .unwrap();
+        ret
     }
 }
