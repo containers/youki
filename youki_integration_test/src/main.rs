@@ -2,7 +2,7 @@ mod tests;
 mod utils;
 
 use crate::tests::lifecycle::{ContainerCreate, ContainerLifecycle};
-use crate::tests::tlb::tlb_test;
+use crate::tests::tlb::get_tlb_test;
 use crate::utils::support::set_runtime_path;
 use anyhow::Result;
 use clap::Clap;
@@ -57,7 +57,7 @@ fn main() -> Result<()> {
 
     let cl = ContainerLifecycle::new();
     let cc = ContainerCreate::new();
-    let huge_tlb = tlb_test();
+    let huge_tlb = get_tlb_test();
 
     tm.add_test_group(&cl);
     tm.add_test_group(&cc);
