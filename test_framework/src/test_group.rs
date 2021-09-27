@@ -7,7 +7,7 @@ pub struct TestGroup<'a> {
     /// name of the test group
     name: &'a str,
     /// tests belonging to this group
-    tests: BTreeMap<&'a str, Box<dyn Testable<'a> + 'static + Sync + Send>>,
+    tests: BTreeMap<&'a str, Box<dyn Testable<'a> + Sync + Send + 'a>>,
 }
 
 impl<'a> TestGroup<'a> {
@@ -20,9 +20,9 @@ impl<'a> TestGroup<'a> {
     }
 
     /// add a test to the group
-    pub fn add(&mut self, tests: Vec<impl Testable<'a> + 'static + Sync + Send>) {
+    pub fn add(&mut self, tests: Vec<Box<impl Testable<'a> + Sync + Send + 'a>>) {
         tests.into_iter().for_each(|t| {
-            self.tests.insert(t.get_name(), Box::new(t));
+            self.tests.insert(t.get_name(), t);
         });
     }
 }
