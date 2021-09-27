@@ -12,6 +12,10 @@ use std::{fs, path::Path};
 use tar::Archive;
 use uuid::Uuid;
 
+use std::thread::sleep;
+use std::time::Duration;
+const SLEEP_TIME: Duration = Duration::from_millis(150);
+
 /// This will generate the UUID needed when creating the container.
 pub fn generate_uuid() -> Uuid {
     let mut rng = rand::thread_rng();
@@ -46,7 +50,7 @@ pub fn prepare_bundle(id: &Uuid) -> Result<TempDir> {
 /// Sets the config.json file as per given spec
 #[allow(dead_code)]
 pub fn set_config<P: AsRef<Path>>(project_path: P, config: &Spec) -> Result<()> {
-    let path = project_path.as_ref().join("config.json");
+    let path = project_path.as_ref().join("bundle").join("config.json");
     config.save(path)?;
     Ok(())
 }
@@ -55,6 +59,7 @@ pub fn set_config<P: AsRef<Path>>(project_path: P, config: &Spec) -> Result<()> 
 #[allow(dead_code)]
 pub fn start_runtime<P: AsRef<Path>>(id: &Uuid, dir: P) -> Result<Child> {
     let res = Command::new(get_runtime_path())
+        .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .arg("--root")
@@ -71,8 +76,8 @@ pub fn start_runtime<P: AsRef<Path>>(id: &Uuid, dir: P) -> Result<Child> {
 #[allow(dead_code)]
 pub fn stop_runtime<P: AsRef<Path>>(id: &Uuid, dir: P) -> Result<Child> {
     let res = Command::new(get_runtime_path())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .arg("--root")
         .arg(dir.as_ref().join("runtime"))
         .arg("kill")
@@ -80,4 +85,21 @@ pub fn stop_runtime<P: AsRef<Path>>(id: &Uuid, dir: P) -> Result<Child> {
         .arg("9")
         .spawn()?;
     Ok(res)
+}
+
+#[allow(dead_code)]
+pub fn get_state<P: AsRef<Path>>(id: &Uuid, dir: P) -> Result<(String, String)> {
+    sleep(SLEEP_TIME);
+    let output = Command::new(get_runtime_path())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .arg("--root")
+        .arg(dir.as_ref().join("runtime"))
+        .arg("state")
+        .arg(id.to_string())
+        .spawn()?
+        .wait_with_output()?;
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    Ok((stdout, stderr))
 }
