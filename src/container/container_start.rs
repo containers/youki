@@ -42,11 +42,11 @@ impl Container {
         let spec = self
             .spec()
             .with_context(|| format!("failed to load runtime spec for container {}", self.id()))?;
-        if let Some(hooks) = spec.hooks.as_ref() {
+        if let Some(hooks) = spec.hooks().as_ref() {
             // While prestart is marked as deprecated in the OCI spec, the docker and integration test still
             // uses it.
             #[allow(deprecated)]
-            hooks::run_hooks(hooks.prestart.as_ref(), Some(self))
+            hooks::run_hooks(hooks.prestart().as_ref(), Some(self))
                 .with_context(|| "failed to run pre start hooks")?;
         }
 
@@ -60,8 +60,8 @@ impl Container {
 
         // Run post start hooks. It runs after the container process is started.
         // It is called in the runtime namespace.
-        if let Some(hooks) = spec.hooks.as_ref() {
-            hooks::run_hooks(hooks.poststart.as_ref(), Some(self))
+        if let Some(hooks) = spec.hooks().as_ref() {
+            hooks::run_hooks(hooks.poststart().as_ref(), Some(self))
                 .with_context(|| "failed to run post start hooks")?;
         }
 

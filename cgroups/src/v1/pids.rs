@@ -20,17 +20,19 @@ impl Controller for Pids {
     fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply pids cgroup config");
 
-        if let Some(pids) = &controller_opt.resources.pids {
+        if let Some(pids) = &controller_opt.resources.pids() {
             Self::apply(cgroup_root, pids).context("failed to apply pids resource restrictions")?;
         }
 
         Ok(())
     }
 
-    fn needs_to_handle<'a>(controller_opt: &'a ControllerOpt) -> Option<&'a Self::Resource> {
-        if let Some(pids) = &controller_opt.resources.pids {
-            return Some(pids);
-        }
+    fn needs_to_handle<'a>(_controller_opt: &'a ControllerOpt) -> Option<&'a Self::Resource> {
+        // TODO: fix compile error
+        // error[E0515]: cannot return value referencing temporary value
+        // if let Some(pids) = &controller_opt.resources.pids() {
+        //     return Some(pids);
+        // }
 
         None
     }
@@ -46,8 +48,8 @@ impl StatsProvider for Pids {
 
 impl Pids {
     fn apply(root_path: &Path, pids: &LinuxPids) -> Result<()> {
-        let limit = if pids.limit > 0 {
-            pids.limit.to_string()
+        let limit = if pids.limit() > 0 {
+            pids.limit().to_string()
         } else {
             "max".to_string()
         };
@@ -61,7 +63,7 @@ impl Pids {
 mod tests {
     use super::*;
     use crate::test::{create_temp_dir, set_fixture};
-    use oci_spec::runtime::LinuxPids;
+    use oci_spec::runtime::LinuxPidsBuilder;
 
     // Contains the current number of active pids
     const CGROUP_PIDS_CURRENT: &str = "pids.current";
@@ -71,12 +73,12 @@ mod tests {
         let tmp = create_temp_dir("test_set_pids").expect("create temp directory for test");
         set_fixture(&tmp, CGROUP_PIDS_MAX, "1000").expect("Set fixture for 1000 pids");
 
-        let pids = LinuxPids { limit: 1000 };
+        let pids = LinuxPidsBuilder::default().limit(1000).build().unwrap();
 
         Pids::apply(&tmp, &pids).expect("apply pids");
         let content =
             std::fs::read_to_string(tmp.join(CGROUP_PIDS_MAX)).expect("Read pids contents");
-        assert_eq!(pids.limit.to_string(), content);
+        assert_eq!(pids.limit().to_string(), content);
     }
 
     #[test]
@@ -84,7 +86,7 @@ mod tests {
         let tmp = create_temp_dir("test_set_pids_max").expect("create temp directory for test");
         set_fixture(&tmp, CGROUP_PIDS_MAX, "0").expect("set fixture for 0 pids");
 
-        let pids = LinuxPids { limit: 0 };
+        let pids = LinuxPidsBuilder::default().limit(0).build().unwrap();
 
         Pids::apply(&tmp, &pids).expect("apply pids");
 

@@ -132,24 +132,24 @@ pub fn reset_effective<S: Syscall + ?Sized>(syscall: &S) -> Result<()> {
 
 /// Drop any extra granted capabilities, and reset to defaults which are in oci specification
 pub fn drop_privileges<S: Syscall + ?Sized>(cs: &LinuxCapabilities, syscall: &S) -> Result<()> {
-    log::debug!("dropping bounding capabilities to {:?}", cs.bounding);
-    if let Some(bounding) = cs.bounding.as_ref() {
+    log::debug!("dropping bounding capabilities to {:?}", cs.bounding());
+    if let Some(bounding) = cs.bounding().as_ref() {
         syscall.set_capability(CapSet::Bounding, &to_set(bounding))?;
     }
 
-    if let Some(effective) = cs.effective.as_ref() {
+    if let Some(effective) = cs.effective().as_ref() {
         syscall.set_capability(CapSet::Effective, &to_set(effective))?;
     }
 
-    if let Some(permitted) = cs.permitted.as_ref() {
+    if let Some(permitted) = cs.permitted().as_ref() {
         syscall.set_capability(CapSet::Permitted, &to_set(permitted))?;
     }
 
-    if let Some(inheritable) = cs.inheritable.as_ref() {
+    if let Some(inheritable) = cs.inheritable().as_ref() {
         syscall.set_capability(CapSet::Inheritable, &to_set(inheritable))?;
     }
 
-    if let Some(ambient) = cs.ambient.as_ref() {
+    if let Some(ambient) = cs.ambient().as_ref() {
         // check specifically for ambient, as those might not always be available
         if let Err(e) = syscall.set_capability(CapSet::Ambient, &to_set(ambient)) {
             log::error!("failed to set ambient capabilities: {}", e);
@@ -161,6 +161,9 @@ pub fn drop_privileges<S: Syscall + ?Sized>(cs: &LinuxCapabilities, syscall: &S)
 
 #[cfg(test)]
 mod tests {
+    use oci_spec::runtime::LinuxCapabilitiesBuilder;
+    use std::collections::HashSet;
+
     use super::*;
     use crate::syscall::test::TestHelperSyscall;
 
@@ -555,13 +558,14 @@ mod tests {
         let tests = vec![
             Testcase {
                 name: format!("all LinuxCapabilities fields with caps: {:?}", cps),
-                input: LinuxCapabilities {
-                    bounding: cps.clone().into_iter().collect::<Capabilities>().into(),
-                    effective: cps.clone().into_iter().collect::<Capabilities>().into(),
-                    inheritable: cps.clone().into_iter().collect::<Capabilities>().into(),
-                    permitted: cps.clone().into_iter().collect::<Capabilities>().into(),
-                    ambient: cps.clone().into_iter().collect::<Capabilities>().into(),
-                },
+                input: LinuxCapabilitiesBuilder::default()
+                    .bounding(cps.clone().into_iter().collect::<Capabilities>())
+                    .effective(cps.clone().into_iter().collect::<Capabilities>())
+                    .inheritable(cps.clone().into_iter().collect::<Capabilities>())
+                    .permitted(cps.clone().into_iter().collect::<Capabilities>())
+                    .ambient(cps.clone().into_iter().collect::<Capabilities>())
+                    .build()
+                    .unwrap(),
                 want: vec![
                     (CapSet::Bounding, cps.clone()),
                     (CapSet::Effective, cps.clone()),
@@ -572,29 +576,37 @@ mod tests {
             },
             Testcase {
                 name: format!("partial LinuxCapabilities fields with caps: {:?}", cps),
-                input: LinuxCapabilities {
-                    bounding: cps.clone().into_iter().collect::<Capabilities>().into(),
-                    effective: cps.clone().into_iter().collect::<Capabilities>().into(),
-                    inheritable: None,
-                    permitted: cps.clone().into_iter().collect::<Capabilities>().into(),
-                    ambient: None,
-                },
+                input: LinuxCapabilitiesBuilder::default()
+                    .bounding(cps.clone().into_iter().collect::<Capabilities>())
+                    .effective(cps.clone().into_iter().collect::<Capabilities>())
+                    .permitted(cps.clone().into_iter().collect::<Capabilities>())
+                    .build()
+                    .unwrap(),
                 want: vec![
                     (CapSet::Bounding, cps.clone()),
                     (CapSet::Effective, cps.clone()),
                     (CapSet::Permitted, cps.clone()),
+                    (CapSet::Inheritable, cps.clone()),
+                    (CapSet::Ambient, cps.clone()),
                 ],
             },
             Testcase {
                 name: format!("empty LinuxCapabilities fields with caps: {:?}", cps),
-                input: LinuxCapabilities {
-                    bounding: None,
-                    effective: None,
-                    inheritable: None,
-                    permitted: None,
-                    ambient: None,
-                },
-                want: vec![],
+                input: LinuxCapabilitiesBuilder::default()
+                    .bounding(HashSet::new())
+                    .effective(HashSet::new())
+                    .inheritable(HashSet::new())
+                    .permitted(HashSet::new())
+                    .ambient(HashSet::new())
+                    .build()
+                    .unwrap(),
+                want: vec![
+                    (CapSet::Bounding, cps.clone()),
+                    (CapSet::Effective, cps.clone()),
+                    (CapSet::Permitted, cps.clone()),
+                    (CapSet::Inheritable, cps.clone()),
+                    (CapSet::Ambient, cps),
+                ],
             },
         ];
 

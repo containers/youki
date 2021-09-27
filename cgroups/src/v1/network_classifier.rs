@@ -23,7 +23,7 @@ impl Controller for NetworkClassifier {
     }
 
     fn needs_to_handle<'a>(controller_opt: &'a ControllerOpt) -> Option<&'a Self::Resource> {
-        if let Some(network) = controller_opt.resources.network.as_ref() {
+        if let Some(network) = controller_opt.resources.network().as_ref() {
             return Some(network);
         }
 
@@ -33,7 +33,7 @@ impl Controller for NetworkClassifier {
 
 impl NetworkClassifier {
     fn apply(root_path: &Path, network: &LinuxNetwork) -> Result<()> {
-        if let Some(class_id) = network.class_id {
+        if let Some(class_id) = network.class_id() {
             common::write_cgroup_file(root_path.join("net_cls.classid"), class_id)?;
         }
 
@@ -45,6 +45,7 @@ impl NetworkClassifier {
 mod tests {
     use super::*;
     use crate::test::{create_temp_dir, set_fixture};
+    use oci_spec::runtime::LinuxNetworkBuilder;
 
     #[test]
     fn test_apply_network_classifier() {
@@ -52,11 +53,12 @@ mod tests {
             .expect("create temp directory for test");
         set_fixture(&tmp, "net_cls.classid", "0").expect("set fixture for classID");
 
-        let id = 0x100001;
-        let network = LinuxNetwork {
-            class_id: Some(id),
-            priorities: Some(vec![]),
-        };
+        let id = 0x100001u32;
+        let network = LinuxNetworkBuilder::default()
+            .class_id(id)
+            .priorities(vec![])
+            .build()
+            .unwrap();
 
         NetworkClassifier::apply(&tmp, &network).expect("apply network classID");
 

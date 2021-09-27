@@ -127,7 +127,7 @@ mod tests {
     use crate::common::{FreezerState, CGROUP_PROCS};
     use crate::test::{create_temp_dir, set_fixture};
     use nix::unistd::Pid;
-    use oci_spec::runtime::LinuxResources;
+    use oci_spec::runtime::LinuxResourcesBuilder;
 
     #[test]
     fn test_set_freezer_state() {
@@ -176,17 +176,11 @@ mod tests {
 
         // set Thawed state.
         {
-            let linux_resources = LinuxResources {
-                devices: Some(vec![]),
-                memory: None,
-                cpu: None,
-                pids: None,
-                block_io: None,
-                hugepage_limits: Some(vec![]),
-                network: None,
-                rdma: None,
-                unified: None,
-            };
+            let linux_resources = LinuxResourcesBuilder::default()
+                .devices(vec![])
+                .hugepage_limits(vec![])
+                .build()
+                .unwrap();
             let state = FreezerState::Thawed;
 
             let controller_opt = ControllerOpt {
@@ -209,18 +203,11 @@ mod tests {
 
         // set Frozen state.
         {
-            let linux_resources = LinuxResources {
-                devices: Some(vec![]),
-                memory: None,
-                cpu: None,
-                pids: None,
-                block_io: None,
-                hugepage_limits: Some(vec![]),
-                network: None,
-                rdma: None,
-                unified: None,
-            };
-
+            let linux_resources = LinuxResourcesBuilder::default()
+                .devices(vec![])
+                .hugepage_limits(vec![])
+                .build()
+                .unwrap();
             let state = FreezerState::Frozen;
 
             let controller_opt = ControllerOpt {
@@ -243,17 +230,11 @@ mod tests {
 
         // set Undefined state.
         {
-            let linux_resources = LinuxResources {
-                devices: Some(vec![]),
-                memory: None,
-                cpu: None,
-                pids: None,
-                block_io: None,
-                hugepage_limits: Some(vec![]),
-                network: None,
-                rdma: None,
-                unified: None,
-            };
+            let linux_resources = LinuxResourcesBuilder::default()
+                .devices(vec![])
+                .hugepage_limits(vec![])
+                .build()
+                .unwrap();
 
             let state = FreezerState::Undefined;
 

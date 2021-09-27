@@ -48,7 +48,10 @@ impl Container {
                 })?;
 
                 let cgroups_path = utils::get_cgroup_path(
-                    &spec.linux.context("no linux in spec")?.cgroups_path,
+                    spec.linux()
+                        .as_ref()
+                        .context("no linux in spec")?
+                        .cgroups_path(),
                     self.id(),
                 );
 
@@ -64,8 +67,8 @@ impl Container {
                     format!("failed to remove cgroup {}", cgroups_path.display())
                 })?;
 
-                if let Some(hooks) = spec.hooks.as_ref() {
-                    hooks::run_hooks(hooks.poststop.as_ref(), Some(self))
+                if let Some(hooks) = spec.hooks().as_ref() {
+                    hooks::run_hooks(hooks.poststop().as_ref(), Some(self))
                         .with_context(|| "failed to run post stop hooks")?;
                 }
             }

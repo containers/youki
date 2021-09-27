@@ -38,7 +38,10 @@ impl Container {
 
         let spec = self.spec()?;
         let cgroups_path = utils::get_cgroup_path(
-            &spec.linux.context("no linux in spec")?.cgroups_path,
+            spec.linux()
+                .as_ref()
+                .context("no linux in spec")?
+                .cgroups_path(),
             self.id(),
         );
 

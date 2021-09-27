@@ -27,21 +27,21 @@ pub fn run_hooks(hooks: Option<&Vec<Hook>>, container: Option<&Container>) -> Re
 
     if let Some(hooks) = hooks {
         for hook in hooks {
-            let mut hook_command = process::Command::new(&hook.path);
+            let mut hook_command = process::Command::new(&hook.path());
             // Based on OCI spec, the first arguement of the args vector is the
             // arg0, which can be different from the path.  For example, path
             // may be "/usr/bin/true" and arg0 is set to "true". However, rust
             // command differenciates arg0 from args, where rust command arg
             // doesn't include arg0. So we have to make the split arg0 from the
             // rest of args.
-            if let Some((arg0, args)) = hook.args.as_ref().map(|a| a.split_first()).flatten() {
+            if let Some((arg0, args)) = hook.args().as_ref().map(|a| a.split_first()).flatten() {
                 log::debug!("run_hooks arg0: {:?}, args: {:?}", arg0, args);
                 hook_command.arg0(arg0).args(args)
             } else {
-                hook_command.arg0(&hook.path.as_path().display().to_string())
+                hook_command.arg0(&hook.path().as_path().display().to_string())
             };
 
-            let envs: HashMap<String, String> = if let Some(env) = hook.env.as_ref() {
+            let envs: HashMap<String, String> = if let Some(env) = hook.env().as_ref() {
                 utils::parse_env(env)
             } else {
                 HashMap::new()
@@ -78,7 +78,7 @@ pub fn run_hooks(hooks: Option<&Vec<Hook>>, container: Option<&Container>) -> Re
                 }
             }
 
-            let res = if let Some(timeout_sec) = hook.timeout {
+            let res = if let Some(timeout_sec) = hook.timeout() {
                 // Rust does not make it easy to handle executing a command and
                 // timeout. Here we decided to wait for the command in a
                 // different thread, so the main thread is not blocked. We use a
@@ -137,8 +137,9 @@ pub fn run_hooks(hooks: Option<&Vec<Hook>>, container: Option<&Container>) -> Re
 mod test {
     use super::*;
     use anyhow::{bail, Result};
+    use oci_spec::runtime::HookBuilder;
     use serial_test::serial;
-    use std::{env, fs, path::PathBuf};
+    use std::{env, fs};
 
     fn is_command_in_path(program: &str) -> bool {
         if let Ok(path) = env::var("PATH") {
@@ -170,12 +171,8 @@ mod test {
         {
             assert!(is_command_in_path("true"), "The true was not found.");
             let default_container: Container = Default::default();
-            let hook = Hook {
-                path: PathBuf::from("true"),
-                args: None,
-                env: None,
-                timeout: None,
-            };
+
+            let hook = HookBuilder::default().path("true").build()?;
             let hooks = Some(vec![hook]);
             run_hooks(hooks.as_ref(), Some(&default_container)).context("Failed true")?;
         }
@@ -187,16 +184,15 @@ mod test {
             );
             // Use `printenv` to make sure the environment is set correctly.
             let default_container: Container = Default::default();
-            let hook = Hook {
-                path: PathBuf::from("bash"),
-                args: Some(vec![
+            let hook = HookBuilder::default()
+                .path("bash")
+                .args(vec![
                     String::from("bash"),
                     String::from("-c"),
                     String::from("printenv key > /dev/null"),
-                ]),
-                env: Some(vec![String::from("key=value")]),
-                timeout: None,
-            };
+                ])
+                .env(vec![String::from("key=value")])
+                .build()?;
             let hooks = Some(vec![hook]);
             run_hooks(hooks.as_ref(), Some(&default_container)).context("Failed printenv test")?;
         }
@@ -211,16 +207,15 @@ mod test {
     fn test_run_hook_timeout() -> Result<()> {
         let default_container: Container = Default::default();
         // We use `tail -f /dev/null` here to simulate a hook command that hangs.
-        let hook = Hook {
-            path: PathBuf::from("tail"),
-            args: Some(vec![
+        let hook = HookBuilder::default()
+            .path("tail")
+            .args(vec![
                 String::from("tail"),
                 String::from("-f"),
                 String::from("/dev/null"),
-            ]),
-            env: None,
-            timeout: Some(1),
-        };
+            ])
+            .timeout(1)
+            .build()?;
         let hooks = Some(vec![hook]);
         match run_hooks(hooks.as_ref(), Some(&default_container)) {
             Ok(_) => {

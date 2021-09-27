@@ -21,7 +21,7 @@ pub struct Cpu {}
 
 impl Controller for Cpu {
     fn apply(controller_opt: &ControllerOpt, path: &Path) -> Result<()> {
-        if let Some(cpu) = &controller_opt.resources.cpu {
+        if let Some(cpu) = &controller_opt.resources.cpu() {
             Self::apply(path, cpu).context("failed to apply cpu resource restrictions")?;
         }
 
@@ -61,7 +61,7 @@ impl Cpu {
             bail!("realtime is not supported on cgroup v2 yet");
         }
 
-        if let Some(mut shares) = cpu.shares {
+        if let Some(mut shares) = cpu.shares() {
             shares = Self::convert_shares_to_cgroup2(shares);
             if shares != 0 {
                 // will result in Erno 34 (numerical result out of range) otherwise
@@ -71,14 +71,14 @@ impl Cpu {
 
         // if quota is unrestricted set to 'max'
         let mut quota_string = UNRESTRICTED_QUOTA.to_owned();
-        if let Some(quota) = cpu.quota {
+        if let Some(quota) = cpu.quota() {
             if quota > 0 {
                 quota_string = quota.to_string();
             }
         }
 
         let mut period_string: String = DEFAULT_PERIOD.to_owned();
-        if let Some(period) = cpu.period {
+        if let Some(period) = cpu.period() {
             if period > 0 {
                 period_string = period.to_string();
             }
@@ -103,11 +103,11 @@ impl Cpu {
     }
 
     fn is_realtime_requested(cpu: &LinuxCpu) -> bool {
-        if cpu.realtime_period.is_some() {
+        if cpu.realtime_period().is_some() {
             return true;
         }
 
-        if cpu.realtime_runtime.is_some() {
+        if cpu.realtime_runtime().is_some() {
             return true;
         }
 
@@ -118,7 +118,8 @@ impl Cpu {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test::{create_temp_dir, set_fixture, setup, LinuxCpuBuilder};
+    use crate::test::{create_temp_dir, set_fixture, setup};
+    use oci_spec::runtime::LinuxCpuBuilder;
     use std::fs;
 
     #[test]
@@ -127,7 +128,7 @@ mod tests {
         let (tmp, weight) = setup("test_set_shares", CGROUP_CPU_WEIGHT);
         let _ = set_fixture(&tmp, CGROUP_CPU_MAX, "")
             .unwrap_or_else(|_| panic!("set test fixture for {}", CGROUP_CPU_MAX));
-        let cpu = LinuxCpuBuilder::new().with_shares(22000).build();
+        let cpu = LinuxCpuBuilder::default().shares(22000u64).build().unwrap();
 
         // act
         Cpu::apply(&tmp, &cpu).expect("apply cpu");
@@ -143,7 +144,7 @@ mod tests {
         // arrange
         const QUOTA: i64 = 200000;
         let (tmp, max) = setup("test_set_positive_quota", CGROUP_CPU_MAX);
-        let cpu = LinuxCpuBuilder::new().with_quota(QUOTA).build();
+        let cpu = LinuxCpuBuilder::default().quota(QUOTA).build().unwrap();
 
         // act
         Cpu::apply(&tmp, &cpu).expect("apply cpu");
@@ -158,7 +159,7 @@ mod tests {
     fn test_set_zero_quota() {
         // arrange
         let (tmp, max) = setup("test_set_zero_quota", CGROUP_CPU_MAX);
-        let cpu = LinuxCpuBuilder::new().with_quota(0).build();
+        let cpu = LinuxCpuBuilder::default().quota(0).build().unwrap();
 
         // act
         Cpu::apply(&tmp, &cpu).expect("apply cpu");
@@ -177,7 +178,7 @@ mod tests {
         // arrange
         const PERIOD: u64 = 100000;
         let (tmp, max) = setup("test_set_positive_period", CGROUP_CPU_MAX);
-        let cpu = LinuxCpuBuilder::new().with_period(PERIOD).build();
+        let cpu = LinuxCpuBuilder::default().period(PERIOD).build().unwrap();
 
         // act
         Cpu::apply(&tmp, &cpu).expect("apply cpu");
@@ -192,7 +193,7 @@ mod tests {
     fn test_set_zero_period() {
         // arrange
         let (tmp, max) = setup("test_set_zero_period", CGROUP_CPU_MAX);
-        let cpu = LinuxCpuBuilder::new().with_period(0).build();
+        let cpu = LinuxCpuBuilder::default().period(0u64).build().unwrap();
 
         // act
         Cpu::apply(&tmp, &cpu).expect("apply cpu");
@@ -212,10 +213,11 @@ mod tests {
         const QUOTA: i64 = 200000;
         const PERIOD: u64 = 100000;
         let (tmp, max) = setup("test_set_quota_and_period", CGROUP_CPU_MAX);
-        let cpu = LinuxCpuBuilder::new()
-            .with_quota(QUOTA)
-            .with_period(PERIOD)
-            .build();
+        let cpu = LinuxCpuBuilder::default()
+            .quota(QUOTA)
+            .period(PERIOD)
+            .build()
+            .unwrap();
 
         // act
         Cpu::apply(&tmp, &cpu).expect("apply cpu");
@@ -231,7 +233,10 @@ mod tests {
         // arrange
         let tmp = create_temp_dir("test_realtime_runtime_not_supported")
             .expect("create temp directory for test");
-        let cpu = LinuxCpuBuilder::new().with_realtime_runtime(5).build();
+        let cpu = LinuxCpuBuilder::default()
+            .realtime_runtime(5)
+            .build()
+            .unwrap();
 
         // act
         let result = Cpu::apply(&tmp, &cpu);
@@ -248,7 +253,10 @@ mod tests {
         // arrange
         let tmp = create_temp_dir("test_realtime_period_not_supported")
             .expect("create temp directory for test");
-        let cpu = LinuxCpuBuilder::new().with_realtime_period(5).build();
+        let cpu = LinuxCpuBuilder::default()
+            .realtime_period(5u64)
+            .build()
+            .unwrap();
 
         // act
         let result = Cpu::apply(&tmp, &cpu);

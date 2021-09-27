@@ -48,14 +48,14 @@ impl<'a> ContainerBuilderImpl<'a> {
     }
 
     fn run_container(&mut self) -> Result<()> {
-        let linux = self.spec.linux.as_ref().context("no linux in spec")?;
-        let cgroups_path = utils::get_cgroup_path(&linux.cgroups_path, &self.container_id);
+        let linux = self.spec.linux().as_ref().context("no linux in spec")?;
+        let cgroups_path = utils::get_cgroup_path(linux.cgroups_path(), &self.container_id);
         let cmanager = cgroups::common::create_cgroup_manager(&cgroups_path, self.use_systemd)?;
-        let process = self.spec.process.as_ref().context("No process in spec")?;
+        let process = self.spec.process().as_ref().context("No process in spec")?;
 
         if self.init {
-            if let Some(hooks) = self.spec.hooks.as_ref() {
-                hooks::run_hooks(hooks.create_runtime.as_ref(), self.container.as_ref())?
+            if let Some(hooks) = self.spec.hooks().as_ref() {
+                hooks::run_hooks(hooks.create_runtime().as_ref(), self.container.as_ref())?
             }
         }
 
@@ -78,7 +78,7 @@ impl<'a> ContainerBuilderImpl<'a> {
         // is not writeable unless you're an privileged user (if !dumpable is
         // set). All children inherit their parent's oom_score_adj value on
         // fork(2) so this will always be propagated properly.
-        if let Some(oom_score_adj) = process.oom_score_adj {
+        if let Some(oom_score_adj) = process.oom_score_adj() {
             log::debug!("Set OOM score to {}", oom_score_adj);
             let mut f = fs::File::create("/proc/self/oom_score_adj")?;
             f.write_all(oom_score_adj.to_string().as_bytes())?;
@@ -92,7 +92,7 @@ impl<'a> ContainerBuilderImpl<'a> {
         // going to be switching to a different security context. Thus setting
         // ourselves to be non-dumpable only breaks things (like rootless
         // containers), which is the recommendation from the kernel folks.
-        if linux.namespaces.is_some() {
+        if linux.namespaces().is_some() {
             prctl::set_dumpable(false).unwrap();
         }
 
@@ -147,8 +147,8 @@ impl<'a> ContainerBuilderImpl<'a> {
         let init_pid = receiver_from_intermediate.wait_for_intermediate_ready()?;
         log::debug!("init pid is {:?}", init_pid);
 
-        if self.rootless.is_none() && linux.resources.is_some() && self.init {
-            if let Some(resources) = linux.resources.as_ref() {
+        if self.rootless.is_none() && linux.resources().is_some() && self.init {
+            if let Some(resources) = linux.resources().as_ref() {
                 apply_cgroups(resources, init_pid, cmanager.as_ref())?;
             }
         }
@@ -215,7 +215,7 @@ mod tests {
         sched::{unshare, CloneFlags},
         unistd::{self, getgid, getuid},
     };
-    use oci_spec::runtime::LinuxIdMapping;
+    use oci_spec::runtime::LinuxIdMappingBuilder;
     use serial_test::serial;
 
     use crate::process::channel::{intermediate_to_main, main_to_intermediate};
@@ -225,11 +225,11 @@ mod tests {
     #[test]
     #[serial]
     fn setup_uid_mapping_should_succeed() -> Result<()> {
-        let uid_mapping = LinuxIdMapping {
-            host_id: u32::from(getuid()),
-            container_id: 0,
-            size: 1,
-        };
+        let uid_mapping = LinuxIdMappingBuilder::default()
+            .host_id(getuid())
+            .container_id(0u32)
+            .size(1u32)
+            .build()?;
         let uid_mappings = vec![uid_mapping];
         let rootless = Rootless {
             uid_mappings: Some(&uid_mappings),
@@ -246,9 +246,9 @@ mod tests {
                 let line = fs::read_to_string(format!("/proc/{}/uid_map", child.as_raw()))?;
                 let line_splited = line.split_whitespace();
                 for (act, expect) in line_splited.zip([
-                    uid_mapping.container_id.to_string().as_str(),
-                    uid_mapping.host_id.to_string().as_str(),
-                    uid_mapping.size.to_string().as_str(),
+                    uid_mapping.container_id().to_string().as_str(),
+                    uid_mapping.host_id().to_string().as_str(),
+                    uid_mapping.size().to_string().as_str(),
                 ]) {
                     assert_eq!(act, expect);
                 }
@@ -271,11 +271,11 @@ mod tests {
     #[test]
     #[serial]
     fn setup_gid_mapping_should_successed() -> Result<()> {
-        let gid_mapping = LinuxIdMapping {
-            host_id: u32::from(getgid()),
-            container_id: 0,
-            size: 1,
-        };
+        let gid_mapping = LinuxIdMappingBuilder::default()
+            .host_id(getgid())
+            .container_id(0u32)
+            .size(1u32)
+            .build()?;
         let gid_mappings = vec![gid_mapping];
         let rootless = Rootless {
             gid_mappings: Some(&gid_mappings),
@@ -291,9 +291,9 @@ mod tests {
                 let line = fs::read_to_string(format!("/proc/{}/gid_map", child.as_raw()))?;
                 let line_splited = line.split_whitespace();
                 for (act, expect) in line_splited.zip([
-                    gid_mapping.container_id.to_string().as_str(),
-                    gid_mapping.host_id.to_string().as_str(),
-                    gid_mapping.size.to_string().as_str(),
+                    gid_mapping.container_id().to_string().as_str(),
+                    gid_mapping.host_id().to_string().as_str(),
+                    gid_mapping.size().to_string().as_str(),
                 ]) {
                     assert_eq!(act, expect);
                 }

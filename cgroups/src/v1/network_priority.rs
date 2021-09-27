@@ -23,7 +23,7 @@ impl Controller for NetworkPriority {
     }
 
     fn needs_to_handle<'a>(controller_opt: &'a ControllerOpt) -> Option<&'a Self::Resource> {
-        if let Some(network) = &controller_opt.resources.network {
+        if let Some(network) = &controller_opt.resources.network() {
             return Some(network);
         }
 
@@ -33,7 +33,7 @@ impl Controller for NetworkPriority {
 
 impl NetworkPriority {
     fn apply(root_path: &Path, network: &LinuxNetwork) -> Result<()> {
-        if let Some(ni_priorities) = network.priorities.as_ref() {
+        if let Some(ni_priorities) = network.priorities().as_ref() {
             let priorities: String = ni_priorities.iter().map(|p| p.to_string()).collect();
             common::write_cgroup_file_str(root_path.join("net_prio.ifpriomap"), priorities.trim())?;
         }
@@ -46,7 +46,7 @@ impl NetworkPriority {
 mod tests {
     use super::*;
     use crate::test::{create_temp_dir, set_fixture};
-    use oci_spec::runtime::LinuxInterfacePriority;
+    use oci_spec::runtime::{LinuxInterfacePriorityBuilder, LinuxNetworkBuilder};
 
     #[test]
     fn test_apply_network_priorites() {
@@ -54,20 +54,22 @@ mod tests {
             .expect("create temp directory for test");
         set_fixture(&tmp, "net_prio.ifpriomap", "").expect("set fixture for priority map");
         let priorities = vec![
-            LinuxInterfacePriority {
-                name: "a".to_owned(),
-                priority: 1,
-            },
-            LinuxInterfacePriority {
-                name: "b".to_owned(),
-                priority: 2,
-            },
+            LinuxInterfacePriorityBuilder::default()
+                .name("a")
+                .priority(1u32)
+                .build()
+                .unwrap(),
+            LinuxInterfacePriorityBuilder::default()
+                .name("b")
+                .priority(2u32)
+                .build()
+                .unwrap(),
         ];
         let priorities_string = priorities.iter().map(|p| p.to_string()).collect::<String>();
-        let network = LinuxNetwork {
-            class_id: None,
-            priorities: priorities.into(),
-        };
+        let network = LinuxNetworkBuilder::default()
+            .priorities(priorities)
+            .build()
+            .unwrap();
 
         NetworkPriority::apply(&tmp, &network).expect("apply network priorities");
 

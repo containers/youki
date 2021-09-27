@@ -14,7 +14,7 @@ impl Controller for Devices {
     fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply Devices cgroup config");
 
-        if let Some(devices) = controller_opt.resources.devices.as_ref() {
+        if let Some(devices) = controller_opt.resources.devices().as_ref() {
             for d in devices {
                 Self::apply_device(d, cgroup_root)?;
             }
@@ -40,7 +40,7 @@ impl Controller for Devices {
 
 impl Devices {
     fn apply_device(device: &LinuxDeviceCgroup, cgroup_root: &Path) -> Result<()> {
-        let path = if device.allow {
+        let path = if device.allow() {
             cgroup_root.join("devices.allow")
         } else {
             cgroup_root.join("devices.deny")
@@ -56,7 +56,7 @@ mod tests {
     use super::*;
     use crate::test::create_temp_dir;
     use crate::test::set_fixture;
-    use oci_spec::runtime::{LinuxDeviceCgroup, LinuxDeviceType};
+    use oci_spec::runtime::{LinuxDeviceCgroupBuilder, LinuxDeviceType};
     use std::fs::read_to_string;
 
     #[test]
@@ -74,7 +74,7 @@ mod tests {
 
             Devices::apply_device(d, &tmp).expect("Apply default device");
             println!("Device: {}", d.to_string());
-            if d.allow {
+            if d.allow() {
                 let allowed_content =
                     read_to_string(tmp.join("devices.allow")).expect("read to string");
                 assert_eq!(allowed_content, d.to_string());
@@ -90,34 +90,34 @@ mod tests {
     fn test_set_mock_devices() {
         let tmp = create_temp_dir("test_set_mock_devices").expect("create temp directory for test");
         [
-            LinuxDeviceCgroup {
-                allow: true,
-                typ: Some(LinuxDeviceType::C),
-                major: Some(10),
-                minor: None,
-                access: "rwm".to_string().into(),
-            },
-            LinuxDeviceCgroup {
-                allow: true,
-                typ: Some(LinuxDeviceType::A),
-                major: None,
-                minor: Some(200),
-                access: "rwm".to_string().into(),
-            },
-            LinuxDeviceCgroup {
-                allow: false,
-                typ: Some(LinuxDeviceType::P),
-                major: Some(10),
-                minor: Some(200),
-                access: "m".to_string().into(),
-            },
-            LinuxDeviceCgroup {
-                allow: false,
-                typ: Some(LinuxDeviceType::U),
-                major: None,
-                minor: None,
-                access: "rw".to_string().into(),
-            },
+            LinuxDeviceCgroupBuilder::default()
+                .allow(true)
+                .typ(LinuxDeviceType::C)
+                .major(10)
+                .access("rwm")
+                .build()
+                .unwrap(),
+            LinuxDeviceCgroupBuilder::default()
+                .allow(true)
+                .typ(LinuxDeviceType::A)
+                .minor(200)
+                .access("rwm")
+                .build()
+                .unwrap(),
+            LinuxDeviceCgroupBuilder::default()
+                .allow(false)
+                .typ(LinuxDeviceType::P)
+                .major(10)
+                .minor(200)
+                .access("m")
+                .build()
+                .unwrap(),
+            LinuxDeviceCgroupBuilder::default()
+                .allow(false)
+                .typ(LinuxDeviceType::U)
+                .access("rw")
+                .build()
+                .unwrap(),
         ]
         .iter()
         .for_each(|d| {
@@ -126,7 +126,7 @@ mod tests {
 
             Devices::apply_device(d, &tmp).expect("Apply default device");
             println!("Device: {}", d.to_string());
-            if d.allow {
+            if d.allow() {
                 let allowed_content =
                     read_to_string(tmp.join("devices.allow")).expect("read to string");
                 assert_eq!(allowed_content, d.to_string());
@@ -144,7 +144,7 @@ mod tests {
             set_fixture(&tmp, "devices.allow", "").expect("create allowed devices list");
             set_fixture(&tmp, "devices.deny", "").expect("create denied devices list");
             Devices::apply_device(&device, &tmp).expect("Apply default device");
-            if device.allow {
+            if device.allow() {
                 let allowed_content =
                     read_to_string(tmp.join("devices.allow")).expect("read to string");
                 allowed_content == device.to_string()
@@ -162,7 +162,7 @@ mod tests {
                     set_fixture(&tmp, "devices.allow", "").expect("create allowed devices list");
                     set_fixture(&tmp, "devices.deny", "").expect("create denied devices list");
                     Devices::apply_device(device, &tmp).expect("Apply default device");
-                    if device.allow {
+                    if device.allow() {
                         let allowed_content =
                             read_to_string(tmp.join("devices.allow")).expect("read to string");
                         allowed_content == device.to_string()

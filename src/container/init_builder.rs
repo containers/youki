@@ -46,12 +46,12 @@ impl<'a> InitContainerBuilder<'a> {
         let mut container = self.create_container_state(&container_dir)?;
         container
             .set_systemd(self.use_systemd)
-            .set_annotations(spec.annotations.clone());
+            .set_annotations(spec.annotations().clone());
 
         unistd::chdir(&*container_dir)?;
         let notify_path = container_dir.join(NOTIFY_FILE);
         // convert path of root file system of the container to absolute path
-        let rootfs = fs::canonicalize(&spec.root.as_ref().context("no root in spec")?.path)?;
+        let rootfs = fs::canonicalize(&spec.root().as_ref().context("no root in spec")?.path())?;
 
         // if socket file path is given in commandline options,
         // get file descriptors of console socket
@@ -109,15 +109,15 @@ impl<'a> InitContainerBuilder<'a> {
     }
 
     fn validate_spec(spec: &Spec) -> Result<()> {
-        if !spec.version.starts_with("1.0") {
+        if !spec.version().starts_with("1.0") {
             bail!(
                 "runtime spec has incompatible version '{}'. Only 1.0.X is supported",
-                spec.version
+                spec.version()
             );
         }
 
-        if let Some(process) = &spec.process {
-            if let Some(profile) = &process.apparmor_profile {
+        if let Some(process) = &spec.process() {
+            if let Some(profile) = &process.apparmor_profile() {
                 if !apparmor::is_enabled()? {
                     bail!(
                         "apparmor profile {} is specified in runtime spec, \

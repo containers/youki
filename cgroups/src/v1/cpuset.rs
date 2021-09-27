@@ -39,8 +39,8 @@ impl Controller for CpuSet {
     }
 
     fn needs_to_handle<'a>(controller_opt: &'a ControllerOpt) -> Option<&'a Self::Resource> {
-        if let Some(cpuset) = &controller_opt.resources.cpu {
-            if cpuset.cpus.is_some() || cpuset.mems.is_some() {
+        if let Some(cpuset) = &controller_opt.resources.cpu() {
+            if cpuset.cpus().is_some() || cpuset.mems().is_some() {
                 return Some(cpuset);
             }
         }
@@ -51,11 +51,11 @@ impl Controller for CpuSet {
 
 impl CpuSet {
     fn apply(cgroup_path: &Path, cpuset: &LinuxCpu) -> Result<()> {
-        if let Some(cpus) = &cpuset.cpus {
+        if let Some(cpus) = &cpuset.cpus() {
             common::write_cgroup_file_str(cgroup_path.join(CGROUP_CPUSET_CPUS), cpus)?;
         }
 
-        if let Some(mems) = &cpuset.mems {
+        if let Some(mems) = &cpuset.mems() {
             common::write_cgroup_file_str(cgroup_path.join(CGROUP_CPUSET_MEMS), mems)?;
         }
 
@@ -93,13 +93,17 @@ mod tests {
     use std::fs;
 
     use super::*;
-    use crate::test::{setup, LinuxCpuBuilder};
+    use crate::test::setup;
+    use oci_spec::runtime::LinuxCpuBuilder;
 
     #[test]
     fn test_set_cpus() {
         // arrange
         let (tmp, cpus) = setup("test_set_cpus", CGROUP_CPUSET_CPUS);
-        let cpuset = LinuxCpuBuilder::new().with_cpus("1-3".to_owned()).build();
+        let cpuset = LinuxCpuBuilder::default()
+            .cpus("1-3".to_owned())
+            .build()
+            .unwrap();
 
         // act
         CpuSet::apply(&tmp, &cpuset).expect("apply cpuset");
@@ -114,7 +118,10 @@ mod tests {
     fn test_set_mems() {
         // arrange
         let (tmp, mems) = setup("test_set_mems", CGROUP_CPUSET_MEMS);
-        let cpuset = LinuxCpuBuilder::new().with_mems("1-3".to_owned()).build();
+        let cpuset = LinuxCpuBuilder::default()
+            .mems("1-3".to_owned())
+            .build()
+            .unwrap();
 
         // act
         CpuSet::apply(&tmp, &cpuset).expect("apply cpuset");

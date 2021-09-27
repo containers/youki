@@ -37,7 +37,7 @@ impl From<Option<&Vec<LinuxNamespace>>> for Namespaces {
         let namespace_map: collections::HashMap<CloneFlags, LinuxNamespace> = namespaces
             .unwrap_or(&vec![])
             .iter()
-            .map(|ns| (get_clone_flag(ns.typ), ns.clone()))
+            .map(|ns| (get_clone_flag(ns.typ()), ns.clone()))
             .collect();
 
         Namespaces {
@@ -63,14 +63,14 @@ impl Namespaces {
 
     pub fn unshare_or_setns(&self, namespace: &LinuxNamespace) -> Result<()> {
         log::debug!("unshare or setns: {:?}", namespace);
-        if namespace.path.is_none() {
-            self.command.unshare(get_clone_flag(namespace.typ))?;
+        if namespace.path().is_none() {
+            self.command.unshare(get_clone_flag(namespace.typ()))?;
         } else {
-            let ns_path = namespace.path.as_ref().unwrap();
+            let ns_path = namespace.path().as_ref().unwrap();
             let fd = fcntl::open(ns_path, fcntl::OFlag::empty(), stat::Mode::empty())
                 .with_context(|| format!("Failed to open namespace fd: {:?}", ns_path))?;
             self.command
-                .set_ns(fd, get_clone_flag(namespace.typ))
+                .set_ns(fd, get_clone_flag(namespace.typ()))
                 .with_context(|| "Failed to set namespace")?;
             unistd::close(fd).with_context(|| "Failed to close namespace fd")?;
         }
@@ -87,31 +87,33 @@ impl Namespaces {
 mod tests {
     use super::*;
     use crate::syscall::test::TestHelperSyscall;
-    use oci_spec::runtime::LinuxNamespaceType;
+    use oci_spec::runtime::{LinuxNamespaceBuilder, LinuxNamespaceType};
     use serial_test::serial;
 
     fn gen_sample_linux_namespaces() -> Vec<LinuxNamespace> {
         vec![
-            LinuxNamespace {
-                typ: LinuxNamespaceType::Mount,
-                path: Some("/dev/null".into()),
-            },
-            LinuxNamespace {
-                typ: LinuxNamespaceType::Network,
-                path: Some("/dev/null".into()),
-            },
-            LinuxNamespace {
-                typ: LinuxNamespaceType::Pid,
-                path: None,
-            },
-            LinuxNamespace {
-                typ: LinuxNamespaceType::User,
-                path: None,
-            },
-            LinuxNamespace {
-                typ: LinuxNamespaceType::Ipc,
-                path: None,
-            },
+            LinuxNamespaceBuilder::default()
+                .typ(LinuxNamespaceType::Mount)
+                .path("/dev/null")
+                .build()
+                .unwrap(),
+            LinuxNamespaceBuilder::default()
+                .typ(LinuxNamespaceType::Network)
+                .path("/dev/null")
+                .build()
+                .unwrap(),
+            LinuxNamespaceBuilder::default()
+                .typ(LinuxNamespaceType::Pid)
+                .build()
+                .unwrap(),
+            LinuxNamespaceBuilder::default()
+                .typ(LinuxNamespaceType::User)
+                .build()
+                .unwrap(),
+            LinuxNamespaceBuilder::default()
+                .typ(LinuxNamespaceType::Ipc)
+                .build()
+                .unwrap(),
         ]
     }
 
