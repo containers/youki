@@ -54,7 +54,7 @@ impl<'a> TestManager<'a> {
     pub fn run_all(&self) {
         thread::scope(|s| {
             let mut collector = Vec::with_capacity(self.test_groups.len());
-            for (name, tg) in self.test_groups.iter() {
+            for (name, tg) in &self.test_groups {
                 let r = s.spawn(move |_| tg.run_all());
                 collector.push((name, r));
             }
@@ -69,18 +69,14 @@ impl<'a> TestManager<'a> {
     pub fn run_selected(&self, tests: Vec<(&str, Option<Vec<&str>>)>) {
         thread::scope(|s| {
             let mut collector = Vec::with_capacity(tests.len());
-            for (test_group_name, tests) in tests.iter() {
+            for (test_group_name, tests) in &tests {
                 if let Some(tg) = self.test_groups.get(test_group_name) {
+                    let r;
                     match tests {
-                        None => {
-                            let r = s.spawn(move |_| tg.run_all());
-                            collector.push((test_group_name, r));
-                        }
-                        Some(tests) => {
-                            let r = s.spawn(move |_| tg.run_selected(tests));
-                            collector.push((test_group_name, r));
-                        }
+                        None => r = s.spawn(move |_| tg.run_all()),
+                        Some(tests) => r = s.spawn(move |_| tg.run_selected(tests)),
                     }
+                    collector.push((test_group_name, r));
                 } else {
                     eprintln!("Error : Test Group {} not found, skipping", test_group_name);
                 }

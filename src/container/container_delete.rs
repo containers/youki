@@ -67,7 +67,7 @@ impl Container {
                     format!("failed to remove cgroup {}", cgroups_path.display())
                 })?;
 
-                if let Some(hooks) = spec.hooks().as_ref() {
+                if let Some(hooks) = spec.hooks() {
                     hooks::run_hooks(hooks.poststop().as_ref(), Some(self))
                         .with_context(|| "failed to run post stop hooks")?;
                 }

@@ -34,14 +34,14 @@ pub fn run_hooks(hooks: Option<&Vec<Hook>>, container: Option<&Container>) -> Re
             // command differenciates arg0 from args, where rust command arg
             // doesn't include arg0. So we have to make the split arg0 from the
             // rest of args.
-            if let Some((arg0, args)) = hook.args().as_ref().map(|a| a.split_first()).flatten() {
+            if let Some((arg0, args)) = hook.args().as_ref().and_then(|a| a.split_first()) {
                 log::debug!("run_hooks arg0: {:?}, args: {:?}", arg0, args);
                 hook_command.arg0(arg0).args(args)
             } else {
-                hook_command.arg0(&hook.path().as_path().display().to_string())
+                hook_command.arg0(&hook.path().display().to_string())
             };
 
-            let envs: HashMap<String, String> = if let Some(env) = hook.env().as_ref() {
+            let envs: HashMap<String, String> = if let Some(env) = hook.env() {
                 utils::parse_env(env)
             } else {
                 HashMap::new()
@@ -57,7 +57,7 @@ pub fn run_hooks(hooks: Option<&Vec<Hook>>, container: Option<&Container>) -> Re
             let hook_process_pid = Pid::from_raw(hook_process.id() as i32);
             // Based on the OCI spec, we need to pipe the container state into
             // the hook command through stdin.
-            if let Some(mut stdin) = hook_process.stdin.as_ref() {
+            if let Some(stdin) = &mut hook_process.stdin {
                 // We want to ignore BrokenPipe here. A BrokenPipe indicates
                 // either the hook is crashed/errored or it ran successfully.
                 // Either way, this is an indication that the hook command

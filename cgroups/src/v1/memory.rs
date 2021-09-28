@@ -51,7 +51,7 @@ impl Controller for Memory {
     fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply Memory cgroup config");
 
-        if let Some(memory) = controller_opt.resources.memory().as_ref() {
+        if let Some(memory) = &controller_opt.resources.memory() {
             let reservation = memory.reservation().unwrap_or(0);
 
             Self::apply(memory, cgroup_root)?;

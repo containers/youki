@@ -64,7 +64,7 @@ fn try_read_os_from<P: AsRef<Path>>(path: P) -> Option<String> {
         let name = find_parameter(&release_content, "NAME");
         let version = find_parameter(&release_content, "VERSION");
 
-        if let (Some(name), Some(version)) = (name, version) {
+        if let Some((name, version)) = name.zip(version) {
             return Some(format!(
                 "{} {}",
                 name.trim_matches('"'),
@@ -78,16 +78,10 @@ fn try_read_os_from<P: AsRef<Path>>(path: P) -> Option<String> {
 
 /// Helper function to find keyword values in OS info string
 fn find_parameter<'a>(content: &'a str, param_name: &str) -> Option<&'a str> {
-    let param_value = content
+    content
         .lines()
         .find(|l| l.starts_with(param_name))
-        .map(|l| l.split_terminator('=').last());
-
-    if let Some(Some(value)) = param_value {
-        return Some(value);
-    }
-
-    None
+        .and_then(|l| l.split_terminator('=').last())
 }
 
 /// Print Hardware information of system

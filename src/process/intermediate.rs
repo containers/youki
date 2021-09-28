@@ -47,8 +47,8 @@ pub fn container_intermediate(
 
     // set limits and namespaces to the process
     let proc = spec.process().as_ref().context("no process in spec")?;
-    if let Some(rlimits) = proc.rlimits().as_ref() {
-        for rlimit in rlimits.iter() {
+    if let Some(rlimits) = proc.rlimits() {
+        for rlimit in rlimits {
             command.set_rlimit(rlimit).context("failed to set rlimit")?;
         }
     }

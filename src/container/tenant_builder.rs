@@ -97,7 +97,7 @@ impl<'a> TenantContainerBuilder<'a> {
 
         log::debug!("{:#?}", spec);
 
-        unistd::chdir(&*container_dir)?;
+        unistd::chdir(&container_dir)?;
         let notify_path = Self::setup_notify_listener(&container_dir)?;
         // convert path of root file system of the container to absolute path
         let rootfs = fs::canonicalize(&spec.root().as_ref().context("no root in spec")?.path())?;
@@ -160,7 +160,7 @@ impl<'a> TenantContainerBuilder<'a> {
     }
 
     fn adapt_spec_for_tenant(&self, spec: &Spec, container: &Container) -> Result<Spec> {
-        let process = if let Some(ref process) = self.process {
+        let process = if let Some(process) = &self.process {
             self.set_process(process)?
         } else {
             let mut process_builder = ProcessBuilder::default();
@@ -238,7 +238,7 @@ impl<'a> TenantContainerBuilder<'a> {
     }
 
     fn set_working_dir(&self) -> Result<Option<PathBuf>> {
-        if let Some(ref cwd) = self.cwd {
+        if let Some(cwd) = &self.cwd {
             if cwd.is_relative() {
                 bail!(
                     "Current working directory must be an absolute path, but is {}",
@@ -280,7 +280,7 @@ impl<'a> TenantContainerBuilder<'a> {
             let caps: SpecCapabilities =
                 caps.iter().map(|c| SpecCapability::from_cap(*c)).collect();
 
-            if let Some(ref spec_caps) = spec
+            if let Some(spec_caps) = spec
                 .process()
                 .as_ref()
                 .context("no process in spec")?
@@ -345,8 +345,8 @@ impl<'a> TenantContainerBuilder<'a> {
     fn set_namespaces(&self, init_namespaces: Vec<Namespace>) -> Result<Vec<LinuxNamespace>> {
         let mut tenant_namespaces = Vec::with_capacity(init_namespaces.len());
 
-        for ns_type in NAMESPACE_TYPES.iter().copied() {
-            if let Some(init_ns) = init_namespaces.iter().find(|n| n.ns_type.eq(ns_type)) {
+        for &ns_type in NAMESPACE_TYPES {
+            if let Some(init_ns) = init_namespaces.iter().find(|n| n.ns_type == ns_type) {
                 let tenant_ns = LinuxNamespaceType::try_from(ns_type)?;
                 tenant_namespaces.push(
                     LinuxNamespaceBuilder::default()

@@ -34,7 +34,7 @@ pub fn setup_console_socket(
     )?;
     csocketfd = match socket::connect(
         csocketfd,
-        &socket::SockAddr::Unix(socket::UnixAddr::new(&*socket_name)?),
+        &socket::SockAddr::Unix(socket::UnixAddr::new(socket_name)?),
     ) {
         Err(errno) => {
             if !matches!(errno, Errno::ENOENT) {
