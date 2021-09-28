@@ -1,3 +1,4 @@
+use cgroups::common::CgroupManager;
 use oci_spec::runtime::Spec;
 use std::os::unix::prelude::RawFd;
 use std::path::PathBuf;
@@ -24,4 +25,6 @@ pub struct ContainerArgs<'a> {
     pub container: Option<Container>,
     /// Options for rootless containers
     pub rootless: Option<Rootless<'a>>,
+    /// Cgroup Manager
+    pub cgroup_manager: Box<dyn CgroupManager>,
 }

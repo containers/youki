@@ -1,7 +1,10 @@
 use crate::{namespaces::Namespaces, process::channel, process::fork};
-use anyhow::{Context, Result};
-use nix::unistd::{Gid, Uid};
-use oci_spec::runtime::LinuxNamespaceType;
+use anyhow::{Context, Error, Result};
+use cgroups::common::CgroupManager;
+use nix::unistd::{Gid, Pid, Uid};
+use oci_spec::runtime::{LinuxNamespaceType, LinuxResources};
+use procfs::process::Process;
+use std::convert::From;
 
 use super::args::ContainerArgs;
 use super::init::container_init;
@@ -23,7 +26,7 @@ pub fn container_intermediate(
     if let Some(user_namespace) = namespaces.get(LinuxNamespaceType::User) {
         namespaces
             .unshare_or_setns(user_namespace)
-            .with_context(|| format!("Failed to enter pid namespace: {:?}", user_namespace))?;
+            .with_context(|| format!("Failed to enter user namespace: {:?}", user_namespace))?;
         if user_namespace.path().is_none() {
             log::debug!("creating new user namespace");
             // child needs to be dumpable, otherwise the non root parent is not
@@ -60,6 +63,17 @@ pub fn container_intermediate(
             .with_context(|| format!("Failed to enter pid namespace: {:?}", pid_namespace))?;
     }
 
+    // this needs to be done before we create the init process, so that the init
+    // process will already be captured by the cgroup
+    if args.rootless.is_none() {
+        apply_cgroups(
+            args.cgroup_manager.as_ref(),
+            linux.resources().as_ref(),
+            args.init,
+        )
+        .context("failed to apply cgroups")?
+    }
+
     // We only need for init process to send us the ChildReady.
     let (sender_to_intermediate, receiver_from_init) = &mut channel::init_to_intermediate()?;
 
@@ -87,6 +101,32 @@ pub fn container_intermediate(
     sender_to_main
         .intermediate_ready(pid)
         .context("Failed to send child ready from intermediate process")?;
+
+    Ok(())
+}
+
+fn apply_cgroups<C: CgroupManager + ?Sized>(
+    cmanager: &C,
+    resources: Option<&LinuxResources>,
+    init: bool,
+) -> Result<(), Error> {
+    let pid = Pid::from_raw(Process::myself()?.pid());
+    cmanager
+        .add_task(pid)
+        .with_context(|| format!("failed to add task {} to cgroup manager", pid))?;
+
+    if resources.is_some() && init {
+        let controller_opt = cgroups::common::ControllerOpt {
+            resources: resources.unwrap(),
+            freezer_state: None,
+            oom_score_adj: None,
+            disable_oom_killer: false,
+        };
+
+        cmanager
+            .apply(&controller_opt)
+            .context("failed to apply resource limits to cgroup")?;
+    }
 
     Ok(())
 }

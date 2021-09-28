@@ -7,9 +7,8 @@ use crate::{
     utils,
 };
 use anyhow::{bail, Context, Result};
-use cgroups::{self, common::CgroupManager};
 use nix::unistd::Pid;
-use oci_spec::runtime::{LinuxResources, Spec};
+use oci_spec::runtime::Spec;
 use std::{fs, io::Write, os::unix::prelude::RawFd, path::PathBuf};
 
 use super::{Container, ContainerStatus};
@@ -117,6 +116,7 @@ impl<'a> ContainerBuilderImpl<'a> {
             preserve_fds: self.preserve_fds,
             container: self.container.clone(),
             rootless: self.rootless.clone(),
+            cgroup_manager: cmanager,
         };
         let intermediate_pid = fork::container_fork(|| {
             // The fds in the pipe is duplicated during fork, so we first close
@@ -154,12 +154,6 @@ impl<'a> ContainerBuilderImpl<'a> {
 
         let init_pid = receiver_from_intermediate.wait_for_intermediate_ready()?;
         log::debug!("init pid is {:?}", init_pid);
-
-        if self.rootless.is_none() && linux.resources().is_some() && self.init {
-            if let Some(resources) = linux.resources() {
-                apply_cgroups(resources, init_pid, cmanager.as_ref())?;
-            }
-        }
 
         // if file to write the pid to is specified, write pid of the child
         if let Some(pid_file) = &self.pid_file {
@@ -223,31 +217,8 @@ fn setup_mapping(rootless: &Rootless, pid: Pid) -> Result<()> {
     Ok(())
 }
 
-fn apply_cgroups<C: CgroupManager + ?Sized>(
-    resources: &LinuxResources,
-    pid: Pid,
-    cmanager: &C,
-) -> Result<()> {
-    let controller_opt = cgroups::common::ControllerOpt {
-        resources,
-        freezer_state: None,
-        oom_score_adj: None,
-        disable_oom_killer: false,
-    };
-    cmanager
-        .add_task(pid)
-        .with_context(|| format!("failed to add task {} to cgroup manager", pid))?;
-
-    cmanager
-        .apply(&controller_opt)
-        .context("failed to apply resource limits to cgroup")?;
-
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
-    use cgroups::test_manager::TestManager;
     use nix::{
         sched::{unshare, CloneFlags},
         unistd::{self, getgid, getuid},
@@ -351,16 +322,6 @@ mod tests {
                 std::process::exit(0);
             }
         }
-        Ok(())
-    }
-
-    #[test]
-    fn apply_cgroup_successed() -> Result<()> {
-        let cmanager = TestManager::default();
-        let sample_pid = Pid::from_raw(1000);
-        let resources = LinuxResources::default();
-        apply_cgroups(&resources, sample_pid, &cmanager)?;
-        assert_eq!(cmanager.get_add_task_args(), vec![sample_pid]);
         Ok(())
     }
 }
