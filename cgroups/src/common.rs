@@ -191,7 +191,7 @@ pub async fn async_read_cgroup_file<P: AsRef<Path>>(path: P) -> Result<String> {
     let (res, buffer) = file.read_at(buffer, 0).await;
     let mut bytes_read = res?;
     let s = std::str::from_utf8(&buffer[..bytes_read])?;
-    result.push_str(&s);
+    result.push_str(s);
     // if the amount of bytes read is equal to the chunk size there may be more bytes to read
     while bytes_read == CHUNK_SIZE {
         let buffer = vec![0; CHUNK_SIZE];
@@ -203,7 +203,7 @@ pub async fn async_read_cgroup_file<P: AsRef<Path>>(path: P) -> Result<String> {
             break;
         }
         let s = std::str::from_utf8(&buffer[..bytes_read])?;
-        result.push_str(&s);
+        result.push_str(s);
     }
 
     Ok(result)
