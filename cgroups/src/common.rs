@@ -21,10 +21,7 @@ use systemd::daemon::booted;
 fn booted() -> Result<bool> {
     bail!("This build does not include the systemd cgroups feature")
 }
-use tokio_uring::{
-    buf::IoBuf,
-    fs::OpenOptions,
-};
+use tokio_uring::{buf::IoBuf, fs::OpenOptions};
 
 use super::v1;
 use super::v2;

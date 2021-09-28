@@ -23,7 +23,9 @@ impl Controller for Freezer {
         create_dir_all(&cgroup_root)?;
 
         if let Some(freezer_state) = Self::needs_to_handle(controller_opt) {
-            Self::apply(freezer_state, cgroup_root).await.context("failed to appyl freezer")?;
+            Self::apply(freezer_state, cgroup_root)
+                .await
+                .context("failed to appyl freezer")?;
         }
 
         Ok(())
@@ -73,7 +75,7 @@ impl Freezer {
                     cgroup_root.join(CGROUP_FREEZER_STATE),
                     FREEZER_STATE_THAWED,
                 )
-                    .await;
+                .await;
                 thread::sleep(time::Duration::from_millis(10));
             }
 
@@ -81,7 +83,7 @@ impl Freezer {
                 cgroup_root.join(CGROUP_FREEZER_STATE),
                 FREEZER_STATE_FROZEN,
             )
-                .await?;
+            .await?;
 
             if i % 25 == 24 {
                 thread::sleep(time::Duration::from_millis(10));
@@ -117,7 +119,7 @@ impl Freezer {
 mod tests {
     use super::*;
     use crate::common::{FreezerState, CGROUP_PROCS};
-    use crate::test::{create_temp_dir, set_fixture, aw};
+    use crate::test::{aw, create_temp_dir, set_fixture};
     use nix::unistd::Pid;
     use oci_spec::runtime::LinuxResourcesBuilder;
 

@@ -1,14 +1,11 @@
 use std::collections::HashMap;
-use std::path::Path;
 use std::io;
+use std::path::Path;
 
 use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
 use nix::errno::Errno;
-use tokio_uring::{
-    buf::IoBuf,
-    fs::OpenOptions,
-};
+use tokio_uring::{buf::IoBuf, fs::OpenOptions};
 
 use super::Controller;
 use crate::common::{self, ControllerOpt};
@@ -241,8 +238,8 @@ impl Memory {
             match res {
                 Ok(0) => {
                     return Err(io::Error::new(
-                            io::ErrorKind::UnexpectedEof,
-                            "failed to fill whole buffer",
+                        io::ErrorKind::UnexpectedEof,
+                        "failed to fill whole buffer",
                     ))
                 }
                 Ok(n) => {

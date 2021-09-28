@@ -56,7 +56,7 @@ impl Devices {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test::{aw, set_fixture, create_temp_dir};
+    use crate::test::{aw, create_temp_dir, set_fixture};
     use oci_spec::runtime::{LinuxDeviceCgroupBuilder, LinuxDeviceType};
     use std::fs::read_to_string;
 

@@ -28,7 +28,9 @@ impl Controller for Cpu {
         log::debug!("Apply Cpu cgroup config");
 
         if let Some(cpu) = Self::needs_to_handle(controller_opt) {
-            Self::apply(cgroup_root, cpu).await.context("failed to apply cpu resource restrictions")?;
+            Self::apply(cgroup_root, cpu)
+                .await
+                .context("failed to apply cpu resource restrictions")?;
         }
 
         Ok(())

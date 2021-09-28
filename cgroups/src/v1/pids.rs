@@ -23,7 +23,9 @@ impl Controller for Pids {
         log::debug!("Apply pids cgroup config");
 
         if let Some(pids) = &controller_opt.resources.pids() {
-            Self::apply(cgroup_root, pids).await.context("failed to apply pids resource restrictions")?;
+            Self::apply(cgroup_root, pids)
+                .await
+                .context("failed to apply pids resource restrictions")?;
         }
 
         Ok(())
