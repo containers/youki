@@ -806,6 +806,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "pentacle"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e26ee4fbe38a973890ca68cace434e192d88f3703099fd64f799f3d6043ee7b6"
+dependencies = [
+ "libc",
+ "log",
+]
+
+[[package]]
 name = "pin-project-lite"
 version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1246,6 +1256,7 @@ dependencies = [
  "nix",
  "oci-spec",
  "once_cell",
+ "pentacle",
  "prctl",
  "procfs",
  "quickcheck",
