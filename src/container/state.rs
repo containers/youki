@@ -24,6 +24,7 @@ pub enum ContainerStatus {
     // The container process has paused
     Paused,
 }
+
 impl Default for ContainerStatus {
     fn default() -> Self {
         ContainerStatus::Creating
@@ -84,7 +85,7 @@ pub struct State {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pid: Option<i32>,
     // Bundle is the path to the container's bundle directory.
-    pub bundle: String,
+    pub bundle: PathBuf,
     // Annotations are key values associated with the container.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub annotations: Option<HashMap<String, String>>,
@@ -105,14 +106,14 @@ impl State {
         container_id: &str,
         status: ContainerStatus,
         pid: Option<i32>,
-        bundle: &str,
+        bundle: PathBuf,
     ) -> Self {
         Self {
             oci_version: "v1.0.2".to_string(),
             id: container_id.to_string(),
             status,
             pid,
-            bundle: bundle.to_string(),
+            bundle,
             annotations: Some(HashMap::default()),
             created: None,
             creator: None,
@@ -128,8 +129,8 @@ impl State {
             .append(false)
             .create(true)
             .truncate(true)
-            .open(state_file_path)
-            .expect("Unable to open");
+            .open(&state_file_path)
+            .with_context(|| format!("failed to open {}", state_file_path.display()))?;
         serde_json::to_writer(&file, self)?;
         Ok(())
     }
@@ -155,5 +156,60 @@ impl State {
     /// ```
     pub fn file_path(container_root: &Path) -> PathBuf {
         container_root.join(Self::STATE_FILE_PATH)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_creating_status() {
+        let cstatus = ContainerStatus::default();
+        assert!(!cstatus.can_start());
+        assert!(!cstatus.can_delete());
+        assert!(!cstatus.can_kill());
+        assert!(!cstatus.can_pause());
+        assert!(!cstatus.can_resume());
+    }
+
+    #[test]
+    fn test_create_status() {
+        let cstatus = ContainerStatus::Created;
+        assert!(cstatus.can_start());
+        assert!(!cstatus.can_delete());
+        assert!(cstatus.can_kill());
+        assert!(!cstatus.can_pause());
+        assert!(!cstatus.can_resume());
+    }
+
+    #[test]
+    fn test_running_status() {
+        let cstatus = ContainerStatus::Running;
+        assert!(!cstatus.can_start());
+        assert!(!cstatus.can_delete());
+        assert!(cstatus.can_kill());
+        assert!(cstatus.can_pause());
+        assert!(!cstatus.can_resume());
+    }
+
+    #[test]
+    fn test_stopped_status() {
+        let cstatus = ContainerStatus::Stopped;
+        assert!(!cstatus.can_start());
+        assert!(cstatus.can_delete());
+        assert!(!cstatus.can_kill());
+        assert!(!cstatus.can_pause());
+        assert!(!cstatus.can_resume());
+    }
+
+    #[test]
+    fn test_paused_status() {
+        let cstatus = ContainerStatus::Paused;
+        assert!(!cstatus.can_start());
+        assert!(!cstatus.can_delete());
+        assert!(cstatus.can_kill());
+        assert!(!cstatus.can_pause());
+        assert!(cstatus.can_resume());
     }
 }

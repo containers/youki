@@ -4,12 +4,13 @@ use cgroups;
 use clap::{self, Clap};
 use std::{path::PathBuf, process::Command};
 
-/// display the processes inside a container
+/// Display the processes inside the container
 #[derive(Clap, Debug)]
 pub struct Ps {
     /// format to display processes: table or json (default: "table")
     #[clap(short, long, default_value = "table")]
     format: String,
+    #[clap(forbid_empty_values = true, required = true)]
     pub container_id: String,
     /// options will be passed to the ps utility
     #[clap(setting = clap::ArgSettings::Last)]
@@ -21,14 +22,17 @@ impl Ps {
         if !container_root.exists() {
             bail!("{} doesn't exist.", self.container_id)
         }
-        let container = Container::load(container_root)?.refresh_status()?;
+        let container = Container::load(container_root)?;
         if container.root.exists() {
             let config_absolute_path = container.root.join("config.json");
             log::debug!("load spec from {:?}", config_absolute_path);
-            let spec = oci_spec::Spec::load(config_absolute_path)?;
+            let spec = oci_spec::runtime::Spec::load(config_absolute_path)?;
             log::debug!("spec: {:?}", spec);
             let cgroups_path = utils::get_cgroup_path(
-                &spec.linux.context("no linux in spec")?.cgroups_path,
+                spec.linux()
+                    .as_ref()
+                    .context("no linux in spec")?
+                    .cgroups_path(),
                 container.id(),
             );
             let systemd_cgroup = container

@@ -5,14 +5,15 @@ use std::{
 
 use anyhow::{anyhow, bail, Result};
 use nix::unistd::Pid;
-use oci_spec::{FreezerState, LinuxResources};
 use std::path::{Path, PathBuf};
 
+#[cfg(feature = "cgroupsv2_devices")]
+use super::devices::Devices;
 use super::{
     controller::Controller, controller_type::ControllerType, cpu::Cpu, cpuset::CpuSet,
     freezer::Freezer, hugetlb::HugeTlb, io::Io, memory::Memory, pids::Pids,
 };
-use crate::common::{self, CgroupManager, PathBufExt};
+use crate::common::{self, CgroupManager, ControllerOpt, FreezerState, PathBufExt};
 use crate::stats::Stats;
 
 const CGROUP_PROCS: &str = "cgroup.procs";
@@ -225,19 +226,20 @@ impl CgroupManager for SystemDCGroupManager {
         Ok(())
     }
 
-    fn apply(&self, linux_resources: &LinuxResources) -> Result<()> {
+    fn apply(&self, controller_opt: &ControllerOpt) -> Result<()> {
         for controller in CONTROLLER_TYPES {
             match controller {
-                ControllerType::Cpu => Cpu::apply(linux_resources, &self.full_path)?,
-                ControllerType::CpuSet => CpuSet::apply(linux_resources, &self.full_path)?,
-                ControllerType::HugeTlb => HugeTlb::apply(linux_resources, &self.full_path)?,
-                ControllerType::Io => Io::apply(linux_resources, &self.full_path)?,
-                ControllerType::Memory => Memory::apply(linux_resources, &self.full_path)?,
-                ControllerType::Pids => Pids::apply(linux_resources, &self.full_path)?,
-                ControllerType::Freezer => Freezer::apply(linux_resources, &self.full_path)?,
+                ControllerType::Cpu => Cpu::apply(controller_opt, &self.full_path)?,
+                ControllerType::CpuSet => CpuSet::apply(controller_opt, &self.full_path)?,
+                ControllerType::HugeTlb => HugeTlb::apply(controller_opt, &self.full_path)?,
+                ControllerType::Io => Io::apply(controller_opt, &self.full_path)?,
+                ControllerType::Memory => Memory::apply(controller_opt, &self.full_path)?,
+                ControllerType::Pids => Pids::apply(controller_opt, &self.full_path)?,
             }
         }
 
+        #[cfg(feature = "cgroupsv2_devices")]
+        Devices::apply(controller_opt, &self.full_path)?;
         Ok(())
     }
 
@@ -246,11 +248,13 @@ impl CgroupManager for SystemDCGroupManager {
     }
 
     fn freeze(&self, state: FreezerState) -> Result<()> {
-        let linux_resources = LinuxResources {
-            freezer: Some(state),
-            ..Default::default()
+        let controller_opt = ControllerOpt {
+            resources: &Default::default(),
+            freezer_state: Some(state),
+            oom_score_adj: None,
+            disable_oom_killer: false,
         };
-        Freezer::apply(&linux_resources, &self.full_path)
+        Freezer::apply(&controller_opt, &self.full_path)
     }
 
     fn stats(&self) -> Result<Stats> {

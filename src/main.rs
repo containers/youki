@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 use anyhow::bail;
 use anyhow::Result;
-use clap::Clap;
+use clap::{crate_version, Clap};
 
 use nix::sys::stat::Mode;
 use nix::unistd::getuid;
@@ -25,14 +25,14 @@ use youki::commands::run;
 use youki::commands::spec_json;
 use youki::commands::start;
 use youki::commands::state;
-use youki::rootless::should_use_rootless;
+use youki::rootless::rootless_required;
 use youki::utils::{self, create_dir_all_with_mode};
 
 // High-level commandline option definition
 // This takes global options as well as individual commands as specified in [OCI runtime-spec](https://github.com/opencontainers/runtime-spec/blob/master/runtime.md)
 // Also check [runc commandline documentation](https://github.com/opencontainers/runc/blob/master/man/runc.8.md) for more explanation
 #[derive(Clap, Debug)]
-#[clap(version = "0.0.0", author = "youki team")]
+#[clap(version = crate_version!(), author = "youki team")]
 struct Opts {
     /// root directory to store container state
     #[clap(short, long)]
@@ -53,33 +53,33 @@ struct Opts {
 // Also for a short information, check [runc commandline documentation](https://github.com/opencontainers/runc/blob/master/man/runc.8.md)
 #[derive(Clap, Debug)]
 enum SubCommand {
-    #[clap(version = "0.0.0", author = "youki team")]
+    #[clap(version = crate_version!(), author = "youki team")]
     Create(create::Create),
-    #[clap(version = "0.0.0", author = "youki team")]
+    #[clap(version = crate_version!(), author = "youki team")]
     Start(start::Start),
-    #[clap(version = "0.0.0", author = "youki team")]
+    #[clap(version = crate_version!(), author = "youki team")]
     Run(run::Run),
-    #[clap(version = "0.0.0", author = "youki team")]
+    #[clap(version = crate_version!(), author = "youki team")]
     Exec(exec::Exec),
-    #[clap(version = "0.0.0", author = "youki team")]
+    #[clap(version = crate_version!(), author = "youki team")]
     Kill(kill::Kill),
-    #[clap(version = "0.0.0", author = "youki team")]
+    #[clap(version = crate_version!(), author = "youki team")]
     Delete(delete::Delete),
-    #[clap(version = "0.0.0", author = "youki team")]
+    #[clap(version = crate_version!(), author = "youki team")]
     State(state::State),
-    #[clap(version = "0.0.0", author = "youki team")]
+    #[clap(version = crate_version!(), author = "youki team")]
     Info(info::Info),
-    #[clap(version = "0.0.0", author = "youki team")]
+    #[clap(version = crate_version!(), author = "youki team")]
     Spec(spec_json::SpecJson),
-    #[clap(version = "0.0.0", author = "youki team")]
+    #[clap(version = crate_version!(), author = "youki team")]
     List(list::List),
-    #[clap(version = "0.0.0", author = "youki team")]
+    #[clap(version = crate_version!(), author = "youki team")]
     Pause(pause::Pause),
-    #[clap(version = "0.0.0", author = "youki team")]
+    #[clap(version = crate_version!(), author = "youki team")]
     Resume(resume::Resume),
-    #[clap(version = "0.0.0", author = "youki team")]
+    #[clap(version = crate_version!(), author = "youki team")]
     Events(events::Events),
-    #[clap(version = "0.0.0", author = "youki team", setting=clap::AppSettings::AllowLeadingHyphen)]
+    #[clap(version = crate_version!(), author = "youki team", setting=clap::AppSettings::AllowLeadingHyphen)]
     Ps(ps::Ps),
 }
 
@@ -101,13 +101,13 @@ fn main() -> Result<()> {
         SubCommand::Run(run) => run.exec(root_path, systemd_cgroup),
         SubCommand::Exec(exec) => exec.exec(root_path),
         SubCommand::Kill(kill) => kill.exec(root_path),
-        SubCommand::Delete(delete) => delete.exec(root_path, systemd_cgroup),
+        SubCommand::Delete(delete) => delete.exec(root_path),
         SubCommand::State(state) => state.exec(root_path),
         SubCommand::Info(info) => info.exec(),
         SubCommand::List(list) => list.exec(root_path),
         SubCommand::Spec(spec) => spec.exec(),
-        SubCommand::Pause(pause) => pause.exec(root_path, systemd_cgroup),
-        SubCommand::Resume(resume) => resume.exec(root_path, systemd_cgroup),
+        SubCommand::Pause(pause) => pause.exec(root_path),
+        SubCommand::Resume(resume) => resume.exec(root_path),
         SubCommand::Events(events) => events.exec(root_path),
         SubCommand::Ps(ps) => ps.exec(root_path),
     }
@@ -118,7 +118,7 @@ fn determine_root_path(root_path: Option<PathBuf>) -> Result<PathBuf> {
         return Ok(path);
     }
 
-    if !should_use_rootless() {
+    if !rootless_required() {
         let default = PathBuf::from("/run/youki");
         utils::create_dir_all(&default)?;
         return Ok(default);
@@ -137,8 +137,7 @@ fn determine_root_path(root_path: Option<PathBuf>) -> Result<PathBuf> {
     }
 
     if let Ok(path) = std::env::var("HOME") {
-        let home = PathBuf::from(path);
-        if let Ok(resolved) = fs::canonicalize(home) {
+        if let Ok(resolved) = fs::canonicalize(path) {
             let run_dir = resolved.join(".youki/run");
             if create_dir_all_with_mode(&run_dir, uid, Mode::S_IRWXU).is_ok() {
                 return Ok(run_dir);

@@ -3,10 +3,9 @@ use anyhow::Result;
 use clap::Clap;
 use std::path::PathBuf;
 
-use crate::container::builder::ContainerBuilder;
+use crate::{container::builder::ContainerBuilder, syscall::syscall::create_syscall};
 
-/// This is the main structure which stores various commandline options given by
-/// high-level container runtime
+/// Create a container
 #[derive(Clap, Debug)]
 pub struct Create {
     /// File to write pid of the container created
@@ -23,6 +22,7 @@ pub struct Create {
     #[clap(long, default_value = "0")]
     preserve_fds: i32,
     /// name of the container instance to be started
+    #[clap(forbid_empty_values = true, required = true)]
     pub container_id: String,
 }
 
@@ -32,31 +32,17 @@ pub struct Create {
 // it is running, it is just another process, and has attributes such as pid, file descriptors, etc.
 // associated with it like any other process.
 impl Create {
-    /// instant Create Command
-    pub fn new(
-        container_id: String,
-        pid_file: Option<PathBuf>,
-        bundle: PathBuf,
-        console_socket: Option<PathBuf>,
-        preserve_fds: i32,
-    ) -> Self {
-        Self {
-            pid_file,
-            bundle,
-            console_socket,
-            container_id,
-            preserve_fds,
-        }
-    }
-    /// Starts a new container process
     pub fn exec(&self, root_path: PathBuf, systemd_cgroup: bool) -> Result<()> {
-        ContainerBuilder::new(self.container_id.clone())
+        let syscall = create_syscall();
+        ContainerBuilder::new(self.container_id.clone(), syscall.as_ref())
             .with_pid_file(self.pid_file.as_ref())
             .with_console_socket(self.console_socket.as_ref())
             .with_root_path(root_path)
             .with_preserved_fds(self.preserve_fds)
             .as_init(&self.bundle)
             .with_systemd(systemd_cgroup)
-            .build()
+            .build()?;
+
+        Ok(())
     }
 }

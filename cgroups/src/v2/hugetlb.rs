@@ -3,20 +3,21 @@ use std::{collections::HashMap, path::Path};
 
 use super::controller::Controller;
 use crate::{
-    common,
+    common::{self, ControllerOpt},
     stats::{parse_single_value, supported_page_sizes, HugeTlbStats, StatsProvider},
 };
 
-use oci_spec::{LinuxHugepageLimit, LinuxResources};
+use oci_spec::runtime::LinuxHugepageLimit;
 
 pub struct HugeTlb {}
 
 impl Controller for HugeTlb {
-    fn apply(linux_resources: &LinuxResources, cgroup_root: &std::path::Path) -> Result<()> {
+    fn apply(controller_opt: &ControllerOpt, cgroup_root: &std::path::Path) -> Result<()> {
         log::debug!("Apply hugetlb cgroup v2 config");
-        if let Some(hugepage_limits) = linux_resources.hugepage_limits.as_ref() {
+        if let Some(hugepage_limits) = controller_opt.resources.hugepage_limits() {
             for hugetlb in hugepage_limits {
-                Self::apply(cgroup_root, hugetlb)?
+                Self::apply(cgroup_root, hugetlb)
+                    .context("failed to apply hugetlb resource restrictions")?
             }
         }
         Ok(())
@@ -44,7 +45,7 @@ impl StatsProvider for HugeTlb {
 impl HugeTlb {
     fn apply(root_path: &Path, hugetlb: &LinuxHugepageLimit) -> Result<()> {
         let page_size: String = hugetlb
-            .page_size
+            .page_size()
             .chars()
             .take_while(|c| c.is_digit(10))
             .collect();
@@ -54,8 +55,8 @@ impl HugeTlb {
         }
 
         common::write_cgroup_file(
-            root_path.join(format!("hugetlb.{}.limit_in_bytes", hugetlb.page_size)),
-            hugetlb.limit,
+            root_path.join(format!("hugetlb.{}.limit_in_bytes", hugetlb.page_size())),
+            hugetlb.limit(),
         )?;
         Ok(())
     }
@@ -87,7 +88,7 @@ impl HugeTlb {
 mod tests {
     use super::*;
     use crate::test::{create_temp_dir, set_fixture};
-    use oci_spec::LinuxHugepageLimit;
+    use oci_spec::runtime::LinuxHugepageLimitBuilder;
     use std::fs::read_to_string;
 
     #[test]
@@ -96,13 +97,14 @@ mod tests {
         let tmp = create_temp_dir("test_set_hugetlbv2").expect("create temp directory for test");
         set_fixture(&tmp, page_file_name, "0").expect("Set fixture for 2 MB page size");
 
-        let hugetlb = LinuxHugepageLimit {
-            page_size: "2MB".to_owned(),
-            limit: 16384,
-        };
+        let hugetlb = LinuxHugepageLimitBuilder::default()
+            .page_size("2MB")
+            .limit(16384)
+            .build()
+            .unwrap();
         HugeTlb::apply(&tmp, &hugetlb).expect("apply hugetlb");
         let content = read_to_string(tmp.join(page_file_name)).expect("Read hugetlb file content");
-        assert_eq!(hugetlb.limit.to_string(), content);
+        assert_eq!(hugetlb.limit().to_string(), content);
     }
 
     #[test]
@@ -110,10 +112,11 @@ mod tests {
         let tmp = create_temp_dir("test_set_hugetlbv2_with_invalid_page_size")
             .expect("create temp directory for test");
 
-        let hugetlb = LinuxHugepageLimit {
-            page_size: "3MB".to_owned(),
-            limit: 16384,
-        };
+        let hugetlb = LinuxHugepageLimitBuilder::default()
+            .page_size("3MB")
+            .limit(16384)
+            .build()
+            .unwrap();
 
         let result = HugeTlb::apply(&tmp, &hugetlb);
         assert!(
@@ -124,13 +127,13 @@ mod tests {
 
     quickcheck! {
         fn property_test_set_hugetlb(hugetlb: LinuxHugepageLimit) -> bool {
-            let page_file_name = format!("hugetlb.{:?}.limit_in_bytes", hugetlb.page_size);
+            let page_file_name = format!("hugetlb.{:?}.limit_in_bytes", hugetlb.page_size());
             let tmp = create_temp_dir("property_test_set_hugetlbv2").expect("create temp directory for test");
             set_fixture(&tmp, &page_file_name, "0").expect("Set fixture for page size");
             let result = HugeTlb::apply(&tmp, &hugetlb);
 
             let page_size: String = hugetlb
-            .page_size
+            .page_size()
             .chars()
             .take_while(|c| c.is_digit(10))
             .collect();
@@ -139,7 +142,7 @@ mod tests {
             if HugeTlb::is_power_of_two(page_size) && page_size != 1 {
                 let content =
                     read_to_string(tmp.join(page_file_name)).expect("Read hugetlb file content");
-                hugetlb.limit.to_string() == content
+                hugetlb.limit().to_string() == content
             } else {
                 result.is_err()
             }

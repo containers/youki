@@ -8,6 +8,12 @@ pub mod builder;
 mod builder_impl;
 #[allow(clippy::module_inception)]
 mod container;
+mod container_delete;
+mod container_events;
+mod container_kill;
+mod container_pause;
+mod container_resume;
+mod container_start;
 pub mod init_builder;
 pub mod state;
 pub mod tenant_builder;

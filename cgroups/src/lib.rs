@@ -4,9 +4,10 @@
 #[cfg(test)]
 #[macro_use]
 extern crate quickcheck;
+mod test;
 
 pub mod common;
 pub mod stats;
-mod test;
+pub mod test_manager;
 pub mod v1;
 pub mod v2;

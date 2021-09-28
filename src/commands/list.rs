@@ -1,5 +1,4 @@
 //! Contains Functionality of list container command
-use std::ffi::OsString;
 use std::fs;
 use std::io;
 use std::io::Write;
@@ -12,7 +11,7 @@ use tabwriter::TabWriter;
 
 use crate::container::{state::State, Container};
 
-/// Empty struct for list command
+/// List created containers
 #[derive(Clap, Debug)]
 pub struct List {}
 
@@ -30,18 +29,14 @@ impl List {
                 continue;
             }
 
-            let container = Container::load(container_dir)?.refresh_status()?;
+            let container = Container::load(container_dir)?;
             let pid = if let Some(pid) = container.pid() {
                 pid.to_string()
             } else {
                 "".to_owned()
             };
 
-            let user_name = if let Some(creator) = container.creator() {
-                creator
-            } else {
-                OsString::new()
-            };
+            let user_name = container.creator().unwrap_or_default();
 
             let created = if let Some(utc) = container.created() {
                 let local: DateTime<Local> = DateTime::from(utc);
@@ -55,7 +50,7 @@ impl List {
                 container.id(),
                 pid,
                 container.status(),
-                container.bundle(),
+                container.bundle().to_string_lossy(),
                 created,
                 user_name.to_string_lossy()
             ));

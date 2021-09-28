@@ -8,7 +8,7 @@ use chrono::DateTime;
 use nix::unistd::Pid;
 
 use chrono::Utc;
-use oci_spec::Spec;
+use oci_spec::runtime::Spec;
 use procfs::process::Process;
 
 use crate::syscall::syscall::create_syscall;
@@ -38,11 +38,11 @@ impl Container {
         container_id: &str,
         status: ContainerStatus,
         pid: Option<i32>,
-        bundle: &str,
+        bundle: &Path,
         container_root: &Path,
     ) -> Result<Self> {
         let container_root = fs::canonicalize(container_root)?;
-        let state = State::new(container_id, status, pid, bundle);
+        let state = State::new(container_id, status, pid, bundle.to_path_buf());
         Ok(Self {
             state,
             root: container_root,
@@ -50,49 +50,7 @@ impl Container {
     }
 
     pub fn id(&self) -> &str {
-        self.state.id.as_str()
-    }
-
-    pub fn status(&self) -> ContainerStatus {
-        self.state.status
-    }
-    pub fn refresh_status(&mut self) -> Result<Self> {
-        let new_status = match self.pid() {
-            Some(pid) => {
-                // Note that Process::new does not spawn a new process
-                // but instead creates a new Process structure, and fill
-                // it with information about the process with given pid
-                if let Ok(proc) = Process::new(pid.as_raw()) {
-                    use procfs::process::ProcState;
-                    match proc.stat.state().unwrap() {
-                        ProcState::Zombie | ProcState::Dead => ContainerStatus::Stopped,
-                        _ => match self.status() {
-                            ContainerStatus::Creating
-                            | ContainerStatus::Created
-                            | ContainerStatus::Paused => self.status(),
-                            _ => ContainerStatus::Running,
-                        },
-                    }
-                } else {
-                    ContainerStatus::Stopped
-                }
-            }
-            None => ContainerStatus::Stopped,
-        };
-        Ok(self.update_status(new_status))
-    }
-
-    pub fn refresh_state(&self) -> Result<Self> {
-        let state = State::load(&self.root)?;
-        Ok(Self {
-            state,
-            root: self.root.clone(),
-        })
-    }
-
-    pub fn save(&self) -> Result<()> {
-        log::debug!("Save container status: {:?} in {:?}", self, self.root);
-        self.state.save(&self.root)
+        &self.state.id
     }
 
     pub fn can_start(&self) -> bool {
@@ -119,27 +77,26 @@ impl Container {
         self.state.status.can_resume()
     }
 
+    pub fn bundle(&self) -> &PathBuf {
+        &self.state.bundle
+    }
+
+    pub fn set_annotations(&mut self, annotations: Option<HashMap<String, String>>) -> &mut Self {
+        self.state.annotations = annotations;
+        self
+    }
+
     pub fn pid(&self) -> Option<Pid> {
         self.state.pid.map(Pid::from_raw)
     }
 
-    pub fn set_pid(&self, pid: i32) -> Self {
-        let mut new_state = self.state.clone();
-        new_state.pid = Some(pid);
-
-        Self {
-            state: new_state,
-            root: self.root.clone(),
-        }
+    pub fn set_pid(&mut self, pid: i32) -> &mut Self {
+        self.state.pid = Some(pid);
+        self
     }
 
     pub fn created(&self) -> Option<DateTime<Utc>> {
         self.state.created
-    }
-
-    pub fn set_creator(mut self, uid: u32) -> Self {
-        self.state.creator = Some(uid);
-        self
     }
 
     pub fn creator(&self) -> Option<OsString> {
@@ -154,17 +111,8 @@ impl Container {
         None
     }
 
-    pub fn bundle(&self) -> String {
-        self.state.bundle.clone()
-    }
-
-    pub fn set_systemd(mut self, should_use: bool) -> Self {
-        self.state.use_systemd = Some(should_use);
-        self
-    }
-
-    pub fn set_annotations(mut self, annotations: Option<HashMap<String, String>>) -> Self {
-        self.state.annotations = annotations;
+    pub fn set_creator(&mut self, uid: u32) -> &mut Self {
+        self.state.creator = Some(uid);
         self
     }
 
@@ -172,31 +120,112 @@ impl Container {
         self.state.use_systemd
     }
 
-    pub fn update_status(&self, status: ContainerStatus) -> Self {
+    pub fn set_systemd(&mut self, should_use: bool) -> &mut Self {
+        self.state.use_systemd = Some(should_use);
+        self
+    }
+
+    pub fn status(&self) -> ContainerStatus {
+        self.state.status
+    }
+
+    pub fn set_status(&mut self, status: ContainerStatus) -> &mut Self {
         let created = match (status, self.state.created) {
             (ContainerStatus::Created, None) => Some(Utc::now()),
             _ => self.state.created,
         };
 
-        let mut new_state = self.state.clone();
-        new_state.created = created;
-        new_state.status = status;
+        self.state.created = created;
+        self.state.status = status;
 
-        Self {
-            state: new_state,
-            root: self.root.clone(),
-        }
+        self
+    }
+
+    pub fn refresh_status(&mut self) -> Result<()> {
+        let new_status = match self.pid() {
+            Some(pid) => {
+                // Note that Process::new does not spawn a new process
+                // but instead creates a new Process structure, and fill
+                // it with information about the process with given pid
+                if let Ok(proc) = Process::new(pid.as_raw()) {
+                    use procfs::process::ProcState;
+                    match proc.stat.state().unwrap() {
+                        ProcState::Zombie | ProcState::Dead => ContainerStatus::Stopped,
+                        _ => match self.status() {
+                            ContainerStatus::Creating
+                            | ContainerStatus::Created
+                            | ContainerStatus::Paused => self.status(),
+                            _ => ContainerStatus::Running,
+                        },
+                    }
+                } else {
+                    ContainerStatus::Stopped
+                }
+            }
+            None => ContainerStatus::Stopped,
+        };
+
+        self.set_status(new_status);
+        Ok(())
+    }
+
+    pub fn refresh_state(&mut self) -> Result<&mut Self> {
+        let state = State::load(&self.root)?;
+        self.state = state;
+
+        Ok(self)
     }
 
     pub fn load(container_root: PathBuf) -> Result<Self> {
         let state = State::load(&container_root)?;
-        Ok(Self {
+        let mut container = Self {
             state,
             root: container_root,
-        })
+        };
+        container.refresh_status()?;
+        Ok(container)
+    }
+
+    pub fn save(&self) -> Result<()> {
+        log::debug!("Save container status: {:?} in {:?}", self, self.root);
+        self.state.save(&self.root)
     }
 
     pub fn spec(&self) -> Result<Spec> {
-        Spec::load(self.root.join("config.json"))
+        let spec = Spec::load(self.root.join("config.json"))?;
+        Ok(spec)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::env;
+
+    use super::*;
+    use anyhow::Result;
+
+    #[test]
+    fn test_set_id() -> Result<()> {
+        let dir = env::temp_dir();
+        let mut container =
+            Container::new("container_id", ContainerStatus::Created, None, &dir, &dir)?;
+        container.set_pid(1);
+        assert_eq!(container.pid(), Some(Pid::from_raw(1)));
+        Ok(())
+    }
+
+    #[test]
+    fn test_basic_getter() -> Result<()> {
+        let container = Container::new(
+            "container_id",
+            ContainerStatus::Created,
+            None,
+            &PathBuf::from("."),
+            &PathBuf::from("."),
+        )?;
+
+        assert_eq!(container.bundle(), &PathBuf::from("."));
+        assert_eq!(container.root, fs::canonicalize(PathBuf::from("."))?);
+        Ok(())
     }
 }

@@ -1,11 +1,11 @@
 use std::path::Path;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use async_trait::async_trait;
 
 use super::Controller;
-use crate::common;
-use oci_spec::{LinuxNetwork, LinuxResources};
+use crate::common::{self, ControllerOpt};
+use oci_spec::runtime::LinuxNetwork;
 
 pub struct NetworkClassifier {}
 
@@ -13,28 +13,26 @@ pub struct NetworkClassifier {}
 impl Controller for NetworkClassifier {
     type Resource = LinuxNetwork;
 
-    async fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
+    async fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply NetworkClassifier cgroup config");
 
-        if let Some(network) = Self::needs_to_handle(linux_resources) {
-            Self::apply(cgroup_root, network).await?;
+        if let Some(network) = Self::needs_to_handle(controller_opt) {
+            Self::apply(cgroup_root, network)
+                .await
+                .context("failed to apply network classifier resource restrictions")?;
         }
 
         Ok(())
     }
 
-    fn needs_to_handle(linux_resources: &LinuxResources) -> Option<&Self::Resource> {
-        if let Some(network) = linux_resources.network.as_ref() {
-            return Some(network);
-        }
-
-        None
+    fn needs_to_handle<'a>(controller_opt: &'a ControllerOpt) -> Option<&'a Self::Resource> {
+        controller_opt.resources.network().as_ref()
     }
 }
 
 impl NetworkClassifier {
     async fn apply(root_path: &Path, network: &LinuxNetwork) -> Result<()> {
-        if let Some(class_id) = network.class_id {
+        if let Some(class_id) = network.class_id() {
             common::async_write_cgroup_file(root_path.join("net_cls.classid"), class_id).await?;
         }
 
@@ -46,6 +44,7 @@ impl NetworkClassifier {
 mod tests {
     use super::*;
     use crate::test::{aw, create_temp_dir, set_fixture};
+    use oci_spec::runtime::LinuxNetworkBuilder;
 
     #[test]
     fn test_apply_network_classifier() {
@@ -53,11 +52,12 @@ mod tests {
             .expect("create temp directory for test");
         set_fixture(&tmp, "net_cls.classid", "0").expect("set fixture for classID");
 
-        let id = 0x100001;
-        let network = LinuxNetwork {
-            class_id: Some(id),
-            priorities: Some(vec![]),
-        };
+        let id = 0x100001u32;
+        let network = LinuxNetworkBuilder::default()
+            .class_id(id)
+            .priorities(vec![])
+            .build()
+            .unwrap();
 
         aw!(NetworkClassifier::apply(&tmp, &network)).expect("apply network classID");
 

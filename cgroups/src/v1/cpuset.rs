@@ -1,12 +1,12 @@
 use std::{fs, path::Path};
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
 use nix::unistd;
-use oci_spec::{LinuxCpu, LinuxResources};
+use oci_spec::runtime::LinuxCpu;
 use unistd::Pid;
 
-use crate::common::{self, CGROUP_PROCS};
+use crate::common::{self, ControllerOpt, CGROUP_PROCS};
 
 use super::{util, Controller, ControllerType};
 
@@ -29,19 +29,21 @@ impl Controller for CpuSet {
         Ok(())
     }
 
-    async fn apply(linux_resources: &LinuxResources, cgroup_path: &Path) -> Result<()> {
+    async fn apply(controller_opt: &ControllerOpt, cgroup_path: &Path) -> Result<()> {
         log::debug!("Apply CpuSet cgroup config");
 
-        if let Some(cpuset) = Self::needs_to_handle(linux_resources) {
-            Self::apply(cgroup_path, cpuset).await?;
+        if let Some(cpuset) = Self::needs_to_handle(controller_opt) {
+            Self::apply(cgroup_path, cpuset)
+                .await
+                .context("failed to apply cpuset resource restrictions")?;
         }
 
         Ok(())
     }
 
-    fn needs_to_handle(linux_resources: &LinuxResources) -> Option<&Self::Resource> {
-        if let Some(cpuset) = &linux_resources.cpu {
-            if cpuset.cpus.is_some() || cpuset.mems.is_some() {
+    fn needs_to_handle<'a>(controller_opt: &'a ControllerOpt) -> Option<&'a Self::Resource> {
+        if let Some(cpuset) = &controller_opt.resources.cpu() {
+            if cpuset.cpus().is_some() || cpuset.mems().is_some() {
                 return Some(cpuset);
             }
         }
@@ -52,11 +54,11 @@ impl Controller for CpuSet {
 
 impl CpuSet {
     async fn apply(cgroup_path: &Path, cpuset: &LinuxCpu) -> Result<()> {
-        if let Some(cpus) = &cpuset.cpus {
+        if let Some(cpus) = &cpuset.cpus() {
             common::async_write_cgroup_file(cgroup_path.join(CGROUP_CPUSET_CPUS), cpus).await?;
         }
 
-        if let Some(mems) = &cpuset.mems {
+        if let Some(mems) = &cpuset.mems() {
             common::async_write_cgroup_file(cgroup_path.join(CGROUP_CPUSET_MEMS), mems).await?;
         }
 
@@ -94,13 +96,17 @@ mod tests {
     use std::fs;
 
     use super::*;
-    use crate::test::{aw, setup, LinuxCpuBuilder};
+    use crate::test::{aw, setup};
+    use oci_spec::runtime::LinuxCpuBuilder;
 
     #[test]
     fn test_set_cpus() {
         // arrange
         let (tmp, cpus) = setup("test_set_cpus", CGROUP_CPUSET_CPUS);
-        let cpuset = LinuxCpuBuilder::new().with_cpus("1-3".to_owned()).build();
+        let cpuset = LinuxCpuBuilder::default()
+            .cpus("1-3".to_owned())
+            .build()
+            .unwrap();
 
         // act
         aw!(CpuSet::apply(&tmp, &cpuset)).expect("apply cpuset");
@@ -115,7 +121,10 @@ mod tests {
     fn test_set_mems() {
         // arrange
         let (tmp, mems) = setup("test_set_mems", CGROUP_CPUSET_MEMS);
-        let cpuset = LinuxCpuBuilder::new().with_mems("1-3".to_owned()).build();
+        let cpuset = LinuxCpuBuilder::default()
+            .mems("1-3".to_owned())
+            .build()
+            .unwrap();
 
         // act
         aw!(CpuSet::apply(&tmp, &cpuset)).expect("apply cpuset");

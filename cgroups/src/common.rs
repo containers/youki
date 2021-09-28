@@ -1,15 +1,20 @@
 use std::{
-    env,
     fmt::{Debug, Display},
     fs::{self, File},
     io::{BufRead, BufReader, Write},
     path::{Path, PathBuf},
+    time::Duration,
 };
 
 use anyhow::{bail, Context, Result};
-use nix::unistd::Pid;
-use oci_spec::{FreezerState, LinuxResources};
-use procfs::process::Process;
+use nix::{
+    sys::statfs::{statfs, CGROUP2_SUPER_MAGIC, TMPFS_MAGIC},
+    unistd::Pid,
+};
+use oci_spec::runtime::{
+    LinuxDevice, LinuxDeviceBuilder, LinuxDeviceCgroup, LinuxDeviceCgroupBuilder, LinuxDeviceType,
+    LinuxResources,
+};
 #[cfg(feature = "systemd_cgroups")]
 use systemd::daemon::booted;
 #[cfg(not(feature = "systemd_cgroups"))]
@@ -38,33 +43,64 @@ const CHUNK_SIZE: usize = 4096;
 pub trait CgroupManager {
     /// Adds a task specified by its pid to the cgroup
     fn add_task(&self, pid: Pid) -> Result<()>;
+
     /// Applies resource restrictions to the cgroup
-    fn apply(&self, linux_resources: &LinuxResources) -> Result<()>;
+    fn apply(&self, controller_opt: &ControllerOpt) -> Result<()>;
+
     /// Removes the cgroup
     fn remove(&self) -> Result<()>;
+
     // Sets the freezer cgroup to the specified state
     fn freeze(&self, state: FreezerState) -> Result<()>;
+
     /// Retrieve statistics for the cgroup
     fn stats(&self) -> Result<Stats>;
+
     // Gets the PIDs inside the cgroup
     fn get_all_pids(&self) -> Result<Vec<Pid>>;
 }
 
 #[derive(Debug)]
-pub enum Cgroup {
-    V1,
-    V2,
+pub enum CgroupSetup {
+    Hybrid,
+    Legacy,
+    Unified,
 }
 
-impl Display for Cgroup {
+impl Display for CgroupSetup {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let print = match *self {
-            Cgroup::V1 => "v1",
-            Cgroup::V2 => "v2",
+        let print = match self {
+            CgroupSetup::Hybrid => "hybrid",
+            CgroupSetup::Legacy => "legacy",
+            CgroupSetup::Unified => "unified",
         };
 
         write!(f, "{}", print)
     }
+}
+
+/// FreezerState is given freezer contoller
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FreezerState {
+    /// Tasks in cgroup are undefined
+    Undefined,
+    /// Tasks in cgroup are suspended.
+    Frozen,
+    /// Tasks in cgroup are resuming.
+    Thawed,
+}
+
+/// ControllerOpt is given all cgroup controller for applying cgroup configuration.
+#[derive(Clone, Debug)]
+pub struct ControllerOpt<'a> {
+    /// Resources contain cgroup information for handling resource constraints for the container.
+    pub resources: &'a LinuxResources,
+    /// Disables the OOM killer for out of memory conditions.
+    pub disable_oom_killer: bool,
+    /// Specify an oom_score_adj for container.
+    pub oom_score_adj: Option<i32>,
+    /// FreezerState is given to freezer contoller for suspending process.
+    pub freezer_state: Option<FreezerState>,
 }
 
 #[inline]
@@ -176,92 +212,79 @@ pub async fn async_read_cgroup_file<P: AsRef<Path>>(path: P) -> Result<String> {
     Ok(result)
 }
 
-pub fn get_supported_cgroup_fs() -> Result<Vec<Cgroup>> {
-    let cgroup_mount = Process::myself()?
-        .mountinfo()?
-        .into_iter()
-        .find(|m| m.fs_type == "cgroup");
+/// Determines the cgroup setup of the system. Systems typically have one of
+/// three setups:
+/// - Unified: Pure cgroup v2 system.
+/// - Legacy: Pure cgroup v1 system.
+/// - Hybrid: Hybrid is basically a cgroup v1 system, except for
+///   an additional unified hierarchy which doesn't have any
+///   controllers attached. Resource control can purely be achieved
+///   through the cgroup v1 hierarchy, not through the cgroup v2 hierarchy.
+pub fn get_cgroup_setup() -> Result<CgroupSetup> {
+    let default_root = Path::new(DEFAULT_CGROUP_ROOT);
+    match default_root.exists() {
+        true => {
+            // If the filesystem is of type cgroup2, the system is in unified mode.
+            // If the filesystem is tmpfs instead the system is either in legacy or
+            // hybrid mode. If a cgroup2 filesystem has been mounted under the "unified"
+            // folder we are in hybrid mode, otherwise we are in legacy mode.
+            let stat = statfs(default_root).with_context(|| {
+                format!(
+                    "failed to stat default cgroup root {}",
+                    &default_root.display()
+                )
+            })?;
+            if stat.filesystem_type() == CGROUP2_SUPER_MAGIC {
+                return Ok(CgroupSetup::Unified);
+            }
 
-    let cgroup2_mount = Process::myself()?
-        .mountinfo()?
-        .into_iter()
-        .find(|m| m.fs_type == "cgroup2");
+            if stat.filesystem_type() == TMPFS_MAGIC {
+                let unified = Path::new("/sys/fs/cgroup/unified");
+                if Path::new(unified).exists() {
+                    let stat = statfs(unified)
+                        .with_context(|| format!("failed to stat {}", unified.display()))?;
+                    if stat.filesystem_type() == CGROUP2_SUPER_MAGIC {
+                        return Ok(CgroupSetup::Hybrid);
+                    }
+                }
 
-    let mut cgroups = vec![];
-    if cgroup_mount.is_some() {
-        cgroups.push(Cgroup::V1);
+                return Ok(CgroupSetup::Legacy);
+            }
+        }
+        false => bail!("non default cgroup root not supported"),
     }
 
-    if cgroup2_mount.is_some() {
-        cgroups.push(Cgroup::V2);
-    }
-
-    Ok(cgroups)
+    bail!("failed to detect cgroup setup");
 }
 
 pub fn create_cgroup_manager<P: Into<PathBuf>>(
     cgroup_path: P,
     systemd_cgroup: bool,
 ) -> Result<Box<dyn CgroupManager>> {
-    let cgroup_mount = Process::myself()?
-        .mountinfo()?
-        .into_iter()
-        .find(|m| m.fs_type == "cgroup");
+    let cgroup_setup = get_cgroup_setup()?;
 
-    let cgroup2_mount = Process::myself()?
-        .mountinfo()?
-        .into_iter()
-        .find(|m| m.fs_type == "cgroup2");
-
-    match (cgroup_mount, cgroup2_mount) {
-        (Some(_), None) => {
+    match cgroup_setup {
+        CgroupSetup::Legacy | CgroupSetup::Hybrid => {
             log::info!("cgroup manager V1 will be used");
             Ok(Box::new(v1::manager::Manager::new(cgroup_path.into())?))
         }
-        (None, Some(cgroup2)) => {
-            log::info!("cgroup manager V2 will be used");
+        CgroupSetup::Unified => {
             if systemd_cgroup {
                 if !booted()? {
                     bail!("systemd cgroup flag passed, but systemd support for managing cgroups is not available");
                 }
                 log::info!("systemd cgroup manager will be used");
                 return Ok(Box::new(v2::SystemDCGroupManager::new(
-                    cgroup2.mount_point,
+                    DEFAULT_CGROUP_ROOT.into(),
                     cgroup_path.into(),
                 )?));
             }
+            log::info!("cgroup manager V2 will be used");
             Ok(Box::new(v2::manager::Manager::new(
-                cgroup2.mount_point,
+                DEFAULT_CGROUP_ROOT.into(),
                 cgroup_path.into(),
             )?))
         }
-        (Some(_), Some(cgroup2)) => {
-            let cgroup_override = env::var("YOUKI_PREFER_CGROUPV2");
-            match cgroup_override {
-                Ok(v) if v == "true" => {
-                    log::info!("cgroup manager V2 will be used");
-                    if systemd_cgroup {
-                        if !booted()? {
-                            bail!("systemd cgroup flag passed, but systemd support for managing cgroups is not available");
-                        }
-                        log::info!("systemd cgroup manager will be used");
-                        return Ok(Box::new(v2::SystemDCGroupManager::new(
-                            cgroup2.mount_point,
-                            cgroup_path.into(),
-                        )?));
-                    }
-                    Ok(Box::new(v2::manager::Manager::new(
-                        cgroup2.mount_point,
-                        cgroup_path.into(),
-                    )?))
-                }
-                _ => {
-                    log::info!("cgroup manager V1 will be used");
-                    Ok(Box::new(v1::manager::Manager::new(cgroup_path.into())?))
-                }
-            }
-        }
-        _ => bail!("could not find cgroup filesystem"),
     }
 }
 
@@ -297,7 +320,7 @@ where
     Ok(())
 }
 
-pub trait PathBufExt {
+pub(crate) trait PathBufExt {
     fn join_safely(&self, p: &Path) -> Result<PathBuf>;
 }
 
@@ -311,4 +334,135 @@ impl PathBufExt for PathBuf {
         }
         Ok(PathBuf::from(format!("{}{}", self.display(), p.display())))
     }
+}
+
+pub(crate) fn default_allow_devices() -> Vec<LinuxDeviceCgroup> {
+    vec![
+        LinuxDeviceCgroupBuilder::default()
+            .allow(true)
+            .typ(LinuxDeviceType::C)
+            .access("m")
+            .build()
+            .unwrap(),
+        LinuxDeviceCgroupBuilder::default()
+            .allow(true)
+            .typ(LinuxDeviceType::B)
+            .access("m")
+            .build()
+            .unwrap(),
+        // /dev/console
+        LinuxDeviceCgroupBuilder::default()
+            .allow(true)
+            .typ(LinuxDeviceType::C)
+            .major(5)
+            .minor(1)
+            .access("rwm")
+            .build()
+            .unwrap(),
+        // /dev/pts
+        LinuxDeviceCgroupBuilder::default()
+            .allow(true)
+            .typ(LinuxDeviceType::C)
+            .major(136)
+            .access("rwm")
+            .build()
+            .unwrap(),
+        LinuxDeviceCgroupBuilder::default()
+            .allow(true)
+            .typ(LinuxDeviceType::C)
+            .major(5)
+            .minor(2)
+            .access("rwm")
+            .build()
+            .unwrap(),
+        // tun/tap
+        LinuxDeviceCgroupBuilder::default()
+            .allow(true)
+            .typ(LinuxDeviceType::C)
+            .major(10)
+            .minor(200)
+            .access("rwm")
+            .build()
+            .unwrap(),
+    ]
+}
+
+pub(crate) fn default_devices() -> Vec<LinuxDevice> {
+    vec![
+        LinuxDeviceBuilder::default()
+            .path(PathBuf::from("/dev/null"))
+            .typ(LinuxDeviceType::C)
+            .major(1)
+            .minor(3)
+            .file_mode(0o066u32)
+            .build()
+            .unwrap(),
+        LinuxDeviceBuilder::default()
+            .path(PathBuf::from("/dev/zero"))
+            .typ(LinuxDeviceType::C)
+            .major(1)
+            .minor(5)
+            .file_mode(0o066u32)
+            .build()
+            .unwrap(),
+        LinuxDeviceBuilder::default()
+            .path(PathBuf::from("/dev/full"))
+            .typ(LinuxDeviceType::C)
+            .major(1)
+            .minor(7)
+            .file_mode(0o066u32)
+            .build()
+            .unwrap(),
+        LinuxDeviceBuilder::default()
+            .path(PathBuf::from("/dev/tty"))
+            .typ(LinuxDeviceType::C)
+            .major(5)
+            .minor(0)
+            .file_mode(0o066u32)
+            .build()
+            .unwrap(),
+        LinuxDeviceBuilder::default()
+            .path(PathBuf::from("/dev/urandom"))
+            .typ(LinuxDeviceType::C)
+            .major(1)
+            .minor(9)
+            .file_mode(0o066u32)
+            .build()
+            .unwrap(),
+        LinuxDeviceBuilder::default()
+            .path(PathBuf::from("/dev/random"))
+            .typ(LinuxDeviceType::C)
+            .major(1)
+            .minor(8)
+            .file_mode(0o066u32)
+            .build()
+            .unwrap(),
+    ]
+}
+
+/// Attempts to delete the path the requested number of times.
+pub(crate) fn delete_with_retry<P: AsRef<Path>, L: Into<Option<Duration>>>(
+    path: P,
+    retries: u32,
+    limit_backoff: L,
+) -> Result<()> {
+    let mut attempts = 0;
+    let mut delay = Duration::from_millis(10);
+    let path = path.as_ref();
+    let limit = limit_backoff.into().unwrap_or(Duration::MAX);
+
+    while attempts < retries {
+        if fs::remove_dir(path).is_ok() {
+            return Ok(());
+        }
+
+        std::thread::sleep(delay);
+        attempts += attempts;
+        delay *= attempts;
+        if delay > limit {
+            delay = limit;
+        }
+    }
+
+    bail!("could not delete {:?}", path)
 }

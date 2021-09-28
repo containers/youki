@@ -2,10 +2,9 @@ use std::path::Path;
 
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
-use oci_spec::LinuxResources;
 
 use crate::{
-    common,
+    common::{self, ControllerOpt},
     stats::{CpuUsage, StatsProvider},
 };
 
@@ -26,11 +25,11 @@ pub struct CpuAcct {}
 impl Controller for CpuAcct {
     type Resource = ();
 
-    async fn apply(_linux_resources: &LinuxResources, _cgroup_path: &Path) -> Result<()> {
+    async fn apply(_controller_opt: &ControllerOpt, _cgroup_path: &Path) -> Result<()> {
         Ok(())
     }
 
-    fn needs_to_handle(_linux_resources: &LinuxResources) -> Option<&Self::Resource> {
+    fn needs_to_handle<'a>(_controller_opt: &'a ControllerOpt) -> Option<&'a Self::Resource> {
         None
     }
 }
@@ -209,17 +208,17 @@ mod tests {
 
         assert_eq!(
             stats.per_core_usage_user,
-            &[5838999815217, 4139072325517, 4175712075766, 4021385867300]
+            [5838999815217, 4139072325517, 4175712075766, 4021385867300]
         );
 
         assert_eq!(
             stats.per_core_usage_kernel,
-            &[295316023007, 325194619244, 323435639997, 304269989810]
+            [295316023007, 325194619244, 323435639997, 304269989810]
         );
 
         assert_eq!(
             stats.per_core_usage_total,
-            &[989683000640, 4409567860144, 4439880333849, 4273328034121]
+            [989683000640, 4409567860144, 4439880333849, 4273328034121]
         );
     }
 }

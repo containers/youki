@@ -1,21 +1,26 @@
 use anyhow::{bail, Context, Result};
 use caps::Capability;
 use nix::unistd;
-use oci_spec::{LinuxCapabilities, LinuxNamespace, LinuxNamespaceType, Process, Spec};
+use oci_spec::runtime::{
+    Capabilities as SpecCapabilities, Capability as SpecCapability, LinuxBuilder,
+    LinuxCapabilities, LinuxCapabilitiesBuilder, LinuxNamespace, LinuxNamespaceBuilder,
+    LinuxNamespaceType, Process, ProcessBuilder, Spec, SpecBuilder,
+};
+use procfs::process::Namespace;
 
 use std::{
     collections::HashMap,
     convert::TryFrom,
-    ffi::{CString, OsString},
     fs,
-    os::unix::prelude::{OsStrExt, RawFd},
+    os::unix::prelude::RawFd,
     path::{Path, PathBuf},
     str::FromStr,
 };
 
-use crate::{notify_socket::NotifySocket, rootless::detect_rootless, tty, utils};
+use crate::{capabilities::CapabilityExt, container::builder_impl::ContainerBuilderImpl};
+use crate::{notify_socket::NotifySocket, rootless::Rootless, tty, utils};
 
-use super::{builder::ContainerBuilder, builder_impl::ContainerBuilderImpl, Container};
+use super::{builder::ContainerBuilder, Container};
 
 const NAMESPACE_TYPES: &[&str] = &["ipc", "uts", "net", "pid", "mnt", "cgroup"];
 const TENANT_NOTIFY: &str = "tenant-notify-";
@@ -23,8 +28,8 @@ const TENANT_TTY: &str = "tenant-tty-";
 
 /// Builder that can be used to configure the properties of a process
 /// that will join an existing container sandbox
-pub struct TenantContainerBuilder {
-    base: ContainerBuilder,
+pub struct TenantContainerBuilder<'a> {
+    base: ContainerBuilder<'a>,
     env: HashMap<String, String>,
     cwd: Option<PathBuf>,
     args: Vec<String>,
@@ -33,11 +38,11 @@ pub struct TenantContainerBuilder {
     process: Option<PathBuf>,
 }
 
-impl TenantContainerBuilder {
+impl<'a> TenantContainerBuilder<'a> {
     /// Generates the base configuration for a process that will join
     /// an existing container sandbox from which configuration methods
     /// can be chained
-    pub(super) fn new(builder: ContainerBuilder) -> Self {
+    pub(super) fn new(builder: ContainerBuilder<'a>) -> Self {
         Self {
             base: builder,
             env: HashMap::new(),
@@ -86,21 +91,23 @@ impl TenantContainerBuilder {
     pub fn build(self) -> Result<()> {
         let container_dir = self.lookup_container_dir()?;
         let container = self.load_container_state(container_dir.clone())?;
-        let mut spec = self.load_init_spec(&container_dir)?;
-        self.adapt_spec_for_tenant(&mut spec, &container)?;
+
+        let spec = self.load_init_spec(&container_dir)?;
+        let spec = self.adapt_spec_for_tenant(&spec, &container)?;
+
         log::debug!("{:#?}", spec);
 
-        unistd::chdir(&*container_dir)?;
+        unistd::chdir(&container_dir)?;
         let notify_path = Self::setup_notify_listener(&container_dir)?;
         // convert path of root file system of the container to absolute path
-        let rootfs = fs::canonicalize(&spec.root.as_ref().context("no root in spec")?.path)?;
+        let rootfs = fs::canonicalize(&spec.root().as_ref().context("no root in spec")?.path())?;
 
         // if socket file path is given in commandline options,
         // get file descriptors of console socket
         let csocketfd = self.setup_tty_socket(&container_dir)?;
 
         let use_systemd = self.should_use_systemd(&container);
-        let rootless = detect_rootless(&spec)?;
+        let rootless = Rootless::new(&spec)?;
 
         let mut builder_impl = ContainerBuilderImpl {
             init: false,
@@ -136,12 +143,12 @@ impl TenantContainerBuilder {
     fn load_init_spec(&self, container_dir: &Path) -> Result<Spec> {
         let spec_path = container_dir.join("config.json");
 
-        let spec = oci_spec::Spec::load(spec_path).context("failed to load spec")?;
+        let spec = Spec::load(spec_path).context("failed to load spec")?;
         Ok(spec)
     }
 
     fn load_container_state(&self, container_dir: PathBuf) -> Result<Container> {
-        let container = Container::load(container_dir)?.refresh_status()?;
+        let container = Container::load(container_dir)?;
         if !container.can_exec() {
             bail!(
                 "Cannot exec as container is in state {}",
@@ -152,28 +159,72 @@ impl TenantContainerBuilder {
         Ok(container)
     }
 
-    fn adapt_spec_for_tenant(&self, spec: &mut Spec, container: &Container) -> Result<()> {
-        if let Some(ref process) = self.process {
-            self.set_process(spec, process)?;
+    fn adapt_spec_for_tenant(&self, spec: &Spec, container: &Container) -> Result<Spec> {
+        let process = if let Some(process) = &self.process {
+            self.set_process(process)?
         } else {
-            self.set_working_dir(spec)?;
-            self.set_args(spec)?;
-            self.set_environment(spec)?;
-            self.set_no_new_privileges(spec)?;
-            self.set_capabilities(spec)?;
-        }
+            let mut process_builder = ProcessBuilder::default();
+
+            process_builder = match self.set_working_dir()? {
+                Some(cwd) => process_builder.cwd(cwd),
+                None => process_builder,
+            };
+
+            process_builder = process_builder.args(self.set_args()?);
+            process_builder = process_builder.env(self.set_environment()?);
+
+            process_builder = match self.set_no_new_privileges() {
+                Some(no_new_priv) => process_builder.no_new_privileges(no_new_priv),
+                None => process_builder,
+            };
+
+            process_builder = match self.set_capabilities(spec)? {
+                Some(caps) => process_builder.capabilities(caps),
+                None => process_builder,
+            };
+
+            process_builder.build()?
+        };
 
         if container.pid().is_none() {
             bail!("Could not retrieve container init pid");
         }
 
         let init_process = procfs::process::Process::new(container.pid().unwrap().as_raw())?;
-        self.set_namespaces(spec, init_process.namespaces()?)?;
+        let ns = self.set_namespaces(init_process.namespaces()?)?;
+        let linux = LinuxBuilder::default().namespaces(ns).build()?;
 
-        Ok(())
+        let mut spec_builder = SpecBuilder::default()
+            .process(process)
+            .version(spec.version())
+            .linux(linux);
+
+        spec_builder = match spec.root() {
+            Some(root) => spec_builder.root(root.clone()),
+            None => spec_builder,
+        };
+        spec_builder = match spec.mounts() {
+            Some(mounts) => spec_builder.mounts(mounts.clone()),
+            None => spec_builder,
+        };
+        spec_builder = match spec.hostname() {
+            Some(hostname) => spec_builder.hostname(hostname.clone()),
+            None => spec_builder,
+        };
+        spec_builder = match spec.hooks() {
+            Some(hooks) => spec_builder.hooks(hooks.clone()),
+            None => spec_builder,
+        };
+        spec_builder = match spec.annotations() {
+            Some(annotations) => spec_builder.annotations(annotations.clone()),
+            None => spec_builder,
+        };
+
+        let spec = spec_builder.build()?;
+        Ok(spec)
     }
 
-    fn set_process(&self, spec: &mut Spec, process: &Path) -> Result<()> {
+    fn set_process(&self, process: &Path) -> Result<Process> {
         if !process.exists() {
             bail!(
                 "Process.json file does not exist at specified path {}",
@@ -182,135 +233,131 @@ impl TenantContainerBuilder {
         }
 
         let process = utils::open(process)?;
-        let process_spec: Process = serde_json::from_reader(process)?;
-        spec.process = Some(process_spec);
-        Ok(())
+        let process_spec = serde_json::from_reader(process)?;
+        Ok(process_spec)
     }
 
-    fn set_working_dir(&self, spec: &mut Spec) -> Result<()> {
-        if let Some(ref cwd) = self.cwd {
+    fn set_working_dir(&self) -> Result<Option<PathBuf>> {
+        if let Some(cwd) = &self.cwd {
             if cwd.is_relative() {
                 bail!(
                     "Current working directory must be an absolute path, but is {}",
                     cwd.display()
                 );
             }
-
-            spec.process.as_mut().context("no process in spec")?.cwd =
-                cwd.to_string_lossy().to_string();
+            return Ok(Some(cwd.into()));
         }
-
-        Ok(())
+        Ok(None)
     }
 
-    fn set_args(&self, spec: &mut Spec) -> Result<()> {
+    fn set_args(&self) -> Result<Vec<String>> {
         if self.args.is_empty() {
             bail!("Container command was not specified")
         }
 
-        spec.process.as_mut().context("no process in spec")?.args = self.args.clone().into();
-        Ok(())
+        Ok(self.args.clone())
     }
 
-    fn set_environment(&self, spec: &mut Spec) -> Result<()> {
-        spec.process
-            .as_mut()
-            .context("no process in spec")?
+    fn set_environment(&self) -> Result<Vec<String>> {
+        Ok(self
             .env
-            .as_mut()
-            .context("no env in process spec")?
-            .append(
-                &mut self
-                    .env
-                    .iter()
-                    .map(|(k, v)| format!("{}={}", k, v))
-                    .collect(),
-            );
-
-        Ok(())
+            .iter()
+            .map(|(k, v)| format!("{}={}", k, v))
+            .collect())
     }
 
-    fn set_no_new_privileges(&self, spec: &mut Spec) -> Result<()> {
-        if let Some(no_new_privs) = self.no_new_privs {
-            spec.process
-                .as_mut()
-                .context("no process in spec")?
-                .no_new_privileges = no_new_privs.into();
-        }
-        Ok(())
+    fn set_no_new_privileges(&self) -> Option<bool> {
+        self.no_new_privs
     }
 
-    fn set_capabilities(&self, spec: &mut Spec) -> Result<()> {
+    fn set_capabilities(&self, spec: &Spec) -> Result<Option<LinuxCapabilities>> {
         if !self.capabilities.is_empty() {
             let mut caps: Vec<Capability> = Vec::with_capacity(self.capabilities.len());
             for cap in &self.capabilities {
                 caps.push(Capability::from_str(cap)?);
             }
 
-            if let Some(ref mut spec_caps) = spec
-                .process
-                .as_mut()
+            let caps: SpecCapabilities =
+                caps.iter().map(|c| SpecCapability::from_cap(*c)).collect();
+
+            if let Some(spec_caps) = spec
+                .process()
+                .as_ref()
                 .context("no process in spec")?
-                .capabilities
+                .capabilities()
             {
-                spec_caps
-                    .ambient
-                    .as_mut()
-                    .context("no ambient caps in process spec")?
-                    .append(&mut caps.clone());
-                spec_caps
-                    .bounding
-                    .as_mut()
-                    .context("no bounding caps in process spec")?
-                    .append(&mut caps.clone());
-                spec_caps
-                    .effective
-                    .as_mut()
-                    .context("no effective caps in process spec")?
-                    .append(&mut caps.clone());
-                spec_caps
-                    .inheritable
-                    .as_mut()
-                    .context("no inheritable caps in process spec")?
-                    .append(&mut caps.clone());
-                spec_caps
-                    .permitted
-                    .as_mut()
-                    .context("no permitted caps in process spec")?
-                    .append(&mut caps);
-            } else {
-                spec.process
-                    .as_mut()
-                    .context("no process in spec")?
-                    .capabilities = Some(LinuxCapabilities {
-                    ambient: caps.clone().into(),
-                    bounding: caps.clone().into(),
-                    effective: caps.clone().into(),
-                    inheritable: caps.clone().into(),
-                    permitted: caps.into(),
-                })
+                let mut capabilities_builder = LinuxCapabilitiesBuilder::default();
+                capabilities_builder = match spec_caps.ambient() {
+                    Some(ambient) => {
+                        let ambient: SpecCapabilities = ambient.union(&caps).copied().collect();
+                        capabilities_builder.ambient(ambient)
+                    }
+                    None => capabilities_builder,
+                };
+                capabilities_builder = match spec_caps.bounding() {
+                    Some(bounding) => {
+                        let bounding: SpecCapabilities = bounding.union(&caps).copied().collect();
+                        capabilities_builder.bounding(bounding)
+                    }
+                    None => capabilities_builder,
+                };
+                capabilities_builder = match spec_caps.effective() {
+                    Some(effective) => {
+                        let effective: SpecCapabilities = effective.union(&caps).copied().collect();
+                        capabilities_builder.effective(effective)
+                    }
+                    None => capabilities_builder,
+                };
+                capabilities_builder = match spec_caps.inheritable() {
+                    Some(inheritable) => {
+                        let inheritable: SpecCapabilities =
+                            inheritable.union(&caps).copied().collect();
+                        capabilities_builder.inheritable(inheritable)
+                    }
+                    None => capabilities_builder,
+                };
+                capabilities_builder = match spec_caps.permitted() {
+                    Some(permitted) => {
+                        let permitted: SpecCapabilities = permitted.union(&caps).copied().collect();
+                        capabilities_builder.permitted(permitted)
+                    }
+                    None => capabilities_builder,
+                };
+
+                let c = capabilities_builder.build()?;
+                return Ok(Some(c));
             }
+
+            return Ok(Some(
+                LinuxCapabilitiesBuilder::default()
+                    .bounding(caps.clone())
+                    .effective(caps.clone())
+                    .inheritable(caps.clone())
+                    .permitted(caps.clone())
+                    .ambient(caps)
+                    .build()?,
+            ));
         }
 
-        Ok(())
+        Ok(None)
     }
 
-    fn set_namespaces(&self, spec: &mut Spec, init_namespaces: Vec<Namespace>) -> Result<()> {
+    fn set_namespaces(&self, init_namespaces: Vec<Namespace>) -> Result<Vec<LinuxNamespace>> {
         let mut tenant_namespaces = Vec::with_capacity(init_namespaces.len());
 
-        for ns_type in NAMESPACE_TYPES.iter().copied() {
-            if let Some(init_ns) = init_namespaces.iter().find(|n| n.ns_type.eq(ns_type)) {
+        for &ns_type in NAMESPACE_TYPES {
+            if let Some(init_ns) = init_namespaces.iter().find(|n| n.ns_type == ns_type) {
                 let tenant_ns = LinuxNamespaceType::try_from(ns_type)?;
-                tenant_namespaces.push(LinuxNamespace {
-                    typ: tenant_ns,
-                    path: Some(init_ns.path.clone()),
-                })
+                tenant_namespaces.push(
+                    LinuxNamespaceBuilder::default()
+                        .typ(tenant_ns)
+                        .path(init_ns.path.clone())
+                        .build()?,
+                )
             }
         }
 
-        let mut linux = &mut spec.linux.as_mut().context("no linux in spec")?;
-        linux.namespaces = tenant_namespaces.into();
-        Ok(())
+        Ok(tenant_namespaces)
     }
 
     fn should_use_systemd(&self, container: &Container) -> bool {
@@ -353,62 +400,3 @@ impl TenantContainerBuilder {
         }
     }
 }
-
-// Can be removed once https://github.com/eminence/procfs/pull/135 is available
-trait GetNamespace {
-    fn namespaces(&self) -> Result<Vec<Namespace>>;
-}
-
-impl GetNamespace for procfs::process::Process {
-    /// Describes namespaces to which the process with the corresponding PID belongs.
-    /// Doc reference: https://man7.org/linux/man-pages/man7/namespaces.7.html
-    fn namespaces(&self) -> Result<Vec<Namespace>> {
-        let proc_path = PathBuf::from(format!("/proc/{}", self.pid()));
-        let ns = proc_path.join("ns");
-        let mut namespaces = Vec::new();
-        for entry in fs::read_dir(ns)? {
-            let entry = entry?;
-            let path = entry.path();
-            let ns_type = entry.file_name();
-            let cstr = CString::new(path.as_os_str().as_bytes()).unwrap();
-
-            let mut stat = unsafe { std::mem::zeroed() };
-            if unsafe { libc::stat(cstr.as_ptr(), &mut stat) } != 0 {
-                bail!("Unable to stat {:?}", path);
-            }
-
-            namespaces.push(Namespace {
-                ns_type,
-                path,
-                identifier: stat.st_ino,
-                device_id: stat.st_dev,
-            })
-        }
-
-        Ok(namespaces)
-    }
-}
-
-/// Information about a namespace
-///
-/// See also the [Process::namespaces()] method
-#[derive(Debug, Clone)]
-pub struct Namespace {
-    /// Namespace type
-    pub ns_type: OsString,
-    /// Handle to the namespace
-    pub path: PathBuf,
-    /// Namespace identifier (inode number)
-    pub identifier: u64,
-    /// Device id of the namespace
-    pub device_id: u64,
-}
-
-impl PartialEq for Namespace {
-    fn eq(&self, other: &Self) -> bool {
-        // see https://lore.kernel.org/lkml/87poky5ca9.fsf@xmission.com/
-        self.identifier == other.identifier && self.device_id == other.device_id
-    }
-}
-
-impl Eq for Namespace {}

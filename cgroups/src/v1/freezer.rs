@@ -5,7 +5,7 @@ use async_trait::async_trait;
 
 use super::Controller;
 use crate::common;
-use oci_spec::{FreezerState, LinuxResources};
+use crate::common::{ControllerOpt, FreezerState};
 
 const CGROUP_FREEZER_STATE: &str = "freezer.state";
 const FREEZER_STATE_THAWED: &str = "THAWED";
@@ -18,23 +18,19 @@ pub struct Freezer {}
 impl Controller for Freezer {
     type Resource = FreezerState;
 
-    async fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
+    async fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply Freezer cgroup config");
         create_dir_all(&cgroup_root)?;
 
-        if let Some(freezer_state) = Self::needs_to_handle(linux_resources) {
-            Self::apply(freezer_state, cgroup_root).await?;
+        if let Some(freezer_state) = Self::needs_to_handle(controller_opt) {
+            Self::apply(freezer_state, cgroup_root).await.context("failed to appyl freezer")?;
         }
 
         Ok(())
     }
 
-    fn needs_to_handle(linux_resources: &LinuxResources) -> Option<&Self::Resource> {
-        if let Some(freezer_state) = &linux_resources.freezer {
-            return Some(freezer_state);
-        }
-
-        None
+    fn needs_to_handle<'a>(controller_opt: &'a ControllerOpt) -> Option<&'a Self::Resource> {
+        controller_opt.freezer_state.as_ref()
     }
 }
 
@@ -120,10 +116,10 @@ impl Freezer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::common::CGROUP_PROCS;
+    use crate::common::{FreezerState, CGROUP_PROCS};
     use crate::test::{create_temp_dir, set_fixture, aw};
     use nix::unistd::Pid;
-    use oci_spec::FreezerState;
+    use oci_spec::runtime::LinuxResourcesBuilder;
 
     #[test]
     fn test_set_freezer_state() {
@@ -172,24 +168,23 @@ mod tests {
 
         // set Thawed state.
         {
-            let linux_resources = LinuxResources {
-                devices: Some(vec![]),
-                disable_oom_killer: false,
+            let linux_resources = LinuxResourcesBuilder::default()
+                .devices(vec![])
+                .hugepage_limits(vec![])
+                .build()
+                .unwrap();
+            let state = FreezerState::Thawed;
+
+            let controller_opt = ControllerOpt {
+                resources: &linux_resources,
+                freezer_state: Some(state),
                 oom_score_adj: None,
-                memory: None,
-                cpu: None,
-                pids: None,
-                block_io: None,
-                hugepage_limits: Some(vec![]),
-                network: None,
-                freezer: Some(FreezerState::Thawed),
-                rdma: None,
-                unified: None,
+                disable_oom_killer: false,
             };
 
             let pid = Pid::from_raw(1000);
             Freezer::add_task(pid, &tmp).expect("freezer add task");
-            aw!(<Freezer as Controller>::apply(&linux_resources, &tmp)).expect("freezer apply");
+            aw!(<Freezer as Controller>::apply(&controller_opt, &tmp)).expect("freezer apply");
             let state_content =
                 std::fs::read_to_string(tmp.join(CGROUP_FREEZER_STATE)).expect("read to string");
             assert_eq!(FREEZER_STATE_THAWED, state_content);
@@ -200,24 +195,23 @@ mod tests {
 
         // set Frozen state.
         {
-            let linux_resources = LinuxResources {
-                devices: Some(vec![]),
-                disable_oom_killer: false,
+            let linux_resources = LinuxResourcesBuilder::default()
+                .devices(vec![])
+                .hugepage_limits(vec![])
+                .build()
+                .unwrap();
+            let state = FreezerState::Frozen;
+
+            let controller_opt = ControllerOpt {
+                resources: &linux_resources,
+                freezer_state: Some(state),
                 oom_score_adj: None,
-                memory: None,
-                cpu: None,
-                pids: None,
-                block_io: None,
-                hugepage_limits: Some(vec![]),
-                network: None,
-                freezer: Some(FreezerState::Frozen),
-                rdma: None,
-                unified: None,
+                disable_oom_killer: false,
             };
 
             let pid = Pid::from_raw(1001);
             Freezer::add_task(pid, &tmp).expect("freezer add task");
-            aw!(<Freezer as Controller>::apply(&linux_resources, &tmp)).expect("freezer apply");
+            aw!(<Freezer as Controller>::apply(&controller_opt, &tmp)).expect("freezer apply");
             let state_content =
                 std::fs::read_to_string(tmp.join(CGROUP_FREEZER_STATE)).expect("read to string");
             assert_eq!(FREEZER_STATE_FROZEN, state_content);
@@ -228,26 +222,26 @@ mod tests {
 
         // set Undefined state.
         {
-            let linux_resources = LinuxResources {
-                devices: Some(vec![]),
-                disable_oom_killer: false,
+            let linux_resources = LinuxResourcesBuilder::default()
+                .devices(vec![])
+                .hugepage_limits(vec![])
+                .build()
+                .unwrap();
+
+            let state = FreezerState::Undefined;
+
+            let controller_opt = ControllerOpt {
+                resources: &linux_resources,
+                freezer_state: Some(state),
                 oom_score_adj: None,
-                memory: None,
-                cpu: None,
-                pids: None,
-                block_io: None,
-                hugepage_limits: Some(vec![]),
-                network: None,
-                freezer: Some(FreezerState::Undefined),
-                rdma: None,
-                unified: None,
+                disable_oom_killer: false,
             };
 
             let pid = Pid::from_raw(1002);
             let old_state_content =
                 std::fs::read_to_string(tmp.join(CGROUP_FREEZER_STATE)).expect("read to string");
             Freezer::add_task(pid, &tmp).expect("freezer add task");
-            aw!(<Freezer as Controller>::apply(&linux_resources, &tmp)).expect("freezer apply");
+            aw!(<Freezer as Controller>::apply(&controller_opt, &tmp)).expect("freezer apply");
             let state_content =
                 std::fs::read_to_string(tmp.join(CGROUP_FREEZER_STATE)).expect("read to string");
             assert_eq!(old_state_content, state_content);

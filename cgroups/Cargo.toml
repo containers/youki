@@ -2,24 +2,40 @@
 name = "cgroups"
 version = "0.1.0"
 edition = "2018"
+autoexamples = false
 
 [features]
 default = ["systemd_cgroups"]
 systemd_cgroups = ["systemd"]
+cgroupsv2_devices = ["rbpf", "libbpf-sys", "errno", "libc"]
 
 [dependencies]
 nix = "0.22.0"
-procfs = "0.9.1"
+procfs = "0.10.1"
 log = "0.4"
 anyhow = "1.0"
-oci_spec = { git = "https://github.com/containers/oci-spec-rs", rev = "e0de21b89dc1e65f69a5f45a08bbe426787c7fa1"}
+# TODO: Fetch from crate.io instead of git when next release oci-spec-rs
+# ref: https://github.com/containers/oci-spec-rs/pull/69
+# oci-spec = "0.5.1"
+oci-spec = { git = "https://github.com/containers/oci-spec-rs",  rev = "5018f8e5b0355a82c08962cefa5ab07a05b930c6" }
 systemd = { version = "0.8", default-features = false, optional = true }
 dbus = "0.9.2"
 serde = { version = "1.0", features = ["derive"] }
 async-trait = "0.1.51"
 tokio-uring = "0.1.0"
 tokio = { version = "1.10.0", features = ["io-util"] }
+rbpf = {version = "0.1.0", optional = true }
+libbpf-sys = { version = "0.4.0-2", optional = true }
+errno = { version = "0.2.7", optional = true }
+libc = { version = "0.2.84", optional = true }
 
 [dev-dependencies]
-oci_spec = { git = "https://github.com/containers/oci-spec-rs", rev = "e0de21b89dc1e65f69a5f45a08bbe426787c7fa1", features = ["proptests"]}
+# TODO: Fetch from crate.io instead of git when next release oci-spec-rs
+# ref: https://github.com/containers/oci-spec-rs/pull/69
+# oci-spec = "0.5.1"
+oci-spec = { git = "https://github.com/containers/oci-spec-rs",  rev = "5018f8e5b0355a82c08962cefa5ab07a05b930c6", features = ["proptests"] }
 quickcheck = "1"
+clap = "2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+env_logger = "0.9"

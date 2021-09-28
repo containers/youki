@@ -1,8 +1,8 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use std::path::Path;
 
-use crate::common;
-use oci_spec::{LinuxCpu, LinuxResources};
+use crate::common::{self, ControllerOpt};
+use oci_spec::runtime::LinuxCpu;
 
 use super::controller::Controller;
 
@@ -12,9 +12,10 @@ const CGROUP_CPUSET_MEMS: &str = "cpuset.mems";
 pub struct CpuSet {}
 
 impl Controller for CpuSet {
-    fn apply(linux_resources: &LinuxResources, cgroup_path: &Path) -> Result<()> {
-        if let Some(cpuset) = &linux_resources.cpu {
-            Self::apply(cgroup_path, cpuset)?;
+    fn apply(controller_opt: &ControllerOpt, cgroup_path: &Path) -> Result<()> {
+        if let Some(cpuset) = &controller_opt.resources.cpu() {
+            Self::apply(cgroup_path, cpuset)
+                .context("failed to apply cpuset resource restrictions")?;
         }
 
         Ok(())
@@ -23,11 +24,11 @@ impl Controller for CpuSet {
 
 impl CpuSet {
     fn apply(path: &Path, cpuset: &LinuxCpu) -> Result<()> {
-        if let Some(cpus) = &cpuset.cpus {
+        if let Some(cpus) = &cpuset.cpus() {
             common::write_cgroup_file_str(path.join(CGROUP_CPUSET_CPUS), cpus)?;
         }
 
-        if let Some(mems) = &cpuset.mems {
+        if let Some(mems) = &cpuset.mems() {
             common::write_cgroup_file_str(path.join(CGROUP_CPUSET_MEMS), mems)?;
         }
 
@@ -40,13 +41,17 @@ mod tests {
     use std::fs;
 
     use super::*;
-    use crate::test::{setup, LinuxCpuBuilder};
+    use crate::test::setup;
+    use oci_spec::runtime::LinuxCpuBuilder;
 
     #[test]
     fn test_set_cpus() {
         // arrange
         let (tmp, cpus) = setup("test_set_cpus", CGROUP_CPUSET_CPUS);
-        let cpuset = LinuxCpuBuilder::new().with_cpus("1-3".to_owned()).build();
+        let cpuset = LinuxCpuBuilder::default()
+            .cpus("1-3".to_owned())
+            .build()
+            .unwrap();
 
         // act
         CpuSet::apply(&tmp, &cpuset).expect("apply cpuset");
@@ -61,7 +66,10 @@ mod tests {
     fn test_set_mems() {
         // arrange
         let (tmp, mems) = setup("test_set_mems", CGROUP_CPUSET_MEMS);
-        let cpuset = LinuxCpuBuilder::new().with_mems("1-3".to_owned()).build();
+        let cpuset = LinuxCpuBuilder::default()
+            .mems("1-3".to_owned())
+            .build()
+            .unwrap();
 
         // act
         CpuSet::apply(&tmp, &cpuset).expect("apply cpuset");

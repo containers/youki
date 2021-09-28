@@ -1,3 +1,4 @@
+pub mod apparmor;
 pub mod capabilities;
 pub mod commands;
 pub mod container;
@@ -6,10 +7,10 @@ pub mod hooks;
 pub mod logger;
 pub mod namespaces;
 pub mod notify_socket;
-pub mod pipe;
 pub mod process;
 pub mod rootfs;
 pub mod rootless;
+pub mod seccomp;
 pub mod signal;
 pub mod syscall;
 pub mod tty;

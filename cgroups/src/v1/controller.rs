@@ -4,9 +4,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use nix::unistd::Pid;
 
-use oci_spec::LinuxResources;
-
-use crate::common::{self, CGROUP_PROCS};
+use crate::common::{self, ControllerOpt, CGROUP_PROCS};
 
 #[async_trait(?Send)]
 pub trait Controller {
@@ -20,8 +18,8 @@ pub trait Controller {
     }
 
     /// Applies resource restrictions to the cgroup
-    async fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()>;
+    async fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()>;
 
     /// Checks if the controller needs to handle this request
-    fn needs_to_handle(linux_resources: &LinuxResources) -> Option<&Self::Resource>;
+    fn needs_to_handle<'a>(controller_opt: &'a ControllerOpt) -> Option<&'a Self::Resource>;
 }

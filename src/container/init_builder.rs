@@ -1,29 +1,29 @@
 use anyhow::{bail, Context, Result};
 use nix::unistd;
-use oci_spec::Spec;
-use rootless::detect_rootless;
+use oci_spec::runtime::Spec;
+use rootless::Rootless;
 use std::{
     fs,
     path::{Path, PathBuf},
 };
 
-use crate::{notify_socket::NOTIFY_FILE, rootless, tty, utils};
+use crate::{apparmor, notify_socket::NOTIFY_FILE, rootless, tty, utils};
 
 use super::{
     builder::ContainerBuilder, builder_impl::ContainerBuilderImpl, Container, ContainerStatus,
 };
 
 // Builder that can be used to configure the properties of a new container
-pub struct InitContainerBuilder {
-    base: ContainerBuilder,
+pub struct InitContainerBuilder<'a> {
+    base: ContainerBuilder<'a>,
     bundle: PathBuf,
     use_systemd: bool,
 }
 
-impl InitContainerBuilder {
+impl<'a> InitContainerBuilder<'a> {
     /// Generates the base configuration for a new container from which
     /// configuration methods can be chained
-    pub(super) fn new(builder: ContainerBuilder, bundle: PathBuf) -> Self {
+    pub(super) fn new(builder: ContainerBuilder<'a>, bundle: PathBuf) -> Self {
         Self {
             base: builder,
             bundle,
@@ -38,19 +38,20 @@ impl InitContainerBuilder {
     }
 
     /// Creates a new container
-    pub fn build(self) -> Result<()> {
+    pub fn build(self) -> Result<Container> {
+        let spec = self.load_spec()?;
         let container_dir = self.create_container_dir()?;
-        let spec = self.load_and_safeguard_spec(&container_dir)?;
+        self.save_spec(&spec, &container_dir)?;
 
-        let container_state = self
-            .create_container_state(&container_dir)?
+        let mut container = self.create_container_state(&container_dir)?;
+        container
             .set_systemd(self.use_systemd)
-            .set_annotations(spec.annotations.clone());
+            .set_annotations(spec.annotations().clone());
 
-        unistd::chdir(&*container_dir)?;
+        unistd::chdir(&container_dir)?;
         let notify_path = container_dir.join(NOTIFY_FILE);
         // convert path of root file system of the container to absolute path
-        let rootfs = fs::canonicalize(&spec.root.as_ref().context("no root in spec")?.path)?;
+        let rootfs = fs::canonicalize(&spec.root().as_ref().context("no root in spec")?.path())?;
 
         // if socket file path is given in commandline options,
         // get file descriptors of console socket
@@ -64,8 +65,7 @@ impl InitContainerBuilder {
             None
         };
 
-        let rootless = detect_rootless(&spec)?;
-
+        let rootless = Rootless::new(&spec)?;
         let mut builder_impl = ContainerBuilderImpl {
             init: true,
             syscall: self.base.syscall,
@@ -77,12 +77,14 @@ impl InitContainerBuilder {
             rootfs,
             rootless,
             notify_path,
-            container: Some(container_state),
+            container: Some(container.clone()),
             preserve_fds: self.base.preserve_fds,
         };
 
         builder_impl.create()?;
-        Ok(())
+        container.refresh_state()?;
+
+        Ok(container)
     }
 
     fn create_container_dir(&self) -> Result<PathBuf> {
@@ -97,15 +99,42 @@ impl InitContainerBuilder {
         Ok(container_dir)
     }
 
-    fn load_and_safeguard_spec(&self, container_dir: &Path) -> Result<Spec> {
+    fn load_spec(&self) -> Result<Spec> {
         let source_spec_path = self.bundle.join("config.json");
-        let target_spec_path = container_dir.join("config.json");
+        let mut spec = Spec::load(&source_spec_path)?;
+        Self::validate_spec(&spec).context("failed to validate runtime spec")?;
 
-        let mut spec = oci_spec::Spec::load(&source_spec_path)?;
         spec.canonicalize_rootfs(&self.bundle)?;
-        spec.save(target_spec_path)?;
-
         Ok(spec)
+    }
+
+    fn validate_spec(spec: &Spec) -> Result<()> {
+        if !spec.version().starts_with("1.0") {
+            bail!(
+                "runtime spec has incompatible version '{}'. Only 1.0.X is supported",
+                spec.version()
+            );
+        }
+
+        if let Some(process) = spec.process() {
+            if let Some(profile) = process.apparmor_profile() {
+                if !apparmor::is_enabled()? {
+                    bail!(
+                        "apparmor profile {} is specified in runtime spec, \
+                    but apparmor is not activated on this system",
+                        profile
+                    );
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn save_spec(&self, spec: &Spec, container_dir: &Path) -> Result<()> {
+        let target_spec_path = container_dir.join("config.json");
+        spec.save(target_spec_path)?;
+        Ok(())
     }
 
     fn create_container_state(&self, container_dir: &Path) -> Result<Container> {
@@ -113,7 +142,7 @@ impl InitContainerBuilder {
             &self.base.container_id,
             ContainerStatus::Creating,
             None,
-            self.bundle.as_path().to_str().unwrap(),
+            &self.bundle,
             container_dir,
         )?;
         container.save()?;

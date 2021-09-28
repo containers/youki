@@ -1,0 +1,15 @@
+---
+codecov:
+  notify:
+    after_n_builds: 1
+    require_ci_to_pass: false
+
+coverage:
+  precision: 2
+  round: down
+  range: 50..75
+
+comment:
+  layout: "header, diff"
+  behavior: default
+  require_changes: false

@@ -2,35 +2,34 @@ use std::{
     fs::{self},
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
+    time::Duration,
 };
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 
 use nix::unistd::Pid;
-use oci_spec::{FreezerState, LinuxResources};
 
+#[cfg(feature = "cgroupsv2_devices")]
+use super::devices::Devices;
 use super::{
-    controller::Controller, controller_type::ControllerType, cpu::Cpu, cpuset::CpuSet,
-    freezer::Freezer, hugetlb::HugeTlb, io::Io, memory::Memory, pids::Pids,
+    controller::Controller,
+    controller_type::{
+        ControllerType, PseudoControllerType, CONTROLLER_TYPES, PSEUDO_CONTROLLER_TYPES,
+    },
+    cpu::Cpu,
+    cpuset::CpuSet,
+    freezer::Freezer,
+    hugetlb::HugeTlb,
+    io::Io,
+    memory::Memory,
+    pids::Pids,
+    unified::Unified,
+    util::{self, CGROUP_SUBTREE_CONTROL},
 };
 use crate::{
-    common::{self, CgroupManager, PathBufExt, CGROUP_PROCS},
+    common::{self, CgroupManager, ControllerOpt, FreezerState, PathBufExt, CGROUP_PROCS},
     stats::{Stats, StatsProvider},
 };
-
-const CGROUP_CONTROLLERS: &str = "cgroup.controllers";
-const CGROUP_SUBTREE_CONTROL: &str = "cgroup.subtree_control";
-
-const CONTROLLER_TYPES: &[ControllerType] = &[
-    ControllerType::Cpu,
-    ControllerType::CpuSet,
-    ControllerType::HugeTlb,
-    ControllerType::Io,
-    ControllerType::Memory,
-    ControllerType::Pids,
-    ControllerType::Freezer,
-];
-
 pub struct Manager {
     root_path: PathBuf,
     cgroup_path: PathBuf,
@@ -51,8 +50,7 @@ impl Manager {
     }
 
     fn create_unified_cgroup(&self, pid: Pid) -> Result<()> {
-        let controllers: Vec<String> = self
-            .get_available_controllers()?
+        let controllers: Vec<String> = util::get_available_controllers(&self.root_path)?
             .iter()
             .map(|c| format!("{}{}", "+", c.to_string()))
             .collect();
@@ -79,32 +77,6 @@ impl Manager {
         Ok(())
     }
 
-    fn get_available_controllers(&self) -> Result<Vec<ControllerType>> {
-        let controllers_path = self.root_path.join(CGROUP_CONTROLLERS);
-        if !controllers_path.exists() {
-            bail!(
-                "cannot get available controllers. {:?} does not exist",
-                controllers_path
-            )
-        }
-
-        let mut controllers = Vec::new();
-        for controller in fs::read_to_string(&controllers_path)?.split_whitespace() {
-            match controller {
-                "cpu" => controllers.push(ControllerType::Cpu),
-                "cpuset" => controllers.push(ControllerType::CpuSet),
-                "hugetlb" => controllers.push(ControllerType::HugeTlb),
-                "io" => controllers.push(ControllerType::Io),
-                "memory" => controllers.push(ControllerType::Memory),
-                "pids" => controllers.push(ControllerType::Pids),
-                "freezer" => controllers.push(ControllerType::Freezer),
-                tpe => log::warn!("Controller {} is not yet implemented.", tpe),
-            }
-        }
-
-        Ok(controllers)
-    }
-
     fn write_controllers(path: &Path, controllers: &[String]) -> Result<()> {
         for controller in controllers {
             common::write_cgroup_file_str(path.join(CGROUP_SUBTREE_CONTROL), controller)?;
@@ -120,16 +92,28 @@ impl CgroupManager for Manager {
         Ok(())
     }
 
-    fn apply(&self, linux_resources: &LinuxResources) -> Result<()> {
+    fn apply(&self, controller_opt: &ControllerOpt) -> Result<()> {
         for controller in CONTROLLER_TYPES {
             match controller {
-                ControllerType::Cpu => Cpu::apply(linux_resources, &self.full_path)?,
-                ControllerType::CpuSet => CpuSet::apply(linux_resources, &self.full_path)?,
-                ControllerType::HugeTlb => HugeTlb::apply(linux_resources, &self.full_path)?,
-                ControllerType::Io => Io::apply(linux_resources, &self.full_path)?,
-                ControllerType::Memory => Memory::apply(linux_resources, &self.full_path)?,
-                ControllerType::Pids => Pids::apply(linux_resources, &self.full_path)?,
-                ControllerType::Freezer => Freezer::apply(linux_resources, &self.full_path)?,
+                ControllerType::Cpu => Cpu::apply(controller_opt, &self.full_path)?,
+                ControllerType::CpuSet => CpuSet::apply(controller_opt, &self.full_path)?,
+                ControllerType::HugeTlb => HugeTlb::apply(controller_opt, &self.full_path)?,
+                ControllerType::Io => Io::apply(controller_opt, &self.full_path)?,
+                ControllerType::Memory => Memory::apply(controller_opt, &self.full_path)?,
+                ControllerType::Pids => Pids::apply(controller_opt, &self.full_path)?,
+            }
+        }
+
+        #[cfg(feature = "cgroupsv2_devices")]
+        Devices::apply(controller_opt, &self.cgroup_path)?;
+
+        for pseudoctlr in PSEUDO_CONTROLLER_TYPES {
+            if let PseudoControllerType::Unified = pseudoctlr {
+                Unified::apply(
+                    controller_opt,
+                    &self.cgroup_path,
+                    util::get_available_controllers(&self.root_path)?,
+                )?;
             }
         }
 
@@ -137,18 +121,30 @@ impl CgroupManager for Manager {
     }
 
     fn remove(&self) -> Result<()> {
-        log::debug!("remove cgroup {:?}", self.full_path);
-        fs::remove_dir(&self.full_path)?;
+        if self.full_path.exists() {
+            log::debug!("remove cgroup {:?}", self.full_path);
+            let procs_path = self.full_path.join(CGROUP_PROCS);
+            let procs = fs::read_to_string(&procs_path)?;
+
+            for line in procs.lines() {
+                let pid: i32 = line.parse()?;
+                let _ = nix::sys::signal::kill(Pid::from_raw(pid), nix::sys::signal::SIGKILL);
+            }
+
+            common::delete_with_retry(&self.full_path, 4, Duration::from_millis(100))?;
+        }
 
         Ok(())
     }
 
     fn freeze(&self, state: FreezerState) -> Result<()> {
-        let linux_resources = LinuxResources {
-            freezer: Some(state),
-            ..Default::default()
+        let controller_opt = ControllerOpt {
+            resources: &Default::default(),
+            freezer_state: Some(state),
+            oom_score_adj: None,
+            disable_oom_killer: false,
         };
-        Freezer::apply(&linux_resources, &self.full_path)
+        Freezer::apply(&controller_opt, &self.full_path)
     }
 
     fn stats(&self) -> Result<Stats> {

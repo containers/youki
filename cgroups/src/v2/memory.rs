@@ -1,10 +1,10 @@
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use std::path::Path;
 
-use oci_spec::{LinuxMemory, LinuxResources};
+use oci_spec::runtime::LinuxMemory;
 
 use crate::{
-    common,
+    common::{self, ControllerOpt},
     stats::{self, MemoryData, MemoryStats, StatsProvider},
 };
 
@@ -18,9 +18,10 @@ const MEMORY_STAT: &str = "memory.stat";
 pub struct Memory {}
 
 impl Controller for Memory {
-    fn apply(linux_resources: &LinuxResources, cgroup_path: &Path) -> Result<()> {
-        if let Some(memory) = &linux_resources.memory {
-            Self::apply(cgroup_path, memory)?;
+    fn apply(controller_opt: &ControllerOpt, cgroup_path: &Path) -> Result<()> {
+        if let Some(memory) = &controller_opt.resources.memory() {
+            Self::apply(cgroup_path, memory)
+                .context("failed to apply memory resource restrictions")?;
         }
 
         Ok(())
@@ -83,20 +84,37 @@ impl Memory {
 
     fn apply(path: &Path, memory: &LinuxMemory) -> Result<()> {
         // if nothing is set just exit right away
-        if memory.reservation.is_none() && memory.limit.is_none() && memory.swap.is_none() {
+        if memory.reservation().is_none() && memory.limit().is_none() && memory.swap().is_none() {
             return Ok(());
         }
 
-        match memory.limit {
+        match memory.limit() {
             Some(limit) if limit < -1 => {
                 bail!("invalid memory value: {}", limit);
             }
-            Some(limit) => match memory.swap {
+            Some(limit) => match memory.swap() {
                 Some(swap) if swap < -1 => {
                     bail!("invalid swap value: {}", swap);
                 }
                 Some(swap) => {
-                    Memory::set(path.join(CGROUP_MEMORY_SWAP), swap)?;
+                    // -1 means max
+                    if swap == -1 || limit == -1 {
+                        Memory::set(path.join(CGROUP_MEMORY_SWAP), swap)?;
+                    } else {
+                        if swap < limit {
+                            bail!(
+                                "swap memory ({}) should be bigger than memory limit ({})",
+                                swap,
+                                limit
+                            );
+                        }
+
+                        // In cgroup v1 swap is memory+swap, but in cgroup v2 swap is
+                        // a separate value, so the swap value in the runtime spec needs
+                        // to be converted from the cgroup v1 value to the cgroup v2 value
+                        // by subtracting limit from swap
+                        Memory::set(path.join(CGROUP_MEMORY_SWAP), swap - limit)?;
+                    }
                     Memory::set(path.join(CGROUP_MEMORY_MAX), limit)?;
                 }
                 None => {
@@ -107,13 +125,13 @@ impl Memory {
                 }
             },
             None => {
-                if memory.swap.is_some() {
+                if memory.swap().is_some() {
                     bail!("unable to set swap limit without memory limit");
                 }
             }
         };
 
-        if let Some(reservation) = memory.reservation {
+        if let Some(reservation) = memory.reservation() {
             if reservation < -1 {
                 bail!("invalid memory reservation value: {}", reservation);
             }
@@ -128,7 +146,7 @@ impl Memory {
 mod tests {
     use super::*;
     use crate::test::{create_temp_dir, set_fixture};
-    use oci_spec::LinuxMemory;
+    use oci_spec::runtime::LinuxMemoryBuilder;
     use std::fs::read_to_string;
 
     #[test]
@@ -141,23 +159,21 @@ mod tests {
         let limit = 1024;
         let reservation = 512;
         let swap = 2048;
-        let memory_limits = &LinuxMemory {
-            limit: Some(limit),
-            reservation: Some(reservation),
-            swap: Some(swap),
-            kernel: None,
-            kernel_tcp: None,
-            swappiness: None,
-            disable_oom_killer: None,
-            use_hierarchy: None,
-        };
-        Memory::apply(&tmp, memory_limits).expect("apply memory limits");
+
+        let memory_limits = LinuxMemoryBuilder::default()
+            .limit(limit)
+            .reservation(reservation)
+            .swap(swap)
+            .build()
+            .unwrap();
+
+        Memory::apply(&tmp, &memory_limits).expect("apply memory limits");
 
         let limit_content = read_to_string(tmp.join(CGROUP_MEMORY_MAX)).expect("read memory limit");
         assert_eq!(limit_content, limit.to_string());
 
         let swap_content = read_to_string(tmp.join(CGROUP_MEMORY_SWAP)).expect("read swap limit");
-        assert_eq!(swap_content, swap.to_string());
+        assert_eq!(swap_content, (swap - limit).to_string());
 
         let reservation_content =
             read_to_string(tmp.join(CGROUP_MEMORY_LOW)).expect("read memory reservation");
@@ -172,17 +188,9 @@ mod tests {
         set_fixture(&tmp, CGROUP_MEMORY_LOW, "0").expect("set fixture for memory reservation");
         set_fixture(&tmp, CGROUP_MEMORY_SWAP, "0").expect("set fixture for swap limit");
 
-        let memory_limits = &LinuxMemory {
-            limit: Some(-1),
-            reservation: None,
-            swap: None,
-            kernel: None,
-            kernel_tcp: None,
-            swappiness: None,
-            disable_oom_killer: None,
-            use_hierarchy: None,
-        };
-        Memory::apply(&tmp, memory_limits).expect("apply memory limits");
+        let memory_limits = LinuxMemoryBuilder::default().limit(-1).build().unwrap();
+
+        Memory::apply(&tmp, &memory_limits).expect("apply memory limits");
 
         let limit_content = read_to_string(tmp.join(CGROUP_MEMORY_MAX)).expect("read memory limit");
         assert_eq!(limit_content, "max");
@@ -199,18 +207,9 @@ mod tests {
         set_fixture(&tmp, CGROUP_MEMORY_LOW, "0").expect("set fixture for memory reservation");
         set_fixture(&tmp, CGROUP_MEMORY_SWAP, "0").expect("set fixture for swap limit");
 
-        let memory_limits = &LinuxMemory {
-            limit: None,
-            swap: Some(512),
-            reservation: None,
-            kernel: None,
-            kernel_tcp: None,
-            swappiness: None,
-            disable_oom_killer: None,
-            use_hierarchy: None,
-        };
+        let memory_limits = LinuxMemoryBuilder::default().swap(512).build().unwrap();
 
-        let result = Memory::apply(&tmp, memory_limits);
+        let result = Memory::apply(&tmp, &memory_limits);
 
         assert!(result.is_err());
     }
@@ -222,18 +221,9 @@ mod tests {
         set_fixture(&tmp, CGROUP_MEMORY_LOW, "0").expect("set fixture for memory reservation");
         set_fixture(&tmp, CGROUP_MEMORY_SWAP, "0").expect("set fixture for swap limit");
 
-        let memory_limits = &LinuxMemory {
-            limit: Some(-2),
-            swap: None,
-            reservation: None,
-            kernel: None,
-            kernel_tcp: None,
-            swappiness: None,
-            disable_oom_killer: None,
-            use_hierarchy: None,
-        };
+        let memory_limits = LinuxMemoryBuilder::default().limit(-2).build().unwrap();
 
-        let result = Memory::apply(&tmp, memory_limits);
+        let result = Memory::apply(&tmp, &memory_limits);
 
         assert!(result.is_err());
     }
@@ -245,18 +235,13 @@ mod tests {
         set_fixture(&tmp, CGROUP_MEMORY_LOW, "0").expect("set fixture for memory reservation");
         set_fixture(&tmp, CGROUP_MEMORY_SWAP, "0").expect("set fixture for swap limit");
 
-        let memory_limits = &LinuxMemory {
-            limit: Some(512),
-            swap: Some(-3),
-            reservation: None,
-            kernel: None,
-            kernel_tcp: None,
-            swappiness: None,
-            disable_oom_killer: None,
-            use_hierarchy: None,
-        };
+        let memory_limits = LinuxMemoryBuilder::default()
+            .limit(512)
+            .swap(-3)
+            .build()
+            .unwrap();
 
-        let result = Memory::apply(&tmp, memory_limits);
+        let result = Memory::apply(&tmp, &memory_limits);
 
         assert!(result.is_err());
     }
@@ -272,22 +257,27 @@ mod tests {
 
             // we need to check for expected errors first and foremost or we'll get false negatives
             // later
-            if let Some(limit) = linux_memory.limit {
+            if let Some(limit) = linux_memory.limit() {
                 if limit < -1 {
                     return result.is_err();
                 }
             }
 
-            if let Some(swap) = linux_memory.swap {
+            if let Some(swap) = linux_memory.swap() {
                 if swap < -1 {
                     return result.is_err();
                 }
-                if linux_memory.limit.is_none() {
+                if linux_memory.limit().is_none() {
                     return result.is_err();
+                }
+                if let Some(limit) = linux_memory.limit() {
+                    if limit != -1 && swap != -1 && swap < limit {
+                        return result.is_err();
+                    }
                 }
             }
 
-            if let Some(reservation) = linux_memory.reservation {
+            if let Some(reservation) = linux_memory.reservation() {
                 if reservation < -1 {
                     return result.is_err();
                 }
@@ -295,7 +285,7 @@ mod tests {
 
             // check the limit file is set as expected
             let limit_content = read_to_string(tmp.join(CGROUP_MEMORY_MAX)).expect("read memory limit to string");
-            let limit_check = match linux_memory.limit {
+            let limit_check = match linux_memory.limit() {
                 Some(limit) if limit == -1 => limit_content == "max",
                 Some(limit) => limit_content == limit.to_string(),
                 None => limit_content == "0",
@@ -303,11 +293,21 @@ mod tests {
 
             // check the swap file is set as expected
             let swap_content = read_to_string(tmp.join(CGROUP_MEMORY_SWAP)).expect("read swap limit to string");
-            let swap_check = match linux_memory.swap {
+            let swap_check = match linux_memory.swap() {
                 Some(swap) if swap == -1 => swap_content == "max",
-                Some(swap) => swap_content == swap.to_string(),
+                Some(swap) => {
+                    if let Some(limit) = linux_memory.limit() {
+                        if limit == -1 {
+                            swap_content == swap.to_string()
+                        } else {
+                            swap_content == (swap - linux_memory.limit().unwrap()).to_string()
+                        }
+                    } else {
+                        false
+                    }
+                }
                 None => {
-                    match linux_memory.limit {
+                    match linux_memory.limit() {
                         Some(limit) if limit == -1 => swap_content == "max",
                         _ => swap_content == "0",
                     }
@@ -317,7 +317,7 @@ mod tests {
 
             // check the resevation file is set as expected
             let reservation_content = read_to_string(tmp.join(CGROUP_MEMORY_LOW)).expect("read memory reservation to string");
-            let reservation_check = match linux_memory.reservation {
+            let reservation_check = match linux_memory.reservation() {
                 Some(reservation) if reservation == -1 => reservation_content == "max",
                 Some(reservation) => reservation_content == reservation.to_string(),
                 None => reservation_content == "0",

@@ -1,11 +1,10 @@
+use anyhow::{bail, Context, Result};
+use nix::unistd::{self, close};
 use std::env;
 use std::io::prelude::*;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
-
-use anyhow::{Context, Result};
-use nix::unistd::{self, close};
 
 pub const NOTIFY_FILE: &str = "notify.sock";
 
@@ -36,15 +35,16 @@ impl NotifyListener {
         Ok(Self { socket: stream })
     }
 
-    pub fn wait_for_container_start(&mut self) -> Result<()> {
+    pub fn wait_for_container_start(&self) -> Result<()> {
         match self.socket.accept() {
-            Ok((mut socket, _addr)) => {
+            Ok((mut socket, _)) => {
                 let mut response = String::new();
                 socket.read_to_string(&mut response)?;
                 log::debug!("received: {}", response);
             }
-            Err(e) => println!("accept function failed: {:?}", e),
+            Err(e) => bail!("accept function failed: {:?}", e),
         }
+
         Ok(())
     }
 
@@ -68,11 +68,11 @@ impl NotifySocket {
     pub fn notify_container_start(&mut self) -> Result<()> {
         log::debug!("notify container start");
         let cwd = env::current_dir()?;
-        unistd::chdir(&*self.path.parent().unwrap())?;
+        unistd::chdir(self.path.parent().unwrap())?;
         let mut stream = UnixStream::connect(&self.path.file_name().unwrap())?;
         stream.write_all(b"start container")?;
         log::debug!("notify finished");
-        unistd::chdir(&*cwd)?;
+        unistd::chdir(&cwd)?;
         Ok(())
     }
 

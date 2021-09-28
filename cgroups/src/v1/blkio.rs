@@ -1,14 +1,14 @@
 use std::path::Path;
 
 use crate::{
-    common,
+    common::{self, ControllerOpt},
     stats::{self, BlkioDeviceStat, BlkioStats, StatsProvider},
     v1::Controller,
 };
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use oci_spec::{LinuxBlockIo, LinuxResources};
+use oci_spec::runtime::LinuxBlockIo;
 
 // Throttling/upper limit policy
 // ---------------------------------------
@@ -76,22 +76,18 @@ pub struct Blkio {}
 impl Controller for Blkio {
     type Resource = LinuxBlockIo;
 
-    async fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
+    async fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply blkio cgroup config");
 
-        if let Some(blkio) = Self::needs_to_handle(linux_resources) {
+        if let Some(blkio) = Self::needs_to_handle(controller_opt) {
             Self::apply(cgroup_root, blkio).await?;
         }
 
         Ok(())
     }
 
-    fn needs_to_handle(linux_resources: &LinuxResources) -> Option<&Self::Resource> {
-        if let Some(blkio) = &linux_resources.block_io {
-            return Some(blkio);
-        }
-
-        None
+    fn needs_to_handle<'a>(controller_opt: &'a ControllerOpt) -> Option<&'a Self::Resource> {
+        controller_opt.resources.block_io().as_ref()
     }
 }
 
@@ -109,41 +105,41 @@ impl StatsProvider for Blkio {
 
 impl Blkio {
     async fn apply(root_path: &Path, blkio: &LinuxBlockIo) -> Result<()> {
-        if let Some(throttle_read_bps_device) = blkio.throttle_read_bps_device.as_ref() {
+        if let Some(throttle_read_bps_device) = blkio.throttle_read_bps_device().as_ref() {
             for trbd in throttle_read_bps_device {
                 common::async_write_cgroup_file_str(
                     &root_path.join(BLKIO_THROTTLE_READ_BPS),
-                    &format!("{}:{} {}", trbd.major, trbd.minor, trbd.rate),
+                    &format!("{}:{} {}", trbd.major(), trbd.minor(), trbd.rate()),
                 )
                 .await?;
             }
         }
 
-        if let Some(throttle_write_bps_device) = blkio.throttle_write_bps_device.as_ref() {
+        if let Some(throttle_write_bps_device) = blkio.throttle_write_bps_device().as_ref() {
             for twbd in throttle_write_bps_device {
                 common::async_write_cgroup_file_str(
                     &root_path.join(BLKIO_THROTTLE_WRITE_BPS),
-                    &format!("{}:{} {}", twbd.major, twbd.minor, twbd.rate),
+                    &format!("{}:{} {}", twbd.major(), twbd.minor(), twbd.rate()),
                 )
                 .await?;
             }
         }
 
-        if let Some(throttle_read_iops_device) = blkio.throttle_read_iops_device.as_ref() {
+        if let Some(throttle_read_iops_device) = blkio.throttle_read_iops_device().as_ref() {
             for trid in throttle_read_iops_device {
                 common::async_write_cgroup_file_str(
                     &root_path.join(BLKIO_THROTTLE_READ_IOPS),
-                    &format!("{}:{} {}", trid.major, trid.minor, trid.rate),
+                    &format!("{}:{} {}", trid.major(), trid.minor(), trid.rate()),
                 )
                 .await?;
             }
         }
 
-        if let Some(throttle_write_iops_device) = blkio.throttle_write_iops_device.as_ref() {
+        if let Some(throttle_write_iops_device) = blkio.throttle_write_iops_device().as_ref() {
             for twid in throttle_write_iops_device {
                 common::async_write_cgroup_file_str(
                     &root_path.join(BLKIO_THROTTLE_WRITE_IOPS),
-                    &format!("{}:{} {}", twid.major, twid.minor, twid.rate),
+                    &format!("{}:{} {}", twid.major(), twid.minor(), twid.rate()),
                 )
                 .await?;
             }
@@ -234,63 +230,21 @@ mod tests {
     use crate::test::{aw, create_temp_dir, set_fixture, setup};
 
     use anyhow::Result;
-    use oci_spec::{LinuxBlockIo, LinuxThrottleDevice};
-
-    struct BlockIoBuilder {
-        block_io: LinuxBlockIo,
-    }
-
-    impl BlockIoBuilder {
-        fn new() -> Self {
-            let block_io = LinuxBlockIo {
-                weight: Some(0),
-                leaf_weight: Some(0),
-                weight_device: vec![].into(),
-                throttle_read_bps_device: vec![].into(),
-                throttle_write_bps_device: vec![].into(),
-                throttle_read_iops_device: vec![].into(),
-                throttle_write_iops_device: vec![].into(),
-            };
-
-            Self { block_io }
-        }
-
-        fn with_read_bps(mut self, throttle: Vec<LinuxThrottleDevice>) -> Self {
-            self.block_io.throttle_read_bps_device = throttle.into();
-            self
-        }
-
-        fn with_write_bps(mut self, throttle: Vec<LinuxThrottleDevice>) -> Self {
-            self.block_io.throttle_write_bps_device = throttle.into();
-            self
-        }
-
-        fn with_read_iops(mut self, throttle: Vec<LinuxThrottleDevice>) -> Self {
-            self.block_io.throttle_read_iops_device = throttle.into();
-            self
-        }
-
-        fn with_write_iops(mut self, throttle: Vec<LinuxThrottleDevice>) -> Self {
-            self.block_io.throttle_write_iops_device = throttle.into();
-            self
-        }
-
-        fn build(self) -> LinuxBlockIo {
-            self.block_io
-        }
-    }
+    use oci_spec::runtime::{LinuxBlockIoBuilder, LinuxThrottleDeviceBuilder};
 
     #[test]
     fn test_set_blkio_read_bps() {
         let (tmp, throttle) = setup("test_set_blkio_read_bps", BLKIO_THROTTLE_READ_BPS);
 
-        let blkio = BlockIoBuilder::new()
-            .with_read_bps(vec![LinuxThrottleDevice {
-                major: 8,
-                minor: 0,
-                rate: 102400,
-            }])
-            .build();
+        let blkio = LinuxBlockIoBuilder::default()
+            .throttle_read_bps_device(vec![LinuxThrottleDeviceBuilder::default()
+                .major(8)
+                .minor(0)
+                .rate(102400u64)
+                .build()
+                .unwrap()])
+            .build()
+            .unwrap();
 
         aw!(Blkio::apply(&tmp, &blkio)).expect("apply blkio");
         let content = fs::read_to_string(throttle)
@@ -303,13 +257,15 @@ mod tests {
     fn test_set_blkio_write_bps() {
         let (tmp, throttle) = setup("test_set_blkio_write_bps", BLKIO_THROTTLE_WRITE_BPS);
 
-        let blkio = BlockIoBuilder::new()
-            .with_write_bps(vec![LinuxThrottleDevice {
-                major: 8,
-                minor: 0,
-                rate: 102400,
-            }])
-            .build();
+        let blkio = LinuxBlockIoBuilder::default()
+            .throttle_write_bps_device(vec![LinuxThrottleDeviceBuilder::default()
+                .major(8)
+                .minor(0)
+                .rate(102400u64)
+                .build()
+                .unwrap()])
+            .build()
+            .unwrap();
 
         aw!(Blkio::apply(&tmp, &blkio)).expect("apply blkio");
         let content = fs::read_to_string(throttle)
@@ -322,13 +278,15 @@ mod tests {
     fn test_set_blkio_read_iops() {
         let (tmp, throttle) = setup("test_set_blkio_read_iops", BLKIO_THROTTLE_READ_IOPS);
 
-        let blkio = BlockIoBuilder::new()
-            .with_read_iops(vec![LinuxThrottleDevice {
-                major: 8,
-                minor: 0,
-                rate: 102400,
-            }])
-            .build();
+        let blkio = LinuxBlockIoBuilder::default()
+            .throttle_read_iops_device(vec![LinuxThrottleDeviceBuilder::default()
+                .major(8)
+                .minor(0)
+                .rate(102400u64)
+                .build()
+                .unwrap()])
+            .build()
+            .unwrap();
 
         aw!(Blkio::apply(&tmp, &blkio)).expect("apply blkio");
         let content = fs::read_to_string(throttle)
@@ -341,13 +299,15 @@ mod tests {
     fn test_set_blkio_write_iops() {
         let (tmp, throttle) = setup("test_set_blkio_write_iops", BLKIO_THROTTLE_WRITE_IOPS);
 
-        let blkio = BlockIoBuilder::new()
-            .with_write_iops(vec![LinuxThrottleDevice {
-                major: 8,
-                minor: 0,
-                rate: 102400,
-            }])
-            .build();
+        let blkio = LinuxBlockIoBuilder::default()
+            .throttle_write_iops_device(vec![LinuxThrottleDeviceBuilder::default()
+                .major(8)
+                .minor(0)
+                .rate(102400u64)
+                .build()
+                .unwrap()])
+            .build()
+            .unwrap();
 
         aw!(Blkio::apply(&tmp, &blkio)).expect("apply blkio");
         let content = fs::read_to_string(throttle)

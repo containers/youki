@@ -2,10 +2,10 @@ use std::path::Path;
 
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
-use oci_spec::{LinuxCpu, LinuxResources};
+use oci_spec::runtime::LinuxCpu;
 
 use crate::{
-    common,
+    common::{self, ControllerOpt},
     stats::{CpuThrottling, StatsProvider},
 };
 
@@ -24,23 +24,23 @@ pub struct Cpu {}
 impl Controller for Cpu {
     type Resource = LinuxCpu;
 
-    async fn apply(linux_resources: &LinuxResources, cgroup_root: &Path) -> Result<()> {
+    async fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()> {
         log::debug!("Apply Cpu cgroup config");
 
-        if let Some(cpu) = Self::needs_to_handle(linux_resources) {
-            Self::apply(cgroup_root, cpu).await?;
+        if let Some(cpu) = Self::needs_to_handle(controller_opt) {
+            Self::apply(cgroup_root, cpu).await.context("failed to apply cpu resource restrictions")?;
         }
 
         Ok(())
     }
 
-    fn needs_to_handle(linux_resources: &LinuxResources) -> Option<&Self::Resource> {
-        if let Some(cpu) = &linux_resources.cpu {
-            if cpu.shares.is_some()
-                || cpu.period.is_some()
-                || cpu.quota.is_some()
-                || cpu.realtime_period.is_some()
-                || cpu.realtime_runtime.is_some()
+    fn needs_to_handle<'a>(controller_opt: &'a ControllerOpt) -> Option<&'a Self::Resource> {
+        if let Some(cpu) = &controller_opt.resources.cpu() {
+            if cpu.shares().is_some()
+                || cpu.period().is_some()
+                || cpu.quota().is_some()
+                || cpu.realtime_period().is_some()
+                || cpu.realtime_runtime().is_some()
             {
                 return Some(cpu);
             }
@@ -97,35 +97,35 @@ impl StatsProvider for Cpu {
 
 impl Cpu {
     async fn apply(root_path: &Path, cpu: &LinuxCpu) -> Result<()> {
-        if let Some(cpu_shares) = cpu.shares {
+        if let Some(cpu_shares) = cpu.shares() {
             if cpu_shares != 0 {
                 common::async_write_cgroup_file(root_path.join(CGROUP_CPU_SHARES), cpu_shares)
                     .await?;
             }
         }
 
-        if let Some(cpu_period) = cpu.period {
+        if let Some(cpu_period) = cpu.period() {
             if cpu_period != 0 {
                 common::async_write_cgroup_file(root_path.join(CGROUP_CPU_PERIOD), cpu_period)
                     .await?;
             }
         }
 
-        if let Some(cpu_quota) = cpu.quota {
+        if let Some(cpu_quota) = cpu.quota() {
             if cpu_quota != 0 {
                 common::async_write_cgroup_file(root_path.join(CGROUP_CPU_QUOTA), cpu_quota)
                     .await?;
             }
         }
 
-        if let Some(rt_runtime) = cpu.realtime_runtime {
+        if let Some(rt_runtime) = cpu.realtime_runtime() {
             if rt_runtime != 0 {
                 common::async_write_cgroup_file(root_path.join(CGROUP_CPU_RT_RUNTIME), rt_runtime)
                     .await?;
             }
         }
 
-        if let Some(rt_period) = cpu.realtime_period {
+        if let Some(rt_period) = cpu.realtime_period() {
             if rt_period != 0 {
                 common::async_write_cgroup_file(root_path.join(CGROUP_CPU_RT_PERIOD), rt_period)
                     .await?;
@@ -139,7 +139,8 @@ impl Cpu {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test::{aw, create_temp_dir, set_fixture, setup, LinuxCpuBuilder};
+    use crate::test::{aw, create_temp_dir, set_fixture, setup};
+    use oci_spec::runtime::LinuxCpuBuilder;
     use std::fs;
 
     #[test]
@@ -148,7 +149,7 @@ mod tests {
         let (tmp, shares) = setup("test_set_shares", CGROUP_CPU_SHARES);
         let _ = set_fixture(&tmp, CGROUP_CPU_SHARES, "")
             .unwrap_or_else(|_| panic!("set test fixture for {}", CGROUP_CPU_SHARES));
-        let cpu = LinuxCpuBuilder::new().with_shares(2048).build();
+        let cpu = LinuxCpuBuilder::default().shares(2048u64).build().unwrap();
 
         // act
         aw!(Cpu::apply(&tmp, &cpu)).expect("apply cpu");
@@ -164,7 +165,7 @@ mod tests {
         // arrange
         const QUOTA: i64 = 200000;
         let (tmp, max) = setup("test_set_quota", CGROUP_CPU_QUOTA);
-        let cpu = LinuxCpuBuilder::new().with_quota(QUOTA).build();
+        let cpu = LinuxCpuBuilder::default().quota(QUOTA).build().unwrap();
 
         // act
         aw!(Cpu::apply(&tmp, &cpu)).expect("apply cpu");
@@ -180,7 +181,7 @@ mod tests {
         // arrange
         const PERIOD: u64 = 100000;
         let (tmp, max) = setup("test_set_period", CGROUP_CPU_PERIOD);
-        let cpu = LinuxCpuBuilder::new().with_period(PERIOD).build();
+        let cpu = LinuxCpuBuilder::default().period(PERIOD).build().unwrap();
 
         // act
         aw!(Cpu::apply(&tmp, &cpu)).expect("apply cpu");
@@ -196,9 +197,10 @@ mod tests {
         // arrange
         const RUNTIME: i64 = 100000;
         let (tmp, max) = setup("test_set_rt_runtime", CGROUP_CPU_RT_RUNTIME);
-        let cpu = LinuxCpuBuilder::new()
-            .with_realtime_runtime(RUNTIME)
-            .build();
+        let cpu = LinuxCpuBuilder::default()
+            .realtime_runtime(RUNTIME)
+            .build()
+            .unwrap();
 
         // act
         aw!(Cpu::apply(&tmp, &cpu)).expect("apply cpu");
@@ -214,7 +216,10 @@ mod tests {
         // arrange
         const PERIOD: u64 = 100000;
         let (tmp, max) = setup("test_set_rt_period", CGROUP_CPU_RT_PERIOD);
-        let cpu = LinuxCpuBuilder::new().with_realtime_period(PERIOD).build();
+        let cpu = LinuxCpuBuilder::default()
+            .realtime_period(PERIOD)
+            .build()
+            .unwrap();
 
         // act
         aw!(Cpu::apply(&tmp, &cpu)).expect("apply cpu");

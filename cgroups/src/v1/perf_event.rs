@@ -1,7 +1,7 @@
 use super::Controller;
+use crate::common::ControllerOpt;
 use anyhow::Result;
 use async_trait::async_trait;
-use oci_spec::LinuxResources;
 use std::path::Path;
 
 pub struct PerfEvent {}
@@ -10,11 +10,11 @@ pub struct PerfEvent {}
 impl Controller for PerfEvent {
     type Resource = ();
 
-    async fn apply(_linux_resources: &LinuxResources, _cgroup_root: &Path) -> Result<()> {
+    async fn apply(_controller_opt: &ControllerOpt, _cgroup_root: &Path) -> Result<()> {
         Ok(())
     }
     //no need to handle any case
-    fn needs_to_handle(_linux_resources: &LinuxResources) -> Option<&Self::Resource> {
+    fn needs_to_handle<'a>(_controller_opt: &'a ControllerOpt) -> Option<&'a Self::Resource> {
         None
     }
 }

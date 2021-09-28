@@ -1,8 +1,8 @@
 use anyhow::Result;
 use std::path::Path;
 
-use oci_spec::LinuxResources;
+use crate::common::ControllerOpt;
 
 pub trait Controller {
-    fn apply(linux_resources: &LinuxResources, cgroup_path: &Path) -> Result<()>;
+    fn apply(controller_opt: &ControllerOpt, cgroup_path: &Path) -> Result<()>;
 }

@@ -1,14 +1,14 @@
-use crate::syscall::linux::LinuxSyscall;
+use crate::syscall::Syscall;
 use std::path::PathBuf;
 
 use super::{init_builder::InitContainerBuilder, tenant_builder::TenantContainerBuilder};
-pub struct ContainerBuilder {
+pub struct ContainerBuilder<'a> {
     /// Id of the container
     pub(super) container_id: String,
     /// Root directory for container state
     pub(super) root_path: PathBuf,
     /// Interface to operating system primitives
-    pub(super) syscall: LinuxSyscall,
+    pub(super) syscall: &'a dyn Syscall,
     /// File which will be used to communicate the pid of the
     /// container process to the higher level runtime
     pub(super) pid_file: Option<PathBuf>,
@@ -25,15 +25,16 @@ pub struct ContainerBuilder {
 ///
 /// ```no_run
 /// use youki::container::builder::ContainerBuilder;
+/// use youki::syscall::syscall::create_syscall;;
 ///
-/// ContainerBuilder::new("74f1a4cb3801".to_owned())
+/// ContainerBuilder::new("74f1a4cb3801".to_owned(), create_syscall().as_ref())
 /// .with_root_path("/run/containers/youki")
 /// .with_pid_file(Some("/var/run/docker.pid"))
 /// .with_console_socket(Some("/var/run/docker/sock.tty"))
 /// .as_init("/var/run/docker/bundle")
 /// .build();
 /// ```
-impl ContainerBuilder {
+impl<'a> ContainerBuilder<'a> {
     /// Generates the base configuration for a container which can be
     /// transformed into either a init container or a tenant container
     ///
@@ -41,16 +42,17 @@ impl ContainerBuilder {
     ///
     /// ```no_run
     /// use youki::container::builder::ContainerBuilder;
+    /// use youki::syscall::syscall::create_syscall;;
     ///
-    /// let builder = ContainerBuilder::new("74f1a4cb3801".to_owned());
+    /// let builder = ContainerBuilder::new("74f1a4cb3801".to_owned(), create_syscall().as_ref());
     /// ```
-    pub fn new(container_id: String) -> Self {
+    pub fn new(container_id: String, syscall: &'a dyn Syscall) -> Self {
         let root_path = PathBuf::from("/run/youki");
 
         Self {
             container_id,
             root_path,
-            syscall: LinuxSyscall,
+            syscall,
             pid_file: None,
             console_socket: None,
             preserve_fds: 0,
@@ -62,14 +64,15 @@ impl ContainerBuilder {
     ///
     /// ```no_run
     /// # use youki::container::builder::ContainerBuilder;
+    /// # use youki::syscall::syscall::create_syscall;
     ///
-    /// ContainerBuilder::new("74f1a4cb3801".to_owned())
+    /// ContainerBuilder::new("74f1a4cb3801".to_owned(), create_syscall().as_ref())
     /// .as_tenant()
     /// .with_container_args(vec!["sleep".to_owned(), "9001".to_owned()])
     /// .build();
     /// ```
     #[allow(clippy::wrong_self_convention)]
-    pub fn as_tenant(self) -> TenantContainerBuilder {
+    pub fn as_tenant(self) -> TenantContainerBuilder<'a> {
         TenantContainerBuilder::new(self)
     }
 
@@ -78,14 +81,15 @@ impl ContainerBuilder {
     ///
     /// ```no_run
     /// # use youki::container::builder::ContainerBuilder;
+    /// # use youki::syscall::syscall::create_syscall;
     ///
-    /// ContainerBuilder::new("74f1a4cb3801".to_owned())
+    /// ContainerBuilder::new("74f1a4cb3801".to_owned(), create_syscall().as_ref())
     /// .as_init("/var/run/docker/bundle")
     /// .with_systemd(false)
     /// .build();
     /// ```
     #[allow(clippy::wrong_self_convention)]
-    pub fn as_init<P: Into<PathBuf>>(self, bundle: P) -> InitContainerBuilder {
+    pub fn as_init<P: Into<PathBuf>>(self, bundle: P) -> InitContainerBuilder<'a> {
         InitContainerBuilder::new(self, bundle.into())
     }
 
@@ -94,8 +98,9 @@ impl ContainerBuilder {
     ///
     /// ```no_run
     /// # use youki::container::builder::ContainerBuilder;
+    /// # use youki::syscall::syscall::create_syscall;
     ///
-    /// ContainerBuilder::new("74f1a4cb3801".to_owned())
+    /// ContainerBuilder::new("74f1a4cb3801".to_owned(), create_syscall().as_ref())
     /// .with_root_path("/run/containers/youki");
     /// ```
     pub fn with_root_path<P: Into<PathBuf>>(mut self, path: P) -> Self {
@@ -109,8 +114,9 @@ impl ContainerBuilder {
     ///
     /// ```no_run
     /// # use youki::container::builder::ContainerBuilder;
+    /// # use youki::syscall::syscall::create_syscall;
     ///
-    /// ContainerBuilder::new("74f1a4cb3801".to_owned())
+    /// ContainerBuilder::new("74f1a4cb3801".to_owned(), create_syscall().as_ref())
     /// .with_pid_file(Some("/var/run/docker.pid"));
     /// ```
     pub fn with_pid_file<P: Into<PathBuf>>(mut self, path: Option<P>) -> Self {
@@ -124,8 +130,9 @@ impl ContainerBuilder {
     ///
     /// ```no_run
     /// # use youki::container::builder::ContainerBuilder;
+    /// # use youki::syscall::syscall::create_syscall;
     ///
-    /// ContainerBuilder::new("74f1a4cb3801".to_owned())
+    /// ContainerBuilder::new("74f1a4cb3801".to_owned(), create_syscall().as_ref())
     /// .with_console_socket(Some("/var/run/docker/sock.tty"));
     /// ```
     pub fn with_console_socket<P: Into<PathBuf>>(mut self, path: Option<P>) -> Self {
@@ -133,14 +140,15 @@ impl ContainerBuilder {
         self
     }
 
-    /// Sets the console socket, which will be used to send the file descriptor
-    /// of the pseudoterminal
+    /// Sets the number of additional file descriptors which will be passed into
+    /// the container process.
     /// # Example
     ///
     /// ```no_run
     /// # use youki::container::builder::ContainerBuilder;
+    /// # use youki::syscall::syscall::create_syscall;
     ///
-    /// ContainerBuilder::new("74f1a4cb3801".to_owned())
+    /// ContainerBuilder::new("74f1a4cb3801".to_owned(), create_syscall().as_ref())
     /// .with_preserved_fds(5);
     /// ```
     pub fn with_preserved_fds(mut self, preserved_fds: i32) -> Self {

@@ -3,10 +3,23 @@ name = "youki_integration_test"
 version = "0.1.0"
 edition = "2018"
 
+[dependencies.clap]
+version = "=3.0.0-beta.2"
+default-features = false
+features = ["std", "suggestions", "derive"]
+
+[dependencies.clap_derive]
+version = "=3.0.0-beta.2"
+default-features = true
+
 [dependencies]
 uuid = "0.8"
 rand = "0.8.0"
 tar = "0.4"
 flate2 = "1.0"
-testanything = "0.2.1"
+test_framework = { version = "0.1.0", path = "../test_framework"}
 anyhow = "1.0"
+lazy_static = "1.4.0"
+once_cell = "1.8.0"
+oci-spec = "0.5.1"
+which = "4.2.2"
