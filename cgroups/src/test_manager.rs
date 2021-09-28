@@ -11,12 +11,14 @@ use crate::{
 #[derive(Debug)]
 pub struct TestManager {
     add_task_args: RefCell<Vec<Pid>>,
+    pub apply_called: RefCell<bool>,
 }
 
 impl Default for TestManager {
     fn default() -> Self {
         Self {
             add_task_args: RefCell::new(vec![]),
+            apply_called: RefCell::new(false),
         }
     }
 }
@@ -29,6 +31,7 @@ impl CgroupManager for TestManager {
 
     // NOTE: The argument cannot be stored due to lifetime.
     fn apply(&self, _controller_opt: &ControllerOpt) -> Result<()> {
+        *self.apply_called.borrow_mut() = true;
         Ok(())
     }
 
@@ -52,5 +55,9 @@ impl CgroupManager for TestManager {
 impl TestManager {
     pub fn get_add_task_args(&self) -> Vec<Pid> {
         self.add_task_args.borrow_mut().clone()
+    }
+
+    pub fn apply_called(&self) -> bool {
+        self.apply_called.borrow_mut().clone()
     }
 }

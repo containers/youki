@@ -130,3 +130,66 @@ fn apply_cgroups<C: CgroupManager + ?Sized>(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::apply_cgroups;
+    use anyhow::Result;
+    use cgroups::test_manager::TestManager;
+    use nix::unistd::Pid;
+    use oci_spec::runtime::LinuxResources;
+    use procfs::process::Process;
+
+    #[test]
+    fn apply_cgroup_init() -> Result<()> {
+        // arrange
+        let cmanager = TestManager::default();
+        let resources = LinuxResources::default();
+
+        // act
+        apply_cgroups(&cmanager, Some(&resources), true)?;
+
+        // assert
+        assert!(cmanager.get_add_task_args().len() == 1);
+        assert_eq!(
+            cmanager.get_add_task_args()[0],
+            Pid::from_raw(Process::myself()?.pid())
+        );
+        assert_eq!(cmanager.apply_called(), true);
+        Ok(())
+    }
+
+    #[test]
+    fn apply_cgroup_tenant() -> Result<()> {
+        // arrange
+        let cmanager = TestManager::default();
+        let resources = LinuxResources::default();
+
+        // act
+        apply_cgroups(&cmanager, Some(&resources), false)?;
+
+        // assert
+        assert_eq!(
+            cmanager.get_add_task_args()[0],
+            Pid::from_raw(Process::myself()?.pid())
+        );
+        assert_eq!(cmanager.apply_called(), false);
+        Ok(())
+    }
+
+    #[test]
+    fn apply_cgroup_no_resources() -> Result<()> {
+        // arrange
+        let cmanager = TestManager::default();
+
+        // act
+        apply_cgroups(&cmanager, None, true)?;
+        // assert
+        assert_eq!(
+            cmanager.get_add_task_args()[0],
+            Pid::from_raw(Process::myself()?.pid())
+        );
+        assert_eq!(cmanager.apply_called(), false);
+        Ok(())
+    }
+}
