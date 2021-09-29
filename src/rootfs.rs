@@ -40,7 +40,7 @@ pub fn prepare_rootfs(
         .mount(None, Path::new("/"), None, flags, None)
         .context("failed to mount rootfs")?;
 
-    make_parent_mount_private(rootfs, command)
+    make_parent_mount_private(rootfs, &Process::myself()?.mountinfo()?, command)
         .context("failed to change parent mount of rootfs private")?;
 
     log::debug!("mount root fs {:?}", rootfs);
@@ -408,9 +408,12 @@ fn find_parent_mount<'a>(rootfs: &Path, mount_infos: &'a [MountInfo]) -> Result<
 
 /// Make parent mount of rootfs private if it was shared, which is required by pivot_root.
 /// It also makes sure following bind mount does not propagate in other namespaces.
-fn make_parent_mount_private(rootfs: &Path, command: &dyn Syscall) -> Result<()> {
-    let mount_infos = Process::myself()?.mountinfo()?;
-    let parent_mount = find_parent_mount(rootfs, &mount_infos)?;
+fn make_parent_mount_private(
+    rootfs: &Path,
+    mount_infos: &[MountInfo],
+    command: &dyn Syscall,
+) -> Result<()> {
+    let parent_mount = find_parent_mount(rootfs, mount_infos)?;
 
     // check parent mount has 'shared' propagation type
     if parent_mount
@@ -449,38 +452,48 @@ pub fn adjust_root_mount_propagation(linux: &Linux, command: &dyn Syscall) -> Re
 
 #[cfg(test)]
 mod tests {
+    use crate::syscall::test::{MountArgs, TestHelperSyscall};
     use anyhow::{Context, Result};
-    use procfs::process::MountInfo;
+    use nix::mount::MsFlags;
+    use oci_spec::runtime::LinuxNamespaceType::Mount;
+    use procfs::process::{MountInfo, MountOptFields};
     use std::path::{Path, PathBuf};
+
+    // sample root mount info
+    fn root_mount() -> MountInfo {
+        MountInfo {
+            mnt_id: 11,
+            pid: 10,
+            majmin: String::from(""),
+            root: String::from("/"),
+            mount_point: PathBuf::from("/"),
+            mount_options: Default::default(),
+            opt_fields: vec![],
+            fs_type: String::from("ext4"),
+            mount_source: Some(String::from("/dev/sda1")),
+            super_options: Default::default(),
+        }
+    }
+
+    // sample proc mount info
+    fn proc_mount() -> MountInfo {
+        MountInfo {
+            mnt_id: 12,
+            pid: 11,
+            majmin: String::from(""),
+            root: String::from("/"),
+            mount_point: PathBuf::from("/proc"),
+            mount_options: Default::default(),
+            opt_fields: vec![],
+            fs_type: String::from("proc"),
+            mount_source: Some(String::from("proc")),
+            super_options: Default::default(),
+        }
+    }
 
     #[test]
     fn test_find_parent_mount() -> Result<()> {
-        let mount_infos = vec![
-            MountInfo {
-                mnt_id: 11,
-                pid: 10,
-                majmin: "".to_string(),
-                root: "/".to_string(),
-                mount_point: PathBuf::from("/"),
-                mount_options: Default::default(),
-                opt_fields: vec![],
-                fs_type: "ext4".to_string(),
-                mount_source: Some("/dev/sda1".to_string()),
-                super_options: Default::default(),
-            },
-            MountInfo {
-                mnt_id: 12,
-                pid: 11,
-                majmin: "".to_string(),
-                root: "/".to_string(),
-                mount_point: PathBuf::from("/proc"),
-                mount_options: Default::default(),
-                opt_fields: vec![],
-                fs_type: "proc".to_string(),
-                mount_source: Some("proc".to_string()),
-                super_options: Default::default(),
-            },
-        ];
+        let mount_infos = vec![root_mount(), proc_mount()];
 
         let res = super::find_parent_mount(Path::new("/path/to/rootfs"), &mount_infos)
             .context("Failed to get parent mount")?;
@@ -493,5 +506,46 @@ mod tests {
         let mount_infos = vec![];
         let res = super::find_parent_mount(Path::new("/path/to/rootfs"), &mount_infos);
         assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_make_parent_mount_private() -> Result<()> {
+        let opt_fields_list = [
+            vec![MountOptFields::Shared(1)],
+            vec![MountOptFields::Master(1)],
+            vec![],
+        ];
+
+        let expected_mount_args_list = [
+            vec![MountArgs {
+                source: None,
+                target: PathBuf::from("/"),
+                fstype: None,
+                flags: MsFlags::MS_PRIVATE,
+                data: None,
+            }],
+            vec![],
+            vec![],
+        ];
+
+        for (opt_fields, expected_mount_args) in
+            opt_fields_list.iter().zip(expected_mount_args_list.iter())
+        {
+            let mut root_mount = root_mount();
+            root_mount.opt_fields = opt_fields.to_owned();
+            let mount_infos = vec![root_mount, proc_mount()];
+            let command = TestHelperSyscall::default();
+
+            super::make_parent_mount_private(Path::new("/path/to/rootfs"), &mount_infos, &command)?;
+
+            assert_eq!(
+                command.get_mount_args(),
+                *expected_mount_args,
+                "failed with opt_fields of mount info: {:?}",
+                opt_fields
+            );
+        }
+
+        Ok(())
     }
 }

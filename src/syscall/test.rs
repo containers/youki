@@ -16,13 +16,13 @@ pub struct TestHelperSyscall {
     mount_args: RefCell<Vec<MountArgs>>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct MountArgs {
-    source: Option<PathBuf>,
-    target: PathBuf,
-    fstype: Option<String>,
-    flags: MsFlags,
-    data: Option<String>,
+    pub source: Option<PathBuf>,
+    pub target: PathBuf,
+    pub fstype: Option<String>,
+    pub flags: MsFlags,
+    pub data: Option<String>,
 }
 
 impl Default for TestHelperSyscall {
@@ -113,5 +113,9 @@ impl TestHelperSyscall {
 
     pub fn get_set_capability_args(&self) -> Vec<(CapSet, CapsHashSet)> {
         self.set_capability_args.borrow_mut().clone()
+    }
+
+    pub fn get_mount_args(&self) -> Vec<MountArgs> {
+        self.mount_args.borrow_mut().clone()
     }
 }
