@@ -2,12 +2,9 @@
 
 use anyhow::Context;
 use anyhow::{bail, Result};
-use ipc_channel::ipc;
 use nix::sys::stat::Mode;
 use nix::sys::statfs;
-use nix::sys::wait;
 use nix::unistd;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ffi::CString;
 use std::fs::{self, DirBuilder, File};
@@ -218,42 +215,51 @@ pub fn create_temp_dir(test_name: &str) -> Result<TempDir> {
     Ok(dir)
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct TestResult {
-    success: bool,
-    message: String,
-}
+#[cfg(test)]
+pub(crate) mod test_utils {
+    use anyhow::Context;
+    use anyhow::{bail, Result};
+    use ipc_channel::ipc;
+    use nix::sys::wait;
+    use serde::{Deserialize, Serialize};
 
-pub fn test_in_child_process<F: FnOnce() -> Result<()>>(cb: F) -> Result<()> {
-    let (sender, receiver) = ipc::channel::<TestResult>()?;
-    match unsafe { nix::unistd::fork()? } {
-        nix::unistd::ForkResult::Parent { child } => {
-            let res = receiver.recv().unwrap();
-            wait::waitpid(child, None)?;
+    #[derive(Debug, Serialize, Deserialize)]
+    struct TestResult {
+        success: bool,
+        message: String,
+    }
 
-            if !res.success {
-                bail!("child process failed: {}", res.message);
+    pub fn test_in_child_process<F: FnOnce() -> Result<()>>(cb: F) -> Result<()> {
+        let (sender, receiver) = ipc::channel::<TestResult>()?;
+        match unsafe { nix::unistd::fork()? } {
+            nix::unistd::ForkResult::Parent { child } => {
+                let res = receiver.recv().unwrap();
+                wait::waitpid(child, None)?;
+
+                if !res.success {
+                    bail!("child process failed: {}", res.message);
+                }
             }
-        }
-        nix::unistd::ForkResult::Child => {
-            let test_result = match cb() {
-                Ok(_) => TestResult {
-                    success: true,
-                    message: String::new(),
-                },
-                Err(err) => TestResult {
-                    success: false,
-                    message: err.to_string(),
-                },
-            };
-            sender
-                .send(test_result)
-                .context("failed to send from the child process")?;
-            std::process::exit(0);
-        }
-    };
+            nix::unistd::ForkResult::Child => {
+                let test_result = match cb() {
+                    Ok(_) => TestResult {
+                        success: true,
+                        message: String::new(),
+                    },
+                    Err(err) => TestResult {
+                        success: false,
+                        message: err.to_string(),
+                    },
+                };
+                sender
+                    .send(test_result)
+                    .context("failed to send from the child process")?;
+                std::process::exit(0);
+            }
+        };
 
-    Ok(())
+        Ok(())
+    }
 }
 
 #[cfg(test)]

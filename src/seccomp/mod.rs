@@ -382,7 +382,7 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils;
+    use crate::utils::test_utils;
     use anyhow::Result;
     use oci_spec::runtime::Arch;
     use oci_spec::runtime::{LinuxSeccompBuilder, LinuxSyscallBuilder};
@@ -415,7 +415,7 @@ mod tests {
             .syscalls(vec![syscall])
             .build()?;
 
-        utils::test_in_child_process(|| {
+        test_utils::test_in_child_process(|| {
             let _ = prctl::set_no_new_privileges(true);
             initialize_seccomp(&seccomp_profile)?;
             let ret = nix::unistd::getcwd();
@@ -447,7 +447,7 @@ mod tests {
 
         // We know linux and seccomp exist, so let's just unwrap.
         let seccomp_profile = spec.linux().as_ref().unwrap().seccomp().as_ref().unwrap();
-        utils::test_in_child_process(|| {
+        test_utils::test_in_child_process(|| {
             let _ = prctl::set_no_new_privileges(true);
             initialize_seccomp(seccomp_profile)?;
 
@@ -469,7 +469,7 @@ mod tests {
             .architectures(vec![Arch::ScmpArchNative])
             .syscalls(vec![syscall])
             .build()?;
-        utils::test_in_child_process(|| {
+        test_utils::test_in_child_process(|| {
             let _ = prctl::set_no_new_privileges(true);
             let fd = initialize_seccomp(&seccomp_profile)?;
             if fd.is_none() {
