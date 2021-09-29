@@ -449,7 +449,7 @@ mod tests {
         let seccomp_profile = spec.linux().as_ref().unwrap().seccomp().as_ref().unwrap();
         utils::test_in_child_process(|| {
             let _ = prctl::set_no_new_privileges(true);
-            initialize_seccomp(&seccomp_profile)?;
+            initialize_seccomp(seccomp_profile)?;
 
             Ok(())
         })?;
