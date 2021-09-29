@@ -1,11 +1,24 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use procfs::process::Process;
 
 use super::{controller_type::CONTROLLERS, ControllerType};
 
-pub fn list_subsystem_mount_points() -> Result<HashMap<ControllerType, PathBuf>> {
+/// List all cgroup v1 subsystem mount points on the system. This can include unsupported
+/// subsystems, comounted controllers and named hierarchies.
+pub fn list_subsystem_mount_points() -> Result<Vec<PathBuf>> {
+    Ok(Process::myself()?
+        .mountinfo()
+        .context("failed to get mountinfo")?
+        .into_iter()
+        .filter(|m| m.fs_type == "cgroup")
+        .map(|m| m.mount_point)
+        .collect())
+}
+
+/// List the mount points of all currently supported cgroup subsystems.
+pub fn list_supported_mount_points() -> Result<HashMap<ControllerType, PathBuf>> {
     let mut mount_paths = HashMap::with_capacity(CONTROLLERS.len());
 
     for controller in CONTROLLERS {
@@ -20,7 +33,8 @@ pub fn list_subsystem_mount_points() -> Result<HashMap<ControllerType, PathBuf>>
 pub fn get_subsystem_mount_point(subsystem: &ControllerType) -> Result<PathBuf> {
     let subsystem = subsystem.to_string();
     Process::myself()?
-        .mountinfo()?
+        .mountinfo()
+        .context("failed to get mountinfo")?
         .into_iter()
         .find(|m| {
             if m.fs_type == "cgroup" {

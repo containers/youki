@@ -107,7 +107,7 @@ pub fn print_cgroups() {
     }
 
     println!("Cgroup mounts");
-    if let Ok(v1_mounts) = cgroups::v1::util::list_subsystem_mount_points() {
+    if let Ok(v1_mounts) = cgroups::v1::util::list_supported_mount_points() {
         let mut v1_mounts: Vec<String> = v1_mounts
             .iter()
             .map(|kv| format!("  {:<16}{}", kv.0.to_string(), kv.1.display()))

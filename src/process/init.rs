@@ -187,11 +187,11 @@ pub fn container_init(
                 && ns_type != CloneFlags::CLONE_NEWPID
                 && ns_type != CloneFlags::CLONE_NEWNS
         })
-        .with_context(|| "Failed to apply namespaces")?;
+        .with_context(|| "failed to apply namespaces")?;
     if let Some(mount_namespace) = namespaces.get(LinuxNamespaceType::Mount) {
         namespaces
             .unshare_or_setns(mount_namespace)
-            .with_context(|| format!("Failed to enter mount namespace: {:?}", mount_namespace))?;
+            .with_context(|| format!("failed to enter mount namespace: {:?}", mount_namespace))?;
     }
 
     // Only set the host name if entering into a new uts namespace
@@ -216,8 +216,13 @@ pub fn container_init(
         }
 
         let bind_service = namespaces.get(LinuxNamespaceType::User).is_some();
-        rootfs::prepare_rootfs(spec, rootfs, bind_service)
-            .with_context(|| "Failed to prepare rootfs")?;
+        rootfs::prepare_rootfs(
+            spec,
+            rootfs,
+            bind_service,
+            namespaces.get(LinuxNamespaceType::Cgroup).is_some(),
+        )
+        .with_context(|| "Failed to prepare rootfs")?;
 
         // Entering into the rootfs jail. If mount namespace is specified, then
         // we use pivot_root, but if we are on the host mount namespace, we will

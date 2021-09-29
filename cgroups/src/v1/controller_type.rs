@@ -37,6 +37,25 @@ impl Display for ControllerType {
     }
 }
 
+impl AsRef<str> for ControllerType {
+    fn as_ref(&self) -> &str {
+        match *self {
+            Self::Cpu => "cpu",
+            Self::CpuAcct => "cpuacct",
+            Self::CpuSet => "cpuset",
+            Self::Devices => "devices",
+            Self::HugeTlb => "hugetlb",
+            Self::Pids => "pids",
+            Self::PerfEvent => "perf_event",
+            Self::Memory => "memory",
+            Self::Blkio => "blkio",
+            Self::NetworkPriority => "net_prio",
+            Self::NetworkClassifier => "net_cls",
+            Self::Freezer => "freezer",
+        }
+    }
+}
+
 pub const CONTROLLERS: &[ControllerType] = &[
     ControllerType::Cpu,
     ControllerType::CpuAcct,
