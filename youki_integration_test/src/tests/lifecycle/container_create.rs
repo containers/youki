@@ -1,4 +1,4 @@
-use super::{create, kill};
+use super::{create, delete, kill};
 use crate::utils::TempDir;
 use crate::utils::{generate_uuid, prepare_bundle};
 use test_framework::{TestResult, TestableGroup};
@@ -41,6 +41,7 @@ impl<'a> ContainerCreate {
         let temp = create::create(&self.project_path, &self.container_id);
         if let TestResult::Ok = temp {
             kill::kill(&self.project_path, &self.container_id);
+            delete::delete(&self.project_path, &self.container_id);
         }
         temp
     }
@@ -51,6 +52,7 @@ impl<'a> ContainerCreate {
         let _ = create::create(&self.project_path, &id);
         let temp = create::create(&self.project_path, &id);
         kill::kill(&self.project_path, &id);
+        delete::delete(&self.project_path, &id);
         match temp {
             TestResult::Ok => TestResult::Err(anyhow::anyhow!(
                 "Container should not have been created with same id, but was created."

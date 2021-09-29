@@ -2,9 +2,9 @@
 use crate::testable::{TestResult, Testable};
 
 // type aliases for test function signature
-type TestFn = dyn Fn() -> TestResult;
+type TestFn = dyn Fn() -> TestResult + Sync + Send;
 // type alias for function signature for function which checks if a test can be run or not
-type CheckFn = dyn Fn() -> bool;
+type CheckFn = dyn Fn() -> bool + Sync + Send;
 
 /// Basic Template structure for tests which need to be run conditionally
 pub struct ConditionalTest<'a> {

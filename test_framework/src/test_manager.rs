@@ -1,10 +1,13 @@
 ///! This exposes the main control wrapper to control the tests
 use crate::testable::{TestResult, TestableGroup};
+use crossbeam::thread;
 use std::collections::BTreeMap;
+
+type TestableGroupType<'a> = dyn TestableGroup<'a> + Sync + Send + 'a;
 
 /// This manages all test groups, and thus the tests
 pub struct TestManager<'a> {
-    test_groups: BTreeMap<&'a str, &'a dyn TestableGroup<'a>>,
+    test_groups: BTreeMap<&'a str, &'a TestableGroupType<'a>>,
 }
 
 impl<'a> Default for TestManager<'a> {
@@ -22,7 +25,7 @@ impl<'a> TestManager<'a> {
     }
 
     /// add a test group to the test manager
-    pub fn add_test_group(&mut self, tg: &'a dyn TestableGroup<'a>) {
+    pub fn add_test_group(&mut self, tg: &'a TestableGroupType<'a>) {
         self.test_groups.insert(tg.get_name(), tg);
     }
 
@@ -47,34 +50,41 @@ impl<'a> TestManager<'a> {
         }
         println!("\n# End group {}", name);
     }
-
-    /// Run all tests from given group
-    fn run_test_group(&self, name: &str, tg: &'a dyn TestableGroup<'a>) {
-        let results = tg.run_all();
-        self.print_test_result(name, &results);
-    }
-
     /// Run all tests from all tests group
     pub fn run_all(&self) {
-        for (name, tg) in &self.test_groups {
-            self.run_test_group(name, *tg);
-        }
+        thread::scope(|s| {
+            let mut collector = Vec::with_capacity(self.test_groups.len());
+            for (name, tg) in &self.test_groups {
+                let r = s.spawn(move |_| tg.run_all());
+                collector.push((name, r));
+            }
+            for (name, handle) in collector {
+                self.print_test_result(name, &handle.join().unwrap());
+            }
+        })
+        .unwrap();
     }
 
     /// Run only selected tests
     pub fn run_selected(&self, tests: Vec<(&str, Option<Vec<&str>>)>) {
-        for (test_group_name, tests) in &tests {
-            if let Some(tg) = self.test_groups.get(test_group_name) {
-                match tests {
-                    None => self.run_test_group(test_group_name, *tg),
-                    Some(tests) => {
-                        let results = tg.run_selected(tests);
-                        self.print_test_result(test_group_name, &results);
+        thread::scope(|s| {
+            let mut collector = Vec::with_capacity(tests.len());
+            for (test_group_name, tests) in &tests {
+                if let Some(tg) = self.test_groups.get(test_group_name) {
+                    let r;
+                    match tests {
+                        None => r = s.spawn(move |_| tg.run_all()),
+                        Some(tests) => r = s.spawn(move |_| tg.run_selected(tests)),
                     }
+                    collector.push((test_group_name, r));
+                } else {
+                    eprintln!("Error : Test Group {} not found, skipping", test_group_name);
                 }
-            } else {
-                eprintln!("Error : Test Group {} not found, skipping", test_group_name);
             }
-        }
+            for (name, handle) in collector {
+                self.print_test_result(name, &handle.join().unwrap());
+            }
+        })
+        .unwrap();
     }
 }
