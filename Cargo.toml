@@ -50,6 +50,7 @@ tabwriter = "1"
 fastrand = "1.4.1"
 crossbeam-channel = "0.5"
 seccomp = { version = "0.1.0", path = "./seccomp" }
+ipc-channel = "0.15.0"
 
 [dev-dependencies]
 # TODO: Fetch from crate.io instead of git when next release oci-spec-rs
