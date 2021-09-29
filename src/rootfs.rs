@@ -330,13 +330,7 @@ fn mount_to_container(
                 | MsFlags::MS_SLAVE),
         )
     {
-        command.mount(
-            Some(dest),
-            dest,
-            None,
-            flags | MsFlags::MS_REMOUNT,
-            None,
-        )?;
+        command.mount(Some(dest), dest, None, flags | MsFlags::MS_REMOUNT, None)?;
     }
     Ok(())
 }
@@ -455,7 +449,7 @@ mod tests {
     use crate::syscall::test::{MountArgs, TestHelperSyscall};
     use anyhow::{Context, Result};
     use nix::mount::MsFlags;
-    use oci_spec::runtime::LinuxNamespaceType::Mount;
+    use oci_spec::runtime::LinuxBuilder;
     use procfs::process::{MountInfo, MountOptFields};
     use std::path::{Path, PathBuf};
 
@@ -543,6 +537,52 @@ mod tests {
                 *expected_mount_args,
                 "failed with opt_fields of mount info: {:?}",
                 opt_fields
+            );
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_adjust_root_mount_propagation() -> Result<()> {
+        let propagation_type_list = vec!["shared", "private", "slave", "unbindable"];
+
+        let expected_mount_args_list = vec![
+            vec![MountArgs {
+                source: None,
+                target: PathBuf::from("/"),
+                fstype: None,
+                flags: MsFlags::MS_SHARED,
+                data: None,
+            }],
+            vec![],
+            vec![],
+            vec![MountArgs {
+                source: None,
+                target: PathBuf::from("/"),
+                fstype: None,
+                flags: MsFlags::MS_UNBINDABLE,
+                data: None,
+            }],
+        ];
+
+        for (propagation_type, expected_mount_args) in propagation_type_list
+            .into_iter()
+            .zip(expected_mount_args_list.into_iter())
+        {
+            let linux = LinuxBuilder::default()
+                .rootfs_propagation(propagation_type)
+                .build()
+                .expect("could not build");
+            let command = TestHelperSyscall::default();
+
+            super::adjust_root_mount_propagation(&linux, &command)?;
+
+            assert_eq!(
+                command.get_mount_args(),
+                expected_mount_args,
+                "failed with propagation type: {}",
+                propagation_type
             );
         }
 
