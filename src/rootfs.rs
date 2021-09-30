@@ -125,13 +125,16 @@ impl RootFS {
     }
 
     fn setup_ptmx(&self, rootfs: &Path) -> Result<()> {
-        if let Err(e) = remove_file(rootfs.join("dev/ptmx")) {
+        let ptmx = rootfs.join("dev/ptmx");
+        if let Err(e) = remove_file(&ptmx) {
             if e.kind() != ::std::io::ErrorKind::NotFound {
-                bail!("could not delete /dev/ptmx")
+                bail!("could not delete {:?}", ptmx)
             }
         }
 
-        symlink("pts/ptmx", rootfs.join("dev/ptmx")).context("failed to symlink ptmx")?;
+        self.command
+            .symlink(Path::new("pts/ptmx"), &ptmx)
+            .context("failed to symlink ptmx")?;
         Ok(())
     }
 
@@ -710,5 +713,11 @@ mod tests {
                     .unwrap()
             )
         );
+    }
+
+    #[test]
+    fn test_setup_ptmx() {
+        let rootfs = super::RootFS::new();
+        assert!(rootfs.setup_ptmx(Path::new("/tmp")).is_ok());
     }
 }

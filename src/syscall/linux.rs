@@ -1,6 +1,7 @@
 //! Implements Command trait for Linux systems
 use std::ffi::{CStr, OsStr};
 use std::os::unix::ffi::OsStrExt;
+use std::os::unix::fs::symlink;
 use std::sync::Arc;
 use std::{any::Any, mem, path::Path, ptr};
 
@@ -9,18 +10,13 @@ use caps::{errors::CapsError, CapSet, Capability, CapsHashSet};
 use libc::{c_char, uid_t};
 use nix::{
     errno::Errno,
-    unistd::{fchdir, pivot_root, sethostname},
-};
-use nix::{fcntl::open, sched::CloneFlags};
-use nix::{
-    fcntl::OFlag,
-    unistd::{Gid, Uid},
-};
-use nix::{
+    fcntl::{open, OFlag},
     mount::{mount, umount2, MntFlags, MsFlags},
+    sched::{unshare, CloneFlags},
+    sys::stat::Mode,
     unistd,
+    unistd::{fchdir, pivot_root, sethostname, Gid, Uid},
 };
-use nix::{sched::unshare, sys::stat::Mode};
 
 use oci_spec::runtime::LinuxRlimit;
 
@@ -224,5 +220,12 @@ impl Syscall for LinuxSyscall {
             bail!("Failed to mount with flags:{:?}, err:{:?}", flags, e);
         }
         Ok(())
+    }
+
+    fn symlink(&self, original: &Path, link: &Path) -> Result<()> {
+        match symlink(original, link) {
+            Ok(_) => Ok(()),
+            Err(e) => bail!("Failed to symlink {:?}", e),
+        }
     }
 }

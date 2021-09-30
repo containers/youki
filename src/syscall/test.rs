@@ -79,6 +79,10 @@ impl Syscall for TestHelperSyscall {
     ) -> anyhow::Result<()> {
         todo!()
     }
+
+    fn symlink(&self, _original: &std::path::Path, _link: &std::path::Path) -> anyhow::Result<()> {
+        Ok(())
+    }
 }
 
 impl TestHelperSyscall {

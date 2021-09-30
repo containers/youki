@@ -36,6 +36,7 @@ pub trait Syscall {
         flags: MsFlags,
         data: Option<&str>,
     ) -> Result<()>;
+    fn symlink(&self, original: &Path, link: &Path) -> Result<()>;
 }
 
 pub fn create_syscall() -> Box<dyn Syscall> {
