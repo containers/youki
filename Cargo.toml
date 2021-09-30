@@ -58,6 +58,7 @@ seccomp = { version = "0.1.0", path = "./seccomp" }
 oci-spec = { git = "https://github.com/containers/oci-spec-rs",  rev = "5018f8e5b0355a82c08962cefa5ab07a05b930c6", features = ["proptests"] }
 quickcheck = "1"
 serial_test = "0.5.1"
+ipc-channel = "0.15.0"
 
 [profile.release]
 lto = true

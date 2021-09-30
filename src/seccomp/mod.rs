@@ -382,15 +382,11 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::utils::test_utils;
     use anyhow::Result;
-    use mio::unix::pipe;
-    use nix::sys::wait;
     use oci_spec::runtime::Arch;
     use oci_spec::runtime::{LinuxSeccompBuilder, LinuxSyscallBuilder};
     use serial_test::serial;
-    use std::io::Read;
-    use std::io::Write;
-    use std::os::unix::prelude::AsRawFd;
     use std::path;
 
     #[test]
@@ -419,40 +415,24 @@ mod tests {
             .syscalls(vec![syscall])
             .build()?;
 
-        // Since Rust cargo test uses a single process to execute all tests, it
-        // is a good idea to fork a child process to test the seccomp profile,
-        // and then kill the process. This way, the main test process is
-        // unaffected. The child process will pass the returned error code
-        // to the parent for assert and checking.
-        let (mut sender, mut receiver) = pipe::new()?;
-        receiver
-            .set_nonblocking(false)
-            .with_context(|| "Failed to set channel receiver to blocking")?;
+        test_utils::test_in_child_process(|| {
+            let _ = prctl::set_no_new_privileges(true);
+            initialize_seccomp(&seccomp_profile)?;
+            let ret = nix::unistd::getcwd();
+            if ret.is_ok() {
+                bail!("getcwd didn't error out as seccomp profile specified");
+            }
 
-        match unsafe { nix::unistd::fork()? } {
-            nix::unistd::ForkResult::Parent { child } => {
-                nix::unistd::close(sender.as_raw_fd())?;
-                let mut buf = [0; 4];
-                receiver
-                    .read_exact(&mut buf)
-                    .context("Failed to wait from child")?;
-                assert_eq!(i32::from_be_bytes(buf), expect_error);
-                wait::waitpid(child, None)?;
+            if let Some(errno) = ret.err() {
+                if errno != nix::errno::from_i32(expect_error) {
+                    bail!(
+                        "getcwd failed but we didn't get the expected error from seccomp profile: {}", errno
+                    );
+                }
             }
-            nix::unistd::ForkResult::Child => {
-                nix::unistd::close(receiver.as_raw_fd())?;
-                let _ = prctl::set_no_new_privileges(true);
-                initialize_seccomp(&seccomp_profile)?;
-                let ret = nix::unistd::getcwd();
-                let errno: i32 = if ret.is_err() {
-                    ret.err().unwrap() as i32
-                } else {
-                    0
-                };
-                sender.write_all(&errno.to_be_bytes())?;
-                std::process::exit(errno);
-            }
-        }
+
+            Ok(())
+        })?;
 
         Ok(())
     }
@@ -467,28 +447,12 @@ mod tests {
 
         // We know linux and seccomp exist, so let's just unwrap.
         let seccomp_profile = spec.linux().as_ref().unwrap().seccomp().as_ref().unwrap();
-        match unsafe { nix::unistd::fork()? } {
-            nix::unistd::ForkResult::Parent { child } => {
-                let status = wait::waitpid(child, None)?;
-                match status {
-                    wait::WaitStatus::Exited(_, exit_code) => {
-                        assert_eq!(
-                            exit_code, 0,
-                            "Child process didn't configure seccomp profile correctly"
-                        );
-                    }
-                    _ => {
-                        bail!("Child process failed to exit correctly: {:?}", status);
-                    }
-                }
-            }
-            nix::unistd::ForkResult::Child => {
-                let _ = prctl::set_no_new_privileges(true);
-                let ret = initialize_seccomp(seccomp_profile);
-                let exit_code = if ret.is_ok() { 0 } else { -1 };
-                std::process::exit(exit_code);
-            }
-        }
+        test_utils::test_in_child_process(|| {
+            let _ = prctl::set_no_new_privileges(true);
+            initialize_seccomp(seccomp_profile)?;
+
+            Ok(())
+        })?;
 
         Ok(())
     }
@@ -505,33 +469,15 @@ mod tests {
             .architectures(vec![Arch::ScmpArchNative])
             .syscalls(vec![syscall])
             .build()?;
-
-        match unsafe { nix::unistd::fork()? } {
-            nix::unistd::ForkResult::Parent { child } => {
-                let status = wait::waitpid(child, None)?;
-                match status {
-                    wait::WaitStatus::Exited(_, exit_code) => {
-                        assert_eq!(
-                            exit_code, 0,
-                            "Child process didn't configure seccomp profile correctly"
-                        );
-                    }
-                    _ => {
-                        bail!("Child process failed to exit correctly: {:?}", status);
-                    }
-                }
+        test_utils::test_in_child_process(|| {
+            let _ = prctl::set_no_new_privileges(true);
+            let fd = initialize_seccomp(&seccomp_profile)?;
+            if fd.is_none() {
+                bail!("failed to get a seccomp notify fd with notify seccomp profile");
             }
-            nix::unistd::ForkResult::Child => {
-                let _ = prctl::set_no_new_privileges(true);
-                let fd = initialize_seccomp(&seccomp_profile)?;
 
-                if fd.is_some() {
-                    std::process::exit(0)
-                } else {
-                    std::process::exit(-1);
-                }
-            }
-        }
+            Ok(())
+        })?;
 
         Ok(())
     }
