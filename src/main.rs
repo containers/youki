@@ -6,6 +6,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use anyhow::bail;
+use anyhow::Context;
 use anyhow::Result;
 use clap::{crate_version, Clap};
 
@@ -86,6 +87,18 @@ enum SubCommand {
 /// This is the entry point in the container runtime. The binary is run by a high-level container runtime,
 /// with various flags passed. This parses the flags, creates and manages appropriate resources.
 fn main() -> Result<()> {
+    // A malicious container can gain access to the host machine by modifying youki's host
+    // binary and infect it with malicious code. This vulnerability was first discovered
+    // in runc and was assigned as CVE-2019-5736, but it also affects youki.
+    //
+    // The fix is to copy /proc/self/exe in an anonymous file descriptor (created via memfd_create),
+    // seal it and re-execute it. Because the final step is re-execution, this needs to be done at
+    // the beginning of this process.
+    //
+    // Ref: https://github.com/opencontainers/runc/commit/0a8e4117e7f715d5fbeef398405813ce8e88558b
+    // Ref: https://github.com/lxc/lxc/commit/6400238d08cdf1ca20d49bafb85f4e224348bf9d
+    pentacle::ensure_sealed().context("Failed to seal /proc/self/exe")?;
+
     let opts = Opts::parse();
 
     if let Err(e) = youki::logger::init(opts.log) {
