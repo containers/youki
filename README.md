@@ -21,8 +21,8 @@ youki is named after the Japanese word 'youki', which means 'a container'. In Ja
 
 Here is why we are writing a new container runtime in Rust.
 
-- Rust is one of the best languages to implement oci-runtime. Many container tools are written in Go. It's all very nice products. However, the container runtime requires the use of system calls, which requires a bit of special handling when implemented in Go. This is too tricky(e.g. _namespaces(7)_, _fork(2)_); with Rust, it's not that tricky and you can use system calls. Also, unlike C, Rust provides the benefit of memory management. Rust is not yet a major player in the container field, and Rust has the potential to contribute more to this field. I hope to be one of the examples of how Rust can be used in this field.
-- youki has the potential to be faster and use less memory than runc. This means that it can work in environments with tight memory usage. I don't have any benchmarks, etc., as it is not yet fully operational, but I expect that it will probably perform better when implemented in Rust. In fact, [crun](https://github.com/containers/crun#performance), a container runtime implemented in C, is quite high performance. For example, it may be possible to experiment with asynchronous processing using async/await in some parts.
+- Rust is one of the best languages to implement the oci-runtime spec. Many very nice container tools are currently written in Go. However, the container runtime requires the use of system calls, which requires a bit of special handling when implemented in Go. This is too tricky (e.g. _namespaces(7)_, _fork(2)_); with Rust, it's not that tricky. And, unlike in C, Rust provides the benefit of memory safety. While Rust is not yet a major player in the container field, it has the potential to contribute a lot: something this project attempts to exemplify.
+- youki has the potential to be faster and use less memory than runc, and therefore work in environments with tight memory usage requirements. I don't have any benchmarks, as it is not yet fully operational, but I expect that Rust's semantics will lead to higher performance, despite the fact that current implementations such as [crun](https://github.com/containers/crun#performance), a container runtime implemented in C, already have quite high performance. For example, it may be possible to experiment with algorithmic improvements with asynchronous processing using async/await in some parts.
 - The development of [railcar](https://github.com/oracle/railcar) has been suspended. This project was very nice but is no longer being developed. This project is inspired by it.
 - I have fun implementing this. In fact, this may be the most important.
 
@@ -57,7 +57,7 @@ More details are in the works [#14](https://github.com/containers/youki/issues/1
 
 # Getting Started
 
-Local build is only supported on linux.
+Local build is only supported on Linux.
 For other platforms, please use [Vagrantfile](#setting-up-vagrant) that we prepared.
 
 ## Requires
@@ -147,25 +147,19 @@ Change the command to be executed in `config.json` and try something other than 
 
 ## Usage
 
-Starting the docker daemon.
+Start the docker daemon.
 
 ```
 $ dockerd --experimental --add-runtime="youki=$(pwd)/target/x86_64-unknown-linux-gnu/debug/youki"
 ```
 
-In case you get an error like :
+If you get an error like the below, that means your normal Docker daemon is running, and it needs to be stopped. Do that with your init system (i.e., with systemd, run `systemctl stop docker`, as root if necessary).
 
 ```
 failed to start daemon: pid file found, ensure docker is not running or delete /var/run/docker.pid
 ```
 
-That means your normal Docker daemon is running, and it needs to be stopped. For that, open a new shell in same directory and run :
-
-```
-$ systemctl stop docker # might need root permission
-```
-
-Now in the same shell run the first command, which should start the docker daemon.
+Now repeat the command, which should start the docker daemon.
 
 You can use youki in a different terminal to start the container.
 
@@ -173,15 +167,15 @@ You can use youki in a different terminal to start the container.
 $ docker run -it --rm --runtime youki busybox
 ```
 
-Afterwards, you can close the docker daemon process in other the other terminal. To restart normal docker daemon (if you had stopped it before), run :
+Afterwards, you can close the docker daemon process in other the other terminal. To restart normal docker daemon (if you had stopped it before), run:
 
 ```
 $ systemctl start docker # might need root permission
 ```
 
-### Integration test
+### Integration Tests
 
-Go and node-tap are required to run integration test. See the [opencontainers/runtime-tools](https://github.com/opencontainers/runtime-tools) README for details.
+Go and node-tap are required to run integration tests. See the [opencontainers/runtime-tools](https://github.com/opencontainers/runtime-tools) README for details.
 
 ```
 $ git submodule update --init --recursive
@@ -192,7 +186,7 @@ $ ./integration_test.sh linux_*
 
 ### Setting up Vagrant
 
-You can try youki on platforms other than linux by using the Vagrantfile we have prepared. We have prepared two environments for vagrant, namely rootless mode and rootful mode
+You can try youki on platforms other than Linux by using the Vagrantfile we have prepared. We have prepared two environments for vagrant, namely rootless mode and rootful mode
 
 ```
 $ git clone git@github.com:containers/youki.git
