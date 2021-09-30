@@ -115,17 +115,19 @@ fn apply_cgroups<C: CgroupManager + ?Sized>(
         .add_task(pid)
         .with_context(|| format!("failed to add task {} to cgroup manager", pid))?;
 
-    if resources.is_some() && init {
-        let controller_opt = cgroups::common::ControllerOpt {
-            resources: resources.unwrap(),
-            freezer_state: None,
-            oom_score_adj: None,
-            disable_oom_killer: false,
-        };
+    if let Some(resources) = resources {
+        if init {
+            let controller_opt = cgroups::common::ControllerOpt {
+                resources,
+                freezer_state: None,
+                oom_score_adj: None,
+                disable_oom_killer: false,
+            };
 
-        cmanager
-            .apply(&controller_opt)
-            .context("failed to apply resource limits to cgroup")?;
+            cmanager
+                .apply(&controller_opt)
+                .context("failed to apply resource limits to cgroup")?;
+        }
     }
 
     Ok(())
@@ -155,7 +157,7 @@ mod tests {
             cmanager.get_add_task_args()[0],
             Pid::from_raw(Process::myself()?.pid())
         );
-        assert_eq!(cmanager.apply_called(), true);
+        assert!(cmanager.apply_called());
         Ok(())
     }
 
@@ -173,7 +175,7 @@ mod tests {
             cmanager.get_add_task_args()[0],
             Pid::from_raw(Process::myself()?.pid())
         );
-        assert_eq!(cmanager.apply_called(), false);
+        assert!(!cmanager.apply_called());
         Ok(())
     }
 
@@ -189,7 +191,7 @@ mod tests {
             cmanager.get_add_task_args()[0],
             Pid::from_raw(Process::myself()?.pid())
         );
-        assert_eq!(cmanager.apply_called(), false);
+        assert!(!cmanager.apply_called());
         Ok(())
     }
 }

@@ -58,6 +58,6 @@ impl TestManager {
     }
 
     pub fn apply_called(&self) -> bool {
-        self.apply_called.borrow_mut().clone()
+        *self.apply_called.borrow_mut()
     }
 }
