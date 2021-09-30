@@ -1,6 +1,7 @@
 //! During kernel initialization, a minimal replica of the ramfs filesystem is loaded, called rootfs.
 //! Most systems mount another filesystem over it
 
+use crate::syscall::{syscall::create_syscall, Syscall};
 use crate::utils::PathBufExt;
 use anyhow::{anyhow, bail, Context, Result};
 use nix::errno::Errno;
@@ -19,73 +20,117 @@ use std::fs::{canonicalize, create_dir_all, remove_file};
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 
-pub fn prepare_rootfs(spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<()> {
-    log::debug!("Prepare rootfs: {:?}", rootfs);
-    let mut flags = MsFlags::MS_REC;
-    let linux = spec.linux().as_ref().context("no linux in spec")?;
-    if let Some(roofs_propagation) = linux.rootfs_propagation().as_ref() {
-        match roofs_propagation.as_str() {
-            "shared" => flags |= MsFlags::MS_SHARED,
-            "private" => flags |= MsFlags::MS_PRIVATE,
-            "slave" => flags |= MsFlags::MS_SLAVE,
-            "unbindable" => flags |= MsFlags::MS_SLAVE, // set unbindable after pivot_root
-            uknown => bail!("unknown rootfs_propagation: {}", uknown),
+/// Holds information about rootfs
+pub struct RootFS {
+    command: Box<dyn Syscall>,
+}
+
+impl RootFS {
+    pub fn new() -> RootFS {
+        RootFS {
+            command: create_syscall(),
         }
-    } else {
-        flags |= MsFlags::MS_SLAVE;
     }
 
-    nix_mount(None::<&str>, "/", None::<&str>, flags, None::<&str>)
-        .context("Failed to mount rootfs")?;
+    pub fn prepare_rootfs(&self, spec: &Spec, rootfs: &Path, bind_devices: bool) -> Result<()> {
+        log::debug!("Prepare rootfs: {:?}", rootfs);
+        let mut flags = MsFlags::MS_REC;
+        let linux = spec.linux().as_ref().context("no linux in spec")?;
+        if let Some(roofs_propagation) = linux.rootfs_propagation().as_ref() {
+            match roofs_propagation.as_str() {
+                "shared" => flags |= MsFlags::MS_SHARED,
+                "private" => flags |= MsFlags::MS_PRIVATE,
+                "slave" => flags |= MsFlags::MS_SLAVE,
+                "unbindable" => flags |= MsFlags::MS_SLAVE, // set unbindable after pivot_root
+                uknown => bail!("unknown rootfs_propagation: {}", uknown),
+            }
+        } else {
+            flags |= MsFlags::MS_SLAVE;
+        }
 
-    make_parent_mount_private(rootfs).context("Failed to change parent mount of rootfs private")?;
+        self.command
+            .mount(
+                None::<&Path>,
+                &Path::new("/"),
+                None::<&str>,
+                flags,
+                None::<&str>,
+            )
+            .context("Failed to mount rootfs")?;
 
-    log::debug!("mount root fs {:?}", rootfs);
-    nix_mount::<Path, Path, str, str>(
-        Some(rootfs),
-        rootfs,
-        None::<&str>,
-        MsFlags::MS_BIND | MsFlags::MS_REC,
-        None::<&str>,
-    )?;
+        make_parent_mount_private(rootfs)
+            .context("Failed to change parent mount of rootfs private")?;
 
-    if let Some(mounts) = spec.mounts().as_ref() {
-        for mount in mounts.iter() {
-            log::debug!("Mount... {:?}", mount);
-            let (flags, data) = parse_mount(mount);
-            let mount_label = linux.mount_label().as_ref();
-            if *mount.typ() == Some("cgroup".to_string()) {
-                // skip
-                log::warn!("A feature of cgroup is unimplemented.");
-            } else if *mount.destination() == PathBuf::from("/dev") {
-                mount_to_container(
-                    mount,
-                    rootfs,
-                    flags & !MsFlags::MS_RDONLY,
-                    &data,
-                    mount_label,
-                )
-                .with_context(|| format!("Failed to mount /dev: {:?}", mount))?;
-            } else {
-                mount_to_container(mount, rootfs, flags, &data, mount_label)
-                    .with_context(|| format!("Failed to mount: {:?}", mount))?;
+        log::debug!("mount root fs {:?}", rootfs);
+        self.command.mount(
+            Some(rootfs),
+            rootfs,
+            None::<&str>,
+            MsFlags::MS_BIND | MsFlags::MS_REC,
+            None::<&str>,
+        )?;
+
+        if let Some(mounts) = spec.mounts().as_ref() {
+            for mount in mounts.iter() {
+                log::debug!("Mount... {:?}", mount);
+                let (flags, data) = parse_mount(mount);
+                let mount_label = linux.mount_label().as_ref();
+                if *mount.typ() == Some("cgroup".to_string()) {
+                    // skip
+                    log::warn!("A feature of cgroup is unimplemented.");
+                } else if *mount.destination() == PathBuf::from("/dev") {
+                    mount_to_container(
+                        mount,
+                        rootfs,
+                        flags & !MsFlags::MS_RDONLY,
+                        &data,
+                        mount_label,
+                    )
+                    .with_context(|| format!("Failed to mount /dev: {:?}", mount))?;
+                } else {
+                    mount_to_container(mount, rootfs, flags, &data, mount_label)
+                        .with_context(|| format!("Failed to mount: {:?}", mount))?;
+                }
             }
         }
+
+        setup_default_symlinks(rootfs).context("Failed to setup default symlinks")?;
+        if let Some(added_devices) = linux.devices().as_ref() {
+            create_devices(
+                rootfs,
+                default_devices().iter().chain(added_devices),
+                bind_devices,
+            )
+        } else {
+            create_devices(rootfs, default_devices().iter(), bind_devices)
+        }?;
+
+        setup_ptmx(rootfs)?;
+        Ok(())
     }
 
-    setup_default_symlinks(rootfs).context("Failed to setup default symlinks")?;
-    if let Some(added_devices) = linux.devices().as_ref() {
-        create_devices(
-            rootfs,
-            default_devices().iter().chain(added_devices),
-            bind_devices,
-        )
-    } else {
-        create_devices(rootfs, default_devices().iter(), bind_devices)
-    }?;
+    /// Change propagation type of rootfs as specified in spec.
+    pub fn adjust_root_mount_propagation(&self, linux: &Linux) -> Result<()> {
+        let rootfs_propagation = linux.rootfs_propagation().as_deref();
+        let flags = match rootfs_propagation {
+            Some("shared") => Some(MsFlags::MS_SHARED),
+            Some("unbindable") => Some(MsFlags::MS_UNBINDABLE),
+            _ => None,
+        };
 
-    setup_ptmx(rootfs)?;
-    Ok(())
+        if let Some(flags) = flags {
+            log::debug!("make root mount {:?}", flags);
+            self.command.mount(
+                None::<&Path>,
+                &Path::new("/"),
+                None::<&str>,
+                flags,
+                None::<&str>,
+            )?;
+        }
+
+        Ok(())
+    }
 }
 
 fn setup_ptmx(rootfs: &Path) -> Result<()> {
@@ -417,23 +462,6 @@ fn make_parent_mount_private(rootfs: &Path) -> Result<()> {
             MsFlags::MS_PRIVATE,
             None::<&str>,
         )?;
-    }
-
-    Ok(())
-}
-
-/// Change propagation type of rootfs as specified in spec.
-pub fn adjust_root_mount_propagation(linux: &Linux) -> Result<()> {
-    let rootfs_propagation = linux.rootfs_propagation().as_deref();
-    let flags = match rootfs_propagation {
-        Some("shared") => Some(MsFlags::MS_SHARED),
-        Some("unbindable") => Some(MsFlags::MS_UNBINDABLE),
-        _ => None,
-    };
-
-    if let Some(flags) = flags {
-        log::debug!("make root mount {:?}", flags);
-        nix_mount(None::<&str>, "/", None::<&str>, flags, None::<&str>)?;
     }
 
     Ok(())

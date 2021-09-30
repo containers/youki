@@ -71,8 +71,8 @@ impl Syscall for TestHelperSyscall {
 
     fn mount(
         &self,
-        _source: Option<&str>,
-        _target: &str,
+        _source: Option<&std::path::Path>,
+        _target: &std::path::Path,
         _fstype: Option<&str>,
         _flags: nix::mount::MsFlags,
         _data: Option<&str>,

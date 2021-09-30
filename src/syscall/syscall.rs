@@ -30,8 +30,8 @@ pub trait Syscall {
     fn get_pwuid(&self, uid: u32) -> Option<Arc<OsStr>>;
     fn mount(
         &self,
-        source: Option<&str>,
-        target: &str,
+        source: Option<&Path>,
+        target: &Path,
         fstype: Option<&str>,
         flags: MsFlags,
         data: Option<&str>,
