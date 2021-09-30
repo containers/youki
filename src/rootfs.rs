@@ -25,6 +25,12 @@ pub struct RootFS {
     command: Box<dyn Syscall>,
 }
 
+impl Default for RootFS {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RootFS {
     pub fn new() -> RootFS {
         RootFS {
@@ -47,7 +53,7 @@ impl RootFS {
         self.command
             .mount(
                 None::<&Path>,
-                &Path::new("/"),
+                Path::new("/"),
                 None::<&str>,
                 flags,
                 None::<&str>,
@@ -118,7 +124,7 @@ impl RootFS {
             log::debug!("make root mount {:?}", flags);
             self.command.mount(
                 None::<&Path>,
-                &Path::new("/"),
+                Path::new("/"),
                 None::<&str>,
                 flags,
                 None::<&str>,
