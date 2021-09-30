@@ -36,16 +36,12 @@ impl RootFS {
         log::debug!("Prepare rootfs: {:?}", rootfs);
         let mut flags = MsFlags::MS_REC;
         let linux = spec.linux().as_ref().context("no linux in spec")?;
-        if let Some(roofs_propagation) = linux.rootfs_propagation().as_ref() {
-            match roofs_propagation.as_str() {
-                "shared" => flags |= MsFlags::MS_SHARED,
-                "private" => flags |= MsFlags::MS_PRIVATE,
-                "slave" => flags |= MsFlags::MS_SLAVE,
-                "unbindable" => flags |= MsFlags::MS_SLAVE, // set unbindable after pivot_root
-                uknown => bail!("unknown rootfs_propagation: {}", uknown),
-            }
-        } else {
-            flags |= MsFlags::MS_SLAVE;
+
+        match linux.rootfs_propagation().as_deref() {
+            Some("shared") => flags |= MsFlags::MS_SHARED,
+            Some("private") => flags |= MsFlags::MS_PRIVATE,
+            Some("slave" | "unbindable") | None => flags |= MsFlags::MS_SLAVE,
+            Some(uknown) => bail!("unknown rootfs_propagation: {}", uknown),
         }
 
         self.command
@@ -70,8 +66,8 @@ impl RootFS {
             None::<&str>,
         )?;
 
-        if let Some(mounts) = spec.mounts().as_ref() {
-            for mount in mounts.iter() {
+        if let Some(mounts) = spec.mounts() {
+            for mount in mounts {
                 log::debug!("Mount... {:?}", mount);
                 let (flags, data) = parse_mount(mount);
                 let mount_label = linux.mount_label().as_ref();
@@ -95,7 +91,7 @@ impl RootFS {
         }
 
         setup_default_symlinks(rootfs).context("Failed to setup default symlinks")?;
-        if let Some(added_devices) = linux.devices().as_ref() {
+        if let Some(added_devices) = linux.devices() {
             create_devices(
                 rootfs,
                 default_devices().iter().chain(added_devices),
