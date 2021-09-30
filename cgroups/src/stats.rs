@@ -284,20 +284,21 @@ pub fn supported_page_sizes() -> Result<Vec<String>> {
 }
 
 fn extract_page_size(dir_name: &str) -> Result<String> {
-    if let Some(name_stripped) = dir_name.strip_prefix("hugepages-") {
-        if let Some(size) = name_stripped.strip_suffix("kB") {
-            let size: u64 = parse_value(size)?;
+    if let Some(size) = dir_name
+        .strip_prefix("hugepages-")
+        .and_then(|name_stripped| name_stripped.strip_suffix("kB"))
+    {
+        let size: u64 = parse_value(size)?;
 
-            let size_moniker = if size >= (1 << 20) {
-                (size >> 20).to_string() + "GB"
-            } else if size >= (1 << 10) {
-                (size >> 10).to_string() + "MB"
-            } else {
-                size.to_string() + "KB"
-            };
+        let size_moniker = if size >= (1 << 20) {
+            (size >> 20).to_string() + "GB"
+        } else if size >= (1 << 10) {
+            (size >> 10).to_string() + "MB"
+        } else {
+            size.to_string() + "KB"
+        };
 
-            return Ok(size_moniker);
-        }
+        return Ok(size_moniker);
     }
 
     bail!("failed to determine page size from {}", dir_name);

@@ -1,11 +1,6 @@
-use std::{
-    collections::HashMap,
-    fs,
-    path::{Path, PathBuf},
-    time::Duration,
-};
+use std::{collections::HashMap, path::PathBuf};
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, Result};
 use procfs::process::Process;
 
 use super::{controller_type::CONTROLLERS, ControllerType};
@@ -55,22 +50,4 @@ pub fn get_subsystem_mount_point(subsystem: &ControllerType) -> Result<PathBuf> 
         })
         .map(|m| m.mount_point)
         .ok_or_else(|| anyhow!("could not find mountpoint for {}", subsystem))
-}
-
-pub(crate) fn delete_with_retry<P: AsRef<Path>>(path: P) -> Result<()> {
-    let mut attempts = 0;
-    let mut delay = Duration::from_millis(10);
-    let path = path.as_ref();
-
-    while attempts < 5 {
-        if fs::remove_dir(path).is_ok() {
-            return Ok(());
-        }
-
-        std::thread::sleep(delay);
-        attempts += attempts;
-        delay *= attempts;
-    }
-
-    bail!("could not delete {:?}", path)
 }

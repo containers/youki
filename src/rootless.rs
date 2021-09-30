@@ -102,11 +102,7 @@ pub fn rootless_required() -> bool {
         return true;
     }
 
-    if let Ok("true") = std::env::var("YOUKI_USE_ROOTLESS").as_deref() {
-        return true;
-    }
-
-    false
+    matches!(std::env::var("YOUKI_USE_ROOTLESS").as_deref(), Ok("true"))
 }
 
 /// Validates that the spec contains the required information for
@@ -141,27 +137,29 @@ fn validate(spec: &Spec) -> Result<()> {
         gid_mappings,
     )?;
 
-    if let Some(process) = &spec.process() {
-        if let Some(additional_gids) = &process.user().additional_gids() {
-            let privileged = nix::unistd::geteuid().is_root();
+    if let Some(additional_gids) = spec
+        .process()
+        .as_ref()
+        .and_then(|process| process.user().additional_gids().as_ref())
+    {
+        let privileged = nix::unistd::geteuid().is_root();
 
-            match (privileged, additional_gids.is_empty()) {
-                (true, false) => {
-                    for gid in additional_gids {
-                        if !is_id_mapped(*gid, gid_mappings) {
-                            bail!("gid {} is specified as supplementary group, but is not mapped in the user namespace", gid);
-                        }
+        match (privileged, additional_gids.is_empty()) {
+            (true, false) => {
+                for gid in additional_gids {
+                    if !is_id_mapped(*gid, gid_mappings) {
+                        bail!("gid {} is specified as supplementary group, but is not mapped in the user namespace", gid);
                     }
                 }
-                (false, false) => {
-                    bail!(
-                        "user is {} (unprivileged). Supplementary groups cannot be set in \
-                        a rootless container for this user due to CVE-2014-8989",
-                        nix::unistd::geteuid()
-                    )
-                }
-                _ => {}
             }
+            (false, false) => {
+                bail!(
+                    "user is {} (unprivileged). Supplementary groups cannot be set in \
+                        a rootless container for this user due to CVE-2014-8989",
+                    nix::unistd::geteuid()
+                )
+            }
+            _ => {}
         }
     }
 
@@ -174,7 +172,7 @@ fn validate_mounts(
     gid_mappings: &[LinuxIdMapping],
 ) -> Result<()> {
     for mount in mounts {
-        if let Some(options) = &mount.options() {
+        if let Some(options) = mount.options() {
             for opt in options {
                 if opt.starts_with("uid=") && !is_id_mapped(opt[4..].parse()?, uid_mappings) {
                     bail!("Mount {:?} specifies option {} which is not mapped inside the rootless container", mount, opt);
@@ -199,7 +197,7 @@ fn is_id_mapped(id: u32, mappings: &[LinuxIdMapping]) -> bool {
 /// Looks up the location of the newuidmap and newgidmap binaries which
 /// are required to write multiple user/group mappings
 pub fn lookup_map_binaries(spec: &Linux) -> Result<Option<(PathBuf, PathBuf)>> {
-    if let Some(uid_mappings) = spec.uid_mappings().as_ref() {
+    if let Some(uid_mappings) = spec.uid_mappings() {
         if uid_mappings.len() == 1 && uid_mappings.len() == 1 {
             return Ok(None);
         }

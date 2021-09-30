@@ -47,12 +47,10 @@ pub fn parse_env(envs: &[String]) -> HashMap<String, String> {
         .filter_map(|e| {
             let mut split = e.split('=');
 
-            if let Some(key) = split.next() {
-                let value: String = split.collect::<Vec<&str>>().join("=");
-                Some((String::from(key), value))
-            } else {
-                None
-            }
+            split.next().map(|key| {
+                let value = split.collect::<Vec<&str>>().join("=");
+                (key.into(), value)
+            })
         })
         .collect()
 }
@@ -76,7 +74,7 @@ pub fn set_name(_name: &str) -> Result<()> {
 pub fn get_cgroup_path(cgroups_path: &Option<PathBuf>, container_id: &str) -> PathBuf {
     match cgroups_path {
         Some(cpath) => cpath.clone(),
-        None => PathBuf::from(format!("/youki/{}", container_id)),
+        None => PathBuf::from(container_id),
     }
 }
 
@@ -244,7 +242,7 @@ mod tests {
         let cid = "sample_container_id";
         assert_eq!(
             get_cgroup_path(&None, cid),
-            PathBuf::from("/youki/sample_container_id")
+            PathBuf::from("sample_container_id")
         );
         assert_eq!(
             get_cgroup_path(&Some(PathBuf::from("/youki")), cid),

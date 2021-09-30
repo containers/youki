@@ -98,7 +98,7 @@ impl RootFS {
                 bind_devices,
             )
         } else {
-            create_devices(rootfs, default_devices().iter(), bind_devices)
+            create_devices(rootfs, &default_devices(), bind_devices)
         }?;
 
         setup_ptmx(rootfs)?;
@@ -151,7 +151,7 @@ fn setup_default_symlinks(rootfs: &Path) -> Result<()> {
         ("/proc/self/fd/1", "dev/stdout"),
         ("/proc/self/fd/2", "dev/stderr"),
     ];
-    for &(src, dst) in defaults.iter() {
+    for (src, dst) in defaults {
         symlink(src, rootfs.join(dst)).context("Fail to symlink defaults")?;
     }
 
@@ -213,11 +213,12 @@ pub fn default_devices() -> Vec<LinuxDevice> {
 
 fn create_devices<'a, I>(rootfs: &Path, devices: I, bind: bool) -> Result<()>
 where
-    I: Iterator<Item = &'a LinuxDevice>,
+    I: IntoIterator<Item = &'a LinuxDevice>,
 {
     let old_mode = umask(Mode::from_bits_truncate(0o000));
     if bind {
         let _ = devices
+            .into_iter()
             .map(|dev| {
                 if !dev.path().starts_with("/dev") {
                     panic!("{} is not a valid device path", dev.path().display());
@@ -228,6 +229,7 @@ where
             .collect::<Result<Vec<_>>>()?;
     } else {
         devices
+            .into_iter()
             .map(|dev| {
                 if !dev.path().starts_with("/dev") {
                     panic!("{} is not a valid device path", dev.path().display());
@@ -364,8 +366,8 @@ fn mount_to_container(
         )
     {
         nix_mount(
-            Some(&*dest),
-            &*dest,
+            Some(dest),
+            dest,
             None::<&str>,
             flags | MsFlags::MS_REMOUNT,
             None::<&str>,

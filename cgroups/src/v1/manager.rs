@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::Path;
+use std::time::Duration;
 use std::{collections::HashMap, path::PathBuf};
 
 use anyhow::bail;
@@ -161,7 +162,7 @@ impl CgroupManager for Manager {
                     let _ = nix::sys::signal::kill(Pid::from_raw(pid), nix::sys::signal::SIGKILL);
                 }
 
-                util::delete_with_retry(cgroup_path.1)?;
+                common::delete_with_retry(cgroup_path.1, 4, Duration::from_millis(100))?;
             }
         }
 

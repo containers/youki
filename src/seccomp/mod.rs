@@ -1,6 +1,7 @@
 use anyhow::bail;
 use anyhow::Context;
 use anyhow::Result;
+use nix::errno::Errno;
 use oci_spec::runtime::Arch;
 use oci_spec::runtime::LinuxSeccomp;
 use oci_spec::runtime::LinuxSeccompAction;
@@ -8,6 +9,7 @@ use oci_spec::runtime::LinuxSeccompOperator;
 use seccomp::scmp_compare::*;
 use seccomp::*;
 use std::ffi::CString;
+use std::os::unix::io;
 
 #[derive(Debug)]
 struct Compare {
@@ -47,7 +49,7 @@ impl Compare {
     }
 
     pub fn build(self) -> Result<scmp_arg_cmp> {
-        if let (Some(op), Some(datum_a)) = (self.op, self.datum_a) {
+        if let Some((op, datum_a)) = self.op.zip(self.datum_a) {
             Ok(scmp_arg_cmp {
                 arg: self.arg,
                 op,
@@ -109,7 +111,7 @@ impl FilterContext {
                     rule.action,
                     rule.syscall_nr,
                     rule.comparators.len() as u32,
-                    rule.comparators.as_slice().as_ptr(),
+                    rule.comparators.as_ptr(),
                 )
             },
         };
@@ -139,6 +141,35 @@ impl FilterContext {
 
         Ok(())
     }
+
+    pub fn notify_fd(&self) -> Result<Option<i32>> {
+        let res = unsafe { seccomp_notify_fd(self.ctx) };
+        if res > 0 {
+            return Ok(Some(res));
+        }
+
+        // -1 indicates the notify fd is not set. This can happen if no seccomp
+        // notify filter is set.
+        if res == -1 {
+            return Ok(None);
+        }
+
+        match nix::errno::from_i32(res.abs()) {
+            Errno::EINVAL => {
+                bail!("invalid seccomp context used to call notify fd");
+            }
+            Errno::EFAULT => {
+                bail!("internal libseccomp fault; likely no seccomp filter is loaded");
+            }
+            Errno::EOPNOTSUPP => {
+                bail!("seccomp notify filter not supported");
+            }
+
+            _ => {
+                bail!("unknown error from return code: {}", res);
+            }
+        };
+    }
 }
 
 fn translate_syscall(syscall_name: &str) -> Result<i32> {
@@ -152,7 +183,7 @@ fn translate_syscall(syscall_name: &str) -> Result<i32> {
     Ok(res)
 }
 
-fn translate_action(action: &LinuxSeccompAction, errno: Option<u32>) -> u32 {
+fn translate_action(action: LinuxSeccompAction, errno: Option<u32>) -> u32 {
     let errno = errno.unwrap_or(libc::EPERM as u32);
     match action {
         LinuxSeccompAction::ScmpActKill => SCMP_ACT_KILL,
@@ -166,7 +197,7 @@ fn translate_action(action: &LinuxSeccompAction, errno: Option<u32>) -> u32 {
     }
 }
 
-fn translate_op(op: &LinuxSeccompOperator) -> scmp_compare {
+fn translate_op(op: LinuxSeccompOperator) -> scmp_compare {
     match op {
         LinuxSeccompOperator::ScmpCmpNe => SCMP_CMP_NE,
         LinuxSeccompOperator::ScmpCmpLt => SCMP_CMP_LT,
@@ -178,7 +209,7 @@ fn translate_op(op: &LinuxSeccompOperator) -> scmp_compare {
     }
 }
 
-fn translate_arch(arch: &Arch) -> scmp_arch {
+fn translate_arch(arch: Arch) -> scmp_arch {
     match arch {
         Arch::ScmpArchNative => SCMP_ARCH_NATIVE,
         Arch::ScmpArchX86 => SCMP_ARCH_X86,
@@ -200,21 +231,53 @@ fn translate_arch(arch: &Arch) -> scmp_arch {
     }
 }
 
-pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<()> {
+fn check_seccomp(seccomp: &LinuxSeccomp) -> Result<()> {
+    // We don't support notify as default action. After the seccomp filter is
+    // created with notify, the container process will have to communicate the
+    // returned fd to another process. Therefore, we need the write syscall or
+    // otherwise, the write syscall will be block by the seccomp filter causing
+    // the container process to hang. `runc` also disallow notify as default
+    // action.
+    // Note: read and close syscall are also used, because if we can
+    // successfully write fd to another process, the other process can choose to
+    // handle read/close syscall and allow read and close to proceed as
+    // expected.
+    if seccomp.default_action() == LinuxSeccompAction::ScmpActNotify {
+        bail!("SCMP_ACT_NOTIFY cannot be used as default action");
+    }
+
+    if let Some(syscalls) = seccomp.syscalls() {
+        for syscall in syscalls {
+            if syscall.action() == LinuxSeccompAction::ScmpActNotify {
+                for name in syscall.names() {
+                    if name == "write" {
+                        bail!("SCMP_ACT_NOTIFY cannot be used for the write syscall");
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
     if seccomp.flags().is_some() {
         // runc did not support this, so let's skip it for now.
         bail!("seccomp flags are not yet supported");
     }
 
+    check_seccomp(seccomp)?;
+
     // TODO: fix default action error number. The spec repo doesn't have it yet.
-    let default_action = translate_action(&seccomp.default_action(), None);
+    let default_action = translate_action(seccomp.default_action(), None);
     let mut ctx = FilterContext::default(default_action)?;
 
-    if let Some(architectures) = seccomp.architectures().as_ref() {
-        for arch in architectures {
+    if let Some(architectures) = seccomp.architectures() {
+        for &arch in architectures {
             let arch_token = translate_arch(arch);
             ctx.add_arch(arch_token as u32)
-                .context("Failed to add arch to seccomp")?;
+                .context("failed to add arch to seccomp")?;
         }
     }
 
@@ -228,14 +291,14 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<()> {
     let ret = unsafe { seccomp_attr_set(ctx.ctx, scmp_filter_attr::SCMP_FLTATR_CTL_NNP, 0) };
     if ret != 0 {
         bail!(
-            "Failed to unset the no new privileges bit for seccomp: {}",
+            "failed to unset the no new privileges bit for seccomp: {}",
             ret
         );
     }
 
-    if let Some(syscalls) = seccomp.syscalls().as_ref() {
+    if let Some(syscalls) = seccomp.syscalls() {
         for syscall in syscalls {
-            let action = translate_action(&syscall.action(), syscall.errno_ret());
+            let action = translate_action(syscall.action(), syscall.errno_ret());
             if action == default_action {
                 // When the action is the same as the default action, the rule is redundent. We can
                 // skip this here to avoid failing when we add the rules.
@@ -246,7 +309,7 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<()> {
                 continue;
             }
 
-            for name in syscall.names().iter() {
+            for name in syscall.names() {
                 let syscall_number = match translate_syscall(name) {
                     Ok(x) => x,
                     Err(_) => {
@@ -262,12 +325,12 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<()> {
                 // Not clear why but if there are multiple arg attached to one
                 // syscall rule, we have to add them seperatly. add_rule will
                 // return EINVAL. runc does the same but doesn't explain why.
-                match syscall.args().as_ref() {
+                match syscall.args() {
                     Some(args) => {
                         for arg in args {
                             let mut rule = Rule::new(action, syscall_number);
                             let cmp = Compare::new(arg.index() as u32)
-                                .op(translate_op(&arg.op()))
+                                .op(translate_op(arg.op()))
                                 .datum_a(arg.value())
                                 .datum_b(arg.value_two().unwrap_or(0))
                                 .build()
@@ -275,7 +338,7 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<()> {
                             rule.add_comparator(cmp);
                             ctx.add_rule(&rule).with_context(|| {
                                 format!(
-                                    "Failed to add seccomp rule: {:?}. Syscall: {:?}",
+                                    "failed to add seccomp rule: {:?}. Syscall: {:?}",
                                     &rule, name,
                                 )
                             })?;
@@ -285,7 +348,7 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<()> {
                         let rule = Rule::new(action, syscall_number);
                         ctx.add_rule(&rule).with_context(|| {
                             format!(
-                                "Failed to add seccomp rule: {:?}. Syscall: {:?}",
+                                "failed to add seccomp rule: {:?}. Syscall: {:?}",
                                 &rule, name,
                             )
                         })?;
@@ -299,9 +362,21 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<()> {
     // thread must have the CAP_SYS_ADMIN capability in its user namespace, or
     // the thread must already have the no_new_privs bit set.
     // Ref: https://man7.org/linux/man-pages/man2/seccomp.2.html
-    ctx.load().context("Failed to load seccomp context")?;
+    ctx.load().context("failed to load seccomp context")?;
 
-    Ok(())
+    let is_seccomp_notify = seccomp
+        .syscalls()
+        .iter()
+        .flatten()
+        .any(|syscall| syscall.action() == LinuxSeccompAction::ScmpActNotify);
+
+    let fd = if is_seccomp_notify {
+        ctx.notify_fd().context("failed to get seccomp notify fd")?
+    } else {
+        None
+    };
+
+    Ok(fd)
 }
 
 #[cfg(test)]
@@ -412,6 +487,49 @@ mod tests {
                 let ret = initialize_seccomp(seccomp_profile);
                 let exit_code = if ret.is_ok() { 0 } else { -1 };
                 std::process::exit(exit_code);
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    #[serial]
+    fn test_seccomp_notify() -> Result<()> {
+        let syscall = LinuxSyscallBuilder::default()
+            .names(vec![String::from("getcwd")])
+            .action(LinuxSeccompAction::ScmpActNotify)
+            .build()?;
+        let seccomp_profile = LinuxSeccompBuilder::default()
+            .default_action(LinuxSeccompAction::ScmpActAllow)
+            .architectures(vec![Arch::ScmpArchNative])
+            .syscalls(vec![syscall])
+            .build()?;
+
+        match unsafe { nix::unistd::fork()? } {
+            nix::unistd::ForkResult::Parent { child } => {
+                let status = wait::waitpid(child, None)?;
+                match status {
+                    wait::WaitStatus::Exited(_, exit_code) => {
+                        assert_eq!(
+                            exit_code, 0,
+                            "Child process didn't configure seccomp profile correctly"
+                        );
+                    }
+                    _ => {
+                        bail!("Child process failed to exit correctly: {:?}", status);
+                    }
+                }
+            }
+            nix::unistd::ForkResult::Child => {
+                let _ = prctl::set_no_new_privileges(true);
+                let fd = initialize_seccomp(&seccomp_profile)?;
+
+                if fd.is_some() {
+                    std::process::exit(0)
+                } else {
+                    std::process::exit(-1);
+                }
             }
         }
 

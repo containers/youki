@@ -48,7 +48,7 @@ impl<'a> InitContainerBuilder<'a> {
             .set_systemd(self.use_systemd)
             .set_annotations(spec.annotations().clone());
 
-        unistd::chdir(&*container_dir)?;
+        unistd::chdir(&container_dir)?;
         let notify_path = container_dir.join(NOTIFY_FILE);
         // convert path of root file system of the container to absolute path
         let rootfs = fs::canonicalize(&spec.root().as_ref().context("no root in spec")?.path())?;
@@ -116,8 +116,8 @@ impl<'a> InitContainerBuilder<'a> {
             );
         }
 
-        if let Some(process) = &spec.process() {
-            if let Some(profile) = &process.apparmor_profile() {
+        if let Some(process) = spec.process() {
+            if let Some(profile) = process.apparmor_profile() {
                 if !apparmor::is_enabled()? {
                     bail!(
                         "apparmor profile {} is specified in runtime spec, \
@@ -142,7 +142,7 @@ impl<'a> InitContainerBuilder<'a> {
             &self.base.container_id,
             ContainerStatus::Creating,
             None,
-            self.bundle.as_path(),
+            &self.bundle,
             container_dir,
         )?;
         container.save()?;

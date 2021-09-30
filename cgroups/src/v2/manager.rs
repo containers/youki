@@ -2,6 +2,7 @@ use std::{
     fs::{self},
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
+    time::Duration,
 };
 
 use anyhow::Result;
@@ -120,8 +121,18 @@ impl CgroupManager for Manager {
     }
 
     fn remove(&self) -> Result<()> {
-        log::debug!("remove cgroup {:?}", self.full_path);
-        fs::remove_dir(&self.full_path)?;
+        if self.full_path.exists() {
+            log::debug!("remove cgroup {:?}", self.full_path);
+            let procs_path = self.full_path.join(CGROUP_PROCS);
+            let procs = fs::read_to_string(&procs_path)?;
+
+            for line in procs.lines() {
+                let pid: i32 = line.parse()?;
+                let _ = nix::sys::signal::kill(Pid::from_raw(pid), nix::sys::signal::SIGKILL);
+            }
+
+            common::delete_with_retry(&self.full_path, 4, Duration::from_millis(100))?;
+        }
 
         Ok(())
     }

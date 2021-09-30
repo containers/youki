@@ -85,11 +85,7 @@ impl Controller for Blkio {
     }
 
     fn needs_to_handle<'a>(controller_opt: &'a ControllerOpt) -> Option<&'a Self::Resource> {
-        if let Some(blkio) = &controller_opt.resources.block_io() {
-            return Some(blkio);
-        }
-
-        None
+        controller_opt.resources.block_io().as_ref()
     }
 }
 

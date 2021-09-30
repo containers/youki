@@ -133,23 +133,23 @@ pub fn reset_effective<S: Syscall + ?Sized>(syscall: &S) -> Result<()> {
 /// Drop any extra granted capabilities, and reset to defaults which are in oci specification
 pub fn drop_privileges<S: Syscall + ?Sized>(cs: &LinuxCapabilities, syscall: &S) -> Result<()> {
     log::debug!("dropping bounding capabilities to {:?}", cs.bounding());
-    if let Some(bounding) = cs.bounding().as_ref() {
+    if let Some(bounding) = cs.bounding() {
         syscall.set_capability(CapSet::Bounding, &to_set(bounding))?;
     }
 
-    if let Some(effective) = cs.effective().as_ref() {
+    if let Some(effective) = cs.effective() {
         syscall.set_capability(CapSet::Effective, &to_set(effective))?;
     }
 
-    if let Some(permitted) = cs.permitted().as_ref() {
+    if let Some(permitted) = cs.permitted() {
         syscall.set_capability(CapSet::Permitted, &to_set(permitted))?;
     }
 
-    if let Some(inheritable) = cs.inheritable().as_ref() {
+    if let Some(inheritable) = cs.inheritable() {
         syscall.set_capability(CapSet::Inheritable, &to_set(inheritable))?;
     }
 
-    if let Some(ambient) = cs.ambient().as_ref() {
+    if let Some(ambient) = cs.ambient() {
         // check specifically for ambient, as those might not always be available
         if let Err(e) = syscall.set_capability(CapSet::Ambient, &to_set(ambient)) {
             log::error!("failed to set ambient capabilities: {}", e);

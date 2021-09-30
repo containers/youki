@@ -6,7 +6,7 @@ use crate::{
     syscall::Syscall,
     utils,
 };
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use cgroups::{self, common::CgroupManager};
 use nix::unistd::Pid;
 use oci_spec::runtime::{LinuxResources, Spec};
@@ -44,7 +44,15 @@ pub(super) struct ContainerBuilderImpl<'a> {
 
 impl<'a> ContainerBuilderImpl<'a> {
     pub(super) fn create(&mut self) -> Result<()> {
-        self.run_container()
+        if let Err(outer) = self.run_container().context("failed to create container") {
+            if let Err(inner) = self.cleanup_container() {
+                return Err(outer.context(inner));
+            }
+
+            return Err(outer);
+        }
+
+        Ok(())
     }
 
     fn run_container(&mut self) -> Result<()> {
@@ -54,7 +62,7 @@ impl<'a> ContainerBuilderImpl<'a> {
         let process = self.spec.process().as_ref().context("No process in spec")?;
 
         if self.init {
-            if let Some(hooks) = self.spec.hooks().as_ref() {
+            if let Some(hooks) = self.spec.hooks() {
                 hooks::run_hooks(hooks.create_runtime().as_ref(), self.container.as_ref())?
             }
         }
@@ -138,7 +146,7 @@ impl<'a> ContainerBuilderImpl<'a> {
         // If creating a rootless container, the intermediate process will ask
         // the main process to set up uid and gid mapping, once the intermediate
         // process enters into a new user namespace.
-        if let Some(rootless) = self.rootless.as_ref() {
+        if let Some(rootless) = &self.rootless {
             receiver_from_intermediate.wait_for_mapping_request()?;
             setup_mapping(rootless, intermediate_pid)?;
             sender_to_intermediate.mapping_written()?;
@@ -148,7 +156,7 @@ impl<'a> ContainerBuilderImpl<'a> {
         log::debug!("init pid is {:?}", init_pid);
 
         if self.rootless.is_none() && linux.resources().is_some() && self.init {
-            if let Some(resources) = linux.resources().as_ref() {
+            if let Some(resources) = linux.resources() {
                 apply_cgroups(resources, init_pid, cmanager.as_ref())?;
             }
         }
@@ -166,6 +174,33 @@ impl<'a> ContainerBuilderImpl<'a> {
                 .set_pid(init_pid.as_raw())
                 .save()
                 .context("Failed to save container state")?;
+        }
+
+        Ok(())
+    }
+
+    fn cleanup_container(&self) -> Result<()> {
+        let linux = self.spec.linux().as_ref().context("no linux in spec")?;
+        let cgroups_path = utils::get_cgroup_path(linux.cgroups_path(), &self.container_id);
+        let cmanager = cgroups::common::create_cgroup_manager(&cgroups_path, self.use_systemd)?;
+
+        let mut errors = Vec::new();
+        if let Err(e) = cmanager.remove().context("failed to remove cgroup") {
+            errors.push(e.to_string());
+        }
+
+        if let Some(container) = &self.container {
+            if container.root.exists() {
+                if let Err(e) = fs::remove_dir_all(&container.root)
+                    .with_context(|| format!("could not delete {}", container.root.display()))
+                {
+                    errors.push(e.to_string());
+                }
+            }
+        }
+
+        if !errors.is_empty() {
+            bail!("failed to cleanup container: {}", errors.join(";"));
         }
 
         Ok(())
@@ -201,10 +236,12 @@ fn apply_cgroups<C: CgroupManager + ?Sized>(
     };
     cmanager
         .add_task(pid)
-        .context("Failed to add tasks to cgroup manager")?;
+        .with_context(|| format!("failed to add task {} to cgroup manager", pid))?;
+
     cmanager
         .apply(&controller_opt)
-        .context("Failed to apply resource limits through cgroup")?;
+        .context("failed to apply resource limits to cgroup")?;
+
     Ok(())
 }
 
@@ -246,9 +283,9 @@ mod tests {
                 let line = fs::read_to_string(format!("/proc/{}/uid_map", child.as_raw()))?;
                 let line_splited = line.split_whitespace();
                 for (act, expect) in line_splited.zip([
-                    uid_mapping.container_id().to_string().as_str(),
-                    uid_mapping.host_id().to_string().as_str(),
-                    uid_mapping.size().to_string().as_str(),
+                    uid_mapping.container_id().to_string(),
+                    uid_mapping.host_id().to_string(),
+                    uid_mapping.size().to_string(),
                 ]) {
                     assert_eq!(act, expect);
                 }
@@ -291,9 +328,9 @@ mod tests {
                 let line = fs::read_to_string(format!("/proc/{}/gid_map", child.as_raw()))?;
                 let line_splited = line.split_whitespace();
                 for (act, expect) in line_splited.zip([
-                    gid_mapping.container_id().to_string().as_str(),
-                    gid_mapping.host_id().to_string().as_str(),
-                    gid_mapping.size().to_string().as_str(),
+                    gid_mapping.container_id().to_string(),
+                    gid_mapping.host_id().to_string(),
+                    gid_mapping.size().to_string(),
                 ]) {
                     assert_eq!(act, expect);
                 }
