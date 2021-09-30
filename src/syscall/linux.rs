@@ -211,4 +211,26 @@ impl Syscall for LinuxSyscall {
 
         Ok(())
     }
+
+    fn mount(
+        &self,
+        source: Option<&str>,
+        target: &str,
+        fstype: Option<&str>,
+        flags: MsFlags,
+        data: Option<&str>,
+    ) -> Result<()> {
+        if let Err(e) = nix::mount::mount(source, target, fstype, flags, data) {
+            bail!(
+                "Failed to mount source:{:?}, target:{:?}, fstype:{:?}, flags:{:?}, data:{:?}, err:{:?}",
+                source,
+                target,
+                fstype,
+                flags,
+                data,
+                e,
+            );
+        }
+        Ok(())
+    }
 }

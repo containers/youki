@@ -68,6 +68,17 @@ impl Syscall for TestHelperSyscall {
     fn chroot(&self, _: &std::path::Path) -> anyhow::Result<()> {
         todo!()
     }
+
+    fn mount(
+        &self,
+        _source: Option<&str>,
+        _target: &str,
+        _fstype: Option<&str>,
+        _flags: nix::mount::MsFlags,
+        _data: Option<&str>,
+    ) -> anyhow::Result<()> {
+        todo!()
+    }
 }
 
 impl TestHelperSyscall {

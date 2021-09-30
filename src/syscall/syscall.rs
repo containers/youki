@@ -6,6 +6,7 @@ use std::{any::Any, ffi::OsStr, path::Path, sync::Arc};
 use anyhow::Result;
 use caps::{errors::CapsError, CapSet, CapsHashSet};
 use nix::{
+    mount::MsFlags,
     sched::CloneFlags,
     unistd::{Gid, Uid},
 };
@@ -27,6 +28,14 @@ pub trait Syscall {
     fn set_hostname(&self, hostname: &str) -> Result<()>;
     fn set_rlimit(&self, rlimit: &LinuxRlimit) -> Result<()>;
     fn get_pwuid(&self, uid: u32) -> Option<Arc<OsStr>>;
+    fn mount(
+        &self,
+        source: Option<&str>,
+        target: &str,
+        fstype: Option<&str>,
+        flags: MsFlags,
+        data: Option<&str>,
+    ) -> Result<()>;
 }
 
 pub fn create_syscall() -> Box<dyn Syscall> {
