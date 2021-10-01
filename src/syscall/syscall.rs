@@ -8,6 +8,7 @@ use caps::{errors::CapsError, CapSet, CapsHashSet};
 use nix::{
     mount::MsFlags,
     sched::CloneFlags,
+    sys::stat::{Mode, SFlag},
     unistd::{Gid, Uid},
 };
 
@@ -37,6 +38,8 @@ pub trait Syscall {
         data: Option<&str>,
     ) -> Result<()>;
     fn symlink(&self, original: &Path, link: &Path) -> Result<()>;
+    fn mknod(&self, path: &Path, kind: SFlag, perm: Mode, dev: u64) -> Result<()>;
+    fn chown(&self, path: &Path, owner: Option<Uid>, group: Option<Gid>) -> Result<()>;
 }
 
 pub fn create_syscall() -> Box<dyn Syscall> {

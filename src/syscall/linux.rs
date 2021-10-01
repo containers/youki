@@ -13,9 +13,9 @@ use nix::{
     fcntl::{open, OFlag},
     mount::{mount, umount2, MntFlags, MsFlags},
     sched::{unshare, CloneFlags},
-    sys::stat::Mode,
+    sys::stat::{mknod, Mode, SFlag},
     unistd,
-    unistd::{fchdir, pivot_root, sethostname, Gid, Uid},
+    unistd::{chown, fchdir, pivot_root, sethostname, Gid, Uid},
 };
 
 use oci_spec::runtime::LinuxRlimit;
@@ -216,16 +216,30 @@ impl Syscall for LinuxSyscall {
         flags: MsFlags,
         data: Option<&str>,
     ) -> Result<()> {
-        if let Err(e) = nix::mount::mount(source, target, fstype, flags, data) {
-            bail!("Failed to mount with flags:{:?}, err:{:?}", flags, e);
+        match mount(source, target, fstype, flags, data) {
+            Ok(_) => Ok(()),
+            Err(e) => bail!("Failed to mount {:?}", e),
         }
-        Ok(())
     }
 
     fn symlink(&self, original: &Path, link: &Path) -> Result<()> {
         match symlink(original, link) {
             Ok(_) => Ok(()),
             Err(e) => bail!("Failed to symlink {:?}", e),
+        }
+    }
+
+    fn mknod(&self, path: &Path, kind: SFlag, perm: Mode, dev: u64) -> Result<()> {
+        match mknod(path, kind, perm, dev) {
+            Ok(_) => Ok(()),
+            Err(e) => bail!("Failed to mknod {:?}", e),
+        }
+    }
+
+    fn chown(&self, path: &Path, owner: Option<Uid>, group: Option<Gid>) -> Result<()> {
+        match chown(path, owner, group) {
+            Ok(_) => Ok(()),
+            Err(e) => bail!("Failed to chown {:?}", e),
         }
     }
 }

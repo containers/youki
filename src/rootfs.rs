@@ -8,9 +8,9 @@ use nix::errno::Errno;
 use nix::fcntl::{open, OFlag};
 use nix::mount::mount as nix_mount;
 use nix::mount::MsFlags;
-use nix::sys::stat::{mknod, umask};
+use nix::sys::stat::umask;
 use nix::sys::stat::{Mode, SFlag};
-use nix::unistd::{chown, close};
+use nix::unistd::close;
 use nix::unistd::{Gid, Uid};
 use nix::NixPath;
 use oci_spec::runtime::{Linux, LinuxDevice, LinuxDeviceBuilder, LinuxDeviceType, Mount, Spec};
@@ -186,6 +186,30 @@ impl RootFS {
         Ok(())
     }
 
+    fn mknod_dev(&self, rootfs: &Path, dev: &LinuxDevice) -> Result<()> {
+        fn makedev(major: i64, minor: i64) -> u64 {
+            ((minor & 0xff)
+                | ((major & 0xfff) << 8)
+                | ((minor & !0xff) << 12)
+                | ((major & !0xfff) << 32)) as u64
+        }
+
+        let full_container_path = rootfs.join(dev.path().as_in_container()?);
+        self.command.mknod(
+            &full_container_path,
+            to_sflag(dev.typ()),
+            Mode::from_bits_truncate(dev.file_mode().unwrap_or(0)),
+            makedev(dev.major(), dev.minor()),
+        )?;
+        self.command.chown(
+            &full_container_path,
+            dev.uid().map(Uid::from_raw),
+            dev.gid().map(Gid::from_raw),
+        )?;
+
+        Ok(())
+    }
+
     fn create_devices<'a, I>(&self, rootfs: &Path, devices: I, bind: bool) -> Result<()>
     where
         I: IntoIterator<Item = &'a LinuxDevice>,
@@ -196,7 +220,7 @@ impl RootFS {
                 .into_iter()
                 .map(|dev| {
                     if !dev.path().starts_with("/dev") {
-                        panic!("{} is not a valid device path", dev.path().display());
+                        bail!("{} is not a valid device path", dev.path().display());
                     }
 
                     self.bind_dev(rootfs, dev)
@@ -207,7 +231,7 @@ impl RootFS {
                 .into_iter()
                 .map(|dev| {
                     if !dev.path().starts_with("/dev") {
-                        panic!("{} is not a valid device path", dev.path().display());
+                        bail!("{} is not a valid device path", dev.path().display());
                     }
 
                     self.mknod_dev(rootfs, dev)
@@ -215,30 +239,6 @@ impl RootFS {
                 .collect::<Result<Vec<_>>>()?;
         }
         umask(old_mode);
-
-        Ok(())
-    }
-
-    fn mknod_dev(&self, rootfs: &Path, dev: &LinuxDevice) -> Result<()> {
-        fn makedev(major: i64, minor: i64) -> u64 {
-            ((minor & 0xff)
-                | ((major & 0xfff) << 8)
-                | ((minor & !0xff) << 12)
-                | ((major & !0xfff) << 32)) as u64
-        }
-
-        let full_container_path = rootfs.join(dev.path().as_in_container()?);
-        mknod(
-            &full_container_path,
-            to_sflag(dev.typ()),
-            Mode::from_bits_truncate(dev.file_mode().unwrap_or(0)),
-            makedev(dev.major(), dev.minor()),
-        )?;
-        chown(
-            &full_container_path,
-            dev.uid().map(Uid::from_raw),
-            dev.gid().map(Gid::from_raw),
-        )?;
 
         Ok(())
     }
@@ -474,7 +474,7 @@ fn parse_mount(m: &Mount) -> (MsFlags, String) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::syscall::test::TestHelperSyscall;
+    use crate::syscall::test::{ChownArgs, MknodArgs, MountArgs, TestHelperSyscall};
     use anyhow::{Context, Result};
     use nix::mount::MsFlags;
     use nix::sys::stat::SFlag;
@@ -784,13 +784,14 @@ mod tests {
                     .unwrap(),
             )
             .is_ok());
-        let want = (
-            Some(PathBuf::from("/null")),
-            PathBuf::from("/tmp/null"),
-            Some("bind".to_string()),
-            MsFlags::MS_BIND,
-            None::<String>,
-        );
+
+        let want = MountArgs {
+            source: Some(PathBuf::from("/null")),
+            target: PathBuf::from("/tmp/null"),
+            fstype: Some("bind".to_string()),
+            flags: MsFlags::MS_BIND,
+            data: None,
+        };
         let got = &rootfs
             .command
             .as_any()
@@ -798,5 +799,53 @@ mod tests {
             .unwrap()
             .get_mount_args()[0];
         assert_eq!(want, *got)
+    }
+
+    #[test]
+    #[serial]
+    fn test_mknod_dev() {
+        let rootfs = RootFS::new();
+        assert!(rootfs
+            .mknod_dev(
+                Path::new("/tmp"),
+                &LinuxDeviceBuilder::default()
+                    .path(PathBuf::from("/null"))
+                    .major(1)
+                    .minor(3)
+                    .typ(LinuxDeviceType::C)
+                    .file_mode(0o644u32)
+                    .uid(1000u32)
+                    .gid(1000u32)
+                    .build()
+                    .unwrap(),
+            )
+            .is_ok());
+
+        let want_mknod = MknodArgs {
+            path: PathBuf::from("/tmp/null"),
+            kind: SFlag::S_IFCHR,
+            perm: Mode::S_IRUSR | Mode::S_IWUSR | Mode::S_IRGRP | Mode::S_IROTH,
+            dev: 259,
+        };
+        let got_mknod = &rootfs
+            .command
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap()
+            .get_mknod_args()[0];
+        assert_eq!(want_mknod, *got_mknod);
+
+        let want_chown = ChownArgs {
+            path: PathBuf::from("/tmp/null"),
+            owner: Some(Uid::from_raw(1000)),
+            group: Some(Gid::from_raw(1000)),
+        };
+        let got_chown = &rootfs
+            .command
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap()
+            .get_chown_args()[0];
+        assert_eq!(want_chown, *got_chown);
     }
 }
