@@ -770,4 +770,33 @@ mod tests {
             .get_symlink_args();
         assert_eq!(want, got)
     }
+
+    #[test]
+    #[serial]
+    fn test_bind_dev() {
+        let rootfs = RootFS::new();
+        assert!(rootfs
+            .bind_dev(
+                Path::new("/tmp"),
+                &LinuxDeviceBuilder::default()
+                    .path(PathBuf::from("/null"))
+                    .build()
+                    .unwrap(),
+            )
+            .is_ok());
+        let want = (
+            Some(PathBuf::from("/null")),
+            PathBuf::from("/tmp/null"),
+            Some("bind".to_string()),
+            MsFlags::MS_BIND,
+            None::<String>,
+        );
+        let got = &rootfs
+            .command
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap()
+            .get_mount_args()[0];
+        assert_eq!(want, *got)
+    }
 }

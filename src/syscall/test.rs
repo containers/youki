@@ -11,6 +11,15 @@ pub struct TestHelperSyscall {
     set_ns_args: RefCell<Vec<(i32, CloneFlags)>>,
     unshare_args: RefCell<Vec<CloneFlags>>,
     set_capability_args: RefCell<Vec<(CapSet, CapsHashSet)>>,
+    mount_args: RefCell<
+        Vec<(
+            Option<std::path::PathBuf>,
+            std::path::PathBuf,
+            Option<String>,
+            nix::mount::MsFlags,
+            Option<String>,
+        )>,
+    >,
     symlink_args: RefCell<Vec<(PathBuf, PathBuf)>>,
 }
 
@@ -20,6 +29,7 @@ impl Default for TestHelperSyscall {
             set_ns_args: RefCell::new(vec![]),
             unshare_args: RefCell::new(vec![]),
             set_capability_args: RefCell::new(vec![]),
+            mount_args: RefCell::new(vec![]),
             symlink_args: RefCell::new(vec![]),
         }
     }
@@ -73,13 +83,20 @@ impl Syscall for TestHelperSyscall {
 
     fn mount(
         &self,
-        _source: Option<&std::path::Path>,
-        _target: &std::path::Path,
-        _fstype: Option<&str>,
-        _flags: nix::mount::MsFlags,
-        _data: Option<&str>,
+        source: Option<&std::path::Path>,
+        target: &std::path::Path,
+        fstype: Option<&str>,
+        flags: nix::mount::MsFlags,
+        data: Option<&str>,
     ) -> anyhow::Result<()> {
-        todo!()
+        self.mount_args.borrow_mut().push((
+            source.map(|x| x.to_owned()),
+            target.to_owned(),
+            fstype.map(|x| x.to_owned()),
+            flags,
+            data.map(|x| x.to_owned()),
+        ));
+        Ok(())
     }
 
     fn symlink(&self, original: &std::path::Path, link: &std::path::Path) -> anyhow::Result<()> {
@@ -101,6 +118,18 @@ impl TestHelperSyscall {
 
     pub fn get_set_capability_args(&self) -> Vec<(CapSet, CapsHashSet)> {
         self.set_capability_args.borrow_mut().clone()
+    }
+
+    pub fn get_mount_args(
+        &self,
+    ) -> Vec<(
+        Option<std::path::PathBuf>,
+        std::path::PathBuf,
+        Option<String>,
+        nix::mount::MsFlags,
+        Option<String>,
+    )> {
+        self.mount_args.borrow_mut().clone()
     }
 
     pub fn get_symlink_args(&self) -> Vec<(PathBuf, PathBuf)> {
