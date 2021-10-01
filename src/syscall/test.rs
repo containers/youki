@@ -1,4 +1,4 @@
-use std::{any::Any, cell::RefCell, ffi::OsStr, sync::Arc};
+use std::{any::Any, cell::RefCell, ffi::OsStr, path::PathBuf, sync::Arc};
 
 use caps::{errors::CapsError, CapSet, CapsHashSet};
 use nix::sched::CloneFlags;
@@ -11,6 +11,7 @@ pub struct TestHelperSyscall {
     set_ns_args: RefCell<Vec<(i32, CloneFlags)>>,
     unshare_args: RefCell<Vec<CloneFlags>>,
     set_capability_args: RefCell<Vec<(CapSet, CapsHashSet)>>,
+    ptmx_args: RefCell<(PathBuf, PathBuf)>,
 }
 
 impl Default for TestHelperSyscall {
@@ -19,6 +20,7 @@ impl Default for TestHelperSyscall {
             set_ns_args: RefCell::new(vec![]),
             unshare_args: RefCell::new(vec![]),
             set_capability_args: RefCell::new(vec![]),
+            ptmx_args: RefCell::new((PathBuf::default(), PathBuf::default())),
         }
     }
 }
@@ -80,7 +82,8 @@ impl Syscall for TestHelperSyscall {
         todo!()
     }
 
-    fn symlink(&self, _original: &std::path::Path, _link: &std::path::Path) -> anyhow::Result<()> {
+    fn symlink(&self, original: &std::path::Path, link: &std::path::Path) -> anyhow::Result<()> {
+        *self.ptmx_args.borrow_mut() = (original.to_path_buf(), link.to_path_buf());
         Ok(())
     }
 }
@@ -96,5 +99,9 @@ impl TestHelperSyscall {
 
     pub fn get_set_capability_args(&self) -> Vec<(CapSet, CapsHashSet)> {
         self.set_capability_args.borrow_mut().clone()
+    }
+
+    pub fn get_ptmx_args(&self) -> (PathBuf, PathBuf) {
+        self.ptmx_args.borrow_mut().clone()
     }
 }

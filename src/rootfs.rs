@@ -464,11 +464,14 @@ fn parse_mount(m: &Mount) -> (MsFlags, String) {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::syscall::test::TestHelperSyscall;
     use anyhow::{Context, Result};
     use nix::mount::MsFlags;
     use nix::sys::stat::SFlag;
     use oci_spec::runtime::{LinuxDeviceType, MountBuilder};
     use procfs::process::MountInfo;
+    use serial_test::serial;
     use std::path::{Path, PathBuf};
 
     #[test]
@@ -500,7 +503,7 @@ mod tests {
             },
         ];
 
-        let res = super::find_parent_mount(Path::new("/path/to/rootfs"), &mount_infos)
+        let res = find_parent_mount(Path::new("/path/to/rootfs"), &mount_infos)
             .context("Failed to get parent mount")?;
         assert_eq!(res.mnt_id, 11);
         Ok(())
@@ -509,7 +512,7 @@ mod tests {
     #[test]
     fn test_find_parent_mount_with_empty_mount_infos() {
         let mount_infos = vec![];
-        let res = super::find_parent_mount(Path::new("/path/to/rootfs"), &mount_infos);
+        let res = find_parent_mount(Path::new("/path/to/rootfs"), &mount_infos);
         assert!(res.is_err());
     }
 
@@ -517,19 +520,19 @@ mod tests {
     fn test_to_sflag() {
         assert_eq!(
             SFlag::S_IFBLK | SFlag::S_IFCHR | SFlag::S_IFIFO,
-            super::to_sflag(LinuxDeviceType::A)
+            to_sflag(LinuxDeviceType::A)
         );
-        assert_eq!(SFlag::S_IFBLK, super::to_sflag(LinuxDeviceType::B));
-        assert_eq!(SFlag::S_IFCHR, super::to_sflag(LinuxDeviceType::C));
-        assert_eq!(SFlag::S_IFCHR, super::to_sflag(LinuxDeviceType::U));
-        assert_eq!(SFlag::S_IFIFO, super::to_sflag(LinuxDeviceType::P));
+        assert_eq!(SFlag::S_IFBLK, to_sflag(LinuxDeviceType::B));
+        assert_eq!(SFlag::S_IFCHR, to_sflag(LinuxDeviceType::C));
+        assert_eq!(SFlag::S_IFCHR, to_sflag(LinuxDeviceType::U));
+        assert_eq!(SFlag::S_IFIFO, to_sflag(LinuxDeviceType::P));
     }
 
     #[test]
     fn test_parse_mount() {
         assert_eq!(
             (MsFlags::empty(), "".to_string()),
-            super::parse_mount(
+            parse_mount(
                 &MountBuilder::default()
                     .destination(PathBuf::from("/proc"))
                     .typ("proc")
@@ -540,7 +543,7 @@ mod tests {
         );
         assert_eq!(
             (MsFlags::MS_NOSUID, "mode=755,size=65536k".to_string()),
-            super::parse_mount(
+            parse_mount(
                 &MountBuilder::default()
                     .destination(PathBuf::from("/dev"))
                     .typ("tmpfs")
@@ -560,7 +563,7 @@ mod tests {
                 MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC,
                 "newinstance,ptmxmode=0666,mode=0620,gid=5".to_string()
             ),
-            super::parse_mount(
+            parse_mount(
                 &MountBuilder::default()
                     .destination(PathBuf::from("/dev/pts"))
                     .typ("devpts")
@@ -582,7 +585,7 @@ mod tests {
                 MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
                 "mode=1777,size=65536k".to_string()
             ),
-            super::parse_mount(
+            parse_mount(
                 &MountBuilder::default()
                     .destination(PathBuf::from("/dev/shm"))
                     .typ("tmpfs")
@@ -603,7 +606,7 @@ mod tests {
                 MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
                 "".to_string()
             ),
-            super::parse_mount(
+            parse_mount(
                 &MountBuilder::default()
                     .destination(PathBuf::from("/dev/mqueue"))
                     .typ("mqueue")
@@ -622,7 +625,7 @@ mod tests {
                 MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV | MsFlags::MS_RDONLY,
                 "".to_string()
             ),
-            super::parse_mount(
+            parse_mount(
                 &MountBuilder::default()
                     .destination(PathBuf::from("/sys"))
                     .typ("sysfs")
@@ -642,7 +645,7 @@ mod tests {
                 MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV | MsFlags::MS_RDONLY,
                 "".to_string()
             ),
-            super::parse_mount(
+            parse_mount(
                 &MountBuilder::default()
                     .destination(PathBuf::from("/sys/fs/cgroup"))
                     .typ("cgroup")
@@ -672,7 +675,7 @@ mod tests {
                     | MsFlags::MS_UNBINDABLE,
                 "".to_string()
             ),
-            super::parse_mount(
+            parse_mount(
                 &MountBuilder::default()
                     .options(vec![
                         "defaults".to_string(),
@@ -716,8 +719,17 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_setup_ptmx() {
-        let rootfs = super::RootFS::new();
+        let rootfs = RootFS::new();
+        let want = (PathBuf::from("pts/ptmx"), PathBuf::from("/tmp/dev/ptmx"));
         assert!(rootfs.setup_ptmx(Path::new("/tmp")).is_ok());
+        let got = rootfs
+            .command
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap()
+            .get_ptmx_args();
+        assert_eq!(want, got)
     }
 }
