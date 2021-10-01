@@ -17,7 +17,6 @@ use oci_spec::runtime::{Linux, LinuxDevice, LinuxDeviceBuilder, LinuxDeviceType,
 use procfs::process::{MountInfo, MountOptFields, Process};
 use std::fs::OpenOptions;
 use std::fs::{canonicalize, create_dir_all, remove_file};
-use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 
 /// Holds information about rootfs
@@ -90,8 +89,11 @@ impl RootFS {
             }
         }
 
+        self.setup_kcore_symlink(rootfs)
+            .context("Failed to setup kcore symlink")?;
         self.setup_default_symlinks(rootfs)
             .context("Failed to setup default symlinks")?;
+
         if let Some(added_devices) = linux.devices() {
             self.create_devices(
                 rootfs,
@@ -138,11 +140,16 @@ impl RootFS {
         Ok(())
     }
 
-    fn setup_default_symlinks(&self, rootfs: &Path) -> Result<()> {
+    fn setup_kcore_symlink(&self, rootfs: &Path) -> Result<()> {
         if Path::new("/proc/kcore").exists() {
-            symlink("/proc/kcore", rootfs.join("dev/kcore")).context("Failed to symlink kcore")?;
+            self.command
+                .symlink(Path::new("/proc/kcore"), &rootfs.join("dev/kcore"))
+                .context("Failed to symlink kcore")?;
         }
+        Ok(())
+    }
 
+    fn setup_default_symlinks(&self, rootfs: &Path) -> Result<()> {
         let defaults = [
             ("/proc/self/fd", "dev/fd"),
             ("/proc/self/fd/0", "dev/stdin"),
@@ -150,7 +157,9 @@ impl RootFS {
             ("/proc/self/fd/2", "dev/stderr"),
         ];
         for (src, dst) in defaults {
-            symlink(src, rootfs.join(dst)).context("Fail to symlink defaults")?;
+            self.command
+                .symlink(Path::new(src), &rootfs.join(dst))
+                .context("Fail to symlink defaults")?;
         }
 
         Ok(())
@@ -722,14 +731,43 @@ mod tests {
     #[serial]
     fn test_setup_ptmx() {
         let rootfs = RootFS::new();
-        let want = (PathBuf::from("pts/ptmx"), PathBuf::from("/tmp/dev/ptmx"));
         assert!(rootfs.setup_ptmx(Path::new("/tmp")).is_ok());
+        let want = (PathBuf::from("pts/ptmx"), PathBuf::from("/tmp/dev/ptmx"));
+        let got = &rootfs
+            .command
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap()
+            .get_symlink_args()[0];
+        assert_eq!(want, *got)
+    }
+
+    #[test]
+    #[serial]
+    fn test_setup_default_symlinks() {
+        let rootfs = RootFS::new();
+        assert!(rootfs.setup_default_symlinks(Path::new("/tmp")).is_ok());
+        let want = vec![
+            (PathBuf::from("/proc/self/fd"), PathBuf::from("/tmp/dev/fd")),
+            (
+                PathBuf::from("/proc/self/fd/0"),
+                PathBuf::from("/tmp/dev/stdin"),
+            ),
+            (
+                PathBuf::from("/proc/self/fd/1"),
+                PathBuf::from("/tmp/dev/stdout"),
+            ),
+            (
+                PathBuf::from("/proc/self/fd/2"),
+                PathBuf::from("/tmp/dev/stderr"),
+            ),
+        ];
         let got = rootfs
             .command
             .as_any()
             .downcast_ref::<TestHelperSyscall>()
             .unwrap()
-            .get_ptmx_args();
+            .get_symlink_args();
         assert_eq!(want, got)
     }
 }

@@ -11,7 +11,7 @@ pub struct TestHelperSyscall {
     set_ns_args: RefCell<Vec<(i32, CloneFlags)>>,
     unshare_args: RefCell<Vec<CloneFlags>>,
     set_capability_args: RefCell<Vec<(CapSet, CapsHashSet)>>,
-    ptmx_args: RefCell<(PathBuf, PathBuf)>,
+    symlink_args: RefCell<Vec<(PathBuf, PathBuf)>>,
 }
 
 impl Default for TestHelperSyscall {
@@ -20,7 +20,7 @@ impl Default for TestHelperSyscall {
             set_ns_args: RefCell::new(vec![]),
             unshare_args: RefCell::new(vec![]),
             set_capability_args: RefCell::new(vec![]),
-            ptmx_args: RefCell::new((PathBuf::default(), PathBuf::default())),
+            symlink_args: RefCell::new(vec![]),
         }
     }
 }
@@ -83,7 +83,9 @@ impl Syscall for TestHelperSyscall {
     }
 
     fn symlink(&self, original: &std::path::Path, link: &std::path::Path) -> anyhow::Result<()> {
-        *self.ptmx_args.borrow_mut() = (original.to_path_buf(), link.to_path_buf());
+        self.symlink_args
+            .borrow_mut()
+            .push((original.to_path_buf(), link.to_path_buf()));
         Ok(())
     }
 }
@@ -101,7 +103,7 @@ impl TestHelperSyscall {
         self.set_capability_args.borrow_mut().clone()
     }
 
-    pub fn get_ptmx_args(&self) -> (PathBuf, PathBuf) {
-        self.ptmx_args.borrow_mut().clone()
+    pub fn get_symlink_args(&self) -> Vec<(PathBuf, PathBuf)> {
+        self.symlink_args.borrow_mut().clone()
     }
 }
