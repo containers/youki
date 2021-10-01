@@ -580,7 +580,6 @@ dependencies = [
 [[package]]
 name = "oci_spec"
 version = "0.1.0"
-source = "git+https://github.com/containers/oci-spec-rs?rev=e0de21b89dc1e65f69a5f45a08bbe426787c7fa1#e0de21b89dc1e65f69a5f45a08bbe426787c7fa1"
 dependencies = [
  "anyhow",
  "caps",
