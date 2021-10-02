@@ -179,6 +179,9 @@ pub fn print_namespaces() {
         print_feature_status(&content, "CONFIG_USER_NS", FeatureDisplay::new("user"));
         print_feature_status(&content, "CONFIG_PID_NS", FeatureDisplay::new("pid"));
         print_feature_status(&content, "CONFIG_NET_NS", FeatureDisplay::new("network"));
+        // While the CONFIG_CGROUP_NS kernel feature exists, it is obsolete and should not be used. CGroup namespaces
+        // are instead enabled with CONFIG_CGROUPS.
+        print_feature_status(&content, "CONFIG_CGROUPS", FeatureDisplay::new("cgroup"))
     }
 }
 
