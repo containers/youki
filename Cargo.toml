@@ -61,7 +61,6 @@ oci-spec = { git = "https://github.com/containers/oci-spec-rs",  rev = "5018f8e5
 quickcheck = "1"
 serial_test = "0.5.1"
 ipc-channel = "0.15.0"
-tempfile = "3"
 
 [profile.release]
 lto = true

@@ -112,12 +112,13 @@ impl SpecJson {
 // Tests become unstable if not serial. The cause is not known.
 mod tests {
     use super::*;
+    use crate::utils::create_temp_dir;
 
     #[test]
     fn test_spec_json() -> Result<()> {
         let mut spec = Default::default();
         spec = set_for_rootless(&spec)?;
-        let tmpdir = tempfile::tempdir().unwrap();
+        let tmpdir = create_temp_dir("test_spec_json").expect("failed to create temp dir");
         let path = tmpdir.path().join("config.json");
         to_writer_pretty(&File::create(path)?, &spec)?;
         Ok(())

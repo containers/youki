@@ -1546,5 +1546,4 @@ dependencies = [
  "serial_test",
  "systemd",
  "tabwriter",
- "tempfile",
 ]
