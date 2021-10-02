@@ -1,15 +1,14 @@
 use anyhow::Result;
 use clap::Clap;
-use std::path::PathBuf;
-
 use nix;
 use oci_spec::runtime::{
-    LinuxBuilder, LinuxIdMappingBuilder, LinuxNamespaceBuilder, LinuxNamespaceType, MountBuilder,
-    Spec, SpecBuilder,
+    Linux, LinuxBuilder, LinuxIdMappingBuilder, LinuxNamespace, LinuxNamespaceBuilder,
+    LinuxNamespaceType, MountBuilder, Spec, SpecBuilder,
 };
 use path_clean;
 use serde_json::to_writer_pretty;
 use std::fs::File;
+use std::path::PathBuf;
 /// Command generates a config.json
 #[derive(Clap, Debug)]
 pub struct SpecJson {
@@ -23,20 +22,20 @@ pub fn set_for_rootless(spec: &Spec) -> Result<Spec> {
     let gid = nix::unistd::getegid().as_raw();
 
     // Remove network from the default spec
-    let mut namespaces = vec![];
-    for ns in spec
+    let mut namespaces: Vec<LinuxNamespace> = spec
         .linux()
         .as_ref()
-        .unwrap()
+        .unwrap_or(&Linux::default())
         .namespaces()
         .as_ref()
-        .unwrap()
+        .unwrap_or(&vec![])
         .iter()
-    {
-        if ns.typ() != LinuxNamespaceType::Network && ns.typ() != LinuxNamespaceType::User {
-            namespaces.push(ns.clone());
-        }
-    }
+        .filter(|&ns| {
+            ns.typ() != LinuxNamespaceType::Network && ns.typ() != LinuxNamespaceType::User
+        })
+        .map(|ns| ns.clone())
+        .collect();
+
     // Add user namespace
     namespaces.push(
         LinuxNamespaceBuilder::default()
@@ -60,6 +59,8 @@ pub fn set_for_rootless(spec: &Spec) -> Result<Spec> {
     let mut mounts = vec![];
     for mount in spec.mounts().as_ref().unwrap().iter() {
         let dest = mount.destination().clone();
+        // Use path_clean to reduce multiple slashes to a single slash
+        // and take care of '..' and '.' in dest path.
         if path_clean::clean(dest.as_path().to_str().unwrap()) == "/sys" {
             let mount = MountBuilder::default()
                 .destination(PathBuf::from("/sys"))
