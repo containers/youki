@@ -13,7 +13,6 @@ use std::os::linux::fs::MetadataExt;
 use std::os::unix::fs::DirBuilderExt;
 use std::os::unix::prelude::AsRawFd;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
 
 pub trait PathBufExt {
     fn as_in_container(&self) -> Result<PathBuf>;
@@ -64,35 +63,12 @@ pub fn do_exec(path: impl AsRef<Path>, args: &[String]) -> Result<()> {
     Ok(())
 }
 
-// TODO implement
-pub fn set_name(_name: &str) -> Result<()> {
-    Ok(())
-}
-
 /// If None, it will generate a default path for cgroups.
 pub fn get_cgroup_path(cgroups_path: &Option<PathBuf>, container_id: &str) -> PathBuf {
     match cgroups_path {
         Some(cpath) => cpath.clone(),
         None => PathBuf::from(container_id),
     }
-}
-
-pub fn delete_with_retry<P: AsRef<Path>>(path: P) -> Result<()> {
-    let mut attempts = 0;
-    let mut delay = Duration::from_millis(10);
-    let path = path.as_ref();
-
-    while attempts < 5 {
-        if fs::remove_dir(path).is_ok() {
-            return Ok(());
-        }
-
-        std::thread::sleep(delay);
-        attempts += attempts;
-        delay *= attempts;
-    }
-
-    bail!("could not delete {:?}", path)
 }
 
 pub fn write_file<P: AsRef<Path>, C: AsRef<[u8]>>(path: P, contents: C) -> Result<()> {
