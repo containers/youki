@@ -117,7 +117,9 @@ mod tests {
     fn test_spec_json() -> Result<()> {
         let mut spec = Default::default();
         spec = set_for_rootless(&spec)?;
-        to_writer_pretty(&File::create("config.json")?, &spec)?;
+        let tmpdir = tempfile::tempdir().unwrap();
+        let path = tmpdir.path().join("config.json");
+        to_writer_pretty(&File::create(path)?, &spec)?;
         Ok(())
     }
 }
