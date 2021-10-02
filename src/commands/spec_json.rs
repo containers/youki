@@ -107,3 +107,17 @@ impl SpecJson {
         Ok(())
     }
 }
+
+#[cfg(test)]
+// Tests become unstable if not serial. The cause is not known.
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_spec_json() -> Result<()> {
+        let mut spec = Default::default();
+        spec = set_for_rootless(&spec)?;
+        to_writer_pretty(&File::create("config.json")?, &spec)?;
+        Ok(())
+    }
+}
