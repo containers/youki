@@ -17,9 +17,10 @@ use std::path::{Path, PathBuf};
 pub trait PathBufExt {
     fn as_in_container(&self) -> Result<PathBuf>;
     fn join_absolute_path(&self, p: &Path) -> Result<PathBuf>;
+    fn join_safely(&self, p: &Path) -> Result<PathBuf>;
 }
 
-impl PathBufExt for PathBuf {
+impl PathBufExt for Path {
     fn as_in_container(&self) -> Result<PathBuf> {
         if self.is_relative() {
             bail!("Relative path cannot be converted to the path in the container.")
@@ -37,6 +38,17 @@ impl PathBufExt for PathBuf {
             )
         }
         Ok(PathBuf::from(format!("{}{}", self.display(), p.display())))
+    }
+
+    fn join_safely(&self, p: &Path) -> Result<PathBuf> {
+        if p.is_relative() {
+            return Ok(self.join(p));
+        }
+
+        let stripped = p
+            .strip_prefix("/")
+            .with_context(|| format!("failed to strip prefix from {}", p.display()))?;
+        Ok(self.join(stripped))
     }
 }
 
