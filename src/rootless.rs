@@ -58,6 +58,7 @@ impl<'a> Rootless<'a> {
         log::debug!("Write UID mapping for {:?}", target_pid);
         if let Some(uid_mappings) = self.uid_mappings {
             write_id_mapping(
+                target_pid,
                 &format!("/proc/{}/uid_map", target_pid),
                 uid_mappings,
                 self.newuidmap.as_deref(),
@@ -71,6 +72,7 @@ impl<'a> Rootless<'a> {
         log::debug!("Write GID mapping for {:?}", target_pid);
         if let Some(gid_mappings) = self.gid_mappings {
             return write_id_mapping(
+                target_pid,
                 &format!("/proc/{}/gid_map", target_pid),
                 gid_mappings,
                 self.newgidmap.as_deref(),
@@ -223,6 +225,7 @@ fn lookup_map_binary(binary: &str) -> Result<Option<PathBuf>> {
 }
 
 fn write_id_mapping(
+    pid: Pid,
     map_file: &str,
     mappings: &[LinuxIdMapping],
     map_binary: Option<&Path>,
@@ -236,6 +239,7 @@ fn write_id_mapping(
         utils::write_file(map_file, mappings.first().unwrap())?;
     } else {
         Command::new(map_binary.unwrap())
+            .arg(pid.to_string())
             .args(mappings)
             .output()
             .with_context(|| format!("failed to execute {:?}", map_binary))?;
