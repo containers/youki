@@ -152,6 +152,66 @@ pub fn ensure_procfs(path: &Path) -> Result<()> {
     Ok(())
 }
 
+pub fn secure_join(rootfs: &Path, unsafe_path: &Path) -> Result<PathBuf> {
+    
+    let mut clean_path = PathBuf::from(rootfs);
+    let mut path = PathBuf::from(unsafe_path);
+    let mut p = PathBuf::new();
+
+    let mut part = path.iter();
+    let mut i = 0;
+
+    loop {
+        if i > 255 {
+            // Dereference too many symlinks, may be infinite loop
+            break;
+        }
+
+        let part_path;
+        match part.next() {
+            Some(part) => {
+                part_path = PathBuf::from(part);
+            },
+            None => {
+                break;
+            }
+        }
+
+        if !part_path.is_absolute() {
+            if part_path.starts_with("..") {
+                p.pop();
+            } else {
+                // check if symlink then dereference
+                let metadata = match PathBuf::from(&clean_path).join(&p).join(&part_path).symlink_metadata() {
+                    Ok(metadata) => Some(metadata),
+                    Err(_) => None,
+                };
+
+                match metadata {
+                    Some(metadata) => {
+                        if metadata.file_type().is_symlink() {
+
+                            let link_path = fs::read_link(PathBuf::from(&clean_path).join(&p).join(&part_path)).unwrap();
+                            path = link_path.join(part.as_path());
+                            part = path.iter();
+        
+                            // increase after dereference symlink
+                            i += 1;
+                            continue;
+                        }
+                    },
+                    None => {}
+                }
+
+                p.push(&part_path);
+            }
+        }
+    }
+
+    clean_path.push(p);
+    Ok(clean_path)
+}
+
 pub struct TempDir {
     path: Option<PathBuf>,
 }
@@ -297,5 +357,60 @@ mod tests {
         assert_eq!(env_output.get_key_value(&key), Some((&key, &value)));
 
         Ok(())
+    }
+    #[test]
+    fn test_secure_join() {
+        assert_eq!(
+            secure_join(Path::new("/root"), Path::new("path")).unwrap(),
+            PathBuf::from("/root/path")
+        );
+        assert_eq!(
+            secure_join(Path::new("/root"), Path::new("more/path")).unwrap(),
+            PathBuf::from("/root/more/path")
+        );
+        assert_eq!(
+            secure_join(Path::new("/root"), Path::new("/absolute/path")).unwrap(),
+            PathBuf::from("/root/absolute/path")
+        );
+        assert_eq!(
+            secure_join(Path::new("/root"), Path::new("/path/with/../parent/./sample")).unwrap(),
+            PathBuf::from("/root/path/parent/sample")
+        );
+        assert_eq!(
+            secure_join(Path::new("/root"), Path::new("/../../../../tmp")).unwrap(),
+            PathBuf::from("/root/tmp")
+        );
+        assert_eq!(
+            secure_join(Path::new("/root"), Path::new("./../../../../var/log")).unwrap(),
+            PathBuf::from("/root/var/log")
+        );
+        assert_eq!(
+            secure_join(Path::new("/root"), Path::new("../../../../etc/passwd")).unwrap(),
+            PathBuf::from("/root/etc/passwd")
+        );
+    }
+    #[test]
+    fn test_secure_join_symlink() {
+        use std::os::unix::fs::symlink;
+        
+        let tmp = create_temp_dir("root").unwrap();
+        let test_root_dir = tmp.path();
+
+        symlink("somepath", PathBuf::from(&test_root_dir).join("etc")).unwrap();
+        symlink("../../../../../../../../../../../../../etc", PathBuf::from(&test_root_dir).join("longbacklink")).unwrap();
+        symlink("/../../../../../../../../../../../../../etc/passwd", PathBuf::from(&test_root_dir).join("absolutelink")).unwrap();
+
+        assert_eq!(
+            secure_join(&test_root_dir, PathBuf::from("etc").as_path()).unwrap(),
+            PathBuf::from(&test_root_dir).join("somepath")
+        );
+        assert_eq!(
+            secure_join(&test_root_dir, PathBuf::from("longbacklink").as_path()).unwrap(),
+            PathBuf::from(&test_root_dir).join("somepath")
+        );
+        assert_eq!(
+            secure_join(&test_root_dir, PathBuf::from("absolutelink").as_path()).unwrap(),
+            PathBuf::from(&test_root_dir).join("somepath/passwd")
+        );
     }
 }
