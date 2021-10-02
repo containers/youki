@@ -33,7 +33,7 @@ pub fn set_for_rootless(spec: &Spec) -> Result<Spec> {
         .filter(|&ns| {
             ns.typ() != LinuxNamespaceType::Network && ns.typ() != LinuxNamespaceType::User
         })
-        .map(|ns| ns.clone())
+        .cloned()
         .collect();
 
     // Add user namespace
