@@ -1,6 +1,7 @@
 //! Implements Command trait for Linux systems
 use std::ffi::{CStr, OsStr};
 use std::os::unix::ffi::OsStrExt;
+use std::os::unix::fs::symlink;
 use std::sync::Arc;
 use std::{any::Any, mem, path::Path, ptr};
 
@@ -9,18 +10,13 @@ use caps::{errors::CapsError, CapSet, Capability, CapsHashSet};
 use libc::{c_char, uid_t};
 use nix::{
     errno::Errno,
-    unistd::{fchdir, pivot_root, sethostname},
-};
-use nix::{fcntl::open, sched::CloneFlags};
-use nix::{
-    fcntl::OFlag,
-    unistd::{Gid, Uid},
-};
-use nix::{
+    fcntl::{open, OFlag},
     mount::{mount, umount2, MntFlags, MsFlags},
+    sched::{unshare, CloneFlags},
+    sys::stat::{mknod, Mode, SFlag},
     unistd,
+    unistd::{chown, fchdir, pivot_root, sethostname, Gid, Uid},
 };
-use nix::{sched::unshare, sys::stat::Mode};
 
 use oci_spec::runtime::LinuxRlimit;
 
@@ -210,5 +206,40 @@ impl Syscall for LinuxSyscall {
         unistd::chroot(path)?;
 
         Ok(())
+    }
+
+    fn mount(
+        &self,
+        source: Option<&Path>,
+        target: &Path,
+        fstype: Option<&str>,
+        flags: MsFlags,
+        data: Option<&str>,
+    ) -> Result<()> {
+        match mount(source, target, fstype, flags, data) {
+            Ok(_) => Ok(()),
+            Err(e) => bail!("Failed to mount {:?}", e),
+        }
+    }
+
+    fn symlink(&self, original: &Path, link: &Path) -> Result<()> {
+        match symlink(original, link) {
+            Ok(_) => Ok(()),
+            Err(e) => bail!("Failed to symlink {:?}", e),
+        }
+    }
+
+    fn mknod(&self, path: &Path, kind: SFlag, perm: Mode, dev: u64) -> Result<()> {
+        match mknod(path, kind, perm, dev) {
+            Ok(_) => Ok(()),
+            Err(e) => bail!("Failed to mknod {:?}", e),
+        }
+    }
+
+    fn chown(&self, path: &Path, owner: Option<Uid>, group: Option<Gid>) -> Result<()> {
+        match chown(path, owner, group) {
+            Ok(_) => Ok(()),
+            Err(e) => bail!("Failed to chown {:?}", e),
+        }
     }
 }
