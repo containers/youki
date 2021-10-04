@@ -94,7 +94,7 @@ pub fn run_hooks(hooks: Option<&Vec<Hook>>, container: Option<&Container>) -> Re
                     let res = hook_process.wait();
                     let _ = s.send(res);
                 });
-                match r.recv_timeout(time::Duration::from_secs(timeout_sec as u64)) {
+                match r.recv_timeout(time::Duration::from_secs(timeout_sec.as_secs())) {
                     Ok(res) => res,
                     Err(crossbeam_channel::RecvTimeoutError::Timeout) => {
                         // Kill the process. There is no need to further clean
@@ -139,7 +139,7 @@ mod test {
     use anyhow::{bail, Result};
     use oci_spec::runtime::HookBuilder;
     use serial_test::serial;
-    use std::{env, fs};
+    use std::{env, fs, time::Duration};
 
     fn is_command_in_path(program: &str) -> bool {
         if let Ok(path) = env::var("PATH") {
@@ -214,7 +214,7 @@ mod test {
                 String::from("-f"),
                 String::from("/dev/null"),
             ])
-            .timeout(1)
+            .timeout(Duration::from_secs(1))
             .build()?;
         let hooks = Some(vec![hook]);
         match run_hooks(hooks.as_ref(), Some(&default_container)) {
