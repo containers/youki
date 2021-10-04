@@ -154,16 +154,15 @@ pub fn ensure_procfs(path: &Path) -> Result<()> {
 }
 
 pub fn secure_join(rootfs: &Path, unsafe_path: &Path) -> Result<PathBuf> {
-    let mut clean_path = PathBuf::from(rootfs);
+    let mut rootfs = PathBuf::from(rootfs);
     let mut path = PathBuf::from(unsafe_path);
-    let mut p = PathBuf::new();
+    let mut clean_path = PathBuf::new();
 
     let mut part = path.iter();
     let mut i = 0;
 
     loop {
         if i > 255 {
-            // Dereference too many symlinks, may be infinite loop
             bail!("dereference too many symlinks, may be infinite loop");
         }
 
@@ -179,14 +178,11 @@ pub fn secure_join(rootfs: &Path, unsafe_path: &Path) -> Result<PathBuf> {
 
         if !part_path.is_absolute() {
             if part_path.starts_with("..") {
-                p.pop();
+                clean_path.pop();
             } else {
                 // check if symlink then dereference
-                let metadata = match PathBuf::from(&clean_path)
-                    .join(&p)
-                    .join(&part_path)
-                    .symlink_metadata()
-                {
+                let curr_path = PathBuf::from(&rootfs).join(&clean_path).join(&part_path);
+                let metadata = match curr_path.symlink_metadata() {
                     Ok(metadata) => Some(metadata),
                     Err(error) => match error.kind() {
                         // if file does not exists, treat it as normal path
@@ -194,7 +190,7 @@ pub fn secure_join(rootfs: &Path, unsafe_path: &Path) -> Result<PathBuf> {
                         other_error => {
                             bail!(
                                 "unable to obtain symlink metadata for file {:?}: {:?}",
-                                PathBuf::from(&clean_path).join(&p).join(&part_path),
+                                curr_path,
                                 other_error
                             );
                         }
@@ -203,9 +199,7 @@ pub fn secure_join(rootfs: &Path, unsafe_path: &Path) -> Result<PathBuf> {
 
                 if let Some(metadata) = metadata {
                     if metadata.file_type().is_symlink() {
-                        let link_path =
-                            fs::read_link(PathBuf::from(&clean_path).join(&p).join(&part_path))
-                                .unwrap();
+                        let link_path = fs::read_link(curr_path)?;
                         path = link_path.join(part.as_path());
                         part = path.iter();
 
@@ -215,13 +209,13 @@ pub fn secure_join(rootfs: &Path, unsafe_path: &Path) -> Result<PathBuf> {
                     }
                 }
 
-                p.push(&part_path);
+                clean_path.push(&part_path);
             }
         }
     }
 
-    clean_path.push(p);
-    Ok(clean_path)
+    rootfs.push(clean_path);
+    Ok(rootfs)
 }
 
 pub struct TempDir {
@@ -429,15 +423,15 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            secure_join(&test_root_dir, PathBuf::from("etc").as_path()).unwrap(),
+            secure_join(test_root_dir, PathBuf::from("etc").as_path()).unwrap(),
             PathBuf::from(&test_root_dir).join("somepath")
         );
         assert_eq!(
-            secure_join(&test_root_dir, PathBuf::from("longbacklink").as_path()).unwrap(),
+            secure_join(test_root_dir, PathBuf::from("longbacklink").as_path()).unwrap(),
             PathBuf::from(&test_root_dir).join("somepath")
         );
         assert_eq!(
-            secure_join(&test_root_dir, PathBuf::from("absolutelink").as_path()).unwrap(),
+            secure_join(test_root_dir, PathBuf::from("absolutelink").as_path()).unwrap(),
             PathBuf::from(&test_root_dir).join("somepath/passwd")
         );
     }
