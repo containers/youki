@@ -30,7 +30,7 @@ struct MountOptions<'a> {
 
 /// Holds information about rootfs
 pub struct RootFS {
-    command: Box<dyn Syscall>,
+    syscall: Box<dyn Syscall>,
 }
 
 impl Default for RootFS {
@@ -42,7 +42,7 @@ impl Default for RootFS {
 impl RootFS {
     pub fn new() -> RootFS {
         RootFS {
-            command: create_syscall(),
+            syscall: create_syscall(),
         }
     }
 
@@ -64,7 +64,7 @@ impl RootFS {
             Some(uknown) => bail!("unknown rootfs_propagation: {}", uknown),
         }
 
-        self.command
+        self.syscall
             .mount(None, Path::new("/"), None, flags, None)
             .context("failed to mount rootfs")?;
 
@@ -72,7 +72,7 @@ impl RootFS {
             .context("failed to change parent mount of rootfs private")?;
 
         log::debug!("mount root fs {:?}", rootfs);
-        self.command.mount(
+        self.syscall.mount(
             Some(rootfs),
             rootfs,
             None,
@@ -237,7 +237,7 @@ impl RootFS {
 
         for comount in subsystem_name.split_terminator(',') {
             let link = cgroup_root.join(comount);
-            self.command
+            self.syscall
                 .symlink(Path::new(subsystem_name), &link)
                 .with_context(|| format!("failed to symlink {:?} to {:?}", link, subsystem_name))?;
         }
@@ -257,7 +257,7 @@ impl RootFS {
             }
         }
 
-        self.command
+        self.syscall
             .symlink(Path::new("pts/ptmx"), &rootfs.join("dev/ptmx"))
             .context("failed to symlink ptmx")?;
         Ok(())
@@ -265,7 +265,7 @@ impl RootFS {
 
     fn setup_default_symlinks(&self, rootfs: &Path) -> Result<()> {
         if Path::new("/proc/kcore").exists() {
-            self.command
+            self.syscall
                 .symlink(Path::new("/proc/kcore"), &rootfs.join("dev/kcore"))
                 .context("Failed to symlink kcore")?;
         }
@@ -277,7 +277,7 @@ impl RootFS {
             ("/proc/self/fd/2", "dev/stderr"),
         ];
         for (src, dst) in defaults {
-            self.command
+            self.syscall
                 .symlink(Path::new(src), &rootfs.join(dst))
                 .context("failed to symlink defaults")?;
         }
@@ -327,7 +327,7 @@ impl RootFS {
             Mode::from_bits_truncate(0o644),
         )?;
         close(fd)?;
-        self.command.mount(
+        self.syscall.mount(
             Some(dev.path()),
             &full_container_path,
             Some("bind"),
@@ -347,13 +347,13 @@ impl RootFS {
         }
 
         let full_container_path = rootfs.join(dev.path().as_in_container()?);
-        self.command.mknod(
+        self.syscall.mknod(
             &full_container_path,
             to_sflag(dev.typ()),
             Mode::from_bits_truncate(dev.file_mode().unwrap_or(0)),
             makedev(dev.major(), dev.minor()),
         )?;
-        self.command.chown(
+        self.syscall.chown(
             &full_container_path,
             dev.uid().map(Uid::from_raw),
             dev.gid().map(Gid::from_raw),
@@ -415,14 +415,14 @@ impl RootFS {
             PathBuf::from(source)
         };
 
-        if let Err(err) = self.command.mount(Some(&*src), dest, typ, flags, Some(&*d)) {
+        if let Err(err) = self.syscall.mount(Some(&*src), dest, typ, flags, Some(&*d)) {
             if let Some(errno) = err.downcast_ref() {
                 if !matches!(errno, Errno::EINVAL) {
                     bail!("mount of {:?} failed. {}", m.destination(), errno);
                 }
             }
 
-            self.command
+            self.syscall
                 .mount(Some(&*src), dest, typ, flags, Some(data))?;
         }
 
@@ -436,7 +436,7 @@ impl RootFS {
                     | MsFlags::MS_SLAVE),
             )
         {
-            self.command
+            self.syscall
                 .mount(Some(dest), dest, None, flags | MsFlags::MS_REMOUNT, None)?;
         }
         Ok(())
@@ -454,7 +454,7 @@ impl RootFS {
             .iter()
             .any(|field| matches!(field, MountOptFields::Shared(_)))
         {
-            self.command.mount(
+            self.syscall.mount(
                 None,
                 &parent_mount.mount_point,
                 None,
@@ -477,7 +477,7 @@ impl RootFS {
 
         if let Some(flags) = flags {
             log::debug!("make root mount {:?}", flags);
-            self.command
+            self.syscall
                 .mount(None, Path::new("/"), None, flags, None)?;
         }
 
