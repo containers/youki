@@ -1,8 +1,8 @@
 use super::args::ContainerArgs;
 use crate::apparmor;
 use crate::{
-    capabilities, hooks, namespaces::Namespaces, process::channel, rootfs, rootless::Rootless,
-    seccomp, tty, utils,
+    capabilities, hooks, namespaces::Namespaces, process::channel, rootfs::RootFS,
+    rootless::Rootless, seccomp, tty, utils,
 };
 use anyhow::{bail, Context, Result};
 use nix::mount::mount as nix_mount;
@@ -167,7 +167,7 @@ pub fn container_init(
     let linux = spec.linux().as_ref().context("no linux in spec")?;
     let proc = spec.process().as_ref().context("no process in spec")?;
     let mut envs: Vec<String> = proc.env().as_ref().unwrap_or(&vec![]).clone();
-    let rootfs = &args.rootfs;
+    let rootfs_path = &args.rootfs;
     let hooks = spec.hooks().as_ref();
     let container = args.container.as_ref();
     let namespaces = Namespaces::from(linux.namespaces().as_ref());
@@ -216,13 +216,15 @@ pub fn container_init(
         }
 
         let bind_service = namespaces.get(LinuxNamespaceType::User).is_some();
-        rootfs::prepare_rootfs(
-            spec,
-            rootfs,
-            bind_service,
-            namespaces.get(LinuxNamespaceType::Cgroup).is_some(),
-        )
-        .with_context(|| "Failed to prepare rootfs")?;
+        let rootfs = RootFS::new();
+        rootfs
+            .prepare_rootfs(
+                spec,
+                rootfs_path,
+                bind_service,
+                namespaces.get(LinuxNamespaceType::Cgroup).is_some(),
+            )
+            .with_context(|| "Failed to prepare rootfs")?;
 
         // Entering into the rootfs jail. If mount namespace is specified, then
         // we use pivot_root, but if we are on the host mount namespace, we will
@@ -231,15 +233,16 @@ pub fn container_init(
         if namespaces.get(LinuxNamespaceType::Mount).is_some() {
             // change the root of filesystem of the process to the rootfs
             command
-                .pivot_rootfs(rootfs)
-                .with_context(|| format!("Failed to pivot root to {:?}", rootfs))?;
+                .pivot_rootfs(rootfs_path)
+                .with_context(|| format!("Failed to pivot root to {:?}", rootfs_path))?;
         } else {
             command
-                .chroot(rootfs)
-                .with_context(|| format!("Failed to chroot to {:?}", rootfs))?;
+                .chroot(rootfs_path)
+                .with_context(|| format!("Failed to chroot to {:?}", rootfs_path))?;
         }
 
-        rootfs::adjust_root_mount_propagation(linux)
+        rootfs
+            .adjust_root_mount_propagation(linux)
             .context("Failed to set propagation type of root mount")?;
 
         if let Some(kernel_params) = linux.sysctl() {
