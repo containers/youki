@@ -4,6 +4,8 @@ This is a simple test framework which provides various structs to setup and run 
 
 ## Docs
 
+One important thins to note here, is that all structs provided by default, TestGroup and TestManager run the individual test cases, and test groups , respectively, in parallel. Also the default Test, ConditionalTest and TestGroup structs are meant for stateless tests. For stateful tests, or for tests which need to be run in serial, please implement respective traits on custom structs.
+
 This crate provides following things.
 
 #### TestResult

@@ -41,8 +41,7 @@ pub struct ContainerData {
 }
 
 /// Starts the runtime with given directory as root directory
-#[allow(dead_code)]
-pub fn start_runtime<P: AsRef<Path>>(id: &Uuid, dir: P) -> Result<Child> {
+pub fn create_container<P: AsRef<Path>>(id: &Uuid, dir: P) -> Result<Child> {
     let res = Command::new(get_runtime_path())
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -58,8 +57,7 @@ pub fn start_runtime<P: AsRef<Path>>(id: &Uuid, dir: P) -> Result<Child> {
 }
 
 /// Sends a kill command to the given container process
-#[allow(dead_code)]
-pub fn stop_runtime<P: AsRef<Path>>(id: &Uuid, dir: P) -> Result<Child> {
+pub fn kill_container<P: AsRef<Path>>(id: &Uuid, dir: P) -> Result<Child> {
     let res = Command::new(get_runtime_path())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -84,7 +82,6 @@ pub fn delete_container<P: AsRef<Path>>(id: &Uuid, dir: P) -> Result<Child> {
     Ok(res)
 }
 
-#[allow(dead_code)]
 pub fn get_state<P: AsRef<Path>>(id: &Uuid, dir: P) -> Result<(String, String)> {
     sleep(SLEEP_TIME);
     let output = Command::new(get_runtime_path())
@@ -105,7 +102,7 @@ pub fn test_outside_container(spec: Spec, f: &dyn Fn(ContainerData) -> TestResul
     let id = generate_uuid();
     let bundle = prepare_bundle(&id).unwrap();
     set_config(&bundle, &spec).unwrap();
-    let r = start_runtime(&id, &bundle).unwrap().wait();
+    let r = create_container(&id, &bundle).unwrap().wait();
     let (out, err) = get_state(&id, &bundle).unwrap();
     let state: Option<State> = match serde_json::from_str(&out) {
         Ok(v) => Some(v),
@@ -118,7 +115,7 @@ pub fn test_outside_container(spec: Spec, f: &dyn Fn(ContainerData) -> TestResul
         exit_status: r,
     };
     let ret = f(data);
-    stop_runtime(&id, &bundle).unwrap().wait().unwrap();
+    kill_container(&id, &bundle).unwrap().wait().unwrap();
     delete_container(&id, &bundle).unwrap().wait().unwrap();
     ret
 }
