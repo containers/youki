@@ -93,8 +93,11 @@ impl RootFS {
             }
         }
 
+        self.setup_kcore_symlink(rootfs)
+            .context("failed to  setup kcore symlink")?;
         self.setup_default_symlinks(rootfs)
             .context("failed to setup default symlinks")?;
+
         if let Some(added_devices) = linux.devices() {
             self.create_devices(
                 rootfs,
@@ -251,25 +254,31 @@ impl RootFS {
     }
 
     fn setup_ptmx(&self, rootfs: &Path) -> Result<()> {
-        if let Err(e) = remove_file(rootfs.join("dev/ptmx")) {
+        let ptmx = rootfs.join("dev/ptmx");
+        if let Err(e) = remove_file(&ptmx) {
             if e.kind() != ::std::io::ErrorKind::NotFound {
                 bail!("could not delete /dev/ptmx")
             }
         }
 
         self.syscall
-            .symlink(Path::new("pts/ptmx"), &rootfs.join("dev/ptmx"))
+            .symlink(Path::new("pts/ptmx"), &ptmx)
             .context("failed to symlink ptmx")?;
         Ok(())
     }
 
-    fn setup_default_symlinks(&self, rootfs: &Path) -> Result<()> {
+    // separating kcore symlink out from setup_default_symlinks for a better way to do the unit test,
+    // since not every architecture has /proc/kcore file.
+    fn setup_kcore_symlink(&self, rootfs: &Path) -> Result<()> {
         if Path::new("/proc/kcore").exists() {
             self.syscall
                 .symlink(Path::new("/proc/kcore"), &rootfs.join("dev/kcore"))
                 .context("Failed to symlink kcore")?;
         }
+        Ok(())
+    }
 
+    fn setup_default_symlinks(&self, rootfs: &Path) -> Result<()> {
         let defaults = [
             ("/proc/self/fd", "dev/fd"),
             ("/proc/self/fd/0", "dev/stdin"),
@@ -615,9 +624,9 @@ fn find_parent_mount<'a>(rootfs: &Path, mount_infos: &'a [MountInfo]) -> Result<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use anyhow::{Context, Result};
+    use crate::syscall::test::TestHelperSyscall;
     use procfs::process::MountInfo;
-    use std::path::{Path, PathBuf};
+    use serial_test::serial;
 
     #[test]
     fn test_find_parent_mount() -> Result<()> {
@@ -861,5 +870,74 @@ mod tests {
                     .unwrap()
             )
         );
+    }
+
+    #[test]
+    #[serial]
+    fn test_setup_ptmx() {
+        {
+            let rootfs = RootFS::new();
+            assert!(rootfs.setup_ptmx(Path::new("/tmp")).is_ok());
+            let want = (PathBuf::from("pts/ptmx"), PathBuf::from("/tmp/dev/ptmx"));
+            let got = &rootfs
+                .syscall
+                .as_any()
+                .downcast_ref::<TestHelperSyscall>()
+                .unwrap()
+                .get_symlink_args()[0];
+            assert_eq!(want, *got)
+        }
+        // make remove_file goes into the bail! path
+        {
+            open(
+                "/tmp/dev",
+                OFlag::O_RDWR | OFlag::O_CREAT,
+                Mode::from_bits_truncate(0o644),
+            )
+            .unwrap();
+
+            let rootfs = RootFS::new();
+            assert!(rootfs.setup_ptmx(Path::new("/tmp")).is_err());
+            assert_eq!(
+                0,
+                rootfs
+                    .syscall
+                    .as_any()
+                    .downcast_ref::<TestHelperSyscall>()
+                    .unwrap()
+                    .get_symlink_args()
+                    .len()
+            );
+            remove_file("/tmp/dev").unwrap();
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn test_setup_default_symlinks() {
+        let rootfs = RootFS::new();
+        assert!(rootfs.setup_default_symlinks(Path::new("/tmp")).is_ok());
+        let want = vec![
+            (PathBuf::from("/proc/self/fd"), PathBuf::from("/tmp/dev/fd")),
+            (
+                PathBuf::from("/proc/self/fd/0"),
+                PathBuf::from("/tmp/dev/stdin"),
+            ),
+            (
+                PathBuf::from("/proc/self/fd/1"),
+                PathBuf::from("/tmp/dev/stdout"),
+            ),
+            (
+                PathBuf::from("/proc/self/fd/2"),
+                PathBuf::from("/tmp/dev/stderr"),
+            ),
+        ];
+        let got = rootfs
+            .syscall
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap()
+            .get_symlink_args();
+        assert_eq!(want, got)
     }
 }
