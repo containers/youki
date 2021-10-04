@@ -614,6 +614,7 @@ fn find_parent_mount<'a>(rootfs: &Path, mount_infos: &'a [MountInfo]) -> Result<
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use anyhow::{Context, Result};
     use procfs::process::MountInfo;
     use std::path::{Path, PathBuf};
@@ -647,7 +648,7 @@ mod tests {
             },
         ];
 
-        let res = super::find_parent_mount(Path::new("/path/to/rootfs"), &mount_infos)
+        let res = find_parent_mount(Path::new("/path/to/rootfs"), &mount_infos)
             .context("Failed to get parent mount")?;
         assert_eq!(res.mnt_id, 11);
         Ok(())
@@ -656,7 +657,209 @@ mod tests {
     #[test]
     fn test_find_parent_mount_with_empty_mount_infos() {
         let mount_infos = vec![];
-        let res = super::find_parent_mount(Path::new("/path/to/rootfs"), &mount_infos);
+        let res = find_parent_mount(Path::new("/path/to/rootfs"), &mount_infos);
         assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_to_sflag() {
+        assert_eq!(
+            SFlag::S_IFBLK | SFlag::S_IFCHR | SFlag::S_IFIFO,
+            to_sflag(LinuxDeviceType::A)
+        );
+        assert_eq!(SFlag::S_IFBLK, to_sflag(LinuxDeviceType::B));
+        assert_eq!(SFlag::S_IFCHR, to_sflag(LinuxDeviceType::C));
+        assert_eq!(SFlag::S_IFCHR, to_sflag(LinuxDeviceType::U));
+        assert_eq!(SFlag::S_IFIFO, to_sflag(LinuxDeviceType::P));
+    }
+
+    #[test]
+    fn test_parse_mount() {
+        assert_eq!(
+            (MsFlags::empty(), "".to_string()),
+            parse_mount(
+                &MountBuilder::default()
+                    .destination(PathBuf::from("/proc"))
+                    .typ("proc")
+                    .source(PathBuf::from("proc"))
+                    .build()
+                    .unwrap()
+            )
+        );
+        assert_eq!(
+            (MsFlags::MS_NOSUID, "mode=755,size=65536k".to_string()),
+            parse_mount(
+                &MountBuilder::default()
+                    .destination(PathBuf::from("/dev"))
+                    .typ("tmpfs")
+                    .source(PathBuf::from("tmpfs"))
+                    .options(vec![
+                        "nosuid".to_string(),
+                        "strictatime".to_string(),
+                        "mode=755".to_string(),
+                        "size=65536k".to_string(),
+                    ])
+                    .build()
+                    .unwrap()
+            )
+        );
+        assert_eq!(
+            (
+                MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC,
+                "newinstance,ptmxmode=0666,mode=0620,gid=5".to_string()
+            ),
+            parse_mount(
+                &MountBuilder::default()
+                    .destination(PathBuf::from("/dev/pts"))
+                    .typ("devpts")
+                    .source(PathBuf::from("devpts"))
+                    .options(vec![
+                        "nosuid".to_string(),
+                        "noexec".to_string(),
+                        "newinstance".to_string(),
+                        "ptmxmode=0666".to_string(),
+                        "mode=0620".to_string(),
+                        "gid=5".to_string(),
+                    ])
+                    .build()
+                    .unwrap()
+            )
+        );
+        assert_eq!(
+            (
+                MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
+                "mode=1777,size=65536k".to_string()
+            ),
+            parse_mount(
+                &MountBuilder::default()
+                    .destination(PathBuf::from("/dev/shm"))
+                    .typ("tmpfs")
+                    .source(PathBuf::from("shm"))
+                    .options(vec![
+                        "nosuid".to_string(),
+                        "noexec".to_string(),
+                        "nodev".to_string(),
+                        "mode=1777".to_string(),
+                        "size=65536k".to_string(),
+                    ])
+                    .build()
+                    .unwrap()
+            )
+        );
+        assert_eq!(
+            (
+                MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
+                "".to_string()
+            ),
+            parse_mount(
+                &MountBuilder::default()
+                    .destination(PathBuf::from("/dev/mqueue"))
+                    .typ("mqueue")
+                    .source(PathBuf::from("mqueue"))
+                    .options(vec![
+                        "nosuid".to_string(),
+                        "noexec".to_string(),
+                        "nodev".to_string(),
+                    ])
+                    .build()
+                    .unwrap()
+            )
+        );
+        assert_eq!(
+            (
+                MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV | MsFlags::MS_RDONLY,
+                "".to_string()
+            ),
+            parse_mount(
+                &MountBuilder::default()
+                    .destination(PathBuf::from("/sys"))
+                    .typ("sysfs")
+                    .source(PathBuf::from("sysfs"))
+                    .options(vec![
+                        "nosuid".to_string(),
+                        "noexec".to_string(),
+                        "nodev".to_string(),
+                        "ro".to_string(),
+                    ])
+                    .build()
+                    .unwrap()
+            )
+        );
+        assert_eq!(
+            (
+                MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV | MsFlags::MS_RDONLY,
+                "".to_string()
+            ),
+            parse_mount(
+                &MountBuilder::default()
+                    .destination(PathBuf::from("/sys/fs/cgroup"))
+                    .typ("cgroup")
+                    .source(PathBuf::from("cgroup"))
+                    .options(vec![
+                        "nosuid".to_string(),
+                        "noexec".to_string(),
+                        "nodev".to_string(),
+                        "relatime".to_string(),
+                        "ro".to_string(),
+                    ])
+                    .build()
+                    .unwrap()
+            )
+        );
+        // this case is just for coverage purpose
+        assert_eq!(
+            (
+                MsFlags::MS_NOSUID
+                    | MsFlags::MS_NODEV
+                    | MsFlags::MS_NOEXEC
+                    | MsFlags::MS_REMOUNT
+                    | MsFlags::MS_DIRSYNC
+                    | MsFlags::MS_NOATIME
+                    | MsFlags::MS_NODIRATIME
+                    | MsFlags::MS_BIND
+                    | MsFlags::MS_UNBINDABLE,
+                "".to_string()
+            ),
+            parse_mount(
+                &MountBuilder::default()
+                    .options(vec![
+                        "defaults".to_string(),
+                        "ro".to_string(),
+                        "rw".to_string(),
+                        "suid".to_string(),
+                        "nosuid".to_string(),
+                        "dev".to_string(),
+                        "nodev".to_string(),
+                        "exec".to_string(),
+                        "noexec".to_string(),
+                        "sync".to_string(),
+                        "async".to_string(),
+                        "dirsync".to_string(),
+                        "remount".to_string(),
+                        "mand".to_string(),
+                        "nomand".to_string(),
+                        "atime".to_string(),
+                        "noatime".to_string(),
+                        "diratime".to_string(),
+                        "nodiratime".to_string(),
+                        "bind".to_string(),
+                        "rbind".to_string(),
+                        "unbindable".to_string(),
+                        "runbindable".to_string(),
+                        "private".to_string(),
+                        "rprivate".to_string(),
+                        "shared".to_string(),
+                        "rshared".to_string(),
+                        "slave".to_string(),
+                        "rslave".to_string(),
+                        "relatime".to_string(),
+                        "norelatime".to_string(),
+                        "strictatime".to_string(),
+                        "nostrictatime".to_string(),
+                    ])
+                    .build()
+                    .unwrap()
+            )
+        );
     }
 }
