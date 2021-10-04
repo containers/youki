@@ -1,16 +1,16 @@
 //! During kernel initialization, a minimal replica of the ramfs filesystem is loaded, called rootfs.
 //! Most systems mount another filesystem over it
 
+use crate::syscall::{syscall::create_syscall, Syscall};
 use crate::utils::PathBufExt;
 use anyhow::{anyhow, bail, Context, Result};
 use cgroups::common::CgroupSetup::{Hybrid, Legacy, Unified};
 use nix::errno::Errno;
 use nix::fcntl::{open, OFlag};
-use nix::mount::mount as nix_mount;
 use nix::mount::MsFlags;
-use nix::sys::stat::{mknod, umask};
+use nix::sys::stat::umask;
 use nix::sys::stat::{Mode, SFlag};
-use nix::unistd::{chown, close};
+use nix::unistd::close;
 use nix::unistd::{Gid, Uid};
 use nix::NixPath;
 use oci_spec::runtime::{
@@ -19,7 +19,6 @@ use oci_spec::runtime::{
 use procfs::process::{MountInfo, MountOptFields, Process};
 use std::fs::OpenOptions;
 use std::fs::{canonicalize, create_dir_all, remove_file};
-use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
@@ -29,227 +28,461 @@ struct MountOptions<'a> {
     cgroup_ns: bool,
 }
 
-pub fn prepare_rootfs(
-    spec: &Spec,
-    rootfs: &Path,
-    bind_devices: bool,
-    cgroup_ns: bool,
-) -> Result<()> {
-    log::debug!("Prepare rootfs: {:?}", rootfs);
-    let mut flags = MsFlags::MS_REC;
-    let linux = spec.linux().as_ref().context("no linux in spec")?;
+/// Holds information about rootfs
+pub struct RootFS {
+    command: Box<dyn Syscall>,
+}
 
-    match linux.rootfs_propagation().as_deref() {
-        Some("shared") => flags |= MsFlags::MS_SHARED,
-        Some("private") => flags |= MsFlags::MS_PRIVATE,
-        Some("slave" | "unbindable") | None => flags |= MsFlags::MS_SLAVE,
-        Some(uknown) => bail!("unknown rootfs_propagation: {}", uknown),
+impl Default for RootFS {
+    fn default() -> Self {
+        Self::new()
     }
+}
 
-    nix_mount(None::<&str>, "/", None::<&str>, flags, None::<&str>)
-        .context("failed to mount rootfs")?;
-
-    make_parent_mount_private(rootfs).context("failed to change parent mount of rootfs private")?;
-
-    log::debug!("mount root fs {:?}", rootfs);
-    nix_mount::<Path, Path, str, str>(
-        Some(rootfs),
-        rootfs,
-        None::<&str>,
-        MsFlags::MS_BIND | MsFlags::MS_REC,
-        None::<&str>,
-    )?;
-
-    let global_options = MountOptions {
-        root: rootfs,
-        label: linux.mount_label().as_deref(),
-        cgroup_ns,
-    };
-
-    if let Some(mounts) = spec.mounts() {
-        for mount in mounts {
-            setup_mount(mount, &global_options)
-                .with_context(|| format!("failed to setup mount {:#?}", mount))?;
+impl RootFS {
+    pub fn new() -> RootFS {
+        RootFS {
+            command: create_syscall(),
         }
     }
 
-    setup_default_symlinks(rootfs).context("failed to setup default symlinks")?;
-    if let Some(added_devices) = linux.devices() {
-        create_devices(
+    pub fn prepare_rootfs(
+        &self,
+        spec: &Spec,
+        rootfs: &Path,
+        bind_devices: bool,
+        cgroup_ns: bool,
+    ) -> Result<()> {
+        log::debug!("Prepare rootfs: {:?}", rootfs);
+        let mut flags = MsFlags::MS_REC;
+        let linux = spec.linux().as_ref().context("no linux in spec")?;
+
+        match linux.rootfs_propagation().as_deref() {
+            Some("shared") => flags |= MsFlags::MS_SHARED,
+            Some("private") => flags |= MsFlags::MS_PRIVATE,
+            Some("slave" | "unbindable") | None => flags |= MsFlags::MS_SLAVE,
+            Some(uknown) => bail!("unknown rootfs_propagation: {}", uknown),
+        }
+
+        self.command
+            .mount(None, Path::new("/"), None, flags, None)
+            .context("failed to mount rootfs")?;
+
+        self.make_parent_mount_private(rootfs)
+            .context("failed to change parent mount of rootfs private")?;
+
+        log::debug!("mount root fs {:?}", rootfs);
+        self.command.mount(
+            Some(rootfs),
             rootfs,
-            default_devices().iter().chain(added_devices),
-            bind_devices,
-        )
-    } else {
-        create_devices(rootfs, &default_devices(), bind_devices)
-    }?;
+            None,
+            MsFlags::MS_BIND | MsFlags::MS_REC,
+            None,
+        )?;
 
-    setup_ptmx(rootfs)?;
-    Ok(())
-}
+        let global_options = MountOptions {
+            root: rootfs,
+            label: linux.mount_label().as_deref(),
+            cgroup_ns,
+        };
 
-fn setup_mount(mount: &Mount, options: &MountOptions) -> Result<()> {
-    log::debug!("Mounting {:?}", mount);
-    let (flags, data) = parse_mount(mount);
-
-    match mount.typ().as_deref() {
-        Some("cgroup") => {
-            match cgroups::common::get_cgroup_setup().context("failed to determine cgroup setup")? {
-                Legacy | Hybrid => {
-                    mount_cgroup_v1(mount, options).context("failed to mount cgroup v1")?
-                }
-                Unified => mount_cgroup_v2(mount, options, flags, &data)
-                    .context("failed to mount cgroup v2")?,
+        if let Some(mounts) = spec.mounts() {
+            for mount in mounts {
+                self.setup_mount(mount, &global_options)
+                    .with_context(|| format!("failed to setup mount {:#?}", mount))?;
             }
         }
-        _ => {
-            if *mount.destination() == PathBuf::from("/dev") {
-                mount_to_container(
-                    mount,
-                    options.root,
-                    flags & !MsFlags::MS_RDONLY,
-                    &data,
-                    options.label,
-                )
-                .with_context(|| format!("failed to mount /dev: {:?}", mount))?;
-            } else {
-                mount_to_container(mount, options.root, flags, &data, options.label)
-                    .with_context(|| format!("failed to mount: {:?}", mount))?;
-            }
-        }
+
+        self.setup_default_symlinks(rootfs)
+            .context("failed to setup default symlinks")?;
+        if let Some(added_devices) = linux.devices() {
+            self.create_devices(
+                rootfs,
+                default_devices().iter().chain(added_devices),
+                bind_devices,
+            )
+        } else {
+            self.create_devices(rootfs, &default_devices(), bind_devices)
+        }?;
+
+        self.setup_ptmx(rootfs)?;
+        Ok(())
     }
 
-    Ok(())
-}
+    fn setup_mount(&self, mount: &Mount, options: &MountOptions) -> Result<()> {
+        log::debug!("Mounting {:?}", mount);
+        let (flags, data) = parse_mount(mount);
 
-fn mount_cgroup_v1(mount: &Mount, options: &MountOptions) -> Result<()> {
-    // create tmpfs into which the cgroup subsystems will be mounted
-    let tmpfs = MountBuilder::default()
-        .source("tmpfs")
-        .typ("tmpfs")
-        .destination(mount.destination())
-        .options(
-            ["noexec", "nosuid", "nodev", "mode=755"]
-                .iter()
-                .map(|o| o.to_string())
-                .collect::<Vec<String>>(),
-        )
-        .build()
-        .context("failed to build tmpfs for cgroup")?;
-
-    setup_mount(&tmpfs, options).context("failed to mount tmpfs for cgroup")?;
-
-    // get all cgroup mounts on the host system
-    let mount_points: Vec<PathBuf> = cgroups::v1::util::list_subsystem_mount_points()
-        .context("failed to get subsystem mount points")?
-        .into_iter()
-        .filter(|p| p.as_path().starts_with("/sys/fs"))
-        .collect();
-    log::debug!("{:?}", mount_points);
-
-    // setup cgroup mounts for container
-    let cgroup_root = options
-        .root
-        .join_safely(mount.destination())
-        .context("could not join rootfs with cgroup destination")?;
-    for mount_point in mount_points {
-        if let Some(subsystem_name) = mount_point.file_name().and_then(|n| n.to_str()) {
-            let cgroup_mount = MountBuilder::default()
-                .source("cgroup")
-                .typ("cgroup")
-                .destination(mount.destination().join(subsystem_name))
-                .options(
-                    ["noexec", "nosuid", "nodev"]
-                        .iter()
-                        .map(|o| o.to_string())
-                        .collect::<Vec<String>>(),
-                )
-                .build()
-                .with_context(|| format!("failed to build {}", subsystem_name))?;
-
-            if subsystem_name == "systemd" {
-                continue;
+        match mount.typ().as_deref() {
+            Some("cgroup") => {
+                match cgroups::common::get_cgroup_setup()
+                    .context("failed to determine cgroup setup")?
+                {
+                    Legacy | Hybrid => self
+                        .mount_cgroup_v1(mount, options)
+                        .context("failed to mount cgroup v1")?,
+                    Unified => self
+                        .mount_cgroup_v2(mount, options, flags, &data)
+                        .context("failed to mount cgroup v2")?,
+                }
             }
+            _ => {
+                if *mount.destination() == PathBuf::from("/dev") {
+                    self.mount_to_container(
+                        mount,
+                        options.root,
+                        flags & !MsFlags::MS_RDONLY,
+                        &data,
+                        options.label,
+                    )
+                    .with_context(|| format!("failed to mount /dev: {:?}", mount))?;
+                } else {
+                    self.mount_to_container(mount, options.root, flags, &data, options.label)
+                        .with_context(|| format!("failed to mount: {:?}", mount))?;
+                }
+            }
+        }
 
-            if options.cgroup_ns {
-                setup_namespaced_hierarchy(&cgroup_mount, options, subsystem_name)?;
-                setup_comount_symlinks(&cgroup_root, subsystem_name)?;
+        Ok(())
+    }
+
+    fn mount_cgroup_v1(&self, mount: &Mount, options: &MountOptions) -> Result<()> {
+        // create tmpfs into which the cgroup subsystems will be mounted
+        let tmpfs = MountBuilder::default()
+            .source("tmpfs")
+            .typ("tmpfs")
+            .destination(mount.destination())
+            .options(
+                ["noexec", "nosuid", "nodev", "mode=755"]
+                    .iter()
+                    .map(|o| o.to_string())
+                    .collect::<Vec<String>>(),
+            )
+            .build()
+            .context("failed to build tmpfs for cgroup")?;
+
+        self.setup_mount(&tmpfs, options)
+            .context("failed to mount tmpfs for cgroup")?;
+
+        // get all cgroup mounts on the host system
+        let mount_points: Vec<PathBuf> = cgroups::v1::util::list_subsystem_mount_points()
+            .context("failed to get subsystem mount points")?
+            .into_iter()
+            .filter(|p| p.as_path().starts_with("/sys/fs"))
+            .collect();
+        log::debug!("{:?}", mount_points);
+
+        // setup cgroup mounts for container
+        let cgroup_root = options
+            .root
+            .join_safely(mount.destination())
+            .context("could not join rootfs with cgroup destination")?;
+        for mount_point in mount_points {
+            if let Some(subsystem_name) = mount_point.file_name().and_then(|n| n.to_str()) {
+                let cgroup_mount = MountBuilder::default()
+                    .source("cgroup")
+                    .typ("cgroup")
+                    .destination(mount.destination().join(subsystem_name))
+                    .options(
+                        ["noexec", "nosuid", "nodev"]
+                            .iter()
+                            .map(|o| o.to_string())
+                            .collect::<Vec<String>>(),
+                    )
+                    .build()
+                    .with_context(|| format!("failed to build {}", subsystem_name))?;
+
+                if subsystem_name == "systemd" {
+                    continue;
+                }
+
+                if options.cgroup_ns {
+                    self.setup_namespaced_hierarchy(&cgroup_mount, options, subsystem_name)?;
+                    self.setup_comount_symlinks(&cgroup_root, subsystem_name)?;
+                } else {
+                    log::warn!("cgroup mounts are currently only suported with cgroup namespaces")
+                }
             } else {
-                log::warn!("cgroup mounts are currently only suported with cgroup namespaces")
+                log::warn!("could not get subsystem name from {:?}", mount_point);
+            }
+        }
+
+        Ok(())
+    }
+
+    // On some distros cgroup subsystems are comounted e.g. cpu,cpuacct or net_cls,net_prio. These systems
+    // have to be comounted in the container as well as the kernel will reject trying to mount them separately.
+    fn setup_namespaced_hierarchy(
+        &self,
+        cgroup_mount: &Mount,
+        options: &MountOptions,
+        subsystem_name: &str,
+    ) -> Result<()> {
+        log::debug!("Mounting cgroup subsystem: {:?}", subsystem_name);
+        self.mount_to_container(
+            cgroup_mount,
+            options.root,
+            MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
+            subsystem_name,
+            options.label,
+        )
+        .with_context(|| format!("failed to mount {:?}", cgroup_mount))
+    }
+
+    // Create symlinks for subsystems that have been comounted e.g. cpu -> cpu,cpuacct, cpuacct -> cpu,cpuacct
+    fn setup_comount_symlinks(&self, cgroup_root: &Path, subsystem_name: &str) -> Result<()> {
+        if !subsystem_name.contains(',') {
+            return Ok(());
+        }
+
+        for comount in subsystem_name.split_terminator(',') {
+            let link = cgroup_root.join(comount);
+            self.command
+                .symlink(Path::new(subsystem_name), &link)
+                .with_context(|| format!("failed to symlink {:?} to {:?}", link, subsystem_name))?;
+        }
+
+        Ok(())
+    }
+
+    fn mount_cgroup_v2(&self, _: &Mount, _: &MountOptions, _: MsFlags, _: &str) -> Result<()> {
+        log::warn!("Mounting cgroup v2 is not yet supported");
+        Ok(())
+    }
+
+    fn setup_ptmx(&self, rootfs: &Path) -> Result<()> {
+        if let Err(e) = remove_file(rootfs.join("dev/ptmx")) {
+            if e.kind() != ::std::io::ErrorKind::NotFound {
+                bail!("could not delete /dev/ptmx")
+            }
+        }
+
+        self.command
+            .symlink(Path::new("pts/ptmx"), &rootfs.join("dev/ptmx"))
+            .context("failed to symlink ptmx")?;
+        Ok(())
+    }
+
+    fn setup_default_symlinks(&self, rootfs: &Path) -> Result<()> {
+        if Path::new("/proc/kcore").exists() {
+            self.command
+                .symlink(Path::new("/proc/kcore"), &rootfs.join("dev/kcore"))
+                .context("Failed to symlink kcore")?;
+        }
+
+        let defaults = [
+            ("/proc/self/fd", "dev/fd"),
+            ("/proc/self/fd/0", "dev/stdin"),
+            ("/proc/self/fd/1", "dev/stdout"),
+            ("/proc/self/fd/2", "dev/stderr"),
+        ];
+        for (src, dst) in defaults {
+            self.command
+                .symlink(Path::new(src), &rootfs.join(dst))
+                .context("failed to symlink defaults")?;
+        }
+
+        Ok(())
+    }
+
+    fn create_devices<'a, I>(&self, rootfs: &Path, devices: I, bind: bool) -> Result<()>
+    where
+        I: IntoIterator<Item = &'a LinuxDevice>,
+    {
+        let old_mode = umask(Mode::from_bits_truncate(0o000));
+        if bind {
+            let _ = devices
+                .into_iter()
+                .map(|dev| {
+                    if !dev.path().starts_with("/dev") {
+                        panic!("{} is not a valid device path", dev.path().display());
+                    }
+
+                    self.bind_dev(rootfs, dev)
+                })
+                .collect::<Result<Vec<_>>>()?;
+        } else {
+            devices
+                .into_iter()
+                .map(|dev| {
+                    if !dev.path().starts_with("/dev") {
+                        panic!("{} is not a valid device path", dev.path().display());
+                    }
+
+                    self.mknod_dev(rootfs, dev)
+                })
+                .collect::<Result<Vec<_>>>()?;
+        }
+        umask(old_mode);
+
+        Ok(())
+    }
+
+    fn bind_dev(&self, rootfs: &Path, dev: &LinuxDevice) -> Result<()> {
+        let full_container_path = rootfs.join(dev.path().as_in_container()?);
+
+        let fd = open(
+            &full_container_path,
+            OFlag::O_RDWR | OFlag::O_CREAT,
+            Mode::from_bits_truncate(0o644),
+        )?;
+        close(fd)?;
+        self.command.mount(
+            Some(dev.path()),
+            &full_container_path,
+            Some("bind"),
+            MsFlags::MS_BIND,
+            None,
+        )?;
+
+        Ok(())
+    }
+
+    fn mknod_dev(&self, rootfs: &Path, dev: &LinuxDevice) -> Result<()> {
+        fn makedev(major: i64, minor: i64) -> u64 {
+            ((minor & 0xff)
+                | ((major & 0xfff) << 8)
+                | ((minor & !0xff) << 12)
+                | ((major & !0xfff) << 32)) as u64
+        }
+
+        let full_container_path = rootfs.join(dev.path().as_in_container()?);
+        self.command.mknod(
+            &full_container_path,
+            to_sflag(dev.typ()),
+            Mode::from_bits_truncate(dev.file_mode().unwrap_or(0)),
+            makedev(dev.major(), dev.minor()),
+        )?;
+        self.command.chown(
+            &full_container_path,
+            dev.uid().map(Uid::from_raw),
+            dev.gid().map(Gid::from_raw),
+        )?;
+
+        Ok(())
+    }
+
+    fn mount_to_container(
+        &self,
+        m: &Mount,
+        rootfs: &Path,
+        flags: MsFlags,
+        data: &str,
+        label: Option<&str>,
+    ) -> Result<()> {
+        let typ = m.typ().as_deref();
+        let d = if let Some(l) = label {
+            if typ != Some("proc") && typ != Some("sysfs") {
+                if data.is_empty() {
+                    format!("context=\"{}\"", l)
+                } else {
+                    format!("{},context=\"{}\"", data, l)
+                }
+            } else {
+                data.to_string()
             }
         } else {
-            log::warn!("could not get subsystem name from {:?}", mount_point);
+            data.to_string()
+        };
+        let dest_for_host = format!(
+            "{}{}",
+            rootfs.to_string_lossy().into_owned(),
+            m.destination().display()
+        );
+        let dest = Path::new(&dest_for_host);
+        let source = m.source().as_ref().context("no source in mount spec")?;
+        let src = if typ == Some("bind") {
+            let src = canonicalize(source)?;
+            let dir = if src.is_file() {
+                Path::new(&dest).parent().unwrap()
+            } else {
+                Path::new(&dest)
+            };
+            create_dir_all(&dir)
+                .with_context(|| format!("Failed to create dir for bind mount: {:?}", dir))?;
+            if src.is_file() {
+                OpenOptions::new()
+                    .create(true)
+                    .write(true)
+                    .open(&dest)
+                    .unwrap();
+            }
+
+            src
+        } else {
+            create_dir_all(&dest)
+                .with_context(|| format!("Failed to create device: {:?}", dest))?;
+            PathBuf::from(source)
+        };
+
+        if let Err(err) = self.command.mount(Some(&*src), dest, typ, flags, Some(&*d)) {
+            if let Some(errno) = err.downcast_ref() {
+                if !matches!(errno, Errno::EINVAL) {
+                    bail!("mount of {:?} failed. {}", m.destination(), errno);
+                }
+            }
+
+            self.command
+                .mount(Some(&*src), dest, typ, flags, Some(data))?;
         }
-    }
 
-    Ok(())
-}
-
-// On some distros cgroup subsystems are comounted e.g. cpu,cpuacct or net_cls,net_prio. These systems
-// have to be comounted in the container as well as the kernel will reject trying to mount them separately.
-fn setup_namespaced_hierarchy(
-    cgroup_mount: &Mount,
-    options: &MountOptions,
-    subsystem_name: &str,
-) -> Result<()> {
-    log::debug!("Mounting cgroup subsystem: {:?}", subsystem_name);
-    mount_to_container(
-        cgroup_mount,
-        options.root,
-        MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
-        subsystem_name,
-        options.label,
-    )
-    .with_context(|| format!("failed to mount {:?}", cgroup_mount))
-}
-
-// Create symlinks for subsystems that have been comounted e.g. cpu -> cpu,cpuacct, cpuacct -> cpu,cpuacct
-fn setup_comount_symlinks(cgroup_root: &Path, subsystem_name: &str) -> Result<()> {
-    if !subsystem_name.contains(',') {
-        return Ok(());
-    }
-
-    for comount in subsystem_name.split_terminator(',') {
-        let link = cgroup_root.join(comount);
-        symlink(subsystem_name, &link)
-            .with_context(|| format!("failed to symlink {:?} to {:?}", link, subsystem_name))?;
-    }
-
-    Ok(())
-}
-
-fn mount_cgroup_v2(_: &Mount, _: &MountOptions, _: MsFlags, _: &str) -> Result<()> {
-    log::warn!("Mounting cgroup v2 is not yet supported");
-    Ok(())
-}
-
-fn setup_ptmx(rootfs: &Path) -> Result<()> {
-    if let Err(e) = remove_file(rootfs.join("dev/ptmx")) {
-        if e.kind() != ::std::io::ErrorKind::NotFound {
-            bail!("could not delete /dev/ptmx")
+        if flags.contains(MsFlags::MS_BIND)
+            && flags.intersects(
+                !(MsFlags::MS_REC
+                    | MsFlags::MS_REMOUNT
+                    | MsFlags::MS_BIND
+                    | MsFlags::MS_PRIVATE
+                    | MsFlags::MS_SHARED
+                    | MsFlags::MS_SLAVE),
+            )
+        {
+            self.command
+                .mount(Some(dest), dest, None, flags | MsFlags::MS_REMOUNT, None)?;
         }
+        Ok(())
     }
 
-    symlink("pts/ptmx", rootfs.join("dev/ptmx")).context("failed to symlink ptmx")?;
-    Ok(())
-}
+    /// Make parent mount of rootfs private if it was shared, which is required by pivot_root.
+    /// It also makes sure following bind mount does not propagate in other namespaces.
+    fn make_parent_mount_private(&self, rootfs: &Path) -> Result<()> {
+        let mount_infos = Process::myself()?.mountinfo()?;
+        let parent_mount = find_parent_mount(rootfs, &mount_infos)?;
 
-fn setup_default_symlinks(rootfs: &Path) -> Result<()> {
-    if Path::new("/proc/kcore").exists() {
-        symlink("/proc/kcore", rootfs.join("dev/kcore")).context("Failed to symlink kcore")?;
+        // check parent mount has 'shared' propagation type
+        if parent_mount
+            .opt_fields
+            .iter()
+            .any(|field| matches!(field, MountOptFields::Shared(_)))
+        {
+            self.command.mount(
+                None,
+                &parent_mount.mount_point,
+                None,
+                MsFlags::MS_PRIVATE,
+                None,
+            )?;
+        }
+
+        Ok(())
     }
 
-    let defaults = [
-        ("/proc/self/fd", "dev/fd"),
-        ("/proc/self/fd/0", "dev/stdin"),
-        ("/proc/self/fd/1", "dev/stdout"),
-        ("/proc/self/fd/2", "dev/stderr"),
-    ];
-    for (src, dst) in defaults {
-        symlink(src, rootfs.join(dst)).context("failed to symlink defaults")?;
-    }
+    /// Change propagation type of rootfs as specified in spec.
+    pub fn adjust_root_mount_propagation(&self, linux: &Linux) -> Result<()> {
+        let rootfs_propagation = linux.rootfs_propagation().as_deref();
+        let flags = match rootfs_propagation {
+            Some("shared") => Some(MsFlags::MS_SHARED),
+            Some("unbindable") => Some(MsFlags::MS_UNBINDABLE),
+            _ => None,
+        };
 
-    Ok(())
+        if let Some(flags) = flags {
+            log::debug!("make root mount {:?}", flags);
+            self.command
+                .mount(None, Path::new("/"), None, flags, None)?;
+        }
+
+        Ok(())
+    }
 }
 
 pub fn default_devices() -> Vec<LinuxDevice> {
@@ -305,59 +538,6 @@ pub fn default_devices() -> Vec<LinuxDevice> {
     ]
 }
 
-fn create_devices<'a, I>(rootfs: &Path, devices: I, bind: bool) -> Result<()>
-where
-    I: IntoIterator<Item = &'a LinuxDevice>,
-{
-    let old_mode = umask(Mode::from_bits_truncate(0o000));
-    if bind {
-        let _ = devices
-            .into_iter()
-            .map(|dev| {
-                if !dev.path().starts_with("/dev") {
-                    panic!("{} is not a valid device path", dev.path().display());
-                }
-
-                bind_dev(rootfs, dev)
-            })
-            .collect::<Result<Vec<_>>>()?;
-    } else {
-        devices
-            .into_iter()
-            .map(|dev| {
-                if !dev.path().starts_with("/dev") {
-                    panic!("{} is not a valid device path", dev.path().display());
-                }
-
-                mknod_dev(rootfs, dev)
-            })
-            .collect::<Result<Vec<_>>>()?;
-    }
-    umask(old_mode);
-
-    Ok(())
-}
-
-fn bind_dev(rootfs: &Path, dev: &LinuxDevice) -> Result<()> {
-    let full_container_path = rootfs.join(dev.path().as_in_container()?);
-
-    let fd = open(
-        &full_container_path,
-        OFlag::O_RDWR | OFlag::O_CREAT,
-        Mode::from_bits_truncate(0o644),
-    )?;
-    close(fd)?;
-    nix_mount(
-        Some(dev.path()),
-        &full_container_path,
-        Some("bind"),
-        MsFlags::MS_BIND,
-        None::<&str>,
-    )?;
-
-    Ok(())
-}
-
 fn to_sflag(dev_type: LinuxDeviceType) -> SFlag {
     match dev_type {
         LinuxDeviceType::A => SFlag::S_IFBLK | SFlag::S_IFCHR | SFlag::S_IFIFO,
@@ -365,109 +545,6 @@ fn to_sflag(dev_type: LinuxDeviceType) -> SFlag {
         LinuxDeviceType::C | LinuxDeviceType::U => SFlag::S_IFCHR,
         LinuxDeviceType::P => SFlag::S_IFIFO,
     }
-}
-
-fn mknod_dev(rootfs: &Path, dev: &LinuxDevice) -> Result<()> {
-    fn makedev(major: i64, minor: i64) -> u64 {
-        ((minor & 0xff)
-            | ((major & 0xfff) << 8)
-            | ((minor & !0xff) << 12)
-            | ((major & !0xfff) << 32)) as u64
-    }
-
-    let full_container_path = rootfs.join(dev.path().as_in_container()?);
-    mknod(
-        &full_container_path,
-        to_sflag(dev.typ()),
-        Mode::from_bits_truncate(dev.file_mode().unwrap_or(0)),
-        makedev(dev.major(), dev.minor()),
-    )?;
-    chown(
-        &full_container_path,
-        dev.uid().map(Uid::from_raw),
-        dev.gid().map(Gid::from_raw),
-    )?;
-
-    Ok(())
-}
-
-fn mount_to_container(
-    m: &Mount,
-    rootfs: &Path,
-    flags: MsFlags,
-    data: &str,
-    label: Option<&str>,
-) -> Result<()> {
-    let typ = m.typ().as_deref();
-    let d = if let Some(l) = label {
-        if typ != Some("proc") && typ != Some("sysfs") {
-            if data.is_empty() {
-                format!("context=\"{}\"", l)
-            } else {
-                format!("{},context=\"{}\"", data, l)
-            }
-        } else {
-            data.to_string()
-        }
-    } else {
-        data.to_string()
-    };
-    let dest_for_host = format!(
-        "{}{}",
-        rootfs.to_string_lossy().into_owned(),
-        m.destination().display()
-    );
-    let dest = Path::new(&dest_for_host);
-    let source = m.source().as_ref().context("no source in mount spec")?;
-    let src = if typ == Some("bind") {
-        let src = canonicalize(source)?;
-        let dir = if src.is_file() {
-            Path::new(&dest).parent().unwrap()
-        } else {
-            Path::new(&dest)
-        };
-        create_dir_all(&dir)
-            .with_context(|| format!("Failed to create dir for bind mount: {:?}", dir))?;
-        if src.is_file() {
-            OpenOptions::new()
-                .create(true)
-                .write(true)
-                .open(&dest)
-                .unwrap();
-        }
-
-        src
-    } else {
-        create_dir_all(&dest).with_context(|| format!("Failed to create device: {:?}", dest))?;
-        PathBuf::from(source)
-    };
-
-    if let Err(errno) = nix_mount(Some(&*src), dest, typ, flags, Some(&*d)) {
-        if !matches!(errno, Errno::EINVAL) {
-            bail!("mount of {:?} failed. {}", m.destination(), errno);
-        }
-        nix_mount(Some(&*src), dest, typ, flags, Some(data))?;
-    }
-
-    if flags.contains(MsFlags::MS_BIND)
-        && flags.intersects(
-            !(MsFlags::MS_REC
-                | MsFlags::MS_REMOUNT
-                | MsFlags::MS_BIND
-                | MsFlags::MS_PRIVATE
-                | MsFlags::MS_SHARED
-                | MsFlags::MS_SLAVE),
-        )
-    {
-        nix_mount(
-            Some(dest),
-            dest,
-            None::<&str>,
-            flags | MsFlags::MS_REMOUNT,
-            None::<&str>,
-        )?;
-    }
-    Ok(())
 }
 
 fn parse_mount(m: &Mount) -> (MsFlags, String) {
@@ -533,47 +610,6 @@ fn find_parent_mount<'a>(rootfs: &Path, mount_infos: &'a [MountInfo]) -> Result<
         .max_by(|mi1, mi2| mi1.mount_point.len().cmp(&mi2.mount_point.len()))
         .ok_or_else(|| anyhow!("couldn't find parent mount of {}", rootfs.display()))?;
     Ok(parent_mount_info)
-}
-
-/// Make parent mount of rootfs private if it was shared, which is required by pivot_root.
-/// It also makes sure following bind mount does not propagate in other namespaces.
-fn make_parent_mount_private(rootfs: &Path) -> Result<()> {
-    let mount_infos = Process::myself()?.mountinfo()?;
-    let parent_mount = find_parent_mount(rootfs, &mount_infos)?;
-
-    // check parent mount has 'shared' propagation type
-    if parent_mount
-        .opt_fields
-        .iter()
-        .any(|field| matches!(field, MountOptFields::Shared(_)))
-    {
-        nix_mount(
-            None::<&str>,
-            &parent_mount.mount_point,
-            None::<&str>,
-            MsFlags::MS_PRIVATE,
-            None::<&str>,
-        )?;
-    }
-
-    Ok(())
-}
-
-/// Change propagation type of rootfs as specified in spec.
-pub fn adjust_root_mount_propagation(linux: &Linux) -> Result<()> {
-    let rootfs_propagation = linux.rootfs_propagation().as_deref();
-    let flags = match rootfs_propagation {
-        Some("shared") => Some(MsFlags::MS_SHARED),
-        Some("unbindable") => Some(MsFlags::MS_UNBINDABLE),
-        _ => None,
-    };
-
-    if let Some(flags) = flags {
-        log::debug!("make root mount {:?}", flags);
-        nix_mount(None::<&str>, "/", None::<&str>, flags, None::<&str>)?;
-    }
-
-    Ok(())
 }
 
 #[cfg(test)]
