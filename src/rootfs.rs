@@ -306,13 +306,11 @@ impl RootFS {
                     bail!("{} is not a valid device path", dev.path().display());
                 }
 
-                crate::utils::create_dir_all_with_mode(
+                crate::utils::create_dir_all(
                     rootfs
                         .join(dev.path().as_in_container()?)
                         .parent()
-                        .unwrap_or_else(|| Path::new("/")),
-                    dev.uid().unwrap_or(0),
-                    Mode::from_bits_truncate(0o755),
+                        .unwrap_or_else(|| Path::new("")),
                 )?;
 
                 if bind {
