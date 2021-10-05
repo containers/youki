@@ -8,6 +8,7 @@ use nix::unistd;
 use std::collections::HashMap;
 use std::ffi::CString;
 use std::fs::{self, DirBuilder, File};
+use std::io::ErrorKind;
 use std::ops::Deref;
 use std::os::linux::fs::MetadataExt;
 use std::os::unix::fs::DirBuilderExt;
@@ -150,6 +151,71 @@ pub fn ensure_procfs(path: &Path) -> Result<()> {
     }
 
     Ok(())
+}
+
+pub fn secure_join(rootfs: &Path, unsafe_path: &Path) -> Result<PathBuf> {
+    let mut rootfs = PathBuf::from(rootfs);
+    let mut path = PathBuf::from(unsafe_path);
+    let mut clean_path = PathBuf::new();
+
+    let mut part = path.iter();
+    let mut i = 0;
+
+    loop {
+        if i > 255 {
+            bail!("dereference too many symlinks, may be infinite loop");
+        }
+
+        let part_path;
+        match part.next() {
+            Some(part) => {
+                part_path = PathBuf::from(part);
+            }
+            None => {
+                break;
+            }
+        }
+
+        if !part_path.is_absolute() {
+            if part_path.starts_with("..") {
+                clean_path.pop();
+            } else {
+                // check if symlink then dereference
+                let curr_path = PathBuf::from(&rootfs).join(&clean_path).join(&part_path);
+                let metadata = match curr_path.symlink_metadata() {
+                    Ok(metadata) => Some(metadata),
+                    Err(error) => match error.kind() {
+                        // if file does not exists, treat it as normal path
+                        ErrorKind::NotFound => None,
+                        other_error => {
+                            bail!(
+                                "unable to obtain symlink metadata for file {:?}: {:?}",
+                                curr_path,
+                                other_error
+                            );
+                        }
+                    },
+                };
+
+                if let Some(metadata) = metadata {
+                    if metadata.file_type().is_symlink() {
+                        let link_path = fs::read_link(curr_path)?;
+                        path = link_path.join(part.as_path());
+                        part = path.iter();
+
+                        // increase after dereference symlink
+                        i += 1;
+                        continue;
+                    }
+                }
+
+                clean_path.push(&part_path);
+            }
+        }
+    }
+
+    rootfs.push(clean_path);
+    Ok(rootfs)
 }
 
 pub struct TempDir {
@@ -297,5 +363,76 @@ mod tests {
         assert_eq!(env_output.get_key_value(&key), Some((&key, &value)));
 
         Ok(())
+    }
+    #[test]
+    fn test_secure_join() {
+        assert_eq!(
+            secure_join(Path::new("/tmp/rootfs"), Path::new("path")).unwrap(),
+            PathBuf::from("/tmp/rootfs/path")
+        );
+        assert_eq!(
+            secure_join(Path::new("/tmp/rootfs"), Path::new("more/path")).unwrap(),
+            PathBuf::from("/tmp/rootfs/more/path")
+        );
+        assert_eq!(
+            secure_join(Path::new("/tmp/rootfs"), Path::new("/absolute/path")).unwrap(),
+            PathBuf::from("/tmp/rootfs/absolute/path")
+        );
+        assert_eq!(
+            secure_join(
+                Path::new("/tmp/rootfs"),
+                Path::new("/path/with/../parent/./sample")
+            )
+            .unwrap(),
+            PathBuf::from("/tmp/rootfs/path/parent/sample")
+        );
+        assert_eq!(
+            secure_join(Path::new("/tmp/rootfs"), Path::new("/../../../../tmp")).unwrap(),
+            PathBuf::from("/tmp/rootfs/tmp")
+        );
+        assert_eq!(
+            secure_join(Path::new("/tmp/rootfs"), Path::new("./../../../../var/log")).unwrap(),
+            PathBuf::from("/tmp/rootfs/var/log")
+        );
+        assert_eq!(
+            secure_join(
+                Path::new("/tmp/rootfs"),
+                Path::new("../../../../etc/passwd")
+            )
+            .unwrap(),
+            PathBuf::from("/tmp/rootfs/etc/passwd")
+        );
+    }
+    #[test]
+    fn test_secure_join_symlink() {
+        use std::os::unix::fs::symlink;
+
+        let tmp = create_temp_dir("root").unwrap();
+        let test_root_dir = tmp.path();
+
+        symlink("somepath", PathBuf::from(&test_root_dir).join("etc")).unwrap();
+        symlink(
+            "../../../../../../../../../../../../../etc",
+            PathBuf::from(&test_root_dir).join("longbacklink"),
+        )
+        .unwrap();
+        symlink(
+            "/../../../../../../../../../../../../../etc/passwd",
+            PathBuf::from(&test_root_dir).join("absolutelink"),
+        )
+        .unwrap();
+
+        assert_eq!(
+            secure_join(test_root_dir, PathBuf::from("etc").as_path()).unwrap(),
+            PathBuf::from(&test_root_dir).join("somepath")
+        );
+        assert_eq!(
+            secure_join(test_root_dir, PathBuf::from("longbacklink").as_path()).unwrap(),
+            PathBuf::from(&test_root_dir).join("somepath")
+        );
+        assert_eq!(
+            secure_join(test_root_dir, PathBuf::from("absolutelink").as_path()).unwrap(),
+            PathBuf::from(&test_root_dir).join("somepath/passwd")
+        );
     }
 }
