@@ -299,29 +299,27 @@ impl RootFS {
         I: IntoIterator<Item = &'a LinuxDevice>,
     {
         let old_mode = umask(Mode::from_bits_truncate(0o000));
-        if bind {
-            let _ = devices
-                .into_iter()
-                .map(|dev| {
-                    if !dev.path().starts_with("/dev") {
-                        panic!("{} is not a valid device path", dev.path().display());
-                    }
+        devices
+            .into_iter()
+            .map(|dev| {
+                if !dev.path().starts_with("/dev") {
+                    bail!("{} is not a valid device path", dev.path().display());
+                }
 
+                crate::utils::create_dir_all(
+                    rootfs
+                        .join(dev.path().as_in_container()?)
+                        .parent()
+                        .unwrap_or_else(|| Path::new("")),
+                )?;
+
+                if bind {
                     self.bind_dev(rootfs, dev)
-                })
-                .collect::<Result<Vec<_>>>()?;
-        } else {
-            devices
-                .into_iter()
-                .map(|dev| {
-                    if !dev.path().starts_with("/dev") {
-                        panic!("{} is not a valid device path", dev.path().display());
-                    }
-
+                } else {
                     self.mknod_dev(rootfs, dev)
-                })
-                .collect::<Result<Vec<_>>>()?;
-        }
+                }
+            })
+            .collect::<Result<Vec<_>>>()?;
         umask(old_mode);
 
         Ok(())
@@ -624,9 +622,9 @@ fn find_parent_mount<'a>(rootfs: &Path, mount_infos: &'a [MountInfo]) -> Result<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::syscall::test::TestHelperSyscall;
+    use crate::syscall::test::{ChownArgs, MknodArgs, MountArgs, TestHelperSyscall};
+    use crate::utils::TempDir;
     use procfs::process::MountInfo;
-    use serial_test::serial;
 
     #[test]
     fn test_find_parent_mount() -> Result<()> {
@@ -873,12 +871,12 @@ mod tests {
     }
 
     #[test]
-    #[serial]
     fn test_setup_ptmx() {
         {
+            let tmp_dir = TempDir::new("/tmp/test_setup_ptmx").unwrap();
             let rootfs = RootFS::new();
-            assert!(rootfs.setup_ptmx(Path::new("/tmp")).is_ok());
-            let want = (PathBuf::from("pts/ptmx"), PathBuf::from("/tmp/dev/ptmx"));
+            assert!(rootfs.setup_ptmx(tmp_dir.path()).is_ok());
+            let want = (PathBuf::from("pts/ptmx"), tmp_dir.path().join("dev/ptmx"));
             let got = &rootfs
                 .syscall
                 .as_any()
@@ -889,15 +887,16 @@ mod tests {
         }
         // make remove_file goes into the bail! path
         {
+            let tmp_dir = TempDir::new("/tmp/test_setup_ptmx").unwrap();
             open(
-                "/tmp/dev",
+                &tmp_dir.path().join("dev"),
                 OFlag::O_RDWR | OFlag::O_CREAT,
                 Mode::from_bits_truncate(0o644),
             )
             .unwrap();
 
             let rootfs = RootFS::new();
-            assert!(rootfs.setup_ptmx(Path::new("/tmp")).is_err());
+            assert!(rootfs.setup_ptmx(tmp_dir.path()).is_err());
             assert_eq!(
                 0,
                 rootfs
@@ -908,28 +907,30 @@ mod tests {
                     .get_symlink_args()
                     .len()
             );
-            remove_file("/tmp/dev").unwrap();
         }
     }
 
     #[test]
-    #[serial]
     fn test_setup_default_symlinks() {
+        let tmp_dir = TempDir::new("/tmp/test_setup_default_symlinks").unwrap();
         let rootfs = RootFS::new();
-        assert!(rootfs.setup_default_symlinks(Path::new("/tmp")).is_ok());
+        assert!(rootfs.setup_default_symlinks(tmp_dir.path()).is_ok());
         let want = vec![
-            (PathBuf::from("/proc/self/fd"), PathBuf::from("/tmp/dev/fd")),
+            (
+                PathBuf::from("/proc/self/fd"),
+                tmp_dir.path().join("dev/fd"),
+            ),
             (
                 PathBuf::from("/proc/self/fd/0"),
-                PathBuf::from("/tmp/dev/stdin"),
+                tmp_dir.path().join("dev/stdin"),
             ),
             (
                 PathBuf::from("/proc/self/fd/1"),
-                PathBuf::from("/tmp/dev/stdout"),
+                tmp_dir.path().join("dev/stdout"),
             ),
             (
                 PathBuf::from("/proc/self/fd/2"),
-                PathBuf::from("/tmp/dev/stderr"),
+                tmp_dir.path().join("dev/stderr"),
             ),
         ];
         let got = rootfs
@@ -939,5 +940,136 @@ mod tests {
             .unwrap()
             .get_symlink_args();
         assert_eq!(want, got)
+    }
+
+    #[test]
+    fn test_bind_dev() {
+        let tmp_dir = TempDir::new("/tmp/test_bind_dev").unwrap();
+        let rootfs = RootFS::new();
+        assert!(rootfs
+            .bind_dev(
+                tmp_dir.path(),
+                &LinuxDeviceBuilder::default()
+                    .path(PathBuf::from("/null"))
+                    .build()
+                    .unwrap(),
+            )
+            .is_ok());
+
+        let want = MountArgs {
+            source: Some(PathBuf::from("/null")),
+            target: tmp_dir.path().join("null"),
+            fstype: Some("bind".to_string()),
+            flags: MsFlags::MS_BIND,
+            data: None,
+        };
+        let got = &rootfs
+            .syscall
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap()
+            .get_mount_args()[0];
+        assert_eq!(want, *got);
+    }
+
+    #[test]
+    fn test_mknod_dev() {
+        let tmp_dir = TempDir::new("/tmp/test_mknod_dev").unwrap();
+        let rootfs = RootFS::new();
+        assert!(rootfs
+            .mknod_dev(
+                tmp_dir.path(),
+                &LinuxDeviceBuilder::default()
+                    .path(PathBuf::from("/null"))
+                    .major(1)
+                    .minor(3)
+                    .typ(LinuxDeviceType::C)
+                    .file_mode(0o644u32)
+                    .uid(1000u32)
+                    .gid(1000u32)
+                    .build()
+                    .unwrap(),
+            )
+            .is_ok());
+
+        let want_mknod = MknodArgs {
+            path: tmp_dir.path().join("null"),
+            kind: SFlag::S_IFCHR,
+            perm: Mode::S_IRUSR | Mode::S_IWUSR | Mode::S_IRGRP | Mode::S_IROTH,
+            dev: 259,
+        };
+        let got_mknod = &rootfs
+            .syscall
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap()
+            .get_mknod_args()[0];
+        assert_eq!(want_mknod, *got_mknod);
+
+        let want_chown = ChownArgs {
+            path: tmp_dir.path().join("null"),
+            owner: Some(Uid::from_raw(1000)),
+            group: Some(Gid::from_raw(1000)),
+        };
+        let got_chown = &rootfs
+            .syscall
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap()
+            .get_chown_args()[0];
+        assert_eq!(want_chown, *got_chown);
+    }
+
+    #[test]
+    fn test_create_devices() {
+        let tmp_dir = TempDir::new("/tmp/test_create_devices").unwrap();
+        let rootfs = RootFS::new();
+        let devices = vec![LinuxDeviceBuilder::default()
+            .path(PathBuf::from("/dev/null"))
+            .major(1)
+            .minor(3)
+            .typ(LinuxDeviceType::C)
+            .file_mode(0o644u32)
+            .uid(1000u32)
+            .gid(1000u32)
+            .build()
+            .unwrap()];
+
+        assert!(rootfs
+            .create_devices(tmp_dir.path(), &devices, true)
+            .is_ok());
+
+        let want = MountArgs {
+            source: Some(PathBuf::from("/dev/null")),
+            target: tmp_dir.path().join("dev/null"),
+            fstype: Some("bind".to_string()),
+            flags: MsFlags::MS_BIND,
+            data: None,
+        };
+        let got = &rootfs
+            .syscall
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap()
+            .get_mount_args()[0];
+        assert_eq!(want, *got);
+
+        assert!(rootfs
+            .create_devices(tmp_dir.path(), &devices, false)
+            .is_ok());
+
+        let want = MknodArgs {
+            path: tmp_dir.path().join("dev/null"),
+            kind: SFlag::S_IFCHR,
+            perm: Mode::S_IRUSR | Mode::S_IWUSR | Mode::S_IRGRP | Mode::S_IROTH,
+            dev: 259,
+        };
+        let got = &rootfs
+            .syscall
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap()
+            .get_mknod_args()[0];
+        assert_eq!(want, *got);
     }
 }
