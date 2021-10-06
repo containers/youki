@@ -139,7 +139,7 @@ mod test {
     use anyhow::{bail, Result};
     use oci_spec::runtime::HookBuilder;
     use serial_test::serial;
-    use std::{env, fs, time::Duration};
+    use std::{env, fs};
 
     fn is_command_in_path(program: &str) -> bool {
         if let Ok(path) = env::var("PATH") {
