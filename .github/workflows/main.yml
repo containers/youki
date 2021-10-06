@@ -18,7 +18,6 @@ jobs:
         with:
           filters: |
             .: src/**
-            ./test_framework: test_framework/**
             ./youki_integration_test: youki_integration_test/**
             ./cgroups: cgroups/**
             ./seccomp: seccomp/**

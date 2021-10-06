@@ -155,7 +155,7 @@ fn test_valid_tlb() -> TestResult {
 
 pub fn get_tlb_test<'a>() -> TestGroup<'a> {
     let wrong_tlb = ConditionalTest::new(
-        "wrong_tlb",
+        "invalid_tlb",
         Box::new(check_hugetlb),
         Box::new(test_wrong_tlb),
     );
