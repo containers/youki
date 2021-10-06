@@ -401,7 +401,8 @@ impl RootFS {
             .as_ref()
             .with_context(|| "no source in mount spec".to_string())?;
         let src = if typ == Some("bind") {
-            let src = canonicalize(source)?;
+            let src = canonicalize(source)
+                .with_context(|| format!("Failed to canonicalize: {:?}", source))?;
             let dir = if src.is_file() {
                 Path::new(&dest).parent().unwrap()
             } else {
@@ -416,7 +417,7 @@ impl RootFS {
                     .create(true)
                     .write(true)
                     .open(&dest)
-                    .unwrap();
+                    .with_context(|| format!("Failed to create file for bind mount: {:?}", src))?;
             }
 
             src
@@ -439,7 +440,7 @@ impl RootFS {
                 .with_context(|| format!("Failed to mount {:?} to {:?}", src, dest))?;
         }
 
-        if flags.contains(MsFlags::MS_BIND)
+        if typ == Some("bind")
             && flags.intersects(
                 !(MsFlags::MS_REC
                     | MsFlags::MS_REMOUNT

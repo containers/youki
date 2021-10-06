@@ -452,39 +452,90 @@ fn test_create_devices() {
 #[test]
 fn test_mount_to_container() {
     let tmp_dir = TempDir::new("/tmp/test_mount_to_container").unwrap();
-    let rootfs = RootFS::new();
-    let mount = &MountBuilder::default()
-        .destination(PathBuf::from("/dev/pts"))
-        .typ("devpts")
-        .source(PathBuf::from("devpts"))
-        .options(vec![
-            "nosuid".to_string(),
-            "noexec".to_string(),
-            "newinstance".to_string(),
-            "ptmxmode=0666".to_string(),
-            "mode=0620".to_string(),
-            "gid=5".to_string(),
-        ])
-        .build()
-        .unwrap();
-    let (flags, data) = parse_mount(mount);
+    {
+        let rootfs = RootFS::new();
+        let mount = &MountBuilder::default()
+            .destination(PathBuf::from("/dev/pts"))
+            .typ("devpts")
+            .source(PathBuf::from("devpts"))
+            .options(vec![
+                "nosuid".to_string(),
+                "noexec".to_string(),
+                "newinstance".to_string(),
+                "ptmxmode=0666".to_string(),
+                "mode=0620".to_string(),
+                "gid=5".to_string(),
+            ])
+            .build()
+            .unwrap();
+        let (flags, data) = parse_mount(mount);
 
-    assert!(rootfs
-        .mount_to_container(mount, tmp_dir.path(), flags, &data, None)
-        .is_ok());
+        assert!(rootfs
+            .mount_to_container(mount, tmp_dir.path(), flags, &data, Some("defaults"))
+            .is_ok());
 
-    let want = MountArgs {
-        source: Some(PathBuf::from("devpts")),
-        target: tmp_dir.path().join("dev/pts"),
-        fstype: Some("devpts".to_string()),
-        flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC,
-        data: Some("newinstance,ptmxmode=0666,mode=0620,gid=5".to_string()),
-    };
-    let got = &rootfs
-        .syscall
-        .as_any()
-        .downcast_ref::<TestHelperSyscall>()
-        .unwrap()
-        .get_mount_args()[0];
-    assert_eq!(want, *got);
+        let want = vec![MountArgs {
+            source: Some(PathBuf::from("devpts")),
+            target: tmp_dir.path().join("dev/pts"),
+            fstype: Some("devpts".to_string()),
+            flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC,
+            data: Some(
+                "newinstance,ptmxmode=0666,mode=0620,gid=5,context=\"defaults\"".to_string(),
+            ),
+        }];
+        let got = &rootfs
+            .syscall
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap()
+            .get_mount_args();
+        assert_eq!(want, *got);
+        assert_eq!(got.len(), 1);
+    }
+    {
+        let rootfs = RootFS::new();
+        let mount = &MountBuilder::default()
+            .destination(PathBuf::from("/dev/null"))
+            .typ("bind")
+            .source(tmp_dir.path().join("null"))
+            .options(vec!["ro".to_string()])
+            .build()
+            .unwrap();
+        let (flags, data) = parse_mount(mount);
+        OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(tmp_dir.path().join("null"))
+            .unwrap();
+
+        assert!(rootfs
+            .mount_to_container(mount, tmp_dir.path(), flags, &data, None)
+            .is_ok());
+
+        let want = vec![
+            MountArgs {
+                source: Some(tmp_dir.path().join("null")),
+                target: tmp_dir.path().join("dev/null"),
+                fstype: Some("bind".to_string()),
+                flags: MsFlags::MS_RDONLY,
+                data: Some("".to_string()),
+            },
+            // remount one
+            MountArgs {
+                source: Some(tmp_dir.path().join("dev/null")),
+                target: tmp_dir.path().join("dev/null"),
+                fstype: None,
+                flags: MsFlags::MS_RDONLY | MsFlags::MS_REMOUNT,
+                data: None,
+            },
+        ];
+        let got = &rootfs
+            .syscall
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap()
+            .get_mount_args();
+        assert_eq!(want, *got);
+        assert_eq!(got.len(), 2);
+    }
 }
