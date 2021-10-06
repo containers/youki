@@ -5,7 +5,7 @@ fn main() {
         .atleast_version(MINIMUM_VERSION)
         .probe(PKG_NAME)
     {
-        Ok(_) => return,
+        Ok(_) => {}
         Err(err) => {
             eprintln!("{}", err);
             std::process::exit(1);
