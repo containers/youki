@@ -94,7 +94,7 @@ pub fn run_hooks(hooks: Option<&Vec<Hook>>, container: Option<&Container>) -> Re
                     let res = hook_process.wait();
                     let _ = s.send(res);
                 });
-                match r.recv_timeout(time::Duration::from_secs(timeout_sec.as_secs())) {
+                match r.recv_timeout(time::Duration::from_secs(timeout_sec as u64)) {
                     Ok(res) => res,
                     Err(crossbeam_channel::RecvTimeoutError::Timeout) => {
                         // Kill the process. There is no need to further clean
@@ -214,7 +214,7 @@ mod test {
                 String::from("-f"),
                 String::from("/dev/null"),
             ])
-            .timeout(Duration::from_secs(1))
+            .timeout(1)
             .build()?;
         let hooks = Some(vec![hook]);
         match run_hooks(hooks.as_ref(), Some(&default_container)) {
