@@ -1,6 +1,7 @@
 use super::{Container, ContainerStatus};
+use crate::signal::Signal;
 use anyhow::{bail, Context, Result};
-use nix::sys::signal::{self, Signal};
+use nix::sys::signal::{self};
 
 impl Container {
     /// Sends the specified signal to the container init process
@@ -21,7 +22,8 @@ impl Container {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn kill(&mut self, signal: Signal) -> Result<()> {
+    pub fn kill<S: Into<Signal>>(&mut self, signal: S) -> Result<()> {
+        let signal = signal.into().into_raw();
         self.refresh_status()
             .context("failed to refresh container status")?;
         if self.can_kill() {

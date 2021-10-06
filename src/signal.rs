@@ -1,16 +1,19 @@
 //! Returns *nix signal enum value from passed string
 
-use anyhow::{bail, Result};
-use nix::sys::signal::Signal;
+use anyhow::{bail, Context, Result};
+use nix::sys::signal::Signal as NixSignal;
+use std::convert::TryFrom;
 
-pub trait ToSignal<From = Self> {
-    fn to_signal(&self) -> Result<Signal>;
-}
+/// POSIX Signal
+#[derive(Debug)]
+pub struct Signal(NixSignal);
 
-impl ToSignal for String {
-    fn to_signal(&self) -> Result<Signal> {
-        use Signal::*;
-        Ok(match self.to_ascii_uppercase().as_str() {
+impl TryFrom<&str> for Signal {
+    type Error = anyhow::Error;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        use NixSignal::*;
+        Ok(match s.to_ascii_uppercase().as_str() {
             "1" | "HUP" | "SIGHUP" => SIGHUP,
             "2" | "INT" | "SIGINT" => SIGINT,
             "3" | "QUIT" | "SIGQUIT" => SIGQUIT,
@@ -42,8 +45,31 @@ impl ToSignal for String {
             "29" | "IO" | "SIGIO" => SIGIO,
             "30" | "PWR" | "SIGPWR" => SIGPWR,
             "31" | "SYS" | "SIGSYS" => SIGSYS,
-            _ => bail! {"{} is not a valid signal", self},
+            _ => bail! {"{} is not a valid signal", s},
         })
+        .map(Signal)
+    }
+}
+
+impl TryFrom<i32> for Signal {
+    type Error = anyhow::Error;
+
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
+        NixSignal::try_from(value)
+            .with_context(|| format!("{} is not a valid signal", value))
+            .map(Signal)
+    }
+}
+
+impl From<NixSignal> for Signal {
+    fn from(s: NixSignal) -> Self {
+        Signal(s)
+    }
+}
+
+impl Signal {
+    pub(crate) fn into_raw(self) -> NixSignal {
+        self.0
     }
 }
 
@@ -89,13 +115,13 @@ mod tests {
         test_sets.insert(SIGSYS, vec!["31", "SYS", "SIGSYS"]);
         for (signal, strings) in test_sets {
             for s in strings {
-                assert_eq!(signal, s.to_string().to_signal().unwrap());
+                assert_eq!(signal, Signal::try_from(s).unwrap().into_raw());
             }
         }
     }
 
     #[test]
     fn test_conversion_from_string_should_be_failed() {
-        assert!("invalid".to_string().to_signal().is_err())
+        assert!(Signal::try_from("invalid").is_err())
     }
 }
