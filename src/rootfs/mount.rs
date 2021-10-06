@@ -11,6 +11,7 @@ use oci_spec::runtime::{Mount as SpecMount, MountBuilder as SpecMountBuilder};
 use procfs::process::{MountOptFields, Process};
 use std::{collections::HashMap, fs::{canonicalize, create_dir_all, OpenOptions}};
 use std::path::{Path, PathBuf};
+use std::borrow::Cow;
 
 #[derive(Debug)]
 pub struct MountOptions<'a> {
@@ -87,50 +88,60 @@ impl Mount {
             )
             .build()
             .context("failed to build tmpfs for cgroup")?;
-        self.setup_mount(&tmpfs, options).context("failed to mount tmpfs for cgroup")?;
-    
+        self.setup_mount(&tmpfs, options)
+            .context("failed to mount tmpfs for cgroup")?;
+
         // get all cgroup mounts on the host system
         let host_mounts: Vec<PathBuf> = cgroups::v1::util::list_subsystem_mount_points()
             .context("failed to get subsystem mount points")?
             .into_iter()
             .filter(|p| p.as_path().starts_with(DEFAULT_CGROUP_ROOT))
             .collect();
-    
+
         let cgroup_root = options
             .root
             .join_safely(cgroup_mount.destination())
             .context("could not join rootfs path with cgroup mount destination")?;
 
         let symlink = Symlink::new();
-    
+
         // setup cgroup mounts for container
         for host_mount in &host_mounts {
             if let Some(subsystem_name) = host_mount.file_name().and_then(|n| n.to_str()) {
-                if subsystem_name == "systemd" {
-                    continue;
-                }
-    
                 if options.cgroup_ns {
-                    self.setup_namespaced_subsystem(cgroup_mount, options, subsystem_name)?;
+                    self.setup_namespaced_subsystem(
+                        cgroup_mount,
+                        options,
+                        subsystem_name,
+                        subsystem_name == "systemd",
+                    )?;
                 } else {
-                    self.setup_emulated_subsystem(cgroup_mount, options, host_mount, subsystem_name)?;
+                    self.setup_emulated_subsystem(
+                        cgroup_mount,
+                        options,
+                        host_mount,
+                        subsystem_name,
+                        subsystem_name == "systemd",
+                    )?;
                 }
-    
+
                 symlink.setup_comount_symlinks(&cgroup_root, subsystem_name)?;
             } else {
                 log::warn!("could not get subsystem name from {:?}", host_mount);
             }
         }
-    
+
         Ok(())
     }
 
     // On some distros cgroup subsystems are comounted e.g. cpu,cpuacct or net_cls,net_prio. These systems
     // have to be comounted in the container as well as the kernel will reject trying to mount them separately.
-    fn setup_namespaced_subsystem(&self,
+    fn setup_namespaced_subsystem(
+        &self,
         cgroup_mount: &SpecMount,
         options: &MountOptions,
         subsystem_name: &str,
+        named: bool,
     ) -> Result<()> {
         let subsystem_mount = SpecMountBuilder::default()
             .source("cgroup")
@@ -144,13 +155,19 @@ impl Mount {
             )
             .build()
             .with_context(|| format!("failed to build {}", subsystem_name))?;
-    
+
+        let data: Cow<str> = if named {
+            format!("name={}", subsystem_name).into()
+        } else {
+            subsystem_name.into()
+        };
+
         log::debug!("Mounting cgroup subsystem: {:?}", subsystem_name);
         self.mount_to_container(
             &subsystem_mount,
             options.root,
             MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
-            subsystem_name,
+            &data,
             options.label,
         )
         .with_context(|| format!("failed to mount {:?}", subsystem_mount))
@@ -162,6 +179,7 @@ impl Mount {
         options: &MountOptions,
         host_mount: &Path,
         subsystem_name: &str,
+        named: bool,
     ) -> Result<()> {
         let process_cgroups: HashMap<String, String> = Process::myself()?
             .cgroups()
@@ -169,9 +187,15 @@ impl Mount {
             .into_iter()
             .map(|c| (c.controllers.join(","), c.pathname))
             .collect();
-    
+
+        let named_hierarchy: Cow<str> = if named {
+            format!("name={}", subsystem_name).into()
+        } else {
+            subsystem_name.into()
+        };
+
         log::debug!("{:?}", process_cgroups);
-        if let Some(proc_path) = process_cgroups.get(subsystem_name) {
+        if let Some(proc_path) = process_cgroups.get(named_hierarchy.as_ref()) {
             let emulated = SpecMountBuilder::default()
                 .source(
                     host_mount
@@ -203,11 +227,11 @@ impl Mount {
                 )
                 .build()?;
             log::debug!("Mounting emulated cgroup subsystem: {:?}", emulated);
-    
+
             self.setup_mount(&emulated, options)
                 .with_context(|| format!("failed to mount {} cgroup hierarchy", subsystem_name))?;
         }
-    
+
         Ok(())
     }
 
