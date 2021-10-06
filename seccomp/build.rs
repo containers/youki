@@ -7,10 +7,7 @@ fn main() {
     {
         Ok(_) => return,
         Err(err) => {
-            eprintln!(
-                "{:?} could not be found meeting minimum version requirement {:?}: {}",
-                PKG_NAME, MINIMUM_VERSION, err
-            );
+            eprintln!("{}", err);
             std::process::exit(1);
         }
     }
