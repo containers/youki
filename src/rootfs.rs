@@ -378,26 +378,22 @@ impl RootFS {
         label: Option<&str>,
     ) -> Result<()> {
         let typ = m.typ().as_deref();
-        let d = if let Some(l) = label {
+        let mut d = data.to_string();
+
+        if let Some(l) = label {
             if typ != Some("proc") && typ != Some("sysfs") {
-                if data.is_empty() {
-                    format!("context=\"{}\"", l)
-                } else {
-                    format!("{},context=\"{}\"", data, l)
+                match data.is_empty() {
+                    true => d = format!("context=\"{}\"", l),
+                    false => d = format!("{},context=\"{}\"", data, l),
                 }
-            } else {
-                data.to_string()
             }
-        } else {
-            data.to_string()
-        };
-        let dest_for_host = format!(
-            "{}{}",
-            rootfs.to_string_lossy().into_owned(),
-            m.destination().display()
-        );
-        let dest = Path::new(&dest_for_host);
-        let source = m.source().as_ref().context("no source in mount spec")?;
+        }
+
+        let dest = rootfs.join(m.destination());
+        let source = m
+            .source()
+            .as_ref()
+            .with_context(|| "no source in mount spec".to_string())?;
         let src = if typ == Some("bind") {
             let src = canonicalize(source)?;
             let dir = if src.is_file() {
@@ -405,8 +401,10 @@ impl RootFS {
             } else {
                 Path::new(&dest)
             };
+
             create_dir_all(&dir)
                 .with_context(|| format!("Failed to create dir for bind mount: {:?}", dir))?;
+
             if src.is_file() {
                 OpenOptions::new()
                     .create(true)
@@ -419,10 +417,14 @@ impl RootFS {
         } else {
             create_dir_all(&dest)
                 .with_context(|| format!("Failed to create device: {:?}", dest))?;
+
             PathBuf::from(source)
         };
 
-        if let Err(err) = self.syscall.mount(Some(&*src), dest, typ, flags, Some(&*d)) {
+        if let Err(err) = self
+            .syscall
+            .mount(Some(&*src), &dest, typ, flags, Some(&*d))
+        {
             if let Some(errno) = err.downcast_ref() {
                 if !matches!(errno, Errno::EINVAL) {
                     bail!("mount of {:?} failed. {}", m.destination(), errno);
@@ -430,7 +432,8 @@ impl RootFS {
             }
 
             self.syscall
-                .mount(Some(&*src), dest, typ, flags, Some(data))?;
+                .mount(Some(&*src), &dest, typ, flags, Some(data))
+                .with_context(|| format!("Failed to mount {:?} to {:?}", src, dest))?;
         }
 
         if flags.contains(MsFlags::MS_BIND)
@@ -444,8 +447,10 @@ impl RootFS {
             )
         {
             self.syscall
-                .mount(Some(dest), dest, None, flags | MsFlags::MS_REMOUNT, None)?;
+                .mount(Some(&dest), &dest, None, flags | MsFlags::MS_REMOUNT, None)
+                .with_context(|| format!("Failed to remount: {:?}", dest))?;
         }
+
         Ok(())
     }
 
@@ -1071,5 +1076,30 @@ mod tests {
             .unwrap()
             .get_mknod_args()[0];
         assert_eq!(want, *got);
+    }
+
+    #[test]
+    fn test_mount_to_container() {
+        let tmp_dir = TempDir::new("/tmp/test_mount_to_container").unwrap();
+        let rootfs = RootFS::new();
+        let mount = &MountBuilder::default()
+            .destination(PathBuf::from("/dev/pts"))
+            .typ("devpts")
+            .source(PathBuf::from("devpts"))
+            .options(vec![
+                "nosuid".to_string(),
+                "noexec".to_string(),
+                "newinstance".to_string(),
+                "ptmxmode=0666".to_string(),
+                "mode=0620".to_string(),
+                "gid=5".to_string(),
+            ])
+            .build()
+            .unwrap();
+        let (flags, data) = parse_mount(mount);
+
+        assert!(rootfs
+            .mount_to_container(mount, tmp_dir.path(), flags, &data, None)
+            .is_ok());
     }
 }
