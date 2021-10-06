@@ -389,7 +389,12 @@ impl RootFS {
             }
         }
 
-        let dest = rootfs.join(m.destination());
+        let dest_for_host = format!(
+            "{}{}",
+            rootfs.to_string_lossy().into_owned(),
+            m.destination().display()
+        );
+        let dest = Path::new(&dest_for_host);
         let source = m
             .source()
             .as_ref()
@@ -421,10 +426,7 @@ impl RootFS {
             PathBuf::from(source)
         };
 
-        if let Err(err) = self
-            .syscall
-            .mount(Some(&*src), &dest, typ, flags, Some(&*d))
-        {
+        if let Err(err) = self.syscall.mount(Some(&*src), dest, typ, flags, Some(&*d)) {
             if let Some(errno) = err.downcast_ref() {
                 if !matches!(errno, Errno::EINVAL) {
                     bail!("mount of {:?} failed. {}", m.destination(), errno);
@@ -432,7 +434,7 @@ impl RootFS {
             }
 
             self.syscall
-                .mount(Some(&*src), &dest, typ, flags, Some(data))
+                .mount(Some(&*src), dest, typ, flags, Some(data))
                 .with_context(|| format!("Failed to mount {:?} to {:?}", src, dest))?;
         }
 
@@ -447,7 +449,7 @@ impl RootFS {
             )
         {
             self.syscall
-                .mount(Some(&dest), &dest, None, flags | MsFlags::MS_REMOUNT, None)
+                .mount(Some(dest), dest, None, flags | MsFlags::MS_REMOUNT, None)
                 .with_context(|| format!("Failed to remount: {:?}", dest))?;
         }
 
