@@ -73,7 +73,6 @@ impl Mount {
 
         Ok(())
     }
-
     fn mount_cgroup_v1(&self, cgroup_mount: &SpecMount, options: &MountOptions) -> Result<()> {
         // create tmpfs into which the cgroup subsystems will be mounted
         let tmpfs = SpecMountBuilder::default()
@@ -88,6 +87,7 @@ impl Mount {
             )
             .build()
             .context("failed to build tmpfs for cgroup")?;
+
         self.setup_mount(&tmpfs, options)
             .context("failed to mount tmpfs for cgroup")?;
 
@@ -97,11 +97,22 @@ impl Mount {
             .into_iter()
             .filter(|p| p.as_path().starts_with(DEFAULT_CGROUP_ROOT))
             .collect();
+        log::debug!("Cgroup mounts: {:?}", host_mounts);
+
+        // get process cgroups
+        let process_cgroups: HashMap<String, String> = Process::myself()?
+            .cgroups()
+            .context("failed to get process cgroups")?
+            .into_iter()
+            .map(|c| (c.controllers.join(","), c.pathname))
+            .collect();
+        log::debug!("Process cgroups: {:?}", process_cgroups);
 
         let cgroup_root = options
             .root
             .join_safely(cgroup_mount.destination())
             .context("could not join rootfs path with cgroup mount destination")?;
+        log::debug!("Cgroup root: {:?}", cgroup_root);
 
         let symlink = Symlink::new();
 
@@ -119,9 +130,10 @@ impl Mount {
                     self.setup_emulated_subsystem(
                         cgroup_mount,
                         options,
-                        host_mount,
                         subsystem_name,
                         subsystem_name == "systemd",
+                        host_mount,
+                        &process_cgroups,
                     )?;
                 }
 
@@ -143,6 +155,10 @@ impl Mount {
         subsystem_name: &str,
         named: bool,
     ) -> Result<()> {
+        log::debug!(
+            "Mounting (namespaced) {:?} cgroup subsystem",
+            subsystem_name
+        );
         let subsystem_mount = SpecMountBuilder::default()
             .source("cgroup")
             .typ("cgroup")
@@ -162,7 +178,6 @@ impl Mount {
             subsystem_name.into()
         };
 
-        log::debug!("Mounting cgroup subsystem: {:?}", subsystem_name);
         self.mount_to_container(
             &subsystem_mount,
             options.root,
@@ -175,26 +190,20 @@ impl Mount {
 
     fn setup_emulated_subsystem(
         &self,
-        mount: &SpecMount,
+        cgroup_mount: &SpecMount,
         options: &MountOptions,
-        host_mount: &Path,
         subsystem_name: &str,
         named: bool,
+        host_mount: &Path,
+        process_cgroups: &HashMap<String, String>,
     ) -> Result<()> {
-        let process_cgroups: HashMap<String, String> = Process::myself()?
-            .cgroups()
-            .context("failed to get process cgroups")?
-            .into_iter()
-            .map(|c| (c.controllers.join(","), c.pathname))
-            .collect();
-
+        log::debug!("Mounting (emulated) {:?} cgroup subsystem", subsystem_name);
         let named_hierarchy: Cow<str> = if named {
             format!("name={}", subsystem_name).into()
         } else {
             subsystem_name.into()
         };
 
-        log::debug!("{:?}", process_cgroups);
         if let Some(proc_path) = process_cgroups.get(named_hierarchy.as_ref()) {
             let emulated = SpecMountBuilder::default()
                 .source(
@@ -208,7 +217,7 @@ impl Mount {
                         })?,
                 )
                 .destination(
-                    mount
+                    cgroup_mount
                         .destination()
                         .join_safely(subsystem_name)
                         .with_context(|| {
@@ -230,6 +239,8 @@ impl Mount {
 
             self.setup_mount(&emulated, options)
                 .with_context(|| format!("failed to mount {} cgroup hierarchy", subsystem_name))?;
+        } else {
+            log::warn!("Could not mount {:?} cgroup subsystem", subsystem_name);
         }
 
         Ok(())
