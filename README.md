@@ -69,7 +69,7 @@ For other platforms, please use [Vagrantfile](#setting-up-vagrant) that we prepa
 
 ### Debian, Ubuntu and related distributions
 
-```sh
+```console
 $ sudo apt-get install   \
       pkg-config         \
       libsystemd-dev     \
@@ -81,7 +81,7 @@ $ sudo apt-get install   \
 
 ### Fedora, Centos, RHEL and related distributions
 
-```sh
+```console
 $ sudo dnf install   \
       pkg-config     \
       systemd-devel  \
@@ -92,7 +92,7 @@ $ sudo dnf install   \
 
 ## Build
 
-```sh
+```console
 $ git clone git@github.com:containers/youki.git
 $ cd youki
 $ ./build.sh
@@ -103,7 +103,7 @@ $ ./youki -h # you can get information about youki command
 
 Let's try to run a container that executes `sleep 30` with youki. This tutorial may need root permission.
 
-```sh
+```console
 $ git clone git@github.com:containers/youki.git
 $ cd youki
 $ ./build.sh
@@ -116,7 +116,7 @@ $ docker export $(docker create busybox) | tar -C rootfs -xvf -
 
 Then, we need to prepare a configuration file. This file contains metadata and specs for a container, such as the process to run, environment variables to inject, sandboxing features to use, etc.
 
-```sh
+```cconsole
 $ ../youki spec  # will generate a spec file named config.json
 ```
 
@@ -134,7 +134,7 @@ We can edit the `config.json` to add customized behaviors for container. Here, w
 ```
 
 Then we can explore the lifecycle of a container:
-```sh
+```console
 $ cd ..                                                # go back to the repository root
 $ sudo ./youki create -b tutorial tutorial_container   # create a container with name `tutorial_container`
 $ sudo ./youki state tutorial_container                # you can see the state the container is `created`
@@ -149,7 +149,7 @@ Change the command to be executed in `config.json` and try something other than 
 
 Start the docker daemon.
 
-```
+```console
 $ dockerd --experimental --add-runtime="youki=$(pwd)/target/x86_64-unknown-linux-gnu/debug/youki"
 ```
 
@@ -163,13 +163,13 @@ Now repeat the command, which should start the docker daemon.
 
 You can use youki in a different terminal to start the container.
 
-```
+```console
 $ docker run -it --rm --runtime youki busybox
 ```
 
 Afterwards, you can close the docker daemon process in other the other terminal. To restart normal docker daemon (if you had stopped it before), run:
 
-```
+```console
 $ systemctl start docker # might need root permission
 ```
 
@@ -177,7 +177,7 @@ $ systemctl start docker # might need root permission
 
 Go and node-tap are required to run integration tests. See the [opencontainers/runtime-tools](https://github.com/opencontainers/runtime-tools) README for details.
 
-```
+```console
 $ git submodule update --init --recursive
 $ ./integration_test.sh
 # run specific test_cases with pattern
@@ -188,7 +188,7 @@ $ ./integration_test.sh linux_*
 
 You can try youki on platforms other than Linux by using the Vagrantfile we have prepared. We have prepared two environments for vagrant, namely rootless mode and rootful mode
 
-```
+```console
 $ git clone git@github.com:containers/youki.git
 $ cd youki
 
