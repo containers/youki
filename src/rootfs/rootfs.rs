@@ -18,6 +18,10 @@ use std::fs::OpenOptions;
 use std::fs::{canonicalize, create_dir_all, remove_file};
 use std::path::{Path, PathBuf};
 
+#[path = "tests.rs"]
+#[cfg(test)]
+mod tests;
+
 #[derive(Debug)]
 struct MountOptions<'a> {
     root: &'a Path,
