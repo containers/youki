@@ -5,13 +5,19 @@ use super::{
 use crate::syscall::{syscall::create_syscall, Syscall};
 use crate::utils::PathBufExt;
 use anyhow::{bail, Context, Result};
-use cgroups::common::{CgroupSetup::{Hybrid, Legacy, Unified}, DEFAULT_CGROUP_ROOT};
+use cgroups::common::{
+    CgroupSetup::{Hybrid, Legacy, Unified},
+    DEFAULT_CGROUP_ROOT,
+};
 use nix::{errno::Errno, mount::MsFlags};
 use oci_spec::runtime::{Mount as SpecMount, MountBuilder as SpecMountBuilder};
 use procfs::process::{MountOptFields, Process};
-use std::{collections::HashMap, fs::{canonicalize, create_dir_all, OpenOptions}};
-use std::path::{Path, PathBuf};
 use std::borrow::Cow;
+use std::path::{Path, PathBuf};
+use std::{
+    collections::HashMap,
+    fs::{canonicalize, create_dir_all, OpenOptions},
+};
 
 #[derive(Debug)]
 pub struct MountOptions<'a> {

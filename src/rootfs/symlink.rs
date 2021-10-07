@@ -15,13 +15,11 @@ impl Default for Symlink {
 
 impl Symlink {
     pub fn new() -> Symlink {
-       Symlink::with_syscall(create_syscall())
+        Symlink::with_syscall(create_syscall())
     }
 
     fn with_syscall(syscall: Box<dyn Syscall>) -> Symlink {
-        Symlink {
-            syscall,
-        }
+        Symlink { syscall }
     }
 
     // Create symlinks for subsystems that have been comounted e.g. cpu -> cpu,cpuacct, cpuacct -> cpu,cpuacct
@@ -86,8 +84,8 @@ impl Symlink {
 mod tests {
     use super::*;
     use crate::syscall::linux::LinuxSyscall;
-    use crate::{syscall::test::TestHelperSyscall, utils::create_temp_dir};
     use crate::utils::TempDir;
+    use crate::{syscall::test::TestHelperSyscall, utils::create_temp_dir};
     use nix::{
         fcntl::{open, OFlag},
         sys::stat::Mode,
@@ -178,7 +176,9 @@ mod tests {
         let symlink = Symlink::with_syscall(Box::new(LinuxSyscall));
 
         // act
-        symlink.setup_comount_symlinks(&tmp, "cpu,cpuacct").context("failed to setup symlinks")?;
+        symlink
+            .setup_comount_symlinks(&tmp, "cpu,cpuacct")
+            .context("failed to setup symlinks")?;
 
         // assert
         assert!(cpu.exists(), "cpu symlink does not exist");
@@ -214,8 +214,9 @@ mod tests {
         let symlink = Symlink::with_syscall(Box::new(LinuxSyscall));
 
         // act
-        let result =
-            symlink.setup_comount_symlinks(&tmp, "memory,task").context("failed to setup symlinks");
+        let result = symlink
+            .setup_comount_symlinks(&tmp, "memory,task")
+            .context("failed to setup symlinks");
 
         // assert
         assert!(result.is_ok());
