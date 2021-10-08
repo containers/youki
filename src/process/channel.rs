@@ -351,6 +351,7 @@ mod tests {
                 wait::waitpid(child, None)?;
             }
             unistd::ForkResult::Child => {
+                receiver.close()?;
                 std::process::exit(0);
             }
         };
@@ -373,6 +374,7 @@ mod tests {
                 wait::waitpid(child, None)?;
             }
             unistd::ForkResult::Child => {
+                receiver.close()?;
                 std::process::exit(0);
             }
         };
