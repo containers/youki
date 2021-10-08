@@ -170,16 +170,9 @@ fn apply_rest_namespaces(
 ) -> Result<()> {
     namespaces
         .apply_namespaces(|ns_type| -> bool {
-            ns_type != CloneFlags::CLONE_NEWUSER
-                && ns_type != CloneFlags::CLONE_NEWPID
-                && ns_type != CloneFlags::CLONE_NEWNS
+            ns_type != CloneFlags::CLONE_NEWUSER && ns_type != CloneFlags::CLONE_NEWPID
         })
         .with_context(|| "failed to apply namespaces")?;
-    if let Some(mount_namespace) = namespaces.get(LinuxNamespaceType::Mount) {
-        namespaces
-            .unshare_or_setns(mount_namespace)
-            .with_context(|| format!("failed to enter mount namespace: {:?}", mount_namespace))?;
-    }
 
     // Only set the host name if entering into a new uts namespace
     if let Some(uts_namespace) = namespaces.get(LinuxNamespaceType::Uts) {
