@@ -370,4 +370,28 @@ mod tests {
             assert_eq!(got.len(), 2);
         }
     }
+
+    #[test]
+    fn test_make_parent_mount_private() {
+        let tmp_dir = TempDir::new("/tmp/test_make_parent_mount_private").unwrap();
+        let m = Mount::new();
+        assert!(m.make_parent_mount_private(tmp_dir.path()).is_ok());
+
+        let want = MountArgs {
+            source: None,
+            target: PathBuf::from("/"),
+            fstype: None,
+            flags: MsFlags::MS_PRIVATE,
+            data: None,
+        };
+        let got = m
+            .syscall
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap()
+            .get_mount_args();
+
+        assert_eq!(got.len(), 1);
+        assert_eq!(want, got[0]);
+    }
 }
