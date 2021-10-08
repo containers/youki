@@ -4,3 +4,8 @@
 #[allow(clippy::module_inception)]
 pub(crate) mod rootfs;
 pub use rootfs::RootFS;
+
+pub(super) mod device;
+pub(super) mod mount;
+pub(super) mod symlink;
+pub(super) mod utils;
