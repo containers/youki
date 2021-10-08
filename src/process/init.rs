@@ -1,5 +1,6 @@
 use super::args::ContainerArgs;
 use crate::apparmor;
+use crate::syscall::Syscall;
 use crate::{
     capabilities, hooks, namespaces::Namespaces, process::channel, rootfs::RootFS,
     rootless::Rootless, seccomp, tty, utils,
@@ -12,7 +13,7 @@ use nix::{
     fcntl,
     unistd::{self, Gid, Uid},
 };
-use oci_spec::runtime::{LinuxNamespaceType, User};
+use oci_spec::runtime::{LinuxNamespaceType, Spec, User};
 use std::collections::HashMap;
 use std::{
     env, fs,
@@ -232,11 +233,11 @@ pub fn container_init(
         // in the host mount namespace...
         if namespaces.get(LinuxNamespaceType::Mount).is_some() {
             // change the root of filesystem of the process to the rootfs
-            command
+            syscall
                 .pivot_rootfs(rootfs_path)
                 .with_context(|| format!("Failed to pivot root to {:?}", rootfs_path))?;
         } else {
-            command
+            syscall
                 .chroot(rootfs_path)
                 .with_context(|| format!("Failed to chroot to {:?}", rootfs_path))?;
         }
@@ -297,7 +298,7 @@ pub fn container_init(
     set_supplementary_gids(proc.user(), &args.rootless)
         .context("failed to set supplementary gids")?;
 
-    command
+    syscall
         .set_id(
             Uid::from_raw(proc.user().uid()),
             Gid::from_raw(proc.user().gid()),
@@ -312,9 +313,9 @@ pub fn container_init(
             .context("Failed to execute seccomp")?;
     }
 
-    capabilities::reset_effective(command).context("Failed to reset effective capabilities")?;
+    capabilities::reset_effective(syscall).context("Failed to reset effective capabilities")?;
     if let Some(caps) = proc.capabilities() {
-        capabilities::drop_privileges(caps, command).context("Failed to drop capabilities")?;
+        capabilities::drop_privileges(caps, syscall).context("Failed to drop capabilities")?;
     }
 
     // Take care of LISTEN_FDS used for systemd-active-socket. If the value is
