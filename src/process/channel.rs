@@ -10,6 +10,17 @@ use std::io::Read;
 use std::io::Write;
 use std::os::unix::io::AsRawFd;
 
+/// Channel Design
+///
+/// Each of the main, intermediate, and init process will have a uni-directional
+/// channel, a sender and a receiver. Each process will hold the receiver and
+/// listen message on it. Each sender is shared between each process to send
+/// message to the corresponding receiver. For example, main_sender and
+/// main_receiver is used for the main process. The main process will use
+/// receiver to receive all message sent to the main process. The other
+/// processes will share the main_sender and use it to send message to the main
+/// process.
+
 trait SenderExt {
     fn write_message(&mut self, msg: Message) -> Result<()>;
 }
@@ -24,73 +35,16 @@ impl SenderExt for Sender {
     }
 }
 
-pub fn main_to_intermediate() -> Result<(SenderMainToIntermediate, ReceiverFromMain)> {
+pub fn main_channel() -> Result<(MainSender, MainReceiver)> {
     let (sender, receiver) = new_pipe()?;
-    Ok((
-        SenderMainToIntermediate { sender },
-        ReceiverFromMain { receiver },
-    ))
+    Ok((MainSender { sender }, MainReceiver { receiver }))
 }
 
-pub struct SenderMainToIntermediate {
+pub struct MainSender {
     sender: Sender,
 }
 
-impl SenderMainToIntermediate {
-    pub fn mapping_written(&mut self) -> Result<()> {
-        log::debug!("identifier mapping written");
-        self.sender
-            .write_all(&(Message::MappingWritten as u8).to_be_bytes())?;
-        Ok(())
-    }
-
-    pub fn close(&self) -> Result<()> {
-        unistd::close(self.sender.as_raw_fd())?;
-        Ok(())
-    }
-}
-
-pub struct ReceiverFromMain {
-    receiver: Receiver,
-}
-
-impl ReceiverFromMain {
-    // wait until the parent process has finished writing the id mappings
-    pub fn wait_for_mapping_ack(&mut self) -> Result<()> {
-        log::debug!("waiting for mapping ack");
-        let mut buf = [0; 1];
-        self.receiver
-            .read_exact(&mut buf)
-            .with_context(|| "Failed to receive a message from the main process.")?;
-
-        match Message::from(u8::from_be_bytes(buf)) {
-            Message::MappingWritten => Ok(()),
-            msg => bail!(
-                "receive unexpected message {:?} in waiting for mapping ack",
-                msg
-            ),
-        }
-    }
-
-    pub fn close(&self) -> Result<()> {
-        unistd::close(self.receiver.as_raw_fd())?;
-        Ok(())
-    }
-}
-
-pub fn intermediate_to_main() -> Result<(SenderIntermediateToMain, ReceiverFromIntermediate)> {
-    let (sender, receiver) = new_pipe()?;
-    Ok((
-        SenderIntermediateToMain { sender },
-        ReceiverFromIntermediate { receiver },
-    ))
-}
-
-pub struct SenderIntermediateToMain {
-    sender: Sender,
-}
-
-impl SenderIntermediateToMain {
+impl MainSender {
     // requests the Main to write the id mappings for the intermediate process
     // this needs to be done from the parent see https://man7.org/linux/man-pages/man7/user_namespaces.7.html
     pub fn identifier_mapping_request(&mut self) -> Result<()> {
@@ -113,16 +67,41 @@ impl SenderIntermediateToMain {
     }
 }
 
-pub struct ReceiverFromIntermediate {
+pub struct MainReceiver {
     receiver: Receiver,
 }
 
-impl ReceiverFromIntermediate {
+impl MainReceiver {
+    /// Waits for associated intermediate process to send ready message
+    /// and return the pid of init process which is forked by intermediate process
+    pub fn wait_for_intermediate_ready(&mut self) -> Result<Pid> {
+        let mut buf = [0; 1];
+        self.receiver
+            .read_exact(&mut buf)
+            .with_context(|| "failed to receive a message from the intermediate process")?;
+
+        match Message::from(u8::from_be_bytes(buf)) {
+            Message::IntermediateReady => {
+                log::debug!("received intermediate ready message");
+                // Read the Pid which will be i32 or 4 bytes.
+                let mut buf = [0; 4];
+                self.receiver
+                    .read_exact(&mut buf)
+                    .with_context(|| "failed to receive a message from the intermediate process")?;
+
+                Ok(Pid::from_raw(i32::from_be_bytes(buf)))
+            }
+            msg => bail!(
+                "receive unexpected message {:?} waiting for intermediate ready",
+                msg
+            ),
+        }
+    }
     pub fn wait_for_mapping_request(&mut self) -> Result<()> {
         let mut buf = [0; 1];
         self.receiver
             .read_exact(&mut buf)
-            .with_context(|| "Failed to receive a message from the child process.")?;
+            .with_context(|| "failed to receive a message from the child process")?;
 
         // convert to Message wrapper
         match Message::from(u8::from_be_bytes(buf)) {
@@ -134,51 +113,32 @@ impl ReceiverFromIntermediate {
         }
     }
 
-    /// Waits for associated intermediate process to send ready message
-    /// and return the pid of init process which is forked by intermediate process
-    pub fn wait_for_intermediate_ready(&mut self) -> Result<Pid> {
-        let mut buf = [0; 1];
-        self.receiver
-            .read_exact(&mut buf)
-            .with_context(|| "Failed to receive a message from the intermediate process.")?;
-
-        match Message::from(u8::from_be_bytes(buf)) {
-            Message::IntermediateReady => {
-                log::debug!("received intermediate ready message");
-                // Read the Pid which will be i32 or 4 bytes.
-                let mut buf = [0; 4];
-                self.receiver.read_exact(&mut buf).with_context(|| {
-                    "Failed to receive a message from the intermediate process."
-                })?;
-
-                Ok(Pid::from_raw(i32::from_be_bytes(buf)))
-            }
-            msg => bail!(
-                "receive unexpected message {:?} waiting for intermediate ready",
-                msg
-            ),
-        }
-    }
-
     pub fn close(&self) -> Result<()> {
         unistd::close(self.receiver.as_raw_fd())?;
         Ok(())
     }
 }
 
-pub fn init_to_intermediate() -> Result<(SenderInitToIntermediate, ReceiverFromInit)> {
+pub fn intermediate_channel() -> Result<(IntermediateSender, IntermediateReceiver)> {
     let (sender, receiver) = new_pipe()?;
     Ok((
-        SenderInitToIntermediate { sender },
-        ReceiverFromInit { receiver },
+        IntermediateSender { sender },
+        IntermediateReceiver { receiver },
     ))
 }
 
-pub struct SenderInitToIntermediate {
+pub struct IntermediateSender {
     sender: Sender,
 }
 
-impl SenderInitToIntermediate {
+impl IntermediateSender {
+    pub fn mapping_written(&mut self) -> Result<()> {
+        log::debug!("identifier mapping written");
+        self.sender
+            .write_all(&(Message::MappingWritten as u8).to_be_bytes())?;
+        Ok(())
+    }
+
     pub fn init_ready(&mut self) -> Result<()> {
         self.sender.write_message(Message::InitReady)?;
         Ok(())
@@ -190,11 +150,28 @@ impl SenderInitToIntermediate {
     }
 }
 
-pub struct ReceiverFromInit {
+pub struct IntermediateReceiver {
     receiver: Receiver,
 }
 
-impl ReceiverFromInit {
+impl IntermediateReceiver {
+    // wait until the parent process has finished writing the id mappings
+    pub fn wait_for_mapping_ack(&mut self) -> Result<()> {
+        log::debug!("waiting for mapping ack");
+        let mut buf = [0; 1];
+        self.receiver
+            .read_exact(&mut buf)
+            .with_context(|| "Failed to receive a message from the main process.")?;
+
+        match Message::from(u8::from_be_bytes(buf)) {
+            Message::MappingWritten => Ok(()),
+            msg => bail!(
+                "receive unexpected message {:?} in waiting for mapping ack",
+                msg
+            ),
+        }
+    }
+
     /// Waits for associated init process to send ready message
     /// and return the pid of init process which is forked by init process
     pub fn wait_for_init_ready(&mut self) -> Result<()> {
@@ -218,6 +195,33 @@ impl ReceiverFromInit {
     }
 }
 
+pub fn init_channel() -> Result<(InitSender, InitReceiver)> {
+    let (sender, receiver) = new_pipe()?;
+    Ok((InitSender { sender }, InitReceiver { receiver }))
+}
+
+pub struct InitSender {
+    sender: Sender,
+}
+
+impl InitSender {
+    pub fn close(&self) -> Result<()> {
+        unistd::close(self.sender.as_raw_fd())?;
+        Ok(())
+    }
+}
+
+pub struct InitReceiver {
+    receiver: Receiver,
+}
+
+impl InitReceiver {
+    pub fn close(&self) -> Result<()> {
+        unistd::close(self.receiver.as_raw_fd())?;
+        Ok(())
+    }
+}
+
 fn new_pipe() -> Result<(Sender, Receiver)> {
     let (sender, receiver) = pipe::new()?;
     // Our use case is for the process to wait for the communication to come
@@ -230,7 +234,6 @@ fn new_pipe() -> Result<(Sender, Receiver)> {
 }
 
 #[cfg(test)]
-// Tests become unstable if not serial. The cause is not known.
 mod tests {
     use super::*;
     use anyhow::Context;
@@ -248,7 +251,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_channel_intermadiate_ready() -> Result<()> {
-        let (sender, receiver) = &mut intermediate_to_main()?;
+        let (sender, receiver) = &mut main_channel()?;
         match unsafe { unistd::fork()? } {
             unistd::ForkResult::Parent { child } => {
                 wait::waitpid(child, None)?;
@@ -272,7 +275,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_channel_id_mapping_request() -> Result<()> {
-        let (sender, receiver) = &mut intermediate_to_main()?;
+        let (sender, receiver) = &mut main_channel()?;
         match unsafe { unistd::fork()? } {
             unistd::ForkResult::Parent { child } => {
                 wait::waitpid(child, None)?;
@@ -294,7 +297,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_channel_id_mapping_ack() -> Result<()> {
-        let (sender, receiver) = &mut main_to_intermediate()?;
+        let (sender, receiver) = &mut intermediate_channel()?;
         match unsafe { unistd::fork()? } {
             unistd::ForkResult::Parent { child } => {
                 wait::waitpid(child, None)?;
@@ -314,7 +317,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_channel_init_ready() -> Result<()> {
-        let (sender, receiver) = &mut init_to_intermediate()?;
+        let (sender, receiver) = &mut intermediate_channel()?;
         match unsafe { unistd::fork()? } {
             unistd::ForkResult::Parent { child } => {
                 wait::waitpid(child, None)?;
@@ -335,11 +338,11 @@ mod tests {
 
     #[test]
     #[serial]
-    fn test_channel_intermedaite_graceful_exit() -> Result<()> {
-        let (sender, receiver) = &mut intermediate_to_main()?;
+    fn test_channel_main_graceful_exit() -> Result<()> {
+        let (sender, receiver) = &mut main_channel()?;
         match unsafe { unistd::fork()? } {
             unistd::ForkResult::Parent { child } => {
-                sender.close().context("Failed to close sender")?;
+                sender.close().context("failed to close sender")?;
                 // The child process will exit without send the intermediate ready
                 // message. This should cause the wait_for_intermediate_ready to error
                 // out, instead of keep blocking.
@@ -348,7 +351,7 @@ mod tests {
                 wait::waitpid(child, None)?;
             }
             unistd::ForkResult::Child => {
-                receiver.close().context("Failed to close receiver")?;
+                receiver.close()?;
                 std::process::exit(0);
             }
         };
@@ -358,11 +361,11 @@ mod tests {
 
     #[test]
     #[serial]
-    fn test_channel_init_graceful_exit() -> Result<()> {
-        let (sender, receiver) = &mut init_to_intermediate()?;
+    fn test_channel_intermediate_graceful_exit() -> Result<()> {
+        let (sender, receiver) = &mut intermediate_channel()?;
         match unsafe { unistd::fork()? } {
             unistd::ForkResult::Parent { child } => {
-                sender.close().context("Failed to close sender")?;
+                sender.close().context("failed to close sender")?;
                 // The child process will exit without send the init ready
                 // message. This should cause the wait_for_init_ready to error
                 // out, instead of keep blocking.
@@ -371,7 +374,7 @@ mod tests {
                 wait::waitpid(child, None)?;
             }
             unistd::ForkResult::Child => {
-                receiver.close().context("Failed to close receiver")?;
+                receiver.close()?;
                 std::process::exit(0);
             }
         };

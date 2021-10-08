@@ -67,8 +67,8 @@ impl<'a> ContainerBuilderImpl<'a> {
         }
 
         // We use a set of channels to communicate between parent and child process. Each channel is uni-directional.
-        let (sender_to_intermediate, receiver_from_main) = &mut channel::main_to_intermediate()?;
-        let (sender_to_main, receiver_from_intermediate) = &mut channel::intermediate_to_main()?;
+        let (main_sender, main_receiver) = &mut channel::main_channel()?;
+        let (intermediate_sender, intermediate_receiver) = &mut channel::intermediate_channel()?;
 
         // Need to create the notify socket before we pivot root, since the unix
         // domain socket used here is outside of the rootfs of container. During
@@ -119,45 +119,44 @@ impl<'a> ContainerBuilderImpl<'a> {
             cgroup_manager: cmanager,
         };
         let intermediate_pid = fork::container_fork(|| {
-            // The fds in the pipe is duplicated during fork, so we first close
+            // The fds in the channel is duplicated during fork, so we first close
             // the unused fds. Note, this already runs in the child process.
-            sender_to_intermediate
+            main_receiver
                 .close()
-                .context("Failed to close unused sender")?;
-            receiver_from_intermediate
-                .close()
-                .context("Failed to close unused receiver")?;
+                .context("failed to close unused receiver")?;
 
             intermediate::container_intermediate(
                 intermediate_args,
-                receiver_from_main,
-                sender_to_main,
+                intermediate_sender,
+                intermediate_receiver,
+                main_sender,
             )
         })?;
         // Close down unused fds. The corresponding fds are duplicated to the
         // child process during fork.
-        receiver_from_main
+        main_sender
             .close()
-            .context("Failed to close parent to child receiver")?;
-        sender_to_main
-            .close()
-            .context("Failed to close child to parent sender")?;
+            .context("failed to close unused sender")?;
 
         // If creating a rootless container, the intermediate process will ask
         // the main process to set up uid and gid mapping, once the intermediate
         // process enters into a new user namespace.
         if let Some(rootless) = &self.rootless {
-            receiver_from_intermediate.wait_for_mapping_request()?;
+            main_receiver.wait_for_mapping_request()?;
             setup_mapping(rootless, intermediate_pid)?;
-            sender_to_intermediate.mapping_written()?;
+            intermediate_sender.mapping_written()?;
         }
 
-        let init_pid = receiver_from_intermediate.wait_for_intermediate_ready()?;
+        intermediate_sender
+            .close()
+            .context("failed to close unused sender")?;
+
+        let init_pid = main_receiver.wait_for_intermediate_ready()?;
         log::debug!("init pid is {:?}", init_pid);
 
         // if file to write the pid to is specified, write pid of the child
         if let Some(pid_file) = &self.pid_file {
-            fs::write(&pid_file, format!("{}", init_pid)).context("Failed to write pid file")?;
+            fs::write(&pid_file, format!("{}", init_pid)).context("failed to write pid file")?;
         }
 
         if let Some(container) = &mut self.container {
@@ -186,7 +185,7 @@ impl<'a> ContainerBuilderImpl<'a> {
         if let Some(container) = &self.container {
             if container.root.exists() {
                 if let Err(e) = fs::remove_dir_all(&container.root)
-                    .with_context(|| format!("could not delete {}", container.root.display()))
+                    .with_context(|| format!("could not delete {:?}", container.root))
                 {
                     errors.push(e.to_string());
                 }
@@ -219,16 +218,14 @@ fn setup_mapping(rootless: &Rootless, pid: Pid) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::process::channel::{intermediate_channel, main_channel};
     use nix::{
         sched::{unshare, CloneFlags},
         unistd::{self, getgid, getuid},
     };
     use oci_spec::runtime::LinuxIdMappingBuilder;
     use serial_test::serial;
-
-    use crate::process::channel::{intermediate_to_main, main_to_intermediate};
-
-    use super::*;
 
     #[test]
     #[serial]
@@ -244,12 +241,12 @@ mod tests {
             privileged: true,
             ..Default::default()
         };
-        let (mut sender_to_parent, mut receiver_from_child) = intermediate_to_main()?;
-        let (mut sender_to_child, mut receiver_from_parent) = main_to_intermediate()?;
+        let (mut parent_sender, mut parent_receiver) = main_channel()?;
+        let (mut child_sender, mut child_receiver) = intermediate_channel()?;
         match unsafe { unistd::fork()? } {
             unistd::ForkResult::Parent { child } => {
-                receiver_from_child.wait_for_mapping_request()?;
-                receiver_from_child.close()?;
+                parent_receiver.wait_for_mapping_request()?;
+                parent_receiver.close()?;
                 setup_mapping(&rootless, child)?;
                 let line = fs::read_to_string(format!("/proc/{}/uid_map", child.as_raw()))?;
                 let line_splited = line.split_whitespace();
@@ -260,16 +257,16 @@ mod tests {
                 ]) {
                     assert_eq!(act, expect);
                 }
-                sender_to_child.mapping_written()?;
-                sender_to_child.close()?;
+                child_sender.mapping_written()?;
+                child_sender.close()?;
             }
             unistd::ForkResult::Child => {
                 prctl::set_dumpable(true).unwrap();
                 unshare(CloneFlags::CLONE_NEWUSER)?;
-                sender_to_parent.identifier_mapping_request()?;
-                sender_to_parent.close()?;
-                receiver_from_parent.wait_for_mapping_ack()?;
-                receiver_from_child.close()?;
+                parent_sender.identifier_mapping_request()?;
+                parent_sender.close()?;
+                child_receiver.wait_for_mapping_ack()?;
+                child_receiver.close()?;
                 std::process::exit(0);
             }
         }
@@ -289,12 +286,12 @@ mod tests {
             gid_mappings: Some(&gid_mappings),
             ..Default::default()
         };
-        let (mut sender_to_parent, mut receiver_from_child) = intermediate_to_main()?;
-        let (mut sender_to_child, mut receiver_from_parent) = main_to_intermediate()?;
+        let (mut parent_sender, mut parent_receiver) = main_channel()?;
+        let (mut child_sender, mut child_receiver) = intermediate_channel()?;
         match unsafe { unistd::fork()? } {
             unistd::ForkResult::Parent { child } => {
-                receiver_from_child.wait_for_mapping_request()?;
-                receiver_from_child.close()?;
+                parent_receiver.wait_for_mapping_request()?;
+                parent_receiver.close()?;
                 setup_mapping(&rootless, child)?;
                 let line = fs::read_to_string(format!("/proc/{}/gid_map", child.as_raw()))?;
                 let line_splited = line.split_whitespace();
@@ -309,16 +306,16 @@ mod tests {
                     fs::read_to_string(format!("/proc/{}/setgroups", child.as_raw()))?,
                     "deny\n",
                 );
-                sender_to_child.mapping_written()?;
-                sender_to_child.close()?;
+                child_sender.mapping_written()?;
+                child_sender.close()?;
             }
             unistd::ForkResult::Child => {
                 prctl::set_dumpable(true).unwrap();
                 unshare(CloneFlags::CLONE_NEWUSER)?;
-                sender_to_parent.identifier_mapping_request()?;
-                sender_to_parent.close()?;
-                receiver_from_parent.wait_for_mapping_ack()?;
-                receiver_from_child.close()?;
+                parent_sender.identifier_mapping_request()?;
+                parent_sender.close()?;
+                child_receiver.wait_for_mapping_ack()?;
+                child_receiver.close()?;
                 std::process::exit(0);
             }
         }
