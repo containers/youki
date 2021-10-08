@@ -160,7 +160,8 @@ fn masked_path(path: &str, mount_label: &Option<String>) -> Result<()> {
 
 pub fn container_init(
     args: ContainerArgs,
-    sender_to_intermediate: &mut channel::SenderInitToIntermediate,
+    intermediate_sender: &mut channel::IntermediateSender,
+    _init_receiver: &mut channel::InitReceiver,
 ) -> Result<()> {
     let command = args.syscall;
     let spec = &args.spec;
@@ -362,8 +363,7 @@ pub fn container_init(
 
     // change directory to process.cwd if process.cwd is not empty
     if do_chdir {
-        unistd::chdir(proc.cwd())
-            .with_context(|| format!("Failed to chdir {}", proc.cwd().display()))?;
+        unistd::chdir(proc.cwd()).with_context(|| format!("failed to chdir {:?}", proc.cwd()))?;
     }
 
     // Reset the process env based on oci spec.
@@ -376,7 +376,7 @@ pub fn container_init(
     // Note, we pass -1 here because we are already inside the pid namespace.
     // The pid outside the pid namespace should be recorded by the intermediate
     // process.
-    sender_to_intermediate.init_ready()?;
+    intermediate_sender.init_ready()?;
 
     // listing on the notify socket for container start command
     let notify_socket = args.notify_socket;
@@ -390,17 +390,18 @@ pub fn container_init(
         }
     }
 
-    if linux.seccomp().is_some() && proc.no_new_privileges().is_some() {
-        // Initialize seccomp profile right before we are ready to execute the
-        // payload. The notify socket will still need network related syscalls.
-        seccomp::initialize_seccomp(linux.seccomp().as_ref().unwrap())
-            .context("Failed to execute seccomp")?;
+    if let Some(seccomp) = linux.seccomp() {
+        if proc.no_new_privileges().is_some() {
+            // Initialize seccomp profile right before we are ready to execute the
+            // payload. The notify socket will still need network related syscalls.
+            seccomp::initialize_seccomp(seccomp).context("Failed to execute seccomp")?;
+        }
     }
 
     if let Some(args) = proc.args() {
         utils::do_exec(&args[0], args)?;
     } else {
-        bail!("On non-Windows, at least one process arg entry is required.")
+        bail!("on non-Windows, at least one process arg entry is required")
     }
 
     // After do_exec is called, the process is replaced with the container

@@ -11,8 +11,9 @@ use super::init::container_init;
 
 pub fn container_intermediate(
     args: ContainerArgs,
-    receiver_from_main: &mut channel::ReceiverFromMain,
-    sender_to_main: &mut channel::SenderIntermediateToMain,
+    intermediate_sender: &mut channel::IntermediateSender,
+    intermediate_receiver: &mut channel::IntermediateReceiver,
+    main_sender: &mut channel::MainSender,
 ) -> Result<()> {
     let command = &args.syscall;
     let spec = &args.spec;
@@ -32,8 +33,8 @@ pub fn container_intermediate(
             // child needs to be dumpable, otherwise the non root parent is not
             // allowed to write the uid/gid maps
             prctl::set_dumpable(true).unwrap();
-            sender_to_main.identifier_mapping_request()?;
-            receiver_from_main.wait_for_mapping_ack()?;
+            main_sender.identifier_mapping_request()?;
+            intermediate_receiver.wait_for_mapping_ack()?;
             prctl::set_dumpable(false).unwrap();
         }
 
@@ -75,32 +76,38 @@ pub fn container_intermediate(
     }
 
     // We only need for init process to send us the ChildReady.
-    let (sender_to_intermediate, receiver_from_init) = &mut channel::init_to_intermediate()?;
+    let (init_sender, init_receiver) = &mut channel::init_channel()?;
 
     // We have to record the pid of the child (container init process), since
     // the child will be inside the pid namespace. We can't rely on child_ready
     // to send us the correct pid.
     let pid = fork::container_fork(|| {
         // First thing in the child process to close the unused fds in the channel/pipe.
-        receiver_from_init
+        init_sender
             .close()
-            .context("Failed to close receiver in init process")?;
-        container_init(args, sender_to_intermediate)
+            .context("failed to close receiver in init process")?;
+        main_sender
+            .close()
+            .context("failed to close unused sender")?;
+        container_init(args, intermediate_sender, init_receiver)
     })?;
     // Close unused fds in the parent process.
-    sender_to_intermediate
+    intermediate_sender
         .close()
-        .context("Failed to close sender in the intermediate process")?;
+        .context("failed to close sender in the intermediate process")?;
+    init_sender
+        .close()
+        .context("failed to close unused init sender")?;
     // There is no point using the pid returned here, since the child will be
     // inside the pid namespace already.
-    receiver_from_init
+    intermediate_receiver
         .wait_for_init_ready()
-        .context("Failed to wait for the child")?;
+        .context("failed to wait for the child")?;
     // After the child (the container init process) becomes ready, we can signal
     // the parent (the main process) that we are ready.
-    sender_to_main
+    main_sender
         .intermediate_ready(pid)
-        .context("Failed to send child ready from intermediate process")?;
+        .context("failed to send child ready from intermediate process")?;
 
     Ok(())
 }
