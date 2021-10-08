@@ -10,7 +10,7 @@ use super::args::ContainerArgs;
 use super::init::container_init;
 
 pub fn container_intermediate(
-    args: ContainerArgs,
+    args: &ContainerArgs,
     intermediate_sender: &mut channel::IntermediateSender,
     intermediate_receiver: &mut channel::IntermediateReceiver,
     main_sender: &mut channel::MainSender,

@@ -186,7 +186,7 @@ fn apply_rest_namespaces(
 }
 
 pub fn container_init(
-    args: ContainerArgs,
+    args: &ContainerArgs,
     intermediate_sender: &mut channel::IntermediateSender,
     _init_receiver: &mut channel::InitReceiver,
 ) -> Result<()> {
@@ -382,8 +382,7 @@ pub fn container_init(
     intermediate_sender.init_ready()?;
 
     // listing on the notify socket for container start command
-    let notify_socket = args.notify_socket;
-    notify_socket.wait_for_container_start()?;
+    args.notify_socket.wait_for_container_start()?;
 
     // create_container hook needs to be called after the namespace setup, but
     // before pivot_root is called. This runs in the container namespaces.

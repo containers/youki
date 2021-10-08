@@ -6,4 +6,5 @@ pub mod channel;
 pub mod fork;
 pub(crate) mod init;
 pub mod intermediate;
+pub mod main;
 pub mod message;
