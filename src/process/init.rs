@@ -159,29 +159,15 @@ fn masked_path(path: &str, mount_label: &Option<String>) -> Result<()> {
     Ok(())
 }
 
-pub fn container_init(
-    args: ContainerArgs,
-    sender_to_intermediate: &mut channel::SenderInitToIntermediate,
+// Enter into rest of namespace. Note, we already entered into user and pid
+// namespace. We also have to enter into mount namespace last since
+// namespace may be bind to /proc path. The /proc path will need to be
+// accessed before pivot_root.
+fn apply_rest_namespaces(
+    namespaces: &Namespaces,
+    spec: &Spec,
+    syscall: &dyn Syscall,
 ) -> Result<()> {
-    let command = args.syscall;
-    let spec = &args.spec;
-    let linux = spec.linux().as_ref().context("no linux in spec")?;
-    let proc = spec.process().as_ref().context("no process in spec")?;
-    let mut envs: Vec<String> = proc.env().as_ref().unwrap_or(&vec![]).clone();
-    let rootfs_path = &args.rootfs;
-    let hooks = spec.hooks().as_ref();
-    let container = args.container.as_ref();
-    let namespaces = Namespaces::from(linux.namespaces().as_ref());
-
-    // set up tty if specified
-    if let Some(csocketfd) = args.console_socket {
-        tty::setup_console(&csocketfd).with_context(|| "Failed to set up tty")?;
-    }
-
-    // Enter into rest of namespace. Note, we already entered into user and pid
-    // namespace. We also have to enter into mount namespace last since
-    // namespace may be bind to /proc path. The /proc path will need to be
-    // accessed before pivot_root.
     namespaces
         .apply_namespaces(|ns_type| -> bool {
             ns_type != CloneFlags::CLONE_NEWUSER
@@ -199,10 +185,33 @@ pub fn container_init(
     if let Some(uts_namespace) = namespaces.get(LinuxNamespaceType::Uts) {
         if uts_namespace.path().is_none() {
             if let Some(hostname) = spec.hostname() {
-                command.set_hostname(hostname)?;
+                syscall.set_hostname(hostname)?;
             }
         }
     }
+    Ok(())
+}
+
+pub fn container_init(
+    args: ContainerArgs,
+    sender_to_intermediate: &mut channel::SenderInitToIntermediate,
+) -> Result<()> {
+    let syscall = args.syscall;
+    let spec = &args.spec;
+    let linux = spec.linux().as_ref().context("no linux in spec")?;
+    let proc = spec.process().as_ref().context("no process in spec")?;
+    let mut envs: Vec<String> = proc.env().as_ref().unwrap_or(&vec![]).clone();
+    let rootfs_path = &args.rootfs;
+    let hooks = spec.hooks().as_ref();
+    let container = args.container.as_ref();
+    let namespaces = Namespaces::from(linux.namespaces().as_ref());
+
+    // set up tty if specified
+    if let Some(csocketfd) = args.console_socket {
+        tty::setup_console(&csocketfd).with_context(|| "Failed to set up tty")?;
+    }
+
+    apply_rest_namespaces(&namespaces, spec, syscall)?;
 
     if let Some(true) = proc.no_new_privileges() {
         let _ = prctl::set_no_new_privileges(true);
