@@ -228,4 +228,18 @@ mod tests {
             fs::canonicalize(PathBuf::from(".")).unwrap()
         );
     }
+
+    #[test]
+    fn test_set_annotations() {
+        let mut container = Container::default();
+        assert_eq!(container.state.annotations, None);
+
+        let mut annotations = std::collections::HashMap::with_capacity(1);
+        annotations.insert(
+            "org.criu.config".to_string(),
+            "/etc/special-youki-criu-options".to_string(),
+        );
+        container.set_annotations(Some(annotations.clone()));
+        assert_eq!(container.state.annotations, Some(annotations));
+    }
 }
