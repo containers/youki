@@ -372,9 +372,12 @@ impl Mount {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use super::*;
     use crate::syscall::test::{MountArgs, TestHelperSyscall};
     use crate::utils::create_temp_dir;
+    use anyhow::Result;
 
     #[test]
     fn test_mount_to_container() {
@@ -489,5 +492,114 @@ mod tests {
 
         assert_eq!(got.len(), 1);
         assert_eq!(want, got[0]);
+    }
+
+    #[test]
+    fn test_namespaced_subsystem_success() -> Result<()> {
+        let tmp = create_temp_dir("test_namespaced_subsystem_success")?;
+        let container_cgroup = Path::new("/container_cgroup");
+
+        let mounter = Mount::new();
+
+        let spec_cgroup_mount = SpecMountBuilder::default()
+            .destination(&container_cgroup)
+            .source("cgroup")
+            .typ("cgroup")
+            .build()
+            .context("failed to build cgroup mount")?;
+
+        let mount_opts = MountOptions {
+            root: tmp.path(),
+            label: None,
+            cgroup_ns: true,
+        };
+
+        let subsystem_name = "cpu";
+
+        mounter
+            .setup_namespaced_subsystem(&spec_cgroup_mount, &mount_opts, subsystem_name, false)
+            .context("failed to setup namespaced subsystem")?;
+
+        let expected = MountArgs {
+            source: Some(PathBuf::from("cgroup")),
+            target: tmp.join_safely(container_cgroup)?.join(subsystem_name),
+            fstype: Some("cgroup".to_owned()),
+            flags: MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
+            data: Some("cpu".to_owned()),
+        };
+
+        let got = mounter
+            .syscall
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap()
+            .get_mount_args();
+
+        assert_eq!(got.len(), 1);
+        assert_eq!(expected, got[0]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_emulated_subsystem_success() -> Result<()> {
+        // arrange
+        let tmp = create_temp_dir("test_emulated_subsystem")?;
+        let host_cgroup_mount = tmp.join("host_cgroup");
+        let host_cgroup = host_cgroup_mount.join("cpu/container1");
+        fs::create_dir_all(&host_cgroup)?;
+
+        let container_cgroup = Path::new("/container_cgroup");
+        let mounter = Mount::new();
+
+        let spec_cgroup_mount = SpecMountBuilder::default()
+            .destination(&container_cgroup)
+            .source("cgroup")
+            .typ("cgroup")
+            .build()
+            .context("failed to build cgroup mount")?;
+
+        let mount_opts = MountOptions {
+            root: tmp.path(),
+            label: None,
+            cgroup_ns: false,
+        };
+
+        let subsystem_name = "cpu";
+        let mut process_cgroups = HashMap::new();
+        process_cgroups.insert("cpu".to_owned(), "container1".to_owned());
+
+        // act
+        mounter
+            .setup_emulated_subsystem(
+                &spec_cgroup_mount,
+                &mount_opts,
+                subsystem_name,
+                false,
+                &host_cgroup_mount.join(subsystem_name),
+                &process_cgroups,
+            )
+            .context("failed to setup emulated subsystem")?;
+
+        // assert
+        let expected = MountArgs {
+            source: Some(host_cgroup),
+            target: tmp.join_safely(container_cgroup)?.join(subsystem_name),
+            fstype: Some("bind".to_owned()),
+            flags: MsFlags::MS_BIND | MsFlags::MS_REC,
+            data: Some("".to_owned()),
+        };
+
+        let got = mounter
+            .syscall
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap()
+            .get_mount_args();
+
+        assert_eq!(got.len(), 1);
+        assert_eq!(expected, got[0]);
+
+        Ok(())
     }
 }
