@@ -54,7 +54,7 @@ impl Manager {
         } else {
             mount_point.join_safely(cgroup_path)?
         };
-       
+
         Ok(p)
     }
 

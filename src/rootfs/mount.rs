@@ -2,18 +2,21 @@ use super::{
     symlink::Symlink,
     utils::{find_parent_mount, parse_mount},
 };
-use crate::syscall::{syscall::create_syscall, Syscall};
 use crate::utils::PathBufExt;
-use anyhow::{bail, Context, Result};
+use crate::{
+    syscall::{syscall::create_syscall, Syscall},
+    utils,
+};
+use anyhow::{anyhow, bail, Context, Result};
 use cgroups::common::{
     CgroupSetup::{Hybrid, Legacy, Unified},
     DEFAULT_CGROUP_ROOT,
 };
-use nix::{errno::Errno, mount::MsFlags};
+use nix::{errno::Errno, mount::MsFlags, sys::stat::Mode};
 use oci_spec::runtime::{Mount as SpecMount, MountBuilder as SpecMountBuilder};
 use procfs::process::{MountOptFields, Process};
-use std::borrow::Cow;
 use std::path::{Path, PathBuf};
+use std::{borrow::Cow, fs};
 use std::{
     collections::HashMap,
     fs::{canonicalize, create_dir_all, OpenOptions},
@@ -62,7 +65,7 @@ impl Mount {
             }
             _ => {
                 if *mount.destination() == PathBuf::from("/dev") {
-                    self.mount_to_container(
+                    self.mount_into_container(
                         mount,
                         options.root,
                         flags & !MsFlags::MS_RDONLY,
@@ -71,7 +74,7 @@ impl Mount {
                     )
                     .with_context(|| format!("failed to mount /dev: {:?}", mount))?;
                 } else {
-                    self.mount_to_container(mount, options.root, flags, &data, options.label)
+                    self.mount_into_container(mount, options.root, flags, &data, options.label)
                         .with_context(|| format!("failed to mount: {:?}", mount))?;
                 }
             }
@@ -80,6 +83,7 @@ impl Mount {
         Ok(())
     }
     fn mount_cgroup_v1(&self, cgroup_mount: &SpecMount, options: &MountOptions) -> Result<()> {
+        log::debug!("Mounting cgroup v1 filesystem");
         // create tmpfs into which the cgroup subsystems will be mounted
         let tmpfs = SpecMountBuilder::default()
             .source("tmpfs")
@@ -184,7 +188,7 @@ impl Mount {
             subsystem_name.into()
         };
 
-        self.mount_to_container(
+        self.mount_into_container(
             &subsystem_mount,
             options.root,
             MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
@@ -252,8 +256,57 @@ impl Mount {
         Ok(())
     }
 
-    fn mount_cgroup_v2(&self, _: &SpecMount, _: &MountOptions, _: MsFlags, _: &str) -> Result<()> {
-        log::warn!("Mounting cgroup v2 is not yet supported");
+    fn mount_cgroup_v2(
+        &self,
+        cgroup_mount: &SpecMount,
+        options: &MountOptions,
+        flags: MsFlags,
+        data: &str,
+    ) -> Result<()> {
+        log::debug!("Mounting cgroup v2 filesystem");
+
+        let cgroup_mount = SpecMountBuilder::default()
+            .typ("cgroup2")
+            .source("cgroup")
+            .destination(cgroup_mount.destination())
+            .options(Vec::new())
+            .build()?;
+        log::debug!("{:?}", cgroup_mount);
+
+        if let Err(_) = self
+            .mount_into_container(&cgroup_mount, options.root, flags, data, options.label)
+            .context("failed to mount into container")
+        {
+            let host_mount = cgroups::v2::util::get_unified_mount_point()
+                .context("failed to get unified mount point")?;
+
+            let process_cgroup = Process::myself()?
+                .cgroups()
+                .context("failed to get process cgroups")?
+                .into_iter()
+                .find(|c| c.hierarchy == 0)
+                .map(|c| PathBuf::from(c.pathname))
+                .ok_or_else(|| anyhow!("failed to find unified process cgroup"))?;
+
+            let bind_mount = SpecMountBuilder::default()
+                .typ("bind")
+                .source(host_mount.join_safely(process_cgroup)?)
+                .destination(cgroup_mount.destination())
+                .options(Vec::new())
+                .build()
+                .context("failed to build cgroup bind mount")?;
+            log::debug!("{:?}", bind_mount);
+
+            self.mount_into_container(
+                &bind_mount,
+                options.root,
+                flags | MsFlags::MS_BIND,
+                data,
+                options.label,
+            )
+            .context("failed to bind mount cgroup hierarchy")?;
+        }
+
         Ok(())
     }
 
@@ -281,7 +334,7 @@ impl Mount {
         Ok(())
     }
 
-    fn mount_to_container(
+    fn mount_into_container(
         &self,
         m: &SpecMount,
         rootfs: &Path,
@@ -313,7 +366,7 @@ impl Mount {
             .with_context(|| "no source in mount spec".to_string())?;
         let src = if typ == Some("bind") {
             let src = canonicalize(source)
-                .with_context(|| format!("Failed to canonicalize: {:?}", source))?;
+                .with_context(|| format!("failed to canonicalize: {:?}", source))?;
             let dir = if src.is_file() {
                 Path::new(&dest).parent().unwrap()
             } else {
@@ -321,14 +374,14 @@ impl Mount {
             };
 
             create_dir_all(&dir)
-                .with_context(|| format!("Failed to create dir for bind mount: {:?}", dir))?;
+                .with_context(|| format!("failed to create dir for bind mount: {:?}", dir))?;
 
             if src.is_file() {
                 OpenOptions::new()
                     .create(true)
                     .write(true)
                     .open(&dest)
-                    .with_context(|| format!("Failed to create file for bind mount: {:?}", src))?;
+                    .with_context(|| format!("failed to create file for bind mount: {:?}", src))?;
             }
 
             src
@@ -348,7 +401,7 @@ impl Mount {
 
             self.syscall
                 .mount(Some(&*src), dest, typ, flags, Some(data))
-                .with_context(|| format!("Failed to mount {:?} to {:?}", src, dest))?;
+                .with_context(|| format!("failed to mount {:?} to {:?}", src, dest))?;
         }
 
         if typ == Some("bind")
@@ -401,7 +454,7 @@ mod tests {
             let (flags, data) = parse_mount(mount);
 
             assert!(m
-                .mount_to_container(mount, tmp_dir.path(), flags, &data, Some("defaults"))
+                .mount_into_container(mount, tmp_dir.path(), flags, &data, Some("defaults"))
                 .is_ok());
 
             let want = vec![MountArgs {
@@ -439,7 +492,7 @@ mod tests {
                 .unwrap();
 
             assert!(m
-                .mount_to_container(mount, tmp_dir.path(), flags, &data, None)
+                .mount_into_container(mount, tmp_dir.path(), flags, &data, None)
                 .is_ok());
 
             let want = vec![

@@ -1,4 +1,9 @@
-use std::{fs::{self}, os::unix::fs::PermissionsExt, path::{Component::RootDir, Path, PathBuf}, time::Duration};
+use std::{
+    fs::{self},
+    os::unix::fs::PermissionsExt,
+    path::{Component::RootDir, Path, PathBuf},
+    time::Duration,
+};
 
 use anyhow::Result;
 
