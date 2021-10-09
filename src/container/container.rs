@@ -149,7 +149,8 @@ impl Container {
                 // it with information about the process with given pid
                 if let Ok(proc) = Process::new(pid.as_raw()) {
                     use procfs::process::ProcState;
-                    match proc.stat.state().unwrap() {
+                    let state = proc.stat.state()?;
+                    match state {
                         ProcState::Zombie | ProcState::Dead => ContainerStatus::Stopped,
                         _ => match self.status() {
                             ContainerStatus::Creating
@@ -213,7 +214,7 @@ mod tests {
     #[test]
     fn test_container_id_and_bundle_root_paths() {
         let container = Container::new(
-            "container_id_for_testing",
+            "container_id",
             ContainerStatus::Created,
             None,
             &PathBuf::from("."),
@@ -221,7 +222,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(container.id(), "container_id_for_testing");
+        assert_eq!(container.id(), "container_id");
         assert_eq!(container.bundle(), &PathBuf::from("."));
         assert_eq!(
             container.root,
