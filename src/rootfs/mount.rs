@@ -406,11 +406,11 @@ mod tests {
             .unwrap();
         let mount_opts = &MountOptions {
             root: tmp_dir.path(),
-            label: Some("something_test"),
+            label: Some("default"),
             cgroup_ns: false,
         };
         assert!(m
-            .setup_namespaced_hierarchy(mount, mount_opts, "test_setup_namespaced_hierarchy")
+            .setup_namespaced_hierarchy(mount, mount_opts, "cpu,cpuacct")
             .is_ok());
 
         let want = MountArgs {
@@ -420,7 +420,7 @@ mod tests {
                 .join("tmp/test_setup_namespaced_hierarchy/null"),
             fstype: None,
             flags: MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
-            data: Some("test_setup_namespaced_hierarchy,context=\"something_test\"".to_string()),
+            data: Some("cpu,cpuacct,context=\"default\"".to_string()),
         };
         let got = m
             .syscall
