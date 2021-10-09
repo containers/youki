@@ -252,4 +252,12 @@ mod tests {
         container.set_systemd(false);
         assert_eq!(container.systemd(), Some(false));
     }
+
+    #[test]
+    fn test_get_set_creator() {
+        let mut container = Container::default();
+        assert_eq!(container.creator(), None);
+        container.set_creator(1000);
+        assert_eq!(container.creator(), Some(OsString::from("youki")));
+    }
 }
