@@ -49,14 +49,12 @@ impl Manager {
             .find(|c| c.controllers.contains(&subsystem.to_string()))
             .unwrap();
 
-        let p = if cgroup_path.to_string_lossy().into_owned().is_empty() {
+        let p = if cgroup_path.as_os_str().is_empty() {
             mount_point.join_safely(Path::new(&cgroup.pathname))?
-        } else if cgroup_path.is_absolute() {
-            mount_point.join_safely(cgroup_path)?
         } else {
-            mount_point.join(cgroup_path)
+            mount_point.join_safely(cgroup_path)?
         };
-
+       
         Ok(p)
     }
 

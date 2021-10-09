@@ -1,6 +1,7 @@
 use std::{
     fs::{self},
     os::unix::fs::PermissionsExt,
+    path::Component::RootDir,
 };
 
 use anyhow::{anyhow, bail, Result};
@@ -159,7 +160,11 @@ impl SystemDCGroupManager {
         Self::write_controllers(&self.root_path, &controllers)?;
 
         let mut current_path = self.root_path.clone();
-        let mut components = self.cgroups_path.components().skip(1).peekable();
+        let mut components = self
+            .cgroups_path
+            .components()
+            .filter(|c| c.ne(&RootDir))
+            .peekable();
         // Verify that *each level* in the downward path from the root cgroup
         // down to the cgroup_path provided by the user is a valid cgroup hierarchy.
         // containing the attached controllers.

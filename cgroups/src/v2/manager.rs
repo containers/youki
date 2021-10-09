@@ -1,9 +1,4 @@
-use std::{
-    fs::{self},
-    os::unix::fs::PermissionsExt,
-    path::{Path, PathBuf},
-    time::Duration,
-};
+use std::{fs::{self}, os::unix::fs::PermissionsExt, path::{Component::RootDir, Path, PathBuf}, time::Duration};
 
 use anyhow::Result;
 
@@ -58,7 +53,11 @@ impl Manager {
         Self::write_controllers(&self.root_path, &controllers)?;
 
         let mut current_path = self.root_path.clone();
-        let mut components = self.cgroup_path.components().skip(1).peekable();
+        let mut components = self
+            .cgroup_path
+            .components()
+            .filter(|c| c.ne(&RootDir))
+            .peekable();
         while let Some(component) = components.next() {
             current_path = current_path.join(component);
             if !current_path.exists() {
