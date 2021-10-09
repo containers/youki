@@ -278,11 +278,11 @@ impl Mount {
 mod tests {
     use super::*;
     use crate::syscall::test::{MountArgs, TestHelperSyscall};
-    use crate::utils::TempDir;
+    use crate::utils::create_temp_dir;
 
     #[test]
     fn test_mount_to_container() {
-        let tmp_dir = TempDir::new("/tmp/test_mount_to_container").unwrap();
+        let tmp_dir = create_temp_dir("test_mount_to_container").unwrap();
         {
             let m = Mount::new();
             let mount = &SpecMountBuilder::default()
@@ -373,7 +373,7 @@ mod tests {
 
     #[test]
     fn test_make_parent_mount_private() {
-        let tmp_dir = TempDir::new("/tmp/test_make_parent_mount_private").unwrap();
+        let tmp_dir = create_temp_dir("test_make_parent_mount_private").unwrap();
         let m = Mount::new();
         assert!(m.make_parent_mount_private(tmp_dir.path()).is_ok());
 
