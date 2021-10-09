@@ -110,7 +110,7 @@ impl CgroupManager for Manager {
             if let PseudoControllerType::Unified = pseudoctlr {
                 Unified::apply(
                     controller_opt,
-                    &self.cgroup_path,
+                    &self.full_path,
                     util::get_available_controllers(&self.root_path)?,
                 )?;
             }
