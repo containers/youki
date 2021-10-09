@@ -201,6 +201,7 @@ impl Container {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::utils::create_temp_dir;
 
     #[test]
     fn test_get_set_pid() {
@@ -260,5 +261,28 @@ mod tests {
         assert_eq!(container.creator(), None);
         container.set_creator(1000);
         assert_eq!(container.creator(), Some(OsString::from("youki")));
+    }
+
+    #[test]
+    fn test_refresh_load_save_state() {
+        let tmp_dir = create_temp_dir("test_refresh_load_save_state").unwrap();
+        let mut container_1 = Container::new(
+            "container_id_1",
+            ContainerStatus::Created,
+            None,
+            &PathBuf::from("."),
+            tmp_dir.path(),
+        )
+        .unwrap();
+
+        assert!(container_1.save().is_ok());
+        let container_2 = Container::load(tmp_dir.path().to_path_buf()).unwrap();
+        assert_eq!(container_1.state.id, container_2.state.id);
+        assert_eq!(ContainerStatus::Stopped, container_2.state.status);
+
+        container_1.state.id = "container_id_1_modified".to_string();
+        assert!(container_1.save().is_ok());
+        assert!(container_1.refresh_state().is_ok());
+        assert_eq!("container_id_1_modified".to_string(), container_1.state.id);
     }
 }
