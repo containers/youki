@@ -394,42 +394,4 @@ mod tests {
         assert_eq!(got.len(), 1);
         assert_eq!(want, got[0]);
     }
-
-    #[test]
-    fn test_setup_namespaced_hierarchy() {
-        let tmp_dir = TempDir::new("/tmp/test_setup_namespaced_hierarchy").unwrap();
-        let m = Mount::new();
-        let mount = &SpecMountBuilder::default()
-            .destination(tmp_dir.path().join("null"))
-            .source(tmp_dir.path().join("null"))
-            .build()
-            .unwrap();
-        let mount_opts = &MountOptions {
-            root: tmp_dir.path(),
-            label: Some("default"),
-            cgroup_ns: false,
-        };
-        assert!(m
-            .setup_namespaced_hierarchy(mount, mount_opts, "cpu,cpuacct")
-            .is_ok());
-
-        let want = MountArgs {
-            source: Some(tmp_dir.path().join("null")),
-            target: tmp_dir
-                .path()
-                .join("tmp/test_setup_namespaced_hierarchy/null"),
-            fstype: None,
-            flags: MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
-            data: Some("cpu,cpuacct,context=\"default\"".to_string()),
-        };
-        let got = m
-            .syscall
-            .as_any()
-            .downcast_ref::<TestHelperSyscall>()
-            .unwrap()
-            .get_mount_args();
-
-        assert_eq!(got.len(), 1);
-        assert_eq!(want, got[0]);
-    }
 }

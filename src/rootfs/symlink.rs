@@ -160,24 +160,4 @@ mod tests {
             .get_symlink_args();
         assert_eq!(want, got)
     }
-
-    #[test]
-    fn test_setup_comount_symlinks() {
-        let tmp_dir = TempDir::new("/tmp/test_setup_default_symlinks").unwrap();
-        let symlink = Symlink::new();
-        assert!(symlink
-            .setup_comount_symlinks(tmp_dir.path(), "cpu,cpuacct")
-            .is_ok());
-        let want = vec![
-            (PathBuf::from("cpu,cpuacct"), tmp_dir.path().join("cpu")),
-            (PathBuf::from("cpu,cpuacct"), tmp_dir.path().join("cpuacct")),
-        ];
-        let got = symlink
-            .syscall
-            .as_any()
-            .downcast_ref::<TestHelperSyscall>()
-            .unwrap()
-            .get_symlink_args();
-        assert_eq!(want, got)
-    }
 }
