@@ -1,5 +1,6 @@
 use super::args::ContainerArgs;
 use crate::apparmor;
+use crate::syscall::Syscall;
 use crate::{
     capabilities, hooks, namespaces::Namespaces, process::channel, rootfs::RootFS,
     rootless::Rootless, seccomp, tty, utils,
@@ -12,7 +13,7 @@ use nix::{
     fcntl,
     unistd::{self, Gid, Uid},
 };
-use oci_spec::runtime::{LinuxNamespaceType, User};
+use oci_spec::runtime::{LinuxNamespaceType, Spec, User};
 use std::collections::HashMap;
 use std::{
     env, fs,
@@ -158,12 +159,38 @@ fn masked_path(path: &str, mount_label: &Option<String>) -> Result<()> {
     Ok(())
 }
 
+// Enter into rest of namespace. Note, we already entered into user and pid
+// namespace. We also have to enter into mount namespace last since
+// namespace may be bind to /proc path. The /proc path will need to be
+// accessed before pivot_root.
+fn apply_rest_namespaces(
+    namespaces: &Namespaces,
+    spec: &Spec,
+    syscall: &dyn Syscall,
+) -> Result<()> {
+    namespaces
+        .apply_namespaces(|ns_type| -> bool {
+            ns_type != CloneFlags::CLONE_NEWUSER && ns_type != CloneFlags::CLONE_NEWPID
+        })
+        .with_context(|| "failed to apply namespaces")?;
+
+    // Only set the host name if entering into a new uts namespace
+    if let Some(uts_namespace) = namespaces.get(LinuxNamespaceType::Uts) {
+        if uts_namespace.path().is_none() {
+            if let Some(hostname) = spec.hostname() {
+                syscall.set_hostname(hostname)?;
+            }
+        }
+    }
+    Ok(())
+}
+
 pub fn container_init(
     args: ContainerArgs,
     intermediate_sender: &mut channel::IntermediateSender,
     _init_receiver: &mut channel::InitReceiver,
 ) -> Result<()> {
-    let command = args.syscall;
+    let syscall = args.syscall;
     let spec = &args.spec;
     let linux = spec.linux().as_ref().context("no linux in spec")?;
     let proc = spec.process().as_ref().context("no process in spec")?;
@@ -178,31 +205,7 @@ pub fn container_init(
         tty::setup_console(&csocketfd).with_context(|| "Failed to set up tty")?;
     }
 
-    // Enter into rest of namespace. Note, we already entered into user and pid
-    // namespace. We also have to enter into mount namespace last since
-    // namespace may be bind to /proc path. The /proc path will need to be
-    // accessed before pivot_root.
-    namespaces
-        .apply_namespaces(|ns_type| -> bool {
-            ns_type != CloneFlags::CLONE_NEWUSER
-                && ns_type != CloneFlags::CLONE_NEWPID
-                && ns_type != CloneFlags::CLONE_NEWNS
-        })
-        .with_context(|| "failed to apply namespaces")?;
-    if let Some(mount_namespace) = namespaces.get(LinuxNamespaceType::Mount) {
-        namespaces
-            .unshare_or_setns(mount_namespace)
-            .with_context(|| format!("failed to enter mount namespace: {:?}", mount_namespace))?;
-    }
-
-    // Only set the host name if entering into a new uts namespace
-    if let Some(uts_namespace) = namespaces.get(LinuxNamespaceType::Uts) {
-        if uts_namespace.path().is_none() {
-            if let Some(hostname) = spec.hostname() {
-                command.set_hostname(hostname)?;
-            }
-        }
-    }
+    apply_rest_namespaces(&namespaces, spec, syscall)?;
 
     if let Some(true) = proc.no_new_privileges() {
         let _ = prctl::set_no_new_privileges(true);
@@ -233,11 +236,11 @@ pub fn container_init(
         // in the host mount namespace...
         if namespaces.get(LinuxNamespaceType::Mount).is_some() {
             // change the root of filesystem of the process to the rootfs
-            command
+            syscall
                 .pivot_rootfs(rootfs_path)
                 .with_context(|| format!("Failed to pivot root to {:?}", rootfs_path))?;
         } else {
-            command
+            syscall
                 .chroot(rootfs_path)
                 .with_context(|| format!("Failed to chroot to {:?}", rootfs_path))?;
         }
@@ -298,7 +301,7 @@ pub fn container_init(
     set_supplementary_gids(proc.user(), &args.rootless)
         .context("failed to set supplementary gids")?;
 
-    command
+    syscall
         .set_id(
             Uid::from_raw(proc.user().uid()),
             Gid::from_raw(proc.user().gid()),
@@ -313,9 +316,9 @@ pub fn container_init(
             .context("Failed to execute seccomp")?;
     }
 
-    capabilities::reset_effective(command).context("Failed to reset effective capabilities")?;
+    capabilities::reset_effective(syscall).context("Failed to reset effective capabilities")?;
     if let Some(caps) = proc.capabilities() {
-        capabilities::drop_privileges(caps, command).context("Failed to drop capabilities")?;
+        capabilities::drop_privileges(caps, syscall).context("Failed to drop capabilities")?;
     }
 
     // Take care of LISTEN_FDS used for systemd-active-socket. If the value is
