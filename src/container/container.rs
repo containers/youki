@@ -242,4 +242,14 @@ mod tests {
         container.set_annotations(Some(annotations.clone()));
         assert_eq!(container.state.annotations, Some(annotations));
     }
+
+    #[test]
+    fn test_get_set_systemd() {
+        let mut container = Container::default();
+        assert_eq!(container.systemd(), None);
+        container.set_systemd(true);
+        assert_eq!(container.systemd(), Some(true));
+        container.set_systemd(false);
+        assert_eq!(container.systemd(), Some(false));
+    }
 }
