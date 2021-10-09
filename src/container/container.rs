@@ -213,22 +213,29 @@ mod tests {
     }
 
     #[test]
-    fn test_container_id_and_bundle_root_paths() {
-        let container = Container::new(
+    fn test_basic_getter() {
+        let mut container = Container::new(
             "container_id",
-            ContainerStatus::Created,
+            ContainerStatus::Creating,
             None,
             &PathBuf::from("."),
             &PathBuf::from("."),
         )
         .unwrap();
 
+        // testing id
         assert_eq!(container.id(), "container_id");
+        // testing bundle path
         assert_eq!(container.bundle(), &PathBuf::from("."));
+        // testing root path
         assert_eq!(
             container.root,
             fs::canonicalize(PathBuf::from(".")).unwrap()
         );
+        // testing created
+        assert_eq!(container.created(), None);
+        container.set_status(ContainerStatus::Created);
+        assert!(container.created().is_some());
     }
 
     #[test]
@@ -278,11 +285,11 @@ mod tests {
         assert!(container_1.save().is_ok());
         let container_2 = Container::load(tmp_dir.path().to_path_buf()).unwrap();
         assert_eq!(container_1.state.id, container_2.state.id);
-        assert_eq!(ContainerStatus::Stopped, container_2.state.status);
+        assert_eq!(container_2.state.status, ContainerStatus::Stopped);
 
         container_1.state.id = "container_id_1_modified".to_string();
         assert!(container_1.save().is_ok());
         assert!(container_1.refresh_state().is_ok());
-        assert_eq!("container_id_1_modified".to_string(), container_1.state.id);
+        assert_eq!(container_1.state.id, "container_id_1_modified".to_string());
     }
 }
