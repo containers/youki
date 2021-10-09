@@ -199,33 +199,33 @@ impl Container {
 
 #[cfg(test)]
 mod tests {
-    use std::env;
-
     use super::*;
-    use anyhow::Result;
 
     #[test]
-    fn test_set_id() -> Result<()> {
-        let dir = env::temp_dir();
-        let mut container =
-            Container::new("container_id", ContainerStatus::Created, None, &dir, &dir)?;
+    fn test_get_set_pid() {
+        let mut container = Container::default();
+
+        assert_eq!(container.pid(), None);
         container.set_pid(1);
         assert_eq!(container.pid(), Some(Pid::from_raw(1)));
-        Ok(())
     }
 
     #[test]
-    fn test_basic_getter() -> Result<()> {
+    fn test_container_id_and_bundle_root_paths() {
         let container = Container::new(
-            "container_id",
+            "container_id_for_testing",
             ContainerStatus::Created,
             None,
             &PathBuf::from("."),
             &PathBuf::from("."),
-        )?;
+        )
+        .unwrap();
 
+        assert_eq!(container.id(), "container_id_for_testing");
         assert_eq!(container.bundle(), &PathBuf::from("."));
-        assert_eq!(container.root, fs::canonicalize(PathBuf::from("."))?);
-        Ok(())
+        assert_eq!(
+            container.root,
+            fs::canonicalize(PathBuf::from(".")).unwrap()
+        );
     }
 }
