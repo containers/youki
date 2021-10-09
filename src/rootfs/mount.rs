@@ -278,11 +278,11 @@ impl Mount {
 mod tests {
     use super::*;
     use crate::syscall::test::{MountArgs, TestHelperSyscall};
-    use crate::utils::TempDir;
+    use crate::utils::create_temp_dir;
 
     #[test]
     fn test_mount_to_container() {
-        let tmp_dir = TempDir::new("/tmp/test_mount_to_container").unwrap();
+        let tmp_dir = create_temp_dir("test_mount_to_container").unwrap();
         {
             let m = Mount::new();
             let mount = &SpecMountBuilder::default()
@@ -369,5 +369,29 @@ mod tests {
             assert_eq!(want, *got);
             assert_eq!(got.len(), 2);
         }
+    }
+
+    #[test]
+    fn test_make_parent_mount_private() {
+        let tmp_dir = create_temp_dir("test_make_parent_mount_private").unwrap();
+        let m = Mount::new();
+        assert!(m.make_parent_mount_private(tmp_dir.path()).is_ok());
+
+        let want = MountArgs {
+            source: None,
+            target: PathBuf::from("/"),
+            fstype: None,
+            flags: MsFlags::MS_PRIVATE,
+            data: None,
+        };
+        let got = m
+            .syscall
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap()
+            .get_mount_args();
+
+        assert_eq!(got.len(), 1);
+        assert_eq!(want, got[0]);
     }
 }
