@@ -292,4 +292,18 @@ mod tests {
         assert!(container_1.refresh_state().is_ok());
         assert_eq!(container_1.state.id, "container_id_1_modified".to_string());
     }
+
+    #[test]
+    fn test_get_spec() {
+        let tmp_dir = create_temp_dir("test_get_spec").unwrap();
+        use oci_spec::runtime::Spec;
+        let spec = Spec::default();
+        assert!(spec.save(tmp_dir.path().join("config.json")).is_ok());
+
+        let container = Container {
+            root: tmp_dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        assert!(container.spec().is_ok());
+    }
 }
