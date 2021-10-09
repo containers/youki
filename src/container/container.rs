@@ -306,4 +306,36 @@ mod tests {
         };
         assert!(container.spec().is_ok());
     }
+
+    #[test]
+    fn test_get_set_refresh_status() {
+        // there already has a full and well-tested flow of status in state.rs
+        // so we just let the coverage run through those can_xxx functions.
+        let mut container = Container::default();
+        assert_eq!(container.status(), ContainerStatus::Creating);
+        assert!(!container.can_start());
+        assert!(!container.can_kill());
+        assert!(!container.can_delete());
+        assert!(!container.can_exec());
+        assert!(!container.can_pause());
+        assert!(!container.can_resume());
+
+        // no PID case
+        assert!(container.refresh_status().is_ok());
+        assert_eq!(container.status(), ContainerStatus::Stopped);
+
+        // with PID case but PID not exists
+        container.set_pid(-1);
+        assert!(container.refresh_status().is_ok());
+        assert_eq!(container.status(), ContainerStatus::Stopped);
+
+        // with PID case
+        container.set_pid(1);
+        container.set_status(ContainerStatus::Paused);
+        assert!(container.refresh_status().is_ok());
+        assert_eq!(container.status(), ContainerStatus::Paused);
+        container.set_status(ContainerStatus::Running);
+        assert!(container.refresh_status().is_ok());
+        assert_eq!(container.status(), ContainerStatus::Running);
+    }
 }
