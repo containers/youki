@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 pub trait PathBufExt {
     fn as_in_container(&self) -> Result<PathBuf>;
     fn join_absolute_path(&self, p: &Path) -> Result<PathBuf>;
-    fn join_safely(&self, p: &Path) -> Result<PathBuf>;
+    fn join_safely<P: AsRef<Path>>(&self, p: P) -> Result<PathBuf>;
 }
 
 impl PathBufExt for Path {
@@ -41,14 +41,15 @@ impl PathBufExt for Path {
         Ok(PathBuf::from(format!("{}{}", self.display(), p.display())))
     }
 
-    fn join_safely(&self, p: &Path) -> Result<PathBuf> {
-        if p.is_relative() {
-            return Ok(self.join(p));
+    fn join_safely<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf> {
+        let path = path.as_ref();
+        if path.is_relative() {
+            return Ok(self.join(path));
         }
 
-        let stripped = p
+        let stripped = path
             .strip_prefix("/")
-            .with_context(|| format!("failed to strip prefix from {}", p.display()))?;
+            .with_context(|| format!("failed to strip prefix from {}", path.display()))?;
         Ok(self.join(stripped))
     }
 }

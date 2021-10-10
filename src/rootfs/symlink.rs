@@ -15,9 +15,11 @@ impl Default for Symlink {
 
 impl Symlink {
     pub fn new() -> Symlink {
-        Symlink {
-            syscall: create_syscall(),
-        }
+        Symlink::with_syscall(create_syscall())
+    }
+
+    fn with_syscall(syscall: Box<dyn Syscall>) -> Symlink {
+        Symlink { syscall }
     }
 
     // Create symlinks for subsystems that have been comounted e.g. cpu -> cpu,cpuacct, cpuacct -> cpu,cpuacct
@@ -81,12 +83,14 @@ impl Symlink {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::syscall::test::TestHelperSyscall;
+    use crate::syscall::linux::LinuxSyscall;
     use crate::utils::TempDir;
+    use crate::{syscall::test::TestHelperSyscall, utils::create_temp_dir};
     use nix::{
         fcntl::{open, OFlag},
         sys::stat::Mode,
     };
+    use std::fs;
     use std::path::PathBuf;
 
     #[test]
@@ -159,5 +163,63 @@ mod tests {
             .unwrap()
             .get_symlink_args();
         assert_eq!(want, got)
+    }
+
+    #[test]
+    fn setup_comounted_symlinks_success() -> Result<()> {
+        // arrange
+        let tmp = create_temp_dir("setup_comounted_symlinks_success")?;
+        let cpu = tmp.join("cpu");
+        let cpuacct = tmp.join("cpuacct");
+        let cpu_cpuacct = tmp.join("cpu,cpuacct");
+        fs::create_dir_all(&cpu_cpuacct)?;
+        let symlink = Symlink::with_syscall(Box::new(LinuxSyscall));
+
+        // act
+        symlink
+            .setup_comount_symlinks(&tmp, "cpu,cpuacct")
+            .context("failed to setup symlinks")?;
+
+        // assert
+        assert!(cpu.exists(), "cpu symlink does not exist");
+        assert!(cpuacct.exists(), "cpuacct symlink does not exist");
+
+        assert!(
+            fs::symlink_metadata(&cpu)?.file_type().is_symlink(),
+            "cpu is not a symlink"
+        );
+        assert!(
+            fs::symlink_metadata(&cpuacct)?.file_type().is_symlink(),
+            "cpuacct is not a symlink"
+        );
+
+        assert_eq!(
+            fs::read_link(cpu)?,
+            PathBuf::from("cpu,cpuacct"),
+            "cpu does not link to cpu,cpuacct"
+        );
+        assert_eq!(
+            fs::read_link(cpuacct)?,
+            PathBuf::from("cpu,cpuacct"),
+            "cpuacct does not link to cpu,cpuacct"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn setup_comounted_symlinks_no_comounts() -> Result<()> {
+        // arrange
+        let tmp = create_temp_dir("setup_comounted_symlinks_no_comounts")?;
+        let symlink = Symlink::with_syscall(Box::new(LinuxSyscall));
+
+        // act
+        let result = symlink
+            .setup_comount_symlinks(&tmp, "memory,task")
+            .context("failed to setup symlinks");
+
+        // assert
+        assert!(result.is_ok());
+        Ok(())
     }
 }
