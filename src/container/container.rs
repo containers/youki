@@ -149,7 +149,8 @@ impl Container {
                 // it with information about the process with given pid
                 if let Ok(proc) = Process::new(pid.as_raw()) {
                     use procfs::process::ProcState;
-                    match proc.stat.state().unwrap() {
+
+                    match proc.stat.state()? {
                         ProcState::Zombie | ProcState::Dead => ContainerStatus::Stopped,
                         _ => match self.status() {
                             ContainerStatus::Creating
@@ -199,33 +200,145 @@ impl Container {
 
 #[cfg(test)]
 mod tests {
-    use std::env;
-
     use super::*;
-    use anyhow::Result;
+    use crate::utils::create_temp_dir;
 
     #[test]
-    fn test_set_id() -> Result<()> {
-        let dir = env::temp_dir();
-        let mut container =
-            Container::new("container_id", ContainerStatus::Created, None, &dir, &dir)?;
+    fn test_get_set_pid() {
+        let mut container = Container::default();
+
+        assert_eq!(container.pid(), None);
         container.set_pid(1);
         assert_eq!(container.pid(), Some(Pid::from_raw(1)));
-        Ok(())
     }
 
     #[test]
     fn test_basic_getter() -> Result<()> {
-        let container = Container::new(
+        let mut container = Container::new(
             "container_id",
-            ContainerStatus::Created,
+            ContainerStatus::Creating,
             None,
             &PathBuf::from("."),
             &PathBuf::from("."),
         )?;
 
+        // testing id
+        assert_eq!(container.id(), "container_id");
+        // testing bundle path
         assert_eq!(container.bundle(), &PathBuf::from("."));
+        // testing root path
         assert_eq!(container.root, fs::canonicalize(PathBuf::from("."))?);
+        // testing created
+        assert_eq!(container.created(), None);
+        container.set_status(ContainerStatus::Created);
+        assert!(container.created().is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_set_annotations() {
+        let mut container = Container::default();
+        assert_eq!(container.state.annotations, None);
+
+        let mut annotations = std::collections::HashMap::with_capacity(1);
+        annotations.insert(
+            "org.criu.config".to_string(),
+            "/etc/special-youki-criu-options".to_string(),
+        );
+        container.set_annotations(Some(annotations.clone()));
+        assert_eq!(container.state.annotations, Some(annotations));
+    }
+
+    #[test]
+    fn test_get_set_systemd() {
+        let mut container = Container::default();
+        assert_eq!(container.systemd(), None);
+        container.set_systemd(true);
+        assert_eq!(container.systemd(), Some(true));
+        container.set_systemd(false);
+        assert_eq!(container.systemd(), Some(false));
+    }
+
+    #[test]
+    fn test_get_set_creator() {
+        let mut container = Container::default();
+        assert_eq!(container.creator(), None);
+        container.set_creator(1000);
+        assert_eq!(container.creator(), Some(OsString::from("youki")));
+    }
+
+    #[test]
+    fn test_refresh_load_save_state() -> Result<()> {
+        let tmp_dir = create_temp_dir("test_refresh_load_save_state")?;
+        let mut container_1 = Container::new(
+            "container_id_1",
+            ContainerStatus::Created,
+            None,
+            &PathBuf::from("."),
+            tmp_dir.path(),
+        )?;
+
+        container_1.save()?;
+        let container_2 = Container::load(tmp_dir.path().to_path_buf())?;
+        assert_eq!(container_1.state.id, container_2.state.id);
+        assert_eq!(container_2.state.status, ContainerStatus::Stopped);
+
+        container_1.state.id = "container_id_1_modified".to_string();
+        container_1.save()?;
+        container_1.refresh_state()?;
+        assert_eq!(container_1.state.id, "container_id_1_modified".to_string());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_spec() -> Result<()> {
+        let tmp_dir = create_temp_dir("test_get_spec")?;
+        use oci_spec::runtime::Spec;
+        let spec = Spec::default();
+        spec.save(tmp_dir.path().join("config.json"))?;
+
+        let container = Container {
+            root: tmp_dir.path().to_path_buf(),
+            ..Default::default()
+        };
+        container.spec()?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_set_refresh_status() -> Result<()> {
+        // there already has a full and well-tested flow of status in state.rs
+        // so we just let the coverage run through those can_xxx functions.
+        let mut container = Container::default();
+        assert_eq!(container.status(), ContainerStatus::Creating);
+        assert!(!container.can_start());
+        assert!(!container.can_kill());
+        assert!(!container.can_delete());
+        assert!(!container.can_exec());
+        assert!(!container.can_pause());
+        assert!(!container.can_resume());
+
+        // no PID case
+        container.refresh_status()?;
+        assert_eq!(container.status(), ContainerStatus::Stopped);
+
+        // with PID case but PID not exists
+        container.set_pid(-1);
+        container.refresh_status()?;
+        assert_eq!(container.status(), ContainerStatus::Stopped);
+
+        // with PID case
+        container.set_pid(1);
+        container.set_status(ContainerStatus::Paused);
+        container.refresh_status()?;
+        assert_eq!(container.status(), ContainerStatus::Paused);
+        container.set_status(ContainerStatus::Running);
+        container.refresh_status()?;
+        assert_eq!(container.status(), ContainerStatus::Running);
+
         Ok(())
     }
 }

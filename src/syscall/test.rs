@@ -1,7 +1,7 @@
 use std::{
     any::Any,
     cell::RefCell,
-    ffi::OsStr,
+    ffi::{OsStr, OsString},
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -106,7 +106,7 @@ impl Syscall for TestHelperSyscall {
     }
 
     fn get_pwuid(&self, _: u32) -> Option<Arc<OsStr>> {
-        todo!()
+        Some(OsString::from("youki").into())
     }
 
     fn chroot(&self, _: &Path) -> anyhow::Result<()> {
