@@ -149,8 +149,8 @@ impl Container {
                 // it with information about the process with given pid
                 if let Ok(proc) = Process::new(pid.as_raw()) {
                     use procfs::process::ProcState;
-                    let state = proc.stat.state()?;
-                    match state {
+
+                    match proc.stat.state()? {
                         ProcState::Zombie | ProcState::Dead => ContainerStatus::Stopped,
                         _ => match self.status() {
                             ContainerStatus::Creating
@@ -213,29 +213,27 @@ mod tests {
     }
 
     #[test]
-    fn test_basic_getter() {
+    fn test_basic_getter() -> Result<()> {
         let mut container = Container::new(
             "container_id",
             ContainerStatus::Creating,
             None,
             &PathBuf::from("."),
             &PathBuf::from("."),
-        )
-        .unwrap();
+        )?;
 
         // testing id
         assert_eq!(container.id(), "container_id");
         // testing bundle path
         assert_eq!(container.bundle(), &PathBuf::from("."));
         // testing root path
-        assert_eq!(
-            container.root,
-            fs::canonicalize(PathBuf::from(".")).unwrap()
-        );
+        assert_eq!(container.root, fs::canonicalize(PathBuf::from("."))?);
         // testing created
         assert_eq!(container.created(), None);
         container.set_status(ContainerStatus::Created);
         assert!(container.created().is_some());
+
+        Ok(())
     }
 
     #[test]
@@ -271,44 +269,47 @@ mod tests {
     }
 
     #[test]
-    fn test_refresh_load_save_state() {
-        let tmp_dir = create_temp_dir("test_refresh_load_save_state").unwrap();
+    fn test_refresh_load_save_state() -> Result<()> {
+        let tmp_dir = create_temp_dir("test_refresh_load_save_state")?;
         let mut container_1 = Container::new(
             "container_id_1",
             ContainerStatus::Created,
             None,
             &PathBuf::from("."),
             tmp_dir.path(),
-        )
-        .unwrap();
+        )?;
 
-        assert!(container_1.save().is_ok());
-        let container_2 = Container::load(tmp_dir.path().to_path_buf()).unwrap();
+        container_1.save()?;
+        let container_2 = Container::load(tmp_dir.path().to_path_buf())?;
         assert_eq!(container_1.state.id, container_2.state.id);
         assert_eq!(container_2.state.status, ContainerStatus::Stopped);
 
         container_1.state.id = "container_id_1_modified".to_string();
-        assert!(container_1.save().is_ok());
-        assert!(container_1.refresh_state().is_ok());
+        container_1.save()?;
+        container_1.refresh_state()?;
         assert_eq!(container_1.state.id, "container_id_1_modified".to_string());
+
+        Ok(())
     }
 
     #[test]
-    fn test_get_spec() {
-        let tmp_dir = create_temp_dir("test_get_spec").unwrap();
+    fn test_get_spec() -> Result<()> {
+        let tmp_dir = create_temp_dir("test_get_spec")?;
         use oci_spec::runtime::Spec;
         let spec = Spec::default();
-        assert!(spec.save(tmp_dir.path().join("config.json")).is_ok());
+        spec.save(tmp_dir.path().join("config.json"))?;
 
         let container = Container {
             root: tmp_dir.path().to_path_buf(),
             ..Default::default()
         };
-        assert!(container.spec().is_ok());
+        container.spec()?;
+
+        Ok(())
     }
 
     #[test]
-    fn test_get_set_refresh_status() {
+    fn test_get_set_refresh_status() -> Result<()> {
         // there already has a full and well-tested flow of status in state.rs
         // so we just let the coverage run through those can_xxx functions.
         let mut container = Container::default();
@@ -321,21 +322,23 @@ mod tests {
         assert!(!container.can_resume());
 
         // no PID case
-        assert!(container.refresh_status().is_ok());
+        container.refresh_status()?;
         assert_eq!(container.status(), ContainerStatus::Stopped);
 
         // with PID case but PID not exists
         container.set_pid(-1);
-        assert!(container.refresh_status().is_ok());
+        container.refresh_status()?;
         assert_eq!(container.status(), ContainerStatus::Stopped);
 
         // with PID case
         container.set_pid(1);
         container.set_status(ContainerStatus::Paused);
-        assert!(container.refresh_status().is_ok());
+        container.refresh_status()?;
         assert_eq!(container.status(), ContainerStatus::Paused);
         container.set_status(ContainerStatus::Running);
-        assert!(container.refresh_status().is_ok());
+        container.refresh_status()?;
         assert_eq!(container.status(), ContainerStatus::Running);
+
+        Ok(())
     }
 }
