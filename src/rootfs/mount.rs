@@ -2,21 +2,18 @@ use super::{
     symlink::Symlink,
     utils::{find_parent_mount, parse_mount},
 };
+use crate::syscall::{syscall::create_syscall, Syscall};
 use crate::utils::PathBufExt;
-use crate::{
-    syscall::{syscall::create_syscall, Syscall},
-    utils,
-};
 use anyhow::{anyhow, bail, Context, Result};
 use cgroups::common::{
     CgroupSetup::{Hybrid, Legacy, Unified},
     DEFAULT_CGROUP_ROOT,
 };
-use nix::{errno::Errno, mount::MsFlags, sys::stat::Mode};
+use nix::{errno::Errno, mount::MsFlags};
 use oci_spec::runtime::{Mount as SpecMount, MountBuilder as SpecMountBuilder};
 use procfs::process::{MountOptFields, Process};
+use std::borrow::Cow;
 use std::path::{Path, PathBuf};
-use std::{borrow::Cow, fs};
 use std::{
     collections::HashMap,
     fs::{canonicalize, create_dir_all, OpenOptions},
@@ -273,9 +270,10 @@ impl Mount {
             .build()?;
         log::debug!("{:?}", cgroup_mount);
 
-        if let Err(_) = self
+        if self
             .mount_into_container(&cgroup_mount, options.root, flags, data, options.label)
             .context("failed to mount into container")
+            .is_err()
         {
             let host_mount = cgroups::v2::util::get_unified_mount_point()
                 .context("failed to get unified mount point")?;
@@ -640,6 +638,55 @@ mod tests {
             target: tmp.join_safely(container_cgroup)?.join(subsystem_name),
             fstype: Some("bind".to_owned()),
             flags: MsFlags::MS_BIND | MsFlags::MS_REC,
+            data: Some("".to_owned()),
+        };
+
+        let got = mounter
+            .syscall
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap()
+            .get_mount_args();
+
+        assert_eq!(got.len(), 1);
+        assert_eq!(expected, got[0]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_mount_cgroup_v2() -> Result<()> {
+        // arrange
+        let tmp = create_temp_dir("test_mount_cgroup_v2")?;
+        let container_cgroup = PathBuf::from("/sys/fs/cgroup");
+
+        let spec_cgroup_mount = SpecMountBuilder::default()
+            .destination(&container_cgroup)
+            .source("cgroup")
+            .typ("cgroup")
+            .build()
+            .context("failed to build cgroup mount")?;
+
+        let mount_opts = MountOptions {
+            root: tmp.path(),
+            label: None,
+            cgroup_ns: true,
+        };
+
+        let mounter = Mount::new();
+        let flags = MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV;
+
+        // act
+        mounter
+            .mount_cgroup_v2(&spec_cgroup_mount, &mount_opts, flags, "")
+            .context("failed to mount cgroup v2")?;
+
+        // assert
+        let expected = MountArgs {
+            source: Some(PathBuf::from("cgroup".to_owned())),
+            target: tmp.join_safely(container_cgroup)?,
+            fstype: Some("cgroup2".to_owned()),
+            flags: MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
             data: Some("".to_owned()),
         };
 
