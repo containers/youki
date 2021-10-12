@@ -7,5 +7,5 @@ pub use support::{
 pub use temp_dir::{create_temp_dir, TempDir};
 pub use test_utils::{
     create_container, delete_container, get_state, kill_container, test_outside_container,
-    ContainerData,
+    ContainerData, State,
 };
