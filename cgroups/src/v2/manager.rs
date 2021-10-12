@@ -1,7 +1,7 @@
 use std::{
     fs::{self},
     os::unix::fs::PermissionsExt,
-    path::{Path, PathBuf},
+    path::{Component::RootDir, Path, PathBuf},
     time::Duration,
 };
 
@@ -58,7 +58,11 @@ impl Manager {
         Self::write_controllers(&self.root_path, &controllers)?;
 
         let mut current_path = self.root_path.clone();
-        let mut components = self.cgroup_path.components().skip(1).peekable();
+        let mut components = self
+            .cgroup_path
+            .components()
+            .filter(|c| c.ne(&RootDir))
+            .peekable();
         while let Some(component) = components.next() {
             current_path = current_path.join(component);
             if !current_path.exists() {
@@ -111,7 +115,7 @@ impl CgroupManager for Manager {
             if let PseudoControllerType::Unified = pseudoctlr {
                 Unified::apply(
                     controller_opt,
-                    &self.cgroup_path,
+                    &self.full_path,
                     util::get_available_controllers(&self.root_path)?,
                 )?;
             }

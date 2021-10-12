@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
 
 use anyhow::{Context, Result};
 
@@ -14,6 +14,19 @@ impl Unified {
         controllers: Vec<ControllerType>,
     ) -> Result<()> {
         if let Some(unified) = &controller_opt.resources.unified() {
+            Self::apply_impl(unified, cgroup_path, &controllers)
+                .context("failed to apply unified resource restrictions")?;
+        }
+
+        Ok(())
+    }
+
+    fn apply_impl(
+        unified: &HashMap<String, String>,
+        cgroup_path: &Path,
+        controllers: &[ControllerType],
+    ) -> Result<()> {
+        {
             log::debug!("Apply unified cgroup config");
             for (cgroup_file, value) in unified {
                 common::write_cgroup_file_str(cgroup_path.join(cgroup_file), value).map_err(

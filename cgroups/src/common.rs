@@ -236,18 +236,20 @@ where
 }
 
 pub(crate) trait PathBufExt {
-    fn join_safely(&self, p: &Path) -> Result<PathBuf>;
+    fn join_safely<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf>;
 }
 
 impl PathBufExt for PathBuf {
-    fn join_safely(&self, p: &Path) -> Result<PathBuf> {
-        if !p.is_absolute() && !p.as_os_str().is_empty() {
-            bail!(
-                "cannot join {:?} because it is not the absolute path.",
-                p.display()
-            )
+    fn join_safely<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf> {
+        let path = path.as_ref();
+        if path.is_relative() {
+            return Ok(self.join(path));
         }
-        Ok(PathBuf::from(format!("{}{}", self.display(), p.display())))
+
+        let stripped = path
+            .strip_prefix("/")
+            .with_context(|| format!("failed to strip prefix from {}", path.display()))?;
+        Ok(self.join(stripped))
     }
 }
 
