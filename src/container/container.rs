@@ -331,7 +331,8 @@ mod tests {
         assert_eq!(container.status(), ContainerStatus::Stopped);
 
         // with PID case
-        container.set_pid(1);
+        let myself = Process::myself()?;
+        container.set_pid(myself.pid());
         container.set_status(ContainerStatus::Paused);
         container.refresh_status()?;
         assert_eq!(container.status(), ContainerStatus::Paused);
