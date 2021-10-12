@@ -37,6 +37,12 @@ impl MainSender {
         Ok(())
     }
 
+    pub fn seccomp_notify_request(&mut self) -> Result<()> {
+        self.sender.write_message(Message::SeccompNotify)?;
+
+        Ok(())
+    }
+
     pub fn intermediate_ready(&mut self, pid: Pid) -> Result<()> {
         // Send over the IntermediateReady follow by the pid.
         log::debug!("sending init pid ({:?})", pid);
@@ -79,6 +85,22 @@ impl MainReceiver {
             .context("failed to wait for mapping request")?;
         match msg {
             Message::WriteMapping => Ok(()),
+            msg => bail!(
+                "receive unexpected message {:?} waiting for mapping request",
+                msg
+            ),
+        }
+    }
+
+    pub fn wait_for_seccomp_request(&mut self) -> Result<()> {
+        let mut buf = [0; 1];
+        self.receiver
+            .read_exact(&mut buf)
+            .with_context(|| "failed to receive a message from the child process")?;
+
+        // convert to Message wrapper
+        match Message::from(u8::from_be_bytes(buf)) {
+            Message::SeccompNotify => Ok(()),
             msg => bail!(
                 "receive unexpected message {:?} waiting for mapping request",
                 msg
@@ -174,6 +196,12 @@ pub struct InitSender {
 }
 
 impl InitSender {
+    pub fn seccomp_notify_done(&mut self) -> Result<()> {
+        self.sender.write_message(Message::SeccompNotifyDone)?;
+
+        Ok(())
+    }
+
     pub fn close(&self) -> Result<()> {
         self.sender.close()
     }
@@ -184,6 +212,22 @@ pub struct InitReceiver {
 }
 
 impl InitReceiver {
+    pub fn wait_for_seccomp_request_done(&mut self) -> Result<()> {
+        let mut buf = [0; 1];
+        self.receiver
+            .read_exact(&mut buf)
+            .with_context(|| "failed to receive a message")?;
+
+        // convert to Message wrapper
+        match Message::from(u8::from_be_bytes(buf)) {
+            Message::SeccompNotifyDone => Ok(()),
+            msg => bail!(
+                "receive unexpected message {:?} waiting for seccomp done request",
+                msg
+            ),
+        }
+    }
+
     pub fn close(&self) -> Result<()> {
         self.receiver.close()
     }

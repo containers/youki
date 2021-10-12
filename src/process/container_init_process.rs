@@ -13,7 +13,7 @@ use nix::{
     fcntl,
     unistd::{self, Gid, Uid},
 };
-use oci_spec::runtime::{LinuxNamespaceType, Spec, User};
+use oci_spec::runtime::{LinuxNamespaceType, LinuxSeccomp, Spec, User};
 use std::collections::HashMap;
 use std::{
     env, fs,
@@ -188,7 +188,8 @@ fn apply_rest_namespaces(
 pub fn container_init_process(
     args: &ContainerArgs,
     intermediate_sender: &mut channel::IntermediateSender,
-    _init_receiver: &mut channel::InitReceiver,
+    main_sender: &mut channel::MainSender,
+    init_receiver: &mut channel::InitReceiver,
 ) -> Result<()> {
     let syscall = args.syscall;
     let spec = &args.spec;
@@ -294,7 +295,7 @@ pub fn container_init_process(
         match unistd::chdir(proc.cwd()) {
             Ok(_) => false,
             Err(nix::Error::EPERM) => true,
-            Err(e) => bail!("Failed to chdir: {}", e),
+            Err(e) => bail!("failed to chdir: {}", e),
         }
     };
 
@@ -306,14 +307,16 @@ pub fn container_init_process(
             Uid::from_raw(proc.user().uid()),
             Gid::from_raw(proc.user().gid()),
         )
-        .context("Failed to configure uid and gid")?;
+        .context("failed to configure uid and gid")?;
 
     // Without no new privileges, seccomp is a privileged operation. We have to
     // do this before dropping capabilities. Otherwise, we should do it later,
     // as close to exec as possible.
     if linux.seccomp().is_some() && proc.no_new_privileges().is_none() {
-        seccomp::initialize_seccomp(linux.seccomp().as_ref().unwrap())
-            .context("Failed to execute seccomp")?;
+        if let Some(seccomp) = linux.seccomp() {
+            seccomp::initialize_seccomp(seccomp).context("failed to execute seccomp")?;
+            sync_seccomp(seccomp, main_sender, init_receiver).context("failed to sync seccomp")?;
+        }
     }
 
     capabilities::reset_effective(syscall).context("Failed to reset effective capabilities")?;
@@ -361,10 +364,11 @@ pub fn container_init_process(
         }
     };
 
-    // clean up and handle perserved fds.
+    // Clean up and handle perserved fds. We only mark the fd as CLOSEXEC, so we
+    // don't have to worry about when the fd will be closed.
     cleanup_file_descriptors(preserve_fds).with_context(|| "Failed to clean up extra fds")?;
 
-    // change directory to process.cwd if process.cwd is not empty
+    // Change directory to process.cwd if process.cwd is not empty
     if do_chdir {
         unistd::chdir(proc.cwd()).with_context(|| format!("failed to chdir {:?}", proc.cwd()))?;
     }
@@ -374,6 +378,16 @@ pub fn container_init_process(
     utils::parse_env(&envs)
         .iter()
         .for_each(|(key, value)| env::set_var(key, value));
+
+    // Initialize seccomp profile right before we are ready to execute the
+    // payload so as few syscalls will happen between here and payload exec. The
+    // notify socket will still need network related syscalls.
+    if let Some(seccomp) = linux.seccomp() {
+        if proc.no_new_privileges().is_some() {
+            seccomp::initialize_seccomp(seccomp).context("failed to execute seccomp")?;
+            sync_seccomp(seccomp, main_sender, init_receiver).context("failed to sync seccomp")?;
+        }
+    }
 
     // notify parents that the init process is ready to execute the payload.
     // Note, we pass -1 here because we are already inside the pid namespace.
@@ -389,14 +403,6 @@ pub fn container_init_process(
     if args.init {
         if let Some(hooks) = hooks {
             hooks::run_hooks(hooks.start_container().as_ref(), container)?
-        }
-    }
-
-    if let Some(seccomp) = linux.seccomp() {
-        if proc.no_new_privileges().is_some() {
-            // Initialize seccomp profile right before we are ready to execute the
-            // payload. The notify socket will still need network related syscalls.
-            seccomp::initialize_seccomp(seccomp).context("Failed to execute seccomp")?;
         }
     }
 
@@ -464,6 +470,19 @@ fn set_supplementary_gids(user: &User, rootless: &Option<Rootless>) -> Result<()
                 "unprivileged users cannot set supplementary gids in rootless container"
             ),
         }
+    }
+
+    Ok(())
+}
+
+fn sync_seccomp(
+    seccomp: &LinuxSeccomp,
+    main_sender: &mut channel::MainSender,
+    init_receiver: &mut channel::InitReceiver,
+) -> Result<()> {
+    if seccomp::is_notify(seccomp) {
+        main_sender.seccomp_notify_request()?;
+        init_receiver.wait_for_seccomp_request_done()?;
     }
 
     Ok(())

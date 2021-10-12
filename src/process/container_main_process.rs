@@ -1,15 +1,17 @@
 use crate::{
     process::{args::ContainerArgs, channel, container_intermediate_process, fork},
     rootless::Rootless,
-    utils,
+    seccomp, utils,
 };
 use anyhow::{Context, Result};
 use nix::unistd::Pid;
+use oci_spec::runtime::LinuxSeccomp;
 
 pub fn container_main_process(container_args: &ContainerArgs) -> Result<Pid> {
     // We use a set of channels to communicate between parent and child process. Each channel is uni-directional.
     let (main_sender, main_receiver) = &mut channel::main_channel()?;
     let (intermediate_sender, intermediate_receiver) = &mut channel::intermediate_channel()?;
+    let (init_sender, init_receiver) = &mut channel::init_channel()?;
 
     let intermediate_pid = fork::container_fork(|| {
         // The fds in the channel is duplicated during fork, so we first close
@@ -22,6 +24,8 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<Pid> {
             container_args,
             intermediate_sender,
             intermediate_receiver,
+            init_sender,
+            init_receiver,
             main_sender,
         )
     })?;
@@ -44,10 +48,36 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<Pid> {
         .close()
         .context("failed to close unused sender")?;
 
+    if let Some(linux) = container_args.spec.linux() {
+        if let Some(seccomp) = linux.seccomp() {
+            sync_seccomp(seccomp, init_sender, main_receiver)
+                .context("failed to sync seccomp with init")?;
+        }
+    }
+
+    init_sender
+        .close()
+        .context("failed to close unused init sender")?;
+
     let init_pid = main_receiver.wait_for_intermediate_ready()?;
     log::debug!("init pid is {:?}", init_pid);
 
     Ok(init_pid)
+}
+
+fn sync_seccomp(
+    seccomp: &LinuxSeccomp,
+    init_sender: &mut channel::InitSender,
+    main_receiver: &mut channel::MainReceiver,
+) -> Result<()> {
+    if seccomp::is_notify(seccomp) {
+        log::debug!("main process waiting for sync seccomp");
+        main_receiver.wait_for_seccomp_request()?;
+        // process seccomp notify
+        init_sender.seccomp_notify_done()?;
+    }
+
+    Ok(())
 }
 
 fn setup_mapping(rootless: &Rootless, pid: Pid) -> Result<()> {
@@ -57,6 +87,7 @@ fn setup_mapping(rootless: &Rootless, pid: Pid) -> Result<()> {
         // until "deny" has been written to setgroups. See CVE-2014-8989.
         utils::write_file(format!("/proc/{}/setgroups", pid), "deny")?;
     }
+
     rootless
         .write_uid_mapping(pid)
         .context(format!("failed to map uid of pid {}", pid))?;

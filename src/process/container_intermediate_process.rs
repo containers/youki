@@ -13,6 +13,8 @@ pub fn container_intermediate_process(
     args: &ContainerArgs,
     intermediate_sender: &mut channel::IntermediateSender,
     intermediate_receiver: &mut channel::IntermediateReceiver,
+    init_sender: &mut channel::InitSender,
+    init_receiver: &mut channel::InitReceiver,
     main_sender: &mut channel::MainSender,
 ) -> Result<()> {
     let command = &args.syscall;
@@ -75,9 +77,6 @@ pub fn container_intermediate_process(
         .context("failed to apply cgroups")?
     }
 
-    // We only need for init process to send us the ChildReady.
-    let (init_sender, init_receiver) = &mut channel::init_channel()?;
-
     // We have to record the pid of the child (container init process), since
     // the child will be inside the pid namespace. We can't rely on child_ready
     // to send us the correct pid.
@@ -86,10 +85,7 @@ pub fn container_intermediate_process(
         init_sender
             .close()
             .context("failed to close receiver in init process")?;
-        main_sender
-            .close()
-            .context("failed to close unused sender")?;
-        container_init_process(args, intermediate_sender, init_receiver)
+        container_init_process(args, intermediate_sender, main_sender, init_receiver)
     })?;
     // Close unused fds in the parent process.
     intermediate_sender
