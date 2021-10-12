@@ -364,19 +364,21 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
     // Ref: https://man7.org/linux/man-pages/man2/seccomp.2.html
     ctx.load().context("failed to load seccomp context")?;
 
-    let is_seccomp_notify = seccomp
-        .syscalls()
-        .iter()
-        .flatten()
-        .any(|syscall| syscall.action() == LinuxSeccompAction::ScmpActNotify);
-
-    let fd = if is_seccomp_notify {
+    let fd = if is_notify(seccomp) {
         ctx.notify_fd().context("failed to get seccomp notify fd")?
     } else {
         None
     };
 
     Ok(fd)
+}
+
+pub fn is_notify(seccomp: &LinuxSeccomp) -> bool {
+    seccomp
+        .syscalls()
+        .iter()
+        .flatten()
+        .any(|syscall| syscall.action() == LinuxSeccompAction::ScmpActNotify)
 }
 
 #[cfg(test)]
