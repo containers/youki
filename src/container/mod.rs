@@ -18,4 +18,4 @@ pub mod init_builder;
 pub mod state;
 pub mod tenant_builder;
 pub use container::Container;
-pub use state::{ContainerStatus, State};
+pub use state::{ContainerProcessState, ContainerStatus, State};
