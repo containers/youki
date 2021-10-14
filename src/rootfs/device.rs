@@ -1,7 +1,7 @@
 use super::utils::to_sflag;
 use crate::syscall::{syscall::create_syscall, Syscall};
-use crate::utils::PathBufExt;
-use anyhow::{bail, Result};
+use crate::utils::{self, PathBufExt};
+use anyhow::{bail, Context, Result};
 use nix::{
     fcntl::{open, OFlag},
     mount::MsFlags,
@@ -9,7 +9,7 @@ use nix::{
     unistd::{close, Gid, Uid},
 };
 use oci_spec::runtime::LinuxDevice;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub struct Device {
     syscall: Box<dyn Syscall>,
@@ -40,13 +40,6 @@ impl Device {
                     bail!("{} is not a valid device path", dev.path().display());
                 }
 
-                crate::utils::create_dir_all(
-                    rootfs
-                        .join(dev.path().as_in_container()?)
-                        .parent()
-                        .unwrap_or_else(|| Path::new("")),
-                )?;
-
                 if bind {
                     self.bind_dev(rootfs, dev)
                 } else {
@@ -60,7 +53,8 @@ impl Device {
     }
 
     fn bind_dev(&self, rootfs: &Path, dev: &LinuxDevice) -> Result<()> {
-        let full_container_path = rootfs.join(dev.path().as_in_container()?);
+        let full_container_path = create_container_dev_path(rootfs, dev)
+            .with_context(|| format!("could not create container path for device {:?}", dev))?;
 
         let fd = open(
             &full_container_path,
@@ -87,7 +81,9 @@ impl Device {
                 | ((major & !0xfff) << 32)) as u64
         }
 
-        let full_container_path = rootfs.join(dev.path().as_in_container()?);
+        let full_container_path = create_container_dev_path(rootfs, dev)
+            .with_context(|| format!("could not create container path for device {:?}", dev))?;
+
         self.syscall.mknod(
             &full_container_path,
             to_sflag(dev.typ()),
@@ -102,6 +98,23 @@ impl Device {
 
         Ok(())
     }
+}
+
+fn create_container_dev_path(rootfs: &Path, dev: &LinuxDevice) -> Result<PathBuf> {
+    let relative_dev_path = dev
+        .path()
+        .as_relative()
+        .with_context(|| format!("could not convert {:?} to relative path", dev.path()))?;
+    let full_container_path = utils::secure_join(rootfs, relative_dev_path)
+        .with_context(|| format!("could not join {:?} with {:?}", rootfs, dev.path()))?;
+
+    crate::utils::create_dir_all(
+        &full_container_path
+            .parent()
+            .unwrap_or_else(|| Path::new("")),
+    )?;
+
+    Ok(full_container_path)
 }
 
 #[cfg(test)]

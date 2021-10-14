@@ -12,33 +12,22 @@ use std::io::ErrorKind;
 use std::ops::Deref;
 use std::os::linux::fs::MetadataExt;
 use std::os::unix::fs::DirBuilderExt;
-use std::os::unix::prelude::AsRawFd;
+use std::os::unix::prelude::{AsRawFd, OsStrExt};
 use std::path::{Path, PathBuf};
 
 pub trait PathBufExt {
-    fn as_in_container(&self) -> Result<PathBuf>;
-    fn join_absolute_path(&self, p: &Path) -> Result<PathBuf>;
+    fn as_relative(&self) -> Result<&Path>;
     fn join_safely<P: AsRef<Path>>(&self, p: P) -> Result<PathBuf>;
 }
 
 impl PathBufExt for Path {
-    fn as_in_container(&self) -> Result<PathBuf> {
+    fn as_relative(&self) -> Result<&Path> {
         if self.is_relative() {
-            bail!("Relative path cannot be converted to the path in the container.")
+            bail!("relative path cannot be converted to the path in the container.")
         } else {
-            let path_string = self.to_string_lossy().into_owned();
-            Ok(PathBuf::from(path_string[1..].to_string()))
+            self.strip_prefix("/")
+                .with_context(|| format!("failed to strip prefix from {:?}", self))
         }
-    }
-
-    fn join_absolute_path(&self, p: &Path) -> Result<PathBuf> {
-        if !p.is_absolute() && !p.as_os_str().is_empty() {
-            bail!(
-                "cannot join {:?} because it is not an absolute path.",
-                p.display()
-            )
-        }
-        Ok(PathBuf::from(format!("{}{}", self.display(), p.display())))
     }
 
     fn join_safely<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf> {
@@ -68,10 +57,11 @@ pub fn parse_env(envs: &[String]) -> HashMap<String, String> {
 }
 
 pub fn do_exec(path: impl AsRef<Path>, args: &[String]) -> Result<()> {
-    let p = CString::new(path.as_ref().to_string_lossy().to_string())?;
+    let p = CString::new(path.as_ref().as_os_str().as_bytes())
+        .with_context(|| format!("failed to convert path {:?} to cstring", path.as_ref()))?;
     let a: Vec<CString> = args
         .iter()
-        .map(|s| CString::new(s.to_string()).unwrap_or_default())
+        .map(|s| CString::new(s.as_bytes()).unwrap_or_default())
         .collect();
     unistd::execvp(&p, &a)?;
     Ok(())
@@ -154,9 +144,9 @@ pub fn ensure_procfs(path: &Path) -> Result<()> {
     Ok(())
 }
 
-pub fn secure_join(rootfs: &Path, unsafe_path: &Path) -> Result<PathBuf> {
-    let mut rootfs = PathBuf::from(rootfs);
-    let mut path = PathBuf::from(unsafe_path);
+pub fn secure_join<P: Into<PathBuf>>(rootfs: P, unsafe_path: P) -> Result<PathBuf> {
+    let mut rootfs = rootfs.into();
+    let mut path = unsafe_path.into();
     let mut clean_path = PathBuf::new();
 
     let mut part = path.iter();
@@ -320,23 +310,6 @@ pub(crate) mod test_utils {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_join_absolute_path() {
-        assert_eq!(
-            PathBuf::from("sample/a/")
-                .join_absolute_path(&PathBuf::from("/b"))
-                .unwrap(),
-            PathBuf::from("sample/a/b")
-        );
-    }
-
-    #[test]
-    fn test_join_absolute_path_error() {
-        assert!(PathBuf::from("sample/a/")
-            .join_absolute_path(&PathBuf::from("b/c"))
-            .is_err(),);
-    }
 
     #[test]
     fn test_get_cgroup_path() {
