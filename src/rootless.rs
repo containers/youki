@@ -36,9 +36,7 @@ impl<'a> Rootless<'a> {
 
         if user_namespace.is_some() && user_namespace.unwrap().path().is_none() {
             log::debug!("rootless container should be created");
-            log::warn!(
-                "resource constraints and multi id mapping is unimplemented for rootless containers"
-            );
+            log::warn!("resource constraints are unimplemented for rootless containers");
 
             validate(spec).context("The spec failed to comply to rootless requirement")?;
             let mut rootless = Rootless::from(linux);
@@ -217,11 +215,11 @@ pub fn lookup_map_binaries(spec: &Linux) -> Result<Option<(PathBuf, PathBuf)>> {
 }
 
 fn lookup_map_binary(binary: &str) -> Result<Option<PathBuf>> {
-    let paths = env::var("PATH")?;
+    let paths = env::var("PATH").context("could not find PATH")?;
     Ok(paths
         .split_terminator(':')
-        .find(|p| PathBuf::from(p).join(binary).exists())
-        .map(PathBuf::from))
+        .map(|p| Path::new(p).join(binary))
+        .find(|p| p.exists()))
 }
 
 fn write_id_mapping(
@@ -230,19 +228,35 @@ fn write_id_mapping(
     mappings: &[LinuxIdMapping],
     map_binary: Option<&Path>,
 ) -> Result<()> {
-    let mappings: Vec<String> = mappings
-        .iter()
-        .map(|m| format!("{} {} {}", m.container_id(), m.host_id(), m.size()))
-        .collect();
     log::debug!("Write ID mapping: {:?}", mappings);
-    if mappings.len() == 1 {
-        utils::write_file(map_file, mappings.first().unwrap())?;
-    } else {
-        Command::new(map_binary.unwrap())
-            .arg(pid.to_string())
-            .args(mappings)
-            .output()
-            .with_context(|| format!("failed to execute {:?}", map_binary))?;
+
+    match mappings.len() {
+        0 => bail!("at least one id mapping needs to be defined"),
+        1 => {
+            let mapping = mappings
+                .first()
+                .and_then(|m| format!("{} {} {}", m.container_id(), m.host_id(), m.size()).into())
+                .unwrap();
+            utils::write_file(map_file, mapping)?;
+        }
+        _ => {
+            let args: Vec<String> = mappings
+                .iter()
+                .flat_map(|m| {
+                    [
+                        m.container_id().to_string(),
+                        m.host_id().to_string(),
+                        m.size().to_string(),
+                    ]
+                })
+                .collect();
+
+            Command::new(map_binary.unwrap())
+                .arg(pid.to_string())
+                .args(args)
+                .output()
+                .with_context(|| format!("failed to execute {:?}", map_binary))?;
+        }
     }
 
     Ok(())
