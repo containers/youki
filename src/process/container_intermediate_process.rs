@@ -85,7 +85,10 @@ pub fn container_intermediate_process(
         init_sender
             .close()
             .context("failed to close receiver in init process")?;
-        container_init_process(args, intermediate_sender, main_sender, init_receiver)
+        intermediate_sender
+            .close()
+            .context("failed to close sender in the intermediate process")?;
+        container_init_process(args, main_sender, init_receiver)
     })?;
     // Close unused fds in the parent process.
     intermediate_sender
@@ -96,9 +99,7 @@ pub fn container_intermediate_process(
         .context("failed to close unused init sender")?;
     // There is no point using the pid returned here, since the child will be
     // inside the pid namespace already.
-    intermediate_receiver
-        .wait_for_init_ready()
-        .context("failed to wait for the child")?;
+
     // After the child (the container init process) becomes ready, we can signal
     // the parent (the main process) that we are ready.
     main_sender

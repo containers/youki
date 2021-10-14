@@ -5,7 +5,10 @@ use nix::{
     unistd::{self, Pid},
 };
 use serde::{Deserialize, Serialize};
-use std::{marker::PhantomData, os::unix::prelude::RawFd};
+use std::{
+    marker::PhantomData,
+    os::unix::prelude::{AsRawFd, RawFd},
+};
 
 /// Channel Design
 ///
@@ -37,8 +40,9 @@ impl MainSender {
         Ok(())
     }
 
-    pub fn seccomp_notify_request(&mut self) -> Result<()> {
-        self.sender.send(Message::SeccompNotify)?;
+    pub fn seccomp_notify_request(&mut self, fd: RawFd) -> Result<()> {
+        self.sender
+            .send_fds(Message::SeccompNotify, &[fd.as_raw_fd()])?;
 
         Ok(())
     }
@@ -47,6 +51,12 @@ impl MainSender {
         // Send over the IntermediateReady follow by the pid.
         log::debug!("sending init pid ({:?})", pid);
         self.sender.send(Message::IntermediateReady(pid.as_raw()))?;
+
+        Ok(())
+    }
+
+    pub fn init_ready(&mut self) -> Result<()> {
+        self.sender.send(Message::InitReady)?;
 
         Ok(())
     }
@@ -92,16 +102,38 @@ impl MainReceiver {
         }
     }
 
-    pub fn wait_for_seccomp_request(&mut self) -> Result<()> {
-        let msg = self
+    pub fn wait_for_seccomp_request(&mut self) -> Result<i32> {
+        let (msg, fds) = self
             .receiver
-            .recv()
+            .recv_with_fds::<[RawFd; 1]>()
             .context("failed to wait for seccomp request")?;
 
         match msg {
-            Message::SeccompNotify => Ok(()),
+            Message::SeccompNotify => {
+                let fd = match fds {
+                    Some(fds) => fds[0],
+                    None => bail!("expecting fds from seccomp request"),
+                };
+                Ok(fd)
+            }
             msg => bail!(
                 "receive unexpected message {:?} waiting for seccomp request",
+                msg
+            ),
+        }
+    }
+
+    /// Waits for associated init process to send ready message
+    /// and return the pid of init process which is forked by init process
+    pub fn wait_for_init_ready(&mut self) -> Result<()> {
+        let msg = self
+            .receiver
+            .recv()
+            .context("failed to wait for init ready")?;
+        match msg {
+            Message::InitReady => Ok(()),
+            msg => bail!(
+                "receive unexpected message {:?} waiting for init ready",
                 msg
             ),
         }
@@ -132,12 +164,6 @@ impl IntermediateSender {
         Ok(())
     }
 
-    pub fn init_ready(&mut self) -> Result<()> {
-        self.sender.send(Message::InitReady)?;
-
-        Ok(())
-    }
-
     pub fn close(&self) -> Result<()> {
         self.sender.close()
     }
@@ -157,22 +183,6 @@ impl IntermediateReceiver {
             .context("failed to wait for init ready")?;
         match msg {
             Message::MappingWritten => Ok(()),
-            msg => bail!(
-                "receive unexpected message {:?} waiting for init ready",
-                msg
-            ),
-        }
-    }
-
-    /// Waits for associated init process to send ready message
-    /// and return the pid of init process which is forked by init process
-    pub fn wait_for_init_ready(&mut self) -> Result<()> {
-        let msg = self
-            .receiver
-            .recv()
-            .context("failed to wait for init ready")?;
-        match msg {
-            Message::InitReady => Ok(()),
             msg => bail!(
                 "receive unexpected message {:?} waiting for init ready",
                 msg
@@ -502,7 +512,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_channel_init_ready() -> Result<()> {
-        let (sender, receiver) = &mut intermediate_channel()?;
+        let (sender, receiver) = &mut main_channel()?;
         match unsafe { unistd::fork()? } {
             unistd::ForkResult::Parent { child } => {
                 wait::waitpid(child, None)?;
@@ -547,7 +557,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_channel_intermediate_graceful_exit() -> Result<()> {
-        let (sender, receiver) = &mut intermediate_channel()?;
+        let (sender, receiver) = &mut main_channel()?;
         match unsafe { unistd::fork()? } {
             unistd::ForkResult::Parent { child } => {
                 sender.close().context("failed to close sender")?;

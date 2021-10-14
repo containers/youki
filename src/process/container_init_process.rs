@@ -13,7 +13,7 @@ use nix::{
     fcntl,
     unistd::{self, Gid, Uid},
 };
-use oci_spec::runtime::{LinuxNamespaceType, LinuxSeccomp, Spec, User};
+use oci_spec::runtime::{LinuxNamespaceType, Spec, User};
 use std::collections::HashMap;
 use std::{
     env, fs,
@@ -187,7 +187,6 @@ fn apply_rest_namespaces(
 
 pub fn container_init_process(
     args: &ContainerArgs,
-    intermediate_sender: &mut channel::IntermediateSender,
     main_sender: &mut channel::MainSender,
     init_receiver: &mut channel::InitReceiver,
 ) -> Result<()> {
@@ -314,8 +313,10 @@ pub fn container_init_process(
     // as close to exec as possible.
     if linux.seccomp().is_some() && proc.no_new_privileges().is_none() {
         if let Some(seccomp) = linux.seccomp() {
-            seccomp::initialize_seccomp(seccomp).context("failed to execute seccomp")?;
-            sync_seccomp(seccomp, main_sender, init_receiver).context("failed to sync seccomp")?;
+            let notify_fd =
+                seccomp::initialize_seccomp(seccomp).context("failed to execute seccomp")?;
+            sync_seccomp(notify_fd, main_sender, init_receiver)
+                .context("failed to sync seccomp")?;
         }
     }
 
@@ -384,16 +385,18 @@ pub fn container_init_process(
     // notify socket will still need network related syscalls.
     if let Some(seccomp) = linux.seccomp() {
         if proc.no_new_privileges().is_some() {
-            seccomp::initialize_seccomp(seccomp).context("failed to execute seccomp")?;
-            sync_seccomp(seccomp, main_sender, init_receiver).context("failed to sync seccomp")?;
+            let notify_fd =
+                seccomp::initialize_seccomp(seccomp).context("failed to execute seccomp")?;
+            sync_seccomp(notify_fd, main_sender, init_receiver)
+                .context("failed to sync seccomp")?;
         }
     }
 
-    // notify parents that the init process is ready to execute the payload.
+    // Notify main process that the init process is ready to execute the payload.
     // Note, we pass -1 here because we are already inside the pid namespace.
     // The pid outside the pid namespace should be recorded by the intermediate
     // process.
-    intermediate_sender.init_ready()?;
+    main_sender.init_ready()?;
 
     // listing on the notify socket for container start command
     args.notify_socket.wait_for_container_start()?;
@@ -476,12 +479,13 @@ fn set_supplementary_gids(user: &User, rootless: &Option<Rootless>) -> Result<()
 }
 
 fn sync_seccomp(
-    seccomp: &LinuxSeccomp,
+    fd: Option<i32>,
     main_sender: &mut channel::MainSender,
     init_receiver: &mut channel::InitReceiver,
 ) -> Result<()> {
-    if seccomp::is_notify(seccomp) {
-        main_sender.seccomp_notify_request()?;
+    if let Some(fd) = fd {
+        log::debug!("init process sync seccomp, notify fd: {}", fd);
+        main_sender.seccomp_notify_request(fd)?;
         init_receiver.wait_for_seccomp_request_done()?;
     }
 
