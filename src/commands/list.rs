@@ -50,7 +50,7 @@ impl List {
                 container.id(),
                 pid,
                 container.status(),
-                container.bundle().to_string_lossy(),
+                container.bundle().display(),
                 created,
                 user_name.to_string_lossy()
             ));

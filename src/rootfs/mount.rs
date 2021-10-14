@@ -2,8 +2,11 @@ use super::{
     symlink::Symlink,
     utils::{find_parent_mount, parse_mount},
 };
-use crate::syscall::{syscall::create_syscall, Syscall};
 use crate::utils::PathBufExt;
+use crate::{
+    syscall::{syscall::create_syscall, Syscall},
+    utils,
+};
 use anyhow::{anyhow, bail, Context, Result};
 use cgroups::common::{
     CgroupSetup::{Hybrid, Legacy, Unified},
@@ -352,11 +355,9 @@ impl Mount {
             }
         }
 
-        let dest_for_host = format!(
-            "{}{}",
-            rootfs.to_string_lossy().into_owned(),
-            m.destination().display()
-        );
+        let dest_for_host = utils::secure_join(rootfs, m.destination())
+            .with_context(|| format!("failed to join {:?} with {:?}", rootfs, m.destination()))?;
+
         let dest = Path::new(&dest_for_host);
         let source = m
             .source()
