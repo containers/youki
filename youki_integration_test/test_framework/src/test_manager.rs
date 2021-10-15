@@ -48,7 +48,7 @@ impl<'a> TestManager<'a> {
                 }
             }
         }
-        println!("\n# End group {}", name);
+        println!("# End group {}\n", name);
     }
     /// Run all tests from all tests group
     pub fn run_all(&self) {

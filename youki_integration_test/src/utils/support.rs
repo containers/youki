@@ -1,5 +1,5 @@
 use super::{create_temp_dir, TempDir};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use flate2::read::GzDecoder;
 use oci_spec::runtime::Spec;
 use once_cell::sync::OnceCell;
@@ -51,12 +51,22 @@ pub fn generate_uuid() -> Uuid {
 pub fn prepare_bundle(id: &Uuid) -> Result<TempDir> {
     let temp_dir = create_temp_dir(id)?;
     let tar_file_name = "bundle.tar.gz";
-    let tar_path = std::env::current_dir()?.join(tar_file_name);
-    std::fs::copy(tar_path.clone(), (&temp_dir).join(tar_file_name))?;
-    let tar_gz = File::open(tar_path)?;
+    let tar_source = std::env::current_dir()?.join(tar_file_name);
+    let tar_target = temp_dir.as_ref().join(tar_file_name);
+    std::fs::copy(&tar_source, &tar_target)
+        .with_context(|| format!("could not copy {:?} to {:?}", tar_source, tar_target))?;
+
+    let tar_gz = File::open(&tar_source)?;
     let tar = GzDecoder::new(tar_gz);
     let mut archive = Archive::new(tar);
-    archive.unpack(&temp_dir)?;
+    archive.unpack(&temp_dir).with_context(|| {
+        format!(
+            "failed to unpack {:?} to {:?}",
+            tar_source,
+            temp_dir.as_ref()
+        )
+    })?;
+
     Ok(temp_dir)
 }
 
