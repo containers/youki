@@ -1,12 +1,12 @@
 use crate::{
-    process::{args::ContainerArgs, channel, fork, intermediate},
+    process::{args::ContainerArgs, channel, container_intermediate_process, fork},
     rootless::Rootless,
     utils,
 };
 use anyhow::{Context, Result};
 use nix::unistd::Pid;
 
-pub fn container_main(container_args: &ContainerArgs) -> Result<Pid> {
+pub fn container_main_process(container_args: &ContainerArgs) -> Result<Pid> {
     // We use a set of channels to communicate between parent and child process. Each channel is uni-directional.
     let (main_sender, main_receiver) = &mut channel::main_channel()?;
     let (intermediate_sender, intermediate_receiver) = &mut channel::intermediate_channel()?;
@@ -18,7 +18,7 @@ pub fn container_main(container_args: &ContainerArgs) -> Result<Pid> {
             .close()
             .context("failed to close unused receiver")?;
 
-        intermediate::container_intermediate(
+        container_intermediate_process::container_intermediate_process(
             container_args,
             intermediate_sender,
             intermediate_receiver,

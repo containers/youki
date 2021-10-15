@@ -3,8 +3,8 @@
 
 pub mod args;
 pub mod channel;
+pub mod container_init_process;
+pub mod container_intermediate_process;
+pub mod container_main_process;
 pub mod fork;
-pub(crate) mod init;
-pub mod intermediate;
-pub mod main;
 pub mod message;

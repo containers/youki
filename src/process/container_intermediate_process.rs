@@ -7,9 +7,9 @@ use procfs::process::Process;
 use std::convert::From;
 
 use super::args::ContainerArgs;
-use super::init::container_init;
+use super::container_init_process::container_init_process;
 
-pub fn container_intermediate(
+pub fn container_intermediate_process(
     args: &ContainerArgs,
     intermediate_sender: &mut channel::IntermediateSender,
     intermediate_receiver: &mut channel::IntermediateReceiver,
@@ -89,7 +89,7 @@ pub fn container_intermediate(
         main_sender
             .close()
             .context("failed to close unused sender")?;
-        container_init(args, intermediate_sender, init_receiver)
+        container_init_process(args, intermediate_sender, init_receiver)
     })?;
     // Close unused fds in the parent process.
     intermediate_sender

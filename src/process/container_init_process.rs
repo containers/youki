@@ -185,7 +185,7 @@ fn apply_rest_namespaces(
     Ok(())
 }
 
-pub fn container_init(
+pub fn container_init_process(
     args: &ContainerArgs,
     intermediate_sender: &mut channel::IntermediateSender,
     _init_receiver: &mut channel::InitReceiver,
