@@ -108,8 +108,10 @@ impl SpecJson {
 mod tests {
     use super::*;
     use crate::utils::create_temp_dir;
+    use serial_test::serial;
 
     #[test]
+    #[serial]
     fn test_spec_json() -> Result<()> {
         let spec = get_rootless()?;
         let tmpdir = create_temp_dir("test_spec_json").expect("failed to create temp dir");

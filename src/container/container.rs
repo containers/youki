@@ -202,6 +202,7 @@ impl Container {
 mod tests {
     use super::*;
     use crate::utils::create_temp_dir;
+    use serial_test::serial;
 
     #[test]
     fn test_get_set_pid() {
@@ -269,6 +270,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_refresh_load_save_state() -> Result<()> {
         let tmp_dir = create_temp_dir("test_refresh_load_save_state")?;
         let mut container_1 = Container::new(
@@ -293,6 +295,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_get_spec() -> Result<()> {
         let tmp_dir = create_temp_dir("test_get_spec")?;
         use oci_spec::runtime::Spec;
@@ -309,6 +312,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_get_set_refresh_status() -> Result<()> {
         // there already has a full and well-tested flow of status in state.rs
         // so we just let the coverage run through those can_xxx functions.
@@ -331,8 +335,7 @@ mod tests {
         assert_eq!(container.status(), ContainerStatus::Stopped);
 
         // with PID case
-        let myself = Process::myself()?;
-        container.set_pid(myself.pid());
+        container.set_pid(1);
         container.set_status(ContainerStatus::Paused);
         container.refresh_status()?;
         assert_eq!(container.status(), ContainerStatus::Paused);
