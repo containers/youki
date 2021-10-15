@@ -1,14 +1,11 @@
 use crate::process::message::Message;
-use anyhow::bail;
-use anyhow::Context;
-use anyhow::Result;
-use mio::unix::pipe;
-use mio::unix::pipe::{Receiver, Sender};
-use nix::unistd;
-use nix::unistd::Pid;
-use std::io::Read;
-use std::io::Write;
-use std::os::unix::io::AsRawFd;
+use anyhow::{bail, Context, Result};
+use nix::{
+    sys::{socket, uio},
+    unistd::{self, Pid},
+};
+use serde::{Deserialize, Serialize};
+use std::{marker::PhantomData, os::unix::prelude::RawFd};
 
 /// Channel Design
 ///
@@ -21,27 +18,13 @@ use std::os::unix::io::AsRawFd;
 /// processes will share the main_sender and use it to send message to the main
 /// process.
 
-trait SenderExt {
-    fn write_message(&mut self, msg: Message) -> Result<()>;
-}
-
-impl SenderExt for Sender {
-    #[inline]
-    fn write_message(&mut self, msg: Message) -> Result<()> {
-        let bytes = (msg as u8).to_be_bytes();
-        self.write_all(&bytes)
-            .with_context(|| format!("Failed to write message {:?} to the pipe", bytes))?;
-        Ok(())
-    }
-}
-
 pub fn main_channel() -> Result<(MainSender, MainReceiver)> {
-    let (sender, receiver) = new_pipe()?;
+    let (sender, receiver) = channel::<Message>()?;
     Ok((MainSender { sender }, MainReceiver { receiver }))
 }
 
 pub struct MainSender {
-    sender: Sender,
+    sender: Sender<Message>,
 }
 
 impl MainSender {
@@ -49,62 +32,52 @@ impl MainSender {
     // this needs to be done from the parent see https://man7.org/linux/man-pages/man7/user_namespaces.7.html
     pub fn identifier_mapping_request(&mut self) -> Result<()> {
         log::debug!("send identifier mapping request");
-        self.sender.write_message(Message::WriteMapping)?;
+        self.sender.send(Message::WriteMapping)?;
+
         Ok(())
     }
 
     pub fn intermediate_ready(&mut self, pid: Pid) -> Result<()> {
         // Send over the IntermediateReady follow by the pid.
         log::debug!("sending init pid ({:?})", pid);
-        self.sender.write_message(Message::IntermediateReady)?;
-        self.sender.write_all(&(pid.as_raw()).to_be_bytes())?;
+        self.sender.send(Message::IntermediateReady(pid.as_raw()))?;
+
         Ok(())
     }
 
     pub fn close(&self) -> Result<()> {
-        unistd::close(self.sender.as_raw_fd())?;
-        Ok(())
+        self.sender.close()
     }
 }
 
 pub struct MainReceiver {
-    receiver: Receiver,
+    receiver: Receiver<Message>,
 }
 
 impl MainReceiver {
     /// Waits for associated intermediate process to send ready message
     /// and return the pid of init process which is forked by intermediate process
     pub fn wait_for_intermediate_ready(&mut self) -> Result<Pid> {
-        let mut buf = [0; 1];
-        self.receiver
-            .read_exact(&mut buf)
-            .with_context(|| "failed to receive a message from the intermediate process")?;
+        let msg = self
+            .receiver
+            .recv()
+            .context("failed to receive a message from the intermediate process")?;
 
-        match Message::from(u8::from_be_bytes(buf)) {
-            Message::IntermediateReady => {
-                log::debug!("received intermediate ready message");
-                // Read the Pid which will be i32 or 4 bytes.
-                let mut buf = [0; 4];
-                self.receiver
-                    .read_exact(&mut buf)
-                    .with_context(|| "failed to receive a message from the intermediate process")?;
-
-                Ok(Pid::from_raw(i32::from_be_bytes(buf)))
-            }
-            msg => bail!(
+        match msg {
+            Message::IntermediateReady(pid) => Ok(Pid::from_raw(pid)),
+            _ => bail!(
                 "receive unexpected message {:?} waiting for intermediate ready",
                 msg
             ),
         }
     }
-    pub fn wait_for_mapping_request(&mut self) -> Result<()> {
-        let mut buf = [0; 1];
-        self.receiver
-            .read_exact(&mut buf)
-            .with_context(|| "failed to receive a message from the child process")?;
 
-        // convert to Message wrapper
-        match Message::from(u8::from_be_bytes(buf)) {
+    pub fn wait_for_mapping_request(&mut self) -> Result<()> {
+        let msg = self
+            .receiver
+            .recv()
+            .context("failed to wait for mapping request")?;
+        match msg {
             Message::WriteMapping => Ok(()),
             msg => bail!(
                 "receive unexpected message {:?} waiting for mapping request",
@@ -114,13 +87,12 @@ impl MainReceiver {
     }
 
     pub fn close(&self) -> Result<()> {
-        unistd::close(self.receiver.as_raw_fd())?;
-        Ok(())
+        self.receiver.close()
     }
 }
 
 pub fn intermediate_channel() -> Result<(IntermediateSender, IntermediateReceiver)> {
-    let (sender, receiver) = new_pipe()?;
+    let (sender, receiver) = channel::<Message>()?;
     Ok((
         IntermediateSender { sender },
         IntermediateReceiver { receiver },
@@ -128,45 +100,44 @@ pub fn intermediate_channel() -> Result<(IntermediateSender, IntermediateReceive
 }
 
 pub struct IntermediateSender {
-    sender: Sender,
+    sender: Sender<Message>,
 }
 
 impl IntermediateSender {
     pub fn mapping_written(&mut self) -> Result<()> {
         log::debug!("identifier mapping written");
-        self.sender
-            .write_all(&(Message::MappingWritten as u8).to_be_bytes())?;
+        self.sender.send(Message::MappingWritten)?;
+
         Ok(())
     }
 
     pub fn init_ready(&mut self) -> Result<()> {
-        self.sender.write_message(Message::InitReady)?;
+        self.sender.send(Message::InitReady)?;
+
         Ok(())
     }
 
     pub fn close(&self) -> Result<()> {
-        unistd::close(self.sender.as_raw_fd())?;
-        Ok(())
+        self.sender.close()
     }
 }
 
 pub struct IntermediateReceiver {
-    receiver: Receiver,
+    receiver: Receiver<Message>,
 }
 
 impl IntermediateReceiver {
     // wait until the parent process has finished writing the id mappings
     pub fn wait_for_mapping_ack(&mut self) -> Result<()> {
         log::debug!("waiting for mapping ack");
-        let mut buf = [0; 1];
-        self.receiver
-            .read_exact(&mut buf)
-            .with_context(|| "Failed to receive a message from the main process.")?;
-
-        match Message::from(u8::from_be_bytes(buf)) {
+        let msg = self
+            .receiver
+            .recv()
+            .context("failed to wait for init ready")?;
+        match msg {
             Message::MappingWritten => Ok(()),
             msg => bail!(
-                "receive unexpected message {:?} in waiting for mapping ack",
+                "receive unexpected message {:?} waiting for init ready",
                 msg
             ),
         }
@@ -175,12 +146,11 @@ impl IntermediateReceiver {
     /// Waits for associated init process to send ready message
     /// and return the pid of init process which is forked by init process
     pub fn wait_for_init_ready(&mut self) -> Result<()> {
-        let mut buf = [0; 1];
-        self.receiver
-            .read_exact(&mut buf)
-            .with_context(|| "Failed to receive a message from the init process.")?;
-
-        match Message::from(u8::from_be_bytes(buf)) {
+        let msg = self
+            .receiver
+            .recv()
+            .context("failed to wait for init ready")?;
+        match msg {
             Message::InitReady => Ok(()),
             msg => bail!(
                 "receive unexpected message {:?} waiting for init ready",
@@ -190,47 +160,220 @@ impl IntermediateReceiver {
     }
 
     pub fn close(&self) -> Result<()> {
-        unistd::close(self.receiver.as_raw_fd())?;
-        Ok(())
+        self.receiver.close()
     }
 }
 
 pub fn init_channel() -> Result<(InitSender, InitReceiver)> {
-    let (sender, receiver) = new_pipe()?;
+    let (sender, receiver) = channel::<Message>()?;
     Ok((InitSender { sender }, InitReceiver { receiver }))
 }
 
 pub struct InitSender {
-    sender: Sender,
+    sender: Sender<Message>,
 }
 
 impl InitSender {
     pub fn close(&self) -> Result<()> {
-        unistd::close(self.sender.as_raw_fd())?;
-        Ok(())
+        self.sender.close()
     }
 }
 
 pub struct InitReceiver {
-    receiver: Receiver,
+    receiver: Receiver<Message>,
 }
 
 impl InitReceiver {
     pub fn close(&self) -> Result<()> {
-        unistd::close(self.receiver.as_raw_fd())?;
-        Ok(())
+        self.receiver.close()
     }
 }
 
-fn new_pipe() -> Result<(Sender, Receiver)> {
-    let (sender, receiver) = pipe::new()?;
-    // Our use case is for the process to wait for the communication to come
-    // through, so we set nonblocking to false here (double negative). It is
-    // expected that the waiting process will block and wait.
-    receiver
-        .set_nonblocking(false)
-        .with_context(|| "Failed to set channel receiver to blocking")?;
+pub struct Receiver<T> {
+    receiver: RawFd,
+    phantom: PhantomData<T>,
+}
+
+pub struct Sender<T> {
+    sender: RawFd,
+    phantom: PhantomData<T>,
+}
+
+impl<T> Sender<T>
+where
+    T: Serialize,
+{
+    fn send_iovec(&mut self, iov: &[uio::IoVec<&[u8]>], fds: Option<&[RawFd]>) -> Result<usize> {
+        let cmsgs = if let Some(fds) = fds {
+            vec![socket::ControlMessage::ScmRights(fds)]
+        } else {
+            vec![]
+        };
+        socket::sendmsg(self.sender, iov, &cmsgs, socket::MsgFlags::empty(), None)
+            .map_err(|e| e.into())
+    }
+
+    fn send_slice_with_len(&mut self, data: &[u8], fds: Option<&[RawFd]>) -> Result<usize> {
+        let len = data.len() as u64;
+        // Here we prefix the length of the data onto the serialized data.
+        let iov = [
+            uio::IoVec::from_slice(unsafe {
+                std::slice::from_raw_parts(
+                    (&len as *const u64) as *const u8,
+                    std::mem::size_of::<u64>(),
+                )
+            }),
+            uio::IoVec::from_slice(data),
+        ];
+        self.send_iovec(&iov[..], fds)
+    }
+
+    pub fn send(&mut self, object: T) -> Result<()> {
+        let payload = serde_json::to_vec(&object)?;
+        self.send_slice_with_len(&payload, None)?;
+
+        Ok(())
+    }
+
+    pub fn send_fds(&mut self, object: T, fds: &[RawFd]) -> Result<()> {
+        let payload = serde_json::to_vec(&object)?;
+        self.send_slice_with_len(&payload, Some(fds))?;
+
+        Ok(())
+    }
+
+    pub fn close(&self) -> Result<()> {
+        Ok(unistd::close(self.sender)?)
+    }
+}
+
+impl<T> Receiver<T>
+where
+    T: serde::de::DeserializeOwned,
+{
+    fn peek_size_iovec(&mut self) -> Result<u64> {
+        let mut len: u64 = 0;
+        let iov = [uio::IoVec::from_mut_slice(unsafe {
+            std::slice::from_raw_parts_mut(
+                (&mut len as *mut u64) as *mut u8,
+                std::mem::size_of::<u64>(),
+            )
+        })];
+        let _ = socket::recvmsg(self.receiver, &iov, None, socket::MsgFlags::MSG_PEEK)?;
+        match len {
+            0 => bail!("channel connection broken"),
+            _ => Ok(len),
+        }
+    }
+
+    fn recv_into_iovec<F>(&mut self, iov: &[uio::IoVec<&mut [u8]>]) -> Result<(usize, Option<F>)>
+    where
+        F: Default + AsMut<[RawFd]>,
+    {
+        let mut cmsgspace = nix::cmsg_space!(F);
+        let msg = socket::recvmsg(
+            self.receiver,
+            iov,
+            Some(&mut cmsgspace),
+            socket::MsgFlags::MSG_CMSG_CLOEXEC,
+        )?;
+
+        // Sending multiple SCM_RIGHTS message will led to platform dependent
+        // behavior, with some system choose to return EINVAL when sending or
+        // silently only process the first msg or send all of it. Here we assume
+        // there is only one SCM_RIGHTS message and will only process the first
+        // message.
+        let fds: Option<F> = msg
+            .cmsgs()
+            .find_map(|cmsg| {
+                if let socket::ControlMessageOwned::ScmRights(fds) = cmsg {
+                    Some(fds)
+                } else {
+                    None
+                }
+            })
+            .map(|fds| {
+                let mut fds_array: F = Default::default();
+                <F as AsMut<[RawFd]>>::as_mut(&mut fds_array).clone_from_slice(&fds);
+
+                fds_array
+            });
+
+        Ok((msg.bytes, fds))
+    }
+
+    fn recv_into_buf_with_len<F>(&mut self) -> Result<(Vec<u8>, Option<F>)>
+    where
+        F: Default + AsMut<[RawFd]>,
+    {
+        let msg_len = self.peek_size_iovec()?;
+        let mut len: u64 = 0;
+        let mut buf = vec![0u8; msg_len as usize];
+        let (bytes, fds) = {
+            let iov = [
+                uio::IoVec::from_mut_slice(unsafe {
+                    std::slice::from_raw_parts_mut(
+                        (&mut len as *mut u64) as *mut u8,
+                        std::mem::size_of::<u64>(),
+                    )
+                }),
+                uio::IoVec::from_mut_slice(&mut buf),
+            ];
+            self.recv_into_iovec(&iov)?
+        };
+
+        match bytes {
+            0 => bail!("channel connection broken"),
+            _ => Ok((buf, fds)),
+        }
+    }
+
+    // Recv the next message of type T.
+    pub fn recv(&mut self) -> Result<T> {
+        let (buf, _) = self.recv_into_buf_with_len::<[RawFd; 0]>()?;
+        Ok(serde_json::from_slice(&buf[..])?)
+    }
+
+    // Works similar to `recv`, but will look for fds sent by SCM_RIGHTS
+    // message.  We use F as as `[RawFd; n]`, where `n` is the number of
+    // descriptors you want to receive.
+    pub fn recv_with_fds<F>(&mut self) -> Result<(T, Option<F>)>
+    where
+        F: Default + AsMut<[RawFd]>,
+    {
+        let (buf, fds) = self.recv_into_buf_with_len::<F>()?;
+        Ok((serde_json::from_slice(&buf[..])?, fds))
+    }
+
+    pub fn close(&self) -> Result<()> {
+        Ok(unistd::close(self.receiver)?)
+    }
+}
+
+pub fn channel<T>() -> Result<(Sender<T>, Receiver<T>)>
+where
+    T: for<'de> Deserialize<'de> + Serialize,
+{
+    let (os_sender, os_receiver) = unix_channel()?;
+    let receiver = Receiver {
+        receiver: os_receiver,
+        phantom: PhantomData,
+    };
+    let sender = Sender {
+        sender: os_sender,
+        phantom: PhantomData,
+    };
     Ok((sender, receiver))
+}
+
+// Use socketpair as the underlying pipe.
+fn unix_channel() -> Result<(RawFd, RawFd)> {
+    Ok(socket::socketpair(
+        socket::AddressFamily::Unix,
+        socket::SockType::SeqPacket,
+        None,
+        socket::SockFlag::SOCK_CLOEXEC,
+    )?)
 }
 
 #[cfg(test)]
