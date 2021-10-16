@@ -46,14 +46,14 @@ fn test_pidfile() -> TestResult {
 
     if !err.is_empty() {
         cleanup(&container_id, &bundle);
-        return TestResult::Err(anyhow!("Error in state : {}", err));
+        return TestResult::Failed(anyhow!("Error in state : {}", err));
     }
 
     let state: State = serde_json::from_str(&out).unwrap();
 
     if state.id != container_id.to_string() {
         cleanup(&container_id, &bundle);
-        return TestResult::Err(anyhow!(
+        return TestResult::Failed(anyhow!(
             "Error in state : ID not matched ,expected {} got {}",
             container_id,
             state.id
@@ -62,7 +62,7 @@ fn test_pidfile() -> TestResult {
 
     if state.status != "created" {
         cleanup(&container_id, &bundle);
-        return TestResult::Err(anyhow!(
+        return TestResult::Failed(anyhow!(
             "Error in state : Status not matched ,expected 'created' got {}",
             state.status
         ));
@@ -77,7 +77,7 @@ fn test_pidfile() -> TestResult {
     // get pid from the state
     if state.pid.unwrap() != pidfile {
         cleanup(&container_id, &bundle);
-        return TestResult::Err(anyhow!(
+        return TestResult::Failed(anyhow!(
             "Error : Pid not matched ,expected {} as per state, but got {} from pidfile instead",
             state.pid.unwrap(),
             pidfile
@@ -85,7 +85,7 @@ fn test_pidfile() -> TestResult {
     }
 
     cleanup(&container_id, &bundle);
-    TestResult::Ok
+    TestResult::Passed
 }
 
 pub fn get_pidfile_test<'a>() -> TestGroup<'a> {

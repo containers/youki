@@ -102,7 +102,10 @@ pub fn get_state<P: AsRef<Path>>(id: &Uuid, dir: P) -> Result<(String, String)> 
     Ok((stdout, stderr))
 }
 
-pub fn test_outside_container(spec: Spec, execute_test: &dyn Fn(ContainerData) -> TestResult) -> TestResult {
+pub fn test_outside_container(
+    spec: Spec,
+    execute_test: &dyn Fn(ContainerData) -> TestResult,
+) -> TestResult {
     let id = generate_uuid();
     let bundle = prepare_bundle(&id).unwrap();
     set_config(&bundle, &spec).unwrap();
@@ -128,28 +131,41 @@ pub fn check_container_created(data: &ContainerData) -> Result<()> {
     match &data.create_result {
         Ok(exit_status) => {
             if !exit_status.success() {
-                bail!("container creation was not successfull. Exit code was {:?}", exit_status.code())
+                bail!(
+                    "container creation was not successfull. Exit code was {:?}",
+                    exit_status.code()
+                )
             }
 
             if !data.state_err.is_empty() {
-                bail!("container state could not be retrieved successfully. Error was {}", data.state_err);
+                bail!(
+                    "container state could not be retrieved successfully. Error was {}",
+                    data.state_err
+                );
             }
 
-            if let None = data.state {
+            if data.state.is_none() {
                 bail!("container state could not be retrieved");
             }
 
             let container_state = data.state.as_ref().unwrap();
             if container_state.id != data.id {
-                bail!("container state contains container id {}, but expected was {}", container_state.id, data.id);
+                bail!(
+                    "container state contains container id {}, but expected was {}",
+                    container_state.id,
+                    data.id
+                );
             }
 
             if container_state.status != "created" {
-                bail!("expected container to be in state created, but was in state {}", container_state.status);
+                bail!(
+                    "expected container to be in state created, but was in state {}",
+                    container_state.status
+                );
             }
 
             Ok(())
-        },
+        }
         Err(e) => Err(anyhow!("{}", e)),
     }
 }

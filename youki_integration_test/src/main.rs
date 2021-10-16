@@ -9,6 +9,7 @@ use anyhow::Result;
 use clap::Clap;
 use std::path::PathBuf;
 use test_framework::TestManager;
+use tests::cgroups;
 
 #[derive(Clap, Debug)]
 #[clap(version = "0.0.1", author = "youki team")]
@@ -60,11 +61,13 @@ fn main() -> Result<()> {
     let cc = ContainerCreate::new();
     let huge_tlb = get_tlb_test();
     let pidfile = get_pidfile_test();
+    let cgroup_v1_pids = cgroups::pids::get_test_group();
 
     tm.add_test_group(&cl);
     tm.add_test_group(&cc);
     tm.add_test_group(&huge_tlb);
     tm.add_test_group(&pidfile);
+    tm.add_test_group(&cgroup_v1_pids);
 
     if let Some(tests) = opts.tests {
         let tests_to_run = parse_tests(&tests);
