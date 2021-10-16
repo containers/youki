@@ -44,7 +44,7 @@ impl<'a> TestableGroup<'a> for TestGroup<'a> {
                     if t.can_run() {
                         (t.get_name(), t.run())
                     } else {
-                        (t.get_name(), TestResult::Skip)
+                        (t.get_name(), TestResult::Skipped)
                     }
                 });
                 collector.push(_t);
@@ -71,7 +71,7 @@ impl<'a> TestableGroup<'a> for TestGroup<'a> {
                     if t.can_run() {
                         (t.get_name(), t.run())
                     } else {
-                        (t.get_name(), TestResult::Skip)
+                        (t.get_name(), TestResult::Skipped)
                     }
                 });
                 collector.push(_t);

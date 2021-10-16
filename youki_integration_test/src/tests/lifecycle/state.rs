@@ -20,7 +20,7 @@ pub fn state(project_path: &Path, id: &str) -> TestResult {
             let stderr = String::from_utf8(output.stderr).unwrap();
             let stdout = String::from_utf8(output.stdout).unwrap();
             if stderr.contains("Error") || stderr.contains("error") {
-                TestResult::Err(anyhow::anyhow!(
+                TestResult::Failed(anyhow::anyhow!(
                     "Error :\nstdout : {}\nstderr : {}",
                     stdout,
                     stderr
@@ -30,12 +30,12 @@ pub fn state(project_path: &Path, id: &str) -> TestResult {
                 if !(stdout.contains(&format!(r#""id": "{}""#, id))
                     && stdout.contains(r#""status": "stopped""#))
                 {
-                    TestResult::Err(anyhow::anyhow!("Expected state stopped, got : {}", stdout))
+                    TestResult::Failed(anyhow::anyhow!("Expected state stopped, got : {}", stdout))
                 } else {
-                    TestResult::Ok
+                    TestResult::Passed
                 }
             }
         }
-        io::Result::Err(e) => TestResult::Err(anyhow::Error::new(e)),
+        io::Result::Err(e) => TestResult::Failed(anyhow::Error::new(e)),
     }
 }

@@ -37,13 +37,13 @@ impl<'a> TestManager<'a> {
         for (idx, (name, res)) in res.iter().enumerate() {
             print!("{} / {} : {} : ", idx + 1, len, name);
             match res {
-                TestResult::Ok => {
+                TestResult::Passed => {
                     println!("ok");
                 }
-                TestResult::Skip => {
+                TestResult::Skipped => {
                     println!("skipped");
                 }
-                TestResult::Err(e) => {
+                TestResult::Failed(e) => {
                     println!("not ok\n\t{}", e);
                 }
             }

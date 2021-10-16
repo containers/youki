@@ -28,18 +28,18 @@ impl<'a> ContainerCreate {
     fn create_empty_id(&self) -> TestResult {
         let temp = create::create(&self.project_path, "");
         match temp {
-            TestResult::Ok => TestResult::Err(anyhow::anyhow!(
+            TestResult::Passed => TestResult::Failed(anyhow::anyhow!(
                 "Container should not have been created with empty id, but was created."
             )),
-            TestResult::Err(_) => TestResult::Ok,
-            TestResult::Skip => TestResult::Skip,
+            TestResult::Failed(_) => TestResult::Passed,
+            TestResult::Skipped => TestResult::Skipped,
         }
     }
 
     // runtime should create container with valid id
     fn create_valid_id(&self) -> TestResult {
         let temp = create::create(&self.project_path, &self.container_id);
-        if let TestResult::Ok = temp {
+        if let TestResult::Passed = temp {
             kill::kill(&self.project_path, &self.container_id);
             delete::delete(&self.project_path, &self.container_id);
         }
@@ -54,11 +54,11 @@ impl<'a> ContainerCreate {
         kill::kill(&self.project_path, &id);
         delete::delete(&self.project_path, &id);
         match temp {
-            TestResult::Ok => TestResult::Err(anyhow::anyhow!(
+            TestResult::Passed => TestResult::Failed(anyhow::anyhow!(
                 "Container should not have been created with same id, but was created."
             )),
-            TestResult::Err(_) => TestResult::Ok,
-            TestResult::Skip => TestResult::Skip,
+            TestResult::Failed(_) => TestResult::Passed,
+            TestResult::Skipped => TestResult::Skipped,
         }
     }
 }
