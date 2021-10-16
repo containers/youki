@@ -103,13 +103,13 @@ impl<'a> ContainerBuilderImpl<'a> {
         let container_args = ContainerArgs {
             init: self.init,
             syscall: self.syscall,
-            spec: self.spec.clone(),
-            rootfs: self.rootfs.clone(),
+            spec: self.spec,
+            rootfs: &self.rootfs,
             console_socket: self.console_socket,
             notify_socket,
             preserve_fds: self.preserve_fds,
-            container: self.container.clone(),
-            rootless: self.rootless.clone(),
+            container: &self.container,
+            rootless: &self.rootless,
             cgroup_manager: cmanager,
         };
 

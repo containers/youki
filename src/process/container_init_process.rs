@@ -298,7 +298,7 @@ pub fn container_init_process(
         }
     };
 
-    set_supplementary_gids(proc.user(), &args.rootless)
+    set_supplementary_gids(proc.user(), args.rootless)
         .context("failed to set supplementary gids")?;
 
     syscall

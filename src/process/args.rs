@@ -12,9 +12,9 @@ pub struct ContainerArgs<'a> {
     /// Interface to operating system primitives
     pub syscall: &'a dyn Syscall,
     /// OCI complient runtime spec
-    pub spec: Spec,
+    pub spec: &'a Spec,
     /// Root filesystem of the container
-    pub rootfs: PathBuf,
+    pub rootfs: &'a PathBuf,
     /// Socket to communicate the file descriptor of the ptty
     pub console_socket: Option<RawFd>,
     /// The Unix Domain Socket to communicate container start
@@ -22,9 +22,9 @@ pub struct ContainerArgs<'a> {
     /// File descriptos preserved/passed to the container init process.
     pub preserve_fds: i32,
     /// Container state
-    pub container: Option<Container>,
+    pub container: &'a Option<Container>,
     /// Options for rootless containers
-    pub rootless: Option<Rootless<'a>>,
+    pub rootless: &'a Option<Rootless<'a>>,
     /// Cgroup Manager
     pub cgroup_manager: Box<dyn CgroupManager>,
 }
