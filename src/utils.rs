@@ -262,9 +262,9 @@ pub fn create_temp_dir(test_name: &str) -> Result<TempDir> {
 
 #[cfg(test)]
 pub(crate) mod test_utils {
+    use crate::process::channel;
     use anyhow::Context;
     use anyhow::{bail, Result};
-    use ipc_channel::ipc;
     use nix::sys::wait;
     use serde::{Deserialize, Serialize};
 
@@ -275,10 +275,10 @@ pub(crate) mod test_utils {
     }
 
     pub fn test_in_child_process<F: FnOnce() -> Result<()>>(cb: F) -> Result<()> {
-        let (sender, receiver) = ipc::channel::<TestResult>()?;
+        let (mut sender, mut receiver) = channel::channel::<TestResult>()?;
         match unsafe { nix::unistd::fork()? } {
             nix::unistd::ForkResult::Parent { child } => {
-                let res = receiver.recv().unwrap();
+                let res = receiver.recv()?;
                 wait::waitpid(child, None)?;
 
                 if !res.success {

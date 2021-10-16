@@ -53,7 +53,6 @@ path-clean = "0.1.0"
 oci-spec = { git = "https://github.com/containers/oci-spec-rs",  rev = "3d5132a18c305be59d58187201429d8f0243b513", features = ["proptests"] }
 quickcheck = "1"
 serial_test = "0.5.1"
-ipc-channel = "0.15.0"
 
 [profile.release]
 lto = true
