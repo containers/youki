@@ -115,6 +115,10 @@ fn sync_seccomp(
         sync_seccomp_send_msg(listener_path, &encoded_state, seccomp_fd)
             .context("failed to send msg to seccomp listener")?;
         init_sender.seccomp_notify_done()?;
+        // Once we sent the seccomp notify fd to the seccomp listener, we can
+        // safely close the fd. The SCM_RIGHTS msg will duplicate the fd to the
+        // process on the other end of the listener.
+        let _ = unistd::close(seccomp_fd);
     }
 
     Ok(())

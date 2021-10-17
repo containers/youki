@@ -490,6 +490,10 @@ fn sync_seccomp(
         log::debug!("init process sync seccomp, notify fd: {}", fd);
         main_sender.seccomp_notify_request(fd)?;
         init_receiver.wait_for_seccomp_request_done()?;
+        // Once we are sure the seccomp notify fd is sent, we can safely close
+        // it. The fd is now duplicated to the main process and sent to seccomp
+        // listener.
+        let _ = unistd::close(fd);
     }
 
     Ok(())
