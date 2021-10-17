@@ -153,17 +153,17 @@ fn can_run() -> bool {
 pub fn get_test_group<'a>() -> TestGroup<'a> {
     let mut test_group = TestGroup::new("cgroup_v1_pids");
     let positive_limit = ConditionalTest::new(
-        "positive pid limit",
+        "positive_pid_limit",
         Box::new(can_run),
         Box::new(test_positive_limit),
     );
     let zero_limit = ConditionalTest::new(
-        "zero pid limit",
+        "zero_pid_limit",
         Box::new(can_run),
         Box::new(test_zero_limit),
     );
     let negative_limit = ConditionalTest::new(
-        "negative pid limit",
+        "negative_pid_limit",
         Box::new(can_run),
         Box::new(test_negative_limit),
     );
