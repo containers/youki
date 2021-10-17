@@ -5,7 +5,7 @@ use std::{
 
 use anyhow::{bail, Context, Result};
 use oci_spec::runtime::{LinuxBuilder, LinuxPidsBuilder, LinuxResourcesBuilder, Spec, SpecBuilder};
-use test_framework::{ConditionalTest, TestGroup, TestResult};
+use test_framework::{test_result, ConditionalTest, TestGroup, TestResult};
 
 use crate::utils::{
     test_outside_container,
@@ -44,14 +44,12 @@ fn create_spec(cgroup_name: &str, limit: i64) -> Result<Spec> {
 fn test_positive_limit() -> TestResult {
     let cgroup_name = "test_positive_limit";
     let limit = 50;
-    let spec = create_spec(cgroup_name, limit).unwrap();
+    let spec = test_result!(create_spec(cgroup_name, limit));
 
     test_outside_container(spec, &|data| {
-        check_container_created(&data).unwrap();
-        match check_pid_limit_set(cgroup_name, limit) {
-            Ok(_) => TestResult::Passed,
-            Err(e) => TestResult::Failed(e),
-        }
+        test_result!(check_container_created(&data));
+        test_result!(check_pid_limit_set(cgroup_name, limit));
+        TestResult::Passed
     })
 }
 
@@ -59,14 +57,12 @@ fn test_positive_limit() -> TestResult {
 fn test_zero_limit() -> TestResult {
     let cgroup_name = "test_zero_limit";
     let limit = 0;
-    let spec = create_spec(cgroup_name, limit).unwrap();
+    let spec = test_result!(create_spec(cgroup_name, limit));
 
     test_outside_container(spec, &|data| {
-        check_container_created(&data).unwrap();
-        match check_pids_are_unlimited(cgroup_name) {
-            Ok(_) => TestResult::Passed,
-            Err(e) => TestResult::Failed(e),
-        }
+        test_result!(check_container_created(&data));
+        test_result!(check_pids_are_unlimited(cgroup_name));
+        TestResult::Passed
     })
 }
 
@@ -74,14 +70,12 @@ fn test_zero_limit() -> TestResult {
 fn test_negative_limit() -> TestResult {
     let cgroup_name = "test_negative_limit";
     let limit = -1;
-    let spec = create_spec(cgroup_name, limit).unwrap();
+    let spec = test_result!(create_spec(cgroup_name, limit));
 
     test_outside_container(spec, &|data| {
-        check_container_created(&data).unwrap();
-        match check_pids_are_unlimited(cgroup_name) {
-            Ok(_) => TestResult::Passed,
-            Err(e) => TestResult::Failed(e),
-        }
+        test_result!(check_container_created(&data));
+        test_result!(check_pids_are_unlimited(cgroup_name));
+        TestResult::Passed
     })
 }
 

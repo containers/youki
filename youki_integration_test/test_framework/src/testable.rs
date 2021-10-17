@@ -40,3 +40,15 @@ pub trait TestableGroup<'a> {
     fn run_all(&'a self) -> Vec<(&'a str, TestResult)>;
     fn run_selected(&'a self, selected: &[&str]) -> Vec<(&'a str, TestResult)>;
 }
+
+#[macro_export]
+macro_rules! test_result {
+    ($e:expr $(,)?) => {
+        match $e {
+            core::result::Result::Ok(val) => val,
+            core::result::Result::Err(err) => {
+                return $crate::testable::TestResult::Failed(err);
+            }
+        }
+    };
+}
