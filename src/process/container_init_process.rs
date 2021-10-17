@@ -392,11 +392,14 @@ pub fn container_init_process(
         }
     }
 
-    // Notify main process that the init process is ready to execute the payload.
-    // Note, we pass -1 here because we are already inside the pid namespace.
-    // The pid outside the pid namespace should be recorded by the intermediate
-    // process.
+    // Notify main process that the init process is ready to execute the
+    // payload.  Note, because we are already inside the pid namespace, the pid
+    // outside the pid namespace should be recorded by the intermediate process
+    // already.
     main_sender.init_ready()?;
+    main_sender
+        .close()
+        .context("failed to close down main sender in init process")?;
 
     // listing on the notify socket for container start command
     args.notify_socket.wait_for_container_start()?;

@@ -81,7 +81,8 @@ pub fn container_intermediate_process(
     // the child will be inside the pid namespace. We can't rely on child_ready
     // to send us the correct pid.
     let pid = fork::container_fork(|| {
-        // First thing in the child process to close the unused fds in the channel/pipe.
+        // We are inside the forked process here. The first thing we have to do is to close
+        // any unused senders, since fork will make a dup for all the socket.
         init_sender
             .close()
             .context("failed to close receiver in init process")?;
@@ -90,21 +91,23 @@ pub fn container_intermediate_process(
             .context("failed to close sender in the intermediate process")?;
         container_init_process(args, main_sender, init_receiver)
     })?;
-    // Close unused fds in the parent process.
+    // Once we fork the container init process, the job for intermediate process
+    // is done. We notify the container main process about the pid we just
+    // forked for container init process.
+    main_sender
+        .intermediate_ready(pid)
+        .context("failed to send child ready from intermediate process")?;
+
+    // Close unused senders here so we don't have lingering socket around.
+    main_sender
+        .close()
+        .context("failed to close unused main sender")?;
     intermediate_sender
         .close()
         .context("failed to close sender in the intermediate process")?;
     init_sender
         .close()
         .context("failed to close unused init sender")?;
-    // There is no point using the pid returned here, since the child will be
-    // inside the pid namespace already.
-
-    // After the child (the container init process) becomes ready, we can signal
-    // the parent (the main process) that we are ready.
-    main_sender
-        .intermediate_ready(pid)
-        .context("failed to send child ready from intermediate process")?;
 
     Ok(())
 }

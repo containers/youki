@@ -13,18 +13,16 @@ use oci_spec::runtime;
 use std::path::Path;
 
 pub fn container_main_process(container_args: &ContainerArgs) -> Result<Pid> {
-    // We use a set of channels to communicate between parent and child process. Each channel is uni-directional.
+    // We use a set of channels to communicate between parent and child process.
+    // Each channel is uni-directional. Because we will pass these channel to
+    // forked process, we have to be deligent about closing any unused channel.
+    // At minimum, we have to close down any unused senders. The corresponding
+    // receivers will be cleaned up once the senders are closed down.
     let (main_sender, main_receiver) = &mut channel::main_channel()?;
     let (intermediate_sender, intermediate_receiver) = &mut channel::intermediate_channel()?;
     let (init_sender, init_receiver) = &mut channel::init_channel()?;
 
     let intermediate_pid = fork::container_fork(|| {
-        // The fds in the channel is duplicated during fork, so we first close
-        // the unused fds. Note, this already runs in the child process.
-        main_receiver
-            .close()
-            .context("failed to close unused receiver")?;
-
         container_intermediate_process::container_intermediate_process(
             container_args,
             intermediate_sender,
@@ -49,13 +47,15 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<Pid> {
         intermediate_sender.mapping_written()?;
     }
 
+    // At this point, we don't need to send any message to intermediate process anymore,
+    // so we want to close this sender at the earliest point.
+    intermediate_sender
+        .close()
+        .context("failed to close unused intermediate sender")?;
+
     // The intermediate process will send the init pid once it forks the init
     // process.  The intermediate process should exit after this point.
     let init_pid = main_receiver.wait_for_intermediate_ready()?;
-
-    intermediate_sender
-        .close()
-        .context("failed to close unused sender")?;
 
     if let Some(linux) = container_args.spec.linux() {
         if let Some(seccomp) = linux.seccomp() {
@@ -82,6 +82,8 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<Pid> {
         }
     }
 
+    // We don't need to send anything to the init process after this point, so
+    // close the sender.
     init_sender
         .close()
         .context("failed to close unused init sender")?;
@@ -146,6 +148,7 @@ fn sync_seccomp_send_msg(listener_path: &Path, msg: &[u8], fd: i32) -> Result<()
     let cmsgs = socket::ControlMessage::ScmRights(&fds);
     socket::sendmsg(socket, &iov, &[cmsgs], socket::MsgFlags::empty(), None)
         .context("failed to write container state to seccomp listener")?;
+    // The spec requires the listener socket to be closed immediately after sending.
     let _ = unistd::close(socket);
 
     Ok(())
