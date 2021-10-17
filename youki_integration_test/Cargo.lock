@@ -379,8 +379,7 @@ dependencies = [
 [[package]]
 name = "oci-spec"
 version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "63f0f82a50257e72a6f13616dc093f3d0874294629bf8b7d0bc2a098e3db324f"
+source = "git+https://github.com/containers/oci-spec-rs?rev=3d5132a18c305be59d58187201429d8f0243b513#3d5132a18c305be59d58187201429d8f0243b513"
 dependencies = [
  "derive_builder",
  "getset",
@@ -442,9 +441,9 @@ dependencies = [
 
 [[package]]
 name = "procfs"
-version = "0.10.1"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95e344cafeaeefe487300c361654bcfc85db3ac53619eeccced29f5ea18c4c70"
+checksum = "3f2e7eea7c1d7beccbd5acc1e37ac844afccf176525674aad26ece3de1fc7733"
 dependencies = [
  "bitflags",
  "byteorder",

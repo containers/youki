@@ -5,25 +5,18 @@ use oci_spec::runtime::{Spec, SpecBuilder};
 use procfs::process::Process;
 use test_framework::{Test, TestGroup, TestResult};
 
-// I'm not sure we even need this
-//const NAMESPACES: [&str; 5] = ["pid", "net", "ipc", "uts", "mnt"];
-
 // get spec for the test
 fn get_spec() -> Spec {
-    let r = SpecBuilder::default()
-        // We need to remove hostname to avoid test failures when not creating UTS namespace
-        .hostname("")
+    let mut r = SpecBuilder::default()
         .linux(
             LinuxBuilder::default()
                 .namespaces(
-                    // the original test essientially skips all default namespaces,
-                    // so we just put an empty vec here
+                    // we have to remove all namespaces, so we directly
+                    // provide an empty vec here
                     vec![],
                 )
                 // if these both are not empty, we cannot set a inherited
                 // mnt namespace, as these both require a private mnt namespace
-                // original test config has these empty by default, and has a function
-                // to add them if required
                 .masked_paths(vec![])
                 .readonly_paths(vec![])
                 .build()
@@ -31,6 +24,8 @@ fn get_spec() -> Spec {
         )
         .build()
         .unwrap();
+    // We need to remove hostname to avoid test failures when not creating UTS namespace
+    r.set_hostname(None);
     r
 }
 
@@ -45,32 +40,19 @@ fn get_test<'a>(test_name: &'static str) -> Test<'a> {
                     return TestResult::Err(anyhow!("Error in resolving host namespaces : {}", e))
                 }
             };
-            // ! we don't have to actually store these separately
-            // ! as we are making all namespaces to be inherited, we can directly compare
-            // ! the hashmaps (?)
-            // let mut ns_inode = HashMap::new();
-            // for ns in namespaces {
-            //     ns_inode.insert(ns.ns_type.into_string().unwrap(), ns.identifier);
-            // }
-
             let spec = get_spec();
             test_outside_container(spec, &move |data| {
-                let pid = data.state.unwrap().pid.unwrap();
+                let pid = match data.state {
+                    Some(s) => s.pid.unwrap(),
+                    None => return TestResult::Err(anyhow!("State command returned error")),
+                };
                 let container_process = Process::new(pid).unwrap();
                 let container_namespaces = container_process.namespaces().unwrap();
-
-                // for ns in namespaces {
-                //     let inode = ns_inode
-                //         .get(&ns.ns_type.clone().into_string().unwrap())
-                //         .unwrap();
-
-                // ! directly compare the hashmaps
                 if container_namespaces != host_namespaces {
                     return TestResult::Err(anyhow!(
                         "Error : namespaces are not correctly inherited"
                     ));
                 }
-                // }
                 TestResult::Ok
             })
         }),
