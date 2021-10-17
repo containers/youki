@@ -38,7 +38,7 @@ impl MainSender {
     }
 
     pub fn seccomp_notify_request(&mut self) -> Result<()> {
-        self.sender.write_message(Message::SeccompNotify)?;
+        self.sender.send(Message::SeccompNotify)?;
 
         Ok(())
     }
@@ -93,16 +93,15 @@ impl MainReceiver {
     }
 
     pub fn wait_for_seccomp_request(&mut self) -> Result<()> {
-        let mut buf = [0; 1];
-        self.receiver
-            .read_exact(&mut buf)
-            .with_context(|| "failed to receive a message from the child process")?;
+        let msg = self
+            .receiver
+            .recv()
+            .context("failed to wait for seccomp request")?;
 
-        // convert to Message wrapper
-        match Message::from(u8::from_be_bytes(buf)) {
+        match msg {
             Message::SeccompNotify => Ok(()),
             msg => bail!(
-                "receive unexpected message {:?} waiting for mapping request",
+                "receive unexpected message {:?} waiting for seccomp request",
                 msg
             ),
         }
@@ -197,7 +196,7 @@ pub struct InitSender {
 
 impl InitSender {
     pub fn seccomp_notify_done(&mut self) -> Result<()> {
-        self.sender.write_message(Message::SeccompNotifyDone)?;
+        self.sender.send(Message::SeccompNotifyDone)?;
 
         Ok(())
     }
@@ -213,13 +212,12 @@ pub struct InitReceiver {
 
 impl InitReceiver {
     pub fn wait_for_seccomp_request_done(&mut self) -> Result<()> {
-        let mut buf = [0; 1];
-        self.receiver
-            .read_exact(&mut buf)
-            .with_context(|| "failed to receive a message")?;
+        let msg = self
+            .receiver
+            .recv()
+            .context("failed to wait for seccomp request")?;
 
-        // convert to Message wrapper
-        match Message::from(u8::from_be_bytes(buf)) {
+        match msg {
             Message::SeccompNotifyDone => Ok(()),
             msg => bail!(
                 "receive unexpected message {:?} waiting for seccomp done request",
