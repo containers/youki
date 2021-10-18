@@ -59,17 +59,12 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<Pid> {
 
     if let Some(linux) = container_args.spec.linux() {
         if let Some(seccomp) = linux.seccomp() {
-            let seccomp_metadata = if let Some(metadata) = seccomp.listener_metadata() {
-                metadata.to_owned()
-            } else {
-                String::new()
-            };
             let state = ContainerProcessState {
                 oci_version: container_args.spec.version().to_string(),
                 // runc hardcode the `seccompFd` name for fds.
                 fds: vec![String::from("seccompFd")],
                 pid: init_pid.as_raw(),
-                metadata: seccomp_metadata,
+                metadata: seccomp.listener_metadata().to_owned().unwrap_or_default(),
                 state: container_args
                     .container
                     .as_ref()
