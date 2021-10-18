@@ -100,6 +100,7 @@ $ ./youki -h # you can get information about youki command
 
 ## Tutorial
 
+### Create and run a container
 Let's try to run a container that executes `sleep 30` with youki. This tutorial may need root permission.
 
 ```console
@@ -143,6 +144,20 @@ $ sudo ./youki delete tutorial_container               # delete the container
 ```
 
 Change the command to be executed in `config.json` and try something other than `sleep 30`.
+
+### Rootless container
+
+`youki` provides the ability to run containers as non-root user([rootless mode](https://docs.docker.com/engine/security/rootless/)). To run a container in rootless mode, we need to add some extra options in `config.json`, other steps are same with above:
+
+```bash
+$ mkdir -p tutorial/rootfs
+$ cd tutorial
+# use docker to export busybox into the rootfs directory
+$ docker export $(docker create busybox) | tar -C rootfs -xvf -
+
+$ ../youki spec                     # will generate a spec file named config.json with rootless mode
+$ ../youki run rootless-container   # will create and run a container with rootless mode
+```
 
 ## Usage
 
