@@ -703,7 +703,7 @@ mod tests {
         assert_eq!(expected, got.next().unwrap());
 
         for (host_mount, act) in host_mounts.iter().zip(got) {
-            let subsystem_name = host_mount.file_name().unwrap().to_str().unwrap();
+            let subsystem_name = host_mount.file_name().and_then(|f| f.to_str()).unwrap()
             let expected = MountArgs {
                 source: Some(PathBuf::from("cgroup".to_owned())),
                 target: tmp.join_safely(host_mount)?,
