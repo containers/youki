@@ -695,7 +695,7 @@ mod tests {
 
         let expected = MountArgs {
             source: Some(PathBuf::from("tmpfs".to_owned())),
-            target: tmp.join_safely(container_cgroup)?,
+            target: tmp.join_safely(&container_cgroup)?,
             fstype: Some("tmpfs".to_owned()),
             flags: MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
             data: Some("mode=755".to_owned()),
@@ -703,10 +703,10 @@ mod tests {
         assert_eq!(expected, got.next().unwrap());
 
         for (host_mount, act) in host_mounts.iter().zip(got) {
-            let subsystem_name = host_mount.file_name().and_then(|f| f.to_str()).unwrap()
+            let subsystem_name = host_mount.file_name().and_then(|f| f.to_str()).unwrap();
             let expected = MountArgs {
                 source: Some(PathBuf::from("cgroup".to_owned())),
-                target: tmp.join_safely(host_mount)?,
+                target: tmp.join_safely(&container_cgroup)?.join(subsystem_name),
                 fstype: Some("cgroup".to_owned()),
                 flags: MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
                 data: Some(
