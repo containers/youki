@@ -69,6 +69,8 @@ fn main() -> Result<()> {
     tm.add_test_group(&pidfile);
     tm.add_test_group(&cgroup_v1_pids);
 
+    tm.add_cleanup(Box::new(cgroups::cleanup));
+
     if let Some(tests) = opts.tests {
         let tests_to_run = parse_tests(&tests);
         tm.run_selected(tests_to_run);
