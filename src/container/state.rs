@@ -159,6 +159,23 @@ impl State {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ContainerProcessState {
+    // Version is the version of the specification that is supported.
+    pub oci_version: String,
+    // Fds is a string array containing the names of the file descriptors passed.
+    // The index of the name in this array corresponds to index of the file
+    // descriptor in the `SCM_RIGHTS` array.
+    pub fds: Vec<String>,
+    // Pid is the process ID as seen by the runtime.
+    pub pid: i32,
+    // Opaque metadata.
+    pub metadata: String,
+    // State of the container.
+    pub state: State,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1,27 +1,34 @@
 use crate::{
+    container::ContainerProcessState,
     process::{args::ContainerArgs, channel, container_intermediate_process, fork},
     rootless::Rootless,
-    utils,
+    seccomp, utils,
 };
 use anyhow::{Context, Result};
-use nix::unistd::Pid;
+use nix::{
+    sys::{socket, uio},
+    unistd::{self, Pid},
+};
+use oci_spec::runtime;
+use std::path::Path;
 
 pub fn container_main_process(container_args: &ContainerArgs) -> Result<Pid> {
-    // We use a set of channels to communicate between parent and child process. Each channel is uni-directional.
+    // We use a set of channels to communicate between parent and child process.
+    // Each channel is uni-directional. Because we will pass these channel to
+    // forked process, we have to be deligent about closing any unused channel.
+    // At minimum, we have to close down any unused senders. The corresponding
+    // receivers will be cleaned up once the senders are closed down.
     let (main_sender, main_receiver) = &mut channel::main_channel()?;
     let (intermediate_sender, intermediate_receiver) = &mut channel::intermediate_channel()?;
+    let (init_sender, init_receiver) = &mut channel::init_channel()?;
 
     let intermediate_pid = fork::container_fork(|| {
-        // The fds in the channel is duplicated during fork, so we first close
-        // the unused fds. Note, this already runs in the child process.
-        main_receiver
-            .close()
-            .context("failed to close unused receiver")?;
-
         container_intermediate_process::container_intermediate_process(
             container_args,
             intermediate_sender,
             intermediate_receiver,
+            init_sender,
+            init_receiver,
             main_sender,
         )
     })?;
@@ -40,14 +47,110 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<Pid> {
         intermediate_sender.mapping_written()?;
     }
 
+    // At this point, we don't need to send any message to intermediate process anymore,
+    // so we want to close this sender at the earliest point.
     intermediate_sender
         .close()
-        .context("failed to close unused sender")?;
+        .context("failed to close unused intermediate sender")?;
 
+    // The intermediate process will send the init pid once it forks the init
+    // process.  The intermediate process should exit after this point.
     let init_pid = main_receiver.wait_for_intermediate_ready()?;
+
+    if let Some(linux) = container_args.spec.linux() {
+        if let Some(seccomp) = linux.seccomp() {
+            let state = ContainerProcessState {
+                oci_version: container_args.spec.version().to_string(),
+                // runc hardcode the `seccompFd` name for fds.
+                fds: vec![String::from("seccompFd")],
+                pid: init_pid.as_raw(),
+                metadata: seccomp.listener_metadata().to_owned().unwrap_or_default(),
+                state: container_args
+                    .container
+                    .as_ref()
+                    .context("container state is required")?
+                    .state
+                    .clone(),
+            };
+            sync_seccomp(seccomp, &state, init_sender, main_receiver)
+                .context("failed to sync seccomp with init")?;
+        }
+    }
+
+    // We don't need to send anything to the init process after this point, so
+    // close the sender.
+    init_sender
+        .close()
+        .context("failed to close unused init sender")?;
+
+    main_receiver
+        .wait_for_init_ready()
+        .context("failed to wait for init ready")?;
+
     log::debug!("init pid is {:?}", init_pid);
 
     Ok(init_pid)
+}
+
+fn sync_seccomp(
+    seccomp: &runtime::LinuxSeccomp,
+    state: &ContainerProcessState,
+    init_sender: &mut channel::InitSender,
+    main_receiver: &mut channel::MainReceiver,
+) -> Result<()> {
+    if seccomp::is_notify(seccomp) {
+        log::debug!("main process waiting for sync seccomp");
+        let seccomp_fd = main_receiver.wait_for_seccomp_request()?;
+        let listener_path = seccomp
+            .listener_path()
+            .as_ref()
+            .context("notify will require seccomp listener path to be set")?;
+        let encoded_state =
+            serde_json::to_vec(state).context("failed to encode container process state")?;
+        sync_seccomp_send_msg(listener_path, &encoded_state, seccomp_fd)
+            .context("failed to send msg to seccomp listener")?;
+        init_sender.seccomp_notify_done()?;
+        // Once we sent the seccomp notify fd to the seccomp listener, we can
+        // safely close the fd. The SCM_RIGHTS msg will duplicate the fd to the
+        // process on the other end of the listener.
+        let _ = unistd::close(seccomp_fd);
+    }
+
+    Ok(())
+}
+
+fn sync_seccomp_send_msg(listener_path: &Path, msg: &[u8], fd: i32) -> Result<()> {
+    // The seccomp listener has specific instructions on how to transmit the
+    // information through seccomp listener.  Therefore, we have to use
+    // libc/nix APIs instead of Rust std lib APIs to maintain flexibility.
+    let socket = socket::socket(
+        socket::AddressFamily::Unix,
+        socket::SockType::Stream,
+        socket::SockFlag::empty(),
+        None,
+    )
+    .context("failed to create unix domain socket for seccomp listener")?;
+    let unix_addr =
+        socket::SockAddr::new_unix(listener_path).context("failed to create unix addr")?;
+    socket::connect(socket, &unix_addr).with_context(|| {
+        format!(
+            "failed to connect to seccomp notify listerner path: {:?}",
+            listener_path
+        )
+    })?;
+    // We have to use sendmsg here because the spec requires us to send seccomp notify fds through
+    // SCM_RIGHTS message.
+    // Ref: https://man7.org/linux/man-pages/man3/sendmsg.3p.html
+    // Ref: https://man7.org/linux/man-pages/man3/cmsg.3.html
+    let iov = [uio::IoVec::from_slice(msg)];
+    let fds = [fd];
+    let cmsgs = socket::ControlMessage::ScmRights(&fds);
+    socket::sendmsg(socket, &iov, &[cmsgs], socket::MsgFlags::empty(), None)
+        .context("failed to write container state to seccomp listener")?;
+    // The spec requires the listener socket to be closed immediately after sending.
+    let _ = unistd::close(socket);
+
+    Ok(())
 }
 
 fn setup_mapping(rootless: &Rootless, pid: Pid) -> Result<()> {
@@ -57,6 +160,7 @@ fn setup_mapping(rootless: &Rootless, pid: Pid) -> Result<()> {
         // until "deny" has been written to setgroups. See CVE-2014-8989.
         utils::write_file(format!("/proc/{}/setgroups", pid), "deny")?;
     }
+
     rootless
         .write_uid_mapping(pid)
         .context(format!("failed to map uid of pid {}", pid))?;

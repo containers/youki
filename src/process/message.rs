@@ -7,4 +7,6 @@ pub enum Message {
     InitReady,
     WriteMapping,
     MappingWritten,
+    SeccompNotify,
+    SeccompNotifyDone,
 }
