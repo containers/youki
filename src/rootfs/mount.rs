@@ -656,6 +656,75 @@ mod tests {
     }
 
     #[test]
+    fn test_mount_cgroup_v1() -> Result<()> {
+        // arrange
+        let tmp = create_temp_dir("test_mount_cgroup_v1")?;
+        let container_cgroup = PathBuf::from("/sys/fs/cgroup");
+
+        let spec_cgroup_mount = SpecMountBuilder::default()
+            .destination(&container_cgroup)
+            .source("cgroup")
+            .typ("cgroup")
+            .build()
+            .context("failed to build cgroup mount")?;
+
+        let mount_opts = MountOptions {
+            root: tmp.path(),
+            label: None,
+            cgroup_ns: true,
+        };
+
+        let mounter = Mount::new();
+
+        // act
+        mounter
+            .mount_cgroup_v1(&spec_cgroup_mount, &mount_opts)
+            .context("failed to mount cgroup v1")?;
+
+        // assert
+        let mut got = mounter
+            .syscall
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap()
+            .get_mount_args()
+            .into_iter();
+
+        let host_mounts = cgroups::v1::util::list_subsystem_mount_points()?;
+        assert_eq!(got.len(), host_mounts.len() + 1);
+
+        let expected = MountArgs {
+            source: Some(PathBuf::from("tmpfs".to_owned())),
+            target: tmp.join_safely(&container_cgroup)?,
+            fstype: Some("tmpfs".to_owned()),
+            flags: MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
+            data: Some("mode=755".to_owned()),
+        };
+        assert_eq!(expected, got.next().unwrap());
+
+        for (host_mount, act) in host_mounts.iter().zip(got) {
+            let subsystem_name = host_mount.file_name().and_then(|f| f.to_str()).unwrap();
+            let expected = MountArgs {
+                source: Some(PathBuf::from("cgroup".to_owned())),
+                target: tmp.join_safely(&container_cgroup)?.join(subsystem_name),
+                fstype: Some("cgroup".to_owned()),
+                flags: MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
+                data: Some(
+                    if subsystem_name == "systemd" {
+                        format!("name={}", subsystem_name)
+                    } else {
+                        subsystem_name.to_string()
+                    }
+                    .to_owned(),
+                ),
+            };
+            assert_eq!(expected, act);
+        }
+
+        Ok(())
+    }
+
+    #[test]
     fn test_mount_cgroup_v2() -> Result<()> {
         // arrange
         let tmp = create_temp_dir("test_mount_cgroup_v2")?;

@@ -1,6 +1,6 @@
 ///! Thin wrapper struct for creating temp directories
 ///! Taken after cgroups/tempdir
-use anyhow::Result;
+use anyhow::{Context, Result};
 use std::{
     fs,
     ops::Deref,
@@ -15,7 +15,8 @@ pub struct TempDir {
 impl TempDir {
     pub fn new<P: Into<PathBuf>>(path: P) -> Result<Self> {
         let p = path.into();
-        std::fs::create_dir_all(&p)?;
+        std::fs::create_dir_all(&p)
+            .with_context(|| format!("failed to create diectory {:?}", p))?;
         Ok(Self { path: Some(p) })
     }
 

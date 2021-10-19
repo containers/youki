@@ -7,12 +7,14 @@ use procfs::process::Process;
 use std::convert::From;
 
 use super::args::ContainerArgs;
-use super::init::container_init;
+use super::container_init_process::container_init_process;
 
-pub fn container_intermediate(
-    args: ContainerArgs,
+pub fn container_intermediate_process(
+    args: &ContainerArgs,
     intermediate_sender: &mut channel::IntermediateSender,
     intermediate_receiver: &mut channel::IntermediateReceiver,
+    init_sender: &mut channel::InitSender,
+    init_receiver: &mut channel::InitReceiver,
     main_sender: &mut channel::MainSender,
 ) -> Result<()> {
     let command = &args.syscall;
@@ -75,39 +77,37 @@ pub fn container_intermediate(
         .context("failed to apply cgroups")?
     }
 
-    // We only need for init process to send us the ChildReady.
-    let (init_sender, init_receiver) = &mut channel::init_channel()?;
-
     // We have to record the pid of the child (container init process), since
     // the child will be inside the pid namespace. We can't rely on child_ready
     // to send us the correct pid.
     let pid = fork::container_fork(|| {
-        // First thing in the child process to close the unused fds in the channel/pipe.
+        // We are inside the forked process here. The first thing we have to do is to close
+        // any unused senders, since fork will make a dup for all the socket.
         init_sender
             .close()
             .context("failed to close receiver in init process")?;
-        main_sender
+        intermediate_sender
             .close()
-            .context("failed to close unused sender")?;
-        container_init(args, intermediate_sender, init_receiver)
+            .context("failed to close sender in the intermediate process")?;
+        container_init_process(args, main_sender, init_receiver)
     })?;
-    // Close unused fds in the parent process.
+    // Once we fork the container init process, the job for intermediate process
+    // is done. We notify the container main process about the pid we just
+    // forked for container init process.
+    main_sender
+        .intermediate_ready(pid)
+        .context("failed to send child ready from intermediate process")?;
+
+    // Close unused senders here so we don't have lingering socket around.
+    main_sender
+        .close()
+        .context("failed to close unused main sender")?;
     intermediate_sender
         .close()
         .context("failed to close sender in the intermediate process")?;
     init_sender
         .close()
         .context("failed to close unused init sender")?;
-    // There is no point using the pid returned here, since the child will be
-    // inside the pid namespace already.
-    intermediate_receiver
-        .wait_for_init_ready()
-        .context("failed to wait for the child")?;
-    // After the child (the container init process) becomes ready, we can signal
-    // the parent (the main process) that we are ready.
-    main_sender
-        .intermediate_ready(pid)
-        .context("failed to send child ready from intermediate process")?;
 
     Ok(())
 }

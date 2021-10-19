@@ -1,5 +1,6 @@
 ///! This exposes the main control wrapper to control the tests
 use crate::testable::{TestResult, TestableGroup};
+use anyhow::Result;
 use crossbeam::thread;
 use std::collections::BTreeMap;
 
@@ -8,6 +9,7 @@ type TestableGroupType<'a> = dyn TestableGroup<'a> + Sync + Send + 'a;
 /// This manages all test groups, and thus the tests
 pub struct TestManager<'a> {
     test_groups: BTreeMap<&'a str, &'a TestableGroupType<'a>>,
+    cleanup: Vec<Box<dyn Fn() -> Result<()>>>,
 }
 
 impl<'a> Default for TestManager<'a> {
@@ -21,12 +23,17 @@ impl<'a> TestManager<'a> {
     pub fn new() -> Self {
         TestManager {
             test_groups: BTreeMap::new(),
+            cleanup: Vec::new(),
         }
     }
 
     /// add a test group to the test manager
     pub fn add_test_group(&mut self, tg: &'a TestableGroupType<'a>) {
         self.test_groups.insert(tg.get_name(), tg);
+    }
+
+    pub fn add_cleanup(&mut self, cleaner: Box<dyn Fn() -> Result<()>>) {
+        self.cleanup.push(cleaner)
     }
 
     /// Prints the given test results, usually used to print
@@ -37,18 +44,18 @@ impl<'a> TestManager<'a> {
         for (idx, (name, res)) in res.iter().enumerate() {
             print!("{} / {} : {} : ", idx + 1, len, name);
             match res {
-                TestResult::Ok => {
+                TestResult::Passed => {
                     println!("ok");
                 }
-                TestResult::Skip => {
+                TestResult::Skipped => {
                     println!("skipped");
                 }
-                TestResult::Err(e) => {
+                TestResult::Failed(e) => {
                     println!("not ok\n\t{}", e);
                 }
             }
         }
-        println!("\n# End group {}", name);
+        println!("# End group {}\n", name);
     }
     /// Run all tests from all tests group
     pub fn run_all(&self) {
@@ -63,6 +70,11 @@ impl<'a> TestManager<'a> {
             }
         })
         .unwrap();
+        for cleaner in &self.cleanup {
+            if let Err(e) = cleaner() {
+                print!("Failed to cleanup: {}", e);
+            }
+        }
     }
 
     /// Run only selected tests
@@ -86,5 +98,11 @@ impl<'a> TestManager<'a> {
             }
         })
         .unwrap();
+
+        for cleaner in &self.cleanup {
+            if let Err(e) = cleaner() {
+                print!("Failed to cleanup: {}", e);
+            }
+        }
     }
 }

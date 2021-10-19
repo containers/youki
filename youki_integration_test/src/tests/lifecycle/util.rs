@@ -7,15 +7,15 @@ pub fn get_result_from_output(res: io::Result<process::Output>) -> TestResult {
             let stderr = String::from_utf8(output.stderr).unwrap();
             if stderr.contains("Error") || stderr.contains("error") {
                 let stdout = String::from_utf8(output.stdout).unwrap();
-                TestResult::Err(anyhow::anyhow!(
+                TestResult::Failed(anyhow::anyhow!(
                     "Error :\nstdout : {}\nstderr : {}",
                     stdout,
                     stderr
                 ))
             } else {
-                TestResult::Ok
+                TestResult::Passed
             }
         }
-        io::Result::Err(e) => TestResult::Err(anyhow::Error::new(e)),
+        io::Result::Err(e) => TestResult::Failed(anyhow::Error::new(e)),
     }
 }

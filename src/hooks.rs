@@ -67,13 +67,13 @@ pub fn run_hooks(hooks: Option<&Vec<Hook>>, container: Option<&Container>) -> Re
                 // error, in the case that the hook command is waiting for us to
                 // write to stdin.
                 let encoded_state =
-                    serde_json::to_string(state).context("Failed to encode container state")?;
+                    serde_json::to_string(state).context("failed to encode container state")?;
                 if let Err(e) = stdin.write_all(encoded_state.as_bytes()) {
                     if e.kind() != ErrorKind::BrokenPipe {
                         // Not a broken pipe. The hook command may be waiting
                         // for us.
                         let _ = signal::kill(hook_process_pid, signal::Signal::SIGKILL);
-                        bail!("Failed to write container state to stdin: {:?}", e);
+                        bail!("failed to write container state to stdin: {:?}", e);
                     }
                 }
             }
