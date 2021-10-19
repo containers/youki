@@ -24,14 +24,14 @@ pub fn create(project_path: &Path, id: &str) -> TestResult {
     match res {
         io::Result::Ok(status) => {
             if status.success() {
-                TestResult::Ok
+                TestResult::Passed
             } else {
-                TestResult::Err(anyhow::anyhow!(
+                TestResult::Failed(anyhow::anyhow!(
                     "Error : create exited with nonzero status : {}",
                     status
                 ))
             }
         }
-        io::Result::Err(e) => TestResult::Err(anyhow::Error::new(e)),
+        io::Result::Err(e) => TestResult::Failed(anyhow::Error::new(e)),
     }
 }

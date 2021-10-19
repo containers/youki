@@ -1,4 +1,5 @@
 use crate::utils::test_outside_container;
+use crate::utils::test_utils::check_container_created;
 use anyhow::anyhow;
 use oci_spec::runtime::LinuxBuilder;
 use oci_spec::runtime::{LinuxHugepageLimitBuilder, LinuxResourcesBuilder};
@@ -37,23 +38,23 @@ fn test_wrong_tlb() -> TestResult {
     let limit = 100 * 3 * 1024 * 1024;
     let spec = make_hugetlb_spec(page, limit);
     test_outside_container(spec, &|data| {
-        match data.exit_status {
-            Err(e) => TestResult::Err(anyhow!(e)),
+        match data.create_result {
+            Err(e) => TestResult::Failed(anyhow!(e)),
             Ok(res) => {
                 if data.state.is_some() {
-                    return TestResult::Err(anyhow!(
+                    return TestResult::Failed(anyhow!(
                         "stdout of state command was non-empty : {:?}",
                         data.state
                     ));
                 }
                 if data.state_err.is_empty() {
-                    return TestResult::Err(anyhow!("stderr of state command was empty"));
+                    return TestResult::Failed(anyhow!("stderr of state command was empty"));
                 }
                 if res.success() {
                     // The operation should not have succeeded as pagesize was not power of 2
-                    TestResult::Err(anyhow!("Invalid page size of {} was allowed", page))
+                    TestResult::Failed(anyhow!("Invalid page size of {} was allowed", page))
                 } else {
-                    TestResult::Ok
+                    TestResult::Passed
                 }
             }
         }
@@ -96,9 +97,9 @@ fn validate_tlb(id: &str, size: &str, limit: i64) -> TestResult {
     let val_str = std::fs::read_to_string(&path).unwrap();
     let val: i64 = val_str.trim().parse().unwrap();
     if val == limit {
-        TestResult::Ok
+        TestResult::Passed
     } else {
-        TestResult::Err(anyhow!(
+        TestResult::Failed(anyhow!(
             "Page limit not set correctly : for size {}, expected {}, got {}",
             size,
             limit,
@@ -116,41 +117,19 @@ fn test_valid_tlb() -> TestResult {
     for size in tlb_sizes.iter() {
         let spec = make_hugetlb_spec(size, limit);
         let res = test_outside_container(spec, &|data| {
-            match data.exit_status {
-                Err(e) => return TestResult::Err(anyhow!(e)),
-                Ok(res) => {
-                    if !data.state_err.is_empty() {
-                        return TestResult::Err(anyhow!(
-                            "stderr of state command was not-empty : {}",
-                            data.state_err
-                        ));
-                    }
-                    if data.state.is_none() {
-                        return TestResult::Err(anyhow!("stdout of state command was invalid"));
-                    }
-                    let state = data.state.unwrap();
-                    if state.id != data.id || state.status != "created" {
-                        return TestResult::Err(anyhow!("invalid container state : expected id {} and status created, got id {} and state {}",data.id,state.id,state.status));
-                    }
-                    if !res.success() {
-                        return TestResult::Err(anyhow!(
-                            "Setting valid page size of {} was gave error",
-                            size
-                        ));
-                    }
-                }
-            }
+            check_container_created(&data).unwrap();
+
             let r = validate_tlb(&data.id, size, limit);
-            if matches!(r, TestResult::Err(_)) {
+            if matches!(r, TestResult::Failed(_)) {
                 return r;
             }
-            TestResult::Ok
+            TestResult::Passed
         });
-        if matches!(res, TestResult::Err(_)) {
+        if matches!(res, TestResult::Failed(_)) {
             return res;
         }
     }
-    TestResult::Ok
+    TestResult::Passed
 }
 
 pub fn get_tlb_test<'a>() -> TestGroup<'a> {

@@ -2,7 +2,7 @@ mod conditional_test;
 mod test;
 mod test_group;
 mod test_manager;
-mod testable;
+pub mod testable;
 pub use conditional_test::ConditionalTest;
 pub use test::Test;
 pub use test_group::TestGroup;

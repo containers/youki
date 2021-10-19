@@ -6,18 +6,18 @@ use anyhow::{Error, Result};
 /// which includes a Skip variant to indicate that a test was skipped, and the Ok variant has no associated value
 pub enum TestResult {
     /// Test was ok
-    Ok,
+    Passed,
     /// Test needed to be skipped
-    Skip,
+    Skipped,
     /// Test was error
-    Err(Error),
+    Failed(Error),
 }
 
 impl<T> From<Result<T>> for TestResult {
     fn from(result: Result<T>) -> Self {
         match result {
-            Ok(_) => TestResult::Ok,
-            Err(err) => TestResult::Err(err),
+            Ok(_) => TestResult::Passed,
+            Err(err) => TestResult::Failed(err),
         }
     }
 }
@@ -39,4 +39,16 @@ pub trait TestableGroup<'a> {
     fn get_name(&self) -> &'a str;
     fn run_all(&'a self) -> Vec<(&'a str, TestResult)>;
     fn run_selected(&'a self, selected: &[&str]) -> Vec<(&'a str, TestResult)>;
+}
+
+#[macro_export]
+macro_rules! test_result {
+    ($e:expr $(,)?) => {
+        match $e {
+            core::result::Result::Ok(val) => val,
+            core::result::Result::Err(err) => {
+                return $crate::testable::TestResult::Failed(err);
+            }
+        }
+    };
 }
