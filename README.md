@@ -149,13 +149,15 @@ Change the command to be executed in `config.json` and try something other than 
 
 `youki` provides the ability to run containers as non-root user([rootless mode](https://docs.docker.com/engine/security/rootless/)). To run a container in rootless mode, we need to add some extra options in `config.json`, other steps are same with above:
 
-```bash
+```console
 $ mkdir -p tutorial/rootfs
 $ cd tutorial
 # use docker to export busybox into the rootfs directory
 $ docker export $(docker create busybox) | tar -C rootfs -xvf -
 
-$ ../youki spec                     # will generate a spec file named config.json with rootless mode
+$ ../youki spec --rootless          # will generate a spec file named config.json with rootless mode
+## Modify the `args` field as you like
+
 $ ../youki run rootless-container   # will create and run a container with rootless mode
 ```
 
