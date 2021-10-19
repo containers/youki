@@ -92,35 +92,36 @@ fn sysctl(kernel_params: &HashMap<String, String>) -> Result<()> {
 // The first time we bind mount, other flags are ignored,
 // so we need to mount it once and then remount it with the necessary flags specified.
 // https://man7.org/linux/man-pages/man2/mount.2.html
-fn readonly_path(path: &str) -> Result<()> {
-    match nix_mount::<str, str, str, str>(
+fn readonly_path(path: &Path, syscall: &dyn Syscall) -> Result<()> {
+    if let Err(err) = syscall.mount(
         Some(path),
         path,
-        None::<&str>,
+        None,
         MsFlags::MS_BIND | MsFlags::MS_REC,
-        None::<&str>,
+        None,
     ) {
-        // ignore error if path is not exist.
-        Err(nix::errno::Errno::ENOENT) => {
-            log::warn!("readonly path {:?} not exist", path);
-            return Ok(());
+        if let Some(errno) = err.downcast_ref() {
+            // ignore error if path is not exist.
+            if matches!(errno, nix::errno::Errno::ENOENT) {
+                return Ok(());
+            }
         }
-        Err(err) => bail!(err),
-        Ok(_) => {}
+        bail!(err)
     }
 
-    nix_mount::<str, str, str, str>(
+    syscall.mount(
         Some(path),
         path,
-        None::<&str>,
+        None,
         MsFlags::MS_NOSUID
             | MsFlags::MS_NODEV
             | MsFlags::MS_NOEXEC
             | MsFlags::MS_BIND
             | MsFlags::MS_REMOUNT
             | MsFlags::MS_RDONLY,
-        None::<&str>,
+        None,
     )?;
+
     log::debug!("readonly path {:?} mounted", path);
     Ok(())
 }
@@ -273,7 +274,8 @@ pub fn container_init_process(
     if let Some(paths) = linux.readonly_paths() {
         // mount readonly path
         for path in paths {
-            readonly_path(path).context("Failed to set read only path")?;
+            readonly_path(Path::new(path), syscall)
+                .with_context(|| format!("Failed to set read only path {:?}", path))?;
         }
     }
 
@@ -502,7 +504,10 @@ fn sync_seccomp(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use anyhow::{bail, Result};
+    use crate::syscall::{
+        syscall::create_syscall,
+        test::{MountArgs, TestHelperSyscall},
+    };
     use nix::{fcntl, sys, unistd};
     use serial_test::serial;
     use std::{fs, os::unix::prelude::AsRawFd};
@@ -550,6 +555,43 @@ mod tests {
         }
 
         unistd::close(fd)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_readonly_path() -> Result<()> {
+        let syscall = create_syscall();
+        readonly_path(Path::new("/proc/sys"), syscall.as_ref())?;
+
+        let want = vec![
+            MountArgs {
+                source: Some(PathBuf::from("/proc/sys")),
+                target: PathBuf::from("/proc/sys"),
+                fstype: None,
+                flags: MsFlags::MS_BIND | MsFlags::MS_REC,
+                data: None,
+            },
+            MountArgs {
+                source: Some(PathBuf::from("/proc/sys")),
+                target: PathBuf::from("/proc/sys"),
+                fstype: None,
+                flags: MsFlags::MS_NOSUID
+                    | MsFlags::MS_NODEV
+                    | MsFlags::MS_NOEXEC
+                    | MsFlags::MS_BIND
+                    | MsFlags::MS_REMOUNT
+                    | MsFlags::MS_RDONLY,
+                data: None,
+            },
+        ];
+        let got = syscall
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap()
+            .get_mount_args();
+
+        assert_eq!(want, *got);
+        assert_eq!(got.len(), 2);
         Ok(())
     }
 }
