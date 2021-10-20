@@ -10,7 +10,7 @@ pub struct Ps {
     /// format to display processes: table or json (default: "table")
     #[clap(short, long, default_value = "table")]
     format: String,
-    #[clap(forbid_empty_values = true, required = true)]
+    #[clap(required = true)]
     pub container_id: String,
     /// options will be passed to the ps utility
     #[clap(setting = clap::ArgSettings::Last)]

@@ -9,7 +9,7 @@ use crate::{commands::load_container, signal::Signal};
 /// Send the specified signal to the container
 #[derive(Clap, Debug)]
 pub struct Kill {
-    #[clap(forbid_empty_values = true, required = true)]
+    #[clap(required = true)]
     container_id: String,
     signal: String,
 }

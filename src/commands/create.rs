@@ -22,7 +22,7 @@ pub struct Create {
     #[clap(long, default_value = "0")]
     preserve_fds: i32,
     /// name of the container instance to be started
-    #[clap(forbid_empty_values = true, required = true)]
+    #[clap(required = true)]
     pub container_id: String,
 }
 

@@ -9,7 +9,7 @@ use crate::commands::load_container;
 /// Resume the processes within the container
 #[derive(Clap, Debug)]
 pub struct Resume {
-    #[clap(forbid_empty_values = true, required = true)]
+    #[clap(required = true)]
     pub container_id: String,
 }
 

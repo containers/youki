@@ -15,7 +15,7 @@ pub struct Events {
     #[clap(long)]
     pub stats: bool,
     /// Name of the container instance
-    #[clap(forbid_empty_values = true, required = true)]
+    #[clap(required = true)]
     pub container_id: String,
 }
 

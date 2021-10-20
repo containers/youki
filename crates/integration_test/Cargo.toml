@@ -1,5 +1,5 @@
 [package]
-name = "youki_integration_test"
+name = "integration_test"
 version = "0.1.0"
 edition = "2018"
 
@@ -12,18 +12,13 @@ features = ["std", "suggestions", "derive"]
 version = "=3.0.0-beta.2"
 default-features = true
 
-[workspace]
-members = [
-    "test_framework",
-]
-
 [dependencies]
 procfs = "0.11.0"
 uuid = "0.8"
 rand = "0.8.0"
 tar = "0.4"
 flate2 = "1.0"
-test_framework = { path = "./test_framework"}
+test_framework = { path = "../test_framework"}
 anyhow = "1.0"
 once_cell = "1.8.0"
 oci-spec = { git = "https://github.com/containers/oci-spec-rs",  rev = "3d5132a18c305be59d58187201429d8f0243b513" }

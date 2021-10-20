@@ -31,7 +31,7 @@ pub struct Exec {
     #[clap(short, long)]
     pub detach: bool,
     /// Identifier of the container
-    #[clap(forbid_empty_values = true, required = true)]
+    #[clap(required = true)]
     pub container_id: String,
     /// Command that should be executed in the container
     #[clap(required = false)]
