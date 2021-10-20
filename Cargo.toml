@@ -7,8 +7,7 @@ description = "A container runtime written in Rust"
 
 [workspace]
 members = [
-    "crates/*",
-    "seccomp",
+    "crates/*"
 ]
 exclude = [
     "youki_integration_test",
@@ -45,7 +44,7 @@ dbus = "0.9.2"
 tabwriter = "1"
 fastrand = "1.4.1"
 crossbeam-channel = "0.5"
-seccomp = { version = "0.1.0", path = "./seccomp" }
+seccomp = { version = "0.1.0", path = "./crates/seccomp" }
 pentacle = "1.0.0"
 path-clean = "0.1.0"
 
