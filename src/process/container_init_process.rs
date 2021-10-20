@@ -311,8 +311,8 @@ pub fn container_init_process(
     // Without no new privileges, seccomp is a privileged operation. We have to
     // do this before dropping capabilities. Otherwise, we should do it later,
     // as close to exec as possible.
-    if linux.seccomp().is_some() && proc.no_new_privileges().is_none() {
-        if let Some(seccomp) = linux.seccomp() {
+    if let Some(seccomp) = linux.seccomp() {
+        if proc.no_new_privileges().is_none() {
             let notify_fd =
                 seccomp::initialize_seccomp(seccomp).context("failed to execute seccomp")?;
             sync_seccomp(notify_fd, main_sender, init_receiver)
