@@ -5,7 +5,7 @@ use oci_spec::runtime::LinuxBuilder;
 use oci_spec::runtime::{LinuxHugepageLimitBuilder, LinuxResourcesBuilder};
 use oci_spec::runtime::{Spec, SpecBuilder};
 use std::path::PathBuf;
-use test_framework::{ConditionalTest, TestGroup, TestResult};
+use test_framework::{test_result, ConditionalTest, TestGroup, TestResult};
 
 fn check_hugetlb() -> bool {
     PathBuf::from("/sys/fs/cgroup/hugetlb").exists()
@@ -21,7 +21,7 @@ fn make_hugetlb_spec(page_size: &str, limit: i64) -> Spec {
                             .page_size(page_size.to_owned())
                             .limit(limit)
                             .build()
-                            .expect("Could not build")])
+                            .expect("could not build")])
                         .build()
                         .unwrap(),
                 )
@@ -52,7 +52,7 @@ fn test_wrong_tlb() -> TestResult {
                 }
                 if res.success() {
                     // The operation should not have succeeded as pagesize was not power of 2
-                    TestResult::Failed(anyhow!("Invalid page size of {} was allowed", page))
+                    TestResult::Failed(anyhow!("invalid page size of {} was allowed", page))
                 } else {
                     TestResult::Passed
                 }
@@ -77,8 +77,10 @@ fn extract_page_size(dir_name: &str) -> String {
 
 fn get_tlb_sizes() -> Vec<String> {
     let mut sizes = Vec::new();
-    for hugetlb_entry in std::fs::read_dir("/sys/kernel/mm/hugepages").unwrap() {
-        let hugetlb_entry = hugetlb_entry.unwrap();
+    for hugetlb_entry in std::fs::read_dir("/sys/kernel/mm/hugepages")
+        .expect("error in reading /sys/kernel/mm/hugepages")
+    {
+        let hugetlb_entry = hugetlb_entry.expect("error in reading /sys/kernel/mm/hugepages entry");
         if !hugetlb_entry.path().is_dir() {
             continue;
         }
@@ -100,7 +102,7 @@ fn validate_tlb(id: &str, size: &str, limit: i64) -> TestResult {
         TestResult::Passed
     } else {
         TestResult::Failed(anyhow!(
-            "Page limit not set correctly : for size {}, expected {}, got {}",
+            "page limit not set correctly : for size {}, expected {}, got {}",
             size,
             limit,
             val
@@ -117,7 +119,7 @@ fn test_valid_tlb() -> TestResult {
     for size in tlb_sizes.iter() {
         let spec = make_hugetlb_spec(size, limit);
         let res = test_outside_container(spec, &|data| {
-            check_container_created(&data).unwrap();
+            test_result!(check_container_created(&data));
 
             let r = validate_tlb(&data.id, size, limit);
             if matches!(r, TestResult::Failed(_)) {

@@ -33,27 +33,33 @@ fn get_test<'a>(test_name: &'static str) -> Test<'a> {
     Test::new(
         test_name,
         Box::new(move || {
-            let host_proc = Process::myself().unwrap();
+            let host_proc = Process::myself().expect("error in getting /proc/self");
             let host_namespaces = match host_proc.namespaces() {
                 Ok(n) => n,
                 Err(e) => {
-                    return TestResult::Err(anyhow!("Error in resolving host namespaces : {}", e))
+                    return TestResult::Failed(anyhow!(
+                        "error in resolving host namespaces : {}",
+                        e
+                    ))
                 }
             };
             let spec = get_spec();
             test_outside_container(spec, &move |data| {
                 let pid = match data.state {
                     Some(s) => s.pid.unwrap(),
-                    None => return TestResult::Err(anyhow!("State command returned error")),
+                    None => return TestResult::Failed(anyhow!("state command returned error")),
                 };
-                let container_process = Process::new(pid).unwrap();
-                let container_namespaces = container_process.namespaces().unwrap();
+                let container_process =
+                    Process::new(pid).expect("error in getting /proc for container process");
+                let container_namespaces = container_process
+                    .namespaces()
+                    .expect("error in getting namespaces of container process");
                 if container_namespaces != host_namespaces {
-                    return TestResult::Err(anyhow!(
-                        "Error : namespaces are not correctly inherited"
+                    return TestResult::Failed(anyhow!(
+                        "error : namespaces are not correctly inherited"
                     ));
                 }
-                TestResult::Ok
+                TestResult::Passed
             })
         }),
     )
