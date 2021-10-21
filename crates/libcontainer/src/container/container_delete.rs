@@ -61,8 +61,9 @@ impl Container {
                 let use_systemd = self
                     .systemd()
                     .context("container state does not contain cgroup manager")?;
-                let cmanager = libcgroups::common::create_cgroup_manager(&cgroups_path, use_systemd)
-                    .context("failed to create cgroup manager")?;
+                let cmanager =
+                    libcgroups::common::create_cgroup_manager(&cgroups_path, use_systemd)
+                        .context("failed to create cgroup manager")?;
                 cmanager.remove().with_context(|| {
                     format!("failed to remove cgroup {}", cgroups_path.display())
                 })?;

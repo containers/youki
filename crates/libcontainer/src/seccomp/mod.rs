@@ -1,13 +1,13 @@
 use anyhow::bail;
 use anyhow::Context;
 use anyhow::Result;
+use libseccomp::scmp_compare::*;
+use libseccomp::*;
 use nix::errno::Errno;
 use oci_spec::runtime::Arch;
 use oci_spec::runtime::LinuxSeccomp;
 use oci_spec::runtime::LinuxSeccompAction;
 use oci_spec::runtime::LinuxSeccompOperator;
-use libseccomp::scmp_compare::*;
-use libseccomp::*;
 use std::ffi::CString;
 use std::os::unix::io;
 
