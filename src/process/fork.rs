@@ -41,4 +41,17 @@ mod test {
             _ => bail!("test failed"),
         }
     }
+
+    #[test]
+    fn test_container_err_fork() -> Result<()> {
+        let pid = container_fork(|| bail!(""))?;
+        match waitpid(pid, None).expect("wait pid failed.") {
+            WaitStatus::Exited(p, status) => {
+                assert_eq!(pid, p);
+                assert_eq!(status, 255);
+                Ok(())
+            }
+            _ => bail!("test failed"),
+        }
+    }
 }
