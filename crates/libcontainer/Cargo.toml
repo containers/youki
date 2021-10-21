@@ -1,5 +1,5 @@
 [package]
-name = "container"
+name = "libcontainer"
 version = "0.0.1"
 authors = ["youki team"]
 edition = "2018"

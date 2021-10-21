@@ -172,6 +172,7 @@ dependencies = [
 ]
 
 [[package]]
+<<<<<<< HEAD
 name = "container"
 version = "0.0.1"
 dependencies = [
@@ -203,6 +204,8 @@ dependencies = [
 ]
 
 [[package]]
+=======
+>>>>>>> Fix ambigious names by renaming crate to libcontainer
 name = "crc32fast"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -714,6 +717,34 @@ name = "libc"
 version = "0.2.101"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3cb00336871be5ed2c8ed44b60ae9959dc5b9f08539422ed43f09e34ecaeba21"
+
+[[package]]
+name = "libcontainer"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "caps",
+ "cgroups",
+ "chrono",
+ "crossbeam-channel",
+ "dbus",
+ "fastrand",
+ "futures",
+ "libc",
+ "log",
+ "mio",
+ "nix",
+ "oci-spec 0.5.2 (git+https://github.com/containers/oci-spec-rs?rev=d6fb1e91742313cd0d0085937e2d6df5d4669720)",
+ "path-clean",
+ "prctl",
+ "procfs",
+ "quickcheck",
+ "seccomp",
+ "serde",
+ "serde_json",
+ "serial_test",
+ "systemd",
+]
 
 [[package]]
 name = "libdbus-sys"
@@ -1412,3 +1443,27 @@ checksum = "244c3741f4240ef46274860397c7c74e50eb23624996930e484c16679633a54c"
 dependencies = [
  "libc",
 ]
+<<<<<<< HEAD
+=======
+
+[[package]]
+name = "youki"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "cgroups",
+ "chrono",
+ "clap",
+ "libcontainer",
+ "log",
+ "nix",
+ "oci-spec 0.5.2 (git+https://github.com/containers/oci-spec-rs?rev=d6fb1e91742313cd0d0085937e2d6df5d4669720)",
+ "once_cell",
+ "pentacle",
+ "procfs",
+ "serde",
+ "serde_json",
+ "serial_test",
+ "tabwriter",
+]
+>>>>>>> Fix ambigious names by renaming crate to libcontainer
