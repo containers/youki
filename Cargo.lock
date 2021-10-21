@@ -172,6 +172,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "container"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "caps",
+ "cgroups",
+ "chrono",
+ "crossbeam-channel",
+ "dbus",
+ "fastrand",
+ "futures",
+ "libc",
+ "log",
+ "mio",
+ "nix",
+ "oci-spec 0.5.2 (git+https://github.com/containers/oci-spec-rs?rev=d6fb1e91742313cd0d0085937e2d6df5d4669720)",
+ "once_cell",
+ "path-clean",
+ "pentacle",
+ "prctl",
+ "procfs",
+ "quickcheck",
+ "seccomp",
+ "serde",
+ "serde_json",
+ "serial_test",
+ "systemd",
+ "tabwriter",
+]
+
+[[package]]
 name = "crc32fast"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1388,29 +1419,18 @@ name = "youki"
 version = "0.0.1"
 dependencies = [
  "anyhow",
- "caps",
  "cgroups",
  "chrono",
  "clap",
- "crossbeam-channel",
- "dbus",
- "fastrand",
- "futures",
- "libc",
+ "container",
  "log",
- "mio",
  "nix",
  "oci-spec 0.5.2 (git+https://github.com/containers/oci-spec-rs?rev=d6fb1e91742313cd0d0085937e2d6df5d4669720)",
  "once_cell",
- "path-clean",
  "pentacle",
- "prctl",
  "procfs",
- "quickcheck",
- "seccomp",
  "serde",
  "serde_json",
  "serial_test",
- "systemd",
  "tabwriter",
 ]
