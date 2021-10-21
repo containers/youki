@@ -1,7 +1,7 @@
 #!/bin/bash -eu
 
 ROOT=$(pwd)
-RUNTIME=${ROOT}/target/x86_64-unknown-linux-gnu/debug/youki
+RUNTIME=${ROOT}/youki
 PATTERN=${1:-.}
 
 cd integration_test/src/github.com/opencontainers/runtime-tools

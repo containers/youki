@@ -1,10 +1,9 @@
 #!/bin/bash
-
-cd ..
+cd ../../
 ./build.sh
-cp ./youki ./youki_integration_test
-cd ./youki_integration_test
-./build.sh
+cp ./youki ./crates/integration_test
+cp ./youki_integration_test ./crates/integration_test
+cd ./crates/integration_test
 RUNTIME=./youki
 if [[ -n "$1" ]]; then
     RUNTIME="$1"
