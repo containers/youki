@@ -96,7 +96,7 @@ pub fn open<P: AsRef<Path>>(path: P) -> Result<File> {
 /// is the owner that has been specified
 /// # Example
 /// ``` no_run
-/// use youki::utils::create_dir_all_with_mode;
+/// use libcontainer::utils::create_dir_all_with_mode;
 /// use nix::sys::stat::Mode;
 /// use std::path::Path;
 ///

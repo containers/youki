@@ -24,8 +24,8 @@ pub struct ContainerBuilder<'a> {
 /// # Example
 ///
 /// ```no_run
-/// use youki::container::builder::ContainerBuilder;
-/// use youki::syscall::syscall::create_syscall;;
+/// use libcontainer::container::builder::ContainerBuilder;
+/// use libcontainer::syscall::syscall::create_syscall;;
 ///
 /// ContainerBuilder::new("74f1a4cb3801".to_owned(), create_syscall().as_ref())
 /// .with_root_path("/run/containers/youki")
@@ -41,8 +41,8 @@ impl<'a> ContainerBuilder<'a> {
     /// # Example
     ///
     /// ```no_run
-    /// use youki::container::builder::ContainerBuilder;
-    /// use youki::syscall::syscall::create_syscall;;
+    /// use libcontainer::container::builder::ContainerBuilder;
+    /// use libcontainer::syscall::syscall::create_syscall;;
     ///
     /// let builder = ContainerBuilder::new("74f1a4cb3801".to_owned(), create_syscall().as_ref());
     /// ```
@@ -63,8 +63,8 @@ impl<'a> ContainerBuilder<'a> {
     /// # Example
     ///
     /// ```no_run
-    /// # use youki::container::builder::ContainerBuilder;
-    /// # use youki::syscall::syscall::create_syscall;
+    /// # use libcontainer::container::builder::ContainerBuilder;
+    /// # use libcontainer::syscall::syscall::create_syscall;
     ///
     /// ContainerBuilder::new("74f1a4cb3801".to_owned(), create_syscall().as_ref())
     /// .as_tenant()
@@ -80,8 +80,8 @@ impl<'a> ContainerBuilder<'a> {
     /// # Example
     ///
     /// ```no_run
-    /// # use youki::container::builder::ContainerBuilder;
-    /// # use youki::syscall::syscall::create_syscall;
+    /// # use libcontainer::container::builder::ContainerBuilder;
+    /// # use libcontainer::syscall::syscall::create_syscall;
     ///
     /// ContainerBuilder::new("74f1a4cb3801".to_owned(), create_syscall().as_ref())
     /// .as_init("/var/run/docker/bundle")
@@ -97,8 +97,8 @@ impl<'a> ContainerBuilder<'a> {
     /// # Example
     ///
     /// ```no_run
-    /// # use youki::container::builder::ContainerBuilder;
-    /// # use youki::syscall::syscall::create_syscall;
+    /// # use libcontainer::container::builder::ContainerBuilder;
+    /// # use libcontainer::syscall::syscall::create_syscall;
     ///
     /// ContainerBuilder::new("74f1a4cb3801".to_owned(), create_syscall().as_ref())
     /// .with_root_path("/run/containers/youki");
@@ -113,8 +113,8 @@ impl<'a> ContainerBuilder<'a> {
     /// # Example
     ///
     /// ```no_run
-    /// # use youki::container::builder::ContainerBuilder;
-    /// # use youki::syscall::syscall::create_syscall;
+    /// # use libcontainer::container::builder::ContainerBuilder;
+    /// # use libcontainer::syscall::syscall::create_syscall;
     ///
     /// ContainerBuilder::new("74f1a4cb3801".to_owned(), create_syscall().as_ref())
     /// .with_pid_file(Some("/var/run/docker.pid"));
@@ -129,8 +129,8 @@ impl<'a> ContainerBuilder<'a> {
     /// # Example
     ///
     /// ```no_run
-    /// # use youki::container::builder::ContainerBuilder;
-    /// # use youki::syscall::syscall::create_syscall;
+    /// # use libcontainer::container::builder::ContainerBuilder;
+    /// # use libcontainer::syscall::syscall::create_syscall;
     ///
     /// ContainerBuilder::new("74f1a4cb3801".to_owned(), create_syscall().as_ref())
     /// .with_console_socket(Some("/var/run/docker/sock.tty"));
@@ -145,8 +145,8 @@ impl<'a> ContainerBuilder<'a> {
     /// # Example
     ///
     /// ```no_run
-    /// # use youki::container::builder::ContainerBuilder;
-    /// # use youki::syscall::syscall::create_syscall;
+    /// # use libcontainer::container::builder::ContainerBuilder;
+    /// # use libcontainer::syscall::syscall::create_syscall;
     ///
     /// ContainerBuilder::new("74f1a4cb3801".to_owned(), create_syscall().as_ref())
     /// .with_preserved_fds(5);

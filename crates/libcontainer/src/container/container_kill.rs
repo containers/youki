@@ -9,8 +9,8 @@ impl Container {
     /// # Example
     ///
     /// ```no_run
-    /// use youki::container::builder::ContainerBuilder;
-    /// use youki::syscall::syscall::create_syscall;;
+    /// use libcontainer::container::builder::ContainerBuilder;
+    /// use libcontainer::syscall::syscall::create_syscall;;
     /// use nix::sys::signal::Signal;
     ///
     /// # fn main() -> anyhow::Result<()> {

@@ -11,8 +11,8 @@ impl Container {
     /// # Example
     ///
     /// ```no_run
-    /// use youki::container::builder::ContainerBuilder;
-    /// use youki::syscall::syscall::create_syscall;;
+    /// use libcontainer::container::builder::ContainerBuilder;
+    /// use libcontainer::syscall::syscall::create_syscall;;
     ///
     /// # fn main() -> anyhow::Result<()> {
     /// let mut container = ContainerBuilder::new("74f1a4cb3801".to_owned(), create_syscall().as_ref())

@@ -148,7 +148,7 @@ impl State {
     ///
     /// ```
     /// # use std::path::Path;
-    /// # use youki::container::State;
+    /// # use libcontainer::container::State;
     ///
     /// let container_root = Path::new("/var/run/containers/container");
     /// let state_file = State::file_path(&container_root);
