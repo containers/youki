@@ -509,6 +509,7 @@ mod tests {
         test::{MountArgs, TestHelperSyscall},
     };
     use nix::{fcntl, sys, unistd};
+    use oci_spec::runtime::{LinuxNamespaceBuilder, SpecBuilder};
     use serial_test::serial;
     use std::{fs, os::unix::prelude::AsRawFd};
 
@@ -592,6 +593,33 @@ mod tests {
 
         assert_eq!(want, *got);
         assert_eq!(got.len(), 2);
+        Ok(())
+    }
+
+    #[test]
+    fn test_apply_rest_namespaces() -> Result<()> {
+        let syscall = create_syscall();
+        let spec = SpecBuilder::default().build()?;
+        let linux_spaces = vec![
+            LinuxNamespaceBuilder::default()
+                .typ(LinuxNamespaceType::Uts)
+                .build()?,
+            LinuxNamespaceBuilder::default()
+                .typ(LinuxNamespaceType::Pid)
+                .build()?,
+        ];
+        let namespaces = Namespaces::from(Some(&linux_spaces));
+
+        apply_rest_namespaces(&namespaces, &spec, syscall.as_ref())?;
+
+        let got_hostnames = syscall
+            .as_ref()
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap()
+            .get_hostname_args();
+        assert_eq!(1, got_hostnames.len());
+        assert_eq!("youki".to_string(), got_hostnames[0]);
         Ok(())
     }
 }
