@@ -22,3 +22,23 @@ pub fn container_fork<F: FnOnce() -> Result<()>>(cb: F) -> Result<Pid> {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use anyhow::{bail, Result};
+    use nix::sys::wait::{waitpid, WaitStatus};
+
+    #[test]
+    fn test_container_fork() -> Result<()> {
+        let pid = container_fork(|| Ok(()))?;
+        match waitpid(pid, None).expect("wait pid failed.") {
+            WaitStatus::Exited(p, status) => {
+                assert_eq!(pid, p);
+                assert_eq!(status, 0);
+                Ok(())
+            }
+            _ => bail!("test failed"),
+        }
+    }
+}
