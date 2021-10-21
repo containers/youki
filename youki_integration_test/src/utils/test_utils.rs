@@ -34,6 +34,7 @@ pub struct State {
     pub use_systemd: Option<bool>,
 }
 
+#[derive(Debug)]
 pub struct ContainerData {
     pub id: String,
     pub state: Option<State>,

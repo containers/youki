@@ -2,6 +2,7 @@ mod tests;
 mod utils;
 
 use crate::tests::lifecycle::{ContainerCreate, ContainerLifecycle};
+use crate::tests::linux_ns_itype::get_ns_itype_tests;
 use crate::tests::pidfile::get_pidfile_test;
 use crate::tests::tlb::get_tlb_test;
 use crate::utils::support::set_runtime_path;
@@ -54,19 +55,20 @@ fn main() -> Result<()> {
             }
         },
     }
-
     let mut tm = TestManager::new();
 
     let cl = ContainerLifecycle::new();
     let cc = ContainerCreate::new();
     let huge_tlb = get_tlb_test();
     let pidfile = get_pidfile_test();
+    let ns_itype = get_ns_itype_tests();
     let cgroup_v1_pids = cgroups::pids::get_test_group();
 
     tm.add_test_group(&cl);
     tm.add_test_group(&cc);
     tm.add_test_group(&huge_tlb);
     tm.add_test_group(&pidfile);
+    tm.add_test_group(&ns_itype);
     tm.add_test_group(&cgroup_v1_pids);
 
     tm.add_cleanup(Box::new(cgroups::cleanup));
