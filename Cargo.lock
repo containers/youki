@@ -94,28 +94,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
-name = "cgroups"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "dbus",
- "env_logger 0.9.0",
- "errno",
- "libbpf-sys",
- "libc",
- "log",
- "nix",
- "oci-spec 0.5.2 (git+https://github.com/containers/oci-spec-rs?rev=d6fb1e91742313cd0d0085937e2d6df5d4669720)",
- "procfs",
- "quickcheck",
- "rbpf",
- "serde",
- "serde_json",
- "systemd",
-]
-
-[[package]]
 name = "chrono"
 version = "0.4.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -172,40 +150,6 @@ dependencies = [
 ]
 
 [[package]]
-<<<<<<< HEAD
-name = "container"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "caps",
- "cgroups",
- "chrono",
- "crossbeam-channel",
- "dbus",
- "fastrand",
- "futures",
- "libc",
- "log",
- "mio",
- "nix",
- "oci-spec 0.5.2 (git+https://github.com/containers/oci-spec-rs?rev=d6fb1e91742313cd0d0085937e2d6df5d4669720)",
- "once_cell",
- "path-clean",
- "pentacle",
- "prctl",
- "procfs",
- "quickcheck",
- "seccomp",
- "serde",
- "serde_json",
- "serial_test",
- "systemd",
- "tabwriter",
-]
-
-[[package]]
-=======
->>>>>>> Fix ambigious names by renaming crate to libcontainer
 name = "crc32fast"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -719,18 +663,41 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3cb00336871be5ed2c8ed44b60ae9959dc5b9f08539422ed43f09e34ecaeba21"
 
 [[package]]
+name = "libcgroups"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "dbus",
+ "env_logger 0.9.0",
+ "errno",
+ "libbpf-sys",
+ "libc",
+ "log",
+ "nix",
+ "oci-spec 0.5.2 (git+https://github.com/containers/oci-spec-rs?rev=d6fb1e91742313cd0d0085937e2d6df5d4669720)",
+ "procfs",
+ "quickcheck",
+ "rbpf",
+ "serde",
+ "serde_json",
+ "systemd",
+]
+
+[[package]]
 name = "libcontainer"
 version = "0.0.1"
 dependencies = [
  "anyhow",
  "caps",
- "cgroups",
  "chrono",
  "crossbeam-channel",
  "dbus",
  "fastrand",
  "futures",
  "libc",
+ "libcgroups",
+ "libseccomp",
  "log",
  "mio",
  "nix",
@@ -739,7 +706,6 @@ dependencies = [
  "prctl",
  "procfs",
  "quickcheck",
- "seccomp",
  "serde",
  "serde_json",
  "serial_test",
@@ -752,6 +718,14 @@ version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc12a3bc971424edbbf7edaf6e5740483444db63aa8e23d3751ff12a30f306f0"
 dependencies = [
+ "pkg-config",
+]
+
+[[package]]
+name = "libseccomp"
+version = "0.1.0"
+dependencies = [
+ "libc",
  "pkg-config",
 ]
 
@@ -949,16 +923,6 @@ name = "path-clean"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ecba01bf2678719532c5e3059e0b5f0811273d94b397088b82e3bd0a78c78fdd"
-
-[[package]]
-name = "pentacle"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e26ee4fbe38a973890ca68cace434e192d88f3703099fd64f799f3d6043ee7b6"
-dependencies = [
- "libc",
- "log",
-]
 
 [[package]]
 name = "pin-project-lite"
@@ -1165,14 +1129,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d29ab0c6d3fc0ee92fe66e2d99f700eab17a8d57d1c1d3b748380fb20baa78cd"
 
 [[package]]
-name = "seccomp"
-version = "0.1.0"
-dependencies = [
- "libc",
- "pkg-config",
-]
-
-[[package]]
 name = "serde"
 version = "1.0.130"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1267,15 +1223,6 @@ dependencies = [
  "log",
  "memchr",
  "utf8-cstr",
-]
-
-[[package]]
-name = "tabwriter"
-version = "1.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "36205cfc997faadcc4b0b87aaef3fbedafe20d38d4959a7ca6ff803564051111"
-dependencies = [
- "unicode-width",
 ]
 
 [[package]]
@@ -1443,27 +1390,3 @@ checksum = "244c3741f4240ef46274860397c7c74e50eb23624996930e484c16679633a54c"
 dependencies = [
  "libc",
 ]
-<<<<<<< HEAD
-=======
-
-[[package]]
-name = "youki"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "cgroups",
- "chrono",
- "clap",
- "libcontainer",
- "log",
- "nix",
- "oci-spec 0.5.2 (git+https://github.com/containers/oci-spec-rs?rev=d6fb1e91742313cd0d0085937e2d6df5d4669720)",
- "once_cell",
- "pentacle",
- "procfs",
- "serde",
- "serde_json",
- "serial_test",
- "tabwriter",
-]
->>>>>>> Fix ambigious names by renaming crate to libcontainer

@@ -2,7 +2,7 @@ use super::{Container, ContainerStatus};
 use crate::hooks;
 use crate::utils;
 use anyhow::{bail, Context, Result};
-use cgroups;
+use libcgroups;
 use nix::sys::signal;
 use std::fs;
 
@@ -61,7 +61,7 @@ impl Container {
                 let use_systemd = self
                     .systemd()
                     .context("container state does not contain cgroup manager")?;
-                let cmanager = cgroups::common::create_cgroup_manager(&cgroups_path, use_systemd)
+                let cmanager = libcgroups::common::create_cgroup_manager(&cgroups_path, use_systemd)
                     .context("failed to create cgroup manager")?;
                 cmanager.remove().with_context(|| {
                     format!("failed to remove cgroup {}", cgroups_path.display())

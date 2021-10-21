@@ -42,7 +42,7 @@ impl Container {
             .systemd()
             .context("Could not determine cgroup manager")?;
 
-        let cgroup_manager = cgroups::common::create_cgroup_manager(cgroups_path, use_systemd)?;
+        let cgroup_manager = libcgroups::common::create_cgroup_manager(cgroups_path, use_systemd)?;
         match stats {
             true => {
                 let stats = cgroup_manager.stats()?;

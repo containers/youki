@@ -3,7 +3,7 @@ use crate::utils;
 use super::{Container, ContainerStatus};
 
 use anyhow::{bail, Context, Result};
-use cgroups::common::FreezerState;
+use libcgroups::common::FreezerState;
 
 impl Container {
     /// Resumes all processes within the container
@@ -49,7 +49,7 @@ impl Container {
         let use_systemd = self
             .systemd()
             .context("container state does not contain cgroup manager")?;
-        let cmanager = cgroups::common::create_cgroup_manager(cgroups_path, use_systemd)?;
+        let cmanager = libcgroups::common::create_cgroup_manager(cgroups_path, use_systemd)?;
         // resume the frozen container
         cmanager.freeze(FreezerState::Thawed)?;
 

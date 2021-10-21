@@ -1,4 +1,4 @@
-use cgroups::common::CgroupManager;
+use libcgroups::common::CgroupManager;
 use oci_spec::runtime::Spec;
 use std::os::unix::prelude::RawFd;
 use std::path::PathBuf;

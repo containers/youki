@@ -307,7 +307,7 @@ fn extract_page_size(dir_name: &str) -> Result<String> {
 /// Parses this string slice into an u64
 /// # Example
 /// ```
-/// use cgroups::stats::parse_value;
+/// use libcgroups::stats::parse_value;
 ///
 /// let value = parse_value("32").unwrap();
 /// assert_eq!(value, 32);
@@ -322,7 +322,7 @@ pub fn parse_value(value: &str) -> Result<u64> {
 /// # Example
 /// ```no_run
 /// use std::path::Path;
-/// use cgroups::stats::parse_single_value;
+/// use libcgroups::stats::parse_single_value;
 ///
 /// let value = parse_single_value(&Path::new("memory.current")).unwrap();
 /// assert_eq!(value, 32);
@@ -397,7 +397,7 @@ pub fn parse_nested_keyed_data(file_path: &Path) -> Result<HashMap<String, Vec<S
 /// Parses a file that is structed according to the nested keyed format
 /// # Example
 /// ```
-/// use cgroups::stats::parse_device_number;
+/// use libcgroups::stats::parse_device_number;
 ///
 /// let (major, minor) = parse_device_number("8:0").unwrap();
 /// assert_eq!((major, minor), (8, 0));

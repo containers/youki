@@ -1,6 +1,6 @@
 use crate::{namespaces::Namespaces, process::channel, process::fork};
 use anyhow::{Context, Error, Result};
-use cgroups::common::CgroupManager;
+use libcgroups::common::CgroupManager;
 use nix::unistd::{Gid, Pid, Uid};
 use oci_spec::runtime::{LinuxNamespaceType, LinuxResources};
 use procfs::process::Process;
@@ -124,7 +124,7 @@ fn apply_cgroups<C: CgroupManager + ?Sized>(
 
     if let Some(resources) = resources {
         if init {
-            let controller_opt = cgroups::common::ControllerOpt {
+            let controller_opt = libcgroups::common::ControllerOpt {
                 resources,
                 freezer_state: None,
                 oom_score_adj: None,
@@ -144,7 +144,7 @@ fn apply_cgroups<C: CgroupManager + ?Sized>(
 mod tests {
     use super::apply_cgroups;
     use anyhow::Result;
-    use cgroups::test_manager::TestManager;
+    use libcgroups::test_manager::TestManager;
     use nix::unistd::Pid;
     use oci_spec::runtime::LinuxResources;
     use procfs::process::Process;

@@ -8,7 +8,7 @@ use crate::{
     utils,
 };
 use anyhow::{anyhow, bail, Context, Result};
-use cgroups::common::{
+use libcgroups::common::{
     CgroupSetup::{Hybrid, Legacy, Unified},
     DEFAULT_CGROUP_ROOT,
 };
@@ -52,7 +52,7 @@ impl Mount {
 
         match mount.typ().as_deref() {
             Some("cgroup") => {
-                match cgroups::common::get_cgroup_setup()
+                match libcgroups::common::get_cgroup_setup()
                     .context("failed to determine cgroup setup")?
                 {
                     Legacy | Hybrid => self
@@ -102,7 +102,7 @@ impl Mount {
             .context("failed to mount tmpfs for cgroup")?;
 
         // get all cgroup mounts on the host system
-        let host_mounts: Vec<PathBuf> = cgroups::v1::util::list_subsystem_mount_points()
+        let host_mounts: Vec<PathBuf> = libcgroups::v1::util::list_subsystem_mount_points()
             .context("failed to get subsystem mount points")?
             .into_iter()
             .filter(|p| p.as_path().starts_with(DEFAULT_CGROUP_ROOT))
@@ -278,7 +278,7 @@ impl Mount {
             .context("failed to mount into container")
             .is_err()
         {
-            let host_mount = cgroups::v2::util::get_unified_mount_point()
+            let host_mount = libcgroups::v2::util::get_unified_mount_point()
                 .context("failed to get unified mount point")?;
 
             let process_cgroup = Process::myself()?
@@ -690,7 +690,7 @@ mod tests {
             .get_mount_args()
             .into_iter();
 
-        let host_mounts = cgroups::v1::util::list_subsystem_mount_points()?;
+        let host_mounts = libcgroups::v1::util::list_subsystem_mount_points()?;
         assert_eq!(got.len(), host_mounts.len() + 1);
 
         let expected = MountArgs {

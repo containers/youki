@@ -1,5 +1,5 @@
 [package]
-name = "cgroups"
+name = "libcgroups"
 version = "0.1.0"
 edition = "2018"
 autoexamples = false
