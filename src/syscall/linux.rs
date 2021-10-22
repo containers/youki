@@ -15,7 +15,7 @@ use nix::{
     sched::{unshare, CloneFlags},
     sys::stat::{mknod, Mode, SFlag},
     unistd,
-    unistd::{chown, fchdir, pivot_root, sethostname, Gid, Uid},
+    unistd::{chown, fchdir, pivot_root, setgroups, sethostname, Gid, Uid},
 };
 
 use oci_spec::runtime::LinuxRlimit;
@@ -240,6 +240,13 @@ impl Syscall for LinuxSyscall {
         match chown(path, owner, group) {
             Ok(_) => Ok(()),
             Err(e) => bail!("Failed to chown {:?}", e),
+        }
+    }
+
+    fn set_groups(&self, groups: &[Gid]) -> Result<()> {
+        match setgroups(groups) {
+            Ok(_) => Ok(()),
+            Err(e) => bail!("Failed to setgroups {:?}", e),
         }
     }
 }

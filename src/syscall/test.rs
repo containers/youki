@@ -52,6 +52,7 @@ pub struct TestHelperSyscall {
     mknod_args: RefCell<Vec<MknodArgs>>,
     chown_args: RefCell<Vec<ChownArgs>>,
     hostname_args: RefCell<Vec<String>>,
+    groups_args: RefCell<Vec<Vec<Gid>>>,
 }
 
 impl Default for TestHelperSyscall {
@@ -65,6 +66,7 @@ impl Default for TestHelperSyscall {
             mknod_args: RefCell::new(vec![]),
             chown_args: RefCell::new(vec![]),
             hostname_args: RefCell::new(vec![]),
+            groups_args: RefCell::new(vec![]),
         }
     }
 }
@@ -158,6 +160,11 @@ impl Syscall for TestHelperSyscall {
         });
         Ok(())
     }
+
+    fn set_groups(&self, groups: &[Gid]) -> anyhow::Result<()> {
+        self.groups_args.borrow_mut().push(groups.to_vec());
+        Ok(())
+    }
 }
 
 impl TestHelperSyscall {
@@ -191,5 +198,9 @@ impl TestHelperSyscall {
 
     pub fn get_hostname_args(&self) -> Vec<String> {
         self.hostname_args.borrow_mut().clone()
+    }
+
+    pub fn get_groups_args(&self) -> Vec<Vec<Gid>> {
+        self.groups_args.borrow_mut().clone()
     }
 }

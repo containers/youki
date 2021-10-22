@@ -300,7 +300,7 @@ pub fn container_init_process(
         }
     };
 
-    set_supplementary_gids(proc.user(), args.rootless)
+    set_supplementary_gids(proc.user(), args.rootless, syscall)
         .context("failed to set supplementary gids")?;
 
     syscall
@@ -449,14 +449,18 @@ pub fn container_init_process(
 //
 // Privileged user starting a normal container: Just add the supplementary groups.
 //
-fn set_supplementary_gids(user: &User, rootless: &Option<Rootless>) -> Result<()> {
+fn set_supplementary_gids(
+    user: &User,
+    rootless: &Option<Rootless>,
+    syscall: &dyn Syscall,
+) -> Result<()> {
     if let Some(additional_gids) = user.additional_gids() {
         if additional_gids.is_empty() {
             return Ok(());
         }
 
-        let setgroups =
-            fs::read_to_string("/proc/self/setgroups").context("failed to read setgroups")?;
+        let setgroups = fs::read_to_string("/proc/self/setgroups")
+            .with_context(|| "failed to read setgroups".to_string())?;
         if setgroups.trim() == "deny" {
             bail!("cannot set supplementary gids, setgroup is disabled");
         }
@@ -468,10 +472,14 @@ fn set_supplementary_gids(user: &User, rootless: &Option<Rootless>) -> Result<()
 
         match rootless {
             Some(r) if r.privileged => {
-                nix::unistd::setgroups(&gids).context("failed to set supplementary gids")?;
+                syscall.set_groups(&gids).with_context(|| {
+                    format!("failed to set privileged supplementary gids: {:?}", gids)
+                })?;
             }
             None => {
-                nix::unistd::setgroups(&gids).context("failed to set supplementary gids")?;
+                syscall.set_groups(&gids).with_context(|| {
+                    format!("failed to set unprivileged supplementary gids: {:?}", gids)
+                })?;
             }
             // this should have been detected during validation
             _ => unreachable!(
@@ -509,7 +517,7 @@ mod tests {
         test::{MountArgs, TestHelperSyscall},
     };
     use nix::{fcntl, sys, unistd};
-    use oci_spec::runtime::{LinuxNamespaceBuilder, SpecBuilder};
+    use oci_spec::runtime::{LinuxNamespaceBuilder, SpecBuilder, UserBuilder};
     use serial_test::serial;
     use std::{fs, os::unix::prelude::AsRawFd};
 
@@ -620,6 +628,63 @@ mod tests {
             .get_hostname_args();
         assert_eq!(1, got_hostnames.len());
         assert_eq!("youki".to_string(), got_hostnames[0]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_set_supplementary_gids() -> Result<()> {
+        // gids additional gids is empty case
+        let user = UserBuilder::default().build().unwrap();
+        assert!(set_supplementary_gids(&user, &None, create_syscall().as_ref()).is_ok());
+
+        let tests = vec![
+            (
+                UserBuilder::default()
+                    .additional_gids(vec![33, 34])
+                    .build()?,
+                None::<Rootless>,
+                vec![vec![Gid::from_raw(33), Gid::from_raw(34)]],
+            ),
+            // unreachable case
+            (
+                UserBuilder::default().build()?,
+                Some(Rootless::default()),
+                vec![],
+            ),
+            (
+                UserBuilder::default()
+                    .additional_gids(vec![37, 38])
+                    .build()?,
+                Some(Rootless {
+                    privileged: true,
+                    gid_mappings: None,
+                    newgidmap: None,
+                    newuidmap: None,
+                    uid_mappings: None,
+                    user_namespace: None,
+                }),
+                vec![vec![Gid::from_raw(37), Gid::from_raw(38)]],
+            ),
+        ];
+        for (user, rootless, want) in tests.into_iter() {
+            let syscall = create_syscall();
+            let result = set_supplementary_gids(&user, &rootless, syscall.as_ref());
+            match fs::read_to_string("/proc/self/setgroups")?.trim() {
+                "deny" => {
+                    assert!(result.is_err());
+                }
+                "allow" => {
+                    assert!(result.is_ok());
+                    let got = syscall
+                        .as_any()
+                        .downcast_ref::<TestHelperSyscall>()
+                        .unwrap()
+                        .get_groups_args();
+                    assert_eq!(want, got);
+                }
+                _ => unreachable!("setgroups value unknown"),
+            }
+        }
         Ok(())
     }
 }
