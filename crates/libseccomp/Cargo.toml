@@ -1,0 +1,12 @@
+[package]
+name = "libseccomp"
+version = "0.1.0"
+edition = "2018"
+
+build = "build.rs"
+
+[dependencies]
+libc = "0.2.84"
+
+[build-dependencies]
+pkg-config = "0.3.20"

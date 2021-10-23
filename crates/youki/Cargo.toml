@@ -1,0 +1,32 @@
+[package]
+name = "youki"
+version = "0.0.1"
+authors = ["youki team"]
+edition = "2018"
+description = "A container runtime written in Rust"
+
+[dependencies.clap]
+version = "3.0.0-beta.2"
+default-features = false
+features = ["std", "suggestions", "derive", "cargo"]
+
+
+[dependencies]
+anyhow = "1.0"
+chrono = { version="0.4", features = ["serde"] }
+libcgroups = { path = "../libcgroups" }
+libcontainer = { path = "../libcontainer" }
+log = "0.4"
+nix = "0.22.0"
+oci-spec = { git = "https://github.com/containers/oci-spec-rs",  rev = "d6fb1e91742313cd0d0085937e2d6df5d4669720" }
+once_cell = "1.6.0"
+pentacle = "1.0.0"
+procfs = "0.11.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tabwriter = "1"
+
+[dev-dependencies]
+serial_test = "0.5.1"
+
+
