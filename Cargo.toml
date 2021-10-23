@@ -2,7 +2,7 @@
 name = "youki"
 version = "0.0.1"
 authors = ["utam0k <k0ma@utam0k.jp>"]
-edition = "2018"
+edition = "2021"
 description = "A container runtime written in Rust"
 
 [workspace]
