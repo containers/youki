@@ -459,8 +459,8 @@ fn set_supplementary_gids(
             return Ok(());
         }
 
-        let setgroups = fs::read_to_string("/proc/self/setgroups")
-            .with_context(|| "failed to read setgroups".to_string())?;
+        let setgroups =
+            fs::read_to_string("/proc/self/setgroups").context("failed to read setgroups")?;
         if setgroups.trim() == "deny" {
             bail!("cannot set supplementary gids, setgroup is disabled");
         }
