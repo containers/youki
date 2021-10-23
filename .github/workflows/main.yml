@@ -17,10 +17,11 @@ jobs:
         id: filter
         with:
           filters: |
-            .: src/**
-            ./youki_integration_test: youki_integration_test/**
-            ./cgroups: cgroups/**
-            ./seccomp: seccomp/**
+            ./crates/youki: crates/youki/**
+            ./crates/libcontainer: crates/libcontainer/**
+            ./crates/libcgroups: crates/libcgroups/**
+            ./crates/libseccomp: crates/libseccomp/**
+            ./crates/integration_test: crates/integration_test/**        
   check:
     needs: [changes]
     if: ${{ !contains(needs.changes.outputs.dirs, '[]') }}
@@ -37,10 +38,6 @@ jobs:
           override: true
       - name: Cache youki
         uses: Swatinem/rust-cache@v1
-      - name: Cache cgroups
-        uses: Swatinem/rust-cache@v1
-        with:
-          working-directory: ./cgroups
       - run: rustup component add rustfmt clippy
       - run: sudo apt-get -y update
       - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev libseccomp-dev
@@ -63,10 +60,6 @@ jobs:
           override: true
       - name: Cache youki
         uses: Swatinem/rust-cache@v1
-      - name: Cache cgroups
-        uses: Swatinem/rust-cache@v1
-        with:
-          working-directory: ./cgroups
       - run: sudo apt-get -y update
       - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev libseccomp-dev
       - name: Run tests
@@ -85,10 +78,6 @@ jobs:
           components: llvm-tools-preview
       - name: Cache youki
         uses: Swatinem/rust-cache@v1
-      - name: Cache cgroups
-        uses: Swatinem/rust-cache@v1
-        with:
-          working-directory: ./cgroups
       - name: install cargo-llvm-cov
         env:
           CARGO_LLVM_COV_VERSION: 0.1.5
@@ -104,20 +93,10 @@ jobs:
           cargo llvm-cov clean --workspace
           cargo llvm-cov --no-report
           cargo llvm-cov --no-run --lcov --output-path ./coverage.lcov
-      - name: Run Test Coverage for cgroups
-        working-directory: ./cgroups
-        run: |
-          cargo llvm-cov clean --workspace
-          cargo llvm-cov --no-report
-          cargo llvm-cov --no-run --lcov --output-path ./coverage.lcov
       - name: Upload Youki Code Coverage Results
         uses: codecov/codecov-action@v2
         with:
           file: ./coverage.lcov
-      - name: Upload Cgroups Code Coverage Results
-        uses: codecov/codecov-action@v2
-        with:
-          file: ./cgroups/coverage.lcov
   integration_tests:
     runs-on: ubuntu-latest
     strategy:
@@ -138,10 +117,6 @@ jobs:
           toolchain: ${{ matrix.rust }}
       - name: Cache youki
         uses: Swatinem/rust-cache@v1
-      - name: Cache cgroups
-        uses: Swatinem/rust-cache@v1
-        with:
-          working-directory: ./cgroups
       - run: sudo apt-get -y update
       - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev libseccomp-dev
       - name: Build
@@ -149,5 +124,5 @@ jobs:
       - uses: actions/setup-go@v2
         with:
           go-version: '1.11.0'
-      - name: Run intetgration tests
+      - name: Run integration tests
         run: ./integration_test.sh
