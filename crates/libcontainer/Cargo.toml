@@ -2,7 +2,7 @@
 name = "libcontainer"
 version = "0.0.1"
 authors = ["youki team"]
-edition = "2018"
+edition = "2021"
 description = "Library for container creation"
 
 [features]
