@@ -18,7 +18,7 @@ crossbeam-channel = "0.5"
 dbus = "0.9.5"
 fastrand = "1.4.1"
 futures = { version = "0.3", features = ["thread-pool"] }
-libc = "0.2.84"
+libc = "0.2.105"
 log = "0.4"
 mio = { version = "0.7.13", features = ["os-ext", "os-poll"] }
 nix = "0.22.0"
