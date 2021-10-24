@@ -15,7 +15,7 @@ caps = { git = "https://github.com/lucab/caps-rs", rev = "cb54844", features = [
 
 chrono = { version="0.4", features = ["serde"] }
 crossbeam-channel = "0.5"
-dbus = "0.9.2"
+dbus = "0.9.5"
 fastrand = "1.4.1"
 futures = { version = "0.3", features = ["thread-pool"] }
 libc = "0.2.84"
