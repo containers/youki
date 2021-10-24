@@ -92,35 +92,36 @@ fn sysctl(kernel_params: &HashMap<String, String>) -> Result<()> {
 // The first time we bind mount, other flags are ignored,
 // so we need to mount it once and then remount it with the necessary flags specified.
 // https://man7.org/linux/man-pages/man2/mount.2.html
-fn readonly_path(path: &str) -> Result<()> {
-    match nix_mount::<str, str, str, str>(
+fn readonly_path(path: &Path, syscall: &dyn Syscall) -> Result<()> {
+    if let Err(err) = syscall.mount(
         Some(path),
         path,
-        None::<&str>,
+        None,
         MsFlags::MS_BIND | MsFlags::MS_REC,
-        None::<&str>,
+        None,
     ) {
-        // ignore error if path is not exist.
-        Err(nix::errno::Errno::ENOENT) => {
-            log::warn!("readonly path {:?} not exist", path);
-            return Ok(());
+        if let Some(errno) = err.downcast_ref() {
+            // ignore error if path is not exist.
+            if matches!(errno, nix::errno::Errno::ENOENT) {
+                return Ok(());
+            }
         }
-        Err(err) => bail!(err),
-        Ok(_) => {}
+        bail!(err)
     }
 
-    nix_mount::<str, str, str, str>(
+    syscall.mount(
         Some(path),
         path,
-        None::<&str>,
+        None,
         MsFlags::MS_NOSUID
             | MsFlags::MS_NODEV
             | MsFlags::MS_NOEXEC
             | MsFlags::MS_BIND
             | MsFlags::MS_REMOUNT
             | MsFlags::MS_RDONLY,
-        None::<&str>,
+        None,
     )?;
+
     log::debug!("readonly path {:?} mounted", path);
     Ok(())
 }
@@ -273,7 +274,8 @@ pub fn container_init_process(
     if let Some(paths) = linux.readonly_paths() {
         // mount readonly path
         for path in paths {
-            readonly_path(path).context("Failed to set read only path")?;
+            readonly_path(Path::new(path), syscall)
+                .with_context(|| format!("Failed to set read only path {:?}", path))?;
         }
     }
 
@@ -298,7 +300,7 @@ pub fn container_init_process(
         }
     };
 
-    set_supplementary_gids(proc.user(), args.rootless)
+    set_supplementary_gids(proc.user(), args.rootless, syscall)
         .context("failed to set supplementary gids")?;
 
     syscall
@@ -447,7 +449,11 @@ pub fn container_init_process(
 //
 // Privileged user starting a normal container: Just add the supplementary groups.
 //
-fn set_supplementary_gids(user: &User, rootless: &Option<Rootless>) -> Result<()> {
+fn set_supplementary_gids(
+    user: &User,
+    rootless: &Option<Rootless>,
+    syscall: &dyn Syscall,
+) -> Result<()> {
     if let Some(additional_gids) = user.additional_gids() {
         if additional_gids.is_empty() {
             return Ok(());
@@ -466,10 +472,14 @@ fn set_supplementary_gids(user: &User, rootless: &Option<Rootless>) -> Result<()
 
         match rootless {
             Some(r) if r.privileged => {
-                nix::unistd::setgroups(&gids).context("failed to set supplementary gids")?;
+                syscall.set_groups(&gids).with_context(|| {
+                    format!("failed to set privileged supplementary gids: {:?}", gids)
+                })?;
             }
             None => {
-                nix::unistd::setgroups(&gids).context("failed to set supplementary gids")?;
+                syscall.set_groups(&gids).with_context(|| {
+                    format!("failed to set unprivileged supplementary gids: {:?}", gids)
+                })?;
             }
             // this should have been detected during validation
             _ => unreachable!(
@@ -502,8 +512,12 @@ fn sync_seccomp(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use anyhow::{bail, Result};
+    use crate::syscall::{
+        syscall::create_syscall,
+        test::{MountArgs, TestHelperSyscall},
+    };
     use nix::{fcntl, sys, unistd};
+    use oci_spec::runtime::{LinuxNamespaceBuilder, SpecBuilder, UserBuilder};
     use serial_test::serial;
     use std::{fs, os::unix::prelude::AsRawFd};
 
@@ -550,6 +564,127 @@ mod tests {
         }
 
         unistd::close(fd)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_readonly_path() -> Result<()> {
+        let syscall = create_syscall();
+        readonly_path(Path::new("/proc/sys"), syscall.as_ref())?;
+
+        let want = vec![
+            MountArgs {
+                source: Some(PathBuf::from("/proc/sys")),
+                target: PathBuf::from("/proc/sys"),
+                fstype: None,
+                flags: MsFlags::MS_BIND | MsFlags::MS_REC,
+                data: None,
+            },
+            MountArgs {
+                source: Some(PathBuf::from("/proc/sys")),
+                target: PathBuf::from("/proc/sys"),
+                fstype: None,
+                flags: MsFlags::MS_NOSUID
+                    | MsFlags::MS_NODEV
+                    | MsFlags::MS_NOEXEC
+                    | MsFlags::MS_BIND
+                    | MsFlags::MS_REMOUNT
+                    | MsFlags::MS_RDONLY,
+                data: None,
+            },
+        ];
+        let got = syscall
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap()
+            .get_mount_args();
+
+        assert_eq!(want, *got);
+        assert_eq!(got.len(), 2);
+        Ok(())
+    }
+
+    #[test]
+    fn test_apply_rest_namespaces() -> Result<()> {
+        let syscall = create_syscall();
+        let spec = SpecBuilder::default().build()?;
+        let linux_spaces = vec![
+            LinuxNamespaceBuilder::default()
+                .typ(LinuxNamespaceType::Uts)
+                .build()?,
+            LinuxNamespaceBuilder::default()
+                .typ(LinuxNamespaceType::Pid)
+                .build()?,
+        ];
+        let namespaces = Namespaces::from(Some(&linux_spaces));
+
+        apply_rest_namespaces(&namespaces, &spec, syscall.as_ref())?;
+
+        let got_hostnames = syscall
+            .as_ref()
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap()
+            .get_hostname_args();
+        assert_eq!(1, got_hostnames.len());
+        assert_eq!("youki".to_string(), got_hostnames[0]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_set_supplementary_gids() -> Result<()> {
+        // gids additional gids is empty case
+        let user = UserBuilder::default().build().unwrap();
+        assert!(set_supplementary_gids(&user, &None, create_syscall().as_ref()).is_ok());
+
+        let tests = vec![
+            (
+                UserBuilder::default()
+                    .additional_gids(vec![33, 34])
+                    .build()?,
+                None::<Rootless>,
+                vec![vec![Gid::from_raw(33), Gid::from_raw(34)]],
+            ),
+            // unreachable case
+            (
+                UserBuilder::default().build()?,
+                Some(Rootless::default()),
+                vec![],
+            ),
+            (
+                UserBuilder::default()
+                    .additional_gids(vec![37, 38])
+                    .build()?,
+                Some(Rootless {
+                    privileged: true,
+                    gid_mappings: None,
+                    newgidmap: None,
+                    newuidmap: None,
+                    uid_mappings: None,
+                    user_namespace: None,
+                }),
+                vec![vec![Gid::from_raw(37), Gid::from_raw(38)]],
+            ),
+        ];
+        for (user, rootless, want) in tests.into_iter() {
+            let syscall = create_syscall();
+            let result = set_supplementary_gids(&user, &rootless, syscall.as_ref());
+            match fs::read_to_string("/proc/self/setgroups")?.trim() {
+                "deny" => {
+                    assert!(result.is_err());
+                }
+                "allow" => {
+                    assert!(result.is_ok());
+                    let got = syscall
+                        .as_any()
+                        .downcast_ref::<TestHelperSyscall>()
+                        .unwrap()
+                        .get_groups_args();
+                    assert_eq!(want, got);
+                }
+                _ => unreachable!("setgroups value unknown"),
+            }
+        }
         Ok(())
     }
 }

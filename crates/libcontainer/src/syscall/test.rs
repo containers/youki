@@ -51,6 +51,8 @@ pub struct TestHelperSyscall {
     symlink_args: RefCell<Vec<(PathBuf, PathBuf)>>,
     mknod_args: RefCell<Vec<MknodArgs>>,
     chown_args: RefCell<Vec<ChownArgs>>,
+    hostname_args: RefCell<Vec<String>>,
+    groups_args: RefCell<Vec<Vec<Gid>>>,
 }
 
 impl Default for TestHelperSyscall {
@@ -63,6 +65,8 @@ impl Default for TestHelperSyscall {
             symlink_args: RefCell::new(vec![]),
             mknod_args: RefCell::new(vec![]),
             chown_args: RefCell::new(vec![]),
+            hostname_args: RefCell::new(vec![]),
+            groups_args: RefCell::new(vec![]),
         }
     }
 }
@@ -97,8 +101,9 @@ impl Syscall for TestHelperSyscall {
         Ok(())
     }
 
-    fn set_hostname(&self, _hostname: &str) -> anyhow::Result<()> {
-        todo!()
+    fn set_hostname(&self, hostname: &str) -> anyhow::Result<()> {
+        self.hostname_args.borrow_mut().push(hostname.to_owned());
+        Ok(())
     }
 
     fn set_rlimit(&self, _rlimit: &LinuxRlimit) -> anyhow::Result<()> {
@@ -155,6 +160,11 @@ impl Syscall for TestHelperSyscall {
         });
         Ok(())
     }
+
+    fn set_groups(&self, groups: &[Gid]) -> anyhow::Result<()> {
+        self.groups_args.borrow_mut().push(groups.to_vec());
+        Ok(())
+    }
 }
 
 impl TestHelperSyscall {
@@ -184,5 +194,13 @@ impl TestHelperSyscall {
 
     pub fn get_chown_args(&self) -> Vec<ChownArgs> {
         self.chown_args.borrow_mut().clone()
+    }
+
+    pub fn get_hostname_args(&self) -> Vec<String> {
+        self.hostname_args.borrow_mut().clone()
+    }
+
+    pub fn get_groups_args(&self) -> Vec<Vec<Gid>> {
+        self.groups_args.borrow_mut().clone()
     }
 }
