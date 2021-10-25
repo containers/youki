@@ -4,6 +4,7 @@ mod utils;
 use crate::tests::lifecycle::{ContainerCreate, ContainerLifecycle};
 use crate::tests::linux_ns_itype::get_ns_itype_tests;
 use crate::tests::pidfile::get_pidfile_test;
+use crate::tests::seccomp_notify::get_seccomp_notify_test;
 use crate::tests::tlb::get_tlb_test;
 use crate::utils::support::set_runtime_path;
 use anyhow::Result;
@@ -63,6 +64,7 @@ fn main() -> Result<()> {
     let pidfile = get_pidfile_test();
     let ns_itype = get_ns_itype_tests();
     let cgroup_v1_pids = cgroups::pids::get_test_group();
+    let seccomp_notify = get_seccomp_notify_test();
 
     tm.add_test_group(&cl);
     tm.add_test_group(&cc);
@@ -72,6 +74,7 @@ fn main() -> Result<()> {
     tm.add_test_group(&cgroup_v1_pids);
 
     tm.add_cleanup(Box::new(cgroups::cleanup));
+    tm.add_test_group(&seccomp_notify);
 
     if let Some(tests) = opts.tests {
         let tests_to_run = parse_tests(&tests);
