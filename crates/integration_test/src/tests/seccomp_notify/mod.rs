@@ -1,11 +1,9 @@
 use crate::utils::test_outside_container;
 use anyhow::{anyhow, bail, Result};
-use libcontainer::container::ContainerProcessState;
 use oci_spec::runtime::{
     Arch, LinuxBuilder, LinuxSeccompAction, LinuxSeccompBuilder, LinuxSyscallBuilder, SpecBuilder,
 };
 use std::{
-    os::unix::prelude::RawFd,
     path::PathBuf,
     sync::mpsc::{self, Receiver, Sender},
     thread,
@@ -59,8 +57,8 @@ fn test_seccomp_notify() -> Result<()> {
 
     // two threads. One run container life cycle. Another one run seccomp agent...
     let (sender, receiver): (
-        Sender<Result<(ContainerProcessState, RawFd)>>,
-        Receiver<Result<(ContainerProcessState, RawFd)>>,
+        Sender<seccomp_agent::SeccompAgentResult>,
+        Receiver<seccomp_agent::SeccompAgentResult>,
     ) = mpsc::channel();
     // We have to launch the seccomp agent before we launch the container.
     // Otherwise, the container creation will be blocked on trying to send to

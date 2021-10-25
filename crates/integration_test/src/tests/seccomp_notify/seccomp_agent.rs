@@ -8,12 +8,14 @@ use std::{os::unix::prelude::RawFd, path::Path};
 
 const DEFAULT_BUFFER_SIZE: usize = 4096;
 
+pub type SeccompAgentResult = Result<(ContainerProcessState, RawFd)>;
+
 // Receive information from seccomp notify listener. We will receive 2 items, 1
 // container process state and 1 seccomp notify fd. This function will only
 // receive one connection from the listener and will terminate all socket when
 // returning, since we only expect at most 1 connection to the listener based on
 // the spec.
-pub fn recv_seccomp_listener(seccomp_listener: &Path) -> Result<(ContainerProcessState, RawFd)> {
+pub fn recv_seccomp_listener(seccomp_listener: &Path) -> SeccompAgentResult {
     let addr = socket::SockAddr::new_unix(seccomp_listener)?;
     let socket = socket::socket(
         socket::AddressFamily::Unix,
