@@ -10,7 +10,7 @@ systemd_cgroups = ["systemd"]
 cgroupsv2_devices = ["rbpf", "libbpf-sys", "errno", "libc"]
 
 [dependencies]
-nix = "0.22.0"
+nix = "0.23.0"
 procfs = "0.11.0"
 log = "0.4"
 anyhow = "1.0"
