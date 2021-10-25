@@ -1,4 +1,4 @@
-use crate::utils::test_outside_container;
+use crate::utils::{get_runtime_path, test_outside_container};
 use anyhow::{anyhow, bail, Result};
 use oci_spec::runtime::{
     Arch, LinuxBuilder, LinuxSeccompAction, LinuxSeccompBuilder, LinuxSyscallBuilder, SpecBuilder,
@@ -38,7 +38,7 @@ fn test_seccomp_notify() -> Result<()> {
                 .seccomp(
                     LinuxSeccompBuilder::default()
                         .default_action(LinuxSeccompAction::ScmpActAllow)
-                        .architectures(vec![Arch::ScmpArchNative])
+                        .architectures(vec![Arch::ScmpArchX86_64])
                         .listener_path(&seccomp_listener_path)
                         .listener_metadata(seccomp_meta)
                         .syscalls(vec![LinuxSyscallBuilder::default()
@@ -107,9 +107,17 @@ fn test_seccomp_notify() -> Result<()> {
 pub fn get_seccomp_notify_test<'a>() -> TestGroup<'a> {
     let seccomp_notify_test = Test::new(
         "seccomp_notify",
-        Box::new(|| match test_seccomp_notify() {
-            Ok(_) => TestResult::Passed,
-            Err(err) => TestResult::Failed(err),
+        Box::new(|| {
+            let runtime = get_runtime_path();
+            // runc doesn't support seccomp notify yet
+            if runtime.ends_with("runc") {
+                return TestResult::Skipped;
+            }
+
+            match test_seccomp_notify() {
+                Ok(_) => TestResult::Passed,
+                Err(err) => TestResult::Failed(err),
+            }
         }),
     );
     let mut tg = TestGroup::new("seccomp_notify");
