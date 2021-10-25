@@ -669,7 +669,6 @@ dependencies = [
  "rbpf",
  "serde",
  "serde_json",
- "systemd",
 ]
 
 [[package]]

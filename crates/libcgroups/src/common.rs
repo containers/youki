@@ -16,12 +16,12 @@ use oci_spec::runtime::{
     LinuxResources,
 };
 #[cfg(feature = "systemd_cgroups")]
-use systemd::daemon::booted;
 #[cfg(not(feature = "systemd_cgroups"))]
 fn booted() -> Result<bool> {
     bail!("This build does not include the systemd cgroups feature")
 }
 
+use super::systemd;
 use super::v1;
 use super::v2;
 
@@ -185,11 +185,11 @@ pub fn create_cgroup_manager<P: Into<PathBuf>>(
         }
         CgroupSetup::Unified => {
             if systemd_cgroup {
-                if !booted()? {
+                if systemd::booted() {
                     bail!("systemd cgroup flag passed, but systemd support for managing cgroups is not available");
                 }
                 log::info!("systemd cgroup manager will be used");
-                return Ok(Box::new(crate::systemd::manager::Manager::new(
+                return Ok(Box::new(systemd::manager::Manager::new(
                     DEFAULT_CGROUP_ROOT.into(),
                     cgroup_path.into(),
                 )?));
