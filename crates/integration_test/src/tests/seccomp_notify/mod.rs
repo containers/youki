@@ -76,12 +76,22 @@ fn test_seccomp_notify() -> Result<()> {
             .recv()
             .expect("failed to receive from channel")
             .expect("failed to receive from seccomp listener");
-        let pid = match data.state {
-            Some(s) => s.pid.unwrap(),
+
+        let state = match data.state {
+            Some(s) => s,
             None => return TestResult::Failed(anyhow!("state command returned error")),
         };
-        if pid != container_process_state.pid {
+
+        if state.id != container_process_state.state.id {
+            return TestResult::Failed(anyhow!("container id doesn't match"));
+        }
+
+        if state.pid.unwrap() != container_process_state.pid {
             return TestResult::Failed(anyhow!("container process id doesn't match"));
+        }
+
+        if SECCOMP_METADATA != container_process_state.metadata {
+            return TestResult::Failed(anyhow!("seccomp listener metadata doesn't match"));
         }
 
         TestResult::Passed
