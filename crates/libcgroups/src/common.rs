@@ -189,7 +189,7 @@ pub fn create_cgroup_manager<P: Into<PathBuf>>(
                     bail!("systemd cgroup flag passed, but systemd support for managing cgroups is not available");
                 }
                 log::info!("systemd cgroup manager will be used");
-                return Ok(Box::new(v2::SystemDCGroupManager::new(
+                return Ok(Box::new(crate::systemd::manager::Manager::new(
                     DEFAULT_CGROUP_ROOT.into(),
                     cgroup_path.into(),
                 )?));

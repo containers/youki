@@ -8,12 +8,9 @@ use anyhow::{anyhow, bail, Result};
 use nix::unistd::Pid;
 use std::path::{Path, PathBuf};
 
+use super::controller_type::{ControllerType, CONTROLLER_TYPES};
 #[cfg(feature = "cgroupsv2_devices")]
 use super::devices::Devices;
-use super::{
-    controller::Controller, controller_type::ControllerType, cpu::Cpu, cpuset::CpuSet,
-    freezer::Freezer, hugetlb::HugeTlb, io::Io, memory::Memory, pids::Pids,
-};
 use crate::common::{self, CgroupManager, ControllerOpt, FreezerState, PathBufExt};
 use crate::stats::Stats;
 
@@ -21,16 +18,8 @@ const CGROUP_PROCS: &str = "cgroup.procs";
 const CGROUP_CONTROLLERS: &str = "cgroup.controllers";
 const CGROUP_SUBTREE_CONTROL: &str = "cgroup.subtree_control";
 
-// v2 systemd only supports cpu, io, memory and pids.
-const CONTROLLER_TYPES: &[ControllerType] = &[
-    ControllerType::Cpu,
-    ControllerType::Io,
-    ControllerType::Memory,
-    ControllerType::Pids,
-];
-
 /// SystemDCGroupManager is a driver for managing cgroups via systemd.
-pub struct SystemDCGroupManager {
+pub struct Manager {
     root_path: PathBuf,
     cgroups_path: PathBuf,
     full_path: PathBuf,
@@ -46,14 +35,14 @@ struct CgroupsPath {
     name: String,
 }
 
-impl SystemDCGroupManager {
+impl Manager {
     pub fn new(root_path: PathBuf, cgroups_path: PathBuf) -> Result<Self> {
         // TODO: create the systemd unit using a dbus client.
         let destructured_path = Self::destructure_cgroups_path(cgroups_path)?;
         let cgroups_path = Self::construct_cgroups_path(destructured_path)?;
         let full_path = root_path.join_safely(&cgroups_path)?;
 
-        Ok(SystemDCGroupManager {
+        Ok(Manager {
             root_path,
             cgroups_path,
             full_path,
@@ -203,7 +192,7 @@ impl SystemDCGroupManager {
                 "cpu" => controllers.push(ControllerType::Cpu),
                 "io" => controllers.push(ControllerType::Io),
                 "memory" => controllers.push(ControllerType::Memory),
-                "pids" => controllers.push(ControllerType::Pids),
+                "pids" => controllers.push(ControllerType::Tasks),
                 _ => continue,
             }
         }
@@ -220,7 +209,7 @@ impl SystemDCGroupManager {
     }
 }
 
-impl CgroupManager for SystemDCGroupManager {
+impl CgroupManager for Manager {
     fn add_task(&self, pid: Pid) -> Result<()> {
         // Dont attach any pid to the cgroup if -1 is specified as a pid
         if pid.as_raw() == -1 {
@@ -234,12 +223,7 @@ impl CgroupManager for SystemDCGroupManager {
     fn apply(&self, controller_opt: &ControllerOpt) -> Result<()> {
         for controller in CONTROLLER_TYPES {
             match controller {
-                ControllerType::Cpu => Cpu::apply(controller_opt, &self.full_path)?,
-                ControllerType::CpuSet => CpuSet::apply(controller_opt, &self.full_path)?,
-                ControllerType::HugeTlb => HugeTlb::apply(controller_opt, &self.full_path)?,
-                ControllerType::Io => Io::apply(controller_opt, &self.full_path)?,
-                ControllerType::Memory => Memory::apply(controller_opt, &self.full_path)?,
-                ControllerType::Pids => Pids::apply(controller_opt, &self.full_path)?,
+                _ => {}
             }
         }
 
@@ -253,13 +237,7 @@ impl CgroupManager for SystemDCGroupManager {
     }
 
     fn freeze(&self, state: FreezerState) -> Result<()> {
-        let controller_opt = ControllerOpt {
-            resources: &Default::default(),
-            freezer_state: Some(state),
-            oom_score_adj: None,
-            disable_oom_killer: false,
-        };
-        Freezer::apply(&controller_opt, &self.full_path)
+        todo!();
     }
 
     fn stats(&self) -> Result<Stats> {
@@ -278,7 +256,7 @@ mod tests {
     #[test]
     fn expand_slice_works() -> Result<()> {
         assert_eq!(
-            SystemDCGroupManager::expand_slice("test-a-b.slice")?,
+            Manager::expand_slice("test-a-b.slice")?,
             PathBuf::from("/test.slice/test-a.slice/test-a-b.slice"),
         );
 
@@ -287,13 +265,12 @@ mod tests {
 
     #[test]
     fn get_cgroups_path_works_with_a_complex_slice() -> Result<()> {
-        let cgroups_path = SystemDCGroupManager::destructure_cgroups_path(PathBuf::from(
-            "test-a-b.slice:docker:foo",
-        ))
-        .expect("");
+        let cgroups_path =
+            Manager::destructure_cgroups_path(PathBuf::from("test-a-b.slice:docker:foo"))
+                .expect("");
 
         assert_eq!(
-            SystemDCGroupManager::construct_cgroups_path(cgroups_path)?,
+            Manager::construct_cgroups_path(cgroups_path)?,
             PathBuf::from("/test.slice/test-a.slice/test-a-b.slice/docker-foo.scope"),
         );
 
@@ -302,13 +279,11 @@ mod tests {
 
     #[test]
     fn get_cgroups_path_works_with_a_simple_slice() -> Result<()> {
-        let cgroups_path = SystemDCGroupManager::destructure_cgroups_path(PathBuf::from(
-            "machine.slice:libpod:foo",
-        ))
-        .expect("");
+        let cgroups_path =
+            Manager::destructure_cgroups_path(PathBuf::from("machine.slice:libpod:foo")).expect("");
 
         assert_eq!(
-            SystemDCGroupManager::construct_cgroups_path(cgroups_path)?,
+            Manager::construct_cgroups_path(cgroups_path)?,
             PathBuf::from("/machine.slice/libpod-foo.scope"),
         );
 
@@ -318,10 +293,10 @@ mod tests {
     #[test]
     fn get_cgroups_path_works_with_scope() -> Result<()> {
         let cgroups_path =
-            SystemDCGroupManager::destructure_cgroups_path(PathBuf::from(":docker:foo")).expect("");
+            Manager::destructure_cgroups_path(PathBuf::from(":docker:foo")).expect("");
 
         assert_eq!(
-            SystemDCGroupManager::construct_cgroups_path(cgroups_path)?,
+            Manager::construct_cgroups_path(cgroups_path)?,
             PathBuf::from("/machine.slice/docker-foo.scope"),
         );
 

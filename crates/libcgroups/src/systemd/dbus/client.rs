@@ -1,6 +1,6 @@
-use crate::dbus::systemd_manager::OrgFreedesktopSystemd1Manager;
+use crate::systemd::dbus::systemd_api::OrgFreedesktopSystemd1Manager;
 use anyhow::Result;
-use dbus::arg::{RefArg, Variant, PropMap};
+use dbus::arg::{PropMap, Variant};
 use dbus::blocking::Connection;
 use std::time::Duration;
 
@@ -25,7 +25,7 @@ impl Client {
         unit_name: &str,
         mut properties_map: PropMap,
     ) -> Result<()> {
-        // To view and introspect the methods under the 'org.freedesktop.systemd1' destination 
+        // To view and introspect the methods under the 'org.freedesktop.systemd1' destination
         // and object path under it use the following command:
         // `gdbus introspect --system --dest org.freedesktop.systemd1 --object-path /org/freedesktop/systemd1`
         let proxy = self.conn.with_proxy(
@@ -62,7 +62,7 @@ impl Client {
 
         let mut properties = vec![];
         for (name, variant) in &mut properties_map.iter() {
-            let s : &str = &*name;
+            let s: &str = &*name;
             properties.push((s, variant.to_owned()));
         }
         //proxy.start_transient_unit(unit_name, "replace", properties, vec![])?;
