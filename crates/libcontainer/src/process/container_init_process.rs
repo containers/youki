@@ -714,7 +714,7 @@ mod tests {
         // sync_seccomp close the fd,
         sync_seccomp(Some(fd), &mut main_sender, &mut init_receiver)?;
         // so expecting close the same fd again will causing EBADF error.
-        assert_eq!(nix::errno::Errno::EBADF, unistd::close(fd).err().unwrap());
+        assert_eq!(nix::errno::Errno::EBADF, unistd::close(fd).unwrap_err());
         Ok(())
     }
 }
