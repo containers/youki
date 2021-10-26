@@ -706,7 +706,7 @@ mod tests {
         let (mut init_sender, mut init_receiver) = channel::init_channel()?;
 
         let fd = tmp_file.into_raw_fd();
-        thread::spawn(move || {
+        let th = thread::spawn(move || {
             assert!(main_receiver.wait_for_seccomp_request().is_ok());
             assert!(init_sender.seccomp_notify_done().is_ok());
         });
@@ -715,6 +715,7 @@ mod tests {
         sync_seccomp(Some(fd), &mut main_sender, &mut init_receiver)?;
         // so expecting close the same fd again will causing EBADF error.
         assert_eq!(nix::errno::Errno::EBADF, unistd::close(fd).unwrap_err());
+        assert!(th.join().is_ok());
         Ok(())
     }
 }
