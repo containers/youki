@@ -8,12 +8,12 @@ use crate::tests::seccomp_notify::get_seccomp_notify_test;
 use crate::tests::tlb::get_tlb_test;
 use crate::utils::support::set_runtime_path;
 use anyhow::Result;
-use clap::Clap;
+use clap::Parser;
 use std::path::PathBuf;
 use test_framework::TestManager;
 use tests::cgroups;
 
-#[derive(Clap, Debug)]
+#[derive(Parser, Debug)]
 #[clap(version = "0.0.1", author = "youki team")]
 struct Opts {
     /// path for the container runtime to be tested
@@ -22,7 +22,7 @@ struct Opts {
     /// selected tests to be run, format should be
     /// space separated groups, eg
     /// -t group1::test1,test3 group2 group3::test5
-    #[clap(short, long, multiple = true, value_delimiter = " ")]
+    #[clap(short, long, multiple_values = true, value_delimiter = ' ')]
     tests: Option<Vec<String>>,
 }
 
@@ -43,7 +43,6 @@ fn parse_tests(tests: &[String]) -> Vec<(&str, Option<Vec<&str>>)> {
 
 fn main() -> Result<()> {
     let opts: Opts = Opts::parse();
-
     match std::fs::canonicalize(&opts.runtime) {
         // runtime path is relative or resolved correctly
         Ok(path) => set_runtime_path(&path),

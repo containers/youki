@@ -6,13 +6,13 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use chrono::{DateTime, Local};
-use clap::Clap;
+use clap::Parser;
 use tabwriter::TabWriter;
 
 use libcontainer::container::{state::State, Container};
 
 /// List created containers
-#[derive(Clap, Debug)]
+#[derive(Parser, Debug)]
 pub struct List {}
 
 impl List {

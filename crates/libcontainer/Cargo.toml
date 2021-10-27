@@ -11,7 +11,7 @@ systemd_cgroups = ["systemd"]
 
 [dependencies]
 anyhow = "1.0"
-caps = { git = "https://github.com/lucab/caps-rs", rev = "cb54844", features = ["serde_support"] }
+caps = "0.5.3"
 
 chrono = { version="0.4", features = ["serde"] }
 crossbeam-channel = "0.5"
