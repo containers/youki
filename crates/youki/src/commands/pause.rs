@@ -3,12 +3,12 @@ use crate::commands::load_container;
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
-use clap::Clap;
+use clap::Parser;
 
 /// Suspend the processes within the container
-#[derive(Clap, Debug)]
+#[derive(Parser, Debug)]
 pub struct Pause {
-    #[clap(required = true)]
+    #[clap(forbid_empty_values = true, required = true)]
     pub container_id: String,
 }
 

@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use anyhow::bail;
 use anyhow::Context;
 use anyhow::Result;
-use clap::{crate_version, Clap};
+use clap::{crate_version, Parser};
 
 use crate::commands::create;
 use crate::commands::delete;
@@ -35,7 +35,7 @@ use nix::unistd::getuid;
 // High-level commandline option definition
 // This takes global options as well as individual commands as specified in [OCI runtime-spec](https://github.com/opencontainers/runtime-spec/blob/master/runtime.md)
 // Also check [runc commandline documentation](https://github.com/opencontainers/runc/blob/master/man/runc.8.md) for more explanation
-#[derive(Clap, Debug)]
+#[derive(Parser, Debug)]
 #[clap(version = crate_version!(), author = "youki team")]
 struct Opts {
     /// root directory to store container state
@@ -55,7 +55,7 @@ struct Opts {
 
 // Subcommands accepted by Youki, confirming with [OCI runtime-spec](https://github.com/opencontainers/runtime-spec/blob/master/runtime.md)
 // Also for a short information, check [runc commandline documentation](https://github.com/opencontainers/runc/blob/master/man/runc.8.md)
-#[derive(Clap, Debug)]
+#[derive(Parser, Debug)]
 enum SubCommand {
     #[clap(version = crate_version!(), author = "youki team")]
     Create(create::Create),
