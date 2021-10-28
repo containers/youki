@@ -143,17 +143,17 @@ fn masked_path(path: &str, mount_label: &Option<String>, syscall: &dyn Syscall) 
                     Some(l) => format!("context={}", l),
                     None => "".to_string(),
                 };
-                let _ = syscall.mount(
+                syscall.mount(
                     Some(Path::new("tmpfs")),
                     Path::new(path),
                     Some("tmpfs"),
                     MsFlags::MS_RDONLY,
                     Some(label.as_str()),
-                );
+                )?;
             }
-            return Ok(());
+        } else {
+            bail!(e)
         }
-        bail!(e)
     };
     Ok(())
 }
