@@ -140,7 +140,7 @@ fn masked_path(path: &str, mount_label: &Option<String>, syscall: &dyn Syscall) 
                 log::warn!("masked path {:?} not exist", path);
             } else if matches!(errno, nix::errno::Errno::ENOTDIR) {
                 let label = match mount_label {
-                    Some(l) => format!("context={}", l),
+                    Some(l) => format!("context=\"{}\"", l),
                     None => "".to_string(),
                 };
                 syscall.mount(
