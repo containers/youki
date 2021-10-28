@@ -128,35 +128,32 @@ fn readonly_path(path: &Path, syscall: &dyn Syscall) -> Result<()> {
 // For files, bind mounts /dev/null over the top of the specified path.
 // For directories, mounts read-only tmpfs over the top of the specified path.
 fn masked_path(path: &str, mount_label: &Option<String>, syscall: &dyn Syscall) -> Result<()> {
-    match syscall.mount(
+    if let Err(e) = syscall.mount(
         Some(Path::new("/dev/null")),
         Path::new(path),
         None,
         MsFlags::MS_BIND,
         None,
     ) {
-        Err(e) => {
-            if let Some(errno) = e.downcast_ref() {
-                if matches!(errno, nix::errno::Errno::ENOENT) {
-                    log::warn!("masked path {:?} not exist", path);
-                } else if matches!(errno, nix::errno::Errno::ENOTDIR) {
-                    let label = match mount_label {
-                        Some(l) => format!("context={}", l),
-                        None => "".to_string(),
-                    };
-                    syscall.mount(
-                        Some(Path::new("tmpfs")),
-                        Path::new(path),
-                        Some("tmpfs"),
-                        MsFlags::MS_RDONLY,
-                        Some(label.as_str()),
-                    )?;
-                }
-                return Ok(());
+        if let Some(errno) = e.downcast_ref() {
+            if matches!(errno, nix::errno::Errno::ENOENT) {
+                log::warn!("masked path {:?} not exist", path);
+            } else if matches!(errno, nix::errno::Errno::ENOTDIR) {
+                let label = match mount_label {
+                    Some(l) => format!("context={}", l),
+                    None => "".to_string(),
+                };
+                let _ = syscall.mount(
+                    Some(Path::new("tmpfs")),
+                    Path::new(path),
+                    Some("tmpfs"),
+                    MsFlags::MS_RDONLY,
+                    Some(label.as_str()),
+                );
             }
-            bail!(e)
+            return Ok(());
         }
-        Ok(_) => {}
+        bail!(e)
     };
     Ok(())
 }
