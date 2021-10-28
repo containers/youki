@@ -1,11 +1,11 @@
 use anyhow::Result;
-use clap::Clap;
+use clap::Parser;
 use std::{error::Error, path::PathBuf};
 
 use libcontainer::{container::builder::ContainerBuilder, syscall::syscall::create_syscall};
 
 /// Execute a process within an existing container
-#[derive(Clap, Debug)]
+#[derive(Parser, Debug)]
 pub struct Exec {
     /// Unix socket (file) path , which will receive file descriptor of the writing end of the pseudoterminal
     #[clap(long)]
@@ -31,7 +31,7 @@ pub struct Exec {
     #[clap(short, long)]
     pub detach: bool,
     /// Identifier of the container
-    #[clap(required = true)]
+    #[clap(forbid_empty_values = true, required = true)]
     pub container_id: String,
     /// Command that should be executed in the container
     #[clap(required = false)]

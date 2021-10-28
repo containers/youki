@@ -9,4 +9,4 @@ build = "build.rs"
 libc = "0.2.105"
 
 [build-dependencies]
-pkg-config = "0.3.21"
+pkg-config = "0.3.22"
