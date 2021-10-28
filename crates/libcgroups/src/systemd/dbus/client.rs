@@ -27,7 +27,7 @@ impl Client {
     /// start_transient_unit is a higher level API for starting a unit
     /// for a specific container under systemd.
     /// See https://www.freedesktop.org/wiki/Software/systemd/dbus for more details.
-    pub fn start_transient_unit_for_container(
+    pub fn start_transient_unit(
         &self,
         container_name: &str,
         pid: u32,
@@ -37,11 +37,7 @@ impl Client {
         // To view and introspect the methods under the 'org.freedesktop.systemd1' destination
         // and object path under it use the following command:
         // `gdbus introspect --system --dest org.freedesktop.systemd1 --object-path /org/freedesktop/systemd1`
-        let proxy = self.conn.with_proxy(
-            "org.freedesktop.systemd1",
-            "/org/freedesktop/systemd1",
-            Duration::from_millis(5000),
-        );
+        let proxy = self.create_proxy();
 
         // To align with runc, yuoki will always add the following properties to its container units:
         // - CPUAccounting=true
@@ -61,8 +57,6 @@ impl Client {
         if unit_name.ends_with("slice") {
             properties.push(("Wants", Variant(Box::new(parent.to_owned()))));
         } else {
-            log::debug!("SELECTED SCOPE");
-            log::debug!("{}", parent);
             properties.push(("Slice", Variant(Box::new(parent.to_owned()))));
             properties.push(("Delegate", Variant(Box::new(true))));
         }
@@ -77,7 +71,21 @@ impl Client {
 
         proxy
             .start_transient_unit(unit_name, "replace", properties, vec![])
-            .context("failed to start transient unit")?;
+            .with_context(|| {
+                format!(
+                    "failed to start transient unit {}, parent is {}",
+                    unit_name, parent
+                )
+            })?;
+        Ok(())
+    }
+
+    pub fn stop_transient_unit(&self, unit_name: &str) -> Result<()> {
+        let proxy = self.create_proxy();
+
+        proxy
+            .stop_unit(unit_name, "replace")
+            .with_context(|| format!("failed to stop unit {}", unit_name))?;
         Ok(())
     }
 

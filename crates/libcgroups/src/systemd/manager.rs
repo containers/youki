@@ -1,4 +1,5 @@
 use std::{
+    fmt::Display,
     fs::{self},
     os::unix::fs::PermissionsExt,
     path::Component::RootDir,
@@ -41,8 +42,14 @@ pub struct Manager {
 #[derive(Debug)]
 struct CgroupsPath {
     parent: String,
-    scope: String,
+    prefix: String,
     name: String,
+}
+
+impl Display for CgroupsPath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}:{}", self.parent, self.prefix, self.name)
+    }
 }
 
 impl Manager {
@@ -91,7 +98,7 @@ impl Manager {
 
         Ok(CgroupsPath {
             parent: parent.to_owned(),
-            scope: prefix.to_owned(),
+            prefix: prefix.to_owned(),
             name: name.to_owned(),
         })
     }
@@ -101,7 +108,7 @@ impl Manager {
     fn get_unit_name(cgroups_path: &CgroupsPath) -> String {
         // By default we create a scope unless specified explicitly.
         if !cgroups_path.name.ends_with(".slice") {
-            return format!("{}-{}.scope", cgroups_path.scope, cgroups_path.name);
+            return format!("{}-{}.scope", cgroups_path.prefix, cgroups_path.name);
         }
         cgroups_path.name.clone()
     }
@@ -234,7 +241,7 @@ impl CgroupManager for Manager {
         }
 
         self.client
-            .start_transient_unit_for_container(
+            .start_transient_unit(
                 &self.container_name,
                 pid.as_raw() as u32,
                 &self.destructured_path.parent,
@@ -265,7 +272,10 @@ impl CgroupManager for Manager {
     }
 
     fn remove(&self) -> Result<()> {
-        Ok(())
+        log::debug!("remove {}", self.unit_name);
+        self.client
+            .stop_transient_unit(&self.unit_name)
+            .with_context(|| format!("could not remove control group {}", self.destructured_path))
     }
 
     fn freeze(&self, state: FreezerState) -> Result<()> {
