@@ -127,13 +127,13 @@ fn readonly_path(path: &Path, syscall: &dyn Syscall) -> Result<()> {
 
 // For files, bind mounts /dev/null over the top of the specified path.
 // For directories, mounts read-only tmpfs over the top of the specified path.
-fn masked_path(path: &str, mount_label: &Option<String>, syscall: &dyn Syscall) -> Result<()> {
+fn masked_path(path: &Path, mount_label: &Option<String>, syscall: &dyn Syscall) -> Result<()> {
     if let Err(e) = syscall.mount(
         Some(Path::new("/dev/null")),
-        Path::new(path),
-        None::<&str>,
+        path,
+        None,
         MsFlags::MS_BIND,
-        None::<&str>,
+        None,
     ) {
         if let Some(errno) = e.downcast_ref() {
             if matches!(errno, nix::errno::Errno::ENOENT) {
@@ -145,7 +145,7 @@ fn masked_path(path: &str, mount_label: &Option<String>, syscall: &dyn Syscall) 
                 };
                 syscall.mount(
                     Some(Path::new("tmpfs")),
-                    Path::new(path),
+                    path,
                     Some("tmpfs"),
                     MsFlags::MS_RDONLY,
                     Some(label.as_str()),
@@ -280,7 +280,8 @@ pub fn container_init_process(
     if let Some(paths) = linux.masked_paths() {
         // mount masked path
         for path in paths {
-            masked_path(path, linux.mount_label(), syscall).context("Failed to set masked path")?;
+            masked_path(Path::new(path), linux.mount_label(), syscall)
+                .with_context(|| format!("Failed to set masked path {:?}", path))?;
         }
     }
 
@@ -728,7 +729,7 @@ mod tests {
                 .downcast_ref::<TestHelperSyscall>()
                 .unwrap()
                 .set_mount_ret_err(Some(|| Err(anyhow!(nix::errno::Errno::ENOENT))), 1);
-            assert!(masked_path("/proc/self", &None, syscall.as_ref()).is_ok());
+            assert!(masked_path(Path::new("/proc/self"), &None, syscall.as_ref()).is_ok());
             let got = syscall
                 .as_any()
                 .downcast_ref::<TestHelperSyscall>()
@@ -744,7 +745,7 @@ mod tests {
                 .downcast_ref::<TestHelperSyscall>()
                 .unwrap()
                 .set_mount_ret_err(Some(|| Err(anyhow!(nix::errno::Errno::ENOTDIR))), 1);
-            assert!(masked_path("/proc/self", &None, syscall.as_ref()).is_ok());
+            assert!(masked_path(Path::new("/proc/self"), &None, syscall.as_ref()).is_ok());
             let got = syscall
                 .as_any()
                 .downcast_ref::<TestHelperSyscall>()
@@ -768,9 +769,12 @@ mod tests {
                 .downcast_ref::<TestHelperSyscall>()
                 .unwrap()
                 .set_mount_ret_err(Some(|| Err(anyhow!(nix::errno::Errno::ENOTDIR))), 1);
-            assert!(
-                masked_path("/proc/self", &Some("default".to_string()), syscall.as_ref()).is_ok()
-            );
+            assert!(masked_path(
+                Path::new("/proc/self"),
+                &Some("default".to_string()),
+                syscall.as_ref()
+            )
+            .is_ok());
             let got = syscall
                 .as_any()
                 .downcast_ref::<TestHelperSyscall>()
@@ -781,7 +785,7 @@ mod tests {
                 target: PathBuf::from("/proc/self"),
                 fstype: Some("tmpfs".to_string()),
                 flags: MsFlags::MS_RDONLY,
-                data: Some("context=default".to_string()),
+                data: Some("context=\"default\"".to_string()),
             };
             assert_eq!(1, got.len());
             assert_eq!(want, got[0]);
@@ -793,7 +797,7 @@ mod tests {
                 .downcast_ref::<TestHelperSyscall>()
                 .unwrap()
                 .set_mount_ret_err(Some(|| Err(anyhow!("unknown error"))), 1);
-            assert!(masked_path("/proc/self", &None, syscall.as_ref()).is_err());
+            assert!(masked_path(Path::new("/proc/self"), &None, syscall.as_ref()).is_err());
             let got = syscall
                 .as_any()
                 .downcast_ref::<TestHelperSyscall>()
