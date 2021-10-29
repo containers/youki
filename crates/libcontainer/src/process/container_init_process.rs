@@ -720,93 +720,94 @@ mod tests {
     }
 
     #[test]
-    fn test_masked_path() {
-        // Errno::ENOENT case
-        {
-            let syscall = create_syscall();
-            syscall
-                .as_any()
-                .downcast_ref::<TestHelperSyscall>()
-                .unwrap()
-                .set_mount_ret_err(
-                    Some(|| Err(anyhow!(nix::errno::Errno::ENOENT).context(""))),
-                    1,
-                );
-            assert!(masked_path(Path::new("/proc/self"), &None, syscall.as_ref()).is_ok());
-            let got = syscall
-                .as_any()
-                .downcast_ref::<TestHelperSyscall>()
-                .unwrap()
-                .get_mount_args();
-            assert_eq!(0, got.len());
-        }
-        // Errno::ENOTDIR with no label
-        {
-            let syscall = create_syscall();
-            syscall
-                .as_any()
-                .downcast_ref::<TestHelperSyscall>()
-                .unwrap()
-                .set_mount_ret_err(Some(|| Err(anyhow!(nix::errno::Errno::ENOTDIR))), 1);
-            assert!(masked_path(Path::new("/proc/self"), &None, syscall.as_ref()).is_ok());
-            let got = syscall
-                .as_any()
-                .downcast_ref::<TestHelperSyscall>()
-                .unwrap()
-                .get_mount_args();
-            let want = MountArgs {
-                source: Some(PathBuf::from("tmpfs")),
-                target: PathBuf::from("/proc/self"),
-                fstype: Some("tmpfs".to_string()),
-                flags: MsFlags::MS_RDONLY,
-                data: Some("".to_string()),
-            };
-            assert_eq!(1, got.len());
-            assert_eq!(want, got[0]);
-        }
-        // Errno::ENOTDIR with label
-        {
-            let syscall = create_syscall();
-            syscall
-                .as_any()
-                .downcast_ref::<TestHelperSyscall>()
-                .unwrap()
-                .set_mount_ret_err(Some(|| Err(anyhow!(nix::errno::Errno::ENOTDIR))), 1);
-            assert!(masked_path(
-                Path::new("/proc/self"),
-                &Some("default".to_string()),
-                syscall.as_ref()
-            )
-            .is_ok());
-            let got = syscall
-                .as_any()
-                .downcast_ref::<TestHelperSyscall>()
-                .unwrap()
-                .get_mount_args();
-            let want = MountArgs {
-                source: Some(PathBuf::from("tmpfs")),
-                target: PathBuf::from("/proc/self"),
-                fstype: Some("tmpfs".to_string()),
-                flags: MsFlags::MS_RDONLY,
-                data: Some("context=\"default\"".to_string()),
-            };
-            assert_eq!(1, got.len());
-            assert_eq!(want, got[0]);
-        }
-        {
-            let syscall = create_syscall();
-            syscall
-                .as_any()
-                .downcast_ref::<TestHelperSyscall>()
-                .unwrap()
-                .set_mount_ret_err(Some(|| Err(anyhow!("unknown error"))), 1);
-            assert!(masked_path(Path::new("/proc/self"), &None, syscall.as_ref()).is_err());
-            let got = syscall
-                .as_any()
-                .downcast_ref::<TestHelperSyscall>()
-                .unwrap()
-                .get_mount_args();
-            assert_eq!(0, got.len());
-        }
+    fn test_masked_path_does_not_exist() {
+        let syscall = create_syscall();
+        syscall
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap()
+            .set_mount_ret_err(
+                Some(|| Err(anyhow!(nix::errno::Errno::ENOENT).context(""))),
+                1,
+            );
+        assert!(masked_path(Path::new("/proc/self"), &None, syscall.as_ref()).is_ok());
+        let got = syscall
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap()
+            .get_mount_args();
+        assert_eq!(0, got.len());
+    }
+
+    #[test]
+    fn test_masked_path_is_file_with_no_label() {
+        let syscall = create_syscall();
+        syscall
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap()
+            .set_mount_ret_err(Some(|| Err(anyhow!(nix::errno::Errno::ENOTDIR))), 1);
+        assert!(masked_path(Path::new("/proc/self"), &None, syscall.as_ref()).is_ok());
+        let got = syscall
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap()
+            .get_mount_args();
+        let want = MountArgs {
+            source: Some(PathBuf::from("tmpfs")),
+            target: PathBuf::from("/proc/self"),
+            fstype: Some("tmpfs".to_string()),
+            flags: MsFlags::MS_RDONLY,
+            data: Some("".to_string()),
+        };
+        assert_eq!(1, got.len());
+        assert_eq!(want, got[0]);
+    }
+
+    #[test]
+    fn test_masked_path_is_file_with_label() {
+        let syscall = create_syscall();
+        syscall
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap()
+            .set_mount_ret_err(Some(|| Err(anyhow!(nix::errno::Errno::ENOTDIR))), 1);
+        assert!(masked_path(
+            Path::new("/proc/self"),
+            &Some("default".to_string()),
+            syscall.as_ref()
+        )
+        .is_ok());
+        let got = syscall
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap()
+            .get_mount_args();
+        let want = MountArgs {
+            source: Some(PathBuf::from("tmpfs")),
+            target: PathBuf::from("/proc/self"),
+            fstype: Some("tmpfs".to_string()),
+            flags: MsFlags::MS_RDONLY,
+            data: Some("context=\"default\"".to_string()),
+        };
+        assert_eq!(1, got.len());
+        assert_eq!(want, got[0]);
+    }
+
+    #[test]
+    fn test_masked_path_with_unknown_error() {
+        let syscall = create_syscall();
+        syscall
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap()
+            .set_mount_ret_err(Some(|| Err(anyhow!("unknown error"))), 1);
+        assert!(masked_path(Path::new("/proc/self"), &None, syscall.as_ref()).is_err());
+        let got = syscall
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap()
+            .get_mount_args();
+        assert_eq!(0, got.len());
     }
 }
