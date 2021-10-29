@@ -5,7 +5,7 @@ use std::os::unix::fs::symlink;
 use std::sync::Arc;
 use std::{any::Any, mem, path::Path, ptr};
 
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use caps::{errors::CapsError, CapSet, Capability, CapsHashSet};
 use libc::{c_char, uid_t};
 use nix::{
@@ -218,7 +218,8 @@ impl Syscall for LinuxSyscall {
     ) -> Result<()> {
         match mount(source, target, fstype, flags, data) {
             Ok(_) => Ok(()),
-            Err(e) => bail!("Failed to mount {:?}", e),
+            Err(e) => Err(anyhow!(e)),
+            // Err(e) => bail!("Failed to mount {:?}", e),
         }
     }
 
