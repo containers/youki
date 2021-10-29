@@ -218,8 +218,7 @@ impl Syscall for LinuxSyscall {
     ) -> Result<()> {
         match mount(source, target, fstype, flags, data) {
             Ok(_) => Ok(()),
-            Err(e) => Err(anyhow!(e)),
-            // Err(e) => bail!("Failed to mount {:?}", e),
+            Err(e) => Err(anyhow!("Failed to mount {:?}", e)),
         }
     }
 

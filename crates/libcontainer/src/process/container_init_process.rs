@@ -128,35 +128,6 @@ fn readonly_path(path: &Path, syscall: &dyn Syscall) -> Result<()> {
 // For files, bind mounts /dev/null over the top of the specified path.
 // For directories, mounts read-only tmpfs over the top of the specified path.
 fn masked_path(path: &Path, mount_label: &Option<String>, syscall: &dyn Syscall) -> Result<()> {
-    // use nix::mount::mount as nix_mount;
-
-    // if let Err(errno) = nix_mount::<str, str, str, str>(
-    //     Some("/dev/null"),
-    //     path.to_str().unwrap(),
-    //     None::<&str>,
-    //     MsFlags::MS_BIND,
-    //     None::<&str>,
-    // ) {
-    //     if matches!(errno, nix::errno::Errno::ENOENT) {
-    //         log::warn!("masked path {:?} not exist", path);
-    //         return Ok(());
-    //     } else if matches!(errno, nix::errno::Errno::ENOTDIR) {
-    //         let label = match mount_label {
-    //             Some(l) => format!("context=\"{}\"", l),
-    //             None => "".to_string(),
-    //         };
-    //         syscall.mount(
-    //             Some(Path::new("tmpfs")),
-    //             path,
-    //             Some("tmpfs"),
-    //             MsFlags::MS_RDONLY,
-    //             Some(label.as_str()),
-    //         )?;
-    //         return Ok(());
-    //     }
-    //     bail!(errno)
-    // }
-
     if let Err(e) = syscall.mount(
         Some(Path::new("/dev/null")),
         path,
