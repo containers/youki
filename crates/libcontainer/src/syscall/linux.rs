@@ -218,35 +218,35 @@ impl Syscall for LinuxSyscall {
     ) -> Result<()> {
         match mount(source, target, fstype, flags, data) {
             Ok(_) => Ok(()),
-            Err(e) => Err(anyhow!("Failed to mount {:?}", e)),
+            Err(e) => anyhow!(e),
         }
     }
 
     fn symlink(&self, original: &Path, link: &Path) -> Result<()> {
         match symlink(original, link) {
             Ok(_) => Ok(()),
-            Err(e) => bail!("Failed to symlink {:?}", e),
+            Err(e) => anyhow!(e),
         }
     }
 
     fn mknod(&self, path: &Path, kind: SFlag, perm: Mode, dev: u64) -> Result<()> {
         match mknod(path, kind, perm, dev) {
             Ok(_) => Ok(()),
-            Err(e) => bail!("Failed to mknod {:?}", e),
+            Err(e) => anyhow!(e),
         }
     }
 
     fn chown(&self, path: &Path, owner: Option<Uid>, group: Option<Gid>) -> Result<()> {
         match chown(path, owner, group) {
             Ok(_) => Ok(()),
-            Err(e) => bail!("Failed to chown {:?}", e),
+            Err(e) => anyhow!(e),
         }
     }
 
     fn set_groups(&self, groups: &[Gid]) -> Result<()> {
         match setgroups(groups) {
             Ok(_) => Ok(()),
-            Err(e) => bail!("Failed to setgroups {:?}", e),
+            Err(e) => anyhow!(e),
         }
     }
 }
