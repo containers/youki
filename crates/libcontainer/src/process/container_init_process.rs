@@ -131,9 +131,9 @@ fn masked_path(path: &str, mount_label: &Option<String>, syscall: &dyn Syscall) 
     if let Err(e) = syscall.mount(
         Some(Path::new("/dev/null")),
         Path::new(path),
-        None,
+        None::<&str>,
         MsFlags::MS_BIND,
-        None,
+        None::<&str>,
     ) {
         if let Some(errno) = e.downcast_ref() {
             if matches!(errno, nix::errno::Errno::ENOENT) {
