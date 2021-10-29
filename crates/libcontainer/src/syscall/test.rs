@@ -42,12 +42,19 @@ pub struct ChownArgs {
     pub group: Option<Gid>,
 }
 
-#[derive(Clone)]
+#[derive(Default)]
+struct Mock {
+    values: Vec<Box<dyn Any>>,
+    ret_err: Option<fn() -> anyhow::Result<()>>,
+    ret_err_times: usize,
+}
+
+// #[derive(Clone)]
 pub struct TestHelperSyscall {
     set_ns_args: RefCell<Vec<(i32, CloneFlags)>>,
     unshare_args: RefCell<Vec<CloneFlags>>,
     set_capability_args: RefCell<Vec<(CapSet, CapsHashSet)>>,
-    mount_args: RefCell<Vec<MountArgs>>,
+    mount_args: RefCell<Mock>,
     symlink_args: RefCell<Vec<(PathBuf, PathBuf)>>,
     mknod_args: RefCell<Vec<MknodArgs>>,
     chown_args: RefCell<Vec<ChownArgs>>,
@@ -61,7 +68,7 @@ impl Default for TestHelperSyscall {
             set_ns_args: RefCell::new(vec![]),
             unshare_args: RefCell::new(vec![]),
             set_capability_args: RefCell::new(vec![]),
-            mount_args: RefCell::new(vec![]),
+            mount_args: RefCell::new(Mock::default()),
             symlink_args: RefCell::new(vec![]),
             mknod_args: RefCell::new(vec![]),
             chown_args: RefCell::new(vec![]),
@@ -126,13 +133,21 @@ impl Syscall for TestHelperSyscall {
         flags: MsFlags,
         data: Option<&str>,
     ) -> anyhow::Result<()> {
-        self.mount_args.borrow_mut().push(MountArgs {
+        if self.mount_args.borrow().ret_err_times > 0 {
+            self.mount_args.borrow_mut().ret_err_times -= 1;
+            if let Some(e) = &self.mount_args.borrow().ret_err {
+                return e();
+            }
+        }
+
+        let v = MountArgs {
             source: source.map(|x| x.to_owned()),
             target: target.to_owned(),
             fstype: fstype.map(|x| x.to_owned()),
             flags,
             data: data.map(|x| x.to_owned()),
-        });
+        };
+        self.mount_args.borrow_mut().values.push(Box::new(v));
         Ok(())
     }
 
@@ -181,7 +196,17 @@ impl TestHelperSyscall {
     }
 
     pub fn get_mount_args(&self) -> Vec<MountArgs> {
-        self.mount_args.borrow_mut().clone()
+        self.mount_args
+            .borrow()
+            .values
+            .iter()
+            .map(|x| x.downcast_ref::<MountArgs>().unwrap().clone())
+            .collect::<Vec<MountArgs>>()
+    }
+
+    pub fn set_mount_ret_err(&self, err: Option<fn() -> anyhow::Result<()>>, ret_times: usize) {
+        self.mount_args.borrow_mut().ret_err = err;
+        self.mount_args.borrow_mut().ret_err_times = ret_times;
     }
 
     pub fn get_symlink_args(&self) -> Vec<(PathBuf, PathBuf)> {
