@@ -4,7 +4,7 @@
 use std::{any::Any, ffi::OsStr, path::Path, sync::Arc};
 
 use anyhow::Result;
-use caps::{errors::CapsError, CapSet, CapsHashSet};
+use caps::{CapSet, CapsHashSet};
 use nix::{
     mount::MsFlags,
     sched::CloneFlags,
@@ -25,7 +25,7 @@ pub trait Syscall {
     fn set_ns(&self, rawfd: i32, nstype: CloneFlags) -> Result<()>;
     fn set_id(&self, uid: Uid, gid: Gid) -> Result<()>;
     fn unshare(&self, flags: CloneFlags) -> Result<()>;
-    fn set_capability(&self, cset: CapSet, value: &CapsHashSet) -> Result<(), CapsError>;
+    fn set_capability(&self, cset: CapSet, value: &CapsHashSet) -> Result<()>;
     fn set_hostname(&self, hostname: &str) -> Result<()>;
     fn set_rlimit(&self, rlimit: &LinuxRlimit) -> Result<()>;
     fn get_pwuid(&self, uid: u32) -> Option<Arc<OsStr>>;

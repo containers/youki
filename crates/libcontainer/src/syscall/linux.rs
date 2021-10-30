@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::{any::Any, mem, path::Path, ptr};
 
 use anyhow::{anyhow, bail, Result};
-use caps::{errors::CapsError, CapSet, Capability, CapsHashSet};
+use caps::{CapSet, Capability, CapsHashSet};
 use libc::{c_char, uid_t};
 use nix::{
     errno::Errno,
@@ -127,7 +127,7 @@ impl Syscall for LinuxSyscall {
 
     #[cfg_attr(coverage, no_coverage)]
     /// Set capabilities for container process
-    fn set_capability(&self, cset: CapSet, value: &CapsHashSet) -> Result<(), CapsError> {
+    fn set_capability(&self, cset: CapSet, value: &CapsHashSet) -> Result<()> {
         match cset {
             // caps::set cannot set capabilities in bounding set,
             // so we do it differently
@@ -149,10 +149,12 @@ impl Syscall for LinuxSyscall {
                         _ => caps::drop(None, CapSet::Bounding, *c)?,
                     }
                 }
-                Ok(())
             }
-            _ => caps::set(None, cset, value),
+            _ => {
+                caps::set(None, cset, value)?;
+            }
         }
+        Ok(())
     }
 
     #[cfg_attr(coverage, no_coverage)]

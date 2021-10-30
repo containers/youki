@@ -7,9 +7,7 @@ use std::{
     sync::Arc,
 };
 
-// use debug_cell::{Ref, RefCell, RefMut};
-
-use caps::{errors::CapsError, CapSet, CapsHashSet};
+use caps::{CapSet, CapsHashSet};
 use nix::{
     mount::MsFlags,
     sched::CloneFlags,
@@ -130,14 +128,12 @@ impl MockCalls {
 
 pub struct TestHelperSyscall {
     mocks: MockCalls,
-    set_capability_args: RefCell<Vec<(CapSet, CapsHashSet)>>,
 }
 
 impl Default for TestHelperSyscall {
     fn default() -> Self {
         TestHelperSyscall {
             mocks: MockCalls::default(),
-            set_capability_args: RefCell::new(vec![]),
         }
     }
 }
@@ -164,10 +160,9 @@ impl Syscall for TestHelperSyscall {
         self.mocks.act(ArgName::Unshare, Box::new(flags))
     }
 
-    fn set_capability(&self, cset: CapSet, value: &CapsHashSet) -> Result<(), CapsError> {
-        let args = (cset, value.clone());
-        self.set_capability_args.borrow_mut().push(args);
-        Ok(())
+    fn set_capability(&self, cset: CapSet, value: &CapsHashSet) -> anyhow::Result<()> {
+        self.mocks
+            .act(ArgName::Capability, Box::new((cset, value.clone())))
     }
 
     fn set_hostname(&self, hostname: &str) -> anyhow::Result<()> {
@@ -270,7 +265,12 @@ impl TestHelperSyscall {
     }
 
     pub fn get_set_capability_args(&self) -> Vec<(CapSet, CapsHashSet)> {
-        self.set_capability_args.borrow_mut().clone()
+        self.mocks
+            .fetch(ArgName::Capability)
+            .values
+            .iter()
+            .map(|x| x.downcast_ref::<(CapSet, CapsHashSet)>().unwrap().clone())
+            .collect::<Vec<(CapSet, CapsHashSet)>>()
     }
 
     pub fn get_mount_args(&self) -> Vec<MountArgs> {
