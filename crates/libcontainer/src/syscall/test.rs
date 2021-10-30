@@ -141,7 +141,7 @@ pub struct TestHelperSyscall {
 
 impl Default for TestHelperSyscall {
     fn default() -> Self {
-        let ts = TestHelperSyscall {
+        TestHelperSyscall {
             mocks: MockCalls::default(),
             set_ns_args: RefCell::new(vec![]),
             unshare_args: RefCell::new(vec![]),
@@ -151,9 +151,7 @@ impl Default for TestHelperSyscall {
             chown_args: RefCell::new(vec![]),
             hostname_args: RefCell::new(vec![]),
             groups_args: RefCell::new(vec![]),
-        };
-
-        ts
+        }
     }
 }
 
