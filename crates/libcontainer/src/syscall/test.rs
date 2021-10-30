@@ -62,6 +62,7 @@ pub enum ArgName {
     Chown,
     Hostname,
     Groups,
+    Capability,
 }
 
 impl ArgName {
@@ -75,6 +76,7 @@ impl ArgName {
             ArgName::Chown,
             ArgName::Hostname,
             ArgName::Groups,
+            ArgName::Capability,
         ]
         .iter()
         .copied()
@@ -129,28 +131,13 @@ impl MockCalls {
 pub struct TestHelperSyscall {
     mocks: MockCalls,
     set_capability_args: RefCell<Vec<(CapSet, CapsHashSet)>>,
-
-    set_ns_args: RefCell<Vec<(i32, CloneFlags)>>,
-    unshare_args: RefCell<Vec<CloneFlags>>,
-    symlink_args: RefCell<Vec<(PathBuf, PathBuf)>>,
-    mknod_args: RefCell<Vec<MknodArgs>>,
-    chown_args: RefCell<Vec<ChownArgs>>,
-    hostname_args: RefCell<Vec<String>>,
-    groups_args: RefCell<Vec<Vec<Gid>>>,
 }
 
 impl Default for TestHelperSyscall {
     fn default() -> Self {
         TestHelperSyscall {
             mocks: MockCalls::default(),
-            set_ns_args: RefCell::new(vec![]),
-            unshare_args: RefCell::new(vec![]),
             set_capability_args: RefCell::new(vec![]),
-            symlink_args: RefCell::new(vec![]),
-            mknod_args: RefCell::new(vec![]),
-            chown_args: RefCell::new(vec![]),
-            hostname_args: RefCell::new(vec![]),
-            groups_args: RefCell::new(vec![]),
         }
     }
 }
@@ -165,9 +152,8 @@ impl Syscall for TestHelperSyscall {
     }
 
     fn set_ns(&self, rawfd: i32, nstype: CloneFlags) -> anyhow::Result<()> {
-        let args = (rawfd, nstype);
-        self.set_ns_args.borrow_mut().push(args);
-        Ok(())
+        self.mocks
+            .act(ArgName::Namespace, Box::new((rawfd, nstype)))
     }
 
     fn set_id(&self, _uid: Uid, _gid: Gid) -> anyhow::Result<()> {
@@ -175,8 +161,7 @@ impl Syscall for TestHelperSyscall {
     }
 
     fn unshare(&self, flags: CloneFlags) -> anyhow::Result<()> {
-        self.unshare_args.borrow_mut().push(flags);
-        Ok(())
+        self.mocks.act(ArgName::Unshare, Box::new(flags))
     }
 
     fn set_capability(&self, cset: CapSet, value: &CapsHashSet) -> Result<(), CapsError> {
@@ -186,8 +171,8 @@ impl Syscall for TestHelperSyscall {
     }
 
     fn set_hostname(&self, hostname: &str) -> anyhow::Result<()> {
-        self.hostname_args.borrow_mut().push(hostname.to_owned());
-        Ok(())
+        self.mocks
+            .act(ArgName::Hostname, Box::new(hostname.to_owned()))
     }
 
     fn set_rlimit(&self, _rlimit: &LinuxRlimit) -> anyhow::Result<()> {
@@ -210,44 +195,49 @@ impl Syscall for TestHelperSyscall {
         flags: MsFlags,
         data: Option<&str>,
     ) -> anyhow::Result<()> {
-        let v = MountArgs {
-            source: source.map(|x| x.to_owned()),
-            target: target.to_owned(),
-            fstype: fstype.map(|x| x.to_owned()),
-            flags,
-            data: data.map(|x| x.to_owned()),
-        };
-        self.mocks.act(ArgName::Mount, Box::new(v))
+        self.mocks.act(
+            ArgName::Mount,
+            Box::new(MountArgs {
+                source: source.map(|x| x.to_owned()),
+                target: target.to_owned(),
+                fstype: fstype.map(|x| x.to_owned()),
+                flags,
+                data: data.map(|x| x.to_owned()),
+            }),
+        )
     }
 
     fn symlink(&self, original: &Path, link: &Path) -> anyhow::Result<()> {
-        self.symlink_args
-            .borrow_mut()
-            .push((original.to_path_buf(), link.to_path_buf()));
-        Ok(())
+        self.mocks.act(
+            ArgName::Symlink,
+            Box::new((original.to_path_buf(), link.to_path_buf())),
+        )
     }
 
     fn mknod(&self, path: &Path, kind: SFlag, perm: Mode, dev: u64) -> anyhow::Result<()> {
-        self.mknod_args.borrow_mut().push(MknodArgs {
-            path: path.to_path_buf(),
-            kind,
-            perm,
-            dev,
-        });
-        Ok(())
+        self.mocks.act(
+            ArgName::Mknod,
+            Box::new(MknodArgs {
+                path: path.to_path_buf(),
+                kind,
+                perm,
+                dev,
+            }),
+        )
     }
     fn chown(&self, path: &Path, owner: Option<Uid>, group: Option<Gid>) -> anyhow::Result<()> {
-        self.chown_args.borrow_mut().push(ChownArgs {
-            path: path.to_path_buf(),
-            owner,
-            group,
-        });
-        Ok(())
+        self.mocks.act(
+            ArgName::Chown,
+            Box::new(ChownArgs {
+                path: path.to_path_buf(),
+                owner,
+                group,
+            }),
+        )
     }
 
     fn set_groups(&self, groups: &[Gid]) -> anyhow::Result<()> {
-        self.groups_args.borrow_mut().push(groups.to_vec());
-        Ok(())
+        self.mocks.act(ArgName::Groups, Box::new(groups.to_vec()))
     }
 }
 
@@ -262,11 +252,21 @@ impl TestHelperSyscall {
     }
 
     pub fn get_setns_args(&self) -> Vec<(i32, CloneFlags)> {
-        self.set_ns_args.borrow_mut().clone()
+        self.mocks
+            .fetch(ArgName::Namespace)
+            .values
+            .iter()
+            .map(|x| *x.downcast_ref::<(i32, CloneFlags)>().unwrap())
+            .collect::<Vec<(i32, CloneFlags)>>()
     }
 
     pub fn get_unshare_args(&self) -> Vec<CloneFlags> {
-        self.unshare_args.borrow_mut().clone()
+        self.mocks
+            .fetch(ArgName::Unshare)
+            .values
+            .iter()
+            .map(|x| *x.downcast_ref::<CloneFlags>().unwrap())
+            .collect::<Vec<CloneFlags>>()
     }
 
     pub fn get_set_capability_args(&self) -> Vec<(CapSet, CapsHashSet)> {
@@ -283,22 +283,47 @@ impl TestHelperSyscall {
     }
 
     pub fn get_symlink_args(&self) -> Vec<(PathBuf, PathBuf)> {
-        self.symlink_args.borrow_mut().clone()
+        self.mocks
+            .fetch(ArgName::Symlink)
+            .values
+            .iter()
+            .map(|x| x.downcast_ref::<(PathBuf, PathBuf)>().unwrap().clone())
+            .collect::<Vec<(PathBuf, PathBuf)>>()
     }
 
     pub fn get_mknod_args(&self) -> Vec<MknodArgs> {
-        self.mknod_args.borrow_mut().clone()
+        self.mocks
+            .fetch(ArgName::Mknod)
+            .values
+            .iter()
+            .map(|x| x.downcast_ref::<MknodArgs>().unwrap().clone())
+            .collect::<Vec<MknodArgs>>()
     }
 
     pub fn get_chown_args(&self) -> Vec<ChownArgs> {
-        self.chown_args.borrow_mut().clone()
+        self.mocks
+            .fetch(ArgName::Chown)
+            .values
+            .iter()
+            .map(|x| x.downcast_ref::<ChownArgs>().unwrap().clone())
+            .collect::<Vec<ChownArgs>>()
     }
 
     pub fn get_hostname_args(&self) -> Vec<String> {
-        self.hostname_args.borrow_mut().clone()
+        self.mocks
+            .fetch(ArgName::Hostname)
+            .values
+            .iter()
+            .map(|x| x.downcast_ref::<String>().unwrap().clone())
+            .collect::<Vec<String>>()
     }
 
     pub fn get_groups_args(&self) -> Vec<Vec<Gid>> {
-        self.groups_args.borrow_mut().clone()
+        self.mocks
+            .fetch(ArgName::Groups)
+            .values
+            .iter()
+            .map(|x| x.downcast_ref::<Vec<Gid>>().unwrap().clone())
+            .collect::<Vec<Vec<Gid>>>()
     }
 }
