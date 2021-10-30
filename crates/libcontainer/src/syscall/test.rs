@@ -1,10 +1,13 @@
 use std::{
     any::Any,
-    cell::RefCell,
+    cell::{Ref, RefCell, RefMut},
+    collections::HashMap,
     ffi::{OsStr, OsString},
     path::{Path, PathBuf},
     sync::Arc,
 };
+
+// use debug_cell::{Ref, RefCell, RefMut};
 
 use caps::{errors::CapsError, CapSet, CapsHashSet};
 use nix::{
@@ -49,12 +52,86 @@ struct Mock {
     ret_err_times: usize,
 }
 
-// #[derive(Clone)]
+#[derive(PartialEq, Eq, Hash, Copy, Clone)]
+pub enum ArgName {
+    Namespace,
+    Unshare,
+    Mount,
+    Symlink,
+    Mknod,
+    Chown,
+    Hostname,
+    Groups,
+}
+
+impl ArgName {
+    fn iterator() -> impl Iterator<Item = ArgName> {
+        [
+            ArgName::Namespace,
+            ArgName::Unshare,
+            ArgName::Mount,
+            ArgName::Symlink,
+            ArgName::Mknod,
+            ArgName::Chown,
+            ArgName::Hostname,
+            ArgName::Groups,
+        ]
+        .iter()
+        .copied()
+    }
+}
+
+struct MockCalls {
+    args: HashMap<ArgName, RefCell<Mock>>,
+}
+
+impl Default for MockCalls {
+    fn default() -> Self {
+        let mut m = MockCalls {
+            args: HashMap::new(),
+        };
+
+        for name in ArgName::iterator() {
+            m.args.insert(name, RefCell::new(Mock::default()));
+        }
+
+        m
+    }
+}
+
+impl MockCalls {
+    fn act(&self, name: ArgName, value: Box<dyn Any>) -> anyhow::Result<()> {
+        if self.args.get(&name).unwrap().borrow().ret_err_times > 0 {
+            self.args.get(&name).unwrap().borrow_mut().ret_err_times -= 1;
+            if let Some(e) = &self.args.get(&name).unwrap().borrow().ret_err {
+                return e();
+            }
+        }
+
+        self.args
+            .get(&name)
+            .unwrap()
+            .borrow_mut()
+            .values
+            .push(value);
+        Ok(())
+    }
+
+    fn fetch(&self, name: ArgName) -> Ref<Mock> {
+        self.args.get(&name).unwrap().borrow()
+    }
+
+    fn fetch_mut(&self, name: ArgName) -> RefMut<Mock> {
+        self.args.get(&name).unwrap().borrow_mut()
+    }
+}
+
 pub struct TestHelperSyscall {
+    mocks: MockCalls,
+    set_capability_args: RefCell<Vec<(CapSet, CapsHashSet)>>,
+
     set_ns_args: RefCell<Vec<(i32, CloneFlags)>>,
     unshare_args: RefCell<Vec<CloneFlags>>,
-    set_capability_args: RefCell<Vec<(CapSet, CapsHashSet)>>,
-    mount_args: RefCell<Mock>,
     symlink_args: RefCell<Vec<(PathBuf, PathBuf)>>,
     mknod_args: RefCell<Vec<MknodArgs>>,
     chown_args: RefCell<Vec<ChownArgs>>,
@@ -64,17 +141,19 @@ pub struct TestHelperSyscall {
 
 impl Default for TestHelperSyscall {
     fn default() -> Self {
-        TestHelperSyscall {
+        let ts = TestHelperSyscall {
+            mocks: MockCalls::default(),
             set_ns_args: RefCell::new(vec![]),
             unshare_args: RefCell::new(vec![]),
             set_capability_args: RefCell::new(vec![]),
-            mount_args: RefCell::new(Mock::default()),
             symlink_args: RefCell::new(vec![]),
             mknod_args: RefCell::new(vec![]),
             chown_args: RefCell::new(vec![]),
             hostname_args: RefCell::new(vec![]),
             groups_args: RefCell::new(vec![]),
-        }
+        };
+
+        ts
     }
 }
 
@@ -133,13 +212,6 @@ impl Syscall for TestHelperSyscall {
         flags: MsFlags,
         data: Option<&str>,
     ) -> anyhow::Result<()> {
-        if self.mount_args.borrow().ret_err_times > 0 {
-            self.mount_args.borrow_mut().ret_err_times -= 1;
-            if let Some(e) = &self.mount_args.borrow().ret_err {
-                return e();
-            }
-        }
-
         let v = MountArgs {
             source: source.map(|x| x.to_owned()),
             target: target.to_owned(),
@@ -147,8 +219,7 @@ impl Syscall for TestHelperSyscall {
             flags,
             data: data.map(|x| x.to_owned()),
         };
-        self.mount_args.borrow_mut().values.push(Box::new(v));
-        Ok(())
+        self.mocks.act(ArgName::Mount, Box::new(v))
     }
 
     fn symlink(&self, original: &Path, link: &Path) -> anyhow::Result<()> {
@@ -183,6 +254,15 @@ impl Syscall for TestHelperSyscall {
 }
 
 impl TestHelperSyscall {
+    pub fn set_ret_err(&self, name: ArgName, err: fn() -> anyhow::Result<()>) {
+        self.mocks.fetch_mut(name).ret_err = Some(err);
+        self.set_ret_err_times(name, 1);
+    }
+
+    pub fn set_ret_err_times(&self, name: ArgName, times: usize) {
+        self.mocks.fetch_mut(name).ret_err_times = times;
+    }
+
     pub fn get_setns_args(&self) -> Vec<(i32, CloneFlags)> {
         self.set_ns_args.borrow_mut().clone()
     }
@@ -196,17 +276,12 @@ impl TestHelperSyscall {
     }
 
     pub fn get_mount_args(&self) -> Vec<MountArgs> {
-        self.mount_args
-            .borrow()
+        self.mocks
+            .fetch(ArgName::Mount)
             .values
             .iter()
             .map(|x| x.downcast_ref::<MountArgs>().unwrap().clone())
             .collect::<Vec<MountArgs>>()
-    }
-
-    pub fn set_mount_ret_err(&self, err: Option<fn() -> anyhow::Result<()>>, ret_times: usize) {
-        self.mount_args.borrow_mut().ret_err = err;
-        self.mount_args.borrow_mut().ret_err_times = ret_times;
     }
 
     pub fn get_symlink_args(&self) -> Vec<(PathBuf, PathBuf)> {
