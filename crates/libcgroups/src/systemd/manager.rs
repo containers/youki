@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     fmt::Display,
     fs::{self},
     os::unix::fs::PermissionsExt,
@@ -6,6 +7,7 @@ use std::{
 };
 
 use anyhow::{anyhow, bail, Context, Result};
+use dbus::arg::{PropMap, RefArg, Variant};
 use nix::unistd::Pid;
 use std::path::{Path, PathBuf};
 
@@ -240,6 +242,7 @@ impl CgroupManager for Manager {
             return Ok(());
         }
 
+        log::debug!("Starting {:?}", self.unit_name);
         self.client
             .start_transient_unit(
                 &self.container_name,
@@ -254,17 +257,22 @@ impl CgroupManager for Manager {
                 )
             })?;
 
-        //self.create_unified_cgroup(pid)?;
         Ok(())
     }
 
     fn apply(&self, controller_opt: &ControllerOpt) -> Result<()> {
+        let mut properties: HashMap<String, Box<dyn RefArg>> = HashMap::new();
+
         for controller in CONTROLLER_TYPES {
             match controller {
-                ControllerType::Cpu => Cpu::apply(controller_opt)?,
+                ControllerType::Cpu => Cpu::apply(controller_opt, &mut properties)?,
                 _ => {}
-            }
+            };
         }
+
+        self.client
+            .set_unit_properties(&self.unit_name, &properties)
+            .context("could not apply resource restrictions")?;
 
         #[cfg(feature = "cgroupsv2_devices")]
         Devices::apply(controller_opt, &self.full_path)?;
@@ -275,7 +283,11 @@ impl CgroupManager for Manager {
         log::debug!("remove {}", self.unit_name);
         self.client
             .stop_transient_unit(&self.unit_name)
-            .with_context(|| format!("could not remove control group {}", self.destructured_path))
+            .with_context(|| {
+                format!("could not remove control group {}", self.destructured_path)
+            })?;
+
+        Ok(())
     }
 
     fn freeze(&self, state: FreezerState) -> Result<()> {

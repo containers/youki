@@ -2,6 +2,8 @@ use crate::systemd::dbus::systemd_api::OrgFreedesktopSystemd1Manager;
 use anyhow::{Context, Result};
 use dbus::arg::{PropMap, RefArg, Variant};
 use dbus::blocking::{Connection, Proxy};
+use std::collections::HashMap;
+use std::ops::Deref;
 use std::time::Duration;
 
 /// Client is a wrapper providing higher level API and abatraction around dbus.
@@ -87,6 +89,40 @@ impl Client {
             .stop_unit(unit_name, "replace")
             .with_context(|| format!("failed to stop unit {}", unit_name))?;
         Ok(())
+    }
+
+    pub fn set_unit_properties(
+        &self,
+        unit_name: &str,
+        properties: &HashMap<String, Box<dyn RefArg>>,
+    ) -> Result<()> {
+        let proxy = self.create_proxy();
+
+        let mut props = Vec::new();
+        for (name, value) in properties {
+            props.push((name.as_ref(), Variant(value.box_clone())));
+        }
+
+        proxy
+            .set_unit_properties(unit_name, true, props)
+            .with_context(|| format!("failed to set properties for unit {:?}", unit_name))?;
+        Ok(())
+    }
+
+    pub fn systemd_version(&self) -> Result<u32> {
+        let proxy = self.create_proxy();
+
+        let version = proxy
+            .version()
+            .context("dbus request failed")?
+            .chars()
+            .skip_while(|c| c.is_alphabetic())
+            .take_while(|c| c.is_numeric())
+            .collect::<String>()
+            .parse::<u32>()
+            .context("could not parse systemd version")?;
+
+        Ok(version)
     }
 
     pub fn list_units(&self) -> Result<()> {
