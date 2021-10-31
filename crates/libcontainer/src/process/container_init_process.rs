@@ -515,7 +515,6 @@ mod tests {
         syscall::create_syscall,
         test::{ArgName, MountArgs, TestHelperSyscall},
     };
-    use anyhow::{anyhow, Context};
     use nix::{fcntl, sys, unistd};
     use oci_spec::runtime::{LinuxNamespaceBuilder, SpecBuilder, UserBuilder};
     use serial_test::serial;
@@ -726,7 +725,7 @@ mod tests {
             .as_any()
             .downcast_ref::<TestHelperSyscall>()
             .unwrap();
-        mocks.set_ret_err(ArgName::Mount, || Err(anyhow!(nix::errno::Errno::ENOENT)));
+        mocks.set_ret_err(ArgName::Mount, || bail!(nix::errno::Errno::ENOENT));
 
         assert!(masked_path(Path::new("/proc/self"), &None, syscall.as_ref()).is_ok());
         let got = mocks.get_mount_args();
@@ -740,8 +739,7 @@ mod tests {
             .as_any()
             .downcast_ref::<TestHelperSyscall>()
             .unwrap();
-
-        mocks.set_ret_err(ArgName::Mount, || Err(anyhow!(nix::errno::Errno::ENOTDIR)));
+        mocks.set_ret_err(ArgName::Mount, || bail!(nix::errno::Errno::ENOTDIR));
 
         assert!(masked_path(Path::new("/proc/self"), &None, syscall.as_ref()).is_ok());
 
@@ -764,8 +762,7 @@ mod tests {
             .as_any()
             .downcast_ref::<TestHelperSyscall>()
             .unwrap();
-
-        mocks.set_ret_err(ArgName::Mount, || Err(anyhow!(nix::errno::Errno::ENOTDIR)));
+        mocks.set_ret_err(ArgName::Mount, || bail!(nix::errno::Errno::ENOTDIR));
 
         assert!(masked_path(
             Path::new("/proc/self"),
@@ -793,7 +790,7 @@ mod tests {
             .as_any()
             .downcast_ref::<TestHelperSyscall>()
             .unwrap();
-        mocks.set_ret_err(ArgName::Mount, || Err(anyhow!("unknown error")));
+        mocks.set_ret_err(ArgName::Mount, || bail!("unknown error"));
 
         assert!(masked_path(Path::new("/proc/self"), &None, syscall.as_ref()).is_err());
         let got = mocks.get_mount_args();
