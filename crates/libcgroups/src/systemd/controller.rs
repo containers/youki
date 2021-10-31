@@ -7,7 +7,8 @@ use crate::common::ControllerOpt;
 
 pub(crate) trait Controller {
     fn apply(
-        resources: &ControllerOpt,
+        options: &ControllerOpt,
+        systemd_version: u32,
         properties: &mut HashMap<String, Box<dyn RefArg>>,
     ) -> Result<()>;
 }

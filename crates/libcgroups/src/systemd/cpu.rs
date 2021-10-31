@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use dbus::arg::RefArg;
 use oci_spec::runtime::LinuxCpu;
 
@@ -12,10 +12,13 @@ pub(crate) struct Cpu {}
 impl Controller for Cpu {
     fn apply(
         options: &ControllerOpt,
+        systemd_version: u32,
         properties: &mut HashMap<String, Box<dyn RefArg>>,
     ) -> Result<()> {
         if let Some(cpu) = options.resources.cpu() {
-            return Self::apply(cpu, properties);
+            log::debug!("Applying cpu resource restrictions");
+            return Self::apply(cpu, properties)
+                .context("could not apply cpu resource restrictions");
         }
 
         Ok(())
@@ -25,7 +28,7 @@ impl Controller for Cpu {
 impl Cpu {
     fn apply(cpu: &LinuxCpu, properties: &mut HashMap<String, Box<dyn RefArg>>) -> Result<()> {
         if Self::is_realtime_requested(cpu) {
-            bail!("realtime is not supported on cgroup v2 yet");
+            bail!("realtime is not supported on systemd v2 yet");
         }
 
         if let Some(mut shares) = cpu.shares() {

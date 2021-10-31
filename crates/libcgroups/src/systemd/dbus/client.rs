@@ -1,9 +1,8 @@
 use crate::systemd::dbus::systemd_api::OrgFreedesktopSystemd1Manager;
 use anyhow::{Context, Result};
-use dbus::arg::{PropMap, RefArg, Variant};
+use dbus::arg::{RefArg, Variant};
 use dbus::blocking::{Connection, Proxy};
 use std::collections::HashMap;
-use std::ops::Deref;
 use std::time::Duration;
 
 /// Client is a wrapper providing higher level API and abatraction around dbus.

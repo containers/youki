@@ -7,16 +7,17 @@ use std::{
 };
 
 use anyhow::{anyhow, bail, Context, Result};
-use dbus::arg::{PropMap, RefArg, Variant};
+use dbus::arg::RefArg;
 use nix::unistd::Pid;
 use std::path::{Path, PathBuf};
 
 #[cfg(feature = "cgroupsv2_devices")]
 use super::devices::Devices;
 use super::{
-    controller::{self, Controller},
+    controller::Controller,
     controller_type::{ControllerType, CONTROLLER_TYPES},
     cpu::Cpu,
+    cpuset::CpuSet,
     dbus::client::Client,
 };
 use crate::common::{self, CgroupManager, ControllerOpt, FreezerState, PathBufExt};
@@ -262,10 +263,19 @@ impl CgroupManager for Manager {
 
     fn apply(&self, controller_opt: &ControllerOpt) -> Result<()> {
         let mut properties: HashMap<String, Box<dyn RefArg>> = HashMap::new();
+        let systemd_version = self
+            .client
+            .systemd_version()
+            .context("could not retrieve systemd version")?;
 
         for controller in CONTROLLER_TYPES {
             match controller {
-                ControllerType::Cpu => Cpu::apply(controller_opt, &mut properties)?,
+                ControllerType::Cpu => {
+                    Cpu::apply(controller_opt, systemd_version, &mut properties)?
+                }
+                ControllerType::CpuSet => {
+                    CpuSet::apply(controller_opt, systemd_version, &mut properties)?
+                }
                 _ => {}
             };
         }
