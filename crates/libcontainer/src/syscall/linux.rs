@@ -1,4 +1,5 @@
 //! Implements Command trait for Linux systems
+#[cfg_attr(coverage, no_coverage)]
 use std::ffi::{CStr, OsStr};
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::symlink;
@@ -28,7 +29,6 @@ use crate::capabilities;
 pub struct LinuxSyscall;
 
 impl LinuxSyscall {
-    #[cfg_attr(coverage, no_coverage)]
     unsafe fn from_raw_buf<'a, T>(p: *const c_char) -> T
     where
         T: From<&'a OsStr>,
@@ -36,7 +36,6 @@ impl LinuxSyscall {
         T::from(OsStr::from_bytes(CStr::from_ptr(p).to_bytes()))
     }
 
-    #[cfg_attr(coverage, no_coverage)]
     /// Reads data from the `c_passwd` and returns it as a `User`.
     unsafe fn passwd_to_user(passwd: libc::passwd) -> Arc<OsStr> {
         let name: Arc<OsStr> = Self::from_raw_buf(passwd.pw_name);
@@ -45,14 +44,12 @@ impl LinuxSyscall {
 }
 
 impl Syscall for LinuxSyscall {
-    #[cfg_attr(coverage, no_coverage)]
     /// To enable dynamic typing,
     /// see https://doc.rust-lang.org/std/any/index.html for more information
     fn as_any(&self) -> &dyn Any {
         self
     }
 
-    #[cfg_attr(coverage, no_coverage)]
     /// Function to set given path as root path inside process
     fn pivot_rootfs(&self, path: &Path) -> Result<()> {
         // open the path as directory and read only
@@ -88,14 +85,12 @@ impl Syscall for LinuxSyscall {
         Ok(())
     }
 
-    #[cfg_attr(coverage, no_coverage)]
     /// Set namespace for process
     fn set_ns(&self, rawfd: i32, nstype: CloneFlags) -> Result<()> {
         nix::sched::setns(rawfd, nstype)?;
         Ok(())
     }
 
-    #[cfg_attr(coverage, no_coverage)]
     /// set uid and gid for process
     fn set_id(&self, uid: Uid, gid: Gid) -> Result<()> {
         if let Err(e) = prctl::set_keep_capabilities(true) {
@@ -117,7 +112,6 @@ impl Syscall for LinuxSyscall {
         Ok(())
     }
 
-    #[cfg_attr(coverage, no_coverage)]
     /// Disassociate parts of execution context
     // see https://man7.org/linux/man-pages/man2/unshare.2.html for more information
     fn unshare(&self, flags: CloneFlags) -> Result<()> {
@@ -125,7 +119,6 @@ impl Syscall for LinuxSyscall {
         Ok(())
     }
 
-    #[cfg_attr(coverage, no_coverage)]
     /// Set capabilities for container process
     fn set_capability(&self, cset: CapSet, value: &CapsHashSet) -> Result<()> {
         match cset {
@@ -157,7 +150,6 @@ impl Syscall for LinuxSyscall {
         Ok(())
     }
 
-    #[cfg_attr(coverage, no_coverage)]
     /// Sets hostname for process
     fn set_hostname(&self, hostname: &str) -> Result<()> {
         if let Err(e) = sethostname(hostname) {
@@ -166,7 +158,6 @@ impl Syscall for LinuxSyscall {
         Ok(())
     }
 
-    #[cfg_attr(coverage, no_coverage)]
     /// Sets resource limit for process
     fn set_rlimit(&self, rlimit: &LinuxRlimit) -> Result<()> {
         let rlim = &libc::rlimit {
@@ -180,7 +171,6 @@ impl Syscall for LinuxSyscall {
         Ok(())
     }
 
-    #[cfg_attr(coverage, no_coverage)]
     // taken from https://crates.io/crates/users
     fn get_pwuid(&self, uid: uid_t) -> Option<Arc<OsStr>> {
         let mut passwd = unsafe { mem::zeroed::<libc::passwd>() };
@@ -215,14 +205,12 @@ impl Syscall for LinuxSyscall {
         Some(user)
     }
 
-    #[cfg_attr(coverage, no_coverage)]
     fn chroot(&self, path: &Path) -> Result<()> {
         unistd::chroot(path)?;
 
         Ok(())
     }
 
-    #[cfg_attr(coverage, no_coverage)]
     fn mount(
         &self,
         source: Option<&Path>,
@@ -237,7 +225,6 @@ impl Syscall for LinuxSyscall {
         }
     }
 
-    #[cfg_attr(coverage, no_coverage)]
     fn symlink(&self, original: &Path, link: &Path) -> Result<()> {
         match symlink(original, link) {
             Ok(_) => Ok(()),
@@ -245,7 +232,6 @@ impl Syscall for LinuxSyscall {
         }
     }
 
-    #[cfg_attr(coverage, no_coverage)]
     fn mknod(&self, path: &Path, kind: SFlag, perm: Mode, dev: u64) -> Result<()> {
         match mknod(path, kind, perm, dev) {
             Ok(_) => Ok(()),
@@ -253,7 +239,6 @@ impl Syscall for LinuxSyscall {
         }
     }
 
-    #[cfg_attr(coverage, no_coverage)]
     fn chown(&self, path: &Path, owner: Option<Uid>, group: Option<Gid>) -> Result<()> {
         match chown(path, owner, group) {
             Ok(_) => Ok(()),
@@ -261,7 +246,6 @@ impl Syscall for LinuxSyscall {
         }
     }
 
-    #[cfg_attr(coverage, no_coverage)]
     fn set_groups(&self, groups: &[Gid]) -> Result<()> {
         match setgroups(groups) {
             Ok(_) => Ok(()),
