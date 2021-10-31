@@ -1,5 +1,6 @@
 pub mod apparmor;
 pub mod capabilities;
+pub mod config;
 pub mod container;
 pub mod dbus;
 pub mod hooks;

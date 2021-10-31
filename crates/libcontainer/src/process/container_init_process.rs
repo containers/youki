@@ -190,11 +190,11 @@ pub fn container_init_process(
     init_receiver: &mut channel::InitReceiver,
 ) -> Result<()> {
     let syscall = args.syscall;
-    let spec = &args.spec;
+    let spec = args.spec;
     let linux = spec.linux().as_ref().context("no linux in spec")?;
     let proc = spec.process().as_ref().context("no process in spec")?;
     let mut envs: Vec<String> = proc.env().as_ref().unwrap_or(&vec![]).clone();
-    let rootfs_path = &args.rootfs;
+    let rootfs_path = args.rootfs;
     let hooks = spec.hooks().as_ref();
     let container = args.container.as_ref();
     let namespaces = Namespaces::from(linux.namespaces().as_ref());
