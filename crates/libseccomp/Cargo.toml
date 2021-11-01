@@ -6,7 +6,7 @@ edition = "2018"
 build = "build.rs"
 
 [dependencies]
-libc = "0.2.105"
+libc = "0.2.106"
 
 [build-dependencies]
 pkg-config = "0.3.22"
