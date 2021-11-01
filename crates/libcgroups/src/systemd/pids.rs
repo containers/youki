@@ -37,3 +37,79 @@ impl Pids {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use dbus::arg::ArgType;
+    use oci_spec::runtime::{LinuxPidsBuilder, LinuxResources, LinuxResourcesBuilder};
+
+    fn setup(resources: &LinuxResources) -> (ControllerOpt, HashMap<String, Box<dyn RefArg>>) {
+        let properties = HashMap::new();
+        let options = ControllerOpt {
+            resources: &resources,
+            disable_oom_killer: false,
+            oom_score_adj: None,
+            freezer_state: None,
+        };
+
+        (options, properties)
+    }
+
+    #[test]
+    fn test_pids_positive_limit() -> Result<()> {
+        let resources = LinuxResourcesBuilder::default()
+            .pids(LinuxPidsBuilder::default().limit(10).build()?)
+            .build()?;
+        let (options, mut properties) = setup(&resources);
+
+        <Pids as Controller>::apply(&options, 245, &mut properties).context("apply pids")?;
+
+        assert_eq!(properties.len(), 1);
+        assert!(properties.contains_key("TasksMax"));
+
+        let task_max = properties.get("TasksMax").unwrap();
+        assert_eq!(task_max.arg_type(), ArgType::UInt64);
+        assert_eq!(task_max.as_u64().unwrap(), 10);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_pids_zero_limit() -> Result<()> {
+        let resources = LinuxResourcesBuilder::default()
+            .pids(LinuxPidsBuilder::default().limit(0).build()?)
+            .build()?;
+        let (options, mut properties) = setup(&resources);
+
+        <Pids as Controller>::apply(&options, 245, &mut properties).context("apply pids")?;
+
+        assert_eq!(properties.len(), 1);
+        assert!(properties.contains_key("TasksMax"));
+
+        let task_max = properties.get("TasksMax").unwrap();
+        assert_eq!(task_max.arg_type(), ArgType::UInt64);
+        assert_eq!(task_max.as_u64().unwrap(), u64::MAX);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_pids_negative_limit() -> Result<()> {
+        let resources = LinuxResourcesBuilder::default()
+            .pids(LinuxPidsBuilder::default().limit(-500).build()?)
+            .build()?;
+        let (options, mut properties) = setup(&resources);
+
+        <Pids as Controller>::apply(&options, 245, &mut properties).context("apply pids")?;
+
+        assert_eq!(properties.len(), 1);
+        assert!(properties.contains_key("TasksMax"));
+
+        let task_max = properties.get("TasksMax").unwrap();
+        assert_eq!(task_max.arg_type(), ArgType::UInt64);
+        assert_eq!(task_max.as_u64().unwrap(), u64::MAX);
+
+        Ok(())
+    }
+}
