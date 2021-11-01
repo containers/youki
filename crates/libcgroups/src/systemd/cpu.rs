@@ -12,7 +12,7 @@ pub(crate) struct Cpu {}
 impl Controller for Cpu {
     fn apply(
         options: &ControllerOpt,
-        systemd_version: u32,
+        _: u32,
         properties: &mut HashMap<String, Box<dyn RefArg>>,
     ) -> Result<()> {
         if let Some(cpu) = options.resources.cpu() {
@@ -76,5 +76,81 @@ impl Cpu {
         }
 
         1 + ((shares - 2) * 9999) / 262142
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use dbus::arg::ArgType;
+    use oci_spec::runtime::LinuxCpuBuilder;
+
+    use super::*;
+
+    #[test]
+    fn test_set_shares() -> Result<()> {
+        // arrange
+        let cpu = LinuxCpuBuilder::default()
+            .shares(22000u64)
+            .build()
+            .context("build cpu spec")?;
+        let mut properties: HashMap<String, Box<dyn RefArg>> = HashMap::new();
+
+        // act
+        Cpu::apply(&cpu, &mut properties).context("apply cpu")?;
+
+        // assert
+        assert!(properties.contains_key("CPUWeight"));
+
+        let cpu_weight = &properties["CPUWeight"];
+        assert_eq!(cpu_weight.arg_type(), ArgType::UInt64);
+        assert_eq!(cpu_weight.as_u64().unwrap(), 840u64);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_set_quota() -> Result<()> {
+        let quotas: Vec<(i64, u64)> = vec![(200_000, 200_000), (0, u64::MAX), (-50000, u64::MAX)];
+
+        for quota in quotas {
+            // arrange
+            let cpu = LinuxCpuBuilder::default().quota(quota.0).build().unwrap();
+            let mut properties: HashMap<String, Box<dyn RefArg>> = HashMap::new();
+
+            // act
+            Cpu::apply(&cpu, &mut properties).context("apply cpu")?;
+
+            // assert
+            assert!(properties.contains_key("CPUQuotaPerSecUSec"));
+            let cpu_quota = &properties["CPUQuotaPerSecUSec"];
+            assert_eq!(cpu_quota.arg_type(), ArgType::UInt64);
+            assert_eq!(cpu_quota.as_u64().unwrap(), quota.1);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_set_period() -> Result<()> {
+        let periods: Vec<(u64, u64)> = vec![(200_000, 200_000), (0, 100_000)];
+
+        for period in periods {
+            let cpu = LinuxCpuBuilder::default()
+                .period(period.0)
+                .build()
+                .context("build cpu spec")?;
+            let mut properties: HashMap<String, Box<dyn RefArg>> = HashMap::new();
+
+            // act
+            Cpu::apply(&cpu, &mut properties).context("apply cpu")?;
+
+            // assert
+            assert!(properties.contains_key("CPUQuotaPeriodUSec"));
+            let cpu_quota = &properties["CPUQuotaPeriodUSec"];
+            assert_eq!(cpu_quota.arg_type(), ArgType::UInt64);
+            assert_eq!(cpu_quota.as_u64().unwrap(), period.1);
+        }
+
+        Ok(())
     }
 }
