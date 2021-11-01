@@ -41,13 +41,14 @@ impl<'a> InitContainerBuilder<'a> {
     pub fn build(self) -> Result<Container> {
         let spec = self.load_spec()?;
         let container_dir = self.create_container_dir()?;
-        let config: YoukiConfig = (&spec).into();
-        config.save(&container_dir.join("config.json"))?;
 
         let mut container = self.create_container_state(&container_dir)?;
         container
             .set_systemd(self.use_systemd)
             .set_annotations(spec.annotations().clone());
+
+        let config = YoukiConfig::from_spec(&spec, container.id())?;
+        config.save(&container_dir.join("config.json"))?;
 
         unistd::chdir(&container_dir)?;
         let notify_path = container_dir.join(NOTIFY_FILE);
