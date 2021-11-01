@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use anyhow::{bail, Context, Result};
+use dbus::arg::RefArg;
 use fixedbitset::FixedBitSet;
 use oci_spec::runtime::LinuxCpu;
 
@@ -14,7 +15,7 @@ impl Controller for CpuSet {
     fn apply(
         options: &ControllerOpt,
         systemd_version: u32,
-        properties: &mut HashMap<String, Box<dyn dbus::arg::RefArg>>,
+        properties: &mut HashMap<String, Box<dyn RefArg>>,
     ) -> Result<()> {
         if let Some(cpu) = options.resources.cpu() {
             log::debug!("Applying cpuset resource restrictions");
@@ -30,7 +31,7 @@ impl CpuSet {
     fn apply(
         cpu: &LinuxCpu,
         systemd_version: u32,
-        properties: &mut HashMap<String, Box<dyn dbus::arg::RefArg>>,
+        properties: &mut HashMap<String, Box<dyn RefArg>>,
     ) -> Result<()> {
         if systemd_version < 244 {
             bail!(
@@ -62,7 +63,7 @@ impl CpuSet {
                 continue;
             }
 
-            let cpus: Vec<&str> = cpu_set.split('-').collect();
+            let cpus: Vec<&str> = cpu_set.split('-').map(|s| s.trim()).collect();
             if cpus.len() == 1 {
                 let cpu_index: usize = cpus[0].parse()?;
                 if cpu_index >= bitset.len() {
@@ -92,5 +93,129 @@ impl CpuSet {
             .flat_map(|b| b.to_be_bytes())
             .skip_while(|b| *b == 0u8)
             .collect())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use dbus::arg::{ArgType, RefArg};
+    use oci_spec::runtime::LinuxCpuBuilder;
+
+    use super::*;
+
+    #[test]
+    fn to_bitmask_single_value() -> Result<()> {
+        let cpus = "0"; // 0000 0001
+
+        let bitmask = CpuSet::to_bitmask(cpus).context("to bitmask")?;
+
+        assert_eq!(bitmask.len(), 1);
+        assert_eq!(bitmask[0], 1);
+        Ok(())
+    }
+
+    #[test]
+    fn to_bitmask_multiple_single_values() -> Result<()> {
+        let cpus = "0,1,2"; // 0000 0111
+
+        let bitmask = CpuSet::to_bitmask(cpus).context("to bitmask")?;
+
+        assert_eq!(bitmask.len(), 1);
+        assert_eq!(bitmask[0], 7);
+        Ok(())
+    }
+
+    #[test]
+    fn to_bitmask_range_value() -> Result<()> {
+        let cpus = "0-2"; // 0000 0111
+
+        let bitmask = CpuSet::to_bitmask(cpus).context("to bitmask")?;
+
+        assert_eq!(bitmask.len(), 1);
+        assert_eq!(bitmask[0], 7);
+        Ok(())
+    }
+
+    #[test]
+    fn to_bitmask_interchanged_range() -> Result<()> {
+        let cpus = "2-0";
+
+        let result = CpuSet::to_bitmask(cpus).context("to bitmask");
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn to_bitmask_incomplete_range() -> Result<()> {
+        let cpus = vec!["2-", "-2"];
+
+        for c in cpus {
+            let result = CpuSet::to_bitmask(c).context("to bitmask");
+            assert!(result.is_err());
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn to_bitmask_mixed() -> Result<()> {
+        let cpus = "0,2-4,7,9-10"; // 0000 0110 1001 1101
+
+        let bitmask = CpuSet::to_bitmask(cpus).context("to bitmask")?;
+
+        assert_eq!(bitmask.len(), 2);
+        assert_eq!(bitmask[0], 6);
+        assert_eq!(bitmask[1], 157);
+        Ok(())
+    }
+
+    #[test]
+    fn to_bitmask_extra_characters() -> Result<()> {
+        let cpus = "0, 2- 4,,7   ,,9-10"; // 0000 0110 1001 1101
+
+        let bitmask = CpuSet::to_bitmask(cpus).context("to bitmask")?;
+        assert_eq!(bitmask.len(), 2);
+        assert_eq!(bitmask[0], 6);
+        assert_eq!(bitmask[1], 157);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_cpuset_systemd_too_old() -> Result<()> {
+        let systemd_version = 235;
+        let cpu = LinuxCpuBuilder::default()
+            .build()
+            .context("build cpu spec")?;
+        let mut properties: HashMap<String, Box<dyn RefArg>> = HashMap::new();
+
+        let result = CpuSet::apply(&cpu, systemd_version, &mut properties);
+
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_cpuset_set() -> Result<()> {
+        let systemd_version = 245;
+        let cpu = LinuxCpuBuilder::default()
+            .cpus("0-3")
+            .mems("0-3")
+            .build()
+            .context("build cpu spec")?;
+        let mut properties: HashMap<String, Box<dyn RefArg>> = HashMap::new();
+
+        CpuSet::apply(&cpu, systemd_version, &mut properties).context("apply cpuset")?;
+
+        assert_eq!(properties.len(), 2);
+        assert!(properties.contains_key("AllowedCPUs"));
+        let cpus = properties.get("AllowedCPUs").unwrap();
+        assert_eq!(cpus.arg_type(), ArgType::Array);
+
+        assert!(properties.contains_key("AllowedMemoryNodes"));
+        let mems = properties.get("AllowedMemoryNodes").unwrap();
+        assert_eq!(mems.arg_type(), ArgType::Array);
+
+        Ok(())
     }
 }
