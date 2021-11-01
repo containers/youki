@@ -8,7 +8,7 @@ use std::{
     str::FromStr,
 };
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use log::{LevelFilter, Log, Metadata, Record};
 use once_cell::sync::OnceCell;
 
@@ -24,23 +24,29 @@ const DEFAULT_LOG_LEVEL: LevelFilter = LevelFilter::Debug;
 #[cfg(not(debug_assertions))]
 const DEFAULT_LOG_LEVEL: LevelFilter = LevelFilter::Warn;
 
+const LOG_FORMAT_TEXT: &str = "text";
+const LOG_FORMAT_JSON: &str = "json";
+
 /// Initialize the logger, must be called before accessing the logger
 /// Multiple parts might call this at once, but the actual initialization
 /// is done only once due to use of OnceCell
-pub fn init(log_file: Option<PathBuf>) -> Result<()> {
+pub fn init(log_format: Option<String>, log_file: Option<PathBuf>) -> Result<()> {
+    // set the log level if specified in env variable or set to default
+    let level_filter = if let Ok(log_level_str) = env::var("YOUKI_LOG_LEVEL") {
+        LevelFilter::from_str(&log_level_str).unwrap_or(DEFAULT_LOG_LEVEL)
+    } else {
+        DEFAULT_LOG_LEVEL
+    };
+    let logger = match log_format.as_deref() {
+        None | Some(LOG_FORMAT_TEXT) => YoukiLogger::new(level_filter.to_level()),
+        Some(LOG_FORMAT_JSON) => YoukiLogger::new(level_filter.to_level()),
+        Some(unknown) => bail!("unknown log format: {}", unknown),
+    };
+
     // If file exists, ignore, else create and open the file
     let _log_file = LOG_FILE.get_or_init(|| -> Option<File> {
-        // set the log level if specified in env variable or set to default
-        let level_filter = if let Ok(log_level_str) = env::var("YOUKI_LOG_LEVEL") {
-            LevelFilter::from_str(&log_level_str).unwrap_or(DEFAULT_LOG_LEVEL)
-        } else {
-            DEFAULT_LOG_LEVEL
-        };
-
         // Create a new logger, or get existing if already created
-        let logger = YOUKI_LOGGER.get_or_init(|| YoukiLogger::new(level_filter.to_level()));
-
-        log::set_logger(logger)
+        log::set_logger(YOUKI_LOGGER.get_or_init(|| logger))
             .map(|()| log::set_max_level(level_filter))
             .expect("set logger failed");
 
@@ -51,9 +57,10 @@ pub fn init(log_file: Option<PathBuf>) -> Result<()> {
                 .write(true)
                 .truncate(false)
                 .open(log_file_path)
-                .expect("failed opening log file ")
+                .expect("failed opening log file")
         })
     });
+
     Ok(())
 }
 
