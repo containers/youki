@@ -1400,6 +1400,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "clap",
+ "env_logger 0.9.0",
  "libcgroups",
  "libcontainer",
  "log",
