@@ -47,7 +47,7 @@ mod tests {
     fn setup(resources: &LinuxResources) -> (ControllerOpt, HashMap<String, Box<dyn RefArg>>) {
         let properties = HashMap::new();
         let options = ControllerOpt {
-            resources: &resources,
+            resources,
             disable_oom_killer: false,
             oom_score_adj: None,
             freezer_state: None,

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+#![allow(unused_variables)]
 use std::{
     collections::HashMap,
     fmt::Display,
@@ -11,8 +13,6 @@ use dbus::arg::RefArg;
 use nix::unistd::Pid;
 use std::path::{Path, PathBuf};
 
-#[cfg(feature = "cgroupsv2_devices")]
-use super::devices::Devices;
 use super::{
     controller::Controller,
     controller_type::{ControllerType, CONTROLLER_TYPES},
@@ -285,14 +285,10 @@ impl CgroupManager for Manager {
             };
         }
 
-        log::debug!("PROPERTIES {:#?}", properties);
-
         self.client
             .set_unit_properties(&self.unit_name, &properties)
             .context("could not apply resource restrictions")?;
 
-        #[cfg(feature = "cgroupsv2_devices")]
-        Devices::apply(controller_opt, &self.full_path)?;
         Ok(())
     }
 
@@ -340,10 +336,10 @@ mod tests {
             Manager::destructure_cgroups_path(PathBuf::from("test-a-b.slice:docker:foo"))
                 .expect("");
 
-        // assert_eq!(
-        //     Manager::construct_cgroups_path(&cgroups_path)?,
-        //     PathBuf::from("/test.slice/test-a.slice/test-a-b.slice/docker-foo.scope"),
-        // );
+        assert_eq!(
+            Manager::construct_cgroups_path(&cgroups_path)?.0,
+            PathBuf::from("/test.slice/test-a.slice/test-a-b.slice/docker-foo.scope"),
+        );
 
         Ok(())
     }
@@ -353,10 +349,10 @@ mod tests {
         let cgroups_path =
             Manager::destructure_cgroups_path(PathBuf::from("machine.slice:libpod:foo")).expect("");
 
-        // assert_eq!(
-        //     Manager::construct_cgroups_path(&cgroups_path)?,
-        //     PathBuf::from("/machine.slice/libpod-foo.scope"),
-        // );
+        assert_eq!(
+            Manager::construct_cgroups_path(&cgroups_path)?.0,
+            PathBuf::from("/machine.slice/libpod-foo.scope"),
+        );
 
         Ok(())
     }
@@ -366,10 +362,10 @@ mod tests {
         let cgroups_path =
             Manager::destructure_cgroups_path(PathBuf::from(":docker:foo")).expect("");
 
-        // assert_eq!(
-        //     Manager::construct_cgroups_path(&cgroups_path)?,
-        //     PathBuf::from("/machine.slice/docker-foo.scope"),
-        // );
+        assert_eq!(
+            Manager::construct_cgroups_path(&cgroups_path)?.0,
+            PathBuf::from("/system.slice/docker-foo.scope"),
+        );
 
         Ok(())
     }

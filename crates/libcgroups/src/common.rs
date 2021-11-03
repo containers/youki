@@ -15,11 +15,6 @@ use oci_spec::runtime::{
     LinuxDevice, LinuxDeviceBuilder, LinuxDeviceCgroup, LinuxDeviceCgroupBuilder, LinuxDeviceType,
     LinuxResources,
 };
-#[cfg(feature = "systemd_cgroups")]
-#[cfg(not(feature = "systemd_cgroups"))]
-fn booted() -> Result<bool> {
-    bail!("This build does not include the systemd cgroups feature")
-}
 
 use super::systemd;
 use super::v1;

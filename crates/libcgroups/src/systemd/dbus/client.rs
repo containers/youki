@@ -123,13 +123,4 @@ impl Client {
 
         Ok(version)
     }
-
-    pub fn list_units(&self) -> Result<()> {
-        let proxy = self.create_proxy();
-        let units = proxy.list_units()?;
-        for unit in units {
-            log::debug!("{:?}", unit);
-        }
-        Ok(())
-    }
 }
