@@ -300,38 +300,43 @@ mod tests {
 
         let (mut main_sender, mut main_receiver) = channel::main_channel()?;
         let (mut init_sender, mut init_receiver) = channel::init_channel()?;
-
         let socket_path = tmp_dir.path().join("socket_file.sock");
-        let unix_th = thread::spawn(move || {
-            fs::remove_file(socket_path.clone()).unwrap();
-            let lis = UnixListener::bind(socket_path).unwrap();
-            let (mut socket, _) = lis.accept().unwrap();
-            let mut got = String::new();
-            socket.read_to_string(&mut got).unwrap();
-            let want = "{\"ociVersion\":\"\",\"fds\":[],\"pid\":0,\"metadata\":\"\",\"state\":{\"ociVersion\":\"\",\"id\":\"\",\"status\":\"creating\",\"bundle\":\"\",\"useSystemd\":null}}";
-            assert_eq!(want, got);
+        let socket_path_seccomp_th = socket_path.clone();
+
+        let state = ContainerProcessState::default();
+        let want = serde_json::to_string(&state)?;
+        let seccomp_th = thread::spawn(move || {
+            sync_seccomp(
+                &LinuxSeccompBuilder::default()
+                    .listener_path(socket_path_seccomp_th)
+                    .syscalls(vec![LinuxSyscallBuilder::default()
+                        .action(LinuxSeccompAction::ScmpActNotify)
+                        .build()
+                        .unwrap()])
+                    .build()
+                    .unwrap(),
+                &state,
+                &mut init_sender,
+                &mut main_receiver,
+            )
+            .unwrap();
         });
 
         let fd = scmp_file.into_raw_fd();
-        let th = thread::spawn(move || {
+        let notify_th = thread::spawn(move || {
             assert!(main_sender.seccomp_notify_request(fd).is_ok());
             assert!(init_receiver.wait_for_seccomp_request_done().is_ok());
         });
 
-        sync_seccomp(
-            &LinuxSeccompBuilder::default()
-                .listener_path(tmp_dir.path().join("socket_file.sock"))
-                .syscalls(vec![LinuxSyscallBuilder::default()
-                    .action(LinuxSeccompAction::ScmpActNotify)
-                    .build()?])
-                .build()?,
-            &ContainerProcessState::default(),
-            &mut init_sender,
-            &mut main_receiver,
-        )?;
+        fs::remove_file(socket_path.clone())?;
+        let lis = UnixListener::bind(socket_path)?;
+        let (mut socket, _) = lis.accept()?;
+        let mut got = String::new();
+        socket.read_to_string(&mut got)?;
 
-        assert!(th.join().is_ok());
-        assert!(unix_th.join().is_ok());
+        assert_eq!(want, got);
+        assert!(notify_th.join().is_ok());
+        assert!(seccomp_th.join().is_ok());
         Ok(())
     }
 }
