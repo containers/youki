@@ -7,13 +7,17 @@ use oci_spec::runtime::LinuxCpu;
 use super::controller::Controller;
 use crate::common::ControllerOpt;
 
+const CPU_WEIGHT: &str = "CPUWeight";
+const CPU_QUOTA: &str = "CPUQuotaPerSecUSec";
+const CPU_PERIOD: &str = "CPUQuotaPeriodUSec";
+
 pub(crate) struct Cpu {}
 
 impl Controller for Cpu {
     fn apply(
         options: &ControllerOpt,
         _: u32,
-        properties: &mut HashMap<String, Box<dyn RefArg>>,
+        properties: &mut HashMap<&str, Box<dyn RefArg>>,
     ) -> Result<()> {
         if let Some(cpu) = options.resources.cpu() {
             log::debug!("Applying cpu resource restrictions");
@@ -26,7 +30,7 @@ impl Controller for Cpu {
 }
 
 impl Cpu {
-    fn apply(cpu: &LinuxCpu, properties: &mut HashMap<String, Box<dyn RefArg>>) -> Result<()> {
+    fn apply(cpu: &LinuxCpu, properties: &mut HashMap<&str, Box<dyn RefArg>>) -> Result<()> {
         if Self::is_realtime_requested(cpu) {
             bail!("realtime is not supported on systemd v2 yet");
         }
@@ -34,7 +38,7 @@ impl Cpu {
         if let Some(mut shares) = cpu.shares() {
             shares = Self::convert_shares_to_cgroup2(shares);
             if shares != 0 {
-                properties.insert("CPUWeight".to_owned(), Box::new(shares));
+                properties.insert(CPU_WEIGHT, Box::new(shares));
             }
         }
 
@@ -45,7 +49,7 @@ impl Cpu {
                 quota = specified_quota as u64
             }
         }
-        properties.insert("CPUQuotaPerSecUSec".to_owned(), Box::new(quota));
+        properties.insert(CPU_QUOTA, Box::new(quota));
 
         let mut period: u64 = 100_000;
         if let Some(specified_period) = cpu.period() {
@@ -53,21 +57,13 @@ impl Cpu {
                 period = specified_period;
             }
         }
-        properties.insert("CPUQuotaPeriodUSec".to_owned(), Box::new(period));
+        properties.insert(CPU_PERIOD, Box::new(period));
 
         Ok(())
     }
 
     fn is_realtime_requested(cpu: &LinuxCpu) -> bool {
-        if cpu.realtime_period().is_some() {
-            return true;
-        }
-
-        if cpu.realtime_runtime().is_some() {
-            return true;
-        }
-
-        false
+        cpu.realtime_period().is_some() || cpu.realtime_runtime().is_some()
     }
 
     fn convert_shares_to_cgroup2(shares: u64) -> u64 {
@@ -93,15 +89,15 @@ mod tests {
             .shares(22000u64)
             .build()
             .context("build cpu spec")?;
-        let mut properties: HashMap<String, Box<dyn RefArg>> = HashMap::new();
+        let mut properties: HashMap<&str, Box<dyn RefArg>> = HashMap::new();
 
         // act
         Cpu::apply(&cpu, &mut properties).context("apply cpu")?;
 
         // assert
-        assert!(properties.contains_key("CPUWeight"));
+        assert!(properties.contains_key(CPU_WEIGHT));
 
-        let cpu_weight = &properties["CPUWeight"];
+        let cpu_weight = &properties[CPU_WEIGHT];
         assert_eq!(cpu_weight.arg_type(), ArgType::UInt64);
         assert_eq!(cpu_weight.as_u64().unwrap(), 840u64);
 
@@ -115,14 +111,14 @@ mod tests {
         for quota in quotas {
             // arrange
             let cpu = LinuxCpuBuilder::default().quota(quota.0).build().unwrap();
-            let mut properties: HashMap<String, Box<dyn RefArg>> = HashMap::new();
+            let mut properties: HashMap<&str, Box<dyn RefArg>> = HashMap::new();
 
             // act
             Cpu::apply(&cpu, &mut properties).context("apply cpu")?;
 
             // assert
-            assert!(properties.contains_key("CPUQuotaPerSecUSec"));
-            let cpu_quota = &properties["CPUQuotaPerSecUSec"];
+            assert!(properties.contains_key(CPU_QUOTA));
+            let cpu_quota = &properties[CPU_QUOTA];
             assert_eq!(cpu_quota.arg_type(), ArgType::UInt64);
             assert_eq!(cpu_quota.as_u64().unwrap(), quota.1);
         }
@@ -139,14 +135,14 @@ mod tests {
                 .period(period.0)
                 .build()
                 .context("build cpu spec")?;
-            let mut properties: HashMap<String, Box<dyn RefArg>> = HashMap::new();
+            let mut properties: HashMap<&str, Box<dyn RefArg>> = HashMap::new();
 
             // act
             Cpu::apply(&cpu, &mut properties).context("apply cpu")?;
 
             // assert
-            assert!(properties.contains_key("CPUQuotaPeriodUSec"));
-            let cpu_quota = &properties["CPUQuotaPeriodUSec"];
+            assert!(properties.contains_key(CPU_PERIOD));
+            let cpu_quota = &properties[CPU_PERIOD];
             assert_eq!(cpu_quota.arg_type(), ArgType::UInt64);
             assert_eq!(cpu_quota.as_u64().unwrap(), period.1);
         }

@@ -40,7 +40,7 @@ impl Client {
         // `gdbus introspect --system --dest org.freedesktop.systemd1 --object-path /org/freedesktop/systemd1`
         let proxy = self.create_proxy();
 
-        // To align with runc, yuoki will always add the following properties to its container units:
+        // To align with runc, youki will always add the following properties to its container units:
         // - CPUAccounting=true
         // - IOAccounting=true (BlockIOAccounting for cgroup v1)
         // - MemoryAccounting=true
@@ -93,14 +93,14 @@ impl Client {
     pub fn set_unit_properties(
         &self,
         unit_name: &str,
-        properties: &HashMap<String, Box<dyn RefArg>>,
+        properties: &HashMap<&str, Box<dyn RefArg>>,
     ) -> Result<()> {
         let proxy = self.create_proxy();
 
-        let mut props = Vec::new();
-        for (name, value) in properties {
-            props.push((name.as_ref(), Variant(value.box_clone())));
-        }
+        let props = properties
+            .iter()
+            .map(|p| (*p.0, Variant(p.1.box_clone())))
+            .collect();
 
         proxy
             .set_unit_properties(unit_name, true, props)

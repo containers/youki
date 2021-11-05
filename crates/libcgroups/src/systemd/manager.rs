@@ -263,7 +263,7 @@ impl CgroupManager for Manager {
     }
 
     fn apply(&self, controller_opt: &ControllerOpt) -> Result<()> {
-        let mut properties: HashMap<String, Box<dyn RefArg>> = HashMap::new();
+        let mut properties: HashMap<&str, Box<dyn RefArg>> = HashMap::new();
         let systemd_version = self
             .client
             .systemd_version()

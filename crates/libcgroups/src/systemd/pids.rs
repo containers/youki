@@ -8,13 +8,15 @@ use crate::common::ControllerOpt;
 
 use super::controller::Controller;
 
+const TASKS_MAX: &str = "TasksMax";
+
 pub struct Pids {}
 
 impl Controller for Pids {
     fn apply(
         options: &ControllerOpt,
         _: u32,
-        properties: &mut HashMap<String, Box<dyn RefArg>>,
+        properties: &mut HashMap<&str, Box<dyn RefArg>>,
     ) -> Result<()> {
         if let Some(pids) = options.resources.pids() {
             log::debug!("Applying pids resource restrictions");
@@ -26,14 +28,14 @@ impl Controller for Pids {
 }
 
 impl Pids {
-    fn apply(pids: &LinuxPids, properties: &mut HashMap<String, Box<dyn RefArg>>) -> Result<()> {
+    fn apply(pids: &LinuxPids, properties: &mut HashMap<&str, Box<dyn RefArg>>) -> Result<()> {
         let limit = if pids.limit() > 0 {
             pids.limit() as u64
         } else {
             u64::MAX
         };
 
-        properties.insert("TasksMax".to_owned(), Box::new(limit));
+        properties.insert(TASKS_MAX, Box::new(limit));
         Ok(())
     }
 }
@@ -44,7 +46,7 @@ mod tests {
     use dbus::arg::ArgType;
     use oci_spec::runtime::{LinuxPidsBuilder, LinuxResources, LinuxResourcesBuilder};
 
-    fn setup(resources: &LinuxResources) -> (ControllerOpt, HashMap<String, Box<dyn RefArg>>) {
+    fn setup(resources: &LinuxResources) -> (ControllerOpt, HashMap<&str, Box<dyn RefArg>>) {
         let properties = HashMap::new();
         let options = ControllerOpt {
             resources,
@@ -66,9 +68,9 @@ mod tests {
         <Pids as Controller>::apply(&options, 245, &mut properties).context("apply pids")?;
 
         assert_eq!(properties.len(), 1);
-        assert!(properties.contains_key("TasksMax"));
+        assert!(properties.contains_key(TASKS_MAX));
 
-        let task_max = properties.get("TasksMax").unwrap();
+        let task_max = properties.get(TASKS_MAX).unwrap();
         assert_eq!(task_max.arg_type(), ArgType::UInt64);
         assert_eq!(task_max.as_u64().unwrap(), 10);
 
@@ -85,9 +87,9 @@ mod tests {
         <Pids as Controller>::apply(&options, 245, &mut properties).context("apply pids")?;
 
         assert_eq!(properties.len(), 1);
-        assert!(properties.contains_key("TasksMax"));
+        assert!(properties.contains_key(TASKS_MAX));
 
-        let task_max = properties.get("TasksMax").unwrap();
+        let task_max = properties.get(TASKS_MAX).unwrap();
         assert_eq!(task_max.arg_type(), ArgType::UInt64);
         assert_eq!(task_max.as_u64().unwrap(), u64::MAX);
 
@@ -104,9 +106,9 @@ mod tests {
         <Pids as Controller>::apply(&options, 245, &mut properties).context("apply pids")?;
 
         assert_eq!(properties.len(), 1);
-        assert!(properties.contains_key("TasksMax"));
+        assert!(properties.contains_key(TASKS_MAX));
 
-        let task_max = properties.get("TasksMax").unwrap();
+        let task_max = properties.get(TASKS_MAX).unwrap();
         assert_eq!(task_max.arg_type(), ArgType::UInt64);
         assert_eq!(task_max.as_u64().unwrap(), u64::MAX);
 

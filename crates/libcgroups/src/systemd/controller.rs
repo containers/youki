@@ -9,6 +9,6 @@ pub(crate) trait Controller {
     fn apply(
         options: &ControllerOpt,
         systemd_version: u32,
-        properties: &mut HashMap<String, Box<dyn RefArg>>,
+        properties: &mut HashMap<&str, Box<dyn RefArg>>,
     ) -> Result<()>;
 }

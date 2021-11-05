@@ -9,13 +9,16 @@ use crate::common::ControllerOpt;
 
 use super::controller::Controller;
 
+const ALLOWED_CPUS: &str = "AllowedCPUs";
+const ALLOWED_NODES: &str = "AllowedMemoryNodes";
+
 pub struct CpuSet {}
 
 impl Controller for CpuSet {
     fn apply(
         options: &ControllerOpt,
         systemd_version: u32,
-        properties: &mut HashMap<String, Box<dyn RefArg>>,
+        properties: &mut HashMap<&str, Box<dyn RefArg>>,
     ) -> Result<()> {
         if let Some(cpu) = options.resources.cpu() {
             log::debug!("Applying cpuset resource restrictions");
@@ -31,24 +34,24 @@ impl CpuSet {
     fn apply(
         cpu: &LinuxCpu,
         systemd_version: u32,
-        properties: &mut HashMap<String, Box<dyn RefArg>>,
+        properties: &mut HashMap<&str, Box<dyn RefArg>>,
     ) -> Result<()> {
         if systemd_version < 244 {
             bail!(
-                "Systemd version ({}) is too old to support cpuset restrictions",
+                "systemd version ({}) is too old to support cpuset restrictions",
                 systemd_version
             );
         }
 
         if let Some(cpus) = cpu.cpus() {
             let cpu_mask = Self::to_bitmask(cpus).context("could not create bitmask for cpus")?;
-            properties.insert("AllowedCPUs".to_owned(), Box::new(cpu_mask));
+            properties.insert(ALLOWED_CPUS, Box::new(cpu_mask));
         }
 
         if let Some(mems) = cpu.mems() {
             let mems_mask =
                 Self::to_bitmask(mems).context("could not create bitmask for memory nodes")?;
-            properties.insert("AllowedMemoryNodes".to_owned(), Box::new(mems_mask));
+            properties.insert(ALLOWED_NODES, Box::new(mems_mask));
         }
 
         Ok(())
@@ -187,7 +190,7 @@ mod tests {
         let cpu = LinuxCpuBuilder::default()
             .build()
             .context("build cpu spec")?;
-        let mut properties: HashMap<String, Box<dyn RefArg>> = HashMap::new();
+        let mut properties: HashMap<&str, Box<dyn RefArg>> = HashMap::new();
 
         let result = CpuSet::apply(&cpu, systemd_version, &mut properties);
 
@@ -203,17 +206,17 @@ mod tests {
             .mems("0-3")
             .build()
             .context("build cpu spec")?;
-        let mut properties: HashMap<String, Box<dyn RefArg>> = HashMap::new();
+        let mut properties: HashMap<&str, Box<dyn RefArg>> = HashMap::new();
 
         CpuSet::apply(&cpu, systemd_version, &mut properties).context("apply cpuset")?;
 
         assert_eq!(properties.len(), 2);
-        assert!(properties.contains_key("AllowedCPUs"));
-        let cpus = properties.get("AllowedCPUs").unwrap();
+        assert!(properties.contains_key(ALLOWED_CPUS));
+        let cpus = properties.get(ALLOWED_CPUS).unwrap();
         assert_eq!(cpus.arg_type(), ArgType::Array);
 
-        assert!(properties.contains_key("AllowedMemoryNodes"));
-        let mems = properties.get("AllowedMemoryNodes").unwrap();
+        assert!(properties.contains_key(ALLOWED_NODES));
+        let mems = properties.get(ALLOWED_NODES).unwrap();
         assert_eq!(mems.arg_type(), ArgType::Array);
 
         Ok(())
