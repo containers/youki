@@ -1,4 +1,5 @@
 use std::{
+    ffi::CStr,
     fmt::{Debug, Display},
     fs::{self, File},
     io::{BufRead, BufReader, Write},
@@ -15,11 +16,16 @@ use oci_spec::runtime::{
     LinuxDevice, LinuxDeviceBuilder, LinuxDeviceCgroup, LinuxDeviceCgroupBuilder, LinuxDeviceType,
     LinuxResources,
 };
-#[cfg(feature = "systemd_cgroups")]
-use systemd::daemon::booted;
-#[cfg(not(feature = "systemd_cgroups"))]
+
 fn booted() -> Result<bool> {
-    bail!("This build does not include the systemd cgroups feature")
+    Ok(unsafe {
+        libc::faccessat(
+            libc::AT_FDCWD,
+            CStr::from_bytes_with_nul_unchecked(b"/run/systemd/system/\0").as_ptr(),
+            0,
+            libc::AT_SYMLINK_NOFOLLOW,
+        ) >= 0
+    })
 }
 
 use super::v1;

@@ -5,10 +5,6 @@ authors = ["youki team"]
 edition = "2018"
 description = "Library for container creation"
 
-[features]
-default = ["systemd_cgroups"]
-systemd_cgroups = ["systemd"]
-
 [dependencies]
 anyhow = "1.0"
 caps = "0.5.3"
@@ -30,7 +26,6 @@ libcgroups = { version = "0.1.0", path = "../libcgroups" }
 libseccomp = { version = "0.1.0", path = "../libseccomp" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-systemd = { version = "0.9", default-features = false, optional = true }
 
 [dev-dependencies]
 oci-spec = { git = "https://github.com/containers/oci-spec-rs",  rev = "d6fb1e91742313cd0d0085937e2d6df5d4669720", features = ["proptests"] }
