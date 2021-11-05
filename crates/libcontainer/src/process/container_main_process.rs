@@ -293,6 +293,7 @@ mod tests {
             .write(true)
             .create(true)
             .open(tmp_dir.path().join("scmp_file"))?;
+
         std::fs::OpenOptions::new()
             .write(true)
             .create(true)
@@ -305,7 +306,7 @@ mod tests {
 
         let state = ContainerProcessState::default();
         let want = serde_json::to_string(&state)?;
-        let seccomp_th = thread::spawn(move || {
+        let th = thread::spawn(move || {
             sync_seccomp(
                 &LinuxSeccompBuilder::default()
                     .listener_path(socket_path_seccomp_th)
@@ -323,20 +324,17 @@ mod tests {
         });
 
         let fd = scmp_file.into_raw_fd();
-        let notify_th = thread::spawn(move || {
-            assert!(main_sender.seccomp_notify_request(fd).is_ok());
-            assert!(init_receiver.wait_for_seccomp_request_done().is_ok());
-        });
+        assert!(main_sender.seccomp_notify_request(fd).is_ok());
 
         fs::remove_file(socket_path.clone())?;
         let lis = UnixListener::bind(socket_path)?;
         let (mut socket, _) = lis.accept()?;
         let mut got = String::new();
         socket.read_to_string(&mut got)?;
+        assert!(init_receiver.wait_for_seccomp_request_done().is_ok());
 
         assert_eq!(want, got);
-        assert!(notify_th.join().is_ok());
-        assert!(seccomp_th.join().is_ok());
+        assert!(th.join().is_ok());
         Ok(())
     }
 }
