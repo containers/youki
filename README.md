@@ -62,7 +62,7 @@ For other platforms, please use [Vagrantfile](#setting-up-vagrant) that we prepa
 
 ## Requires
 
-- Rust(See [here](https://www.rust-lang.org/tools/install))
+- Rust(See [here](https://www.rust-lang.org/tools/install)), edition 2021
 - Docker(See [here](https://docs.docker.com/engine/install))
 
 ## Dependencies
