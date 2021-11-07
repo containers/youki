@@ -54,7 +54,7 @@ D ->> U : exit $code
 
 On invoking Youki, main function parses args passed to it, which contains directory path to store container state (check runc . 8 . md in [runc man pages]), optional log path and log format string and a subcommand such as create, delete etc.
 
-From there it matches subcommand arg with possible subcommand and takes appropriate actions, such as creating a new container, deleting a container erc.
+From there it matches subcommand arg with possible subcommand and takes appropriate actions, such as creating a new container, deleting a container, etc.
 
 ### create container
 
