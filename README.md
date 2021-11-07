@@ -10,7 +10,7 @@
 </p>
 
 youki is an implementation of the [OCI runtime-spec](https://github.com/opencontainers/runtime-spec) in Rust, similar to [runc](https://github.com/opencontainers/runc).  
-Your feedback is welcome here. [#10](https://github.com/containers/youki/issues/10)
+Your ideas are welcome [here](https://github.com/containers/youki/issues/10).
 
 # About the name
 
