@@ -12,6 +12,7 @@ These are references to various documentations and specifications, which can be 
 - [prctl man page](https://man7.org/linux/man-pages/man2/prctl.2.html) : Process control man pages
 - [OCI Linux spec](https://github.com/opencontainers/runtime-spec/blob/master/config-linux.md) : Linux specific section of OCI Spec
 - [pipe2 man page](https://man7.org/linux/man-pages/man2/pipe.2.html) : Definition and usage of pipe2
+- [systemd resource control](https://www.freedesktop.org/software/systemd/man/systemd.resource-control.html): Options offered by systemd for resource control
 
 ---
 

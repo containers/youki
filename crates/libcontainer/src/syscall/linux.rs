@@ -1,12 +1,13 @@
 //! Implements Command trait for Linux systems
+#[cfg_attr(coverage, no_coverage)]
 use std::ffi::{CStr, OsStr};
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::symlink;
 use std::sync::Arc;
 use std::{any::Any, mem, path::Path, ptr};
 
-use anyhow::{bail, Result};
-use caps::{errors::CapsError, CapSet, Capability, CapsHashSet};
+use anyhow::{anyhow, bail, Result};
+use caps::{CapSet, Capability, CapsHashSet};
 use libc::{c_char, uid_t};
 use nix::{
     errno::Errno,
@@ -15,7 +16,7 @@ use nix::{
     sched::{unshare, CloneFlags},
     sys::stat::{mknod, Mode, SFlag},
     unistd,
-    unistd::{chown, fchdir, pivot_root, sethostname, Gid, Uid},
+    unistd::{chown, fchdir, pivot_root, setgroups, sethostname, Gid, Uid},
 };
 
 use oci_spec::runtime::LinuxRlimit;
@@ -119,7 +120,7 @@ impl Syscall for LinuxSyscall {
     }
 
     /// Set capabilities for container process
-    fn set_capability(&self, cset: CapSet, value: &CapsHashSet) -> Result<(), CapsError> {
+    fn set_capability(&self, cset: CapSet, value: &CapsHashSet) -> Result<()> {
         match cset {
             // caps::set cannot set capabilities in bounding set,
             // so we do it differently
@@ -141,10 +142,12 @@ impl Syscall for LinuxSyscall {
                         _ => caps::drop(None, CapSet::Bounding, *c)?,
                     }
                 }
-                Ok(())
             }
-            _ => caps::set(None, cset, value),
+            _ => {
+                caps::set(None, cset, value)?;
+            }
         }
+        Ok(())
     }
 
     /// Sets hostname for process
@@ -218,28 +221,35 @@ impl Syscall for LinuxSyscall {
     ) -> Result<()> {
         match mount(source, target, fstype, flags, data) {
             Ok(_) => Ok(()),
-            Err(e) => bail!("Failed to mount {:?}", e),
+            Err(e) => Err(anyhow!(e)),
         }
     }
 
     fn symlink(&self, original: &Path, link: &Path) -> Result<()> {
         match symlink(original, link) {
             Ok(_) => Ok(()),
-            Err(e) => bail!("Failed to symlink {:?}", e),
+            Err(e) => Err(anyhow!(e)),
         }
     }
 
     fn mknod(&self, path: &Path, kind: SFlag, perm: Mode, dev: u64) -> Result<()> {
         match mknod(path, kind, perm, dev) {
             Ok(_) => Ok(()),
-            Err(e) => bail!("Failed to mknod {:?}", e),
+            Err(e) => Err(anyhow!(e)),
         }
     }
 
     fn chown(&self, path: &Path, owner: Option<Uid>, group: Option<Gid>) -> Result<()> {
         match chown(path, owner, group) {
             Ok(_) => Ok(()),
-            Err(e) => bail!("Failed to chown {:?}", e),
+            Err(e) => Err(anyhow!(e)),
+        }
+    }
+
+    fn set_groups(&self, groups: &[Gid]) -> Result<()> {
+        match setgroups(groups) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(anyhow!(e)),
         }
     }
 }

@@ -2,14 +2,14 @@ use std::fs;
 use std::path::PathBuf;
 
 use anyhow::Result;
-use clap::Clap;
+use clap::Parser;
 
 use libcontainer::container::Container;
 
 /// Show the container state
-#[derive(Clap, Debug)]
+#[derive(Parser, Debug)]
 pub struct State {
-    #[clap(required = true)]
+    #[clap(forbid_empty_values = true, required = true)]
     pub container_id: String,
 }
 

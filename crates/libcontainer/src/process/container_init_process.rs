@@ -6,7 +6,6 @@ use crate::{
     rootless::Rootless, seccomp, tty, utils,
 };
 use anyhow::{bail, Context, Result};
-use nix::mount::mount as nix_mount;
 use nix::mount::MsFlags;
 use nix::sched::CloneFlags;
 use nix::{
@@ -92,69 +91,69 @@ fn sysctl(kernel_params: &HashMap<String, String>) -> Result<()> {
 // The first time we bind mount, other flags are ignored,
 // so we need to mount it once and then remount it with the necessary flags specified.
 // https://man7.org/linux/man-pages/man2/mount.2.html
-fn readonly_path(path: &str) -> Result<()> {
-    match nix_mount::<str, str, str, str>(
+fn readonly_path(path: &Path, syscall: &dyn Syscall) -> Result<()> {
+    if let Err(err) = syscall.mount(
         Some(path),
         path,
-        None::<&str>,
+        None,
         MsFlags::MS_BIND | MsFlags::MS_REC,
-        None::<&str>,
+        None,
     ) {
-        // ignore error if path is not exist.
-        Err(nix::errno::Errno::ENOENT) => {
-            log::warn!("readonly path {:?} not exist", path);
-            return Ok(());
+        if let Some(errno) = err.downcast_ref() {
+            // ignore error if path is not exist.
+            if matches!(errno, nix::errno::Errno::ENOENT) {
+                return Ok(());
+            }
         }
-        Err(err) => bail!(err),
-        Ok(_) => {}
+        bail!(err)
     }
 
-    nix_mount::<str, str, str, str>(
+    syscall.mount(
         Some(path),
         path,
-        None::<&str>,
+        None,
         MsFlags::MS_NOSUID
             | MsFlags::MS_NODEV
             | MsFlags::MS_NOEXEC
             | MsFlags::MS_BIND
             | MsFlags::MS_REMOUNT
             | MsFlags::MS_RDONLY,
-        None::<&str>,
+        None,
     )?;
+
     log::debug!("readonly path {:?} mounted", path);
     Ok(())
 }
 
 // For files, bind mounts /dev/null over the top of the specified path.
 // For directories, mounts read-only tmpfs over the top of the specified path.
-fn masked_path(path: &str, mount_label: &Option<String>) -> Result<()> {
-    match nix_mount::<str, str, str, str>(
-        Some("/dev/null"),
+fn masked_path(path: &Path, mount_label: &Option<String>, syscall: &dyn Syscall) -> Result<()> {
+    if let Err(e) = syscall.mount(
+        Some(Path::new("/dev/null")),
         path,
-        None::<&str>,
+        None,
         MsFlags::MS_BIND,
-        None::<&str>,
+        None,
     ) {
-        // ignore error if path is not exist.
-        Err(nix::errno::Errno::ENOENT) => {
-            log::warn!("masked path {:?} not exist", path);
-            return Ok(());
+        if let Some(errno) = e.downcast_ref() {
+            if matches!(errno, nix::errno::Errno::ENOENT) {
+                log::warn!("masked path {:?} not exist", path);
+            } else if matches!(errno, nix::errno::Errno::ENOTDIR) {
+                let label = match mount_label {
+                    Some(l) => format!("context=\"{}\"", l),
+                    None => "".to_string(),
+                };
+                syscall.mount(
+                    Some(Path::new("tmpfs")),
+                    path,
+                    Some("tmpfs"),
+                    MsFlags::MS_RDONLY,
+                    Some(label.as_str()),
+                )?;
+            }
+        } else {
+            bail!(e)
         }
-        Err(nix::errno::Errno::ENOTDIR) => {
-            let label = match mount_label {
-                Some(l) => format!("context={}", l),
-                None => "".to_string(),
-            };
-            let _ = nix_mount(
-                Some("tmpfs"),
-                path,
-                Some("tmpfs"),
-                MsFlags::MS_RDONLY,
-                Some(label.as_str()),
-            );
-        }
-        Err(err) => bail!(err),
-        Ok(_) => {}
     };
     Ok(())
 }
@@ -261,26 +260,28 @@ pub fn container_init_process(
     }
 
     if let Some(true) = spec.root().as_ref().map(|r| r.readonly().unwrap_or(false)) {
-        nix_mount(
-            None::<&str>,
-            "/",
-            None::<&str>,
+        syscall.mount(
+            None,
+            Path::new("/"),
+            None,
             MsFlags::MS_RDONLY | MsFlags::MS_REMOUNT | MsFlags::MS_BIND,
-            None::<&str>,
+            None,
         )?
     }
 
     if let Some(paths) = linux.readonly_paths() {
         // mount readonly path
         for path in paths {
-            readonly_path(path).context("Failed to set read only path")?;
+            readonly_path(Path::new(path), syscall)
+                .with_context(|| format!("Failed to set read only path {:?}", path))?;
         }
     }
 
     if let Some(paths) = linux.masked_paths() {
         // mount masked path
         for path in paths {
-            masked_path(path, linux.mount_label()).context("Failed to set masked path")?;
+            masked_path(Path::new(path), linux.mount_label(), syscall)
+                .with_context(|| format!("Failed to set masked path {:?}", path))?;
         }
     }
 
@@ -298,7 +299,7 @@ pub fn container_init_process(
         }
     };
 
-    set_supplementary_gids(proc.user(), args.rootless)
+    set_supplementary_gids(proc.user(), args.rootless, syscall)
         .context("failed to set supplementary gids")?;
 
     syscall
@@ -447,7 +448,11 @@ pub fn container_init_process(
 //
 // Privileged user starting a normal container: Just add the supplementary groups.
 //
-fn set_supplementary_gids(user: &User, rootless: &Option<Rootless>) -> Result<()> {
+fn set_supplementary_gids(
+    user: &User,
+    rootless: &Option<Rootless>,
+    syscall: &dyn Syscall,
+) -> Result<()> {
     if let Some(additional_gids) = user.additional_gids() {
         if additional_gids.is_empty() {
             return Ok(());
@@ -466,10 +471,14 @@ fn set_supplementary_gids(user: &User, rootless: &Option<Rootless>) -> Result<()
 
         match rootless {
             Some(r) if r.privileged => {
-                nix::unistd::setgroups(&gids).context("failed to set supplementary gids")?;
+                syscall.set_groups(&gids).with_context(|| {
+                    format!("failed to set privileged supplementary gids: {:?}", gids)
+                })?;
             }
             None => {
-                nix::unistd::setgroups(&gids).context("failed to set supplementary gids")?;
+                syscall.set_groups(&gids).with_context(|| {
+                    format!("failed to set unprivileged supplementary gids: {:?}", gids)
+                })?;
             }
             // this should have been detected during validation
             _ => unreachable!(
@@ -502,8 +511,12 @@ fn sync_seccomp(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use anyhow::{bail, Result};
+    use crate::syscall::{
+        syscall::create_syscall,
+        test::{ArgName, MountArgs, TestHelperSyscall},
+    };
     use nix::{fcntl, sys, unistd};
+    use oci_spec::runtime::{LinuxNamespaceBuilder, SpecBuilder, UserBuilder};
     use serial_test::serial;
     use std::{fs, os::unix::prelude::AsRawFd};
 
@@ -551,5 +564,236 @@ mod tests {
 
         unistd::close(fd)?;
         Ok(())
+    }
+
+    #[test]
+    fn test_readonly_path() -> Result<()> {
+        let syscall = create_syscall();
+        readonly_path(Path::new("/proc/sys"), syscall.as_ref())?;
+
+        let want = vec![
+            MountArgs {
+                source: Some(PathBuf::from("/proc/sys")),
+                target: PathBuf::from("/proc/sys"),
+                fstype: None,
+                flags: MsFlags::MS_BIND | MsFlags::MS_REC,
+                data: None,
+            },
+            MountArgs {
+                source: Some(PathBuf::from("/proc/sys")),
+                target: PathBuf::from("/proc/sys"),
+                fstype: None,
+                flags: MsFlags::MS_NOSUID
+                    | MsFlags::MS_NODEV
+                    | MsFlags::MS_NOEXEC
+                    | MsFlags::MS_BIND
+                    | MsFlags::MS_REMOUNT
+                    | MsFlags::MS_RDONLY,
+                data: None,
+            },
+        ];
+        let got = syscall
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap()
+            .get_mount_args();
+
+        assert_eq!(want, *got);
+        assert_eq!(got.len(), 2);
+        Ok(())
+    }
+
+    #[test]
+    fn test_apply_rest_namespaces() -> Result<()> {
+        let syscall = create_syscall();
+        let spec = SpecBuilder::default().build()?;
+        let linux_spaces = vec![
+            LinuxNamespaceBuilder::default()
+                .typ(LinuxNamespaceType::Uts)
+                .build()?,
+            LinuxNamespaceBuilder::default()
+                .typ(LinuxNamespaceType::Pid)
+                .build()?,
+        ];
+        let namespaces = Namespaces::from(Some(&linux_spaces));
+
+        apply_rest_namespaces(&namespaces, &spec, syscall.as_ref())?;
+
+        let got_hostnames = syscall
+            .as_ref()
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap()
+            .get_hostname_args();
+        assert_eq!(1, got_hostnames.len());
+        assert_eq!("youki".to_string(), got_hostnames[0]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_set_supplementary_gids() -> Result<()> {
+        // gids additional gids is empty case
+        let user = UserBuilder::default().build().unwrap();
+        assert!(set_supplementary_gids(&user, &None, create_syscall().as_ref()).is_ok());
+
+        let tests = vec![
+            (
+                UserBuilder::default()
+                    .additional_gids(vec![33, 34])
+                    .build()?,
+                None::<Rootless>,
+                vec![vec![Gid::from_raw(33), Gid::from_raw(34)]],
+            ),
+            // unreachable case
+            (
+                UserBuilder::default().build()?,
+                Some(Rootless::default()),
+                vec![],
+            ),
+            (
+                UserBuilder::default()
+                    .additional_gids(vec![37, 38])
+                    .build()?,
+                Some(Rootless {
+                    privileged: true,
+                    gid_mappings: None,
+                    newgidmap: None,
+                    newuidmap: None,
+                    uid_mappings: None,
+                    user_namespace: None,
+                }),
+                vec![vec![Gid::from_raw(37), Gid::from_raw(38)]],
+            ),
+        ];
+        for (user, rootless, want) in tests.into_iter() {
+            let syscall = create_syscall();
+            let result = set_supplementary_gids(&user, &rootless, syscall.as_ref());
+            match fs::read_to_string("/proc/self/setgroups")?.trim() {
+                "deny" => {
+                    assert!(result.is_err());
+                }
+                "allow" => {
+                    assert!(result.is_ok());
+                    let got = syscall
+                        .as_any()
+                        .downcast_ref::<TestHelperSyscall>()
+                        .unwrap()
+                        .get_groups_args();
+                    assert_eq!(want, got);
+                }
+                _ => unreachable!("setgroups value unknown"),
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    #[serial]
+    fn test_sync_seccomp() -> Result<()> {
+        use std::os::unix::io::IntoRawFd;
+        use std::thread;
+        use utils::create_temp_dir;
+
+        let tmp_dir = create_temp_dir("test_sync_seccomp")?;
+        let tmp_file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open(tmp_dir.path().join("temp_file"))
+            .expect("create temp file failed");
+
+        let (mut main_sender, mut main_receiver) = channel::main_channel()?;
+        let (mut init_sender, mut init_receiver) = channel::init_channel()?;
+
+        let fd = tmp_file.into_raw_fd();
+        let th = thread::spawn(move || {
+            assert!(main_receiver.wait_for_seccomp_request().is_ok());
+            assert!(init_sender.seccomp_notify_done().is_ok());
+        });
+
+        // sync_seccomp close the fd,
+        sync_seccomp(Some(fd), &mut main_sender, &mut init_receiver)?;
+        // so expecting close the same fd again will causing EBADF error.
+        assert_eq!(nix::errno::Errno::EBADF, unistd::close(fd).unwrap_err());
+        assert!(th.join().is_ok());
+        Ok(())
+    }
+
+    #[test]
+    fn test_masked_path_does_not_exist() {
+        let syscall = create_syscall();
+        let mocks = syscall
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap();
+        mocks.set_ret_err(ArgName::Mount, || bail!(nix::errno::Errno::ENOENT));
+
+        assert!(masked_path(Path::new("/proc/self"), &None, syscall.as_ref()).is_ok());
+        let got = mocks.get_mount_args();
+        assert_eq!(0, got.len());
+    }
+
+    #[test]
+    fn test_masked_path_is_file_with_no_label() {
+        let syscall = create_syscall();
+        let mocks = syscall
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap();
+        mocks.set_ret_err(ArgName::Mount, || bail!(nix::errno::Errno::ENOTDIR));
+
+        assert!(masked_path(Path::new("/proc/self"), &None, syscall.as_ref()).is_ok());
+
+        let got = mocks.get_mount_args();
+        let want = MountArgs {
+            source: Some(PathBuf::from("tmpfs")),
+            target: PathBuf::from("/proc/self"),
+            fstype: Some("tmpfs".to_string()),
+            flags: MsFlags::MS_RDONLY,
+            data: Some("".to_string()),
+        };
+        assert_eq!(1, got.len());
+        assert_eq!(want, got[0]);
+    }
+
+    #[test]
+    fn test_masked_path_is_file_with_label() {
+        let syscall = create_syscall();
+        let mocks = syscall
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap();
+        mocks.set_ret_err(ArgName::Mount, || bail!(nix::errno::Errno::ENOTDIR));
+
+        assert!(masked_path(
+            Path::new("/proc/self"),
+            &Some("default".to_string()),
+            syscall.as_ref()
+        )
+        .is_ok());
+
+        let got = mocks.get_mount_args();
+        let want = MountArgs {
+            source: Some(PathBuf::from("tmpfs")),
+            target: PathBuf::from("/proc/self"),
+            fstype: Some("tmpfs".to_string()),
+            flags: MsFlags::MS_RDONLY,
+            data: Some("context=\"default\"".to_string()),
+        };
+        assert_eq!(1, got.len());
+        assert_eq!(want, got[0]);
+    }
+
+    #[test]
+    fn test_masked_path_with_unknown_error() {
+        let syscall = create_syscall();
+        let mocks = syscall
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap();
+        mocks.set_ret_err(ArgName::Mount, || bail!("unknown error"));
+
+        assert!(masked_path(Path::new("/proc/self"), &None, syscall.as_ref()).is_err());
+        let got = mocks.get_mount_args();
+        assert_eq!(0, got.len());
     }
 }

@@ -1,16 +1,16 @@
 use anyhow::{bail, Context, Result};
-use clap::{self, Clap};
+use clap::{self, Parser};
 use libcgroups;
 use libcontainer::{container::Container, utils};
 use std::{path::PathBuf, process::Command};
 
 /// Display the processes inside the container
-#[derive(Clap, Debug)]
+#[derive(Parser, Debug)]
 pub struct Ps {
     /// format to display processes: table or json (default: "table")
     #[clap(short, long, default_value = "table")]
     format: String,
-    #[clap(required = true)]
+    #[clap(forbid_empty_values = true, required = true)]
     pub container_id: String,
     /// options will be passed to the ps utility
     #[clap(setting = clap::ArgSettings::Last)]
@@ -38,7 +38,11 @@ impl Ps {
             let systemd_cgroup = container
                 .systemd()
                 .context("could not determine cgroup manager")?;
-            let cmanager = libcgroups::common::create_cgroup_manager(cgroups_path, systemd_cgroup)?;
+            let cmanager = libcgroups::common::create_cgroup_manager(
+                cgroups_path,
+                systemd_cgroup,
+                container.id(),
+            )?;
             let pids: Vec<i32> = cmanager
                 .get_all_pids()?
                 .iter()

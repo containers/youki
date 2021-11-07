@@ -10,7 +10,11 @@ if [[ "$1" == "--release" ]]; then
 fi
 
 cargo build --verbose $TGT $1
-rm -f youki
-rm -f youki_integration_test
+if [ ! -e ./youki ]; then
+    rm -f youki
+fi 
+if [ ! -e ./youki_integration_test ]; then
+    rm -f youki_integration_test
+fi
 cp target/$TARGET/$VERSION/youki .
 cp target/$TARGET/$VERSION/integration_test ./youki_integration_test

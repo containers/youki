@@ -1,12 +1,12 @@
 use crate::commands::load_container;
 use anyhow::{Context, Result};
-use clap::Clap;
+use clap::Parser;
 use std::path::PathBuf;
 
 /// Release any resources held by the container
-#[derive(Clap, Debug)]
+#[derive(Parser, Debug)]
 pub struct Delete {
-    #[clap(required = true)]
+    #[clap(forbid_empty_values = true, required = true)]
     container_id: String,
     /// forces deletion of the container if it is still running (using SIGKILL)
     #[clap(short, long)]

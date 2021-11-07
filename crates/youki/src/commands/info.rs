@@ -2,13 +2,13 @@
 use std::{collections::HashSet, fs, path::Path};
 
 use anyhow::Result;
-use clap::Clap;
+use clap::Parser;
 use procfs::{CpuInfo, Meminfo};
 
 use libcgroups::{common::CgroupSetup, v2::controller_type::ControllerType};
 
 /// Show information about the system
-#[derive(Clap, Debug)]
+#[derive(Parser, Debug)]
 pub struct Info {}
 
 impl Info {

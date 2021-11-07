@@ -1,5 +1,5 @@
 use anyhow::Result;
-use clap::Clap;
+use clap::Parser;
 use nix;
 use oci_spec::runtime::Mount;
 use oci_spec::runtime::{
@@ -11,7 +11,7 @@ use std::fs::File;
 use std::path::Path;
 use std::path::PathBuf;
 /// Command generates a config.json
-#[derive(Clap, Debug)]
+#[derive(Parser, Debug)]
 pub struct SpecJson {
     /// Generate a configuration for a rootless container
     #[clap(long)]
