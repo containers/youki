@@ -55,7 +55,11 @@ impl<'a> ContainerBuilderImpl<'a> {
     fn run_container(&mut self) -> Result<()> {
         let linux = self.spec.linux().as_ref().context("no linux in spec")?;
         let cgroups_path = utils::get_cgroup_path(linux.cgroups_path(), &self.container_id);
-        let cmanager = libcgroups::common::create_cgroup_manager(&cgroups_path, self.use_systemd)?;
+        let cmanager = libcgroups::common::create_cgroup_manager(
+            &cgroups_path,
+            self.use_systemd,
+            &self.container_id,
+        )?;
         let process = self.spec.process().as_ref().context("No process in spec")?;
 
         if self.init {
@@ -136,7 +140,11 @@ impl<'a> ContainerBuilderImpl<'a> {
     fn cleanup_container(&self) -> Result<()> {
         let linux = self.spec.linux().as_ref().context("no linux in spec")?;
         let cgroups_path = utils::get_cgroup_path(linux.cgroups_path(), &self.container_id);
-        let cmanager = libcgroups::common::create_cgroup_manager(&cgroups_path, self.use_systemd)?;
+        let cmanager = libcgroups::common::create_cgroup_manager(
+            &cgroups_path,
+            self.use_systemd,
+            &self.container_id,
+        )?;
 
         let mut errors = Vec::new();
         if let Err(e) = cmanager.remove().context("failed to remove cgroup") {

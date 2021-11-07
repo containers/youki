@@ -15,13 +15,8 @@ use oci_spec::runtime::{
     LinuxDevice, LinuxDeviceBuilder, LinuxDeviceCgroup, LinuxDeviceCgroupBuilder, LinuxDeviceType,
     LinuxResources,
 };
-#[cfg(feature = "systemd_cgroups")]
-use systemd::daemon::booted;
-#[cfg(not(feature = "systemd_cgroups"))]
-fn booted() -> Result<bool> {
-    bail!("This build does not include the systemd cgroups feature")
-}
 
+use super::systemd;
 use super::v1;
 use super::v2;
 
@@ -175,6 +170,7 @@ pub fn get_cgroup_setup() -> Result<CgroupSetup> {
 pub fn create_cgroup_manager<P: Into<PathBuf>>(
     cgroup_path: P,
     systemd_cgroup: bool,
+    container_name: &str,
 ) -> Result<Box<dyn CgroupManager>> {
     let cgroup_setup = get_cgroup_setup()?;
 
@@ -185,13 +181,14 @@ pub fn create_cgroup_manager<P: Into<PathBuf>>(
         }
         CgroupSetup::Unified => {
             if systemd_cgroup {
-                if !booted()? {
+                if !systemd::booted() {
                     bail!("systemd cgroup flag passed, but systemd support for managing cgroups is not available");
                 }
                 log::info!("systemd cgroup manager will be used");
-                return Ok(Box::new(v2::SystemDCGroupManager::new(
+                return Ok(Box::new(systemd::manager::Manager::new(
                     DEFAULT_CGROUP_ROOT.into(),
                     cgroup_path.into(),
+                    container_name.into(),
                 )?));
             }
             log::info!("cgroup manager V2 will be used");
