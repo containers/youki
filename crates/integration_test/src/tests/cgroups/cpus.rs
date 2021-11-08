@@ -106,6 +106,7 @@ fn get_realtime_runtime() -> Option<i64> {
 
 fn test_cpu_cgroups() -> TestResult {
     let cgroup_name = "test_cpu_cgroups";
+    // Kernel counts 0 as a CPU, so on a system with 8 logical cores you will need `0-7` range set.
     let cpu_range = format!("0-{}", num_cpus::get() - 1);
 
     let realtime_period = get_realtime_period();
