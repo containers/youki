@@ -68,7 +68,7 @@ pub fn container_intermediate_process(
 
     // this needs to be done before we create the init process, so that the init
     // process will already be captured by the cgroup
-    if args.rootless.is_none() {
+    if args.rootless.is_some() {
         apply_cgroups(
             args.cgroup_manager.as_ref(),
             linux.resources().as_ref(),
