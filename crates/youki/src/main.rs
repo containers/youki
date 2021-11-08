@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use anyhow::bail;
 use anyhow::Context;
 use anyhow::Result;
-use clap::{crate_version, Clap};
+use clap::{crate_version, Parser};
 
 use crate::commands::create;
 use crate::commands::delete;
@@ -35,7 +35,7 @@ use nix::unistd::getuid;
 // High-level commandline option definition
 // This takes global options as well as individual commands as specified in [OCI runtime-spec](https://github.com/opencontainers/runtime-spec/blob/master/runtime.md)
 // Also check [runc commandline documentation](https://github.com/opencontainers/runc/blob/master/man/runc.8.md) for more explanation
-#[derive(Clap, Debug)]
+#[derive(Parser, Debug)]
 #[clap(version = crate_version!(), author = "youki team")]
 struct Opts {
     /// root directory to store container state
@@ -55,7 +55,7 @@ struct Opts {
 
 // Subcommands accepted by Youki, confirming with [OCI runtime-spec](https://github.com/opencontainers/runtime-spec/blob/master/runtime.md)
 // Also for a short information, check [runc commandline documentation](https://github.com/opencontainers/runc/blob/master/man/runc.8.md)
-#[derive(Clap, Debug)]
+#[derive(Parser, Debug)]
 enum SubCommand {
     #[clap(version = crate_version!(), author = "youki team")]
     Create(create::Create),
@@ -100,11 +100,11 @@ fn main() -> Result<()> {
     //
     // Ref: https://github.com/opencontainers/runc/commit/0a8e4117e7f715d5fbeef398405813ce8e88558b
     // Ref: https://github.com/lxc/lxc/commit/6400238d08cdf1ca20d49bafb85f4e224348bf9d
-    pentacle::ensure_sealed().context("Failed to seal /proc/self/exe")?;
+    pentacle::ensure_sealed().context("failed to seal /proc/self/exe")?;
 
     let opts = Opts::parse();
 
-    if let Err(e) = crate::logger::init(opts.log) {
+    if let Err(e) = crate::logger::init(opts.log_format, opts.log) {
         eprintln!("log init failed: {:?}", e);
     }
 

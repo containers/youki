@@ -12,6 +12,7 @@ These are references to various documentations and specifications, which can be 
 - [prctl man page](https://man7.org/linux/man-pages/man2/prctl.2.html) : Process control man pages
 - [OCI Linux spec](https://github.com/opencontainers/runtime-spec/blob/master/config-linux.md) : Linux specific section of OCI Spec
 - [pipe2 man page](https://man7.org/linux/man-pages/man2/pipe.2.html) : Definition and usage of pipe2
+- [systemd resource control](https://www.freedesktop.org/software/systemd/man/systemd.resource-control.html): Options offered by systemd for resource control
 
 ---
 
@@ -53,7 +54,7 @@ D ->> U : exit $code
 
 On invoking Youki, main function parses args passed to it, which contains directory path to store container state (check runc . 8 . md in [runc man pages]), optional log path and log format string and a subcommand such as create, delete etc.
 
-From there it matches subcommand arg with possible subcommand and takes appropriate actions, such as creating a new container, deleting a container erc.
+From there it matches subcommand arg with possible subcommand and takes appropriate actions, such as creating a new container, deleting a container, etc.
 
 ### create container
 

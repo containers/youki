@@ -1,4 +1,4 @@
-use clap::Clap;
+use clap::Parser;
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
@@ -6,7 +6,7 @@ use anyhow::{Context, Result};
 use crate::commands::load_container;
 
 /// Show resource statistics for the container
-#[derive(Clap, Debug)]
+#[derive(Parser, Debug)]
 pub struct Events {
     /// Sets the stats collection interval in seconds (default: 5s)
     #[clap(long, default_value = "5")]
@@ -15,7 +15,7 @@ pub struct Events {
     #[clap(long)]
     pub stats: bool,
     /// Name of the container instance
-    #[clap(required = true)]
+    #[clap(forbid_empty_values = true, required = true)]
     pub container_id: String,
 }
 

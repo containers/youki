@@ -2,15 +2,15 @@
 use std::{convert::TryInto, path::PathBuf};
 
 use anyhow::Result;
-use clap::Clap;
+use clap::Parser;
 
 use crate::commands::load_container;
 use libcontainer::signal::Signal;
 
 /// Send the specified signal to the container
-#[derive(Clap, Debug)]
+#[derive(Parser, Debug)]
 pub struct Kill {
-    #[clap(required = true)]
+    #[clap(forbid_empty_values = true, required = true)]
     container_id: String,
     signal: String,
 }

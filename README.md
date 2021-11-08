@@ -9,7 +9,8 @@
   <img src="docs/youki.png" width="230" height="230">
 </p>
 
-youki is an implementation of the [OCI runtime-spec](https://github.com/opencontainers/runtime-spec) in Rust, similar to [runc](https://github.com/opencontainers/runc).
+youki is an implementation of the [OCI runtime-spec](https://github.com/opencontainers/runtime-spec) in Rust, similar to [runc](https://github.com/opencontainers/runc).  
+Your ideas are welcome [here](https://github.com/containers/youki/issues/10).
 
 # About the name
 
@@ -34,20 +35,21 @@ Here is why we are writing a new container runtime in Rust.
 youki is not at the practical stage yet. However, it is getting closer to practical use, running with docker and passing all the default tests provided by [opencontainers/runtime-tools](https://github.com/opencontainers/runtime-tools).
 ![youki demo](docs/demo.gif)
 
-|    Feature     |                   Description                   |                                                State                                                |
-| :------------: | :---------------------------------------------: | :-------------------------------------------------------------------------------------------------: |
-|     Docker     |               Running via Docker                |                                                  ✅                                                  |
-|     Podman     |               Running via Podman                | It works, but cgroups isn't supported. WIP on [#24](https://github.com/containers/youki/issues/24)  |
-|   pivot_root   |            Change the root directory            |                                                  ✅                                                  |
-|     Mounts     |    Mount files and directories to container     |                                                  ✅                                                  |
-|   Namespaces   |         Isolation of various resources          |                                                  ✅                                                  |
-|  Capabilities  |            Limiting root privileges             |                                                  ✅                                                  |
-|   Cgroups v1   |            Resource limitations, etc            |                                                  ✅                                                  |
-|   Cgroups v2   |             Improved version of v1              | Support is complete except for devices. WIP on [#78](https://github.com/containers/youki/issues/78) |
-|    Seccomp     |             Filtering system calls              |                                                  ✅                                                  |
-|     Hooks      | Add custom processing during container creation |                                                  ✅                                                  |
-|    Rootless    |   Running a container without root privileges   | It works, but cgroups isn't supported. WIP on [#77](https://github.com/containers/youki/issues/77)  |
-| OCI Compliance |        Compliance with OCI Runtime Spec         |                                  ✅ 50 out of 50 test cases passing                                  |
+|        Feature        |                   Description                   |                                                State                                                |
+| :-------------------: | :---------------------------------------------: | :-------------------------------------------------------------------------------------------------: |
+|        Docker         |               Running via Docker                |                                                  ✅                                                  |
+|        Podman         |               Running via Podman                |                      ✅(The default systemd cgroup driver is not yet supported)                      |
+|      pivot_root       |            Change the root directory            |                                                  ✅                                                  |
+|        Mounts         |    Mount files and directories to container     |                                                  ✅                                                  |
+|      Namespaces       |         Isolation of various resources          |                                                  ✅                                                  |
+|     Capabilities      |            Limiting root privileges             |                                                  ✅                                                  |
+|      Cgroups v1       |            Resource limitations, etc            |                                                  ✅                                                  |
+|      Cgroups v2       |             Improved version of v1              | Support is complete except for devices. WIP on [#78](https://github.com/containers/youki/issues/78) |
+| Systemd cgroup driver |        Setting up a cgroup using systemd        |                     WIP on [#24](https://github.com/containers/youki/issues/24)                     |
+|        Seccomp        |             Filtering system calls              |                                                  ✅                                                  |
+|         Hooks         | Add custom processing during container creation |                                                  ✅                                                  |
+|       Rootless        |   Running a container without root privileges   | It works, but cgroups isn't supported. WIP on [#77](https://github.com/containers/youki/issues/77)  |
+|    OCI Compliance     |        Compliance with OCI Runtime Spec         |                                  ✅ 50 out of 50 test cases passing                                  |
 
 # Design and implementation of youki
 ![sequence diagram of youki](docs/.drawio.svg)
@@ -61,7 +63,7 @@ For other platforms, please use [Vagrantfile](#setting-up-vagrant) that we prepa
 
 ## Requires
 
-- Rust(See [here](https://www.rust-lang.org/tools/install))
+- Rust(See [here](https://www.rust-lang.org/tools/install)), edition 2021
 - Docker(See [here](https://docs.docker.com/engine/install))
 
 ## Dependencies

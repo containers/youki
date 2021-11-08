@@ -178,7 +178,9 @@ mod tests {
         sched::{unshare, CloneFlags},
         unistd::{self, getgid, getuid},
     };
-    use oci_spec::runtime::LinuxIdMappingBuilder;
+    use oci_spec::runtime::{
+        LinuxIdMappingBuilder, LinuxSeccompAction, LinuxSeccompBuilder, LinuxSyscallBuilder,
+    };
     use serial_test::serial;
     use std::fs;
 
@@ -274,6 +276,65 @@ mod tests {
                 std::process::exit(0);
             }
         }
+        Ok(())
+    }
+
+    #[test]
+    #[serial]
+    fn test_sync_seccomp() -> Result<()> {
+        use std::io::Read;
+        use std::os::unix::io::IntoRawFd;
+        use std::os::unix::net::UnixListener;
+        use std::thread;
+        use utils::create_temp_dir;
+
+        let tmp_dir = create_temp_dir("test_sync_seccomp")?;
+        let scmp_file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open(tmp_dir.path().join("scmp_file"))?;
+
+        std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open(tmp_dir.path().join("socket_file.sock"))?;
+
+        let (mut main_sender, mut main_receiver) = channel::main_channel()?;
+        let (mut init_sender, mut init_receiver) = channel::init_channel()?;
+        let socket_path = tmp_dir.path().join("socket_file.sock");
+        let socket_path_seccomp_th = socket_path.clone();
+
+        let state = ContainerProcessState::default();
+        let want = serde_json::to_string(&state)?;
+        let th = thread::spawn(move || {
+            sync_seccomp(
+                &LinuxSeccompBuilder::default()
+                    .listener_path(socket_path_seccomp_th)
+                    .syscalls(vec![LinuxSyscallBuilder::default()
+                        .action(LinuxSeccompAction::ScmpActNotify)
+                        .build()
+                        .unwrap()])
+                    .build()
+                    .unwrap(),
+                &state,
+                &mut init_sender,
+                &mut main_receiver,
+            )
+            .unwrap();
+        });
+
+        let fd = scmp_file.into_raw_fd();
+        assert!(main_sender.seccomp_notify_request(fd).is_ok());
+
+        fs::remove_file(socket_path.clone())?;
+        let lis = UnixListener::bind(socket_path)?;
+        let (mut socket, _) = lis.accept()?;
+        let mut got = String::new();
+        socket.read_to_string(&mut got)?;
+        assert!(init_receiver.wait_for_seccomp_request_done().is_ok());
+
+        assert_eq!(want, got);
+        assert!(th.join().is_ok());
         Ok(())
     }
 }

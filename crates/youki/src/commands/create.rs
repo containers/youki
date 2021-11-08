@@ -1,12 +1,12 @@
 //! Handles the creation of a new container
 use anyhow::Result;
-use clap::Clap;
+use clap::Parser;
 use std::path::PathBuf;
 
 use libcontainer::{container::builder::ContainerBuilder, syscall::syscall::create_syscall};
 
 /// Create a container
-#[derive(Clap, Debug)]
+#[derive(Parser, Debug)]
 pub struct Create {
     /// File to write pid of the container created
     // note that in the end, container is just another process
@@ -22,7 +22,7 @@ pub struct Create {
     #[clap(long, default_value = "0")]
     preserve_fds: i32,
     /// name of the container instance to be started
-    #[clap(required = true)]
+    #[clap(forbid_empty_values = true, required = true)]
     pub container_id: String,
 }
 

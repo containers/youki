@@ -1,7 +1,7 @@
+#![cfg_attr(coverage, feature(no_coverage))]
 pub mod apparmor;
 pub mod capabilities;
 pub mod container;
-pub mod dbus;
 pub mod hooks;
 pub mod namespaces;
 pub mod notify_socket;

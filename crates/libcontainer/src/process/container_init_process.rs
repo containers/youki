@@ -6,7 +6,6 @@ use crate::{
     rootless::Rootless, seccomp, tty, utils,
 };
 use anyhow::{bail, Context, Result};
-use nix::mount::mount as nix_mount;
 use nix::mount::MsFlags;
 use nix::sched::CloneFlags;
 use nix::{
@@ -128,34 +127,33 @@ fn readonly_path(path: &Path, syscall: &dyn Syscall) -> Result<()> {
 
 // For files, bind mounts /dev/null over the top of the specified path.
 // For directories, mounts read-only tmpfs over the top of the specified path.
-fn masked_path(path: &str, mount_label: &Option<String>) -> Result<()> {
-    match nix_mount::<str, str, str, str>(
-        Some("/dev/null"),
+fn masked_path(path: &Path, mount_label: &Option<String>, syscall: &dyn Syscall) -> Result<()> {
+    if let Err(e) = syscall.mount(
+        Some(Path::new("/dev/null")),
         path,
-        None::<&str>,
+        None,
         MsFlags::MS_BIND,
-        None::<&str>,
+        None,
     ) {
-        // ignore error if path is not exist.
-        Err(nix::errno::Errno::ENOENT) => {
-            log::warn!("masked path {:?} not exist", path);
-            return Ok(());
+        if let Some(errno) = e.downcast_ref() {
+            if matches!(errno, nix::errno::Errno::ENOENT) {
+                log::warn!("masked path {:?} not exist", path);
+            } else if matches!(errno, nix::errno::Errno::ENOTDIR) {
+                let label = match mount_label {
+                    Some(l) => format!("context=\"{}\"", l),
+                    None => "".to_string(),
+                };
+                syscall.mount(
+                    Some(Path::new("tmpfs")),
+                    path,
+                    Some("tmpfs"),
+                    MsFlags::MS_RDONLY,
+                    Some(label.as_str()),
+                )?;
+            }
+        } else {
+            bail!(e)
         }
-        Err(nix::errno::Errno::ENOTDIR) => {
-            let label = match mount_label {
-                Some(l) => format!("context={}", l),
-                None => "".to_string(),
-            };
-            let _ = nix_mount(
-                Some("tmpfs"),
-                path,
-                Some("tmpfs"),
-                MsFlags::MS_RDONLY,
-                Some(label.as_str()),
-            );
-        }
-        Err(err) => bail!(err),
-        Ok(_) => {}
     };
     Ok(())
 }
@@ -262,12 +260,12 @@ pub fn container_init_process(
     }
 
     if let Some(true) = spec.root().as_ref().map(|r| r.readonly().unwrap_or(false)) {
-        nix_mount(
-            None::<&str>,
-            "/",
-            None::<&str>,
+        syscall.mount(
+            None,
+            Path::new("/"),
+            None,
             MsFlags::MS_RDONLY | MsFlags::MS_REMOUNT | MsFlags::MS_BIND,
-            None::<&str>,
+            None,
         )?
     }
 
@@ -282,7 +280,8 @@ pub fn container_init_process(
     if let Some(paths) = linux.masked_paths() {
         // mount masked path
         for path in paths {
-            masked_path(path, linux.mount_label()).context("Failed to set masked path")?;
+            masked_path(Path::new(path), linux.mount_label(), syscall)
+                .with_context(|| format!("Failed to set masked path {:?}", path))?;
         }
     }
 
@@ -514,7 +513,7 @@ mod tests {
     use super::*;
     use crate::syscall::{
         syscall::create_syscall,
-        test::{MountArgs, TestHelperSyscall},
+        test::{ArgName, MountArgs, TestHelperSyscall},
     };
     use nix::{fcntl, sys, unistd};
     use oci_spec::runtime::{LinuxNamespaceBuilder, SpecBuilder, UserBuilder};
@@ -686,5 +685,115 @@ mod tests {
             }
         }
         Ok(())
+    }
+
+    #[test]
+    #[serial]
+    fn test_sync_seccomp() -> Result<()> {
+        use std::os::unix::io::IntoRawFd;
+        use std::thread;
+        use utils::create_temp_dir;
+
+        let tmp_dir = create_temp_dir("test_sync_seccomp")?;
+        let tmp_file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open(tmp_dir.path().join("temp_file"))
+            .expect("create temp file failed");
+
+        let (mut main_sender, mut main_receiver) = channel::main_channel()?;
+        let (mut init_sender, mut init_receiver) = channel::init_channel()?;
+
+        let fd = tmp_file.into_raw_fd();
+        let th = thread::spawn(move || {
+            assert!(main_receiver.wait_for_seccomp_request().is_ok());
+            assert!(init_sender.seccomp_notify_done().is_ok());
+        });
+
+        // sync_seccomp close the fd,
+        sync_seccomp(Some(fd), &mut main_sender, &mut init_receiver)?;
+        // so expecting close the same fd again will causing EBADF error.
+        assert_eq!(nix::errno::Errno::EBADF, unistd::close(fd).unwrap_err());
+        assert!(th.join().is_ok());
+        Ok(())
+    }
+
+    #[test]
+    fn test_masked_path_does_not_exist() {
+        let syscall = create_syscall();
+        let mocks = syscall
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap();
+        mocks.set_ret_err(ArgName::Mount, || bail!(nix::errno::Errno::ENOENT));
+
+        assert!(masked_path(Path::new("/proc/self"), &None, syscall.as_ref()).is_ok());
+        let got = mocks.get_mount_args();
+        assert_eq!(0, got.len());
+    }
+
+    #[test]
+    fn test_masked_path_is_file_with_no_label() {
+        let syscall = create_syscall();
+        let mocks = syscall
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap();
+        mocks.set_ret_err(ArgName::Mount, || bail!(nix::errno::Errno::ENOTDIR));
+
+        assert!(masked_path(Path::new("/proc/self"), &None, syscall.as_ref()).is_ok());
+
+        let got = mocks.get_mount_args();
+        let want = MountArgs {
+            source: Some(PathBuf::from("tmpfs")),
+            target: PathBuf::from("/proc/self"),
+            fstype: Some("tmpfs".to_string()),
+            flags: MsFlags::MS_RDONLY,
+            data: Some("".to_string()),
+        };
+        assert_eq!(1, got.len());
+        assert_eq!(want, got[0]);
+    }
+
+    #[test]
+    fn test_masked_path_is_file_with_label() {
+        let syscall = create_syscall();
+        let mocks = syscall
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap();
+        mocks.set_ret_err(ArgName::Mount, || bail!(nix::errno::Errno::ENOTDIR));
+
+        assert!(masked_path(
+            Path::new("/proc/self"),
+            &Some("default".to_string()),
+            syscall.as_ref()
+        )
+        .is_ok());
+
+        let got = mocks.get_mount_args();
+        let want = MountArgs {
+            source: Some(PathBuf::from("tmpfs")),
+            target: PathBuf::from("/proc/self"),
+            fstype: Some("tmpfs".to_string()),
+            flags: MsFlags::MS_RDONLY,
+            data: Some("context=\"default\"".to_string()),
+        };
+        assert_eq!(1, got.len());
+        assert_eq!(want, got[0]);
+    }
+
+    #[test]
+    fn test_masked_path_with_unknown_error() {
+        let syscall = create_syscall();
+        let mocks = syscall
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap();
+        mocks.set_ret_err(ArgName::Mount, || bail!("unknown error"));
+
+        assert!(masked_path(Path::new("/proc/self"), &None, syscall.as_ref()).is_err());
+        let got = mocks.get_mount_args();
+        assert_eq!(0, got.len());
     }
 }
