@@ -32,7 +32,7 @@ impl Manager {
             if let Ok(subsystem_path) = Self::get_subsystem_path(&cgroup_path, subsystem) {
                 subsystems.insert(subsystem.clone(), subsystem_path);
             } else {
-                log::warn!("Cgroup {} not supported on this system", subsystem);
+                log::warn!("cgroup {} not supported on this system", subsystem);
             }
         }
 
@@ -88,7 +88,7 @@ impl Manager {
                 if let Some(subsystem_path) = self.subsystems.get(controller) {
                     required_controllers.insert(controller, subsystem_path);
                 } else {
-                    bail!("Cgroup {} is required to fullfill the request, but is not supported by this system", controller);
+                    bail!("cgroup {} is required to fullfill the request, but is not supported by this system", controller);
                 }
             }
         }
