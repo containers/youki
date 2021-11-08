@@ -64,6 +64,7 @@ fn main() -> Result<()> {
     let pidfile = get_pidfile_test();
     let ns_itype = get_ns_itype_tests();
     let cgroup_v1_pids = cgroups::pids::get_test_group();
+    let cgroup_v1_cpus = cgroups::cpus::get_test_group();
     let seccomp_notify = get_seccomp_notify_test();
 
     tm.add_test_group(&cl);
@@ -72,6 +73,7 @@ fn main() -> Result<()> {
     tm.add_test_group(&pidfile);
     tm.add_test_group(&ns_itype);
     tm.add_test_group(&cgroup_v1_pids);
+    tm.add_test_group(&cgroup_v1_cpus);
 
     tm.add_cleanup(Box::new(cgroups::cleanup));
     tm.add_test_group(&seccomp_notify);

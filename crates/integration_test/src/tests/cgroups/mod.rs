@@ -4,6 +4,7 @@ use anyhow::{Context, Result};
 use procfs::process::Process;
 use std::fs;
 
+pub mod cpus;
 pub mod pids;
 
 pub fn cleanup() -> Result<()> {
