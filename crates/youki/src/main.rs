@@ -38,6 +38,11 @@ use nix::unistd::getuid;
 #[derive(Parser, Debug)]
 #[clap(version = crate_version!(), author = "youki team")]
 struct Opts {
+    // I don't know how to get the log level when the --debug flag is not set (I want to show some default values on the help page when the options are not set)
+    // Example: '--debug     change log level to debug. (default: "warn")'
+    /// change log level to debug.
+    #[clap(long)]
+    debug: bool,
     #[clap(short, long)]
     log: Option<PathBuf>,
     #[clap(long)]
@@ -104,7 +109,7 @@ fn main() -> Result<()> {
 
     let opts = Opts::parse();
 
-    if let Err(e) = crate::logger::init(opts.log, opts.log_format) {
+    if let Err(e) = crate::logger::init(opts.debug, opts.log, opts.log_format) {
         eprintln!("log init failed: {:?}", e);
     }
 

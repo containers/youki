@@ -1,9 +1,13 @@
 //! Default Youki Logger
 
 use anyhow::{bail, Context, Result};
+use log::LevelFilter;
+use std::env;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
+use std::process::exit;
+use std::str::FromStr;
 
 /// If in debug mode, default level is debug to get maximum logging
 #[cfg(debug_assertions)]
@@ -19,11 +23,36 @@ const LOG_FORMAT_JSON: &str = "json";
 /// Initialize the logger, must be called before accessing the logger
 /// Multiple parts might call this at once, but the actual initialization
 /// is done only once due to use of OnceCell
-pub fn init(log_file: Option<PathBuf>, log_format: Option<String>) -> Result<()> {
+pub fn init(
+    log_debug_flag: bool,
+    log_file: Option<PathBuf>,
+    log_format: Option<String>,
+) -> Result<()> {
     let formatter = match log_format.as_deref() {
         None | Some(LOG_FORMAT_TEXT) => text_write,
         Some(LOG_FORMAT_JSON) => json_write,
         Some(unknown) => bail!("unknown log format: {}", unknown),
+    };
+    let log_level_from_env = match env::var("YOUKI_LOG_LEVEL") {
+        Ok(val) => val,
+        Err(err) => {
+            log::error!("unknown log level env: {}", err);
+            exit(1)
+        }
+    };
+    let log_level = if log_debug_flag {
+        "debug"
+    } else if log_level_from_env != "" {
+        &log_level_from_env
+    } else {
+        DEFAULT_LOG_LEVEL
+    };
+    let log_level = match LevelFilter::from_str(log_level) {
+        Ok(val) => val,
+        Err(err) => {
+            log::error!("error: {}", err);
+            exit(1)
+        }
     };
     let target = if let Some(log_file) = log_file {
         let file = OpenOptions::new()
@@ -36,12 +65,11 @@ pub fn init(log_file: Option<PathBuf>, log_format: Option<String>) -> Result<()>
     } else {
         env_logger::Target::Stderr
     };
-    env_logger::Builder::from_env(
-        env_logger::Env::default().filter_or("YOUKI_LOG_LEVEL", DEFAULT_LOG_LEVEL),
-    )
-    .format(formatter)
-    .target(target)
-    .init();
+    env_logger::Builder::new()
+        .filter_level(log_level)
+        .format(formatter)
+        .target(target)
+        .init();
 
     Ok(())
 }
