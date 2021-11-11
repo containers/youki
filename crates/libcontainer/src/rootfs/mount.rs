@@ -107,7 +107,7 @@ impl Mount {
             .into_iter()
             .filter(|p| p.as_path().starts_with(DEFAULT_CGROUP_ROOT))
             .collect();
-        log::debug!("Cgroup mounts: {:?}", host_mounts);
+        log::debug!("cgroup mounts: {:?}", host_mounts);
 
         // get process cgroups
         let process_cgroups: HashMap<String, String> = Process::myself()?
@@ -122,7 +122,7 @@ impl Mount {
             .root
             .join_safely(cgroup_mount.destination())
             .context("could not join rootfs path with cgroup mount destination")?;
-        log::debug!("Cgroup root: {:?}", cgroup_root);
+        log::debug!("cgroup root: {:?}", cgroup_root);
 
         let symlink = Symlink::new();
 

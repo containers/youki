@@ -17,7 +17,7 @@ pub struct Rootless<'a> {
     /// Mappings for group ids
     pub(crate) gid_mappings: Option<&'a Vec<LinuxIdMapping>>,
     /// Info on the user namespaces
-    pub(crate) user_namespace: Option<LinuxNamespace>,
+    pub user_namespace: Option<LinuxNamespace>,
     /// Is rootless container requested by a privileged user
     pub privileged: bool,
 }

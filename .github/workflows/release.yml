@@ -1,0 +1,122 @@
+name: Release
+
+on:
+  push:
+    tags: ["[0-9]+.[0-9]+.[0-9]+*"]
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+  check:
+    name: Check
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - run: sudo apt-get -y update
+      - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev libseccomp-dev
+      - name: Set up cargo
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: 1.56.1
+          override: true
+      - name: Release build
+        run: ./build.sh --release
+      - name: Cargo check
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: -- --skip integration
+
+  upload:
+    name: Upload
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - run: sudo apt-get -y update
+      - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev libseccomp-dev
+      - name: Set up cargo
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: 1.56.1
+          override: true
+      - name: Release build
+        run: ./build.sh --release
+      - name: Create output directory
+        run: mkdir output
+      - name: Copy files to output
+        run: |
+          cp youki output/
+          cp README.md output/README.md
+          cp LICENSE output/LICENSE
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: output
+          path: output/*
+
+  release:
+    name: Publish Release
+    runs-on: ubuntu-latest
+    needs:
+      - upload
+    outputs:
+      version: ${{ steps.info.outputs.version }}
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Determine Release Info
+        id: info
+        env:
+          GITHUB_REF: ${{ github.ref }}
+        run: |
+          VERSION=${GITHUB_REF##*/}
+          MAJOR=${VERSION%%.*}
+          MINOR=${VERSION%.*}
+          MINOR=${MINOR#*.}
+          PATCH=${VERSION##*.}
+          echo "::set-output name=version::${VERSION}"
+          echo "::set-output name=outputdir::youki_${MAJOR}_${MINOR}_${PATCH}_linux"
+          echo "::set-output name=innerdir::youki-${VERSION}"
+      - name: Create Release Draft
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: ${{ steps.info.outputs.version }} Release
+          draft: true
+
+      - name: Create Output Directory
+        run: mkdir -p ${{ steps.info.outputs.outputdir }}/${{ steps.info.outputs.innerdir }}
+
+      - name: Download Linux Artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: output
+          path: ${{ steps.info.outputs.outputdir }}/${{ steps.info.outputs.innerdir }}
+
+      - name: Restore File Modes
+        run: |
+          chmod 755 ${{ steps.info.outputs.outputdir }}/${{ steps.info.outputs.innerdir }}/youki
+      - name: Create tarball
+        run: tar -zcvf ${{ steps.info.outputs.outputdir }}.tar.gz ${{ steps.info.outputs.outputdir }}
+
+      - name: Upload Artifact
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./${{ steps.info.outputs.outputdir }}.tar.gz
+          asset_name: ${{ steps.info.outputs.outputdir }}.tar.gz
+          asset_content_type: application/gzip

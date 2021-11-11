@@ -38,7 +38,11 @@ impl Ps {
             let systemd_cgroup = container
                 .systemd()
                 .context("could not determine cgroup manager")?;
-            let cmanager = libcgroups::common::create_cgroup_manager(cgroups_path, systemd_cgroup)?;
+            let cmanager = libcgroups::common::create_cgroup_manager(
+                cgroups_path,
+                systemd_cgroup,
+                container.id(),
+            )?;
             let pids: Vec<i32> = cmanager
                 .get_all_pids()?
                 .iter()

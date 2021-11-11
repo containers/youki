@@ -9,7 +9,8 @@
   <img src="docs/youki.png" width="230" height="230">
 </p>
 
-youki is an implementation of the [OCI runtime-spec](https://github.com/opencontainers/runtime-spec) in Rust, similar to [runc](https://github.com/opencontainers/runc).
+youki is an implementation of the [OCI runtime-spec](https://github.com/opencontainers/runtime-spec) in Rust, similar to [runc](https://github.com/opencontainers/runc).  
+Your ideas are welcome [here](https://github.com/containers/youki/issues/10).
 
 # About the name
 
@@ -62,7 +63,7 @@ For other platforms, please use [Vagrantfile](#setting-up-vagrant) that we prepa
 
 ## Requires
 
-- Rust(See [here](https://www.rust-lang.org/tools/install))
+- Rust(See [here](https://www.rust-lang.org/tools/install)), edition 2021
 - Docker(See [here](https://docs.docker.com/engine/install))
 
 ## Dependencies
