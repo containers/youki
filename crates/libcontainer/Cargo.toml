@@ -18,7 +18,7 @@ libc = "0.2.107"
 log = "0.4"
 mio = { version = "0.7.14", features = ["os-ext", "os-poll"] }
 nix = "0.23.0"
-oci-spec = { git = "https://github.com/containers/oci-spec-rs",  rev = "d6fb1e91742313cd0d0085937e2d6df5d4669720" }
+oci-spec = { git = "https://github.com/containers/oci-spec-rs",  rev = "54c5e386f01ab37c9305cc4a83404eb157e42440" }
 path-clean = "0.1.0"
 procfs = "0.11.0"
 prctl = "1.0.0"
@@ -28,6 +28,6 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
 [dev-dependencies]
-oci-spec = { git = "https://github.com/containers/oci-spec-rs",  rev = "d6fb1e91742313cd0d0085937e2d6df5d4669720", features = ["proptests"] }
+oci-spec = { git = "https://github.com/containers/oci-spec-rs",  rev = "54c5e386f01ab37c9305cc4a83404eb157e42440", features = ["proptests"] }
 quickcheck = "1"
 serial_test = "0.5.1"
