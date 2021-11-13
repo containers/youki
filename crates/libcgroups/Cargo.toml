@@ -12,7 +12,7 @@ nix = "0.23.0"
 procfs = "0.11.0"
 log = "0.4"
 anyhow = "1.0"
-oci-spec = { git = "https://github.com/containers/oci-spec-rs",  rev = "d6fb1e91742313cd0d0085937e2d6df5d4669720" }
+oci-spec = { git = "https://github.com/containers/oci-spec-rs",  rev = "54c5e386f01ab37c9305cc4a83404eb157e42440" }
 dbus = "0.9.5"
 fixedbitset = "0.4.0"
 serde = { version = "1.0", features = ["derive"] }
@@ -22,7 +22,7 @@ errno = { version = "0.2.8", optional = true }
 libc = { version = "0.2.107", optional = true }
 
 [dev-dependencies]
-oci-spec = { git = "https://github.com/containers/oci-spec-rs",  rev = "d6fb1e91742313cd0d0085937e2d6df5d4669720", features = ["proptests"] }
+oci-spec = { git = "https://github.com/containers/oci-spec-rs",  rev = "54c5e386f01ab37c9305cc4a83404eb157e42440", features = ["proptests"] }
 quickcheck = "1"
 clap = "3.0.0-beta.5"
 serde = { version = "1.0", features = ["derive"] }

@@ -269,8 +269,7 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
 
     check_seccomp(seccomp)?;
 
-    // TODO: fix default action error number. The spec repo doesn't have it yet.
-    let default_action = translate_action(seccomp.default_action(), None);
+    let default_action = translate_action(seccomp.default_action(), seccomp.default_errno_ret());
     let mut ctx = FilterContext::default(default_action)?;
 
     if let Some(architectures) = seccomp.architectures() {
