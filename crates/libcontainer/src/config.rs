@@ -10,8 +10,9 @@ use oci_spec::runtime::{Hooks, Spec};
 
 use crate::utils;
 
-// TODO: comments and examples
-#[derive(Clone, Debug, Deserialize, Serialize)]
+/// A configuration for passing information obtained during container creation to other commands.
+/// Keeping the information to a minimum improves performance.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct YoukiConfig {
     pub hooks: Option<Hooks>,
     pub cgroup_path: PathBuf,
