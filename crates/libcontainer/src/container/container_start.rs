@@ -40,7 +40,7 @@ impl Container {
             bail!(err_msg);
         }
 
-        let config = YoukiConfig::load(self.root.join("config.json"))
+        let config = YoukiConfig::load(&self.root)
             .with_context(|| format!("failed to load runtime spec for container {}", self.id()))?;
         if let Some(hooks) = config.hooks.as_ref() {
             // While prestart is marked as deprecated in the OCI spec, the docker and integration test still

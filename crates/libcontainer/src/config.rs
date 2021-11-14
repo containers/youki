@@ -10,6 +10,8 @@ use oci_spec::runtime::{Hooks, Spec};
 
 use crate::utils;
 
+const YOUKI_CONFIG_NAME: &str = "yconfig.json";
+
 /// A configuration for passing information obtained during container creation to other commands.
 /// Keeping the information to a minimum improves performance.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -34,13 +36,13 @@ impl<'a> YoukiConfig {
     }
 
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        let file = fs::File::create(path.as_ref())?;
+        let file = fs::File::create(path.as_ref().join(YOUKI_CONFIG_NAME))?;
         serde_json::to_writer(&file, self)?;
         Ok(())
     }
 
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let file = fs::File::open(path.as_ref())?;
+        let file = fs::File::open(path.as_ref().join(YOUKI_CONFIG_NAME))?;
         Ok(serde_json::from_reader(&file)?)
     }
 }
@@ -69,8 +71,8 @@ mod tests {
         let tmp = create_temp_dir("test_config_save_and_load").expect("create test directory");
         let spec = Spec::default();
         let config = YoukiConfig::from_spec(&spec, container_id)?;
-        config.save(tmp.join("yconfig.json"))?;
-        let act = YoukiConfig::load(tmp.join("yconfig.json"))?;
+        config.save(&tmp)?;
+        let act = YoukiConfig::load(&tmp)?;
         assert_eq!(act, config);
         Ok(())
     }

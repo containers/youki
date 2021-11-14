@@ -37,10 +37,9 @@ impl Container {
         log::debug!("container status: {:?}", self.status());
         if self.can_delete() {
             if self.root.exists() {
-                let config =
-                    YoukiConfig::load(self.root.join("config.json")).with_context(|| {
-                        format!("failed to load runtime spec for container {}", self.id())
-                    })?;
+                let config = YoukiConfig::load(&self.root).with_context(|| {
+                    format!("failed to load runtime spec for container {}", self.id())
+                })?;
                 log::debug!("config: {:?}", config);
 
                 // remove the directory storing container state
