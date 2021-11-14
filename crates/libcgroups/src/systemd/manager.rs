@@ -19,6 +19,7 @@ use super::{
     cpu::Cpu,
     cpuset::CpuSet,
     dbus::client::Client,
+    memory::Memory,
     pids::Pids,
 };
 use crate::common::{self, CgroupManager, ControllerOpt, FreezerState, PathBufExt};
@@ -274,16 +275,22 @@ impl CgroupManager for Manager {
                 ControllerType::Cpu => {
                     Cpu::apply(controller_opt, systemd_version, &mut properties)?
                 }
+
                 ControllerType::CpuSet => {
                     CpuSet::apply(controller_opt, systemd_version, &mut properties)?
                 }
+
                 ControllerType::Tasks => {
                     Pids::apply(controller_opt, systemd_version, &mut properties)?
                 }
-
+                ControllerType::Memory => {
+                    Memory::apply(controller_opt, systemd_version, &mut properties)?
+                }
                 _ => {}
             };
         }
+
+        log::debug!("{:?}", properties);
 
         self.client
             .set_unit_properties(&self.unit_name, &properties)
