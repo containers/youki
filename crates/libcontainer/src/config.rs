@@ -43,3 +43,34 @@ impl<'a> YoukiConfig {
         Ok(serde_json::from_reader(&file)?)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::utils::create_temp_dir;
+
+    use super::*;
+    use anyhow::Result;
+
+    #[test]
+    fn test_config_from_spec() -> Result<()> {
+        let container_id = "sample";
+        let spec = Spec::default();
+        let config = YoukiConfig::from_spec(&spec, container_id)?;
+        assert_eq!(&config.hooks, spec.hooks());
+        dbg!(&config.cgroup_path);
+        assert_eq!(config.cgroup_path, PathBuf::from(container_id));
+        Ok(())
+    }
+
+    #[test]
+    fn test_config_save_and_load() -> Result<()> {
+        let container_id = "sample";
+        let tmp = create_temp_dir("test_config_save_and_load").expect("create test directory");
+        let spec = Spec::default();
+        let config = YoukiConfig::from_spec(&spec, container_id)?;
+        config.save(tmp.join("yconfig.json"))?;
+        let act = YoukiConfig::load(tmp.join("yconfig.json"))?;
+        assert_eq!(act, config);
+        Ok(())
+    }
+}
