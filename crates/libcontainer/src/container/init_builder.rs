@@ -48,7 +48,7 @@ impl<'a> InitContainerBuilder<'a> {
             .set_annotations(spec.annotations().clone());
 
         let config = YoukiConfig::from_spec(&spec, container.id())?;
-        config.save(&container_dir.join("config.json"))?;
+        config.save(&container_dir.join("yconfig.json"))?;
 
         unistd::chdir(&container_dir)?;
         let notify_path = container_dir.join(NOTIFY_FILE);
