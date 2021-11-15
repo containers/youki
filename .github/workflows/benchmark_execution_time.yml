@@ -135,4 +135,5 @@ jobs:
       uses: marocchino/sticky-pull-request-comment@v2 
       with:
         append: true
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         path: ./bench_exec_result.md 
