@@ -19,7 +19,7 @@ const LOG_FORMAT_JSON: &str = "json";
 /// Initialize the logger, must be called before accessing the logger
 /// Multiple parts might call this at once, but the actual initialization
 /// is done only once due to use of OnceCell
-pub fn init(log_format: Option<String>, log_file: Option<PathBuf>) -> Result<()> {
+pub fn init(log_file: Option<PathBuf>, log_format: Option<String>) -> Result<()> {
     let formatter = match log_format.as_deref() {
         None | Some(LOG_FORMAT_TEXT) => text_write,
         Some(LOG_FORMAT_JSON) => json_write,
