@@ -9,8 +9,8 @@ use crate::common::ControllerOpt;
 
 use super::controller::Controller;
 
-const ALLOWED_CPUS: &str = "AllowedCPUs";
-const ALLOWED_NODES: &str = "AllowedMemoryNodes";
+pub const ALLOWED_CPUS: &str = "AllowedCPUs";
+pub const ALLOWED_NODES: &str = "AllowedMemoryNodes";
 
 pub struct CpuSet {}
 
@@ -36,67 +36,64 @@ impl CpuSet {
         systemd_version: u32,
         properties: &mut HashMap<&str, Box<dyn RefArg>>,
     ) -> Result<()> {
-        if systemd_version < 244 {
-            bail!(
-                "systemd version ({}) is too old to support cpuset restrictions",
-                systemd_version
-            );
+        if systemd_version <= 243 {
+            bail!("setting cpuset restrictions requires systemd version greather than 243");
         }
 
         if let Some(cpus) = cpu.cpus() {
-            let cpu_mask = Self::to_bitmask(cpus).context("could not create bitmask for cpus")?;
+            let cpu_mask = to_bitmask(cpus).context("could not create bitmask for cpus")?;
             properties.insert(ALLOWED_CPUS, Box::new(cpu_mask));
         }
 
         if let Some(mems) = cpu.mems() {
             let mems_mask =
-                Self::to_bitmask(mems).context("could not create bitmask for memory nodes")?;
+                to_bitmask(mems).context("could not create bitmask for memory nodes")?;
             properties.insert(ALLOWED_NODES, Box::new(mems_mask));
         }
 
         Ok(())
     }
+}
 
-    fn to_bitmask(range: &str) -> Result<Vec<u8>> {
-        let mut bitset = FixedBitSet::with_capacity(8);
+pub fn to_bitmask(range: &str) -> Result<Vec<u8>> {
+    let mut bitset = FixedBitSet::with_capacity(8);
 
-        for cpu_set in range.split_terminator(',') {
-            let cpu_set = cpu_set.trim();
-            if cpu_set.is_empty() {
-                continue;
-            }
-
-            let cpus: Vec<&str> = cpu_set.split('-').map(|s| s.trim()).collect();
-            if cpus.len() == 1 {
-                let cpu_index: usize = cpus[0].parse()?;
-                if cpu_index >= bitset.len() {
-                    bitset.grow(bitset.len() + 8);
-                }
-                bitset.set(cpu_index, true);
-            } else {
-                let start_index = cpus[0].parse()?;
-                let end_index = cpus[1].parse()?;
-                if start_index > end_index {
-                    bail!("invalid cpu range {}", cpu_set);
-                }
-
-                if end_index >= bitset.len() {
-                    bitset.grow(end_index + 1);
-                }
-
-                bitset.set_range(start_index..end_index + 1, true);
-            }
+    for cpu_set in range.split_terminator(',') {
+        let cpu_set = cpu_set.trim();
+        if cpu_set.is_empty() {
+            continue;
         }
 
-        // systemd expects a sequence of bytes with no leading zeros, otherwise the values will not be set
-        // with no error message
-        Ok(bitset
-            .as_slice()
-            .iter()
-            .flat_map(|b| b.to_be_bytes())
-            .skip_while(|b| *b == 0u8)
-            .collect())
+        let cpus: Vec<&str> = cpu_set.split('-').map(|s| s.trim()).collect();
+        if cpus.len() == 1 {
+            let cpu_index: usize = cpus[0].parse()?;
+            if cpu_index >= bitset.len() {
+                bitset.grow(bitset.len() + 8);
+            }
+            bitset.set(cpu_index, true);
+        } else {
+            let start_index = cpus[0].parse()?;
+            let end_index = cpus[1].parse()?;
+            if start_index > end_index {
+                bail!("invalid cpu range {}", cpu_set);
+            }
+
+            if end_index >= bitset.len() {
+                bitset.grow(end_index + 1);
+            }
+
+            bitset.set_range(start_index..end_index + 1, true);
+        }
     }
+
+    // systemd expects a sequence of bytes with no leading zeros, otherwise the values will not be set
+    // with no error message
+    Ok(bitset
+        .as_slice()
+        .iter()
+        .flat_map(|b| b.to_be_bytes())
+        .skip_while(|b| *b == 0u8)
+        .collect())
 }
 
 #[cfg(test)]
@@ -110,7 +107,7 @@ mod tests {
     fn to_bitmask_single_value() -> Result<()> {
         let cpus = "0"; // 0000 0001
 
-        let bitmask = CpuSet::to_bitmask(cpus).context("to bitmask")?;
+        let bitmask = to_bitmask(cpus).context("to bitmask")?;
 
         assert_eq!(bitmask.len(), 1);
         assert_eq!(bitmask[0], 1);
@@ -121,7 +118,7 @@ mod tests {
     fn to_bitmask_multiple_single_values() -> Result<()> {
         let cpus = "0,1,2"; // 0000 0111
 
-        let bitmask = CpuSet::to_bitmask(cpus).context("to bitmask")?;
+        let bitmask = to_bitmask(cpus).context("to bitmask")?;
 
         assert_eq!(bitmask.len(), 1);
         assert_eq!(bitmask[0], 7);
@@ -132,7 +129,7 @@ mod tests {
     fn to_bitmask_range_value() -> Result<()> {
         let cpus = "0-2"; // 0000 0111
 
-        let bitmask = CpuSet::to_bitmask(cpus).context("to bitmask")?;
+        let bitmask = to_bitmask(cpus).context("to bitmask")?;
 
         assert_eq!(bitmask.len(), 1);
         assert_eq!(bitmask[0], 7);
@@ -143,7 +140,7 @@ mod tests {
     fn to_bitmask_interchanged_range() -> Result<()> {
         let cpus = "2-0";
 
-        let result = CpuSet::to_bitmask(cpus).context("to bitmask");
+        let result = to_bitmask(cpus).context("to bitmask");
         assert!(result.is_err());
         Ok(())
     }
@@ -153,7 +150,7 @@ mod tests {
         let cpus = vec!["2-", "-2"];
 
         for c in cpus {
-            let result = CpuSet::to_bitmask(c).context("to bitmask");
+            let result = to_bitmask(c).context("to bitmask");
             assert!(result.is_err());
         }
 
@@ -164,7 +161,7 @@ mod tests {
     fn to_bitmask_mixed() -> Result<()> {
         let cpus = "0,2-4,7,9-10"; // 0000 0110 1001 1101
 
-        let bitmask = CpuSet::to_bitmask(cpus).context("to bitmask")?;
+        let bitmask = to_bitmask(cpus).context("to bitmask")?;
 
         assert_eq!(bitmask.len(), 2);
         assert_eq!(bitmask[0], 6);
@@ -176,7 +173,7 @@ mod tests {
     fn to_bitmask_extra_characters() -> Result<()> {
         let cpus = "0, 2- 4,,7   ,,9-10"; // 0000 0110 1001 1101
 
-        let bitmask = CpuSet::to_bitmask(cpus).context("to bitmask")?;
+        let bitmask = to_bitmask(cpus).context("to bitmask")?;
         assert_eq!(bitmask.len(), 2);
         assert_eq!(bitmask[0], 6);
         assert_eq!(bitmask[1], 157);

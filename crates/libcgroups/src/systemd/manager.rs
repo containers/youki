@@ -22,8 +22,11 @@ use super::{
     memory::Memory,
     pids::Pids,
 };
-use crate::common::{self, CgroupManager, ControllerOpt, FreezerState, PathBufExt};
 use crate::stats::Stats;
+use crate::{
+    common::{self, CgroupManager, ControllerOpt, FreezerState, PathBufExt},
+    systemd::unified::Unified,
+};
 
 const CGROUP_PROCS: &str = "cgroup.procs";
 const CGROUP_CONTROLLERS: &str = "cgroup.controllers";
@@ -290,6 +293,7 @@ impl CgroupManager for Manager {
             };
         }
 
+        Unified::apply(controller_opt, systemd_version, &mut properties)?;
         log::debug!("{:?}", properties);
 
         self.client

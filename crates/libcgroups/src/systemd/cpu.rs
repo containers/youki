@@ -7,9 +7,9 @@ use oci_spec::runtime::LinuxCpu;
 use super::controller::Controller;
 use crate::common::ControllerOpt;
 
-const CPU_WEIGHT: &str = "CPUWeight";
-const CPU_QUOTA: &str = "CPUQuotaPerSecUSec";
-const CPU_PERIOD: &str = "CPUQuotaPeriodUSec";
+pub const CPU_WEIGHT: &str = "CPUWeight";
+pub const CPU_QUOTA: &str = "CPUQuotaPerSecUSec";
+pub const CPU_PERIOD: &str = "CPUQuotaPeriodUSec";
 
 pub(crate) struct Cpu {}
 
@@ -36,7 +36,7 @@ impl Cpu {
         }
 
         if let Some(mut shares) = cpu.shares() {
-            shares = Self::convert_shares_to_cgroup2(shares);
+            shares = convert_shares_to_cgroup2(shares);
             if shares != 0 {
                 properties.insert(CPU_WEIGHT, Box::new(shares));
             }
@@ -65,14 +65,14 @@ impl Cpu {
     fn is_realtime_requested(cpu: &LinuxCpu) -> bool {
         cpu.realtime_period().is_some() || cpu.realtime_runtime().is_some()
     }
+}
 
-    fn convert_shares_to_cgroup2(shares: u64) -> u64 {
-        if shares == 0 {
-            return 0;
-        }
-
-        1 + ((shares - 2) * 9999) / 262142
+pub fn convert_shares_to_cgroup2(shares: u64) -> u64 {
+    if shares == 0 {
+        return 0;
     }
+
+    1 + ((shares - 2) * 9999) / 262142
 }
 
 #[cfg(test)]

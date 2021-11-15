@@ -8,9 +8,11 @@ use crate::common::ControllerOpt;
 
 use super::controller::Controller;
 
-const MEMORY_LOW: &str = "MemoryLow";
-const MEMORY_MAX: &str = "MemoryMax";
-const MEMORY_SWAP: &str = "MemorySwapMax";
+pub const MEMORY_MIN: &str = "MemoryMin";
+pub const MEMORY_LOW: &str = "MemoryLow";
+pub const MEMORY_HIGH: &str = "MemoryHigh";
+pub const MEMORY_MAX: &str = "MemoryMax";
+pub const MEMORY_SWAP: &str = "MemorySwapMax";
 
 pub struct Memory {}
 
