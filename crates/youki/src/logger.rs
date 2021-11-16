@@ -8,6 +8,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::process::exit;
 use std::str::FromStr;
+use std::string::String;
 
 /// If in debug mode, default level is debug to get maximum logging
 #[cfg(debug_assertions)]
@@ -35,14 +36,11 @@ pub fn init(
     };
     let log_level_from_env = match env::var("YOUKI_LOG_LEVEL") {
         Ok(val) => val,
-        Err(err) => {
-            log::error!("unknown log level env: {}", err);
-            exit(1)
-        }
+        Err(_) => String::from("i don't know"),
     };
     let log_level = if log_debug_flag {
         "debug"
-    } else if log_level_from_env != "" {
+    } else if log_level_from_env != "i don't know" {
         &log_level_from_env
     } else {
         DEFAULT_LOG_LEVEL
@@ -50,9 +48,9 @@ pub fn init(
     let log_level = match LevelFilter::from_str(log_level) {
         Ok(val) => val,
         Err(err) => {
-            log::error!("error: {}", err);
+            bail!("error: '{}', val from env: '{}'", err, log_level);
             exit(1)
-        }
+        },
     };
     let target = if let Some(log_file) = log_file {
         let file = OpenOptions::new()
