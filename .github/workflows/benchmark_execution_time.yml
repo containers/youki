@@ -113,8 +113,8 @@ jobs:
       run: |
         curl -s https://api.github.com/repos/sharkdp/hyperfine/releases/latest \
         | jq -r '.assets[] | select(.name? | match("hyperfine-musl_.*_amd64.deb")) | .browser_download_url' \
-        | wget -qi -
-        sudo dpkg -i *.deb
+        | wget -qi - -O hyperfine.deb
+        sudo dpkg -i hyperfine.deb
 
     - name: Running benchmark
       run: |
@@ -131,9 +131,23 @@ jobs:
       run: |
         sed -i '1i > commit (${{ github.sha }})\n' bench_exec_result.md
 
-    - name: Writting report to PR comment
-      uses: marocchino/sticky-pull-request-comment@v2 
-      with:
-        append: true
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        path: ./bench_exec_result.md 
+    # since the GITHUB_TOKEN is needed to let the bot commit messages in the PR
+    # but right now it is controlled by the organization.
+    # TODO: change back to use this when the permission granted
+    # - name: Writting report to PR comment
+    #   uses: marocchino/sticky-pull-request-comment@v2 
+    #   with:
+    #     append: true
+    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    #     path: ./bench_exec_result.md 
+
+    # temp solution, print the benchmark result in the terminal.
+    # glow is the prettiest markdown rendering tool I know.
+    # TODO: remove this step when GITHUB_TOKEN permission granted
+    - name: Printing report in the terminal
+      run: |
+        curl -s https://api.github.com/repos/charmbracelet/glow/releases/latest \
+        | jq -r '.assets[] | select(.name? | match("glow_.*_linux_amd64.deb")) | .browser_download_url' \
+        | wget -qi - -O glow.deb
+        sudo dpkg -i glow.deb
+        glow bench_exec_result.md
