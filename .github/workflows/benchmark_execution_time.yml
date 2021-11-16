@@ -129,7 +129,7 @@ jobs:
 
     - name: Adding info into result
       run: |
-        sed -i '1i > commit (${{ github.sha }})\n' bench_exec_result.md
+        sed -i '1i > commit (${{ github.event.pull_request.head.sha }})\n' bench_exec_result.md
 
     # since the GITHUB_TOKEN is needed to let the bot commit messages in the PR
     # but right now it is controlled by the organization.
