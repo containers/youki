@@ -1,9 +1,12 @@
 //! Default Youki Logger
 
 use anyhow::{bail, Context, Result};
+use log::LevelFilter;
+use std::borrow::Cow;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 /// If in debug mode, default level is debug to get maximum logging
 #[cfg(debug_assertions)]
@@ -19,7 +22,18 @@ const LOG_FORMAT_JSON: &str = "json";
 /// Initialize the logger, must be called before accessing the logger
 /// Multiple parts might call this at once, but the actual initialization
 /// is done only once due to use of OnceCell
-pub fn init(log_file: Option<PathBuf>, log_format: Option<String>) -> Result<()> {
+pub fn init(
+    log_debug_flag: bool,
+    log_file: Option<PathBuf>,
+    log_format: Option<String>,
+) -> Result<()> {
+    let filter: Cow<str> = if log_debug_flag {
+        "debug".into()
+    } else if let Ok(level) = std::env::var("YOUKI_LOG_LEVEL") {
+        level.into()
+    } else {
+        DEFAULT_LOG_LEVEL.into()
+    };
     let formatter = match log_format.as_deref() {
         None | Some(LOG_FORMAT_TEXT) => text_write,
         Some(LOG_FORMAT_JSON) => json_write,
@@ -36,12 +50,11 @@ pub fn init(log_file: Option<PathBuf>, log_format: Option<String>) -> Result<()>
     } else {
         env_logger::Target::Stderr
     };
-    env_logger::Builder::from_env(
-        env_logger::Env::default().filter_or("YOUKI_LOG_LEVEL", DEFAULT_LOG_LEVEL),
-    )
-    .format(formatter)
-    .target(target)
-    .init();
+    env_logger::Builder::new()
+        .filter_level(LevelFilter::from_str(filter.as_ref()).context("failed to parse log level")?)
+        .format(formatter)
+        .target(target)
+        .init();
 
     Ok(())
 }

@@ -38,6 +38,10 @@ use nix::unistd::getuid;
 #[derive(Parser, Debug)]
 #[clap(version = crate_version!(), author = "youki team")]
 struct Opts {
+    /// change log level to debug.
+    // Example in future : '--debug     change log level to debug. (default: "warn")'
+    #[clap(long)]
+    debug: bool,
     #[clap(short, long)]
     log: Option<PathBuf>,
     #[clap(long)]
@@ -104,7 +108,7 @@ fn main() -> Result<()> {
 
     let opts = Opts::parse();
 
-    if let Err(e) = crate::logger::init(opts.log, opts.log_format) {
+    if let Err(e) = crate::logger::init(opts.debug, opts.log, opts.log_format) {
         eprintln!("log init failed: {:?}", e);
     }
 
