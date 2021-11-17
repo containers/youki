@@ -10,6 +10,7 @@ use crate::common::ControllerOpt;
 pub const CPU_WEIGHT: &str = "CPUWeight";
 pub const CPU_QUOTA: &str = "CPUQuotaPerSecUSec";
 pub const CPU_PERIOD: &str = "CPUQuotaPeriodUSec";
+const MICROSECS_PER_SEC: u64 = 1_000_000;
 
 pub(crate) struct Cpu {}
 
@@ -46,7 +47,14 @@ impl Cpu {
         let mut quota = u64::MAX;
         if let Some(specified_quota) = cpu.quota() {
             if specified_quota > 0 {
-                quota = specified_quota as u64
+                let period = match cpu.period() {
+                    Some(p) => p,
+                    None => 100_000,
+                };
+
+                // cpu quota in systemd must be specified as number of
+                // microseconds per second of cpu time.
+                quota = specified_quota as u64 * MICROSECS_PER_SEC / period;
             }
         }
         properties.insert(CPU_QUOTA, Box::new(quota));

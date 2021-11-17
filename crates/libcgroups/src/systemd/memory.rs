@@ -39,6 +39,9 @@ impl Memory {
                 1..=i64::MAX => {
                     properties.insert(MEMORY_LOW, Box::new(reservation as u64));
                 }
+                -1 => {
+                    properties.insert(MEMORY_LOW, Box::new(u64::MAX));
+                }
                 _ => bail!("invalid memory reservation value: {}", reservation),
             }
         }
@@ -47,6 +50,9 @@ impl Memory {
             match limit {
                 1..=i64::MAX => {
                     properties.insert(MEMORY_MAX, Box::new(limit as u64));
+                }
+                -1 => {
+                    properties.insert(MEMORY_MAX, Box::new(u64::MAX));
                 }
                 _ => bail!("invalid memory limit value: {}", limit),
             }
