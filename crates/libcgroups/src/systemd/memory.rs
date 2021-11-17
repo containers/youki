@@ -23,7 +23,7 @@ impl Controller for Memory {
         properties: &mut HashMap<&str, Box<dyn RefArg>>,
     ) -> Result<()> {
         if let Some(memory) = options.resources.memory() {
-            log::debug!("Applying memory resource restrictions");
+            log::debug!("applying memory resource restrictions");
             return Self::apply(memory, properties)
                 .context("could not apply memory resource restrictions");
         }

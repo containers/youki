@@ -47,10 +47,7 @@ impl Cpu {
         let mut quota = u64::MAX;
         if let Some(specified_quota) = cpu.quota() {
             if specified_quota > 0 {
-                let period = match cpu.period() {
-                    Some(p) => p,
-                    None => 100_000,
-                };
+                let period = cpu.period().unwrap_or(100_000);
 
                 // cpu quota in systemd must be specified as number of
                 // microseconds per second of cpu time.
@@ -114,7 +111,7 @@ mod tests {
 
     #[test]
     fn test_set_quota() -> Result<()> {
-        let quotas: Vec<(i64, u64)> = vec![(200_000, 200_000), (0, u64::MAX), (-50000, u64::MAX)];
+        let quotas: Vec<(i64, u64)> = vec![(200_000, 2_000_000), (0, u64::MAX), (-50000, u64::MAX)];
 
         for quota in quotas {
             // arrange

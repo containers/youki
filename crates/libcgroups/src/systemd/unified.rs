@@ -19,7 +19,7 @@ impl Controller for Unified {
         properties: &mut HashMap<&str, Box<dyn RefArg>>,
     ) -> Result<()> {
         if let Some(unified) = options.resources.unified() {
-            log::debug!("Applying unified resource restrictions");
+            log::debug!("applying unified resource restrictions");
             Self::apply(unified, systemd_version, properties)
                 .context("failed to apply unified resource restrictions")?;
         }
@@ -129,14 +129,14 @@ mod tests {
         .collect();
 
         let mut expected: HashMap<&str, Box<dyn RefArg>> = HashMap::new();
-        expected.insert(cpu::CPU_WEIGHT, Box::new(840 as u64));
-        expected.insert(cpuset::ALLOWED_CPUS, Box::new(vec![15 as u64]));
-        expected.insert(cpuset::ALLOWED_NODES, Box::new(vec![15 as u64]));
-        expected.insert(memory::MEMORY_MIN, Box::new(100000 as u64));
-        expected.insert(memory::MEMORY_LOW, Box::new(200000 as u64));
-        expected.insert(memory::MEMORY_HIGH, Box::new(300000 as u64));
-        expected.insert(memory::MEMORY_MAX, Box::new(400000 as u64));
-        expected.insert(pids::TASKS_MAX, Box::new(100 as u64));
+        expected.insert(cpu::CPU_WEIGHT, Box::new(840u64));
+        expected.insert(cpuset::ALLOWED_CPUS, Box::new(vec![15u64]));
+        expected.insert(cpuset::ALLOWED_NODES, Box::new(vec![15u64]));
+        expected.insert(memory::MEMORY_MIN, Box::new(100000u64));
+        expected.insert(memory::MEMORY_LOW, Box::new(200000u64));
+        expected.insert(memory::MEMORY_HIGH, Box::new(300000u64));
+        expected.insert(memory::MEMORY_MAX, Box::new(400000u64));
+        expected.insert(pids::TASKS_MAX, Box::new(100u64));
 
         // act
         let mut actual: HashMap<&str, Box<dyn RefArg>> = HashMap::new();
@@ -164,12 +164,10 @@ mod tests {
     #[test]
     fn test_cpu_max_quota_and_period() -> Result<()> {
         // arrange
-        let unified: HashMap<String, String> = [
-            ("cpu.max", "500000 250000"),        
-        ]
-        .into_iter()
-        .map(|(k, v)| (k.to_owned(), v.to_owned()))
-        .collect();
+        let unified: HashMap<String, String> = [("cpu.max", "500000 250000")]
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), v.to_owned()))
+            .collect();
         let mut actual: HashMap<&str, Box<dyn RefArg>> = HashMap::new();
 
         // act
@@ -191,12 +189,10 @@ mod tests {
     #[test]
     fn test_cpu_max_quota_only() -> Result<()> {
         // arrange
-        let unified: HashMap<String, String> = [
-            ("cpu.max", "500000"),        
-        ]
-        .into_iter()
-        .map(|(k, v)| (k.to_owned(), v.to_owned()))
-        .collect();
+        let unified: HashMap<String, String> = [("cpu.max", "500000")]
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), v.to_owned()))
+            .collect();
         let mut actual: HashMap<&str, Box<dyn RefArg>> = HashMap::new();
 
         // act
