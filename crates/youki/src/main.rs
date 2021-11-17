@@ -38,9 +38,8 @@ use nix::unistd::getuid;
 #[derive(Parser, Debug)]
 #[clap(version = crate_version!(), author = "youki team")]
 struct Opts {
-    // I don't know how to get the log level when the --debug flag is not set (I want to show some default values on the help page when the options are not set)
-    // Example: '--debug     change log level to debug. (default: "warn")'
     /// change log level to debug.
+    // Example in future : '--debug     change log level to debug. (default: "warn")'
     #[clap(long)]
     debug: bool,
     #[clap(short, long)]

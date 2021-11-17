@@ -2,13 +2,11 @@
 
 use anyhow::{bail, Context, Result};
 use log::LevelFilter;
-use std::env;
+use std::borrow::Cow;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
-use std::process::exit;
 use std::str::FromStr;
-use std::string::String;
 
 /// If in debug mode, default level is debug to get maximum logging
 #[cfg(debug_assertions)]
@@ -29,28 +27,17 @@ pub fn init(
     log_file: Option<PathBuf>,
     log_format: Option<String>,
 ) -> Result<()> {
+    let filter: Cow<str> = if log_debug_flag {
+        "debug".into()
+    } else if let Ok(level) = std::env::var("YOUKI_LOG_LEVEL") {
+        level.into()
+    } else {
+        DEFAULT_LOG_LEVEL.into()
+    };
     let formatter = match log_format.as_deref() {
         None | Some(LOG_FORMAT_TEXT) => text_write,
         Some(LOG_FORMAT_JSON) => json_write,
         Some(unknown) => bail!("unknown log format: {}", unknown),
-    };
-    let log_level_from_env = match env::var("YOUKI_LOG_LEVEL") {
-        Ok(val) => val,
-        Err(_) => String::from("i don't know"),
-    };
-    let log_level = if log_debug_flag {
-        "debug"
-    } else if log_level_from_env != "i don't know" {
-        &log_level_from_env
-    } else {
-        DEFAULT_LOG_LEVEL
-    };
-    let log_level = match LevelFilter::from_str(log_level) {
-        Ok(val) => val,
-        Err(err) => {
-            bail!("error: '{}', val from env: '{}'", err, log_level);
-            exit(1)
-        },
     };
     let target = if let Some(log_file) = log_file {
         let file = OpenOptions::new()
@@ -64,7 +51,7 @@ pub fn init(
         env_logger::Target::Stderr
     };
     env_logger::Builder::new()
-        .filter_level(log_level)
+        .filter_level(LevelFilter::from_str(filter.as_ref()).context("failed to parse log level")?)
         .format(formatter)
         .target(target)
         .init();
