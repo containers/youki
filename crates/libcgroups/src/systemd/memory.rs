@@ -107,79 +107,53 @@ mod tests {
 
     #[test]
     fn test_set_valid_memory_low() -> Result<()> {
-        // arrange
-        let memory = LinuxMemoryBuilder::default()
-            .reservation(536870912)
-            .build()
-            .context("build memory spec")?;
-        let mut properties: HashMap<&str, Box<dyn RefArg>> = HashMap::new();
+        let values = vec![(536870912, 536870912u64), (-1, u64::MAX)];
 
-        // act
-        Memory::apply(&memory, &mut properties).context("apply memory")?;
+        for (reservation, expected) in values {
+            // arrange
+            let memory = LinuxMemoryBuilder::default()
+                .reservation(reservation)
+                .build()
+                .context("build memory spec")?;
+            let mut properties: HashMap<&str, Box<dyn RefArg>> = HashMap::new();
 
-        // assert
-        assert_eq!(properties.len(), 1);
-        assert!(properties.contains_key(MEMORY_LOW));
-        let memory_low = &properties[MEMORY_LOW];
-        assert_eq!(memory_low.arg_type(), ArgType::UInt64);
-        assert_eq!(memory_low.as_u64().unwrap(), 536870912);
+            // act
+            Memory::apply(&memory, &mut properties).context("apply memory")?;
 
-        Ok(())
-    }
+            // assert
+            assert_eq!(properties.len(), 1);
+            assert!(properties.contains_key(MEMORY_LOW));
+            let memory_low = &properties[MEMORY_LOW];
+            assert_eq!(memory_low.arg_type(), ArgType::UInt64);
+            assert_eq!(memory_low.as_u64().unwrap(), expected);
+        }
 
-    #[test]
-    fn test_set_invalid_memory_low() -> Result<()> {
-        // arrange
-        let memory = LinuxMemoryBuilder::default()
-            .reservation(-1)
-            .build()
-            .context("build memory spec")?;
-        let mut properties: HashMap<&str, Box<dyn RefArg>> = HashMap::new();
-
-        // act
-        let result = Memory::apply(&memory, &mut properties).context("apply memory");
-
-        // assert
-        assert!(result.is_err());
         Ok(())
     }
 
     #[test]
     fn test_set_valid_memory_max() -> Result<()> {
-        // arrange
-        let memory = LinuxMemoryBuilder::default()
-            .limit(536870912)
-            .build()
-            .context("build memory spec")?;
-        let mut properties: HashMap<&str, Box<dyn RefArg>> = HashMap::new();
+        let values = vec![(536870912, 536870912u64, 1), (-1, u64::MAX, 2)];
 
-        // act
-        Memory::apply(&memory, &mut properties).context("apply memory")?;
+        for (reservation, mem_low, prop_count) in values {
+            // arrange
+            let memory = LinuxMemoryBuilder::default()
+                .limit(reservation)
+                .build()
+                .context("build memory spec")?;
+            let mut properties: HashMap<&str, Box<dyn RefArg>> = HashMap::new();
 
-        // assert
-        assert_eq!(properties.len(), 1);
-        assert!(properties.contains_key(MEMORY_MAX));
-        let memory_low = &properties[MEMORY_MAX];
-        assert_eq!(memory_low.arg_type(), ArgType::UInt64);
-        assert_eq!(memory_low.as_u64().unwrap(), 536870912);
+            // act
+            Memory::apply(&memory, &mut properties).context("apply memory")?;
 
-        Ok(())
-    }
+            // assert
+            assert_eq!(properties.len(), prop_count);
+            assert!(properties.contains_key(MEMORY_MAX));
+            let memory_low = &properties[MEMORY_MAX];
+            assert_eq!(memory_low.arg_type(), ArgType::UInt64);
+            assert_eq!(memory_low.as_u64().unwrap(), mem_low);
+        }
 
-    #[test]
-    fn test_set_invalid_memory_max() -> Result<()> {
-        // arrange
-        let memory = LinuxMemoryBuilder::default()
-            .limit(-1)
-            .build()
-            .context("build memory spec")?;
-        let mut properties: HashMap<&str, Box<dyn RefArg>> = HashMap::new();
-
-        // act
-        let result = Memory::apply(&memory, &mut properties).context("apply memory");
-
-        // assert
-        assert!(result.is_err());
         Ok(())
     }
 }
