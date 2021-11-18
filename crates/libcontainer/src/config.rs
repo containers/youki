@@ -10,7 +10,7 @@ use oci_spec::runtime::{Hooks, Spec};
 
 use crate::utils;
 
-const YOUKI_CONFIG_NAME: &str = "yconfig.json";
+const YOUKI_CONFIG_NAME: &str = "youki_config.json";
 
 /// A configuration for passing information obtained during container creation to other commands.
 /// Keeping the information to a minimum improves performance.
