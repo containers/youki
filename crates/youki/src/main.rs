@@ -38,13 +38,17 @@ use nix::unistd::getuid;
 #[derive(Parser, Debug)]
 #[clap(version = crate_version!(), author = "youki team")]
 struct Opts {
-    /// root directory to store container state
-    #[clap(short, long)]
-    root: Option<PathBuf>,
+    /// change log level to debug.
+    // Example in future : '--debug     change log level to debug. (default: "warn")'
+    #[clap(long)]
+    debug: bool,
     #[clap(short, long)]
     log: Option<PathBuf>,
     #[clap(long)]
     log_format: Option<String>,
+    /// root directory to store container state
+    #[clap(short, long)]
+    root: Option<PathBuf>,
     /// Enable systemd cgroup manager, rather then use the cgroupfs directly.
     #[clap(short, long)]
     systemd_cgroup: bool,
@@ -104,7 +108,7 @@ fn main() -> Result<()> {
 
     let opts = Opts::parse();
 
-    if let Err(e) = crate::logger::init(opts.log_format, opts.log) {
+    if let Err(e) = crate::logger::init(opts.debug, opts.log, opts.log_format) {
         eprintln!("log init failed: {:?}", e);
     }
 

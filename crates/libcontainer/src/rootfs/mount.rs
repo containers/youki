@@ -528,22 +528,24 @@ mod tests {
         let m = Mount::new();
         assert!(m.make_parent_mount_private(tmp_dir.path()).is_ok());
 
-        let want = MountArgs {
-            source: None,
-            target: PathBuf::from("/"),
-            fstype: None,
-            flags: MsFlags::MS_PRIVATE,
-            data: None,
-        };
-        let got = m
+        let set = m
             .syscall
             .as_any()
             .downcast_ref::<TestHelperSyscall>()
             .unwrap()
             .get_mount_args();
 
-        assert_eq!(got.len(), 1);
-        assert_eq!(want, got[0]);
+        assert_eq!(set.len(), 1);
+
+        let got = &set[0];
+        assert_eq!(got.source, None);
+        assert_eq!(got.fstype, None);
+        assert_eq!(got.flags, MsFlags::MS_PRIVATE);
+        assert_eq!(got.data, None);
+
+        // This can be either depending on the system, some systems mount tmpfs at /tmp others it's
+        // a plain directory. See https://github.com/containers/youki/issues/471
+        assert!(got.target == PathBuf::from("/") || got.target == PathBuf::from("/tmp"));
     }
 
     #[test]
