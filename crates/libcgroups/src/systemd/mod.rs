@@ -6,7 +6,9 @@ mod cpu;
 mod cpuset;
 mod dbus;
 pub mod manager;
+mod memory;
 mod pids;
+mod unified;
 
 /// Checks if the system was booted with systemd
 pub fn booted() -> bool {

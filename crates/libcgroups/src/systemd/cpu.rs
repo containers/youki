@@ -7,9 +7,10 @@ use oci_spec::runtime::LinuxCpu;
 use super::controller::Controller;
 use crate::common::ControllerOpt;
 
-const CPU_WEIGHT: &str = "CPUWeight";
-const CPU_QUOTA: &str = "CPUQuotaPerSecUSec";
-const CPU_PERIOD: &str = "CPUQuotaPeriodUSec";
+pub const CPU_WEIGHT: &str = "CPUWeight";
+pub const CPU_QUOTA: &str = "CPUQuotaPerSecUSec";
+pub const CPU_PERIOD: &str = "CPUQuotaPeriodUSec";
+const MICROSECS_PER_SEC: u64 = 1_000_000;
 
 pub(crate) struct Cpu {}
 
@@ -36,7 +37,7 @@ impl Cpu {
         }
 
         if let Some(mut shares) = cpu.shares() {
-            shares = Self::convert_shares_to_cgroup2(shares);
+            shares = convert_shares_to_cgroup2(shares);
             if shares != 0 {
                 properties.insert(CPU_WEIGHT, Box::new(shares));
             }
@@ -46,7 +47,11 @@ impl Cpu {
         let mut quota = u64::MAX;
         if let Some(specified_quota) = cpu.quota() {
             if specified_quota > 0 {
-                quota = specified_quota as u64
+                let period = cpu.period().unwrap_or(100_000);
+
+                // cpu quota in systemd must be specified as number of
+                // microseconds per second of cpu time.
+                quota = specified_quota as u64 * MICROSECS_PER_SEC / period;
             }
         }
         properties.insert(CPU_QUOTA, Box::new(quota));
@@ -65,14 +70,14 @@ impl Cpu {
     fn is_realtime_requested(cpu: &LinuxCpu) -> bool {
         cpu.realtime_period().is_some() || cpu.realtime_runtime().is_some()
     }
+}
 
-    fn convert_shares_to_cgroup2(shares: u64) -> u64 {
-        if shares == 0 {
-            return 0;
-        }
-
-        1 + ((shares - 2) * 9999) / 262142
+pub fn convert_shares_to_cgroup2(shares: u64) -> u64 {
+    if shares == 0 {
+        return 0;
     }
+
+    1 + ((shares - 2) * 9999) / 262142
 }
 
 #[cfg(test)]
@@ -106,7 +111,7 @@ mod tests {
 
     #[test]
     fn test_set_quota() -> Result<()> {
-        let quotas: Vec<(i64, u64)> = vec![(200_000, 200_000), (0, u64::MAX), (-50000, u64::MAX)];
+        let quotas: Vec<(i64, u64)> = vec![(200_000, 2_000_000), (0, u64::MAX), (-50000, u64::MAX)];
 
         for quota in quotas {
             // arrange

@@ -8,7 +8,7 @@ use crate::common::ControllerOpt;
 
 use super::controller::Controller;
 
-const TASKS_MAX: &str = "TasksMax";
+pub const TASKS_MAX: &str = "TasksMax";
 
 pub struct Pids {}
 
