@@ -1,4 +1,5 @@
 use super::{Container, ContainerStatus};
+use crate::config::YoukiConfig;
 use crate::hooks;
 use crate::utils;
 use anyhow::{bail, Context, Result};
@@ -36,10 +37,10 @@ impl Container {
         log::debug!("container status: {:?}", self.status());
         if self.can_delete() {
             if self.root.exists() {
-                let spec = self.spec().with_context(|| {
+                let config = YoukiConfig::load(&self.root).with_context(|| {
                     format!("failed to load runtime spec for container {}", self.id())
                 })?;
-                log::debug!("spec: {:?}", spec);
+                log::debug!("config: {:?}", config);
 
                 // remove the directory storing container state
                 log::debug!("remove dir {:?}", self.root);
@@ -47,13 +48,7 @@ impl Container {
                     format!("failed to remove container dir {}", self.root.display())
                 })?;
 
-                let cgroups_path = utils::get_cgroup_path(
-                    spec.linux()
-                        .as_ref()
-                        .context("no linux in spec")?
-                        .cgroups_path(),
-                    self.id(),
-                );
+                let cgroups_path = utils::get_cgroup_path(&Some(config.cgroup_path), self.id());
 
                 // remove the cgroup created for the container
                 // check https://man7.org/linux/man-pages/man7/cgroups.7.html
@@ -71,7 +66,7 @@ impl Container {
                     format!("failed to remove cgroup {}", cgroups_path.display())
                 })?;
 
-                if let Some(hooks) = spec.hooks() {
+                if let Some(hooks) = config.hooks.as_ref() {
                     hooks::run_hooks(hooks.poststop().as_ref(), Some(self))
                         .with_context(|| "failed to run post stop hooks")?;
                 }

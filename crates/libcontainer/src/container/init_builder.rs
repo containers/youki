@@ -7,7 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{apparmor, notify_socket::NOTIFY_FILE, rootless, tty, utils};
+use crate::{apparmor, config::YoukiConfig, notify_socket::NOTIFY_FILE, rootless, tty, utils};
 
 use super::{
     builder::ContainerBuilder, builder_impl::ContainerBuilderImpl, Container, ContainerStatus,
@@ -41,12 +41,14 @@ impl<'a> InitContainerBuilder<'a> {
     pub fn build(self) -> Result<Container> {
         let spec = self.load_spec()?;
         let container_dir = self.create_container_dir()?;
-        self.save_spec(&spec, &container_dir)?;
 
         let mut container = self.create_container_state(&container_dir)?;
         container
             .set_systemd(self.use_systemd)
             .set_annotations(spec.annotations().clone());
+
+        let config = YoukiConfig::from_spec(&spec, container.id())?;
+        config.save(&container_dir)?;
 
         unistd::chdir(&container_dir)?;
         let notify_path = container_dir.join(NOTIFY_FILE);
@@ -128,12 +130,6 @@ impl<'a> InitContainerBuilder<'a> {
             }
         }
 
-        Ok(())
-    }
-
-    fn save_spec(&self, spec: &Spec, container_dir: &Path) -> Result<()> {
-        let target_spec_path = container_dir.join("config.json");
-        spec.save(target_spec_path)?;
         Ok(())
     }
 
