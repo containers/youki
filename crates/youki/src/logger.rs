@@ -8,6 +8,8 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::str::FromStr;
 
+const LOG_LEVEL_ENV_NAME: &str = "YOUKI_LOG_LEVEL";
+
 /// If in debug mode, default level is debug to get maximum logging
 #[cfg(debug_assertions)]
 const DEFAULT_LOG_LEVEL: &str = "debug";
@@ -27,13 +29,7 @@ pub fn init(
     log_file: Option<PathBuf>,
     log_format: Option<String>,
 ) -> Result<()> {
-    let filter: Cow<str> = if log_debug_flag {
-        "debug".into()
-    } else if let Ok(level) = std::env::var("YOUKI_LOG_LEVEL") {
-        level.into()
-    } else {
-        DEFAULT_LOG_LEVEL.into()
-    };
+    let log_level = detect_log_level(log_debug_flag);
     let formatter = match log_format.as_deref() {
         None | Some(LOG_FORMAT_TEXT) => text_write,
         Some(LOG_FORMAT_JSON) => json_write,
@@ -51,12 +47,23 @@ pub fn init(
         env_logger::Target::Stderr
     };
     env_logger::Builder::new()
-        .filter_level(LevelFilter::from_str(filter.as_ref()).context("failed to parse log level")?)
+        .filter_level(log_level.context("failed to parse log level")?)
         .format(formatter)
         .target(target)
         .init();
 
     Ok(())
+}
+
+fn detect_log_level(is_debug: bool) -> Result<LevelFilter> {
+    let filter: Cow<str> = if is_debug {
+        "debug".into()
+    } else if let Ok(level) = std::env::var(LOG_LEVEL_ENV_NAME) {
+        level.into()
+    } else {
+        DEFAULT_LOG_LEVEL.into()
+    };
+    Ok(LevelFilter::from_str(filter.as_ref())?)
 }
 
 fn json_write<F: 'static>(f: &mut F, record: &log::Record) -> std::io::Result<()>
@@ -92,4 +99,32 @@ where
     )?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::env;
+
+    #[test]
+    fn test_detect_log_level_is_debug() {
+        env::set_var(LOG_LEVEL_ENV_NAME, "error");
+        assert_eq!(detect_log_level(true).unwrap(), LevelFilter::Debug)
+    }
+
+    #[test]
+    fn test_detect_log_level_default() {
+        env::remove_var(LOG_LEVEL_ENV_NAME);
+        if cfg!(debug_assertions) {
+            assert_eq!(detect_log_level(false).unwrap(), LevelFilter::Debug)
+        } else {
+            assert_eq!(detect_log_level(false).unwrap(), LevelFilter::Warn)
+        }
+    }
+
+    #[test]
+    fn test_detect_log_level_from_env() {
+        env::set_var(LOG_LEVEL_ENV_NAME, "error");
+        assert_eq!(detect_log_level(false).unwrap(), LevelFilter::Error)
+    }
 }
