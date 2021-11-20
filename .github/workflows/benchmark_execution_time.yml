@@ -1,12 +1,12 @@
 name: Benchmark execution time comparison with the main branch
 
 on:
-  pull_request:
-    branches: [main]
+  issue_comment:
+    types: [created, edited, deleted]
 
 jobs:
   building-pr-branch:
-    if: contains( github.event.pull_request.labels.*.name, 'benchmark-exec-time' )
+    if: (github.event.issue.pull_request != null) && github.event.comment.body == '!github easy-benchmark'
     runs-on: ubuntu-latest
 
     steps:
@@ -35,7 +35,7 @@ jobs:
         path: ./youki
 
   building-main-branch:
-    if: contains( github.event.pull_request.labels.*.name, 'benchmark-exec-time' )
+    if: (github.event.issue.pull_request != null) && github.event.comment.body == '!github easy-benchmark'
     runs-on: ubuntu-latest
 
     steps:
@@ -66,7 +66,7 @@ jobs:
         path: ./youki
 
   benchmark-exec:
-    if: contains( github.event.pull_request.labels.*.name, 'benchmark-exec-time' )
+    if: (github.event.issue.pull_request != null) && github.event.comment.body == '!github easy-benchmark'
     needs:
       - building-pr-branch
       - building-main-branch
