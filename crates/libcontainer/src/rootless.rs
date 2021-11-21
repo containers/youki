@@ -36,7 +36,6 @@ impl<'a> Rootless<'a> {
 
         if user_namespace.is_some() && user_namespace.unwrap().path().is_none() {
             log::debug!("rootless container should be created");
-            log::warn!("resource constraints are unimplemented for rootless containers");
 
             validate(spec).context("The spec failed to comply to rootless requirement")?;
             let mut rootless = Rootless::from(linux);

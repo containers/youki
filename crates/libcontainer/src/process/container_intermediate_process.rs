@@ -47,7 +47,7 @@ pub fn container_intermediate_process(
         // root in the user namespace likely is mapped to an non-priviliged user
         // on the parent user namespace.
         command.set_id(Uid::from_raw(0), Gid::from_raw(0)).context(
-            "Failed to configure uid and gid root in the beginning of a new user namespace",
+            "failed to configure uid and gid root in the beginning of a new user namespace",
         )?;
     }
 
@@ -68,14 +68,13 @@ pub fn container_intermediate_process(
 
     // this needs to be done before we create the init process, so that the init
     // process will already be captured by the cgroup
-    if args.rootless.is_none() {
-        apply_cgroups(
-            args.cgroup_manager.as_ref(),
-            linux.resources().as_ref(),
-            args.init,
-        )
-        .context("failed to apply cgroups")?
-    }
+
+    apply_cgroups(
+        args.cgroup_manager.as_ref(),
+        linux.resources().as_ref(),
+        args.init,
+    )
+    .context("failed to apply cgroups")?;
 
     // We have to record the pid of the child (container init process), since
     // the child will be inside the pid namespace. We can't rely on child_ready
