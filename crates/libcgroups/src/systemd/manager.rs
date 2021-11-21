@@ -61,7 +61,7 @@ impl Display for CgroupsPath {
 }
 
 impl Manager {
-    pub fn new(root_path: PathBuf, cgroups_path: PathBuf, container_name: String) -> Result<Self> {
+    pub fn new(root_path: PathBuf, cgroups_path: PathBuf, container_name: String, use_system: bool) -> Result<Self> {
         // TODO: create the systemd unit using a dbus client.
         let destructured_path = Self::destructure_cgroups_path(cgroups_path)?;
         let (cgroups_path, parent) = Self::construct_cgroups_path(&destructured_path)?;
@@ -74,7 +74,10 @@ impl Manager {
             container_name,
             unit_name: Self::get_unit_name(&destructured_path),
             destructured_path,
-            client: Client::new().context("failed to create dbus client")?,
+            client: match use_system {
+                true => Client::new_system().context("failed to create system dbus client")?,
+                false => Client::new_session().context("failed to create session dbus client")?,
+            }
         })
     }
 

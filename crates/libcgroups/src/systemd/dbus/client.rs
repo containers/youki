@@ -12,8 +12,15 @@ pub struct Client {
 }
 
 impl Client {
-    pub fn new() -> Result<Self> {
+    /// Uses the system bus to communicate with systemd
+    pub fn new_system() -> Result<Self> {
         let conn = Connection::new_system()?;
+        Ok(Client { conn })
+    }
+
+    /// Uses the session bus to communicate with systemd
+    pub fn new_session() -> Result<Self> {
+        let conn = Connection::new_session()?;
         Ok(Client { conn })
     }
 
