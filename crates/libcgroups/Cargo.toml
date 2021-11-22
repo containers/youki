@@ -19,7 +19,7 @@ serde = { version = "1.0", features = ["derive"] }
 rbpf = {version = "0.1.0", optional = true }
 libbpf-sys = { version = "0.5.0-2", optional = true }
 errno = { version = "0.2.8", optional = true }
-libc = { version = "0.2.107", optional = true }
+libc = { version = "0.2.108", optional = true }
 
 [dev-dependencies]
 oci-spec = { git = "https://github.com/containers/oci-spec-rs",  rev = "54c5e386f01ab37c9305cc4a83404eb157e42440", features = ["proptests"] }
