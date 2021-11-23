@@ -3,25 +3,54 @@ use anyhow::{Context, Result};
 use dbus::arg::{RefArg, Variant};
 use dbus::blocking::{Connection, Proxy};
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::time::Duration;
+
+pub trait SystemdClient {
+    fn is_system(&self) -> bool;
+
+    fn start_transient_unit(
+        &self,
+        container_name: &str,
+        pid: u32,
+        parent: &str,
+        unit_name: &str,
+    ) -> Result<()>;
+
+    fn stop_transient_unit(&self, unit_name: &str) -> Result<()>;
+
+    fn set_unit_properties(
+        &self,
+        unit_name: &str,
+        properties: &HashMap<&str, Box<dyn RefArg>>,
+    ) -> Result<()>;
+
+    fn systemd_version(&self) -> Result<u32>;
+
+    fn control_cgroup_root(&self) -> Result<PathBuf>;
+}
 
 /// Client is a wrapper providing higher level API and abatraction around dbus.
 /// For more information see https://www.freedesktop.org/wiki/Software/systemd/dbus/
 pub struct Client {
     conn: Connection,
+    system: bool,
 }
 
 impl Client {
     /// Uses the system bus to communicate with systemd
     pub fn new_system() -> Result<Self> {
         let conn = Connection::new_system()?;
-        Ok(Client { conn })
+        Ok(Client { conn, system: true })
     }
 
     /// Uses the session bus to communicate with systemd
     pub fn new_session() -> Result<Self> {
         let conn = Connection::new_session()?;
-        Ok(Client { conn })
+        Ok(Client {
+            conn,
+            system: false,
+        })
     }
 
     fn create_proxy(&self) -> Proxy<&Connection> {
@@ -31,11 +60,17 @@ impl Client {
             Duration::from_millis(5000),
         )
     }
+}
+
+impl SystemdClient for Client {
+    fn is_system(&self) -> bool {
+        self.system
+    }
 
     /// start_transient_unit is a higher level API for starting a unit
     /// for a specific container under systemd.
     /// See https://www.freedesktop.org/wiki/Software/systemd/dbus for more details.
-    pub fn start_transient_unit(
+    fn start_transient_unit(
         &self,
         container_name: &str,
         pid: u32,
@@ -77,6 +112,8 @@ impl Client {
         properties.push(("DefaultDependencies", Variant(Box::new(false))));
         properties.push(("PIDs", Variant(Box::new(vec![pid]))));
 
+        log::debug!("START UNIT: {:?}", properties);
+
         proxy
             .start_transient_unit(unit_name, "replace", properties, vec![])
             .with_context(|| {
@@ -88,7 +125,7 @@ impl Client {
         Ok(())
     }
 
-    pub fn stop_transient_unit(&self, unit_name: &str) -> Result<()> {
+    fn stop_transient_unit(&self, unit_name: &str) -> Result<()> {
         let proxy = self.create_proxy();
 
         proxy
@@ -97,7 +134,7 @@ impl Client {
         Ok(())
     }
 
-    pub fn set_unit_properties(
+    fn set_unit_properties(
         &self,
         unit_name: &str,
         properties: &HashMap<&str, Box<dyn RefArg>>,
@@ -115,7 +152,7 @@ impl Client {
         Ok(())
     }
 
-    pub fn systemd_version(&self) -> Result<u32> {
+    fn systemd_version(&self) -> Result<u32> {
         let proxy = self.create_proxy();
 
         let version = proxy
@@ -129,5 +166,15 @@ impl Client {
             .context("could not parse systemd version")?;
 
         Ok(version)
+    }
+
+    fn control_cgroup_root(&self) -> Result<PathBuf> {
+        let proxy = self.create_proxy();
+
+        let cgroup_root = proxy
+            .control_group()
+            .context("failed to get systemd control group")?;
+        PathBuf::try_from(cgroup_root)
+            .with_context(|| format!("parse systemd control cgroup into path"))
     }
 }
