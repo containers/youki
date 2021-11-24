@@ -174,7 +174,7 @@ impl SystemdClient for Client {
         let cgroup_root = proxy
             .control_group()
             .context("failed to get systemd control group")?;
-        PathBuf::try_from(cgroup_root)
-            .with_context(|| format!("parse systemd control cgroup into path"))
+        PathBuf::try_from(&cgroup_root)
+            .with_context(|| format!("parse systemd control cgroup {} into path", cgroup_root))
     }
 }

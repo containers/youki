@@ -176,10 +176,6 @@ pub fn create_cgroup_manager<P: Into<PathBuf>>(
 
     match cgroup_setup {
         CgroupSetup::Legacy | CgroupSetup::Hybrid => {
-            if systemd_cgroup {
-                bail!("resource control with systemd is not supported on cgroup v1");
-            }
-
             log::info!("cgroup manager V1 will be used");
             Ok(Box::new(v1::manager::Manager::new(cgroup_path.into())?))
         }

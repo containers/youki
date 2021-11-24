@@ -305,10 +305,6 @@ impl CgroupManager for Manager {
                 )
             })?;
 
-        let cg = self.client.control_cgroup_root().context("cgroup root")?;
-        log::debug!("CONTROL GROUP ROOT: {:?}", cg);
-        log::debug!("MANAGER {:?}", self);
-
         Ok(())
     }
 
