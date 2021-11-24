@@ -190,13 +190,16 @@ pub fn create_cgroup_manager<P: Into<PathBuf>>(
                 }
 
                 let use_system = nix::unistd::geteuid().is_root();
-               
-                log::info!("systemd cgroup manager with system bus {} will be used", use_system);
+
+                log::info!(
+                    "systemd cgroup manager with system bus {} will be used",
+                    use_system
+                );
                 return Ok(Box::new(systemd::manager::Manager::new(
                     DEFAULT_CGROUP_ROOT.into(),
                     cgroup_path.into(),
                     container_name.into(),
-                    use_system
+                    use_system,
                 )?));
             }
             log::info!("cgroup manager V2 will be used");
