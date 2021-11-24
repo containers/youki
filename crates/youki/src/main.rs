@@ -168,7 +168,7 @@ fn determine_root_path(root_path: Option<PathBuf>) -> Result<PathBuf> {
         }
     }
 
-    let tmp_dir = PathBuf::from(format!("/tmp/youki/{}", uid));
+    let tmp_dir = PathBuf::from(format!("/tmp/youki-{}", uid));
     if create_dir_all_with_mode(&tmp_dir, uid, Mode::S_IRWXU).is_ok() {
         return Ok(tmp_dir);
     }
