@@ -2,6 +2,7 @@ use crate::{namespaces::Namespaces, utils};
 use anyhow::{bail, Context, Result};
 use nix::unistd::Pid;
 use oci_spec::runtime::{Linux, LinuxIdMapping, LinuxNamespace, LinuxNamespaceType, Mount, Spec};
+use std::fs;
 use std::path::Path;
 use std::process::Command;
 use std::{env, path::PathBuf};
@@ -102,6 +103,22 @@ pub fn rootless_required() -> bool {
     }
 
     matches!(std::env::var("YOUKI_USE_ROOTLESS").as_deref(), Ok("true"))
+}
+
+pub fn unprivileged_user_ns_enabled() -> Result<bool> {
+    let user_ns_sysctl = Path::new("/proc/sys/kernel/unprivileged_userns_clone");
+    if !user_ns_sysctl.exists() {
+        return Ok(true);
+    }
+
+    let content =
+        fs::read_to_string(user_ns_sysctl).context("failed to read unprivileged userns clone")?;
+
+    match content.trim().parse::<u8>()? {
+        0 => Ok(false),
+        1 => Ok(true),
+        v => bail!("failed to parse unprivileged userns value: {}", v),
+    }
 }
 
 /// Validates that the spec contains the required information for

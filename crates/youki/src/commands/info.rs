@@ -3,6 +3,7 @@ use std::{collections::HashSet, fs, path::Path};
 
 use anyhow::Result;
 use clap::Parser;
+use libcontainer::rootless;
 use procfs::{CpuInfo, Meminfo};
 
 use libcgroups::{common::CgroupSetup, v2::controller_type::ControllerType};
@@ -176,7 +177,12 @@ pub fn print_namespaces() {
         println!("  {:<16}enabled", "mount");
         print_feature_status(&content, "CONFIG_UTS_NS", FeatureDisplay::new("uts"));
         print_feature_status(&content, "CONFIG_IPC_NS", FeatureDisplay::new("ipc"));
-        print_feature_status(&content, "CONFIG_USER_NS", FeatureDisplay::new("user"));
+
+        let user_display = match rootless::unprivileged_user_ns_enabled() {
+            Ok(false) => FeatureDisplay::with_status("user", "enabled (root only)", "disabled"),
+            _ => FeatureDisplay::new("user"),
+        };
+        print_feature_status(&content, "CONFIG_USER_NS", user_display);
         print_feature_status(&content, "CONFIG_PID_NS", FeatureDisplay::new("pid"));
         print_feature_status(&content, "CONFIG_NET_NS", FeatureDisplay::new("network"));
         // While the CONFIG_CGROUP_NS kernel feature exists, it is obsolete and should not be used. CGroup namespaces
