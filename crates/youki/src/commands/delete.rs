@@ -13,12 +13,10 @@ pub struct Delete {
     force: bool,
 }
 
-impl Delete {
-    pub fn exec(&self, root_path: PathBuf) -> Result<()> {
-        log::debug!("start deleting {}", self.container_id);
-        let mut container = load_container(root_path, &self.container_id)?;
-        container
-            .delete(self.force)
-            .with_context(|| format!("failed to delete container {}", self.container_id))
-    }
+pub fn delete(args: Delete, root_path: PathBuf) -> Result<()> {
+    log::debug!("start deleting {}", args.container_id);
+    let mut container = load_container(root_path, &args.container_id)?;
+    container
+        .delete(args.force)
+        .with_context(|| format!("failed to delete container {}", args.container_id))
 }

@@ -14,11 +14,9 @@ pub struct Start {
     pub container_id: String,
 }
 
-impl Start {
-    pub fn exec(&self, root_path: PathBuf) -> Result<()> {
-        let mut container = load_container(root_path, &self.container_id)?;
-        container
-            .start()
-            .with_context(|| format!("failed to start container {}", self.container_id))
-    }
+pub fn start(args: Start, root_path: PathBuf) -> Result<()> {
+    let mut container = load_container(root_path, &args.container_id)?;
+    container
+        .start()
+        .with_context(|| format!("failed to start container {}", args.container_id))
 }

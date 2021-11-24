@@ -31,18 +31,16 @@ pub struct Create {
 // can be given impression that is is running on a complete system, but on the system which
 // it is running, it is just another process, and has attributes such as pid, file descriptors, etc.
 // associated with it like any other process.
-impl Create {
-    pub fn exec(&self, root_path: PathBuf, systemd_cgroup: bool) -> Result<()> {
-        let syscall = create_syscall();
-        ContainerBuilder::new(self.container_id.clone(), syscall.as_ref())
-            .with_pid_file(self.pid_file.as_ref())
-            .with_console_socket(self.console_socket.as_ref())
-            .with_root_path(root_path)
-            .with_preserved_fds(self.preserve_fds)
-            .as_init(&self.bundle)
-            .with_systemd(systemd_cgroup)
-            .build()?;
+pub fn create(args: Create, root_path: PathBuf, systemd_cgroup: bool) -> Result<()> {
+    let syscall = create_syscall();
+    ContainerBuilder::new(args.container_id.clone(), syscall.as_ref())
+        .with_pid_file(args.pid_file.as_ref())
+        .with_console_socket(args.console_socket.as_ref())
+        .with_root_path(root_path)
+        .with_preserved_fds(args.preserve_fds)
+        .as_init(&args.bundle)
+        .with_systemd(systemd_cgroup)
+        .build()?;
 
-        Ok(())
-    }
+    Ok(())
 }

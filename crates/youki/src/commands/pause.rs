@@ -17,12 +17,10 @@ pub struct Pause {
 // For more information see :
 // https://man7.org/linux/man-pages/man7/cgroups.7.html
 // https://www.kernel.org/doc/Documentation/cgroup-v1/freezer-subsystem.txt
-impl Pause {
-    pub fn exec(&self, root_path: PathBuf) -> Result<()> {
-        log::debug!("start pausing container {}", self.container_id);
-        let mut container = load_container(root_path, &self.container_id)?;
-        container
-            .pause()
-            .with_context(|| format!("failed to pause container {}", self.container_id))
-    }
+pub fn pause(args: Pause, root_path: PathBuf) -> Result<()> {
+    log::debug!("start pausing container {}", args.container_id);
+    let mut container = load_container(root_path, &args.container_id)?;
+    container
+        .pause()
+        .with_context(|| format!("failed to pause container {}", args.container_id))
 }

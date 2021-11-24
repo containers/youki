@@ -121,20 +121,20 @@ fn main() -> Result<()> {
     let systemd_cgroup = opts.systemd_cgroup;
 
     match opts.subcmd {
-        SubCommand::Create(create) => create.exec(root_path, systemd_cgroup),
-        SubCommand::Start(start) => start.exec(root_path),
-        SubCommand::Run(run) => run.exec(root_path, systemd_cgroup),
-        SubCommand::Exec(exec) => exec.exec(root_path),
-        SubCommand::Kill(kill) => kill.exec(root_path),
-        SubCommand::Delete(delete) => delete.exec(root_path),
-        SubCommand::State(state) => state.exec(root_path),
-        SubCommand::Info(info) => info.exec(),
-        SubCommand::List(list) => list.exec(root_path),
-        SubCommand::Spec(spec) => spec.exec(),
-        SubCommand::Pause(pause) => pause.exec(root_path),
-        SubCommand::Resume(resume) => resume.exec(root_path),
-        SubCommand::Events(events) => events.exec(root_path),
-        SubCommand::Ps(ps) => ps.exec(root_path),
+        SubCommand::Create(create) => commands::create::create(create, root_path, systemd_cgroup),
+        SubCommand::Start(start) => commands::start::start(start, root_path),
+        SubCommand::Run(run) => commands::run::run(run, root_path, systemd_cgroup),
+        SubCommand::Exec(exec) => commands::exec::exec(exec, root_path),
+        SubCommand::Kill(kill) => commands::kill::kill(kill, root_path),
+        SubCommand::Delete(delete) => commands::delete::delete(delete, root_path),
+        SubCommand::State(state) => commands::state::state(state, root_path),
+        SubCommand::Info(info) => commands::info::info(info),
+        SubCommand::List(list) => commands::list::list(list, root_path),
+        SubCommand::Spec(spec) => commands::spec_json::spec(spec),
+        SubCommand::Pause(pause) => commands::pause::pause(pause, root_path),
+        SubCommand::Resume(resume) => commands::resume::resume(resume, root_path),
+        SubCommand::Events(events) => commands::events::events(events, root_path),
+        SubCommand::Ps(ps) => commands::ps::ps(ps, root_path),
     }
 }
 

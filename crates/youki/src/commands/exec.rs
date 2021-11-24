@@ -38,22 +38,20 @@ pub struct Exec {
     pub command: Vec<String>,
 }
 
-impl Exec {
-    pub fn exec(&self, root_path: PathBuf) -> Result<()> {
-        let syscall = create_syscall();
-        ContainerBuilder::new(self.container_id.clone(), syscall.as_ref())
-            .with_root_path(root_path)
-            .with_console_socket(self.console_socket.as_ref())
-            .with_pid_file(self.pid_file.as_ref())
-            .as_tenant()
-            .with_cwd(self.cwd.as_ref())
-            .with_env(self.env.clone().into_iter().collect())
-            .with_process(self.process.as_ref())
-            .with_no_new_privs(self.no_new_privs)
-            .with_process(self.process.as_ref())
-            .with_container_args(self.command.clone())
-            .build()
-    }
+pub fn exec(args: Exec, root_path: PathBuf) -> Result<()> {
+    let syscall = create_syscall();
+    ContainerBuilder::new(args.container_id.clone(), syscall.as_ref())
+        .with_root_path(root_path)
+        .with_console_socket(args.console_socket.as_ref())
+        .with_pid_file(args.pid_file.as_ref())
+        .as_tenant()
+        .with_cwd(args.cwd.as_ref())
+        .with_env(args.env.clone().into_iter().collect())
+        .with_process(args.process.as_ref())
+        .with_no_new_privs(args.no_new_privs)
+        .with_process(args.process.as_ref())
+        .with_container_args(args.command.clone())
+        .build()
 }
 
 fn parse_key_val<T, U>(s: &str) -> Result<(T, U), Box<dyn Error + Send + Sync + 'static>>

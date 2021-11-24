@@ -18,12 +18,10 @@ pub struct Resume {
 // For more information see :
 // https://man7.org/linux/man-pages/man7/cgroups.7.html
 // https://www.kernel.org/doc/Documentation/cgroup-v1/freezer-subsystem.txt
-impl Resume {
-    pub fn exec(&self, root_path: PathBuf) -> Result<()> {
-        log::debug!("start resuming container {}", self.container_id);
-        let mut container = load_container(root_path, &self.container_id)?;
-        container
-            .resume()
-            .with_context(|| format!("failed to resume container {}", self.container_id))
-    }
+pub fn resume(args: Resume, root_path: PathBuf) -> Result<()> {
+    log::debug!("start resuming container {}", args.container_id);
+    let mut container = load_container(root_path, &args.container_id)?;
+    container
+        .resume()
+        .with_context(|| format!("failed to resume container {}", args.container_id))
 }

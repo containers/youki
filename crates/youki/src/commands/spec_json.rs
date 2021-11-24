@@ -89,18 +89,16 @@ pub fn get_rootless() -> Result<Spec> {
 }
 
 /// spec Cli command
-impl SpecJson {
-    pub fn exec(&self) -> Result<()> {
-        let spec = if self.rootless {
-            get_rootless()?
-        } else {
-            get_default()?
-        };
+pub fn spec(args: SpecJson) -> Result<()> {
+    let spec = if args.rootless {
+        get_rootless()?
+    } else {
+        get_default()?
+    };
 
-        // write data to config.json
-        to_writer_pretty(&File::create("config.json")?, &spec)?;
-        Ok(())
-    }
+    // write data to config.json
+    to_writer_pretty(&File::create("config.json")?, &spec)?;
+    Ok(())
 }
 
 #[cfg(test)]

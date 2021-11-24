@@ -15,10 +15,8 @@ pub struct Kill {
     signal: String,
 }
 
-impl Kill {
-    pub fn exec(&self, root_path: PathBuf) -> Result<()> {
-        let mut container = load_container(root_path, &self.container_id)?;
-        let signal: Signal = self.signal.as_str().try_into()?;
-        container.kill(signal)
-    }
+pub fn kill(args: Kill, root_path: PathBuf) -> Result<()> {
+    let mut container = load_container(root_path, &args.container_id)?;
+    let signal: Signal = args.signal.as_str().try_into()?;
+    container.kill(signal)
 }

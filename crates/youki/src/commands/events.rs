@@ -19,11 +19,9 @@ pub struct Events {
     pub container_id: String,
 }
 
-impl Events {
-    pub fn exec(&self, root_path: PathBuf) -> Result<()> {
-        let mut container = load_container(root_path, &self.container_id)?;
-        container
-            .events(self.interval, self.stats)
-            .with_context(|| format!("failed to get events from container {}", self.container_id))
-    }
+pub fn events(args: Events, root_path: PathBuf) -> Result<()> {
+    let mut container = load_container(root_path, &args.container_id)?;
+    container
+        .events(args.interval, args.stats)
+        .with_context(|| format!("failed to get events from container {}", args.container_id))
 }
