@@ -669,6 +669,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "liboci-cli"
+version = "0.0.1"
+dependencies = [
+ "clap",
+]
+
+[[package]]
 name = "libseccomp"
 version = "0.1.0"
 dependencies = [
@@ -1328,6 +1335,7 @@ dependencies = [
  "clap",
  "libcgroups",
  "libcontainer",
+ "liboci-cli",
  "log",
  "nix",
  "oci-spec 0.5.2 (git+https://github.com/containers/oci-spec-rs?rev=d6fb1e91742313cd0d0085937e2d6df5d4669720)",

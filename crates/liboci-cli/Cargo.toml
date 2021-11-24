@@ -1,0 +1,11 @@
+[package]
+name = "liboci-cli"
+version = "0.0.1"
+authors = ["youki team"]
+edition = "2021"
+description = "Parse command line arguments for OCI container runtimes"
+
+[dependencies.clap]
+version = "3.0.0-beta.5"
+default-features = false
+features = ["std", "suggestions", "derive", "cargo"]

@@ -2,16 +2,9 @@ use std::fs;
 use std::path::PathBuf;
 
 use anyhow::Result;
-use clap::Parser;
 
 use libcontainer::container::Container;
-
-/// Show the container state
-#[derive(Parser, Debug)]
-pub struct State {
-    #[clap(forbid_empty_values = true, required = true)]
-    pub container_id: String,
-}
+use liboci_cli::State;
 
 pub fn state(args: State, root_path: PathBuf) -> Result<()> {
     let root_path = fs::canonicalize(root_path)?;

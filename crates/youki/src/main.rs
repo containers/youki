@@ -12,20 +12,15 @@ use anyhow::Context;
 use anyhow::Result;
 use clap::{crate_version, Parser};
 
-use crate::commands::create;
-use crate::commands::delete;
 use crate::commands::events;
 use crate::commands::exec;
 use crate::commands::info;
-use crate::commands::kill;
 use crate::commands::list;
 use crate::commands::pause;
 use crate::commands::ps;
 use crate::commands::resume;
 use crate::commands::run;
 use crate::commands::spec_json;
-use crate::commands::start;
-use crate::commands::state;
 use libcontainer::rootless::rootless_required;
 use libcontainer::utils;
 use libcontainer::utils::create_dir_all_with_mode;
@@ -62,19 +57,20 @@ struct Opts {
 #[derive(Parser, Debug)]
 enum SubCommand {
     #[clap(version = crate_version!(), author = "youki team")]
-    Create(create::Create),
+    Create(liboci_cli::Create),
     #[clap(version = crate_version!(), author = "youki team")]
-    Start(start::Start),
+    Start(liboci_cli::Start),
+    #[clap(version = crate_version!(), author = "youki team")]
+    State(liboci_cli::State),
+    #[clap(version = crate_version!(), author = "youki team")]
+    Kill(liboci_cli::Kill),
+    #[clap(version = crate_version!(), author = "youki team")]
+    Delete(liboci_cli::Delete),
+
     #[clap(version = crate_version!(), author = "youki team")]
     Run(run::Run),
     #[clap(version = crate_version!(), author = "youki team")]
     Exec(exec::Exec),
-    #[clap(version = crate_version!(), author = "youki team")]
-    Kill(kill::Kill),
-    #[clap(version = crate_version!(), author = "youki team")]
-    Delete(delete::Delete),
-    #[clap(version = crate_version!(), author = "youki team")]
-    State(state::State),
     #[clap(version = crate_version!(), author = "youki team")]
     Info(info::Info),
     #[clap(version = crate_version!(), author = "youki team")]
