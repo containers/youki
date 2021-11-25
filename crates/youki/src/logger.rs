@@ -57,10 +57,13 @@ pub fn init(
 
 fn detect_log_level(is_debug: bool) -> Result<LevelFilter> {
     let filter: Cow<str> = if is_debug {
+        dbg!(is_debug);
         "debug".into()
     } else if let Ok(level) = std::env::var(LOG_LEVEL_ENV_NAME) {
+        println!("from env: {:?}", level);
         level.into()
     } else {
+        println!("default: {:?}", DEFAULT_LOG_LEVEL);
         DEFAULT_LOG_LEVEL.into()
     };
     Ok(LevelFilter::from_str(filter.as_ref())?)
@@ -105,10 +108,30 @@ where
 mod tests {
     use super::*;
     use std::env;
+    struct LogLevelGuard {
+        original_level: Option<String>,
+    }
+
+    impl LogLevelGuard {
+        fn new(level: &str) -> Result<Self> {
+            let original_level = env::var(LOG_LEVEL_ENV_NAME).ok();
+            env::set_var(LOG_LEVEL_ENV_NAME, level);
+            Ok(Self { original_level })
+        }
+    }
+    impl Drop for LogLevelGuard {
+        fn drop(self: &mut LogLevelGuard) {
+            if let Some(level) = self.original_level.as_ref() {
+                env::set_var(LOG_LEVEL_ENV_NAME, level);
+            } else {
+                env::remove_var(LOG_LEVEL_ENV_NAME);
+            }
+        }
+    }
 
     #[test]
     fn test_detect_log_level_is_debug() {
-        env::set_var(LOG_LEVEL_ENV_NAME, "error");
+        let _guard = LogLevelGuard::new("error").unwrap();
         assert_eq!(detect_log_level(true).unwrap(), LevelFilter::Debug)
     }
 
@@ -124,7 +147,7 @@ mod tests {
 
     #[test]
     fn test_detect_log_level_from_env() {
-        env::set_var(LOG_LEVEL_ENV_NAME, "error");
+        let _guard = LogLevelGuard::new("error").unwrap();
         assert_eq!(detect_log_level(false).unwrap(), LevelFilter::Error)
     }
 }
