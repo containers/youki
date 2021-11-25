@@ -112,6 +112,11 @@ fn main() -> Result<()> {
         eprintln!("log init failed: {:?}", e);
     }
 
+    log::debug!(
+        "started by user {} with {:?}",
+        nix::unistd::geteuid(),
+        std::env::args_os()
+    );
     let root_path = determine_root_path(opts.root)?;
     let systemd_cgroup = opts.systemd_cgroup;
 
