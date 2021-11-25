@@ -106,6 +106,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use serial_test::serial;
+
     use super::*;
     use std::env;
     struct LogLevelGuard {
@@ -136,6 +138,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_detect_log_level_default() {
         env::remove_var(LOG_LEVEL_ENV_NAME);
         if cfg!(debug_assertions) {
@@ -146,6 +149,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_detect_log_level_from_env() {
         let _guard = LogLevelGuard::new("error").unwrap();
         assert_eq!(detect_log_level(false).unwrap(), LevelFilter::Error)
