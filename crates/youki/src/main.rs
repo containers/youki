@@ -48,35 +48,22 @@ struct Opts {
 // Also for a short information, check [runc commandline documentation](https://github.com/opencontainers/runc/blob/master/man/runc.8.md)
 #[derive(Parser, Debug)]
 enum SubCommand {
-    #[clap(version = crate_version!(), author = "youki team")]
     Create(liboci_cli::Create),
-    #[clap(version = crate_version!(), author = "youki team")]
     Start(liboci_cli::Start),
-    #[clap(version = crate_version!(), author = "youki team")]
     State(liboci_cli::State),
-    #[clap(version = crate_version!(), author = "youki team")]
     Kill(liboci_cli::Kill),
-    #[clap(version = crate_version!(), author = "youki team")]
     Delete(liboci_cli::Delete),
 
-    #[clap(version = crate_version!(), author = "youki team")]
     Events(liboci_cli::Events),
-    #[clap(version = crate_version!(), author = "youki team")]
     Exec(liboci_cli::Exec),
-    #[clap(version = crate_version!(), author = "youki team")]
     List(liboci_cli::List),
-    #[clap(version = crate_version!(), author = "youki team")]
     Pause(liboci_cli::Pause),
-    #[clap(version = crate_version!(), author = "youki team", setting=clap::AppSettings::AllowLeadingHyphen)]
+    #[clap(setting=clap::AppSettings::AllowLeadingHyphen)]
     Ps(liboci_cli::Ps),
-    #[clap(version = crate_version!(), author = "youki team")]
     Resume(liboci_cli::Resume),
-    #[clap(version = crate_version!(), author = "youki team")]
     Run(liboci_cli::Run),
-    #[clap(version = crate_version!(), author = "youki team")]
     Spec(liboci_cli::Spec),
 
-    #[clap(version = crate_version!(), author = "youki team")]
     Info(info::Info),
 }
 
