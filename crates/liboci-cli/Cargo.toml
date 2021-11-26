@@ -4,6 +4,7 @@ version = "0.0.1"
 authors = ["youki team"]
 edition = "2021"
 description = "Parse command line arguments for OCI container runtimes"
+readme = "README.md"
 
 [dependencies.clap]
 version = "3.0.0-beta.5"
