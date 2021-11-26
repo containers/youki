@@ -14,13 +14,13 @@ Interface][https://github.com/opencontainers/runtime-tools/blob/master/docs/comm
 | kill       | ✅         | ✅                | ✅   | ✅   | ✅    |
 | delete     | ✅         | ✅                | ✅   | ✅   | ✅    |
 | checkpoint |            |                   | ✅   | ✅   |       |
-| events     |            |                   | ✅   |      | ✅    |
-| exec       |            |                   | ✅   | ✅   | ✅    |
-| list       |            |                   | ✅   | ✅   | ✅    |
-| pause      |            |                   | ✅   | ✅   | ✅    |
-| ps         |            |                   | ✅   | ✅   | ✅    |
+| events     | ✅         |                   | ✅   |      | ✅    |
+| exec       | ✅         |                   | ✅   | ✅   | ✅    |
+| list       | ✅         |                   | ✅   | ✅   | ✅    |
+| pause      | ✅         |                   | ✅   | ✅   | ✅    |
+| ps         | ✅         |                   | ✅   | ✅   | ✅    |
 | restore    |            |                   | ✅   | ✅   |       |
-| resume     |            |                   | ✅   | ✅   | ✅    |
-| run        |            |                   | ✅   | ✅   | ✅    |
-| spec       |            |                   | ✅   | ✅   | ✅    |
+| resume     | ✅         |                   | ✅   | ✅   | ✅    |
+| run        | ✅         |                   | ✅   | ✅   | ✅    |
+| spec       | ✅         |                   | ✅   | ✅   | ✅    |
 | update     |            |                   | ✅   | ✅   |       |

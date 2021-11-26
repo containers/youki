@@ -6,14 +6,10 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use chrono::{DateTime, Local};
-use clap::Parser;
 use tabwriter::TabWriter;
 
 use libcontainer::container::{state::State, Container};
-
-/// List created containers
-#[derive(Parser, Debug)]
-pub struct List {}
+use liboci_cli::List;
 
 /// lists all existing containers
 pub fn list(_: List, root_path: PathBuf) -> Result<()> {

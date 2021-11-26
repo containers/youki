@@ -1,21 +1,8 @@
 use anyhow::{bail, Context, Result};
-use clap::{self, Parser};
 use libcgroups;
 use libcontainer::{container::Container, utils};
+use liboci_cli::Ps;
 use std::{path::PathBuf, process::Command};
-
-/// Display the processes inside the container
-#[derive(Parser, Debug)]
-pub struct Ps {
-    /// format to display processes: table or json (default: "table")
-    #[clap(short, long, default_value = "table")]
-    format: String,
-    #[clap(forbid_empty_values = true, required = true)]
-    pub container_id: String,
-    /// options will be passed to the ps utility
-    #[clap(setting = clap::ArgSettings::Last)]
-    ps_options: Vec<String>,
-}
 
 pub fn ps(args: Ps, root_path: PathBuf) -> Result<()> {
     let container_root = root_path.join(&args.container_id);

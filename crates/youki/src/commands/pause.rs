@@ -3,14 +3,8 @@ use crate::commands::load_container;
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
-use clap::Parser;
 
-/// Suspend the processes within the container
-#[derive(Parser, Debug)]
-pub struct Pause {
-    #[clap(forbid_empty_values = true, required = true)]
-    pub container_id: String,
-}
+use liboci_cli::Pause;
 
 // Pausing a container indicates suspending all processes in given container
 // This uses Freezer cgroup to suspend and resume processes

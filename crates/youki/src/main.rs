@@ -12,15 +12,7 @@ use anyhow::Context;
 use anyhow::Result;
 use clap::{crate_version, Parser};
 
-use crate::commands::events;
-use crate::commands::exec;
 use crate::commands::info;
-use crate::commands::list;
-use crate::commands::pause;
-use crate::commands::ps;
-use crate::commands::resume;
-use crate::commands::run;
-use crate::commands::spec_json;
 use libcontainer::rootless::rootless_required;
 use libcontainer::utils;
 use libcontainer::utils::create_dir_all_with_mode;
@@ -68,23 +60,24 @@ enum SubCommand {
     Delete(liboci_cli::Delete),
 
     #[clap(version = crate_version!(), author = "youki team")]
-    Run(run::Run),
+    Events(liboci_cli::Events),
     #[clap(version = crate_version!(), author = "youki team")]
-    Exec(exec::Exec),
+    Exec(liboci_cli::Exec),
+    #[clap(version = crate_version!(), author = "youki team")]
+    List(liboci_cli::List),
+    #[clap(version = crate_version!(), author = "youki team")]
+    Pause(liboci_cli::Pause),
+    #[clap(version = crate_version!(), author = "youki team", setting=clap::AppSettings::AllowLeadingHyphen)]
+    Ps(liboci_cli::Ps),
+    #[clap(version = crate_version!(), author = "youki team")]
+    Resume(liboci_cli::Resume),
+    #[clap(version = crate_version!(), author = "youki team")]
+    Run(liboci_cli::Run),
+    #[clap(version = crate_version!(), author = "youki team")]
+    Spec(liboci_cli::Spec),
+
     #[clap(version = crate_version!(), author = "youki team")]
     Info(info::Info),
-    #[clap(version = crate_version!(), author = "youki team")]
-    Spec(spec_json::SpecJson),
-    #[clap(version = crate_version!(), author = "youki team")]
-    List(list::List),
-    #[clap(version = crate_version!(), author = "youki team")]
-    Pause(pause::Pause),
-    #[clap(version = crate_version!(), author = "youki team")]
-    Resume(resume::Resume),
-    #[clap(version = crate_version!(), author = "youki team")]
-    Events(events::Events),
-    #[clap(version = crate_version!(), author = "youki team", setting=clap::AppSettings::AllowLeadingHyphen)]
-    Ps(ps::Ps),
 }
 
 /// This is the entry point in the container runtime. The binary is run by a high-level container runtime,
