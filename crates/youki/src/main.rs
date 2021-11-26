@@ -19,6 +19,8 @@ use libcontainer::utils::create_dir_all_with_mode;
 use nix::sys::stat::Mode;
 use nix::unistd::getuid;
 
+use liboci_cli::{CommonCmd, StandardCmd};
+
 // High-level commandline option definition
 // This takes global options as well as individual commands as specified in [OCI runtime-spec](https://github.com/opencontainers/runtime-spec/blob/master/runtime.md)
 // Also check [runc commandline documentation](https://github.com/opencontainers/runc/blob/master/man/runc.8.md) for more explanation
@@ -48,22 +50,13 @@ struct Opts {
 // Also for a short information, check [runc commandline documentation](https://github.com/opencontainers/runc/blob/master/man/runc.8.md)
 #[derive(Parser, Debug)]
 enum SubCommand {
-    Create(liboci_cli::Create),
-    Start(liboci_cli::Start),
-    State(liboci_cli::State),
-    Kill(liboci_cli::Kill),
-    Delete(liboci_cli::Delete),
+    // Standard and common commands handled by the liboci_cli crate
+    #[clap(flatten)]
+    Standard(liboci_cli::StandardCmd),
+    #[clap(flatten)]
+    Common(liboci_cli::CommonCmd),
 
-    Events(liboci_cli::Events),
-    Exec(liboci_cli::Exec),
-    List(liboci_cli::List),
-    Pause(liboci_cli::Pause),
-    #[clap(setting=clap::AppSettings::AllowLeadingHyphen)]
-    Ps(liboci_cli::Ps),
-    Resume(liboci_cli::Resume),
-    Run(liboci_cli::Run),
-    Spec(liboci_cli::Spec),
-
+    // Youki specific extensions
     Info(info::Info),
 }
 
@@ -97,20 +90,27 @@ fn main() -> Result<()> {
     let systemd_cgroup = opts.systemd_cgroup;
 
     match opts.subcmd {
-        SubCommand::Create(create) => commands::create::create(create, root_path, systemd_cgroup),
-        SubCommand::Start(start) => commands::start::start(start, root_path),
-        SubCommand::Run(run) => commands::run::run(run, root_path, systemd_cgroup),
-        SubCommand::Exec(exec) => commands::exec::exec(exec, root_path),
-        SubCommand::Kill(kill) => commands::kill::kill(kill, root_path),
-        SubCommand::Delete(delete) => commands::delete::delete(delete, root_path),
-        SubCommand::State(state) => commands::state::state(state, root_path),
+        SubCommand::Standard(cmd) => match cmd {
+            StandardCmd::Create(create) => {
+                commands::create::create(create, root_path, systemd_cgroup)
+            }
+            StandardCmd::Start(start) => commands::start::start(start, root_path),
+            StandardCmd::Kill(kill) => commands::kill::kill(kill, root_path),
+            StandardCmd::Delete(delete) => commands::delete::delete(delete, root_path),
+            StandardCmd::State(state) => commands::state::state(state, root_path),
+        },
+        SubCommand::Common(cmd) => match cmd {
+            CommonCmd::Events(events) => commands::events::events(events, root_path),
+            CommonCmd::Exec(exec) => commands::exec::exec(exec, root_path),
+            CommonCmd::List(list) => commands::list::list(list, root_path),
+            CommonCmd::Pause(pause) => commands::pause::pause(pause, root_path),
+            CommonCmd::Ps(ps) => commands::ps::ps(ps, root_path),
+            CommonCmd::Resume(resume) => commands::resume::resume(resume, root_path),
+            CommonCmd::Run(run) => commands::run::run(run, root_path, systemd_cgroup),
+            CommonCmd::Spec(spec) => commands::spec_json::spec(spec),
+        },
+
         SubCommand::Info(info) => commands::info::info(info),
-        SubCommand::List(list) => commands::list::list(list, root_path),
-        SubCommand::Spec(spec) => commands::spec_json::spec(spec),
-        SubCommand::Pause(pause) => commands::pause::pause(pause, root_path),
-        SubCommand::Resume(resume) => commands::resume::resume(resume, root_path),
-        SubCommand::Events(events) => commands::events::events(events, root_path),
-        SubCommand::Ps(ps) => commands::ps::ps(ps, root_path),
     }
 }
 
