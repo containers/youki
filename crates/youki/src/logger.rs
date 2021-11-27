@@ -137,6 +137,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_detect_log_level_default() {
+        let _guard = LogLevelGuard::new("error").unwrap();
         env::remove_var(LOG_LEVEL_ENV_NAME);
         if cfg!(debug_assertions) {
             assert_eq!(detect_log_level(false).unwrap(), LevelFilter::Debug)
