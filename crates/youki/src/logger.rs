@@ -57,13 +57,10 @@ pub fn init(
 
 fn detect_log_level(is_debug: bool) -> Result<LevelFilter> {
     let filter: Cow<str> = if is_debug {
-        dbg!(is_debug);
         "debug".into()
     } else if let Ok(level) = std::env::var(LOG_LEVEL_ENV_NAME) {
-        println!("from env: {:?}", level);
         level.into()
     } else {
-        println!("default: {:?}", DEFAULT_LOG_LEVEL);
         DEFAULT_LOG_LEVEL.into()
     };
     Ok(LevelFilter::from_str(filter.as_ref())?)
