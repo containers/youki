@@ -22,6 +22,23 @@ pub fn container_intermediate_process(
     let linux = spec.linux().as_ref().context("no linux in spec")?;
     let namespaces = Namespaces::from(linux.namespaces().as_ref());
 
+    // this needs to be done before we create the init process, so that the init
+    // process will already be captured by the cgroup. It also needs to be done
+    // before we enter the user namespace because if a privileged user starts a
+    // rootless container on a cgroup v1 system we can still fulfill resource
+    // restrictions through the cgroup fs support (delegation through systemd is
+    // not supported for v1 by us). This only works if the user has not yet been
+    // mapped to an unprivileged user by the user namespace however.
+    // In addition this needs to be done before we enter the cgroup namespace as
+    // the cgroup of the process will form the root of the cgroup hierarchy in
+    // the cgroup namespace.
+    apply_cgroups(
+        args.cgroup_manager.as_ref(),
+        linux.resources().as_ref(),
+        args.init,
+    )
+    .context("failed to apply cgroups")?;
+
     // if new user is specified in specification, this will be true and new
     // namespace will be created, check
     // https://man7.org/linux/man-pages/man7/user_namespaces.7.html for more
@@ -47,7 +64,7 @@ pub fn container_intermediate_process(
         // root in the user namespace likely is mapped to an non-priviliged user
         // on the parent user namespace.
         command.set_id(Uid::from_raw(0), Gid::from_raw(0)).context(
-            "Failed to configure uid and gid root in the beginning of a new user namespace",
+            "failed to configure uid and gid root in the beginning of a new user namespace",
         )?;
     }
 
@@ -64,17 +81,6 @@ pub fn container_intermediate_process(
         namespaces
             .unshare_or_setns(pid_namespace)
             .with_context(|| format!("Failed to enter pid namespace: {:?}", pid_namespace))?;
-    }
-
-    // this needs to be done before we create the init process, so that the init
-    // process will already be captured by the cgroup
-    if args.rootless.is_none() {
-        apply_cgroups(
-            args.cgroup_manager.as_ref(),
-            linux.resources().as_ref(),
-            args.init,
-        )
-        .context("failed to apply cgroups")?
     }
 
     // We have to record the pid of the child (container init process), since

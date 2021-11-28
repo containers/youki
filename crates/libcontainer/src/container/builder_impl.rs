@@ -57,7 +57,7 @@ impl<'a> ContainerBuilderImpl<'a> {
         let cgroups_path = utils::get_cgroup_path(linux.cgroups_path(), &self.container_id);
         let cmanager = libcgroups::common::create_cgroup_manager(
             &cgroups_path,
-            self.use_systemd,
+            self.use_systemd || self.rootless.is_some(),
             &self.container_id,
         )?;
         let process = self.spec.process().as_ref().context("No process in spec")?;
@@ -142,7 +142,7 @@ impl<'a> ContainerBuilderImpl<'a> {
         let cgroups_path = utils::get_cgroup_path(linux.cgroups_path(), &self.container_id);
         let cmanager = libcgroups::common::create_cgroup_manager(
             &cgroups_path,
-            self.use_systemd,
+            self.use_systemd || self.rootless.is_some(),
             &self.container_id,
         )?;
 
