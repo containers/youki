@@ -61,6 +61,42 @@ struct CgroupsPath {
     name: String,
 }
 
+impl TryFrom<&Path> for CgroupsPath {
+    type Error = anyhow::Error;
+
+    fn try_from(cgroups_path: &Path) -> Result<Self, Self::Error> {
+        // cgroups path may never be empty as it is defaulted to `/youki`
+        // see 'get_cgroup_path' under utils.rs.
+        // if cgroups_path was provided it should be of the form [slice]:[prefix]:[name],
+        // for example: "system.slice:docker:1234".
+        let mut parent = "";
+        let prefix;
+        let name;
+        if cgroups_path.starts_with("/youki") {
+            prefix = "youki";
+            name = cgroups_path
+                .strip_prefix("/youki/")?
+                .to_str()
+                .ok_or_else(|| anyhow!("failed to parse cgroups path {:?}", cgroups_path))?;
+        } else {
+            let parts = cgroups_path
+                .to_str()
+                .ok_or_else(|| anyhow!("failed to parse cgroups path {:?}", cgroups_path))?
+                .split(':')
+                .collect::<Vec<&str>>();
+            parent = parts[0];
+            prefix = parts[1];
+            name = parts[2];
+        }
+
+        Ok(CgroupsPath {
+            parent: parent.to_owned(),
+            prefix: prefix.to_owned(),
+            name: name.to_owned(),
+        })
+    }
+}
+
 impl Display for CgroupsPath {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}:{}:{}", self.parent, self.prefix, self.name)
@@ -89,7 +125,9 @@ impl Manager {
         container_name: String,
         use_system: bool,
     ) -> Result<Self> {
-        let destructured_path = Self::destructure_cgroups_path(&cgroups_path)
+        let destructured_path = cgroups_path
+            .as_path()
+            .try_into()
             .with_context(|| format!("failed to destructure cgroups path {:?}", cgroups_path))?;
         let client = match use_system {
             true => Client::new_system().context("failed to create system dbus client")?,
@@ -108,38 +146,6 @@ impl Manager {
             unit_name: Self::get_unit_name(&destructured_path),
             destructured_path,
             client,
-        })
-    }
-
-    fn destructure_cgroups_path(cgroups_path: &Path) -> Result<CgroupsPath> {
-        // cgroups path may never be empty as it is defaulted to `/youki`
-        // see 'get_cgroup_path' under utils.rs.
-        // if cgroups_path was provided it should be of the form [slice]:[prefix]:[name],
-        // for example: "system.slice:docker:1234".
-        let mut parent = "";
-        let prefix;
-        let name;
-        if cgroups_path.starts_with("/youki") {
-            prefix = "youki";
-            name = cgroups_path
-                .strip_prefix("/youki/")?
-                .to_str()
-                .ok_or_else(|| anyhow!("failed to parse cgroups path"))?;
-        } else {
-            let parts = cgroups_path
-                .to_str()
-                .ok_or_else(|| anyhow!("failed to parse cgroups path"))?
-                .split(':')
-                .collect::<Vec<&str>>();
-            parent = parts[0];
-            prefix = parts[1];
-            name = parts[2];
-        }
-
-        Ok(CgroupsPath {
-            parent: parent.to_owned(),
-            prefix: prefix.to_owned(),
-            name: name.to_owned(),
         })
     }
 
@@ -425,8 +431,9 @@ mod tests {
 
     #[test]
     fn get_cgroups_path_works_with_a_complex_slice() -> Result<()> {
-        let cgroups_path =
-            Manager::destructure_cgroups_path(Path::new("test-a-b.slice:docker:foo")).expect("");
+        let cgroups_path = Path::new("test-a-b.slice:docker:foo")
+            .try_into()
+            .context("construct path")?;
 
         assert_eq!(
             Manager::construct_cgroups_path(&cgroups_path, &TestSystemdClient {})?.0,
@@ -438,8 +445,9 @@ mod tests {
 
     #[test]
     fn get_cgroups_path_works_with_a_simple_slice() -> Result<()> {
-        let cgroups_path =
-            Manager::destructure_cgroups_path(Path::new("machine.slice:libpod:foo")).expect("");
+        let cgroups_path = Path::new("machine.slice:libpod:foo")
+            .try_into()
+            .context("construct path")?;
 
         assert_eq!(
             Manager::construct_cgroups_path(&cgroups_path, &TestSystemdClient {})?.0,
@@ -451,7 +459,9 @@ mod tests {
 
     #[test]
     fn get_cgroups_path_works_with_scope() -> Result<()> {
-        let cgroups_path = Manager::destructure_cgroups_path(Path::new(":docker:foo")).expect("");
+        let cgroups_path = Path::new(":docker:foo")
+            .try_into()
+            .context("construct path")?;
 
         assert_eq!(
             Manager::construct_cgroups_path(&cgroups_path, &TestSystemdClient {})?.0,
