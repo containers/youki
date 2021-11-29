@@ -5,7 +5,7 @@ pub enum ControllerType {
     CpuSet,
     Io,
     Memory,
-    Tasks,
+    Pids,
 }
 
 impl Display for ControllerType {
@@ -15,7 +15,7 @@ impl Display for ControllerType {
             ControllerType::CpuSet => "cpuset",
             ControllerType::Io => "io",
             ControllerType::Memory => "memory",
-            ControllerType::Tasks => "tasks",
+            ControllerType::Pids => "pids",
         };
 
         write!(f, "{}", print)
@@ -29,7 +29,7 @@ impl AsRef<str> for ControllerType {
             ControllerType::CpuSet => "cpuset",
             ControllerType::Io => "io",
             ControllerType::Memory => "memory",
-            ControllerType::Tasks => "tasks",
+            ControllerType::Pids => "pids",
         }
     }
 }
@@ -39,5 +39,5 @@ pub const CONTROLLER_TYPES: &[ControllerType] = &[
     ControllerType::CpuSet,
     ControllerType::Io,
     ControllerType::Memory,
-    ControllerType::Tasks,
+    ControllerType::Pids,
 ];

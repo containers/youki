@@ -22,11 +22,11 @@ use super::{
     memory::Memory,
     pids::Pids,
 };
-use crate::stats::Stats;
 use crate::{
     common::{self, CgroupManager, ControllerOpt, FreezerState, PathBufExt},
     systemd::unified::Unified,
 };
+use crate::{stats::Stats, v2::manager::Manager as FsManager};
 
 const CGROUP_PROCS: &str = "cgroup.procs";
 const CGROUP_CONTROLLERS: &str = "cgroup.controllers";
@@ -48,6 +48,10 @@ pub struct Manager {
     unit_name: String,
     /// Client for communicating with systemd
     client: Client,
+    /// Cgroup manager for the created transient unit
+    fs_manager: FsManager,
+    /// Last control group which is managed by systemd, e.g. /user.slice/user-1000/user@1000.service
+    delegation_boundary: PathBuf,
 }
 
 /// Represents the systemd cgroups path:
@@ -134,9 +138,11 @@ impl Manager {
             false => Client::new_session().context("failed to create session dbus client")?,
         };
 
-        let (cgroups_path, parent) = Self::construct_cgroups_path(&destructured_path, &client)
-            .context("failed to construct cgroups path")?;
+        let (cgroups_path, delegation_boundary) =
+            Self::construct_cgroups_path(&destructured_path, &client)
+                .context("failed to construct cgroups path")?;
         let full_path = root_path.join_safely(&cgroups_path)?;
+        let fs_manager = FsManager::new(root_path.clone(), cgroups_path.clone())?;
 
         Ok(Manager {
             root_path,
@@ -146,6 +152,8 @@ impl Manager {
             unit_name: Self::get_unit_name(&destructured_path),
             destructured_path,
             client,
+            fs_manager,
+            delegation_boundary,
         })
     }
 
@@ -160,7 +168,8 @@ impl Manager {
     }
 
     // get_cgroups_path generates a cgroups path from the one provided by the user via cgroupsPath.
-    // an example of the final path: "/system.slice/docker-foo.scope"
+    // an example of the final path: "/system.slice/youki-569d5ce3afe1074769f67.scope" or if we are
+    // not running as root /user.slice/user-1000/user@1000.service/youki-569d5ce3afe1074769f67.scope
     fn construct_cgroups_path(
         cgroups_path: &CgroupsPath,
         client: &dyn SystemdClient,
@@ -178,12 +187,13 @@ impl Manager {
 
         let systemd_root = client.control_cgroup_root()?;
         let unit_name = Self::get_unit_name(cgroups_path);
+
         let cgroups_path = systemd_root
             .join_safely(&parent)
             .with_context(|| format!("failed to join {:?} with {:?}", systemd_root, parent))?
             .join_safely(&unit_name)
             .with_context(|| format!("failed to join {:?} with {:?}", parent, unit_name))?;
-        Ok((cgroups_path, parent))
+        Ok((cgroups_path, systemd_root))
     }
 
     // systemd represents slice hierarchy using `-`, so we need to follow suit when
@@ -215,22 +225,23 @@ impl Manager {
         Ok(Path::new(&path).to_path_buf())
     }
 
-    /// create_unified_cgroup verifies sure that *each level* in the downward path from the root cgroup
-    /// down to the cgroup_path provided by the user is a valid cgroup hierarchy,
-    /// containing the attached controllers and that it contains the container pid.
-    fn create_unified_cgroup(&self, pid: Pid) -> Result<()> {
+    /// ensures that each level in the downward path from the delegation boundary down to
+    /// the scope or slice of the transient unit has all available controllers enabled
+    fn ensure_controllers_attached(&self) -> Result<()> {
+        let full_boundary_path = self.root_path.join_safely(&self.delegation_boundary)?;
+
         let controllers: Vec<String> = self
-            .get_available_controllers(&self.root_path)?
+            .get_available_controllers(&full_boundary_path)?
             .into_iter()
             .map(|c| format!("{}{}", "+", c.to_string()))
             .collect();
 
-        // Write the controllers to the root_path.
-        Self::write_controllers(&self.root_path, &controllers)?;
+        Self::write_controllers(&full_boundary_path, &controllers)?;
 
-        let mut current_path = self.root_path.clone();
+        let mut current_path = full_boundary_path;
         let mut components = self
             .cgroups_path
+            .strip_prefix(&self.delegation_boundary)?
             .components()
             .filter(|c| c.ne(&RootDir))
             .peekable();
@@ -240,8 +251,11 @@ impl Manager {
         while let Some(component) = components.next() {
             current_path = current_path.join(component);
             if !current_path.exists() {
-                fs::create_dir(&current_path)?;
-                fs::metadata(&current_path)?.permissions().set_mode(0o755);
+                log::warn!(
+                    "{:?} does not exist. Resource restrictions might not work correctly",
+                    current_path
+                );
+                return Ok(());
             }
 
             // last component cannot have subtree_control enabled due to internal process constraint
@@ -251,7 +265,7 @@ impl Manager {
             }
         }
 
-        common::write_cgroup_file(self.full_path.join(CGROUP_PROCS), pid)
+        Ok(())
     }
 
     fn get_available_controllers<P: AsRef<Path>>(
@@ -270,9 +284,8 @@ impl Manager {
         for controller in fs::read_to_string(&controllers_path)?.split_whitespace() {
             match controller {
                 "cpu" => controllers.push(ControllerType::Cpu),
-                "io" => controllers.push(ControllerType::Io),
                 "memory" => controllers.push(ControllerType::Memory),
-                "pids" => controllers.push(ControllerType::Tasks),
+                "pids" => controllers.push(ControllerType::Pids),
                 _ => continue,
             }
         }
@@ -331,7 +344,7 @@ impl CgroupManager for Manager {
                     CpuSet::apply(controller_opt, systemd_version, &mut properties)?
                 }
 
-                ControllerType::Tasks => {
+                ControllerType::Pids => {
                     Pids::apply(controller_opt, systemd_version, &mut properties)?
                 }
                 ControllerType::Memory => {
@@ -344,9 +357,14 @@ impl CgroupManager for Manager {
         Unified::apply(controller_opt, systemd_version, &mut properties)?;
         log::debug!("{:?}", properties);
 
-        self.client
-            .set_unit_properties(&self.unit_name, &properties)
-            .context("could not apply resource restrictions")?;
+        if !properties.is_empty() {
+            self.ensure_controllers_attached()
+                .context("failed to attach controllers")?;
+
+            self.client
+                .set_unit_properties(&self.unit_name, &properties)
+                .context("could not apply resource restrictions")?;
+        }
 
         Ok(())
     }
@@ -363,11 +381,11 @@ impl CgroupManager for Manager {
     }
 
     fn freeze(&self, state: FreezerState) -> Result<()> {
-        todo!();
+        self.fs_manager.freeze(state)
     }
 
     fn stats(&self) -> Result<Stats> {
-        Ok(Stats::default())
+        self.fs_manager.stats()
     }
 
     fn get_all_pids(&self) -> Result<Vec<Pid>> {
