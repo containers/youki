@@ -13,7 +13,7 @@ version = "=3.0.0-beta.5"
 default-features = true
 
 [dependencies]
-procfs = "0.11.0"
+procfs = "0.11.1"
 uuid = "0.8"
 rand = "0.8.0"
 tar = "0.4"
