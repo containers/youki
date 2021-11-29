@@ -1,4 +1,5 @@
 use std::fmt::Debug;
+use std::path::PathBuf;
 
 use clap::Parser;
 
@@ -55,4 +56,24 @@ pub enum CommonCmd {
     Resume(Resume),
     Run(Run),
     Spec(Spec),
+}
+
+// The OCI Command Line Interface document doesn't define any global
+// flags, but these are commonly accepted by runtimes
+#[derive(Parser, Debug)]
+pub struct GlobalOpts {
+    /// change log level to debug.
+    // Example in future : '--debug     change log level to debug. (default: "warn")'
+    #[clap(long)]
+    pub debug: bool,
+    #[clap(short, long)]
+    pub log: Option<PathBuf>,
+    #[clap(long)]
+    pub log_format: Option<String>,
+    /// root directory to store container state
+    #[clap(short, long)]
+    pub root: Option<PathBuf>,
+    /// Enable systemd cgroup manager, rather then use the cgroupfs directly.
+    #[clap(short, long)]
+    pub systemd_cgroup: bool,
 }

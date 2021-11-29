@@ -19,7 +19,7 @@ use libcontainer::utils::create_dir_all_with_mode;
 use nix::sys::stat::Mode;
 use nix::unistd::getuid;
 
-use liboci_cli::{CommonCmd, StandardCmd};
+use liboci_cli::{CommonCmd, GlobalOpts, StandardCmd};
 
 // High-level commandline option definition
 // This takes global options as well as individual commands as specified in [OCI runtime-spec](https://github.com/opencontainers/runtime-spec/blob/master/runtime.md)
@@ -27,21 +27,9 @@ use liboci_cli::{CommonCmd, StandardCmd};
 #[derive(Parser, Debug)]
 #[clap(version = crate_version!(), author = "youki team")]
 struct Opts {
-    /// change log level to debug.
-    // Example in future : '--debug     change log level to debug. (default: "warn")'
-    #[clap(long)]
-    debug: bool,
-    #[clap(short, long)]
-    log: Option<PathBuf>,
-    #[clap(long)]
-    log_format: Option<String>,
-    /// root directory to store container state
-    #[clap(short, long)]
-    root: Option<PathBuf>,
-    /// Enable systemd cgroup manager, rather then use the cgroupfs directly.
-    #[clap(short, long)]
-    systemd_cgroup: bool,
-    /// command to actually manage container
+    #[clap(flatten)]
+    global: GlobalOpts,
+
     #[clap(subcommand)]
     subcmd: SubCommand,
 }
@@ -77,7 +65,8 @@ fn main() -> Result<()> {
 
     let opts = Opts::parse();
 
-    if let Err(e) = crate::logger::init(opts.debug, opts.log, opts.log_format) {
+    if let Err(e) = crate::logger::init(opts.global.debug, opts.global.log, opts.global.log_format)
+    {
         eprintln!("log init failed: {:?}", e);
     }
 
@@ -86,8 +75,8 @@ fn main() -> Result<()> {
         nix::unistd::geteuid(),
         std::env::args_os()
     );
-    let root_path = determine_root_path(opts.root)?;
-    let systemd_cgroup = opts.systemd_cgroup;
+    let root_path = determine_root_path(opts.global.root)?;
+    let systemd_cgroup = opts.global.systemd_cgroup;
 
     match opts.subcmd {
         SubCommand::Standard(cmd) => match cmd {
