@@ -8,9 +8,9 @@ use chrono::DateTime;
 use nix::unistd::Pid;
 
 use chrono::Utc;
-use oci_spec::runtime::Spec;
 use procfs::process::Process;
 
+use crate::config::YoukiConfig;
 use crate::syscall::syscall::create_syscall;
 
 use crate::container::{ContainerStatus, State};
@@ -192,8 +192,8 @@ impl Container {
         self.state.save(&self.root)
     }
 
-    pub fn spec(&self) -> Result<Spec> {
-        let spec = Spec::load(self.root.join("config.json"))?;
+    pub fn spec(&self) -> Result<YoukiConfig> {
+        let spec = YoukiConfig::load(&self.root)?;
         Ok(spec)
     }
 }
