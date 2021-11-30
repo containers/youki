@@ -43,10 +43,10 @@ mod tests {
     #[test]
     fn test_apparmor_is_enabled() -> Result<()> {
         if let Err(e) = fs::File::open("/sys/kernel/security/apparmor") {
-            if e.kind() == std::io::ErrorKind::NotFound && is_enabled()? {
+            if e.kind() == std::io::ErrorKind::NotFound {
                 // from runc it checks /sys/kernel/security/apparmor exists or not,
                 // if that path isn't exist then ENABLED_PARAMETER_PATH should be false too.
-                assert!(false)
+                assert!(!is_enabled()?)
             }
         }
         Ok(())
