@@ -25,7 +25,7 @@ fn load_container<P: AsRef<Path>>(root_path: P, container_id: &str) -> Result<Co
     // the state of the container is stored in a directory named after the container id
     let container_root = root_path.join(container_id);
     if !container_root.exists() {
-        bail!("{} does not exist.", container_id)
+        bail!("container {} does not exist.", container_id)
     }
 
     Container::load(container_root)

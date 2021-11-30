@@ -1,10 +1,7 @@
-#![allow(dead_code)]
-#![allow(unused_variables)]
 use std::{
     collections::HashMap,
     fmt::{Debug, Display},
     fs::{self},
-    os::unix::fs::PermissionsExt,
     path::Component::RootDir,
 };
 
@@ -28,7 +25,6 @@ use crate::{
 };
 use crate::{stats::Stats, v2::manager::Manager as FsManager};
 
-const CGROUP_PROCS: &str = "cgroup.procs";
 const CGROUP_CONTROLLERS: &str = "cgroup.controllers";
 const CGROUP_SUBTREE_CONTROL: &str = "cgroup.subtree_control";
 
@@ -408,22 +404,22 @@ mod tests {
 
         fn start_transient_unit(
             &self,
-            container_name: &str,
-            pid: u32,
-            parent: &str,
-            unit_name: &str,
+            _container_name: &str,
+            _pid: u32,
+            _parent: &str,
+            _unit_name: &str,
         ) -> Result<()> {
             Ok(())
         }
 
-        fn stop_transient_unit(&self, unit_name: &str) -> Result<()> {
+        fn stop_transient_unit(&self, _unit_name: &str) -> Result<()> {
             Ok(())
         }
 
         fn set_unit_properties(
             &self,
-            unit_name: &str,
-            properties: &HashMap<&str, Box<dyn RefArg>>,
+            _unit_name: &str,
+            _properties: &HashMap<&str, Box<dyn RefArg>>,
         ) -> Result<()> {
             Ok(())
         }
