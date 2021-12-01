@@ -34,9 +34,7 @@ pub fn init(
     log_file: Option<PathBuf>,
     log_format: Option<String>,
 ) -> Result<()> {
-    let level = detect_log_level(log_debug_flag)
-        .context("failed to parse log level")?
-        .to_level();
+    let level = detect_log_level(log_debug_flag).context("failed to parse log level")?;
     let format = detect_log_format(log_format).context("failed to detect log format")?;
     let _ = LOG_FILE.get_or_init(|| -> Option<File> {
         log_file.map(|path| {
@@ -49,8 +47,10 @@ pub fn init(
         })
     });
 
-    let logger = YoukiLogger::new(level, format);
-    log::set_boxed_logger(Box::new(logger))?;
+    let logger = YoukiLogger::new(level.to_level(), format);
+    log::set_boxed_logger(Box::new(logger))
+        .map(|()| log::set_max_level(level))
+        .expect("set logger failed");
 
     Ok(())
 }
@@ -159,7 +159,9 @@ mod tests {
     use serial_test::serial;
 
     use super::*;
-    use std::env;
+    use crate::utils::create_temp_dir;
+    use std::{env, path::Path};
+
     struct LogLevelGuard {
         original_level: Option<String>,
     }
@@ -171,6 +173,7 @@ mod tests {
             Ok(Self { original_level })
         }
     }
+
     impl Drop for LogLevelGuard {
         fn drop(self: &mut LogLevelGuard) {
             if let Some(level) = self.original_level.as_ref() {
@@ -204,5 +207,34 @@ mod tests {
     fn test_detect_log_level_from_env() {
         let _guard = LogLevelGuard::new("error").unwrap();
         assert_eq!(detect_log_level(false).unwrap(), LevelFilter::Error)
+    }
+
+    #[test]
+    fn test_logfile() {
+        let temp_dir = create_temp_dir("logfile").expect("failed to create tempdir for logfile");
+        let log_file = Path::join(temp_dir.path(), "test.log");
+
+        init(true, Some(log_file.to_owned()), None).expect("failed to initialize logger");
+        assert!(
+            log_file
+                .as_path()
+                .metadata()
+                .expect("failed to get logfile metadata")
+                .len()
+                == 0,
+            "a new logfile should be empty"
+        );
+
+        log::info!("testing this");
+
+        assert!(
+            log_file
+                .as_path()
+                .metadata()
+                .expect("failed to get logfile metadata")
+                .len()
+                > 0,
+            "some log should be written into the logfile"
+        );
     }
 }

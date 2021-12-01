@@ -16,7 +16,7 @@ anyhow = "1.0"
 chrono = { version="0.4", features = ["serde"] }
 libcgroups = { path = "../libcgroups" }
 libcontainer = { path = "../libcontainer" }
-log = "0.4"
+log = {version = "0.4", features = ["std"]}
 nix = "0.23.0"
 oci-spec = { git = "https://github.com/containers/oci-spec-rs",  rev = "d6fb1e91742313cd0d0085937e2d6df5d4669720" }
 once_cell = "1.6.0"
@@ -28,5 +28,4 @@ tabwriter = "1"
 
 [dev-dependencies]
 serial_test = "0.5.1"
-
 
