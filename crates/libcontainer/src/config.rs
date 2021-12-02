@@ -44,8 +44,9 @@ impl<'a> YoukiConfig {
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path = path.as_ref();
         let file = fs::File::open(path.join(YOUKI_CONFIG_NAME))?;
-        Ok(serde_json::from_reader(&file)
-            .with_context(|| format!("failed to load config from {:?}", path))?)
+        let config = serde_json::from_reader(&file)
+            .with_context(|| format!("failed to load config from {:?}", path))?;
+        Ok(config)
     }
 }
 

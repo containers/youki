@@ -27,19 +27,16 @@ impl Container {
         if !self.state.status.eq(&ContainerStatus::Running) {
             bail!("{} is not in running state", self.id());
         }
-        log::debug!("Mark0");
 
         let cgroups_path = self.spec()?.cgroup_path;
         let use_systemd = self
             .systemd()
             .context("could not determine cgroup manager")?;
-        log::debug!("Mark1");
 
         let cgroup_manager =
             libcgroups::common::create_cgroup_manager(cgroups_path, use_systemd, self.id())?;
         match stats {
             true => {
-                log::debug!("Mark2");
                 let stats = cgroup_manager.stats()?;
                 println!("{}", serde_json::to_string_pretty(&stats)?);
             }

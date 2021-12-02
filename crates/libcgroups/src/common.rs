@@ -179,15 +179,13 @@ pub fn create_cgroup_manager<P: Into<PathBuf>>(
     let cgroup_path = cgroup_path.into();
 
     match cgroup_setup {
-        CgroupSetup::Legacy | CgroupSetup::Hybrid => {
-            return create_v1_cgroup_manager(cgroup_path);
-        },
+        CgroupSetup::Legacy | CgroupSetup::Hybrid => create_v1_cgroup_manager(cgroup_path),
         CgroupSetup::Unified => {
             if systemd_cgroup {
-               return create_systemd_cgroup_manager(cgroup_path, container_name);
+                return create_systemd_cgroup_manager(cgroup_path, container_name);
             }
 
-            return create_v2_cgroup_manager(cgroup_path);
+            create_v2_cgroup_manager(cgroup_path)
         }
     }
 }
@@ -200,7 +198,7 @@ fn create_v1_cgroup_manager(cgroup_path: PathBuf) -> Result<Box<dyn CgroupManage
 
 #[cfg(not(feature = "v1"))]
 fn create_v1_cgroup_manager(_cgroup_path: PathBuf) -> Result<Box<dyn CgroupManager>> {
-    bail!("cgroup v1 feature is not activated");
+    bail!("cgroup v1 feature is required, but was not enabled during compile time");
 }
 
 #[cfg(feature = "v2")]
@@ -208,19 +206,24 @@ fn create_v2_cgroup_manager(cgroup_path: PathBuf) -> Result<Box<dyn CgroupManage
     log::info!("cgroup manager V2 will be used");
     Ok(Box::new(v2::manager::Manager::new(
         DEFAULT_CGROUP_ROOT.into(),
-        cgroup_path.into(),
+        cgroup_path,
     )?))
 }
 
 #[cfg(not(feature = "v2"))]
 fn create_v2_cgroup_manager(_cgroup_path: PathBuf) -> Result<Box<dyn CgroupManager>> {
-    bail!("cgroup v2 feature is not activated");
+    bail!("cgroup v2 feature is required, but was not enabled during compile time");
 }
 
 #[cfg(feature = "systemd")]
-fn create_systemd_cgroup_manager(cgroup_path: PathBuf, container_name: &str) -> Result<Box<dyn CgroupManager>> {
+fn create_systemd_cgroup_manager(
+    cgroup_path: PathBuf,
+    container_name: &str,
+) -> Result<Box<dyn CgroupManager>> {
     if !systemd::booted() {
-        bail!("systemd cgroup flag passed, but systemd support for managing cgroups is not available");
+        bail!(
+            "systemd cgroup flag passed, but systemd support for managing cgroups is not available"
+        );
     }
 
     let use_system = nix::unistd::geteuid().is_root();
@@ -229,17 +232,20 @@ fn create_systemd_cgroup_manager(cgroup_path: PathBuf, container_name: &str) -> 
         "systemd cgroup manager with system bus {} will be used",
         use_system
     );
-    return Ok(Box::new(systemd::manager::Manager::new(
+    Ok(Box::new(systemd::manager::Manager::new(
         DEFAULT_CGROUP_ROOT.into(),
-        cgroup_path.into(),
+        cgroup_path,
         container_name.into(),
         use_system,
-    )?));
+    )?))
 }
 
 #[cfg(not(feature = "systemd"))]
-fn create_systemd_cgroup_manager(_cgroup_path: PathBuf, _container_name: &str) -> Result<Box<dyn CgroupManager>> {
-    bail!("systemd cgroup feature is not activated");
+fn create_systemd_cgroup_manager(
+    _cgroup_path: PathBuf,
+    _container_name: &str,
+) -> Result<Box<dyn CgroupManager>> {
+    bail!("systemd cgroup feature is required, but was not enabled during compile time");
 }
 
 pub fn get_all_pids(path: &Path) -> Result<Vec<Pid>> {
