@@ -12,17 +12,15 @@ use libcgroups::{common::CgroupSetup, v2::controller_type::ControllerType};
 #[derive(Parser, Debug)]
 pub struct Info {}
 
-impl Info {
-    pub fn exec(&self) -> Result<()> {
-        print_youki();
-        print_kernel();
-        print_os();
-        print_hardware();
-        print_cgroups();
-        print_namespaces();
+pub fn info(_: Info) -> Result<()> {
+    print_youki();
+    print_kernel();
+    print_os();
+    print_hardware();
+    print_cgroups();
+    print_namespaces();
 
-        Ok(())
-    }
+    Ok(())
 }
 
 /// print Version of Youki

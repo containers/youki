@@ -1,5 +1,4 @@
 use anyhow::Result;
-use clap::Parser;
 use nix;
 use oci_spec::runtime::Mount;
 use oci_spec::runtime::{
@@ -10,13 +9,6 @@ use serde_json::to_writer_pretty;
 use std::fs::File;
 use std::path::Path;
 use std::path::PathBuf;
-/// Command generates a config.json
-#[derive(Parser, Debug)]
-pub struct SpecJson {
-    /// Generate a configuration for a rootless container
-    #[clap(long)]
-    pub rootless: bool,
-}
 
 pub fn get_default() -> Result<Spec> {
     Ok(Spec::default())
@@ -89,18 +81,16 @@ pub fn get_rootless() -> Result<Spec> {
 }
 
 /// spec Cli command
-impl SpecJson {
-    pub fn exec(&self) -> Result<()> {
-        let spec = if self.rootless {
-            get_rootless()?
-        } else {
-            get_default()?
-        };
+pub fn spec(args: liboci_cli::Spec) -> Result<()> {
+    let spec = if args.rootless {
+        get_rootless()?
+    } else {
+        get_default()?
+    };
 
-        // write data to config.json
-        to_writer_pretty(&File::create("config.json")?, &spec)?;
-        Ok(())
-    }
+    // write data to config.json
+    to_writer_pretty(&File::create("config.json")?, &spec)?;
+    Ok(())
 }
 
 #[cfg(test)]

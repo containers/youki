@@ -12,25 +12,14 @@ use anyhow::Context;
 use anyhow::Result;
 use clap::{crate_version, Parser};
 
-use crate::commands::create;
-use crate::commands::delete;
-use crate::commands::events;
-use crate::commands::exec;
 use crate::commands::info;
-use crate::commands::kill;
-use crate::commands::list;
-use crate::commands::pause;
-use crate::commands::ps;
-use crate::commands::resume;
-use crate::commands::run;
-use crate::commands::spec_json;
-use crate::commands::start;
-use crate::commands::state;
 use libcontainer::rootless::rootless_required;
 use libcontainer::utils;
 use libcontainer::utils::create_dir_all_with_mode;
 use nix::sys::stat::Mode;
 use nix::unistd::getuid;
+
+use liboci_cli::{CommonCmd, GlobalOpts, StandardCmd};
 
 // High-level commandline option definition
 // This takes global options as well as individual commands as specified in [OCI runtime-spec](https://github.com/opencontainers/runtime-spec/blob/master/runtime.md)
@@ -38,21 +27,9 @@ use nix::unistd::getuid;
 #[derive(Parser, Debug)]
 #[clap(version = crate_version!(), author = "youki team")]
 struct Opts {
-    /// change log level to debug.
-    // Example in future : '--debug     change log level to debug. (default: "warn")'
-    #[clap(long)]
-    debug: bool,
-    #[clap(short, long)]
-    log: Option<PathBuf>,
-    #[clap(long)]
-    log_format: Option<String>,
-    /// root directory to store container state
-    #[clap(short, long)]
-    root: Option<PathBuf>,
-    /// Enable systemd cgroup manager, rather then use the cgroupfs directly.
-    #[clap(short, long)]
-    systemd_cgroup: bool,
-    /// command to actually manage container
+    #[clap(flatten)]
+    global: GlobalOpts,
+
     #[clap(subcommand)]
     subcmd: SubCommand,
 }
@@ -61,34 +38,14 @@ struct Opts {
 // Also for a short information, check [runc commandline documentation](https://github.com/opencontainers/runc/blob/master/man/runc.8.md)
 #[derive(Parser, Debug)]
 enum SubCommand {
-    #[clap(version = crate_version!(), author = "youki team")]
-    Create(create::Create),
-    #[clap(version = crate_version!(), author = "youki team")]
-    Start(start::Start),
-    #[clap(version = crate_version!(), author = "youki team")]
-    Run(run::Run),
-    #[clap(version = crate_version!(), author = "youki team")]
-    Exec(exec::Exec),
-    #[clap(version = crate_version!(), author = "youki team")]
-    Kill(kill::Kill),
-    #[clap(version = crate_version!(), author = "youki team")]
-    Delete(delete::Delete),
-    #[clap(version = crate_version!(), author = "youki team")]
-    State(state::State),
-    #[clap(version = crate_version!(), author = "youki team")]
+    // Standard and common commands handled by the liboci_cli crate
+    #[clap(flatten)]
+    Standard(liboci_cli::StandardCmd),
+    #[clap(flatten)]
+    Common(liboci_cli::CommonCmd),
+
+    // Youki specific extensions
     Info(info::Info),
-    #[clap(version = crate_version!(), author = "youki team")]
-    Spec(spec_json::SpecJson),
-    #[clap(version = crate_version!(), author = "youki team")]
-    List(list::List),
-    #[clap(version = crate_version!(), author = "youki team")]
-    Pause(pause::Pause),
-    #[clap(version = crate_version!(), author = "youki team")]
-    Resume(resume::Resume),
-    #[clap(version = crate_version!(), author = "youki team")]
-    Events(events::Events),
-    #[clap(version = crate_version!(), author = "youki team", setting=clap::AppSettings::AllowLeadingHyphen)]
-    Ps(ps::Ps),
 }
 
 /// This is the entry point in the container runtime. The binary is run by a high-level container runtime,
@@ -108,7 +65,8 @@ fn main() -> Result<()> {
 
     let opts = Opts::parse();
 
-    if let Err(e) = crate::logger::init(opts.debug, opts.log, opts.log_format) {
+    if let Err(e) = crate::logger::init(opts.global.debug, opts.global.log, opts.global.log_format)
+    {
         eprintln!("log init failed: {:?}", e);
     }
 
@@ -117,24 +75,31 @@ fn main() -> Result<()> {
         nix::unistd::geteuid(),
         std::env::args_os()
     );
-    let root_path = determine_root_path(opts.root)?;
-    let systemd_cgroup = opts.systemd_cgroup;
+    let root_path = determine_root_path(opts.global.root)?;
+    let systemd_cgroup = opts.global.systemd_cgroup;
 
     match opts.subcmd {
-        SubCommand::Create(create) => create.exec(root_path, systemd_cgroup),
-        SubCommand::Start(start) => start.exec(root_path),
-        SubCommand::Run(run) => run.exec(root_path, systemd_cgroup),
-        SubCommand::Exec(exec) => exec.exec(root_path),
-        SubCommand::Kill(kill) => kill.exec(root_path),
-        SubCommand::Delete(delete) => delete.exec(root_path),
-        SubCommand::State(state) => state.exec(root_path),
-        SubCommand::Info(info) => info.exec(),
-        SubCommand::List(list) => list.exec(root_path),
-        SubCommand::Spec(spec) => spec.exec(),
-        SubCommand::Pause(pause) => pause.exec(root_path),
-        SubCommand::Resume(resume) => resume.exec(root_path),
-        SubCommand::Events(events) => events.exec(root_path),
-        SubCommand::Ps(ps) => ps.exec(root_path),
+        SubCommand::Standard(cmd) => match cmd {
+            StandardCmd::Create(create) => {
+                commands::create::create(create, root_path, systemd_cgroup)
+            }
+            StandardCmd::Start(start) => commands::start::start(start, root_path),
+            StandardCmd::Kill(kill) => commands::kill::kill(kill, root_path),
+            StandardCmd::Delete(delete) => commands::delete::delete(delete, root_path),
+            StandardCmd::State(state) => commands::state::state(state, root_path),
+        },
+        SubCommand::Common(cmd) => match cmd {
+            CommonCmd::Events(events) => commands::events::events(events, root_path),
+            CommonCmd::Exec(exec) => commands::exec::exec(exec, root_path),
+            CommonCmd::List(list) => commands::list::list(list, root_path),
+            CommonCmd::Pause(pause) => commands::pause::pause(pause, root_path),
+            CommonCmd::Ps(ps) => commands::ps::ps(ps, root_path),
+            CommonCmd::Resume(resume) => commands::resume::resume(resume, root_path),
+            CommonCmd::Run(run) => commands::run::run(run, root_path, systemd_cgroup),
+            CommonCmd::Spec(spec) => commands::spec_json::spec(spec),
+        },
+
+        SubCommand::Info(info) => commands::info::info(info),
     }
 }
 
