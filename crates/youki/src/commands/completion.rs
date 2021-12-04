@@ -1,15 +1,22 @@
+use anyhow::Result;
 use clap::{App, Parser};
-use clap_generate::{generate, Generator, Shell};
+use clap_generate::{generate, Shell};
 use std::io;
 
 #[derive(Debug, Parser)]
-pub struct CompletionParser {
-    #[clap(long = "generator", short = 'g', arg_enum)]
-    pub generator: Shell,
+/// Generate scripts for shell completion
+pub struct Completion {
+    #[clap(long = "shell", short = 's', arg_enum)]
+    pub shell: Shell,
 }
 
-pub fn print_completions<G: Generator>(gen: G, app: &mut App) -> Result<(), anyhow::Error> {
-    generate(gen, app, app.get_name().to_string(), &mut io::stdout());
+pub fn completion(args: Completion, app: &mut App) -> Result<()> {
+    generate(
+        args.shell,
+        app,
+        app.get_name().to_string(),
+        &mut io::stdout(),
+    );
 
     Ok(())
 }

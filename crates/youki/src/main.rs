@@ -46,7 +46,7 @@ enum SubCommand {
 
     // Youki specific extensions
     Info(info::Info),
-    Completion(commands::completion::CompletionParser),
+    Completion(commands::completion::Completion),
 }
 
 /// This is the entry point in the container runtime. The binary is run by a high-level container runtime,
@@ -102,8 +102,8 @@ fn main() -> Result<()> {
         },
 
         SubCommand::Info(info) => commands::info::info(info),
-        SubCommand::Completion(parser) => {
-            commands::completion::print_completions(parser.generator, &mut app)
+        SubCommand::Completion(completion) => {
+            commands::completion::completion(completion, &mut app)
         }
     }
 }
