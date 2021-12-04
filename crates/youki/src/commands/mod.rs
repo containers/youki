@@ -3,6 +3,7 @@ use std::{fs, path::Path};
 
 use libcontainer::container::Container;
 
+pub mod completion;
 pub mod create;
 pub mod delete;
 pub mod events;
@@ -17,7 +18,6 @@ pub mod run;
 pub mod spec_json;
 pub mod start;
 pub mod state;
-pub mod completion;
 
 fn load_container<P: AsRef<Path>>(root_path: P, container_id: &str) -> Result<Container> {
     // resolves relative paths, symbolic links etc. and get complete path
