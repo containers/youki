@@ -17,7 +17,7 @@ jobs:
         id: filter
         with:
           filters: |
-            ./integration_test: tests/integration_test/**
+            tests/integration_test: tests/integration_test/**
   validate:
     needs: [changes]
     if: ${{ !contains(needs.changes.outputs.dirs, '[]') }}
@@ -33,8 +33,15 @@ jobs:
           override: true
       - name: Cache youki
         uses: Swatinem/rust-cache@v1
+      - run: rustup component add rustfmt clippy
       - run: sudo apt-get -y update
       - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev libseccomp-dev
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+        working-directory: ${{matrix.dirs}}
+      - name: Check clippy lints
+        working-directory: ${{matrix.dirs}}
+        run: cargo clippy --all-targets --all-features -- -D warnings
       - name: Validate tests on runc
         run: cd ./tests/integration_test && ./run_tests.sh runc
       - name: Validate tests on youki

@@ -2,7 +2,10 @@
 members = [
     "crates/*"
 ]
-
+exclude = [
+    "tests/integration_test",
+    "tests/test_framework"
+]
 
 [profile.release]
 lto = true
