@@ -15,4 +15,4 @@ comment:
   require_changes: false
 
 ignore:
-  - "crates/integration_test"
+  - "tests/integration_test"

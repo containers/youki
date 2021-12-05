@@ -17,3 +17,5 @@ youki_integration_test
 .vscode
 
 *~
+
+test_log.log
