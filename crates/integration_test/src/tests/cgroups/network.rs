@@ -67,7 +67,7 @@ fn get_network_interfaces() -> Option<(String, String)> {
     let lo_if_name = interfaces.get(0).map(|iface| &iface.name)?;
     let eth_if_name = interfaces.get(1).map(|iface| &iface.name)?;
 
-    return Some((lo_if_name.to_string(), eth_if_name.to_string()));
+    Some((lo_if_name.to_string(), eth_if_name.to_string()))
 }
 
 fn test_network_cgroups() -> TestResult {
