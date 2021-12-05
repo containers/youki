@@ -9,6 +9,7 @@ use crate::tests::tlb::get_tlb_test;
 use crate::utils::support::set_runtime_path;
 use anyhow::Result;
 use clap::Parser;
+use integration_test::logger;
 use std::path::PathBuf;
 use test_framework::TestManager;
 use tests::cgroups;
@@ -43,6 +44,11 @@ fn parse_tests(tests: &[String]) -> Vec<(&str, Option<Vec<&str>>)> {
 
 fn main() -> Result<()> {
     let opts: Opts = Opts::parse();
+
+    if let Err(e) = logger::init(None, None) {
+        eprintln!("logger could not be initialized: {:?}", e);
+    }
+
     match std::fs::canonicalize(&opts.runtime) {
         // runtime path is relative or resolved correctly
         Ok(path) => set_runtime_path(&path),
@@ -67,7 +73,6 @@ fn main() -> Result<()> {
     let cgroup_v2_cpu = cgroups::cpu::v2::get_test_group();
     let cgroup_v1_memory = cgroups::memory::get_test_group();
     let seccomp_notify = get_seccomp_notify_test();
-
 
     tm.add_test_group(&cl);
     tm.add_test_group(&cc);

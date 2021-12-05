@@ -573,11 +573,13 @@ name = "integration_test"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "clap",
  "clap_derive",
  "flate2",
  "libcgroups",
  "libcontainer",
+ "log",
  "nix",
  "num_cpus",
  "oci-spec 0.5.2 (git+https://github.com/containers/oci-spec-rs?rev=54c5e386f01ab37c9305cc4a83404eb157e42440)",
