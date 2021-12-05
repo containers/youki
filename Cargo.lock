@@ -576,6 +576,7 @@ dependencies = [
  "clap",
  "clap_derive",
  "flate2",
+ "libcgroups",
  "libcontainer",
  "nix",
  "num_cpus",

@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use procfs::process::Process;
 use std::fs;
 
-pub mod cpus;
+pub mod cpu;
 pub mod memory;
 pub mod pids;
 
