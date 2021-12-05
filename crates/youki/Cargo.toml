@@ -16,6 +16,7 @@ anyhow = "1.0"
 chrono = { version="0.4", features = ["serde"] }
 libcgroups = { path = "../libcgroups" }
 libcontainer = { path = "../libcontainer" }
+liboci-cli = { path = "../liboci-cli" }
 log = {version = "0.4", features = ["std"]}
 nix = "0.23.0"
 oci-spec = { git = "https://github.com/containers/oci-spec-rs",  rev = "d6fb1e91742313cd0d0085937e2d6df5d4669720" }

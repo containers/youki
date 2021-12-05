@@ -8,7 +8,10 @@ mod test;
 
 pub mod common;
 pub mod stats;
+#[cfg(feature = "systemd")]
 pub mod systemd;
 pub mod test_manager;
+#[cfg(feature = "v1")]
 pub mod v1;
+#[cfg(feature = "v2")]
 pub mod v2;

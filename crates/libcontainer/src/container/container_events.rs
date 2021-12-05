@@ -1,7 +1,5 @@
 use std::{thread, time::Duration};
 
-use crate::utils;
-
 use super::{Container, ContainerStatus};
 use anyhow::{bail, Context, Result};
 
@@ -30,17 +28,10 @@ impl Container {
             bail!("{} is not in running state", self.id());
         }
 
-        let cgroups_path = utils::get_cgroup_path(
-            self.spec()?
-                .linux()
-                .as_ref()
-                .context("no linux in spec")?
-                .cgroups_path(),
-            self.id(),
-        );
+        let cgroups_path = self.spec()?.cgroup_path;
         let use_systemd = self
             .systemd()
-            .context("Could not determine cgroup manager")?;
+            .context("could not determine cgroup manager")?;
 
         let cgroup_manager =
             libcgroups::common::create_cgroup_manager(cgroups_path, use_systemd, self.id())?;
