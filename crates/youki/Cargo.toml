@@ -26,6 +26,7 @@ procfs = "0.11.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tabwriter = "1"
+clap_generate = { version = "3.0.0-beta.5" }
 
 [dev-dependencies]
 serial_test = "0.5.1"
