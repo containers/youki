@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use pnet::datalink;
 
 use oci_spec::runtime::{
@@ -61,17 +61,24 @@ fn create_spec(
     Ok(spec)
 }
 
+// Gets the loopback interface and the first ethernet/wlan interface if it exists
+fn get_network_interfaces() -> Option<(String, String)> {
+    let interfaces = datalink::interfaces();
+    let lo_if_name = interfaces.get(0).map(|iface| &iface.name)?;
+    let eth_if_name = interfaces.get(1).map(|iface| &iface.name)?;
+
+    return Some((lo_if_name.to_string(), eth_if_name.to_string()));
+}
+
 fn test_network_cgroups() -> TestResult {
     let cgroup_name = "test_network_cgroups";
 
-    let interfaces = datalink::interfaces();
+    let interfaces = test_result!(get_network_interfaces().ok_or(anyhow!(
+        "Could not find network interfaces required for test"
+    )));
 
-    // Gets the loopback interface, or defaults to "lo"
-    let lo_if_name = interfaces.get(0).map_or_else(|| "lo", |iface| &iface.name);
-    // Gets the first ethernet interface, or defaults to "eth0"
-    let eth_if_name = interfaces
-        .get(1)
-        .map_or_else(|| "eth0", |iface| &iface.name);
+    let lo_if_name = &interfaces.0;
+    let eth_if_name = &interfaces.1;
 
     let cases = vec![
         test_result!(create_spec(cgroup_name, 255, 10, lo_if_name, true, true)),
@@ -123,13 +130,18 @@ fn test_network_cgroups() -> TestResult {
 }
 
 fn can_run() -> bool {
+    // Ensure the expected network interfaces exist on the system running the test
+    let iface_exists = get_network_interfaces().is_some();
+
     // This is kind of annoying, network controller can be at a number of mount points
-    (Path::new("/sys/fs/cgroup/net_cls/net_cls.classid").exists()
+    let cgroup_paths_exists = (Path::new("/sys/fs/cgroup/net_cls/net_cls.classid").exists()
         && Path::new("/sys/fs/cgroup/net_prio/net_prio.ifpriomap").exists())
         || (Path::new("/sys/fs/cgroup/net_cls,net_prio/net_cls.classid").exists()
             && Path::new("/sys/fs/cgroup/net_cls,net_prio/net_prio.ifpriomap").exists())
         || (Path::new("/sys/fs/cgroup/net_prio,net_cls/net_cls.classid").exists()
-            && Path::new("/sys/fs/cgroup/net_prio,net_cl/net_prio.ifpriomap").exists())
+            && Path::new("/sys/fs/cgroup/net_prio,net_cl/net_prio.ifpriomap").exists());
+
+    iface_exists && cgroup_paths_exists
 }
 
 pub fn get_test_group<'a>() -> TestGroup<'a> {
