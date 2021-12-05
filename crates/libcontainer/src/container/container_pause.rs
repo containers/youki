@@ -1,5 +1,3 @@
-use crate::utils;
-
 use super::{Container, ContainerStatus};
 use anyhow::{bail, Context, Result};
 use libcgroups::common::FreezerState;
@@ -34,15 +32,7 @@ impl Container {
             );
         }
 
-        let spec = self.spec()?;
-        let cgroups_path = utils::get_cgroup_path(
-            spec.linux()
-                .as_ref()
-                .context("no linux in spec")?
-                .cgroups_path(),
-            self.id(),
-        );
-
+        let cgroups_path = self.spec()?.cgroup_path;
         let use_systemd = self
             .systemd()
             .context("container state does not contain cgroup manager")?;

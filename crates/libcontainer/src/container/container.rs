@@ -8,9 +8,9 @@ use chrono::DateTime;
 use nix::unistd::Pid;
 
 use chrono::Utc;
-use oci_spec::runtime::Spec;
 use procfs::process::Process;
 
+use crate::config::YoukiConfig;
 use crate::syscall::syscall::create_syscall;
 
 use crate::container::{ContainerStatus, State};
@@ -192,8 +192,8 @@ impl Container {
         self.state.save(&self.root)
     }
 
-    pub fn spec(&self) -> Result<Spec> {
-        let spec = Spec::load(self.root.join("config.json"))?;
+    pub fn spec(&self) -> Result<YoukiConfig> {
+        let spec = YoukiConfig::load(&self.root)?;
         Ok(spec)
     }
 }
@@ -202,6 +202,7 @@ impl Container {
 mod tests {
     use super::*;
     use crate::utils::create_temp_dir;
+    use anyhow::Context;
     use serial_test::serial;
 
     #[test]
@@ -300,13 +301,14 @@ mod tests {
         let tmp_dir = create_temp_dir("test_get_spec")?;
         use oci_spec::runtime::Spec;
         let spec = Spec::default();
-        spec.save(tmp_dir.path().join("config.json"))?;
+        let config = YoukiConfig::from_spec(&spec, "123").context("convert spec to config")?;
+        config.save(tmp_dir.path()).context("save config")?;
 
         let container = Container {
             root: tmp_dir.path().to_path_buf(),
             ..Default::default()
         };
-        container.spec()?;
+        container.spec().context("get config")?;
 
         Ok(())
     }
