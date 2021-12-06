@@ -217,7 +217,7 @@ fn can_run() -> bool {
 }
 
 pub fn get_test_group<'a>() -> TestGroup<'a> {
-    let mut test_group = TestGroup::new("cgroup_v1_cpus");
+    let mut test_group = TestGroup::new("cgroup_v1_cpu");
     let linux_cgroups_cpus = ConditionalTest::new(
         "test_linux_cgroups_cpus",
         Box::new(can_run),

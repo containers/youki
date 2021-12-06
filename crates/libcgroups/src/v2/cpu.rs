@@ -14,6 +14,7 @@ const CGROUP_CPU_WEIGHT: &str = "cpu.weight";
 const CGROUP_CPU_MAX: &str = "cpu.max";
 const DEFAULT_PERIOD: &str = "100000";
 const UNRESTRICTED_QUOTA: &str = "max";
+const MAX_CPU_WEIGHT: u64 = 10000;
 
 const CPU_STAT: &str = "cpu.stat";
 
@@ -99,7 +100,8 @@ impl Cpu {
             return 0;
         }
 
-        1 + ((shares - 2) * 9999) / 262142
+        let weight = 1 + ((shares - 2) * 9999) / 262142;
+        weight.min(MAX_CPU_WEIGHT)
     }
 
     fn is_realtime_requested(cpu: &LinuxCpu) -> bool {
