@@ -6,6 +6,7 @@ use std::fs;
 
 pub mod cpus;
 pub mod memory;
+pub mod network;
 pub mod pids;
 
 pub fn cleanup() -> Result<()> {
