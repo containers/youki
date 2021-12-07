@@ -1,5 +1,7 @@
+use std::fmt::Debug;
+
 ///! Contains Basic setup for testing, testable trait and its result type
-use anyhow::{Error, Result};
+use anyhow::{bail, Error, Result};
 
 #[derive(Debug)]
 /// Enum indicating result of the test. This is like an extended std::result,
@@ -51,4 +53,52 @@ macro_rules! test_result {
             }
         }
     };
+}
+
+#[macro_export]
+macro_rules! assert_result_eq {
+    ($expected:expr, $actual:expr $(,)?) => ({
+        match (&$expected, &$actual) {
+            (expected_val, actual_val) => {
+                if !(*expected_val == *actual_val) {
+                   return test_framework::testable::assert_failed(&*expected_val, &*actual_val, std::option::Option::None);
+                } else {
+                    return Ok(())
+                }
+            }
+        }
+    });
+    ($expected:expr, $actual:expr, $($arg:tt)+) => ({
+        match (&$expected, &$actual) {
+            (expected_val, actual_val) => {
+                if !(*expected_val == *actual_val) {
+                    return test_framework::testable::assert_failed(&*expected_val, &*actual_val, std::option::Option::Some(format_args!($($arg)+)));
+                } else {
+                    return Ok(())
+                }
+            }
+        }
+    });
+}
+
+#[doc(hidden)]
+pub fn assert_failed<T, U>(expected: &T, actual: &U, args: Option<std::fmt::Arguments<'_>>) -> Result<()>
+where
+    T: Debug + ?Sized,
+    U: Debug + ?Sized,
+{
+    match args {
+        Some(args) => {
+            bail!(r#"assertion failed:
+            expected: `{:?}`,
+            actual: `{:?}`: {}"#,
+            expected, actual, args)
+        },
+        None => {
+            bail!(r#"assertion failed:
+            expected: `{:?}`,
+            actual: `{:?}`"#,
+            expected, actual)
+        }
+    }
 }
