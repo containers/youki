@@ -82,23 +82,34 @@ macro_rules! assert_result_eq {
 }
 
 #[doc(hidden)]
-pub fn assert_failed<T, U>(expected: &T, actual: &U, args: Option<std::fmt::Arguments<'_>>) -> Result<()>
+pub fn assert_failed<T, U>(
+    expected: &T,
+    actual: &U,
+    args: Option<std::fmt::Arguments<'_>>,
+) -> Result<()>
 where
     T: Debug + ?Sized,
     U: Debug + ?Sized,
 {
     match args {
         Some(args) => {
-            bail!(r#"assertion failed:
+            bail!(
+                r#"assertion failed:
             expected: `{:?}`,
             actual: `{:?}`: {}"#,
-            expected, actual, args)
-        },
+                expected,
+                actual,
+                args
+            )
+        }
         None => {
-            bail!(r#"assertion failed:
+            bail!(
+                r#"assertion failed:
             expected: `{:?}`,
             actual: `{:?}`"#,
-            expected, actual)
+                expected,
+                actual
+            )
         }
     }
 }

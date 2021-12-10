@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Component::RootDir, Path, PathBuf};
 
 use anyhow::{Context, Result};
 use procfs::process::Process;
@@ -34,4 +34,34 @@ pub fn list_subsystem_mount_points() -> Result<Vec<PathBuf>> {
             }
         })
         .collect())
+}
+
+pub fn attach_controller(cgroup_root: &Path, cgroup_path: &Path, controller: &str) -> Result<()> {
+    let mut current_path = cgroup_root.to_path_buf();
+
+    let mut components = cgroup_path
+        .components()
+        .into_iter()
+        .filter(|c| c.ne(&RootDir))
+        .peekable();
+
+    write_controller(&current_path, controller)?;
+    while let Some(component) = components.next() {
+        current_path.push(component);
+        if components.peek().is_some() {
+            write_controller(&current_path, controller)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn write_controller(cgroup_path: &Path, controller: &str) -> Result<()> {
+    let controller_file = cgroup_path.join("cgroup.subtree_control");
+    fs::write(controller_file, format!("+{}", controller)).with_context(|| {
+        format!(
+            "failed to attach {} controller to {:?}",
+            controller, cgroup_path
+        )
+    })
 }

@@ -1,16 +1,23 @@
-use std::{fs, path::PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
-use crate::utils::{
-    test_outside_container,
-    test_utils::{check_container_created, CGROUP_ROOT},
+use crate::{
+    tests::cgroups::attach_controller,
+    utils::{
+        test_outside_container,
+        test_utils::{check_container_created, CGROUP_ROOT},
+    },
 };
 use anyhow::{bail, Context, Result};
 use libcgroups::{
-    common::{self, CgroupSetup},
+    common::{self, CgroupSetup, DEFAULT_CGROUP_ROOT},
     v2::controller_type::ControllerType,
 };
+use libcontainer::utils::PathBufExt;
 use log::debug;
-use oci_spec::runtime::LinuxCpuBuilder;
+use oci_spec::runtime::{LinuxCpuBuilder, Spec};
 use test_framework::{assert_result_eq, test_result, ConditionalTest, TestGroup, TestResult};
 
 use super::create_spec;
@@ -99,18 +106,20 @@ fn test_cpu_quota_valid_set() -> TestResult {
     })
 }
 
-/// Tests if the cpu quota is unchanged if the cpu quota is unspecified (should be 'max')
+/// Tests if the cpu quota is unchanged if the cpu quota is unspecified
 fn test_cpu_quota_unspecified_unchanged() -> TestResult {
-    let cpu = test_result!(LinuxCpuBuilder::default()
-        .build()
-        .context("build cpu spec"));
+    let cpu = test_result!(LinuxCpuBuilder::default().build().context("build cpu spec"));
+    let expected_quota = 500_000;
 
     let spec = test_result!(create_spec("test_cpu_quota_unspecified_unchanged", cpu));
+    // ensure that 
+    test_result!(prepare_cpu_max(&spec, &expected_quota.to_string()));
+
     test_outside_container(spec, &|data| {
         test_result!(check_container_created(&data));
         test_result!(check_cpu_quota(
             "test_cpu_quota_unspecified_unchanged",
-            i64::MAX
+            expected_quota
         ));
         TestResult::Passed
     })
@@ -145,11 +154,6 @@ fn test_cpu_period_valid_set() -> TestResult {
 
 /// Tests if the cpu period is unchanged if the cpu period is unspecified
 fn test_cpu_period_unspecified_unchanged() -> TestResult {
-    todo!()
-}
-
-/// Tests if the cpu period is the default value (100000) if a negative value has been specified
-fn test_cpu_period_negative_value_default_set() -> TestResult {
     todo!()
 }
 
@@ -198,6 +202,29 @@ fn read_cgroup_data(cgroup_name: &str, cgroup_file: &str) -> Result<String> {
         .with_context(|| format!("failed to read {:?}", cgroup_path))?;
     let trimmed = content.trim();
     Ok(trimmed.to_owned())
+}
+
+// Ensures that cpu.max is set to different values from the default (max 100000)
+// Required to catch runtimes that do not actually skip setting cpu.max if cpu
+// quota and period are not specified, but overwrite the current cpu.max settings
+// with the default values.
+fn prepare_cpu_max(spec: &Spec, quota: &str) -> Result<()> {
+    let cgroups_path = spec
+        .linux()
+        .as_ref()
+        .and_then(|l| l.cgroups_path().as_ref())
+        .unwrap();
+
+    let full_cgroup_path = PathBuf::from(common::DEFAULT_CGROUP_ROOT).join_safely(cgroups_path)?;
+    fs::create_dir_all(&full_cgroup_path)
+        .with_context(|| format!("could not create cgroup {:?}", full_cgroup_path))?;
+    attach_controller(&Path::new(DEFAULT_CGROUP_ROOT), cgroups_path, "cpu")?;
+
+    let cpu_max_path = full_cgroup_path.join("cpu.max");
+    fs::write(&cpu_max_path, format!("{} {}", quota, 500_000))
+        .with_context(|| format!("failed to write to {:?}", cpu_max_path))?;
+
+    Ok(())
 }
 
 fn can_run() -> bool {
@@ -278,12 +305,6 @@ pub fn get_test_group<'a>() -> TestGroup<'a> {
         "test_cpu_period_unspecified_unchanged",
         Box::new(can_run),
         Box::new(test_cpu_period_unspecified_unchanged),
-    );
-
-    let test_cpu_period_negative_value_default_set = ConditionalTest::new(
-        "test_cpu_period_negative_value_default_set",
-        Box::new(can_run),
-        Box::new(test_cpu_period_negative_value_default_set),
     );
 
     test_group.add(vec![
