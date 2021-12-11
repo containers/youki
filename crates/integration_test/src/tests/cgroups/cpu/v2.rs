@@ -22,6 +22,8 @@ use test_framework::{assert_result_eq, test_result, ConditionalTest, TestGroup, 
 
 use super::create_spec;
 
+const DEFAULT_PERIOD: u64 = 100_000;
+
 // SPEC: The runtime spec does not specify what should happen if the cpu weight is outside
 // of the valid range of values [1, 10000]. We assume that a value of zero means that no action
 // should be taken and a value of over 10000 (after being converted into the cgroup v2 format)
@@ -101,7 +103,7 @@ fn test_cpu_quota_valid_set() -> TestResult {
     let spec = test_result!(create_spec("test_cpu_quota_valid_set", cpu));
     test_outside_container(spec, &|data| {
         test_result!(check_container_created(&data));
-        test_result!(check_cpu_quota("test_cpu_quota_valid_set", cpu_quota));
+        test_result!(check_cpu_max("test_cpu_quota_valid_set", cpu_quota, DEFAULT_PERIOD));
         TestResult::Passed
     })
 }
@@ -110,23 +112,23 @@ fn test_cpu_quota_valid_set() -> TestResult {
 fn test_cpu_quota_unspecified_unchanged() -> TestResult {
     let cpu = test_result!(LinuxCpuBuilder::default().build().context("build cpu spec"));
     let expected_quota = 500_000;
+    // let period = 500_000;
 
     let spec = test_result!(create_spec("test_cpu_quota_unspecified_unchanged", cpu));
-    // ensure that 
-    test_result!(prepare_cpu_max(&spec, &expected_quota.to_string()));
+    test_result!(prepare_cpu_max(&spec, &expected_quota.to_string(), &DEFAULT_PERIOD.to_string()));
 
     test_outside_container(spec, &|data| {
         test_result!(check_container_created(&data));
-        test_result!(check_cpu_quota(
+        test_result!(check_cpu_max(
             "test_cpu_quota_unspecified_unchanged",
-            expected_quota
+            expected_quota, DEFAULT_PERIOD
         ));
         TestResult::Passed
     })
 }
 
 /// Tests if the cpu quota is the default value (max) if a negative cpu quota has been specified
-fn test_cpu_quota_negative_value_default_set() -> TestResult {
+fn test_cpu_quota_negative_default_set() -> TestResult {
     let cpu_quota = -9999;
     let cpu = test_result!(LinuxCpuBuilder::default()
         .quota(cpu_quota)
@@ -139,22 +141,87 @@ fn test_cpu_quota_negative_value_default_set() -> TestResult {
     ));
     test_outside_container(spec, &|data| {
         test_result!(check_container_created(&data));
-        test_result!(check_cpu_quota(
+        test_result!(check_cpu_max(
             "test_cpu_quota_negative_value_default_set",
-            i64::MAX
+            i64::MAX, DEFAULT_PERIOD
         ));
         TestResult::Passed
     })
 }
 
-/// Tests if a valid cpu period (x > 0) is set successfully
+/// Tests if a valid cpu period (x > 0) is set successfully. Cpu quota needs to
+/// remain unchanged
 fn test_cpu_period_valid_set() -> TestResult {
-    todo!()
+    let quota = 250_000;
+    let expected_period = 250_000;
+    let cpu = test_result!(LinuxCpuBuilder::default()
+        .period(expected_period)
+        .build()
+        .context("build cpu spec"));
+
+    let spec = test_result!(create_spec(
+        "test_cpu_period_valid_set",
+        cpu
+    ));
+    test_result!(prepare_cpu_max(&spec, &quota.to_string(), &expected_period.to_string()));
+
+    test_outside_container(spec, &|data| {
+        test_result!(check_container_created(&data));
+        test_result!(check_cpu_max(
+            "test_cpu_period_valid_set",
+            quota, expected_period
+        ));
+        TestResult::Passed
+    })
 }
 
-/// Tests if the cpu period is unchanged if the cpu period is unspecified
+/// Tests if the cpu period is unchanged if the cpu period is unspecified. Cpu quota needs
+/// to be unchanged as well
 fn test_cpu_period_unspecified_unchanged() -> TestResult {
-    todo!()
+    let quota = 250_000;
+    let expected_period = 250_000;
+    let cpu = test_result!(LinuxCpuBuilder::default()
+        .build()
+        .context("build cpu spec"));
+
+    let spec = test_result!(create_spec(
+        "test_cpu_period_unspecified_unchanged(",
+        cpu
+    ));
+    test_result!(prepare_cpu_max(&spec, &quota.to_string(), &expected_period.to_string()));
+
+    test_outside_container(spec, &|data| {
+        test_result!(check_container_created(&data));
+        test_result!(check_cpu_max(
+            "test_cpu_period_unspecified_unchanged(",
+            quota, expected_period
+        ));
+        TestResult::Passed
+    })
+}
+
+fn test_cpu_period_and_quota_valid_set() -> TestResult {
+    let expected_quota = 250_000;
+    let expected_period = 250_000;
+    let cpu = test_result!(LinuxCpuBuilder::default()
+        .quota(expected_quota)
+        .period(expected_period)
+        .build()
+        .context("build cpu spec"));
+
+        let spec = test_result!(create_spec(
+            "test_cpu_period_and_quota_valid_set",
+            cpu
+        ));
+
+        test_outside_container(spec, &|data| {
+            test_result!(check_container_created(&data));
+            test_result!(check_cpu_max(
+                "test_cpu_period_and_quota_valid_set",
+                expected_quota, expected_period
+            ));
+            TestResult::Passed
+        })
 }
 
 fn check_cpu_weight(cgroup_name: &str, expected_weight: u64) -> Result<()> {
@@ -166,8 +233,9 @@ fn check_cpu_weight(cgroup_name: &str, expected_weight: u64) -> Result<()> {
     assert_result_eq!(actual_weight, expected_weight, "unexpected cpu weight")
 }
 
-fn check_cpu_quota(cgroup_name: &str, expected_quota: i64) -> Result<()> {
+fn check_cpu_max(cgroup_name: &str, expected_quota: i64, expected_period: u64) -> Result<()> {
     let data = read_cgroup_data(cgroup_name, "cpu.max")?;
+    log::debug!("THE DATA IS {:?}", data);
     let parts: Vec<&str> = data.split_whitespace().collect();
     if parts.len() != 2 {
         bail!(
@@ -188,7 +256,13 @@ fn check_cpu_quota(cgroup_name: &str, expected_quota: i64) -> Result<()> {
     let actual_quota = quota
         .parse::<i64>()
         .with_context(|| format!("failed to parse {:?}", quota))?;
-    assert_result_eq!(expected_quota, actual_quota, "unexpected cpu quota");
+    assert_result_eq!(expected_quota, actual_quota, "unexpected cpu quota")?;
+
+    let period = parts[1].trim();
+    let actual_period = period
+        .parse::<u64>()
+        .with_context(|| format!("failed to parse {:?}", period))?;
+    assert_result_eq!(expected_period, actual_period, "unexpected cpu period")
 }
 
 fn read_cgroup_data(cgroup_name: &str, cgroup_file: &str) -> Result<String> {
@@ -208,7 +282,7 @@ fn read_cgroup_data(cgroup_name: &str, cgroup_file: &str) -> Result<String> {
 // Required to catch runtimes that do not actually skip setting cpu.max if cpu
 // quota and period are not specified, but overwrite the current cpu.max settings
 // with the default values.
-fn prepare_cpu_max(spec: &Spec, quota: &str) -> Result<()> {
+fn prepare_cpu_max(spec: &Spec, quota: &str, period: &str) -> Result<()> {
     let cgroups_path = spec
         .linux()
         .as_ref()
@@ -221,7 +295,7 @@ fn prepare_cpu_max(spec: &Spec, quota: &str) -> Result<()> {
     attach_controller(&Path::new(DEFAULT_CGROUP_ROOT), cgroups_path, "cpu")?;
 
     let cpu_max_path = full_cgroup_path.join("cpu.max");
-    fs::write(&cpu_max_path, format!("{} {}", quota, 500_000))
+    fs::write(&cpu_max_path, format!("{} {}", quota, period))
         .with_context(|| format!("failed to write to {:?}", cpu_max_path))?;
 
     Ok(())
@@ -289,10 +363,10 @@ pub fn get_test_group<'a>() -> TestGroup<'a> {
         Box::new(test_cpu_quota_unspecified_unchanged),
     );
 
-    let test_cpu_quota_negative_value_default_set = ConditionalTest::new(
+    let test_cpu_quota_negative_default_set = ConditionalTest::new(
         "test_cpu_quota_negative_value_default_set",
         Box::new(can_run),
-        Box::new(test_cpu_quota_negative_value_default_set),
+        Box::new(test_cpu_quota_negative_default_set),
     );
 
     let test_cpu_period_valid_set = ConditionalTest::new(
@@ -307,16 +381,22 @@ pub fn get_test_group<'a>() -> TestGroup<'a> {
         Box::new(test_cpu_period_unspecified_unchanged),
     );
 
+    let test_cpu_period_and_quota_valid_set = ConditionalTest::new(
+        "test_cpu_period_and_quota_valid_set",
+        Box::new(can_run),
+        Box::new(test_cpu_period_and_quota_valid_set),
+    );
+
     test_group.add(vec![
         Box::new(test_cpu_weight_valid_set),
         Box::new(test_cpu_weight_zero_ignored),
         Box::new(test_cpu_weight_too_high_maximum_set),
         Box::new(test_cpu_quota_valid_set),
         Box::new(test_cpu_quota_unspecified_unchanged),
-        Box::new(test_cpu_quota_negative_value_default_set),
-        // Box::new(test_cpu_period_valid_set),
-        // Box::new(test_cpu_period_unspecified_unchanged),
-        // Box::new(test_cpu_period_negative_value_default_set),
+        Box::new(test_cpu_quota_negative_default_set),
+        Box::new(test_cpu_period_valid_set),
+        Box::new(test_cpu_period_unspecified_unchanged),
+        Box::new(test_cpu_period_and_quota_valid_set)    
     ]);
     test_group
 }

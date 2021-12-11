@@ -13,7 +13,6 @@ use super::controller::Controller;
 const CGROUP_CPU_WEIGHT: &str = "cpu.weight";
 const CGROUP_CPU_MAX: &str = "cpu.max";
 const UNRESTRICTED_QUOTA: &str = "max";
-const DEFAULT_PERIOD: &str = "100000";
 const MAX_CPU_WEIGHT: u64 = 10000;
 
 const CPU_STAT: &str = "cpu.stat";

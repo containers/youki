@@ -61,9 +61,9 @@ macro_rules! assert_result_eq {
         match (&$expected, &$actual) {
             (expected_val, actual_val) => {
                 if !(*expected_val == *actual_val) {
-                   return test_framework::testable::assert_failed(&*expected_val, &*actual_val, std::option::Option::None);
+                   test_framework::testable::assert_failed(&*expected_val, &*actual_val, std::option::Option::None)
                 } else {
-                    return Ok(())
+                    Ok(())
                 }
             }
         }
@@ -72,9 +72,9 @@ macro_rules! assert_result_eq {
         match (&$expected, &$actual) {
             (expected_val, actual_val) => {
                 if !(*expected_val == *actual_val) {
-                    return test_framework::testable::assert_failed(&*expected_val, &*actual_val, std::option::Option::Some(format_args!($($arg)+)));
+                    test_framework::testable::assert_failed(&*expected_val, &*actual_val, std::option::Option::Some(format_args!($($arg)+)))
                 } else {
-                    return Ok(())
+                    Ok(())
                 }
             }
         }
