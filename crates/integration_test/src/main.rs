@@ -17,14 +17,20 @@ use tests::cgroups;
 #[derive(Parser, Debug)]
 #[clap(version = "0.0.1", author = "youki team")]
 struct Opts {
-    /// path for the container runtime to be tested
+    /// Path for the container runtime to be tested
     #[clap(short, long)]
     runtime: PathBuf,
-    /// selected tests to be run, format should be
+    /// Selected tests to be run, format should be
     /// space separated groups, eg
     /// -t group1::test1,test3 group2 group3::test5
     #[clap(short, long, multiple_values = true, value_delimiter = ' ')]
     tests: Option<Vec<String>>,
+    /// Enables debug output 
+    #[clap(short, long)]
+    debug: bool,
+    /// Logs to the specified file
+    #[clap(long)]
+    log: Option<PathBuf>,
 }
 
 // parse test string given in commandline option as pair of testgroup name and tests belonging to that
@@ -45,7 +51,7 @@ fn parse_tests(tests: &[String]) -> Vec<(&str, Option<Vec<&str>>)> {
 fn main() -> Result<()> {
     let opts: Opts = Opts::parse();
 
-    if let Err(e) = logger::init(None, None) {
+    if let Err(e) = logger::init(opts.log, opts.debug) {
         eprintln!("logger could not be initialized: {:?}", e);
     }
 
