@@ -8,13 +8,31 @@ pub mod cpu;
 pub mod memory;
 pub mod pids;
 
-pub fn cleanup() -> Result<()> {
+pub fn cleanup_v1() -> Result<()> {
     for subsystem in list_subsystem_mount_points()? {
         let runtime_test = subsystem.join("runtime-test");
         if runtime_test.exists() {
             fs::remove_dir(&runtime_test)
                 .with_context(|| format!("failed to delete {:?}", runtime_test))?;
         }
+    }
+
+    Ok(())
+}
+
+pub fn cleanup_v2() -> Result<()> {
+    let runtime_test = Path::new("/sys/fs/cgroup/runtime-test");
+    if runtime_test.exists() {
+        let _: Result<Vec<_>, _> = fs::read_dir(runtime_test)
+            .with_context(|| format!("failed to read {:?}", runtime_test))?
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .filter(|e| e.is_dir())
+            .map(|e| fs::remove_dir(e))
+            .collect();
+
+        fs::remove_dir(&runtime_test)
+            .with_context(|| format!("failed to delete {:?}", runtime_test))?;
     }
 
     Ok(())

@@ -25,7 +25,7 @@ struct Opts {
     /// -t group1::test1,test3 group2 group3::test5
     #[clap(short, long, multiple_values = true, value_delimiter = ' ')]
     tests: Option<Vec<String>>,
-    /// Enables debug output 
+    /// Enables debug output
     #[clap(short, long)]
     debug: bool,
     /// Logs to the specified file
@@ -91,7 +91,8 @@ fn main() -> Result<()> {
     tm.add_test_group(&cgroup_v1_memory);
     tm.add_test_group(&seccomp_notify);
 
-    tm.add_cleanup(Box::new(cgroups::cleanup));
+    tm.add_cleanup(Box::new(cgroups::cleanup_v1));
+    tm.add_cleanup(Box::new(cgroups::cleanup_v2));
 
     if let Some(tests) = opts.tests {
         let tests_to_run = parse_tests(&tests);
