@@ -28,7 +28,7 @@ pub fn cleanup_v2() -> Result<()> {
             .filter_map(|e| e.ok())
             .map(|e| e.path())
             .filter(|e| e.is_dir())
-            .map(|e| fs::remove_dir(e))
+            .map(fs::remove_dir)
             .collect();
 
         fs::remove_dir(&runtime_test)

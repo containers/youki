@@ -10,7 +10,6 @@ use std::str::FromStr;
 pub static LOG_FILE: OnceCell<Option<File>> = OnceCell::new();
 const LOG_LEVEL_ENV_NAME: &str = "YOUKI_INTEGRATION_LOG_LEVEL";
 
-
 /// Initialize the logger, must be called before accessing the logger
 /// Multiple parts might call this at once, but the actual initialization
 /// is done only once due to use of OnceCell
@@ -73,7 +72,7 @@ impl Log for IntegrationLogger {
     /// Function to carry out logging
     fn log(&self, record: &Record) {
         if self.enabled(record.metadata()) {
-            let log_msg =text_format(record);
+            let log_msg = text_format(record);
             // if log file is set, write to it, else write to stderr
             if let Some(mut log_file) = LOG_FILE.get().unwrap().as_ref() {
                 let _ = writeln!(log_file, "{}", log_msg);

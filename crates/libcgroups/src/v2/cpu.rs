@@ -120,7 +120,7 @@ impl Cpu {
         if let Some(old_quota) = old_cpu_max.split_whitespace().next() {
             return Ok(Some(format!("{} {}", old_quota, period).into()));
         }
-        return Ok(None);
+        Ok(None)
     }
 }
 
@@ -176,10 +176,7 @@ mod tests {
         // assert
         let content = fs::read_to_string(max)
             .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_MAX));
-        assert_eq!(
-            content,
-            format!("{}", UNRESTRICTED_QUOTA)
-        )
+        assert_eq!(content, UNRESTRICTED_QUOTA)
     }
 
     #[test]
