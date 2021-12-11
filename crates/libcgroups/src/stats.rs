@@ -11,7 +11,7 @@ pub trait StatsProvider {
 }
 
 /// Reports the statistics for a cgroup
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Default)]
 pub struct Stats {
     /// Cpu statistics for the cgroup
     pub cpu: CpuStats,
@@ -25,20 +25,8 @@ pub struct Stats {
     pub memory: MemoryStats,
 }
 
-impl Default for Stats {
-    fn default() -> Self {
-        Self {
-            cpu: CpuStats::default(),
-            pids: PidStats::default(),
-            hugetlb: HashMap::new(),
-            blkio: BlkioStats::default(),
-            memory: MemoryStats::default(),
-        }
-    }
-}
-
 /// Reports the cpu statistics for a cgroup
-#[derive(Debug, Serialize)]
+#[derive(Debug, Default, Serialize)]
 pub struct CpuStats {
     /// Cpu usage statistics for the cgroup
     pub usage: CpuUsage,
@@ -46,17 +34,8 @@ pub struct CpuStats {
     pub throttling: CpuThrottling,
 }
 
-impl Default for CpuStats {
-    fn default() -> Self {
-        Self {
-            usage: CpuUsage::default(),
-            throttling: CpuThrottling::default(),
-        }
-    }
-}
-
 /// Reports the cpu usage for a cgroup
-#[derive(Debug, PartialEq, Eq, Serialize)]
+#[derive(Debug, Default, PartialEq, Eq, Serialize)]
 pub struct CpuUsage {
     /// Cpu time consumed by tasks in total
     pub usage_total: u64,
@@ -72,21 +51,8 @@ pub struct CpuUsage {
     pub per_core_usage_kernel: Vec<u64>,
 }
 
-impl Default for CpuUsage {
-    fn default() -> Self {
-        Self {
-            usage_total: 0,
-            usage_user: 0,
-            usage_kernel: 0,
-            per_core_usage_total: Vec::new(),
-            per_core_usage_user: Vec::new(),
-            per_core_usage_kernel: Vec::new(),
-        }
-    }
-}
-
 /// Reports the cpu throttling for a cgroup
-#[derive(Debug, PartialEq, Eq, Serialize)]
+#[derive(Debug, Default, PartialEq, Eq, Serialize)]
 pub struct CpuThrottling {
     /// Number of period intervals (as specified in cpu.cfs_period_us) that have elapsed
     pub periods: u64,
@@ -96,18 +62,8 @@ pub struct CpuThrottling {
     pub throttled_time: u64,
 }
 
-impl Default for CpuThrottling {
-    fn default() -> Self {
-        Self {
-            periods: 0,
-            throttled_periods: 0,
-            throttled_time: 0,
-        }
-    }
-}
-
 /// Reports memory stats for a cgroup
-#[derive(Debug, Serialize)]
+#[derive(Debug, Default, Serialize)]
 pub struct MemoryStats {
     /// Usage of memory
     pub memory: MemoryData,
@@ -125,22 +81,8 @@ pub struct MemoryStats {
     pub stats: HashMap<String, u64>,
 }
 
-impl Default for MemoryStats {
-    fn default() -> Self {
-        Self {
-            memory: MemoryData::default(),
-            memswap: MemoryData::default(),
-            kernel: MemoryData::default(),
-            kernel_tcp: MemoryData::default(),
-            cache: 0,
-            hierarchy: false,
-            stats: HashMap::default(),
-        }
-    }
-}
-
 /// Reports memory stats for one type of memory
-#[derive(Debug, PartialEq, Eq, Serialize)]
+#[derive(Debug, Default, PartialEq, Eq, Serialize)]
 pub struct MemoryData {
     /// Usage in bytes
     pub usage: u64,
@@ -152,19 +94,8 @@ pub struct MemoryData {
     pub limit: u64,
 }
 
-impl Default for MemoryData {
-    fn default() -> Self {
-        Self {
-            usage: 0,
-            max_usage: 0,
-            fail_count: 0,
-            limit: 0,
-        }
-    }
-}
-
 /// Reports pid stats for a cgroup
-#[derive(Debug, PartialEq, Eq, Serialize)]
+#[derive(Debug, Default, PartialEq, Eq, Serialize)]
 pub struct PidStats {
     /// Current number of active pids
     pub current: u64,
@@ -172,17 +103,8 @@ pub struct PidStats {
     pub limit: u64,
 }
 
-impl Default for PidStats {
-    fn default() -> Self {
-        Self {
-            current: 0,
-            limit: 0,
-        }
-    }
-}
-
 /// Reports block io stats for a cgroup
-#[derive(Debug, PartialEq, Eq, Serialize)]
+#[derive(Debug, Default, PartialEq, Eq, Serialize)]
 pub struct BlkioStats {
     // Number of bytes transfered to/from a device by the cgroup
     pub service_bytes: Vec<BlkioDeviceStat>,
@@ -200,21 +122,6 @@ pub struct BlkioStats {
     pub queued: Vec<BlkioDeviceStat>,
     // Number of requests merged into requests for I/O operations
     pub merged: Vec<BlkioDeviceStat>,
-}
-
-impl Default for BlkioStats {
-    fn default() -> Self {
-        Self {
-            service_bytes: Vec::new(),
-            serviced: Vec::new(),
-            time: Vec::new(),
-            sectors: Vec::new(),
-            service_time: Vec::new(),
-            wait_time: Vec::new(),
-            queued: Vec::new(),
-            merged: Vec::new(),
-        }
-    }
 }
 
 /// Reports single stat value for a specific device
@@ -245,7 +152,7 @@ impl Display for BlkioDeviceStat {
 }
 
 /// Reports hugetlb stats for a cgroup
-#[derive(Debug, PartialEq, Eq, Serialize)]
+#[derive(Debug, Default, PartialEq, Eq, Serialize)]
 pub struct HugeTlbStats {
     /// Current usage in bytes
     pub usage: u64,
@@ -253,16 +160,6 @@ pub struct HugeTlbStats {
     pub max_usage: u64,
     /// Number of allocation failures due to HugeTlb usage limit
     pub fail_count: u64,
-}
-
-impl Default for HugeTlbStats {
-    fn default() -> Self {
-        Self {
-            usage: 0,
-            max_usage: 0,
-            fail_count: 0,
-        }
-    }
 }
 
 /// Reports which hugepage sizes are supported by the system
