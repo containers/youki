@@ -8,8 +8,8 @@ use test_framework::{test_result, ConditionalTest, TestGroup, TestResult};
 
 use crate::utils::{test_outside_container, test_utils::check_container_created};
 
-const CGROUP_MEMORY_LIMIT: &str = "memory.limit_in_bytes";
-const CGROUP_MEMORY_SWAPPINESS: &str = "memory.swappiness";
+const CGROUP_MEMORY_LIMIT: &str = "/sys/fs/cgroup/memory/memory.limit_in_bytes";
+const CGROUP_MEMORY_SWAPPINESS: &str = "/sys/fs/cgroup/memory/memory.swappiness";
 
 fn create_spec(cgroup_name: &str, limit: i64, swappiness: u64) -> Result<Spec> {
     let spec = SpecBuilder::default()

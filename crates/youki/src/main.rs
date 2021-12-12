@@ -4,13 +4,13 @@
 mod commands;
 mod logger;
 
-use std::fs;
-use std::path::{Path, PathBuf};
-
 use anyhow::bail;
 use anyhow::Context;
 use anyhow::Result;
+use clap::IntoApp;
 use clap::{crate_version, Parser};
+use std::fs;
+use std::path::{Path, PathBuf};
 
 use crate::commands::info;
 use libcontainer::rootless::rootless_required;
@@ -46,6 +46,7 @@ enum SubCommand {
 
     // Youki specific extensions
     Info(info::Info),
+    Completion(commands::completion::Completion),
 }
 
 /// This is the entry point in the container runtime. The binary is run by a high-level container runtime,
@@ -64,6 +65,7 @@ fn main() -> Result<()> {
     pentacle::ensure_sealed().context("failed to seal /proc/self/exe")?;
 
     let opts = Opts::parse();
+    let mut app = Opts::into_app();
 
     if let Err(e) = crate::logger::init(opts.global.debug, opts.global.log, opts.global.log_format)
     {
@@ -100,6 +102,9 @@ fn main() -> Result<()> {
         },
 
         SubCommand::Info(info) => commands::info::info(info),
+        SubCommand::Completion(completion) => {
+            commands::completion::completion(completion, &mut app)
+        }
     }
 }
 

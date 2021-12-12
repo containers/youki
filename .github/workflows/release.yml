@@ -22,7 +22,7 @@ jobs:
       - name: Set up cargo
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: 1.56.1
+          toolchain: stable
           override: true
       - name: Release build
         run: ./build.sh --release
@@ -46,7 +46,7 @@ jobs:
       - name: Set up cargo
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: 1.56.1
+          toolchain: stable
           override: true
       - name: Release build
         run: ./build.sh --release

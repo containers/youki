@@ -3,6 +3,7 @@ use std::{fs, path::Path};
 
 use libcontainer::container::Container;
 
+pub mod completion;
 pub mod create;
 pub mod delete;
 pub mod events;

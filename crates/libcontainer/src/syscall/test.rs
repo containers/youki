@@ -126,16 +126,9 @@ impl MockCalls {
     }
 }
 
+#[derive(Default)]
 pub struct TestHelperSyscall {
     mocks: MockCalls,
-}
-
-impl Default for TestHelperSyscall {
-    fn default() -> Self {
-        TestHelperSyscall {
-            mocks: MockCalls::default(),
-        }
-    }
 }
 
 impl Syscall for TestHelperSyscall {
