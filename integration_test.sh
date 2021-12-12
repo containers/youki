@@ -83,6 +83,11 @@ check_enviroment() {
         return 1
     fi
   fi
+  if [[ $test_case =~ linux_cgroups_*.t ]]; then
+    if grep -q cgroup2 /proc/filesystems; then
+      return 1
+    fi
+  fi
 }
 
 for case in "${test_cases[@]}"; do
