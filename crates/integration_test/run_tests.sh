@@ -1,6 +1,6 @@
 #!/bin/bash
 cd ../../
-./build.sh
+./build.sh --release
 cp ./youki ./crates/integration_test
 cp ./youki_integration_test ./crates/integration_test
 cd ./crates/integration_test
