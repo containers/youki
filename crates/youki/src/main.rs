@@ -116,6 +116,7 @@ fn main() -> Result<()> {
             CommonCmd::Resume(resume) => commands::resume::resume(resume, root_path),
             CommonCmd::Run(run) => commands::run::run(run, root_path, systemd_cgroup),
             CommonCmd::Spec(spec) => commands::spec_json::spec(spec),
+            CommonCmd::Update(update) => commands::update::update(update, root_path),
         },
 
         SubCommand::Info(info) => commands::info::info(info),
