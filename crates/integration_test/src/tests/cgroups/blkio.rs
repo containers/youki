@@ -15,6 +15,17 @@ use crate::utils::{
     test_utils::{check_container_created, CGROUP_ROOT},
 };
 
+// -----> README
+// for this test to work for all parameters, the kernel needs to be compiled with CFQ IO schedular
+// for some reason, Ubuntu and other distributions might come with a kernel compiled with mq-deadline
+// schedular, which does not expose/support options such as blkio.weight, blkio.weight_device
+// for these we can skip all the tests, or skip the corresponding tests
+// the current implementation skips corresponding tests, so one can test atleast bps and iops
+// device on such systems
+// check https://superuser.com/questions/1449688/a-couple-of-blkio-cgroup-files-are-not-present-in-linux-kernel-5
+// and https://github.com/opencontainers/runc/issues/140
+// for more info on this
+
 #[derive(Debug, Default)]
 struct WeightDevice {
     major: i64,
@@ -41,6 +52,28 @@ struct BlockIO {
     throttle_write_iops_devices: Vec<ThrottleDevice>,
 }
 
+fn can_run() -> bool {
+    Path::new("/sys/fs/cgroup/blkio").exists()
+}
+
+fn supports_weight() -> bool {
+    Path::new("/sys/fs/cgroup/blkio/blkio.weight").exists()
+}
+
+fn supports_weight_devices() -> bool {
+    Path::new("/sys/fs/cgroup/blkio/blkio.weight_devices").exists()
+}
+
+// even though the mq-deadline does have these,we better check in case
+// for some system these are absent
+fn supports_throttle_bps() -> bool {
+    Path::new("/sys/fs/cgroup/blkio/blkio.throttle.read_bps_device").exists()
+}
+
+fn supports_throttle_iops() -> bool {
+    Path::new("/sys/fs/cgroup/blkio/blkio.throttle.read_iops_device").exists()
+}
+
 fn create_spec(cgroup_name: &str, block_io: LinuxBlockIo) -> Result<Spec> {
     let spec = SpecBuilder::default()
         .linux(
@@ -61,174 +94,190 @@ fn create_spec(cgroup_name: &str, block_io: LinuxBlockIo) -> Result<Spec> {
     Ok(spec)
 }
 
+/// parses /sys/fs/cgroup/blkio and creates BlockIO struct
 fn get_blkio_data(path: &str) -> Result<BlockIO> {
     let mut device = BlockIO::default();
 
-    // weight
-    let weight_string = fs::read_to_string(format!("{}.weight", path))
-        .context("error in reading block io weight")?;
-    device.weight = weight_string
-        .parse()
-        .context("error in parsing block io weight")?;
+    // we assume that if weight is present, leaf_weight will also be present
+    if supports_weight() {
+        // weight
+        let weight_string = fs::read_to_string(format!("{}/blkio.weight", path))
+            .context("error in reading block io weight")?;
+        device.weight = weight_string
+            .parse()
+            .context("error in parsing block io weight")?;
 
-    // leaf weight
-    let leaf_weight_string = fs::read_to_string(format!("{}.leaf_weight", path))
-        .context("error in reading block io leaf weight")?;
-    device.leaf_weight = leaf_weight_string
-        .parse()
-        .context("error in parsing block io weight")?;
+        // leaf weight
+        let leaf_weight_string = fs::read_to_string(format!("{}/blkio.leaf_weight", path))
+            .context("error in reading block io leaf weight")?;
+        device.leaf_weight = leaf_weight_string
+            .parse()
+            .context("error in parsing block io weight")?;
+    }
 
     // weight devices section ------------
-
-    // device weight
-    let device_weight_string = fs::read_to_string(format!("{}.weight_device", path))
-        .context("error in reading block io weight device")?;
-    let mut weight_devices = Vec::new();
-    // format is  <major>:<minor>  <bytes_per_second>
-    for line in device_weight_string.lines() {
-        let (device_data, weight) = line
-            .split_once(" ")
-            .context("invalid weight device format")?;
-        let (major_str, minor_str) = device_data
-            .split_once(":")
-            .context("invalid major-minor number format")?;
-        weight_devices.push(WeightDevice {
-            major: major_str.parse().context("error in parsing major number")?,
-            minor: minor_str.parse().context("error in parsing minor number")?,
-            weight: Some(weight.parse().context("error in parsing weight")?),
-            leaf_weight: None,
-        });
-    }
-
-    // device leaf weight
-
-    let device_leaf_weight_string = fs::read_to_string(format!("{}.leaf_weight_device", path))
-        .context("error in reading block io leaf weight device")?;
-
-    for line in device_leaf_weight_string.lines() {
-        let (device_data, weight) = line
-            .split_once(" ")
-            .context("invalid weight device format")?;
-        let (major_str, minor_str) = device_data
-            .split_once(":")
-            .context("invalid major-minor number format")?;
-        let leaf_weight: u16 = weight.parse().context("error in parsing leaf weight")?;
-        let major: i64 = major_str.parse().context("error in parsing major number")?;
-        let minor: i64 = minor_str.parse().context("error in parsing minor number")?;
-        let mut found = false;
-        for dev in &mut weight_devices {
-            if dev.major == major && dev.minor == minor {
-                dev.leaf_weight = Some(leaf_weight);
-                found = true;
-            }
-        }
-        if !found {
+    // we assume if device_weight is supported, then device_leaf_weight is also supported
+    if supports_weight_devices() {
+        // device weight
+        let device_weight_string = fs::read_to_string(format!("{}/blkio.weight_device", path))
+            .context("error in reading block io weight device")?;
+        let mut weight_devices = Vec::new();
+        // format is  <major>:<minor>  <bytes_per_second>
+        for line in device_weight_string.lines() {
+            let (device_data, weight) = line
+                .split_once(" ")
+                .context("invalid weight device format")?;
+            let (major_str, minor_str) = device_data
+                .split_once(":")
+                .context("invalid major-minor number format")?;
             weight_devices.push(WeightDevice {
-                major,
-                minor,
-                weight: None,
-                leaf_weight: Some(leaf_weight),
+                major: major_str.parse().context("error in parsing major number")?,
+                minor: minor_str.parse().context("error in parsing minor number")?,
+                weight: Some(weight.parse().context("error in parsing weight")?),
+                leaf_weight: None,
             });
         }
-    }
 
-    device.weight_devices = weight_devices;
+        // device leaf weight
+
+        let device_leaf_weight_string =
+            fs::read_to_string(format!("{}/blkio.leaf_weight_device", path))
+                .context("error in reading block io leaf weight device")?;
+
+        for line in device_leaf_weight_string.lines() {
+            let (device_data, weight) = line
+                .split_once(" ")
+                .context("invalid weight device format")?;
+            let (major_str, minor_str) = device_data
+                .split_once(":")
+                .context("invalid major-minor number format")?;
+            let leaf_weight: u16 = weight.parse().context("error in parsing leaf weight")?;
+            let major: i64 = major_str.parse().context("error in parsing major number")?;
+            let minor: i64 = minor_str.parse().context("error in parsing minor number")?;
+            let mut found = false;
+            for dev in &mut weight_devices {
+                if dev.major == major && dev.minor == minor {
+                    dev.leaf_weight = Some(leaf_weight);
+                    found = true;
+                }
+            }
+            if !found {
+                weight_devices.push(WeightDevice {
+                    major,
+                    minor,
+                    weight: None,
+                    leaf_weight: Some(leaf_weight),
+                });
+            }
+        }
+
+        device.weight_devices = weight_devices;
+    }
 
     // throttle devices section -----
 
-    // throttle read bps
-    let throttle_read_bps_string = fs::read_to_string(format!("{}.throttle.read_bps_device", path))
-        .context("error in reading block io write bps device")?;
-    let mut throttle_devices = Vec::new();
-    for line in throttle_read_bps_string.lines() {
-        let (device_data, rate) = line
-            .split_once(" ")
-            .context("invalid weight device format")?;
-        let (major_str, minor_str) = device_data
-            .split_once(":")
-            .context("invalid major-minor number format")?;
-        throttle_devices.push(ThrottleDevice {
-            major: major_str.parse().context("error in parsing major number")?,
-            minor: minor_str.parse().context("error in parsing minor number")?,
-            rate: rate
-                .parse()
-                .context("error in parsing throttle read bps rate")?,
-        });
+    // we assume that if read_bps is supported, write_bps is also supported
+    if supports_throttle_bps() {
+        // throttle read bps
+        let throttle_read_bps_string =
+            fs::read_to_string(format!("{}/blkio.throttle.read_bps_device", path))
+                .context("error in reading block io write bps device")?;
+        let mut throttle_devices = Vec::new();
+        for line in throttle_read_bps_string.lines() {
+            let (device_data, rate) = line
+                .split_once(" ")
+                .context("invalid weight device format")?;
+            let (major_str, minor_str) = device_data
+                .split_once(":")
+                .context("invalid major-minor number format")?;
+            throttle_devices.push(ThrottleDevice {
+                major: major_str.parse().context("error in parsing major number")?,
+                minor: minor_str.parse().context("error in parsing minor number")?,
+                rate: rate
+                    .parse()
+                    .context("error in parsing throttle read bps rate")?,
+            });
+        }
+        device.throttle_read_bps_devices = throttle_devices;
+
+        // throttle write bps
+
+        let throttle_write_bps_string =
+            fs::read_to_string(format!("{}/blkio.throttle.write_bps_device", path))
+                .context("error in reading block io write bps device")?;
+        let mut throttle_devices = Vec::new();
+        for line in throttle_write_bps_string.lines() {
+            let (device_data, rate) = line
+                .split_once(" ")
+                .context("invalid weight device format")?;
+            let (major_str, minor_str) = device_data
+                .split_once(":")
+                .context("invalid major-minor number format")?;
+            throttle_devices.push(ThrottleDevice {
+                major: major_str.parse().context("error in parsing major number")?,
+                minor: minor_str.parse().context("error in parsing minor number")?,
+                rate: rate
+                    .parse()
+                    .context("error in parsing throttle write bps rate")?,
+            });
+        }
+        device.throttle_write_bps_devices = throttle_devices;
     }
-    device.throttle_read_bps_devices = throttle_devices;
 
-    // throttle write bps
+    // we assume that is read_iops is supported, write_iops is also supported
+    if supports_throttle_iops() {
+        // throttle read iops
 
-    let throttle_write_bps_string =
-        fs::read_to_string(format!("{}.throttle.write_bps_device", path))
-            .context("error in reading block io write bps device")?;
-    let mut throttle_devices = Vec::new();
-    for line in throttle_write_bps_string.lines() {
-        let (device_data, rate) = line
-            .split_once(" ")
-            .context("invalid weight device format")?;
-        let (major_str, minor_str) = device_data
-            .split_once(":")
-            .context("invalid major-minor number format")?;
-        throttle_devices.push(ThrottleDevice {
-            major: major_str.parse().context("error in parsing major number")?,
-            minor: minor_str.parse().context("error in parsing minor number")?,
-            rate: rate
-                .parse()
-                .context("error in parsing throttle write bps rate")?,
-        });
+        let throttle_read_iops_string =
+            fs::read_to_string(format!("{}/blkio.throttle.read_iops_device", path))
+                .context("error in reading block io read iops device")?;
+        let mut throttle_devices = Vec::new();
+        for line in throttle_read_iops_string.lines() {
+            let (device_data, rate) = line
+                .split_once(" ")
+                .context("invalid throttle device format")?;
+            let (major_str, minor_str) = device_data
+                .split_once(":")
+                .context("invalid major-minor number format")?;
+            throttle_devices.push(ThrottleDevice {
+                major: major_str.parse().context("error in parsing major number")?,
+                minor: minor_str.parse().context("error in parsing minor number")?,
+                rate: rate
+                    .parse()
+                    .context("error in parsing throttle read iops rate")?,
+            });
+        }
+        device.throttle_read_iops_devices = throttle_devices;
+
+        // throttle write iops
+
+        let throttle_write_iops_string =
+            fs::read_to_string(format!("{}/blkio.throttle.write_iops_device", path))
+                .context("error in reading block io write iops device")?;
+        let mut throttle_devices = Vec::new();
+        for line in throttle_write_iops_string.lines() {
+            let (device_data, rate) = line
+                .split_once(" ")
+                .context("invalid throttle device format")?;
+            let (major_str, minor_str) = device_data
+                .split_once(":")
+                .context("invalid major-minor number format")?;
+            throttle_devices.push(ThrottleDevice {
+                major: major_str.parse().context("error in parsing major number")?,
+                minor: minor_str.parse().context("error in parsing minor number")?,
+                rate: rate
+                    .parse()
+                    .context("error in parsing throttle write iops rate")?,
+            });
+        }
+        device.throttle_write_iops_devices = throttle_devices;
     }
-    device.throttle_write_bps_devices = throttle_devices;
-
-    // throttle read iops
-
-    let throttle_write_bps_string =
-        fs::read_to_string(format!("{}.throttle.read_iops_device", path))
-            .context("error in reading block io read iops device")?;
-    let mut throttle_devices = Vec::new();
-    for line in throttle_write_bps_string.lines() {
-        let (device_data, rate) = line
-            .split_once(" ")
-            .context("invalid weight device format")?;
-        let (major_str, minor_str) = device_data
-            .split_once(":")
-            .context("invalid major-minor number format")?;
-        throttle_devices.push(ThrottleDevice {
-            major: major_str.parse().context("error in parsing major number")?,
-            minor: minor_str.parse().context("error in parsing minor number")?,
-            rate: rate
-                .parse()
-                .context("error in parsing throttle read iops rate")?,
-        });
-    }
-    device.throttle_read_iops_devices = throttle_devices;
-
-    // throttle write iops
-
-    let throttle_write_bps_string =
-        fs::read_to_string(format!("{}.throttle.write_iops_device", path))
-            .context("error in reading block io write iops device")?;
-    let mut throttle_devices = Vec::new();
-    for line in throttle_write_bps_string.lines() {
-        let (device_data, rate) = line
-            .split_once(" ")
-            .context("invalid weight device format")?;
-        let (major_str, minor_str) = device_data
-            .split_once(":")
-            .context("invalid major-minor number format")?;
-        throttle_devices.push(ThrottleDevice {
-            major: major_str.parse().context("error in parsing major number")?,
-            minor: minor_str.parse().context("error in parsing minor number")?,
-            rate: rate
-                .parse()
-                .context("error in parsing throttle write iops rate")?,
-        });
-    }
-    device.throttle_write_iops_devices = throttle_devices;
 
     Ok(device)
 }
 
+/// validates the BlockIO structure parsed from /sys/fs/cgroup/blkio
+/// with the spec
 fn validate_block_io(cgroup_name: &str, spec: &Spec) -> Result<()> {
     let cgroup_path = PathBuf::from(CGROUP_ROOT)
         .join("blkio/runtime-test")
@@ -237,183 +286,190 @@ fn validate_block_io(cgroup_name: &str, spec: &Spec) -> Result<()> {
 
     let resources = spec.linux().as_ref().unwrap().resources().as_ref().unwrap();
     let spec_block_io = resources.block_io().as_ref().unwrap();
-    if spec_block_io.weight().is_none() {
-        return Err(anyhow::anyhow!("spec block io weight is none"));
-    }
-
-    if spec_block_io.weight().unwrap() != block_io.weight {
-        return Err(anyhow::anyhow!(
-            "block io weight is set incorrectly, expected {}, actual {}",
-            spec_block_io.weight().unwrap(),
-            block_io.weight,
-        ));
-    }
-
-    if spec_block_io.leaf_weight().is_none() {
-        return Err(anyhow::anyhow!("spec block io leaf weight is none"));
-    }
-
-    if spec_block_io.leaf_weight().unwrap() != block_io.leaf_weight {
-        return Err(anyhow::anyhow!(
-            "block io leaf weight is set incorrectly, expected {}, actual {}",
-            spec_block_io.leaf_weight().unwrap(),
-            block_io.leaf_weight,
-        ));
-    }
-
-    for spec_device in spec_block_io.weight_device().as_ref().unwrap() {
-        let spec_major = spec_device.major();
-        let spec_minor = spec_device.minor();
-        let mut found = false;
-        for device in &block_io.weight_devices {
-            if device.major == spec_major && device.minor == spec_minor {
-                found = true;
-                if device.weight != spec_device.weight() {
-                    return Err(anyhow::anyhow!(
-                        "blkio weight is set incorrectly for device {}:{}, expected {:?}, found {:?}",
-                        spec_major,
-                        spec_minor,
-                        spec_device.weight(),
-                        device.weight
-                    ));
-                }
-
-                if device.leaf_weight != spec_device.leaf_weight() {
-                    return Err(anyhow::anyhow!(
-                        "blkio leaf weight is set incorrectly for device {}:{}, expected {:?}, found {:?}",
-                        spec_major,
-                        spec_minor,
-                        spec_device.leaf_weight(),
-                        device.leaf_weight
-                    ));
-                }
-                break;
-            }
+    // weight ------
+    if supports_weight() {
+        if spec_block_io.weight().is_none() {
+            return Err(anyhow::anyhow!("spec block io weight is none"));
         }
-        if !found {
+        if spec_block_io.weight().unwrap() != block_io.weight {
             return Err(anyhow::anyhow!(
-                "blkio weight device {}:{} not found, exists in spec",
-                spec_major,
-                spec_minor
+                "block io weight is set incorrectly, expected {}, actual {}",
+                spec_block_io.weight().unwrap(),
+                block_io.weight,
             ));
         }
-    }
-    for spec_device in spec_block_io.throttle_read_bps_device().as_ref().unwrap() {
-        let spec_major = spec_device.major();
-        let spec_minor = spec_device.minor();
-        let mut found = false;
-        for device in &block_io.throttle_read_bps_devices {
-            if device.major == spec_major && device.minor == spec_minor {
-                found = true;
-                if device.rate != spec_device.rate() {
-                    return Err(anyhow::anyhow!(
-                        "blkio throttle read bps rate is set incorrectly for device {}:{}, expected {}, found {}",
-                        spec_major,
-                        spec_minor,
-                        spec_device.rate(),
-                        device.rate
-                    ));
-                }
-                break;
-            }
+        if spec_block_io.leaf_weight().is_none() {
+            return Err(anyhow::anyhow!("spec block io leaf weight is none"));
         }
-        if !found {
+        if spec_block_io.leaf_weight().unwrap() != block_io.leaf_weight {
             return Err(anyhow::anyhow!(
-                "blkio throttle read bps device {}:{} not found, exists in spec",
-                spec_major,
-                spec_minor
+                "block io leaf weight is set incorrectly, expected {}, actual {}",
+                spec_block_io.leaf_weight().unwrap(),
+                block_io.leaf_weight,
             ));
         }
     }
 
-    for spec_device in spec_block_io.throttle_write_bps_device().as_ref().unwrap() {
-        let spec_major = spec_device.major();
-        let spec_minor = spec_device.minor();
-        let mut found = false;
-        for device in &block_io.throttle_write_bps_devices {
-            if device.major == spec_major && device.minor == spec_minor {
-                found = true;
-                if device.rate != spec_device.rate() {
-                    return Err(anyhow::anyhow!(
-                        "blkio throttle write bps rate is set incorrectly for device {}:{}, expected {}, found {}",
-                        spec_major,
-                        spec_minor,
-                        spec_device.rate(),
-                        device.rate
-                    ));
+    // weight devices ------
+    if supports_weight_devices() {
+        for spec_device in spec_block_io.weight_device().as_ref().unwrap() {
+            let spec_major = spec_device.major();
+            let spec_minor = spec_device.minor();
+            let mut found = false;
+            for device in &block_io.weight_devices {
+                if device.major == spec_major && device.minor == spec_minor {
+                    found = true;
+                    if device.weight != spec_device.weight() {
+                        return Err(anyhow::anyhow!(
+                            "blkio weight is set incorrectly for device {}:{}, expected {:?}, found {:?}",
+                            spec_major,
+                            spec_minor,
+                            spec_device.weight(),
+                            device.weight
+                        ));
+                    }
+                    if device.leaf_weight != spec_device.leaf_weight() {
+                        return Err(anyhow::anyhow!(
+                            "blkio leaf weight is set incorrectly for device {}:{}, expected {:?}, found {:?}",
+                            spec_major,
+                            spec_minor,
+                            spec_device.leaf_weight(),
+                            device.leaf_weight
+                        ));
+                    }
+                    break;
                 }
-                break;
+            }
+            if !found {
+                return Err(anyhow::anyhow!(
+                    "blkio weight device {}:{} not found, exists in spec",
+                    spec_major,
+                    spec_minor
+                ));
             }
         }
-        if !found {
-            return Err(anyhow::anyhow!(
-                "blkio throttle write bps device {}:{} not found, exists in spec",
-                spec_major,
-                spec_minor
-            ));
+    }
+    // throttle bps ------
+    if supports_throttle_bps() {
+        for spec_device in spec_block_io.throttle_read_bps_device().as_ref().unwrap() {
+            let spec_major = spec_device.major();
+            let spec_minor = spec_device.minor();
+            let mut found = false;
+            for device in &block_io.throttle_read_bps_devices {
+                if device.major == spec_major && device.minor == spec_minor {
+                    found = true;
+                    if device.rate != spec_device.rate() {
+                        return Err(anyhow::anyhow!(
+                            "blkio throttle read bps rate is set incorrectly for device {}:{}, expected {}, found {}",
+                            spec_major,
+                            spec_minor,
+                            spec_device.rate(),
+                            device.rate
+                        ));
+                    }
+                    break;
+                }
+            }
+            if !found {
+                return Err(anyhow::anyhow!(
+                    "blkio throttle read bps device {}:{} not found, exists in spec",
+                    spec_major,
+                    spec_minor
+                ));
+            }
+        }
+        for spec_device in spec_block_io.throttle_write_bps_device().as_ref().unwrap() {
+            let spec_major = spec_device.major();
+            let spec_minor = spec_device.minor();
+            let mut found = false;
+            for device in &block_io.throttle_write_bps_devices {
+                if device.major == spec_major && device.minor == spec_minor {
+                    found = true;
+                    if device.rate != spec_device.rate() {
+                        return Err(anyhow::anyhow!(
+                            "blkio throttle write bps rate is set incorrectly for device {}:{}, expected {}, found {}",
+                            spec_major,
+                            spec_minor,
+                            spec_device.rate(),
+                            device.rate
+                        ));
+                    }
+                    break;
+                }
+            }
+            if !found {
+                return Err(anyhow::anyhow!(
+                    "blkio throttle write bps device {}:{} not found, exists in spec",
+                    spec_major,
+                    spec_minor
+                ));
+            }
         }
     }
 
-    for spec_device in spec_block_io.throttle_read_iops_device().as_ref().unwrap() {
-        let spec_major = spec_device.major();
-        let spec_minor = spec_device.minor();
-        let mut found = false;
-        for device in &block_io.throttle_read_iops_devices {
-            if device.major == spec_major && device.minor == spec_minor {
-                found = true;
-                if device.rate != spec_device.rate() {
-                    return Err(anyhow::anyhow!(
+    // throttle iops ------
+    if supports_throttle_iops() {
+        for spec_device in spec_block_io.throttle_read_iops_device().as_ref().unwrap() {
+            let spec_major = spec_device.major();
+            let spec_minor = spec_device.minor();
+            let mut found = false;
+            for device in &block_io.throttle_read_iops_devices {
+                if device.major == spec_major && device.minor == spec_minor {
+                    found = true;
+                    if device.rate != spec_device.rate() {
+                        return Err(anyhow::anyhow!(
                         "blkio throttle read iops rate is set incorrectly for device {}:{}, expected {}, found {}",
                         spec_major,
                         spec_minor,
                         spec_device.rate(),
                         device.rate
                     ));
+                    }
+                    break;
                 }
-                break;
+            }
+            if !found {
+                return Err(anyhow::anyhow!(
+                    "blkio throttle read iops device {}:{} not found, exists in spec",
+                    spec_major,
+                    spec_minor
+                ));
             }
         }
-        if !found {
-            return Err(anyhow::anyhow!(
-                "blkio throttle read iops device {}:{} not found, exists in spec",
-                spec_major,
-                spec_minor
-            ));
-        }
-    }
 
-    for spec_device in spec_block_io.throttle_write_iops_device().as_ref().unwrap() {
-        let spec_major = spec_device.major();
-        let spec_minor = spec_device.minor();
-        let mut found = false;
-        for device in &block_io.throttle_write_iops_devices {
-            if device.major == spec_major && device.minor == spec_minor {
-                found = true;
-                if device.rate != spec_device.rate() {
-                    return Err(anyhow::anyhow!(
+        for spec_device in spec_block_io.throttle_write_iops_device().as_ref().unwrap() {
+            let spec_major = spec_device.major();
+            let spec_minor = spec_device.minor();
+            let mut found = false;
+            for device in &block_io.throttle_write_iops_devices {
+                if device.major == spec_major && device.minor == spec_minor {
+                    found = true;
+                    if device.rate != spec_device.rate() {
+                        return Err(anyhow::anyhow!(
                         "blkio throttle write iops rate is set incorrectly for device {}:{}, expected {}, found {}",
                         spec_major,
                         spec_minor,
                         spec_device.rate(),
                         device.rate
                     ));
+                    }
+                    break;
                 }
-                break;
             }
-        }
-        if !found {
-            return Err(anyhow::anyhow!(
-                "blkio throttle write iops device {}:{} not found, exists in spec",
-                spec_major,
-                spec_minor
-            ));
+            if !found {
+                return Err(anyhow::anyhow!(
+                    "blkio throttle write iops device {}:{} not found, exists in spec",
+                    spec_major,
+                    spec_minor
+                ));
+            }
         }
     }
 
     Ok(())
 }
 
-fn test_blkio(rate: u64, empty: bool) -> TestResult {
+fn test_blkio(test_name: &str, rate: u64, empty: bool) -> TestResult {
     // these "magic" numbers are taken from the original tests
     // https://github.com/opencontainers/runtime-tools/blob/1684d131456a6bc99b8e96aa4a99783f21e58d79/validation/linux_cgroups_blkio/linux_cgroups_blkio.go#L13-L20
     let weight: u16 = 500;
@@ -422,11 +478,12 @@ fn test_blkio(rate: u64, empty: bool) -> TestResult {
     let minor: i64 = 0;
 
     let mut block_io_builder = LinuxBlockIoBuilder::default();
-    if !empty {
+
+    if !empty && supports_weight() {
         block_io_builder = block_io_builder.weight(weight).leaf_weight(leaf_weight)
     }
-    block_io_builder = block_io_builder
-        .weight_device(vec![
+    if supports_weight_devices() {
+        block_io_builder = block_io_builder.weight_device(vec![
             LinuxWeightDeviceBuilder::default()
                 .major(major)
                 .minor(minor)
@@ -440,32 +497,39 @@ fn test_blkio(rate: u64, empty: bool) -> TestResult {
                 .build()
                 .unwrap(),
         ])
-        .throttle_read_bps_device(vec![LinuxThrottleDeviceBuilder::default()
-            .major(major)
-            .minor(minor)
-            .rate(rate)
-            .build()
-            .unwrap()])
-        .throttle_write_bps_device(vec![LinuxThrottleDeviceBuilder::default()
-            .major(major)
-            .minor(minor)
-            .rate(rate)
-            .build()
-            .unwrap()])
-        .throttle_read_iops_device(vec![LinuxThrottleDeviceBuilder::default()
-            .major(major)
-            .minor(minor)
-            .rate(rate)
-            .build()
-            .unwrap()])
-        .throttle_write_iops_device(vec![LinuxThrottleDeviceBuilder::default()
-            .major(major)
-            .minor(minor)
-            .rate(rate)
-            .build()
-            .unwrap()]);
+    }
+    if supports_throttle_bps() {
+        block_io_builder = block_io_builder
+            .throttle_read_bps_device(vec![LinuxThrottleDeviceBuilder::default()
+                .major(major)
+                .minor(minor)
+                .rate(rate)
+                .build()
+                .unwrap()])
+            .throttle_write_bps_device(vec![LinuxThrottleDeviceBuilder::default()
+                .major(major)
+                .minor(minor)
+                .rate(rate)
+                .build()
+                .unwrap()])
+    }
+    if supports_throttle_iops() {
+        block_io_builder = block_io_builder
+            .throttle_read_iops_device(vec![LinuxThrottleDeviceBuilder::default()
+                .major(major)
+                .minor(minor)
+                .rate(rate)
+                .build()
+                .unwrap()])
+            .throttle_write_iops_device(vec![LinuxThrottleDeviceBuilder::default()
+                .major(major)
+                .minor(minor)
+                .rate(rate)
+                .build()
+                .unwrap()]);
+    }
     let spec = create_spec(
-        "block_io_test",
+        test_name,
         block_io_builder
             .build()
             .context("failed to build block io spec")
@@ -475,46 +539,40 @@ fn test_blkio(rate: u64, empty: bool) -> TestResult {
 
     test_outside_container(spec.clone(), &|data| {
         test_result!(check_container_created(&data));
-        test_result!(validate_block_io("block_io_test", &spec));
+        test_result!(validate_block_io(test_name, &spec));
         TestResult::Passed
     })
 }
 
-fn can_run() -> bool {
-    Path::new("/sys/fs/cgroup/blkio.weight").exists()
-        && Path::new("/sys/fs/cgroup/blkio/blkio.weight_device").exists()
-}
-
 pub fn get_test_group<'a>() -> TestGroup<'a> {
     let mut test_group = TestGroup::new("cgroup_v1_blkio");
-
-    let low_non_empty = ConditionalTest::new(
-        "102400_non_empty",
+    let non_empty_100kb = ConditionalTest::new(
+        "non_empty_100kb",
         Box::new(can_run),
-        Box::new(|| test_blkio(102400, false)),
-    );
-    let low_empty = ConditionalTest::new(
-        "102400_empty",
-        Box::new(can_run),
-        Box::new(|| test_blkio(102400, true)),
-    );
-    let high_non_empty = ConditionalTest::new(
-        "204800_non_empty",
-        Box::new(can_run),
-        Box::new(|| test_blkio(204800, false)),
+        Box::new(|| test_blkio("non_empty_100kb", 102400, false)),
     );
 
-    let high_empty = ConditionalTest::new(
-        "204800_empty",
+    let non_empty_200kb = ConditionalTest::new(
+        "non_empty_200kb",
         Box::new(can_run),
-        Box::new(|| test_blkio(204800, true)),
+        Box::new(|| test_blkio("non_empty_200kb", 204800, false)),
+    );
+    let empty_100kb = ConditionalTest::new(
+        "empty_100kb",
+        Box::new(can_run),
+        Box::new(|| test_blkio("empty_100kb", 102400, true)),
+    );
+    let empty_200kb = ConditionalTest::new(
+        "empty_200kb",
+        Box::new(can_run),
+        Box::new(|| test_blkio("empty_200kb", 204800, true)),
     );
 
     test_group.add(vec![
-        Box::new(low_non_empty),
-        Box::new(low_empty),
-        Box::new(high_non_empty),
-        Box::new(high_empty),
+        Box::new(non_empty_100kb),
+        Box::new(non_empty_200kb),
+        Box::new(empty_100kb),
+        Box::new(empty_200kb),
     ]);
     test_group
 }
