@@ -3,7 +3,6 @@ use std::{fs, path::Path};
 
 use libcgroups::common::CgroupManager;
 use libcontainer::container::Container;
-use libcontainer::utils;
 
 pub mod completion;
 pub mod create;
@@ -40,25 +39,11 @@ fn create_cgroup_manager<P: AsRef<Path>>(
     root_path: P,
     container_id: &str,
 ) -> Result<Box<dyn CgroupManager>> {
-    let container = load_container(root_path, &container_id)?;
-    let config_absolute_path = container.root.join("config.json");
-    log::debug!("load spec from {:?}", config_absolute_path);
-    let spec = oci_spec::runtime::Spec::load(config_absolute_path)?;
-    log::debug!("spec: {:?}", spec);
-    let cgroups_path = utils::get_cgroup_path(
-        spec.linux()
-            .as_ref()
-            .context("no linux in spec")?
-            .cgroups_path(),
-        container.id(),
-    );
+    let container = load_container(root_path, container_id)?;
+    let cgroups_path = container.spec()?.cgroup_path;
     let systemd_cgroup = container
         .systemd()
         .context("could not determine cgroup manager")?;
 
-    Ok(libcgroups::common::create_cgroup_manager(
-        cgroups_path,
-        systemd_cgroup,
-        container.id(),
-    )?)
+    libcgroups::common::create_cgroup_manager(cgroups_path, systemd_cgroup, container.id())
 }

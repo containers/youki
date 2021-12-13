@@ -10,9 +10,9 @@ pub fn update(args: Update, root_path: PathBuf) -> Result<()> {
     let cmanager = create_cgroup_manager(root_path, &args.container_id)?;
 
     let mut linux_res = LinuxResources::default();
-    if args.pids_limit.is_some() {
+    if let Some(new_pids_limit) = args.pids_limit {
         let mut pids = LinuxPids::default();
-        pids.set_limit(args.pids_limit.unwrap());
+        pids.set_limit(new_pids_limit);
         linux_res.set_pids(Some(pids));
     }
 
