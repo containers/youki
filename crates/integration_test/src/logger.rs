@@ -1,31 +1,16 @@
 use anyhow::{Context, Result};
 use log::{LevelFilter, Log, Metadata, Record};
-use once_cell::sync::OnceCell;
 use std::borrow::Cow;
-use std::fs::{File, OpenOptions};
 use std::io::{stderr, Write};
-use std::path::PathBuf;
 use std::str::FromStr;
 
-pub static LOG_FILE: OnceCell<Option<File>> = OnceCell::new();
 const LOG_LEVEL_ENV_NAME: &str = "YOUKI_INTEGRATION_LOG_LEVEL";
 
 /// Initialize the logger, must be called before accessing the logger
 /// Multiple parts might call this at once, but the actual initialization
 /// is done only once due to use of OnceCell
-pub fn init(log_file: Option<PathBuf>, debug: bool) -> Result<()> {
+pub fn init(debug: bool) -> Result<()> {
     let level = detect_log_level(debug).context("failed to parse log level")?;
-    let _ = LOG_FILE.get_or_init(|| -> Option<File> {
-        log_file.map(|path| {
-            OpenOptions::new()
-                .create(true)
-                .write(true)
-                .truncate(false)
-                .open(path)
-                .expect("failed opening log file")
-        })
-    });
-
     let logger = IntegrationLogger::new(level.to_level());
     log::set_boxed_logger(Box::new(logger))
         .map(|()| log::set_max_level(level))
@@ -74,21 +59,13 @@ impl Log for IntegrationLogger {
         if self.enabled(record.metadata()) {
             let log_msg = text_format(record);
             // if log file is set, write to it, else write to stderr
-            if let Some(mut log_file) = LOG_FILE.get().unwrap().as_ref() {
-                let _ = writeln!(log_file, "{}", log_msg);
-            } else {
-                let _ = writeln!(stderr(), "{}", log_msg);
-            }
+            let _ = writeln!(stderr(), "{}", log_msg);
         }
     }
 
     /// Flush logs to file
     fn flush(&self) {
-        if let Some(mut log_file) = LOG_FILE.get().unwrap().as_ref() {
-            log_file.flush().expect("failed to flush");
-        } else {
-            stderr().flush().expect("failed to flush");
-        }
+        stderr().flush().expect("failed to flush");
     }
 }
 

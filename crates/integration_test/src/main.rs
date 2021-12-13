@@ -28,9 +28,6 @@ struct Opts {
     /// Enables debug output
     #[clap(short, long)]
     debug: bool,
-    /// Logs to the specified file
-    #[clap(long)]
-    log: Option<PathBuf>,
 }
 
 // parse test string given in commandline option as pair of testgroup name and tests belonging to that
@@ -51,7 +48,7 @@ fn parse_tests(tests: &[String]) -> Vec<(&str, Option<Vec<&str>>)> {
 fn main() -> Result<()> {
     let opts: Opts = Opts::parse();
 
-    if let Err(e) = logger::init(opts.log, opts.debug) {
+    if let Err(e) = logger::init(opts.debug) {
         eprintln!("logger could not be initialized: {:?}", e);
     }
 
