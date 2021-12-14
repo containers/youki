@@ -19,7 +19,8 @@ pub fn get_unified_mount_point() -> Result<PathBuf> {
         .ok_or_else(|| anyhow!("could not find mountpoint for unified"))
 }
 
-pub fn get_available_controllers(root_path: &Path) -> Result<Vec<ControllerType>> {
+pub fn get_available_controllers<P: AsRef<Path>>(root_path: P) -> Result<Vec<ControllerType>> {
+    let root_path = root_path.as_ref();
     let controllers_path = root_path.join(CGROUP_CONTROLLERS);
     if !controllers_path.exists() {
         bail!(

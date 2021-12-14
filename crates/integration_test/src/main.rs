@@ -9,6 +9,7 @@ use crate::tests::tlb::get_tlb_test;
 use crate::utils::support::set_runtime_path;
 use anyhow::Result;
 use clap::Parser;
+use integration_test::logger;
 use std::path::PathBuf;
 use test_framework::TestManager;
 use tests::cgroups;
@@ -16,14 +17,17 @@ use tests::cgroups;
 #[derive(Parser, Debug)]
 #[clap(version = "0.0.1", author = "youki team")]
 struct Opts {
-    /// path for the container runtime to be tested
+    /// Path for the container runtime to be tested
     #[clap(short, long)]
     runtime: PathBuf,
-    /// selected tests to be run, format should be
+    /// Selected tests to be run, format should be
     /// space separated groups, eg
     /// -t group1::test1,test3 group2 group3::test5
     #[clap(short, long, multiple_values = true, value_delimiter = ' ')]
     tests: Option<Vec<String>>,
+    /// Enables debug output
+    #[clap(short, long)]
+    debug: bool,
 }
 
 // parse test string given in commandline option as pair of testgroup name and tests belonging to that
@@ -43,6 +47,11 @@ fn parse_tests(tests: &[String]) -> Vec<(&str, Option<Vec<&str>>)> {
 
 fn main() -> Result<()> {
     let opts: Opts = Opts::parse();
+
+    if let Err(e) = logger::init(opts.debug) {
+        eprintln!("logger could not be initialized: {:?}", e);
+    }
+
     match std::fs::canonicalize(&opts.runtime) {
         // runtime path is relative or resolved correctly
         Ok(path) => set_runtime_path(&path),
@@ -63,7 +72,8 @@ fn main() -> Result<()> {
     let pidfile = get_pidfile_test();
     let ns_itype = get_ns_itype_tests();
     let cgroup_v1_pids = cgroups::pids::get_test_group();
-    let cgroup_v1_cpus = cgroups::cpus::get_test_group();
+    let cgroup_v1_cpu = cgroups::cpu::v1::get_test_group();
+    let cgroup_v2_cpu = cgroups::cpu::v2::get_test_group();
     let cgroup_v1_memory = cgroups::memory::get_test_group();
     let cgroup_v1_network = cgroups::network::get_test_group();
     let seccomp_notify = get_seccomp_notify_test();
@@ -74,12 +84,14 @@ fn main() -> Result<()> {
     tm.add_test_group(&pidfile);
     tm.add_test_group(&ns_itype);
     tm.add_test_group(&cgroup_v1_pids);
-    tm.add_test_group(&cgroup_v1_cpus);
+    tm.add_test_group(&cgroup_v1_cpu);
+    tm.add_test_group(&cgroup_v2_cpu);
     tm.add_test_group(&cgroup_v1_memory);
     tm.add_test_group(&cgroup_v1_network);
-
-    tm.add_cleanup(Box::new(cgroups::cleanup));
     tm.add_test_group(&seccomp_notify);
+
+    tm.add_cleanup(Box::new(cgroups::cleanup_v1));
+    tm.add_cleanup(Box::new(cgroups::cleanup_v2));
 
     if let Some(tests) = opts.tests {
         let tests_to_run = parse_tests(&tests);

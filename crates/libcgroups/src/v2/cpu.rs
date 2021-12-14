@@ -1,5 +1,5 @@
 use anyhow::{bail, Context, Result};
-use std::path::Path;
+use std::{borrow::Cow, path::Path};
 
 use crate::{
     common::{self, ControllerOpt},
@@ -12,8 +12,8 @@ use super::controller::Controller;
 
 const CGROUP_CPU_WEIGHT: &str = "cpu.weight";
 const CGROUP_CPU_MAX: &str = "cpu.max";
-const DEFAULT_PERIOD: &str = "100000";
 const UNRESTRICTED_QUOTA: &str = "max";
+const MAX_CPU_WEIGHT: u64 = 10000;
 
 const CPU_STAT: &str = "cpu.stat";
 
@@ -69,27 +69,27 @@ impl Cpu {
             }
         }
 
-        // if quota is unrestricted set to 'max'
-        let mut quota_string = UNRESTRICTED_QUOTA.to_owned();
-        if let Some(quota) = cpu.quota() {
-            if quota > 0 {
-                quota_string = quota.to_string();
+        let cpu_max_file = path.join(CGROUP_CPU_MAX);
+        let new_cpu_max: Option<Cow<str>> = match (cpu.quota(), cpu.period()) {
+            (None, Some(period)) => Self::create_period_only_value(&cpu_max_file, period)?,
+            (Some(quota), None) if quota >= 0 => Some(quota.to_string().into()),
+            (Some(quota), None) if quota < 0 => Some(UNRESTRICTED_QUOTA.into()),
+            (Some(quota), Some(period)) if quota >= 0 => {
+                Some(format!("{} {}", quota, period).into())
             }
-        }
-
-        let mut period_string: String = DEFAULT_PERIOD.to_owned();
-        if let Some(period) = cpu.period() {
-            if period > 0 {
-                period_string = period.to_string();
+            (Some(quota), Some(period)) if quota < 0 => {
+                Some(format!("{} {}", UNRESTRICTED_QUOTA, period).into())
             }
-        }
+            _ => None,
+        };
 
         // format is 'quota period'
         // the kernel default is 'max 100000'
         // 250000 250000 -> 1 CPU worth of runtime every 250ms
         // 10000 50000 -> 20% of one CPU every 50ms
-        let max = quota_string + " " + &period_string;
-        common::write_cgroup_file_str(path.join(CGROUP_CPU_MAX), &max)?;
+        if let Some(cpu_max) = new_cpu_max {
+            common::write_cgroup_file_str(&cpu_max_file, &cpu_max)?;
+        }
 
         Ok(())
     }
@@ -99,7 +99,8 @@ impl Cpu {
             return 0;
         }
 
-        1 + ((shares - 2) * 9999) / 262142
+        let weight = 1 + ((shares - 2) * 9999) / 262142;
+        weight.min(MAX_CPU_WEIGHT)
     }
 
     fn is_realtime_requested(cpu: &LinuxCpu) -> bool {
@@ -113,6 +114,14 @@ impl Cpu {
 
         false
     }
+
+    fn create_period_only_value(cpu_max_file: &Path, period: u64) -> Result<Option<Cow<str>>> {
+        let old_cpu_max = common::read_cgroup_file(cpu_max_file)?;
+        if let Some(old_quota) = old_cpu_max.split_whitespace().next() {
+            return Ok(Some(format!("{} {}", old_quota, period).into()));
+        }
+        Ok(None)
+    }
 }
 
 #[cfg(test)]
@@ -123,7 +132,7 @@ mod tests {
     use std::fs;
 
     #[test]
-    fn test_set_shares() {
+    fn test_set_valid_shares() {
         // arrange
         let (tmp, weight) = setup("test_set_shares", CGROUP_CPU_WEIGHT);
         let _ = set_fixture(&tmp, CGROUP_CPU_MAX, "")
@@ -152,14 +161,14 @@ mod tests {
         // assert
         let content = fs::read_to_string(max)
             .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_MAX));
-        assert_eq!(content, format!("{} {}", QUOTA, DEFAULT_PERIOD))
+        assert_eq!(content, format!("{}", QUOTA))
     }
 
     #[test]
-    fn test_set_zero_quota() {
+    fn test_set_negative_quota() {
         // arrange
-        let (tmp, max) = setup("test_set_zero_quota", CGROUP_CPU_MAX);
-        let cpu = LinuxCpuBuilder::default().quota(0).build().unwrap();
+        let (tmp, max) = setup("test_set_negative_quota", CGROUP_CPU_MAX);
+        let cpu = LinuxCpuBuilder::default().quota(-500).build().unwrap();
 
         // act
         Cpu::apply(&tmp, &cpu).expect("apply cpu");
@@ -167,17 +176,16 @@ mod tests {
         // assert
         let content = fs::read_to_string(max)
             .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_MAX));
-        assert_eq!(
-            content,
-            format!("{} {}", UNRESTRICTED_QUOTA, DEFAULT_PERIOD)
-        )
+        assert_eq!(content, UNRESTRICTED_QUOTA)
     }
 
     #[test]
     fn test_set_positive_period() {
         // arrange
+        const QUOTA: u64 = 50000;
         const PERIOD: u64 = 100000;
         let (tmp, max) = setup("test_set_positive_period", CGROUP_CPU_MAX);
+        common::write_cgroup_file(&max, QUOTA).unwrap();
         let cpu = LinuxCpuBuilder::default().period(PERIOD).build().unwrap();
 
         // act
@@ -186,25 +194,7 @@ mod tests {
         // assert
         let content = fs::read_to_string(max)
             .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_MAX));
-        assert_eq!(content, format!("{} {}", UNRESTRICTED_QUOTA, PERIOD))
-    }
-
-    #[test]
-    fn test_set_zero_period() {
-        // arrange
-        let (tmp, max) = setup("test_set_zero_period", CGROUP_CPU_MAX);
-        let cpu = LinuxCpuBuilder::default().period(0u64).build().unwrap();
-
-        // act
-        Cpu::apply(&tmp, &cpu).expect("apply cpu");
-
-        // assert
-        let content = fs::read_to_string(max)
-            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_MAX));
-        assert_eq!(
-            content,
-            format!("{} {}", UNRESTRICTED_QUOTA, DEFAULT_PERIOD)
-        );
+        assert_eq!(content, format!("{} {}", QUOTA, PERIOD))
     }
 
     #[test]
