@@ -4,6 +4,7 @@ version = "0.0.1"
 authors = ["youki team"]
 edition = "2021"
 description = "A container runtime written in Rust"
+build = "build.rs"
 
 [dependencies.clap]
 version = "3.0.0-beta.5"
@@ -12,7 +13,7 @@ features = ["std", "suggestions", "derive", "cargo"]
 
 
 [dependencies]
-anyhow = "1.0"
+anyhow = "1.0.51"
 chrono = { version="0.4", features = ["serde"] }
 libcgroups = { path = "../libcgroups" }
 libcontainer = { path = "../libcontainer" }
@@ -31,3 +32,6 @@ clap_generate = { version = "3.0.0-beta.5" }
 [dev-dependencies]
 serial_test = "0.5.1"
 
+[build-dependencies]
+anyhow = "1.0.51"
+vergen = "6.0"
