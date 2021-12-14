@@ -3,6 +3,27 @@ name = "integration_test"
 version = "0.1.0"
 edition = "2021"
 
+[dependencies]
+anyhow = "1.0"
+chrono = { version="0.4" }
+flate2 = "1.0"
+libcgroups = { path = "../libcgroups" }
+libcontainer = { path = "../libcontainer" }
+log = { version = "0.4", features = ["std"] }
+nix = "0.23.0"
+num_cpus = "1.0"
+oci-spec = { git = "https://github.com/containers/oci-spec-rs", rev = "54c5e386f01ab37c9305cc4a83404eb157e42440" }
+once_cell = "1.8.0"
+pnet = "0.28.0"
+procfs = "0.12.0"
+rand = "0.8.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tar = "0.4"
+test_framework = { path = "../test_framework" }
+uuid = "0.8"
+which = "4.2.2"
+
 [dependencies.clap]
 version = "=3.0.0-beta.5"
 default-features = false
@@ -11,21 +32,3 @@ features = ["std", "suggestions", "derive"]
 [dependencies.clap_derive]
 version = "=3.0.0-beta.5"
 default-features = true
-
-[dependencies]
-procfs = "0.11.1"
-uuid = "0.8"
-rand = "0.8.0"
-tar = "0.4"
-flate2 = "1.0"
-test_framework = { path = "../test_framework"}
-anyhow = "1.0"
-once_cell = "1.8.0"
-oci-spec = { git = "https://github.com/containers/oci-spec-rs",  rev = "54c5e386f01ab37c9305cc4a83404eb157e42440" }
-which = "4.2.2"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-nix = "0.23.0"
-libcontainer = { path = "../libcontainer" }
-num_cpus = "1.0"
-pnet = "0.28.0"
