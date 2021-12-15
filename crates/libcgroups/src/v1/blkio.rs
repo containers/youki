@@ -33,8 +33,12 @@ const BLKIO_THROTTLE_IO_SERVICE_BYTES: &str = "blkio.throttle.io_service_bytes";
 // Proportional weight division policy
 // ---------------------------------------
 // Specifies the relative proportion of block I/O access available to the cgroup
-// Format: weight (weight can range from 100 to 1000)
+// Format: weight (weight can range from 10 to 1000)
 const BLKIO_WEIGHT: &str = "blkio.weight";
+// Similar to BLKIO_WEIGHT, but is only available in kernels starting with version 5.0
+// with blk-mq and when using BFQ I/O scheduler
+// Format: weight (weight can range from 1 to 10000)
+const BLKIO_BFQ_WEIGHT: &str = "blkio.bfq.weight";
 // Specifies the relative proportion of block I/O access for specific devices available
 // to the cgroup. This overrides the the blkio.weight value for the specified device
 // Format: Major:Minor weight (weight can range from 100 to 1000)
@@ -103,6 +107,19 @@ impl StatsProvider for Blkio {
 
 impl Blkio {
     fn apply(root_path: &Path, blkio: &LinuxBlockIo) -> Result<()> {
+        if let Some(blkio_weight) = blkio.weight() {
+            // be aligned with what runc does
+            // See also: https://github.com/opencontainers/runc/blob/81044ad7c902f3fc153cb8ffadaf4da62855193f/libcontainer/cgroups/fs/blkio.go#L28-L33
+            if blkio_weight != 0 {
+                let cgroup_file = root_path.join(BLKIO_WEIGHT);
+                if cgroup_file.exists() {
+                    common::write_cgroup_file(&cgroup_file, blkio_weight)?;
+                } else {
+                    common::write_cgroup_file(&root_path.join(BLKIO_BFQ_WEIGHT), blkio_weight)?;
+                }
+            }
+        }
+
         if let Some(throttle_read_bps_device) = blkio.throttle_read_bps_device().as_ref() {
             for trbd in throttle_read_bps_device {
                 common::write_cgroup_file_str(
@@ -225,6 +242,21 @@ mod tests {
 
     use anyhow::Result;
     use oci_spec::runtime::{LinuxBlockIoBuilder, LinuxThrottleDeviceBuilder};
+
+    #[test]
+    fn test_set_blkio_weight() {
+        for cgroup_file in &[BLKIO_WEIGHT, BLKIO_BFQ_WEIGHT] {
+            let (tmp, weight_file) = setup("test_set_blkio_weight", cgroup_file);
+            let blkio = LinuxBlockIoBuilder::default()
+                .weight(200_u16)
+                .build()
+                .unwrap();
+
+            Blkio::apply(&tmp, &blkio).expect("apply blkio");
+            let content = fs::read_to_string(weight_file).expect("read blkio weight");
+            assert_eq!("200", content);
+        }
+    }
 
     #[test]
     fn test_set_blkio_read_bps() {
