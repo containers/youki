@@ -22,10 +22,11 @@ mod ps;
 mod resume;
 mod run;
 mod spec;
+mod update;
 
 pub use {
     events::Events, exec::Exec, list::List, pause::Pause, ps::Ps, resume::Resume, run::Run,
-    spec::Spec,
+    spec::Spec, update::Update,
 };
 
 // Subcommands parsed by liboci-cli, based on the [OCI
@@ -51,10 +52,11 @@ pub enum CommonCmd {
     Exec(Exec),
     List(List),
     Pause(Pause),
-    #[clap(setting=clap::AppSettings::AllowLeadingHyphen)]
+    #[clap(setting = clap::AppSettings::AllowLeadingHyphen)]
     Ps(Ps),
     Resume(Resume),
     Run(Run),
+    Update(Update),
     Spec(Spec),
 }
 

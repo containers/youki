@@ -588,9 +588,9 @@ dependencies = [
 
 [[package]]
 name = "hermit-abi"
-version = "0.1.20"
+version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7a30908dbce072eca83216eab939d2290080e00ca71611b96a09e5cdce5f3fa"
+checksum = "62b467343b94ba476dcb2500d242dadbb39557df889310ac77c5d99100aaac33"
 dependencies = [
  "libc",
 ]
@@ -730,7 +730,7 @@ dependencies = [
  "libc",
  "log",
  "nix",
- "oci-spec 0.5.2 (git+https://github.com/containers/oci-spec-rs?rev=54c5e386f01ab37c9305cc4a83404eb157e42440)",
+ "oci-spec 0.5.2 (git+https://github.com/containers/oci-spec-rs?rev=12dcd858543db0e7bfb1ef053d1b748f2fda74ee)",
  "procfs",
  "quickcheck",
  "rbpf",
@@ -755,7 +755,7 @@ dependencies = [
  "log",
  "mio",
  "nix",
- "oci-spec 0.5.2 (git+https://github.com/containers/oci-spec-rs?rev=54c5e386f01ab37c9305cc4a83404eb157e42440)",
+ "oci-spec 0.5.2 (git+https://github.com/containers/oci-spec-rs?rev=12dcd858543db0e7bfb1ef053d1b748f2fda74ee)",
  "path-clean",
  "prctl",
  "procfs",
@@ -938,7 +938,7 @@ dependencies = [
 [[package]]
 name = "oci-spec"
 version = "0.5.2"
-source = "git+https://github.com/containers/oci-spec-rs?rev=54c5e386f01ab37c9305cc4a83404eb157e42440#54c5e386f01ab37c9305cc4a83404eb157e42440"
+source = "git+https://github.com/containers/oci-spec-rs?rev=12dcd858543db0e7bfb1ef053d1b748f2fda74ee#12dcd858543db0e7bfb1ef053d1b748f2fda74ee"
 dependencies = [
  "derive_builder",
  "getset",
@@ -951,7 +951,7 @@ dependencies = [
 [[package]]
 name = "oci-spec"
 version = "0.5.2"
-source = "git+https://github.com/containers/oci-spec-rs?rev=d6fb1e91742313cd0d0085937e2d6df5d4669720#d6fb1e91742313cd0d0085937e2d6df5d4669720"
+source = "git+https://github.com/containers/oci-spec-rs?rev=54c5e386f01ab37c9305cc4a83404eb157e42440#54c5e386f01ab37c9305cc4a83404eb157e42440"
 dependencies = [
  "derive_builder",
  "getset",
@@ -1671,7 +1671,7 @@ dependencies = [
  "liboci-cli",
  "log",
  "nix",
- "oci-spec 0.5.2 (git+https://github.com/containers/oci-spec-rs?rev=d6fb1e91742313cd0d0085937e2d6df5d4669720)",
+ "oci-spec 0.5.2 (git+https://github.com/containers/oci-spec-rs?rev=12dcd858543db0e7bfb1ef053d1b748f2fda74ee)",
  "once_cell",
  "pentacle",
  "procfs",
