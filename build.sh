@@ -14,4 +14,3 @@ fi
 cargo build --verbose $TGT $1
 
 cp target/$TARGET/$VERSION/youki .
-cp target/$TARGET/$VERSION/integration_test ./youki_integration_test

@@ -25,7 +25,7 @@ use liboci_cli::{CommonCmd, GlobalOpts, StandardCmd};
 // This takes global options as well as individual commands as specified in [OCI runtime-spec](https://github.com/opencontainers/runtime-spec/blob/master/runtime.md)
 // Also check [runc commandline documentation](https://github.com/opencontainers/runc/blob/master/man/runc.8.md) for more explanation
 #[derive(Parser, Debug)]
-#[clap(version = crate_version!(), author = "youki team")]
+#[clap(version = youki_version!(), author = env!("CARGO_PKG_AUTHORS"))]
 struct Opts {
     #[clap(flatten)]
     global: GlobalOpts,
@@ -47,6 +47,23 @@ enum SubCommand {
     // Youki specific extensions
     Info(info::Info),
     Completion(commands::completion::Completion),
+}
+
+/// output Youki version in Moby compatible format
+#[macro_export]
+macro_rules! youki_version {
+    // For compatibility with Moby, match format here:
+    // https://github.com/moby/moby/blob/65cc84abc522a564699bb171ca54ea1857256d10/daemon/info_unix.go#L280
+    () => {
+        concat!(
+            "version ",
+            crate_version!(),
+            "\ncommit: ",
+            crate_version!(),
+            "-0-",
+            env!("VERGEN_GIT_SHA_SHORT")
+        )
+    };
 }
 
 /// This is the entry point in the container runtime. The binary is run by a high-level container runtime,
@@ -99,6 +116,7 @@ fn main() -> Result<()> {
             CommonCmd::Resume(resume) => commands::resume::resume(resume, root_path),
             CommonCmd::Run(run) => commands::run::run(run, root_path, systemd_cgroup),
             CommonCmd::Spec(spec) => commands::spec_json::spec(spec),
+            CommonCmd::Update(update) => commands::update::update(update, root_path),
         },
 
         SubCommand::Info(info) => commands::info::info(info),
