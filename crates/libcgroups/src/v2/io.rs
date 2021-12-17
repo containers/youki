@@ -79,6 +79,17 @@ impl StatsProvider for Io {
 }
 
 impl Io {
+    // Since the OCI spec is designed for cgroup v1, in some cases
+    // there is need to convert from the cgroup v1 configuration to cgroup v2
+    // the formula for BlkIOWeight to IOWeight is y = (1 + (x - 10) * 9999 / 990)
+    // convert linearly from [10-1000] to [1-10000]
+    fn convert_cfq_io_weight_to_bfq(v: u16) -> u16 {
+        if v == 0 {
+            return 0;
+        }
+        1 + (v - 10) * 9999 / 990
+    }
+
     fn io_max_path(path: &Path) -> PathBuf {
         path.join("io.max")
     }
@@ -99,11 +110,18 @@ impl Io {
             }
         }
         if let Some(io_weight) = blkio.weight() {
+            // be aligned with what runc does
+            // See also: https://github.com/opencontainers/runc/blob/81044ad7c902f3fc153cb8ffadaf4da62855193f/libcontainer/cgroups/fs2/io.go#L57-L69
             if io_weight > 0 {
-                common::write_cgroup_file(
-                    root_path.join(CGROUP_IO_WEIGHT),
-                    format!("{}", io_weight),
-                )?;
+                let cgroup_file = root_path.join(CGROUP_BFQ_IO_WEIGHT);
+                if cgroup_file.exists() {
+                    common::write_cgroup_file(cgroup_file, io_weight)?;
+                } else {
+                    common::write_cgroup_file(
+                        root_path.join(CGROUP_IO_WEIGHT),
+                        Self::convert_cfq_io_weight_to_bfq(io_weight),
+                    )?;
+                }
             }
         }
 
@@ -259,17 +277,33 @@ mod test {
 
     #[test]
     fn test_set_ioweight() {
-        let (tmp, throttle) = setup("test_set_io_weight", CGROUP_IO_WEIGHT);
-        let blkio = LinuxBlockIoBuilder::default()
-            .weight(100u16)
-            .build()
-            .unwrap();
+        struct TestCase {
+            cgroup_file: &'static str,
+            weight: u16,
+            expected_weight: String,
+        }
+        for case in &[
+            TestCase {
+                cgroup_file: CGROUP_BFQ_IO_WEIGHT,
+                weight: 100,
+                expected_weight: String::from("100"),
+            },
+            TestCase {
+                cgroup_file: CGROUP_IO_WEIGHT,
+                weight: 10,
+                expected_weight: String::from("1"),
+            },
+        ] {
+            let (tmp, weight_file) = setup("test_set_io_weight", case.cgroup_file);
+            let blkio = LinuxBlockIoBuilder::default()
+                .weight(case.weight)
+                .build()
+                .unwrap();
 
-        Io::apply(&tmp, &blkio).expect("apply blkio");
-        let content =
-            fs::read_to_string(throttle).unwrap_or_else(|_| panic!("read bfq_io_weight content"));
-
-        assert_eq!("100", content);
+            Io::apply(&tmp, &blkio).expect("apply blkio");
+            let content = fs::read_to_string(weight_file).expect("read blkio weight");
+            assert_eq!(case.expected_weight, content);
+        }
     }
 
     #[test]
