@@ -3,7 +3,7 @@ use std::path::{Component::RootDir, Path, PathBuf};
 use anyhow::{Context, Result};
 use procfs::process::Process;
 use std::fs;
-
+pub mod blkio;
 pub mod cpu;
 pub mod memory;
 pub mod network;

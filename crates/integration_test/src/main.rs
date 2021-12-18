@@ -76,6 +76,7 @@ fn main() -> Result<()> {
     let cgroup_v2_cpu = cgroups::cpu::v2::get_test_group();
     let cgroup_v1_memory = cgroups::memory::get_test_group();
     let cgroup_v1_network = cgroups::network::get_test_group();
+    let cgroup_v1_blkio = cgroups::blkio::get_test_group();
     let seccomp_notify = get_seccomp_notify_test();
 
     tm.add_test_group(&cl);
@@ -88,6 +89,7 @@ fn main() -> Result<()> {
     tm.add_test_group(&cgroup_v2_cpu);
     tm.add_test_group(&cgroup_v1_memory);
     tm.add_test_group(&cgroup_v1_network);
+    tm.add_test_group(&cgroup_v1_blkio);
     tm.add_test_group(&seccomp_notify);
 
     tm.add_cleanup(Box::new(cgroups::cleanup_v1));
