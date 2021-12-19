@@ -26,6 +26,8 @@ libcgroups = { version = "0.0.1", path = "../libcgroups" }
 libseccomp = { version = "0.0.1", path = "../libseccomp" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+wasmer = "2.1.0"
+wasmer-wasi = "2.1.0"
 
 [dev-dependencies]
 oci-spec = { git = "https://github.com/containers/oci-spec-rs",  rev = "12dcd858543db0e7bfb1ef053d1b748f2fda74ee", features = ["proptests"] }
