@@ -1,7 +1,7 @@
+use super::{generate_uuid, prepare_bundle, set_config};
 ///! Contains utility functions for testing
 ///! Similar to https://github.com/opencontainers/runtime-tools/blob/master/validation/util/test.go
-use super::get_runtime_path;
-use super::{generate_uuid, prepare_bundle, set_config};
+use super::{get_runtime_path, TempDir};
 use anyhow::{anyhow, bail, Context, Result};
 use oci_spec::runtime::Spec;
 use serde::{Deserialize, Serialize};
@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, ExitStatus, Stdio};
 use std::thread::sleep;
 use std::time::Duration;
-use test_framework::TestResult;
+use test_framework::{test_result, TestResult};
 use uuid::Uuid;
 
 const SLEEP_TIME: Duration = Duration::from_millis(150);
@@ -103,6 +103,19 @@ pub fn get_state<P: AsRef<Path>>(id: &Uuid, dir: P) -> Result<(String, String)> 
     Ok((stdout, stderr))
 }
 
+pub fn start_container<P: AsRef<Path>>(id: &Uuid, dir: P) -> Result<Child> {
+    let res = Command::new(get_runtime_path())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .arg("--root")
+        .arg(dir.as_ref().join("runtime"))
+        .arg("start")
+        .arg(id.to_string())
+        .spawn()
+        .context("could not start container")?;
+    Ok(res)
+}
+
 pub fn test_outside_container(
     spec: Spec,
     execute_test: &dyn Fn(ContainerData) -> TestResult,
@@ -126,6 +139,56 @@ pub fn test_outside_container(
     kill_container(&id, &bundle).unwrap().wait().unwrap();
     delete_container(&id, &bundle).unwrap().wait().unwrap();
     test_result
+}
+
+// mostly needs a name that better expresses what this actually does
+pub fn test_inside_container(
+    spec: Spec,
+    execute_test: &dyn Fn(&TempDir) -> Result<()>,
+) -> TestResult {
+    let id = generate_uuid();
+    let bundle = prepare_bundle(&id).unwrap();
+
+    test_result!(execute_test(&bundle));
+
+    set_config(&bundle, &spec).unwrap();
+    let create_result = create_container(&id, &bundle).unwrap().wait();
+    let (out, err) = get_state(&id, &bundle).unwrap();
+    let state: Option<State> = match serde_json::from_str(&out) {
+        Ok(v) => Some(v),
+        Err(_) => None,
+    };
+    let data = ContainerData {
+        id: id.to_string(),
+        state,
+        state_err: err,
+        create_result,
+    };
+    test_result!(check_container_created(&data));
+    let start_result = test_result!(create_container(&id, &bundle).unwrap().wait_with_output());
+    let stderr = String::from_utf8_lossy(&start_result.stderr);
+    if !stderr.is_empty() {
+        return TestResult::Failed(anyhow!(
+            "container start stderr was not empty : found {}",
+            stderr
+        ));
+    }
+    // we sleep here once again for contingency
+    // and make sure that the container stops before we call the get_state
+    // TODO decide the time to sleep by trial-and-error
+    sleep(SLEEP_TIME);
+    let (out, err) = get_state(&id, &bundle).unwrap();
+
+    let state:State = match serde_json::from_str(&out) {
+        Ok(v) => v,
+        Err(e) => return TestResult::Failed(anyhow!("error in parsing state of container after start in test_inside_container : stdout : {}, parse error : {}",out,e)),
+    };
+    if state.status != "stopped" {
+        return TestResult::Failed(anyhow!("error : unexpected container status in test_inside_runtime : expected stopped, got {}, container state : {:?}",state.status,state));
+    }
+    kill_container(&id, &bundle).unwrap().wait().unwrap();
+    delete_container(&id, &bundle).unwrap().wait().unwrap();
+    TestResult::Passed
 }
 
 pub fn check_container_created(data: &ContainerData) -> Result<()> {
