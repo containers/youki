@@ -1,6 +1,7 @@
 use super::args::ContainerArgs;
 use crate::apparmor;
 use crate::syscall::Syscall;
+use crate::workload::Executor;
 use crate::{
     capabilities, hooks, namespaces::Namespaces, process::channel, rootfs::RootFS,
     rootless::Rootless, seccomp, tty, utils,
@@ -413,16 +414,11 @@ pub fn container_init_process(
         }
     }
 
-    if let Some(args) = proc.args() {
-        crate::exec::wasmer::exec(spec).context("failed to exec")?;
-        //utils::do_exec(&args[0], args)?;
+    if proc.args().is_some() {
+        Executor::new().exec(spec)
     } else {
         bail!("on non-Windows, at least one process arg entry is required")
     }
-
-    // After do_exec is called, the process is replaced with the container
-    // payload through execvp, so it should never reach here.
-    unreachable!();
 }
 
 // Before 3.19 it was possible for an unprivileged user to enter an user namespace,
