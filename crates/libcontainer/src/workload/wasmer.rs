@@ -30,7 +30,10 @@ impl ExecHandler for WasmerExecHandler {
         }
 
         if !args[0].ends_with(".wasm") || !args[0].ends_with(".wat") {
-            bail!("first argument must be a wasm or wat module, but was {}", args[0])
+            bail!(
+                "first argument must be a wasm or wat module, but was {}",
+                args[0]
+            )
         }
 
         let mut wasm_env = WasiState::new("youki_wasm_app")
@@ -39,8 +42,7 @@ impl ExecHandler for WasmerExecHandler {
             .finalize()?;
 
         let store = Store::default();
-        let module =
-            Module::from_file(&store, &args[0]).context("could not load wasm module")?;
+        let module = Module::from_file(&store, &args[0]).context("could not load wasm module")?;
 
         let imports = wasm_env
             .import_object(&module)
@@ -75,5 +77,52 @@ impl ExecHandler for WasmerExecHandler {
 
     fn name(&self) -> &str {
         "wasmer"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use oci_spec::runtime::SpecBuilder;
+    use std::collections::HashMap;
+
+    #[test]
+    fn test_can_handle_oci_handler() -> Result<()> {
+        let mut annotations = HashMap::with_capacity(1);
+        annotations.insert("run.oci.handler".to_owned(), "wasm".to_owned());
+        let spec = SpecBuilder::default()
+            .annotations(annotations)
+            .build()
+            .context("build spec")?;
+
+        let handler = WasmerExecHandler {};
+        assert!(handler.can_handle(&spec).context("can handle")?);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_can_handle_compat_wasm_spec() -> Result<()> {
+        let mut annotations = HashMap::with_capacity(1);
+        annotations.insert("module.wasm.image/variant".to_owned(), "compat".to_owned());
+        let spec = SpecBuilder::default()
+            .annotations(annotations)
+            .build()
+            .context("build spec")?;
+
+        let handler = WasmerExecHandler {};
+        assert!(handler.can_handle(&spec).context("can handle")?);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_can_handle_no_execute() -> Result<()> {
+        let spec = SpecBuilder::default().build().context("build spec")?;
+
+        let handler = WasmerExecHandler {};
+        assert!(!handler.can_handle(&spec).context("can handle")?);
+
+        Ok(())
     }
 }
