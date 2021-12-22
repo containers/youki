@@ -1,6 +1,6 @@
 # liboci-cli
 
-This is a crate to parse command line arguments for OCI container runtimes as specified in the OCI Runtime Command Line Interface. This exposes structures with Clap Parser derived, so that they can be directly used for parsing oci-commandline arguments.
+This module provides the structs for command line arguments for OCI container runtimes as specified in the OCI Runtime Command Line Interface The exposed structures are with Clap Parser derived, so that they can be directly used for parsing oci-commandline arguments.
 
 ### Implemented subcommands
 

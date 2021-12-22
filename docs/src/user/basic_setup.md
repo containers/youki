@@ -1,17 +1,18 @@
 # Basic Setup
 
-This section will explain how to setup youki for use. Currently the only way to get youki is to compile it from the source. Currently youki only supports Linux systems, so this documentation assumes you are using a Linux system. For running youki on other platforms, you can use Vagrant, which is explained in the last part of this section.
+This explains the requirements for compiling Youki as a binary, to use it as a low-level container runtime, or to depend once of its crates as dependency for your own project.
+
+Youki currently only supports Linux Platfrom, and to use it on other platform you will need to use some kind of virtualization. The repo itself provides Vagrantfile that provides basic setup to use Youki on non-Linux system using Vagrant. The last sub-section explains using this vagrantfile.
+
+Also note that Youki currently only supports and expects systemd as init system, and would not work on other systems. There is currently work on-going to put systemd dependent features behind a feature flag, but till then you will need a systemd enabled system to work with Youki.
 
 ### Requirements
 
-youki is written in rust, so you will need rust toolchain installed to compile it. Also if you want to use it with a higher level container engine, such as docker, you will need to install that as well. In case you want to use one of the sub-crates of youki as a dependency, you may not need docker.
+As Youki is written in Rust, you will need to install and setup Rust toolchain to compile it. The instructions for that can be found on Rust's official site [here](https://www.rust-lang.org/tools/install).
 
-The rest of document uses docker as an example when required.
+You can use Youki by itself to start and run containers, but it can be a little tedious, as it is a low-level container runtime. You can use a High-level container runtime, with its runtime set to Youki, so that it will be easier to use. Both of these are explained in the [Basic Usage](./basic_usage.md). For using it along with an high-level runtime, you will to install one such as Docker or Podman. This documentation uses Docker in its examples, which can be installed from [here](https://docs.docker.com/engine/install).
 
-- Rust(See [here](https://www.rust-lang.org/tools/install)), edition 2021
-- Docker(See [here](https://docs.docker.com/engine/install))
-
-Apart from these basic requirements, some other libraries are also required to compile and run youki. To install them on :
+To compile and run, Youki itself depends on some underlying libraries being installed. You can install them using your respective package manager as shown below.
 
 #### Debian, Ubuntu and related distributions
 
@@ -36,28 +37,23 @@ $ sudo dnf install   \
       libseccomp-devel
 ```
 
-#### Getting the source
+---
 
-After installing the dependencies you will need to clone the youki repository if you want to use it directly :
+### Getting the source
+
+Currently Youki can only be installed from the source code itself, so you will need to clone the Youki GitHub repository to get the source code for using it as a runtime. If you are using any crates of Youki as dependency you need to do this step, as Cargo will automatically clone the repository for you.
+
+To clone the repository, run
 
 ```console
 git clone git@github.com:containers/youki.git
 ```
 
-Or if you want ot use it as a dependency in a Rust project, you can specify it in your Cargo.toml :
+This will create a directory named youki in the directory you ran the command in. This youki directory will be referred to as root directory throughout the documentation.
 
-```toml
-[dependencies]
-...
-liboci-cli = { git = "https://github.com/containers/youki.git" }
-...
-```
+### Installing the source
 
-You can specify the crate that you need as a dependency in place of `liboci-cli`
-
-#### Installing the source
-
-If you have cloned the source, you can build it using
+Once you have cloned the source, you can build it using
 
 ```console
 # go into the cloned directory
@@ -67,23 +63,40 @@ cd youki
 ./build.sh
 ```
 
-This will build the youki, and put the binary at the root level of the cloned directory.
+This will build the Youki binary, and put it at the root level of the cloned directory, that is in the youki/ .
 
-When using it as a dependency, you can use it in your source as :
+---
+
+### Using sub-crates as dependency
+
+To use any of the sub-crate as a dependency in your own project, you can specify the dependency as follows,
+
+```toml
+[dependencies]
+...
+liboci-cli = { git = "https://github.com/containers/Youki.git" }
+...
+```
+
+Here we use `liboci-cli` as an example, which can be replaced by the sub-crate that you need.
+
+Then you can use it in your source as
 
 ```
 use liboci_cli::{...}
 ```
 
-You can specify the crate that you need as a dependency in place of `liboci-cli`
+---
 
-#### Using Vagrant to run Youki on non-Linux Platform
+### Using Vagrant to run Youki on non-Linux Platform
 
-you can use the vagrantfile provided with the source, to setup vagrant and run youki inside it. You can see [vagrant installation](https://www.vagrantup.com/docs/installation) for how to download and setup vagrant.
+As explained before, Youki only support Linux, and to build/use it on non-Linux Platforms, you will need to use some kind of virtualization. The repo provides a Vagrantfile to do the required VM setup using Vagrant, which can be installed from [here](https://www.vagrantup.com/docs/installation).
 
-Once done, you can run vagrant commands in the cloned directory to run youki inside the VM created by vagrant :
+Once installed ans setup, you can run vagrant commands in the cloned directory to run Youki inside the VM created by vagrant :
 
 ```console
+# in the youki directory
+
 # for rootless mode, which is default
 vagrant up
 vagrant ssh
@@ -95,5 +108,4 @@ VAGRANT_VAGRANTFILE=Vagrantfile.root vagrant ssh
 # in virtual machine
 cd youki
 ./build.sh
-
 ```
