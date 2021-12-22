@@ -165,7 +165,11 @@ pub fn test_inside_container(
         create_result,
     };
     test_result!(check_container_created(&data));
-    let start_result = test_result!(create_container(&id, &bundle).unwrap().wait_with_output());
+    let start_result = match start_container(&id, &bundle).unwrap().wait_with_output() {
+        std::io::Result::Ok(c) => c,
+        std::io::Result::Err(e) => return TestResult::Failed(anyhow!(e)),
+    };
+
     let stderr = String::from_utf8_lossy(&start_result.stderr);
     if !stderr.is_empty() {
         return TestResult::Failed(anyhow!(
@@ -173,11 +177,14 @@ pub fn test_inside_container(
             stderr
         ));
     }
-    // we sleep here once again for contingency
-    // and make sure that the container stops before we call the get_state
-    // TODO decide the time to sleep by trial-and-error
-    sleep(SLEEP_TIME);
+
     let (out, err) = get_state(&id, &bundle).unwrap();
+    if !err.is_empty() {
+        return TestResult::Failed(anyhow!(
+            "error in getting state after starting the container : {}",
+            err
+        ));
+    }
 
     let state:State = match serde_json::from_str(&out) {
         Ok(v) => v,
