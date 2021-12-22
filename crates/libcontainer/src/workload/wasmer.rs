@@ -29,8 +29,8 @@ impl ExecHandler for WasmerExecHandler {
             bail!("at least one process arg must be specified")
         }
 
-        if !args[0].ends_with(".wasm") {
-            bail!("first argument must be a wasm module, but was {}", args[0])
+        if !args[0].ends_with(".wasm") || !args[0].ends_with(".wat") {
+            bail!("first argument must be a wasm or wat module, but was {}", args[0])
         }
 
         let mut wasm_env = WasiState::new("youki_wasm_app")
@@ -40,7 +40,7 @@ impl ExecHandler for WasmerExecHandler {
 
         let store = Store::default();
         let module =
-            Module::from_file(&store, "hello.wasm").context("could not load wasm module")?;
+            Module::from_file(&store, &args[0]).context("could not load wasm module")?;
 
         let imports = wasm_env
             .import_object(&module)
