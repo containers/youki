@@ -15,9 +15,9 @@ impl ExecHandler for DefaultExecHandler {
             .process()
             .as_ref()
             .and_then(|p| p.args().as_ref())
-            .unwrap_or_else(|| &EMPTY);
+            .unwrap_or(&EMPTY);
 
-        if args.len() == 0 {
+        if args.is_empty() {
             bail!("at least one process arg must be specified")
         }
 
@@ -43,4 +43,3 @@ impl ExecHandler for DefaultExecHandler {
         "default"
     }
 }
-

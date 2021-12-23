@@ -415,7 +415,7 @@ pub fn container_init_process(
     }
 
     if proc.args().is_some() {
-        Executor::new().exec(spec)
+        Executor::default().exec(spec)
     } else {
         bail!("on non-Windows, at least one process arg entry is required")
     }

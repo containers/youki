@@ -12,20 +12,18 @@ impl ExecHandler for WasmerExecHandler {
         log::debug!("Executing workload with wasmer handler");
         let process = spec.process().as_ref();
 
-        let args = process
-            .and_then(|p| p.args().as_ref())
-            .unwrap_or_else(|| &EMPTY);
+        let args = process.and_then(|p| p.args().as_ref()).unwrap_or(&EMPTY);
         let env = process
             .and_then(|p| p.env().as_ref())
-            .unwrap_or_else(|| &EMPTY)
-            .into_iter()
+            .unwrap_or(&EMPTY)
+            .iter()
             .filter_map(|e| {
                 e.split_once("=")
                     .filter(|kv| !kv.0.contains('\u{0}') && !kv.1.contains('\u{0}'))
                     .map(|kv| (kv.0.trim(), kv.1.trim()))
             });
 
-        if args.len() == 0 {
+        if args.is_empty() {
             bail!("at least one process arg must be specified")
         }
 
