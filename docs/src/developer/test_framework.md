@@ -1,5 +1,7 @@
 # test_framework
 
-This is the framework specifically developed to implement the ported integration tests. This exposes Structs to represent individual tests, test groups and test managers which runs the test groups. This also exposes a trait which can be used to implement a custom test struct or a custom test group.
+This crate contains the testing framework specifically developed for porting the OCI integration test to rust. This contains structs to represent the individual tests, group of tests and a test manager that has responsibility to run tests. This Also exposes traits which can be used to implement custom test structs or test group structs if needed.
 
-By default the test groups are run in parallel using [crossbeam crate](https://www.crates.io/crates/crossbeam), and the default test_group implementation also runs individual tests parallelly. Sometimes you might need to run the individual test in certain order, serially such as when testing container lifecycle. In such cases you will need to implement the TestableGroup trait in a custom struct so you can finely control the order of execution.
+By default the test groups are run in parallel using the [crossbeam crate](https://www.crates.io/crates/crossbeam), and the default test_group implementation also runs individual tests parallelly.
+
+Sometimes you might need to run the tests in a test group serially or in certain order, for example in case of testing container lifecycle, a container must be created and started before stopping it. In such cases, you will need to implement the respective traits on your own structs, so that you can have fine control over thr running of tests. Check the readme of the test_framework crate to see the struct and trait documentation [here](https://github.com/containers/youki/tree/main/crates/test_framework).

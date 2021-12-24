@@ -1,18 +1,18 @@
 # Unwritten Rule
 
-This is the place to write down rules or conventions that are discussed in PRs, so that newcomers can easily find them, without having to go through the PR history. So if you decide on any convention to follow for the project, please make sure to add them here.
+This is the place to write down rules or conventions that were discussed in PRs, so that newcomers can easily find them, without having to go through the PR history. So if you decide on any convention to follow for the project, please make sure to add them here.
 
 ## Conventions to follow
 
 #### Errors
 
-Youki currently uses [anyhow](https://www.crates.io/crates/anyhow) library to deal with errors occurring while its execution. So wherever you use fallible actions, or functions that can return `Result`, make sure you attach enough information with the errors so that error logs can be useful for debugging later. For example, if you are reading a file, or parsing something and the operation does not succeed, you can add the path from which you attempted to read the file, or the string that you attempted to parse.
+Youki currently uses [anyhow](https://www.crates.io/crates/anyhow) library to deal with errors occurring during its execution. So wherever you use fallible actions, or functions that can return `Result`, make sure you attach enough information with the errors so that error logs can be useful for debugging later. For example, if you are reading a file, or parsing something and the operation does not succeed, you can add the path from which you attempted to read the file, or the string that you attempted to parse.
 
 Also for the error messages, we follow the convention all small-case letters and no period at the end, as discussed in [this PR](https://github.com/containers/youki/issues/313). Whenever you write error messages, please follow this convention to keep them uniform.
 
 #### Logs
 
-youki uses [log](https://crates.io/crates/log) crate to log information while running. Whenever adding code to interact with system or kernel faetures or such, make sure to add debug logs so that if youki crashes, you can trace the errors using logs.
+youki uses [log](https://crates.io/crates/log) crate to log information while running. Whenever adding code to interact with system or kernel features or such, make sure to add debug logs so that if youki crashes, you can trace the errors and zero-in on the reasons using logs.
 
 #### Comments
 
@@ -20,4 +20,4 @@ Make sure that you comment copiously, and explain the peculiar behavior of your 
 
 #### Update This Documentation
 
-Keep this Documentation updated ! Make sure you add any relevant doc-links and resources to this as you add code, so that it can help newcomers as well as others to find the resources in one single place.
+Keep this Documentation updated! Make sure you add any relevant doc-links and resources to this that you found helpful or contains background information required to understand the code, so that it can help newcomers as well as others to find the resources in one single place.
