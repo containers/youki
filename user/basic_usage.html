@@ -1,0 +1,260 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Basic Usage - Youki User and Developer Documentation</title>
+        <!-- Custom HTML head -->
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="../youki.html">Youki</a></li><li class="spacer"></li><li class="chapter-item expanded "><a href="../user/introduction.html"><strong aria-hidden="true">1.</strong> User Documentation</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../user/basic_setup.html"><strong aria-hidden="true">1.1.</strong> Basic Setup</a></li><li class="chapter-item expanded "><a href="../user/basic_usage.html" class="active"><strong aria-hidden="true">1.2.</strong> Basic Usage</a></li><li class="chapter-item expanded "><a href="../user/crates.html"><strong aria-hidden="true">1.3.</strong> Crates provided</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../user/libcgroups.html"><strong aria-hidden="true">1.3.1.</strong> libcgroups</a></li><li class="chapter-item expanded "><a href="../user/libcontainer.html"><strong aria-hidden="true">1.3.2.</strong> libcontainer</a></li><li class="chapter-item expanded "><a href="../user/liboci_cli.html"><strong aria-hidden="true">1.3.3.</strong> liboci-cli</a></li><li class="chapter-item expanded "><a href="../user/libseccomp.html"><strong aria-hidden="true">1.3.4.</strong> libseccomp</a></li><li class="spacer"></li></ol></li></ol></li><li class="chapter-item expanded "><a href="../developer/introduction.html"><strong aria-hidden="true">2.</strong> Developer Documentation</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../developer/basics.html"><strong aria-hidden="true">2.1.</strong> Basics</a></li><li class="chapter-item expanded "><a href="../developer/unwritten_rules.html"><strong aria-hidden="true">2.2.</strong> Unwritten Rule</a></li><li class="chapter-item expanded "><a href="../developer/good_places_to_start.html"><strong aria-hidden="true">2.3.</strong> Good places to start</a></li><li class="chapter-item expanded "><a href="../developer/documentation_mdbook.html"><strong aria-hidden="true">2.4.</strong> This Documentation</a></li><li class="chapter-item expanded "><a href="../developer/crate_specific_information.html"><strong aria-hidden="true">2.5.</strong> Crate Specific Information</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../developer/libcgroups.html"><strong aria-hidden="true">2.5.1.</strong> libcgroups</a></li><li class="chapter-item expanded "><a href="../developer/libcontainer.html"><strong aria-hidden="true">2.5.2.</strong> libcontainer</a></li><li class="chapter-item expanded "><a href="../developer/liboci_cli.html"><strong aria-hidden="true">2.5.3.</strong> liboci-cli</a></li><li class="chapter-item expanded "><a href="../developer/libseccomp.html"><strong aria-hidden="true">2.5.4.</strong> libseccomp</a></li><li class="chapter-item expanded "><a href="../developer/youki.html"><strong aria-hidden="true">2.5.5.</strong> youki</a></li><li class="chapter-item expanded "><a href="../developer/test_framework.html"><strong aria-hidden="true">2.5.6.</strong> test_framework</a></li><li class="chapter-item expanded "><a href="../developer/integration_test.html"><strong aria-hidden="true">2.5.7.</strong> integration_test</a></li></ol></li></ol></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Youki User and Developer Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="basic-usage"><a class="header" href="#basic-usage">Basic Usage</a></h1>
+<p>This explains using Youki as a low-level container runtime. Youki can be used by itself to create, start and run containers, but doing so can be tedious, and thus you might want to use a higher-level runtime with Youki set as its runtime, so that you can get a convenient and easy interface.</p>
+<p>You can use Youki with Docker, or Podman, but for the purpose of the examples, we will illustrate using Docker.</p>
+<p>Youki can run in two modes, namely rootful mode, and rootless mode. The primary difference from the user-perspective in these is that as the name suggests, rootless mode does not require root/admin permissions, while rootful mode needs the root permissions. Both of these are shown in the examples below.</p>
+<h4 id="using-youki-with-a-high-level-runtime"><a class="header" href="#using-youki-with-a-high-level-runtime">Using youki with a high-level runtime</a></h4>
+<p>We will first see how to use Youki with a high-level runtime such as Docker. You can install Docker from <a href="https://www.vagrantup.com/docs/installation">here</a>.</p>
+<p>By default, after installation the docker sets up so that its daemon process will start running in background after booting up. By default, this configures Docker to use its default low-level runtime, and to use Youki instead , we will first need to stop the running Docker daemon.</p>
+<p>As Youki needs systemd to compile, this assumes that you are running on a systemd based system. So you an first check if the docker daemon is running or not by running</p>
+<pre><code class="language-console">systemctl status docker
+</code></pre>
+<p>This will print a message showing if the daemon is active or not. If it is active, then you will need to stop it by running</p>
+<pre><code class="language-console">sudo systemctl stop docker
+</code></pre>
+<p>After this you need to manually restart the docker daemon, but with Youki as its runtime. To do this, run following command in the youki/ directory after building youki</p>
+<pre><code class="language-console">dockerd --experimental --add-runtime=&quot;youki=$(pwd)/youki&quot; # run in the youki directory
+</code></pre>
+<p>This will start the daemon and hang up the console. You can either start this as a background process to continue using the same terminal, or use another terminal, which will make it easier to stop the docker daemon later.</p>
+<p>In case you don't stop the original daemon, you can get an error message after previous command</p>
+<pre><code>failed to start daemon: pid file found, ensure docker is not running or delete /var/run/docker.pid
+</code></pre>
+<p>Now that the docker daemon is running, you can use docker normally as you will, but you will be able to specify Youki as its low-level runtime to actually create, start and stop the containers.</p>
+<p>You can try running a container such as</p>
+<pre><code class="language-console">docker run -it --rm --runtime youki busybox   # run a container
+</code></pre>
+<p>This will start a busybox container, and give access to terminal inside it.</p>
+<p>After you are done, you can stop the docker daemon by sending it a signal, either by using <code>Ctrl</code> + <code>C</code> if you are running the process in another terminal, or by using kill command with the pid of it, if you have started it as a background process.</p>
+<p>Then to start the original/normal Docker daemon, you can run</p>
+<pre><code class="language-console">sudo systemctl start docker
+</code></pre>
+<h4 id="using-youki-standalone"><a class="header" href="#using-youki-standalone">Using Youki Standalone</a></h4>
+<p>Youki can also be used directly, without a higher-level runtime such as Docker to create, start, stop and delete the container, but the process can be tedious. Here we will show how you can do that, to run a simple container with desired program running in it.</p>
+<p>Note that we will still be using Docker to generate the rootfs required for running the container.</p>
+<p>To start, in the youki directory, make another directory named tutorial, and craete a sub-directory rootfs inside it</p>
+<pre><code class="language-console">mkdir -p tutorial/rootfs
+</code></pre>
+<p>After that, you will need to use docker to create the required directory structure</p>
+<pre><code class="language-console">cd tutorial
+docker export $(docker create busybox) | tar -C rootfs -xvf -
+</code></pre>
+<p>This will create the required directory structure for using it as a root directory inside the container.</p>
+<p>Now the any container runtime gets the information about the permissions, configurations and constraints for the container process by using a config.json file. Youki has a command which can generate the default config for you. To do this, run</p>
+<pre><code class="language-console">../youki spec
+</code></pre>
+<p>After this, you can manually edit the file to customize the behavior of the container process. For example, to run the desired program inside the container, you can edit the process.args</p>
+<pre><code class="language-json">&quot;process&quot;: {
+...
+&quot;args&quot;: [
+  &quot;sleep&quot;, &quot;30&quot;
+],
+...
+ }
+</code></pre>
+<p>Here you can change the args to specify the program to be run, and arguments to be given to it.</p>
+<p>After this, go back to the youki/ directory</p>
+<pre><code class="language-console">cd ..
+</code></pre>
+<p>As the setup is complete, you can now use youki to create the container, start the container, get its state etc.</p>
+<pre><code class="language-console"># create a container with name `tutorial_container`
+sudo ./youki create -b tutorial tutorial_container
+
+# you can see the state the container is `created`
+sudo ./youki state tutorial_container
+
+# start the container
+sudo ./youki start tutorial_container
+
+# will show the list of containers, the container is `running`
+sudo ./youki list
+
+# delete the container
+sudo ./youki delete tutorial_container
+</code></pre>
+<p>The example above shows how to run Youki in a 'rootful' way. To run it without root permissions, that is, in rootless mode, few chagnes are required.</p>
+<p>First, after exporting the rootfs from docker, while generating the config, you will need to pass the rootless flag. This will generate the config withe the options needed for rootless operation of the container.</p>
+<pre><code class="language-console">../youki spec --rootless
+</code></pre>
+<p>After this, the steps are basically the same, except you do not need to use sudo while running youki.</p>
+<pre><code class="language-console">cd ..
+./youki create -b tutorial rootless_container
+./youki state rootless_container
+./youki start rootless_container
+./youki list
+./youki delete rootless_container
+</code></pre>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../user/basic_setup.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                            <a rel="next" href="../user/crates.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../user/basic_setup.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                    <a rel="next" href="../user/crates.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+        <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        <script src="../elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../searcher.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+    </body>
+</html>
