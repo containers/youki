@@ -10,7 +10,7 @@ impl Container {
     ///
     /// ```no_run
     /// use libcontainer::container::builder::ContainerBuilder;
-    /// use libcontainer::syscall::syscall::create_syscall;;
+    /// use libcontainer::syscall::syscall::create_syscall;
     /// use nix::sys::signal::Signal;
     ///
     /// # fn main() -> anyhow::Result<()> {

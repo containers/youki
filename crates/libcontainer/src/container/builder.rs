@@ -25,7 +25,7 @@ pub struct ContainerBuilder<'a> {
 ///
 /// ```no_run
 /// use libcontainer::container::builder::ContainerBuilder;
-/// use libcontainer::syscall::syscall::create_syscall;;
+/// use libcontainer::syscall::syscall::create_syscall;
 ///
 /// ContainerBuilder::new("74f1a4cb3801".to_owned(), create_syscall().as_ref())
 /// .with_root_path("/run/containers/youki")
@@ -42,7 +42,7 @@ impl<'a> ContainerBuilder<'a> {
     ///
     /// ```no_run
     /// use libcontainer::container::builder::ContainerBuilder;
-    /// use libcontainer::syscall::syscall::create_syscall;;
+    /// use libcontainer::syscall::syscall::create_syscall;
     ///
     /// let builder = ContainerBuilder::new("74f1a4cb3801".to_owned(), create_syscall().as_ref());
     /// ```
