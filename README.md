@@ -121,9 +121,8 @@ youki is not at the practical stage yet. However, it is getting closer to practi
 |    OCI Compliance     |        Compliance with OCI Runtime Spec         |                                 ✅ 50 out of 50 test cases passing                                  |
 
 # Design and implementation of youki
-![sequence diagram of youki](docs/.drawio.svg)
 
-More details are in the works [#14](https://github.com/containers/youki/issues/14)
+The User and Developer Documentation for youki is hosted at [https://containers.github.io/youki/](https://containers.github.io/youki/)
 
 # Getting Started
 
