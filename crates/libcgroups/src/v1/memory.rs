@@ -101,13 +101,8 @@ impl Controller for Memory {
         Ok(())
     }
 
-    fn needs_to_handle<'a>(_controller_opt: &'a ControllerOpt) -> Option<&'a Self::Resource> {
-        // TODO: fix compile error
-        // error[E0515]: cannot return value referencing temporary value
-        // if let Some(memory) = &controller_opt.resources.memory() {
-        //     return Some(memory);
-        // }
-        None
+    fn needs_to_handle<'a>(controller_opt: &'a ControllerOpt) -> Option<&'a Self::Resource> {
+        controller_opt.resources.memory().as_ref()
     }
 }
 
