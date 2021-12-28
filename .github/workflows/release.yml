@@ -78,7 +78,7 @@ jobs:
         env:
           GITHUB_REF: ${{ github.ref }}
         run: |
-          VERSION=${GITHUB_REF##*/}
+          VERSION=${GITHUB_REF##*v}
           MAJOR=${VERSION%%.*}
           MINOR=${VERSION%.*}
           MINOR=${MINOR#*.}
