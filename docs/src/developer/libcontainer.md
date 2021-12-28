@@ -1,6 +1,6 @@
 # libcontainer
 
-THis crate is one of the core crates of the youki workspace, and has functions and structs that deal with the actual craetion and management of the container processes.
+This crate is one of the core crates of the youki workspace, and has functions and structs that deal with the actual craetion and management of the container processes.
 
 Remember, in the end, a container is just another process in Linux, which has control groups, namespaces, pivot_root and other mechanisms applied to it. The program executing has the impression that is is running on a complete system, but from the host system's perspective, it is just another process, and has attributes such as pid, file descriptors, etc. associated with it like any other process.
 

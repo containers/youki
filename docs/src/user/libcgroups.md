@@ -62,7 +62,7 @@ Some of the things it exposes are
 
 ### systemd
 
-THis is the module used by youki to interact with sytemd, and it exposes several functions to interact
+This is the module used by youki to interact with sytemd, and it exposes several functions to interact
 
 - function `booted` to check if the system was booted with systemd or not
 
