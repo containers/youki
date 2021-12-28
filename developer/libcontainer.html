@@ -135,7 +135,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="libcontainer"><a class="header" href="#libcontainer">libcontainer</a></h1>
-<p>THis crate is one of the core crates of the youki workspace, and has functions and structs that deal with the actual craetion and management of the container processes.</p>
+<p>This crate is one of the core crates of the youki workspace, and has functions and structs that deal with the actual craetion and management of the container processes.</p>
 <p>Remember, in the end, a container is just another process in Linux, which has control groups, namespaces, pivot_root and other mechanisms applied to it. The program executing has the impression that is is running on a complete system, but from the host system's perspective, it is just another process, and has attributes such as pid, file descriptors, etc. associated with it like any other process.</p>
 <p>Along with the container related functions, this crate also provides Youki Config, a subset of the OCI spec config. This config contains only the essential data required for running the containers, and due to its smaller size, parsing it and passing it around is more efficient than the complete OCI spec config struct.</p>
 <p>Other than that, this crate also provides a wrapper over basic Linux sockets, which are then used internally as well as by youki to communicate between the main youki process and the forked container process as well as the intermediate process.</p>

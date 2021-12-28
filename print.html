@@ -176,7 +176,7 @@ youki is named after the Japanese word 'youki', which means 'a container'. In Ja
 </li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="user-documentation"><a class="header" href="#user-documentation">User Documentation</a></h1>
-<p>THis section provides documentation of youki and the sub crates that the youki repo contains for the users. So if you are using youki as a low level container runtime, or using any of the crates in youki workspace as dependencies for your own project, this section might be helpful for you.</p>
+<p>This section provides documentation of youki and the sub crates that the youki repo contains for the users. So if you are using youki as a low level container runtime, or using any of the crates in youki workspace as dependencies for your own project, this section might be helpful for you.</p>
 <p>This is divided into following sub-sections :</p>
 <ul>
 <li>Basic Setup : This explains how the dependencies and setup required to compile and run youki</li>
@@ -431,7 +431,7 @@ sudo ./youki delete tutorial_container
 </li>
 </ul>
 <h3 id="systemd"><a class="header" href="#systemd">systemd</a></h3>
-<p>THis is the module used by youki to interact with sytemd, and it exposes several functions to interact</p>
+<p>This is the module used by youki to interact with sytemd, and it exposes several functions to interact</p>
 <ul>
 <li>
 <p>function <code>booted</code> to check if the system was booted with systemd or not</p>
@@ -449,7 +449,7 @@ sudo ./youki delete tutorial_container
 <p>These two modules contains functionalities specific to cgroups version 1 and version 2. Both of these expose respective cgroup managers, which can be used to manage that type of cgroup, as well as sme utility functions related to respective cgroup version, such as <code>get_mount_points</code> (for v1 and v2), <code>get_subsystem_mount points (for v1) and </code>get_available_controllers` (for v2) etc.</p>
 <p>The v2 module also exposes devices module, which gives functionality for working with bpf ; such as load a bpf program, query info of a bpf program, attach and detach a bpf program to a cgroup, etc.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="libcontainer"><a class="header" href="#libcontainer">libcontainer</a></h1>
-<p>THis crate provides functionality for creating and managing containers. Youki itself uses this crate to manage and control the containers.</p>
+<p>This crate provides functionality for creating and managing containers. Youki itself uses this crate to manage and control the containers.</p>
 <p>This exposes several modules, each dealing with a specific aspect of working with containers.</p>
 <ul>
 <li>
@@ -633,7 +633,7 @@ cd -
 </ul>
 <p>As youki currently depends on systemd as an init system, this crate also exposes module systemd, which provides interface for working with systemd related operations. <a href="https://www.freedesktop.org/software/systemd/man/systemd.resource-control.html">systemd resource control</a> is a good place to read more about systemd and its involvement in resource control.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="libcontainer-1"><a class="header" href="#libcontainer-1">libcontainer</a></h1>
-<p>THis crate is one of the core crates of the youki workspace, and has functions and structs that deal with the actual craetion and management of the container processes.</p>
+<p>This crate is one of the core crates of the youki workspace, and has functions and structs that deal with the actual craetion and management of the container processes.</p>
 <p>Remember, in the end, a container is just another process in Linux, which has control groups, namespaces, pivot_root and other mechanisms applied to it. The program executing has the impression that is is running on a complete system, but from the host system's perspective, it is just another process, and has attributes such as pid, file descriptors, etc. associated with it like any other process.</p>
 <p>Along with the container related functions, this crate also provides Youki Config, a subset of the OCI spec config. This config contains only the essential data required for running the containers, and due to its smaller size, parsing it and passing it around is more efficient than the complete OCI spec config struct.</p>
 <p>Other than that, this crate also provides a wrapper over basic Linux sockets, which are then used internally as well as by youki to communicate between the main youki process and the forked container process as well as the intermediate process.</p>
