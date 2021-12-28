@@ -1,6 +1,6 @@
 # libcontainer
 
-THis crate provides functionality for creating and managing containers. Youki itself uses this crate to manage and control the containers.
+This crate provides functionality for creating and managing containers. Youki itself uses this crate to manage and control the containers.
 
 This exposes several modules, each dealing with a specific aspect of working with containers.
 
