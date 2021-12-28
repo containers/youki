@@ -72,12 +72,12 @@ impl Cpu {
         let cpu_max_file = path.join(CGROUP_CPU_MAX);
         let new_cpu_max: Option<Cow<str>> = match (cpu.quota(), cpu.period()) {
             (None, Some(period)) => Self::create_period_only_value(&cpu_max_file, period)?,
-            (Some(quota), None) if quota >= 0 => Some(quota.to_string().into()),
-            (Some(quota), None) if quota < 0 => Some(UNRESTRICTED_QUOTA.into()),
-            (Some(quota), Some(period)) if quota >= 0 => {
+            (Some(quota), None) if quota > 0 => Some(quota.to_string().into()),
+            (Some(quota), None) if quota <= 0 => Some(UNRESTRICTED_QUOTA.into()),
+            (Some(quota), Some(period)) if quota > 0 => {
                 Some(format!("{} {}", quota, period).into())
             }
-            (Some(quota), Some(period)) if quota < 0 => {
+            (Some(quota), Some(period)) if quota <= 0 => {
                 Some(format!("{} {}", UNRESTRICTED_QUOTA, period).into())
             }
             _ => None,
