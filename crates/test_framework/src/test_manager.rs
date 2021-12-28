@@ -105,4 +105,8 @@ impl<'a> TestManager<'a> {
             }
         }
     }
+
+    pub fn tests_groups(&self) -> Vec<String> {
+        self.test_groups.iter().map(|tg| tg.0.to_string()).collect()
+    }
 }

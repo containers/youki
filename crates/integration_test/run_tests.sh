@@ -10,7 +10,7 @@ if [[ -n "$1" ]]; then
 fi
 logfile="./test_log.log"
 touch $logfile
-sudo ./youki_integration_test -r $RUNTIME > $logfile
+sudo ./youki_integration_test run -r $RUNTIME > $logfile
 if [ 0 -ne $(grep "not ok" $logfile | wc -l ) ]; then
     cat $logfile
     exit 1
