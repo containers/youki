@@ -55,7 +55,7 @@ impl HugeTlb {
         }
 
         common::write_cgroup_file(
-            root_path.join(format!("hugetlb.{}.limit_in_bytes", hugetlb.page_size())),
+            root_path.join(format!("hugetlb.{}.max", hugetlb.page_size())),
             hugetlb.limit(),
         )?;
         Ok(())
@@ -93,7 +93,7 @@ mod tests {
 
     #[test]
     fn test_set_hugetlb() {
-        let page_file_name = "hugetlb.2MB.limit_in_bytes";
+        let page_file_name = "hugetlb.2MB.max";
         let tmp = create_temp_dir("test_set_hugetlbv2").expect("create temp directory for test");
         set_fixture(&tmp, page_file_name, "0").expect("Set fixture for 2 MB page size");
 
@@ -127,7 +127,7 @@ mod tests {
 
     quickcheck! {
         fn property_test_set_hugetlb(hugetlb: LinuxHugepageLimit) -> bool {
-            let page_file_name = format!("hugetlb.{:?}.limit_in_bytes", hugetlb.page_size());
+            let page_file_name = format!("hugetlb.{:?}.max", hugetlb.page_size());
             let tmp = create_temp_dir("property_test_set_hugetlbv2").expect("create temp directory for test");
             set_fixture(&tmp, &page_file_name, "0").expect("Set fixture for page size");
             let result = HugeTlb::apply(&tmp, &hugetlb);
