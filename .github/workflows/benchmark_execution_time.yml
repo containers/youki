@@ -134,7 +134,7 @@ jobs:
     # since the GITHUB_TOKEN is needed to let the bot commit messages in the PR
     # but right now it is controlled by the organization.
     # TODO: change back to use this when the permission granted
-    # - name: Writting report to PR comment
+    # - name: Writing report to PR comment
     #   uses: marocchino/sticky-pull-request-comment@v2 
     #   with:
     #     append: true
