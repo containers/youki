@@ -76,7 +76,7 @@ test_cases=(
   "state/state.t"
 )
 
-check_enviroment() {
+check_environment() {
   test_case=$1
   if [[ $test_case =~ .*(memory|hugetlb).t ]]; then
     if [[ ! -e "/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes" ]]; then
@@ -94,8 +94,8 @@ done
 
 
 for case in "${test_cases[@]}"; do
-  if ! check_enviroment $case; then
-    echo "Skip $case bacause your enviroment doesn't support this test case"
+  if ! check_environment $case; then
+    echo "Skip $case bacause your environment doesn't support this test case"
     continue
   fi
 
