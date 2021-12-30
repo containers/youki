@@ -88,7 +88,7 @@ impl Manager {
                 if let Some(subsystem_path) = self.subsystems.get(controller) {
                     required_controllers.insert(controller, subsystem_path);
                 } else {
-                    bail!("cgroup {} is required to fullfill the request, but is not supported by this system", controller);
+                    bail!("cgroup {} is required to fulfill the request, but is not supported by this system", controller);
                 }
             }
         }
