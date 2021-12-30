@@ -47,7 +47,7 @@ This framework also has some test utils, meant to help doing common operations i
 - delete_container : runs the runtime command with delete argument, with given id and with given bundle directory
 - get_state : runs the runtime command with state argument, with given id and with given bundle directory
 - test_outside_container : this is meant to mimic [validateOutsideContainer](https://github.com/opencontainers/runtime-tools/blob/59cdde06764be8d761db120664020f0415f36045/validation/util/test.go#L263) function of original tests.
-- check_container_created: this checks if the container was created succesfully.
+- check_container_created: this checks if the container was created successfully.
 - test_result!: this is a macro, that allows you to convert from a Result<T,E> to a TestResult
 
 Note that even though all of the above functions are provided, most of the time the only required function is test_outside_container, as it does all the work of setting up the bundle, creating and running the container, getting the state of the container, killing the container and then deleting the container.
