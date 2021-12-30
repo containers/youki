@@ -30,7 +30,7 @@ impl<'a> Rootless<'a> {
         let user_namespace = namespaces.get(LinuxNamespaceType::User);
 
         // If conditions requires us to use rootless, we must either create a new
-        // user namespace or enter an exsiting.
+        // user namespace or enter an existing.
         if rootless_required() && user_namespace.is_none() {
             bail!("rootless container requires valid user namespace definition");
         }
