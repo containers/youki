@@ -8,7 +8,7 @@ use crate::tests::readonly_paths::get_ro_paths_test;
 use crate::tests::seccomp_notify::get_seccomp_notify_test;
 use crate::tests::tlb::get_tlb_test;
 use crate::utils::support::set_runtime_path;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::Parser;
 use integration_test::logger;
 use std::path::PathBuf;
@@ -18,6 +18,22 @@ use tests::cgroups;
 #[derive(Parser, Debug)]
 #[clap(version = "0.0.1", author = "youki team")]
 struct Opts {
+    /// Enables debug output
+    #[clap(short, long)]
+    debug: bool,
+
+    #[clap(subcommand)]
+    command: SubCommand,
+}
+
+#[derive(Parser, Debug)]
+enum SubCommand {
+    Run(Run),
+    List,
+}
+
+#[derive(Parser, Debug)]
+struct Run {
     /// Path for the container runtime to be tested
     #[clap(short, long)]
     runtime: PathBuf,
@@ -26,9 +42,6 @@ struct Opts {
     /// -t group1::test1,test3 group2 group3::test5
     #[clap(short, long, multiple_values = true, value_delimiter = ' ')]
     tests: Option<Vec<String>>,
-    /// Enables debug output
-    #[clap(short, long)]
-    debug: bool,
 }
 
 // parse test string given in commandline option as pair of testgroup name and tests belonging to that
@@ -53,18 +66,6 @@ fn main() -> Result<()> {
         eprintln!("logger could not be initialized: {:?}", e);
     }
 
-    match std::fs::canonicalize(&opts.runtime) {
-        // runtime path is relative or resolved correctly
-        Ok(path) => set_runtime_path(&path),
-        // runtime path is name of program which probably exists in $PATH
-        Err(_) => match which::which(opts.runtime) {
-            Ok(path) => set_runtime_path(&path),
-            Err(e) => {
-                eprintln!("Error in finding runtime : {}\nexiting.", e);
-                std::process::exit(66);
-            }
-        },
-    }
     let mut tm = TestManager::new();
 
     let cl = ContainerLifecycle::new();
@@ -98,11 +99,42 @@ fn main() -> Result<()> {
     tm.add_cleanup(Box::new(cgroups::cleanup_v1));
     tm.add_cleanup(Box::new(cgroups::cleanup_v2));
 
-    if let Some(tests) = opts.tests {
-        let tests_to_run = parse_tests(&tests);
-        tm.run_selected(tests_to_run);
-    } else {
-        tm.run_all();
+    match &opts.command {
+        SubCommand::Run(args) => run(args, &tm).context("run tests")?,
+        SubCommand::List => list(&tm).context("list tests")?,
     }
+
+    Ok(())
+}
+
+fn run(opts: &Run, test_manager: &TestManager) -> Result<()> {
+    match std::fs::canonicalize(&opts.runtime) {
+        // runtime path is relative or resolved correctly
+        Ok(path) => set_runtime_path(&path),
+        // runtime path is name of program which probably exists in $PATH
+        Err(_) => match which::which(&opts.runtime) {
+            Ok(path) => set_runtime_path(&path),
+            Err(e) => {
+                eprintln!("Error in finding runtime : {}\nexiting.", e);
+                std::process::exit(66);
+            }
+        },
+    }
+
+    if let Some(tests) = &opts.tests {
+        let tests_to_run = parse_tests(tests);
+        test_manager.run_selected(tests_to_run);
+    } else {
+        test_manager.run_all();
+    }
+
+    Ok(())
+}
+
+fn list(test_manager: &TestManager) -> Result<()> {
+    for test_group in test_manager.tests_groups() {
+        println!("{}", test_group);
+    }
+
     Ok(())
 }

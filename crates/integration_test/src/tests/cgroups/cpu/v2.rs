@@ -112,6 +112,26 @@ fn test_cpu_quota_valid_set() -> TestResult {
     })
 }
 
+/// Tests if the cpu quota is the defalt value (max) if a cpu quota of zero has been specified
+fn test_cpu_quota_zero_default_set() -> TestResult {
+    let cpu_quota = 0;
+    let cpu = test_result!(LinuxCpuBuilder::default()
+        .quota(cpu_quota)
+        .build()
+        .context("build cpu spec"));
+
+    let spec = test_result!(create_spec("test_cpu_quota_zero_default_set", cpu));
+    test_outside_container(spec, &|data| {
+        test_result!(check_container_created(&data));
+        test_result!(check_cpu_max(
+            "test_cpu_quota_zero_default_set",
+            i64::MAX,
+            DEFAULT_PERIOD
+        ));
+        TestResult::Passed
+    })
+}
+
 /// Tests if the cpu quota is the default value (max) if a negative cpu quota has been specified
 fn test_cpu_quota_negative_default_set() -> TestResult {
     let cpu_quota = -9999;
@@ -342,6 +362,12 @@ pub fn get_test_group<'a>() -> TestGroup<'a> {
         Box::new(test_cpu_quota_valid_set),
     );
 
+    let test_cpu_quota_zero_default_set = ConditionalTest::new(
+        "test_cpu_quota_zero_default_set",
+        Box::new(can_run),
+        Box::new(test_cpu_quota_zero_default_set),
+    );
+
     let test_cpu_quota_negative_default_set = ConditionalTest::new(
         "test_cpu_quota_negative_value_default_set",
         Box::new(can_run),
@@ -371,6 +397,7 @@ pub fn get_test_group<'a>() -> TestGroup<'a> {
         Box::new(test_cpu_weight_zero_ignored),
         Box::new(test_cpu_weight_too_high_maximum_set),
         Box::new(test_cpu_quota_valid_set),
+        Box::new(test_cpu_quota_zero_default_set),
         Box::new(test_cpu_quota_negative_default_set),
         Box::new(test_cpu_period_valid_set),
         Box::new(test_cpu_period_unspecified_unchanged),

@@ -100,21 +100,22 @@ pub fn write_cgroup_file_str<P: AsRef<Path>>(path: P, data: &str) -> Result<()> 
         .open(path.as_ref())
         .with_context(|| format!("failed to open {:?}", path.as_ref()))?
         .write_all(data.as_bytes())
-        .with_context(|| format!("failed to write to {:?}", path.as_ref()))?;
+        .with_context(|| format!("failed to write {} to {:?}", data, path.as_ref()))?;
 
     Ok(())
 }
 
 #[inline]
 pub fn write_cgroup_file<P: AsRef<Path>, T: ToString>(path: P, data: T) -> Result<()> {
+    let data = data.to_string();
     fs::OpenOptions::new()
         .create(false)
         .write(true)
         .truncate(false)
         .open(path.as_ref())
         .with_context(|| format!("failed to open {:?}", path.as_ref()))?
-        .write_all(data.to_string().as_bytes())
-        .with_context(|| format!("failed to write to {:?}", path.as_ref()))?;
+        .write_all(data.as_bytes())
+        .with_context(|| format!("failed to write {} to {:?}", data, path.as_ref()))?;
 
     Ok(())
 }

@@ -106,24 +106,23 @@ youki is not at the practical stage yet. However, it is getting closer to practi
 
 |        Feature        |                   Description                   |                                                State                                                |
 | :-------------------: | :---------------------------------------------: | :-------------------------------------------------------------------------------------------------: |
-|        Docker         |               Running via Docker                |                                                  ✅                                                  |
-|        Podman         |               Running via Podman                |                      ✅(The default systemd cgroup driver is not yet supported)                      |
-|      pivot_root       |            Change the root directory            |                                                  ✅                                                  |
-|        Mounts         |    Mount files and directories to container     |                                                  ✅                                                  |
-|      Namespaces       |         Isolation of various resources          |                                                  ✅                                                  |
-|     Capabilities      |            Limiting root privileges             |                                                  ✅                                                  |
-|      Cgroups v1       |            Resource limitations, etc            |                                                  ✅                                                  |
+|        Docker         |               Running via Docker                |                                                 ✅                                                  |
+|        Podman         |               Running via Podman                |                                                 ✅                                                  |
+|      pivot_root       |            Change the root directory            |                                                 ✅                                                  |
+|        Mounts         |    Mount files and directories to container     |                                                 ✅                                                  |
+|      Namespaces       |         Isolation of various resources          |                                                 ✅                                                  |
+|     Capabilities      |            Limiting root privileges             |                                                 ✅                                                  |
+|      Cgroups v1       |            Resource limitations, etc            |                                                 ✅                                                  |
 |      Cgroups v2       |             Improved version of v1              | Support is complete except for devices. WIP on [#78](https://github.com/containers/youki/issues/78) |
-| Systemd cgroup driver |        Setting up a cgroup using systemd        |                     WIP on [#24](https://github.com/containers/youki/issues/24)                     |
-|        Seccomp        |             Filtering system calls              |                                                  ✅                                                  |
-|         Hooks         | Add custom processing during container creation |                                                  ✅                                                  |
-|       Rootless        |   Running a container without root privileges   | It works, but cgroups isn't supported. WIP on [#77](https://github.com/containers/youki/issues/77)  |
-|    OCI Compliance     |        Compliance with OCI Runtime Spec         |                                  ✅ 50 out of 50 test cases passing                                  |
+| Systemd cgroup driver |        Setting up a cgroup using systemd        |                                                 ✅                                                  |
+|        Seccomp        |             Filtering system calls              |                                                 ✅                                                  |
+|         Hooks         | Add custom processing during container creation |                                                 ✅                                                  |
+|       Rootless        |   Running a container without root privileges   |                                                 ✅                                                  |
+|    OCI Compliance     |        Compliance with OCI Runtime Spec         |                                 ✅ 50 out of 50 test cases passing                                  |
 
 # Design and implementation of youki
-![sequence diagram of youki](docs/.drawio.svg)
 
-More details are in the works [#14](https://github.com/containers/youki/issues/14)
+The User and Developer Documentation for youki is hosted at [https://containers.github.io/youki/](https://containers.github.io/youki/)
 
 # Getting Started
 
