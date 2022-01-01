@@ -3,11 +3,11 @@ use oci_spec::runtime::Spec;
 use wasmer::{Instance, Module, Store};
 use wasmer_wasi::WasiState;
 
-use super::{ExecHandler, EMPTY};
+use super::{Executor, EMPTY};
 
-pub struct WasmerExecHandler {}
+pub struct WasmerExecutor {}
 
-impl ExecHandler for WasmerExecHandler {
+impl Executor for WasmerExecutor {
     fn exec(&self, spec: &Spec) -> Result<()> {
         log::debug!("Executing workload with wasmer handler");
         let process = spec.process().as_ref();
@@ -27,7 +27,7 @@ impl ExecHandler for WasmerExecHandler {
             bail!("at least one process arg must be specified")
         }
 
-        if !args[0].ends_with(".wasm") || !args[0].ends_with(".wat") {
+        if !args[0].ends_with(".wasm") && !args[0].ends_with(".wat") {
             bail!(
                 "first argument must be a wasm or wat module, but was {}",
                 args[0]
@@ -93,7 +93,7 @@ mod tests {
             .build()
             .context("build spec")?;
 
-        let handler = WasmerExecHandler {};
+        let handler = WasmerExecutor {};
         assert!(handler.can_handle(&spec).context("can handle")?);
 
         Ok(())
@@ -108,7 +108,7 @@ mod tests {
             .build()
             .context("build spec")?;
 
-        let handler = WasmerExecHandler {};
+        let handler = WasmerExecutor {};
         assert!(handler.can_handle(&spec).context("can handle")?);
 
         Ok(())
@@ -118,7 +118,7 @@ mod tests {
     fn test_can_handle_no_execute() -> Result<()> {
         let spec = SpecBuilder::default().build().context("build spec")?;
 
-        let handler = WasmerExecHandler {};
+        let handler = WasmerExecutor {};
         assert!(!handler.can_handle(&spec).context("can handle")?);
 
         Ok(())

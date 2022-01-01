@@ -4,11 +4,11 @@ use anyhow::{bail, Context, Result};
 use nix::unistd;
 use oci_spec::runtime::Spec;
 
-use super::{ExecHandler, EMPTY};
+use super::{Executor, EMPTY};
 
-pub struct DefaultExecHandler {}
+pub struct DefaultExecutor {}
 
-impl ExecHandler for DefaultExecHandler {
+impl Executor for DefaultExecutor {
     fn exec(&self, spec: &Spec) -> Result<()> {
         log::debug!("Executing workload with default handler");
         let args = spec
