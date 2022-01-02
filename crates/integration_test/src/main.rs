@@ -1,6 +1,7 @@
 mod tests;
 mod utils;
 
+use crate::tests::create::get_create_test_group;
 use crate::tests::lifecycle::{ContainerCreate, ContainerLifecycle};
 use crate::tests::linux_ns_itype::get_ns_itype_tests;
 use crate::tests::pidfile::get_pidfile_test;
@@ -79,6 +80,7 @@ fn main() -> Result<()> {
     let cgroup_v1_network = cgroups::network::get_test_group();
     let cgroup_v1_blkio = cgroups::blkio::get_test_group();
     let seccomp_notify = get_seccomp_notify_test();
+    let create = get_create_test_group();
 
     tm.add_test_group(&cl);
     tm.add_test_group(&cc);
@@ -92,6 +94,7 @@ fn main() -> Result<()> {
     tm.add_test_group(&cgroup_v1_network);
     tm.add_test_group(&cgroup_v1_blkio);
     tm.add_test_group(&seccomp_notify);
+    tm.add_test_group(&create);
 
     tm.add_cleanup(Box::new(cgroups::cleanup_v1));
     tm.add_cleanup(Box::new(cgroups::cleanup_v2));
