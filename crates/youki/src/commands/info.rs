@@ -7,7 +7,6 @@ use libcontainer::rootless;
 use procfs::{CpuInfo, Meminfo};
 
 use libcgroups::{common::CgroupSetup, v2::controller_type::ControllerType};
-
 /// Show information about the system
 #[derive(Parser, Debug)]
 pub struct Info {}
@@ -26,6 +25,7 @@ pub fn info(_: Info) -> Result<()> {
 /// print Version of Youki
 pub fn print_youki() {
     println!("{:<18}{}", "Version", env!("CARGO_PKG_VERSION"));
+    println!("{:<18}{}", "Commit", env!("VERGEN_GIT_SHA_SHORT"));
 }
 
 /// Print Kernel Release, Version and Architecture
@@ -100,11 +100,19 @@ pub fn print_hardware() {
 
 /// Print cgroups info of system
 pub fn print_cgroups() {
+    print_cgroups_setup();
+    print_cgroup_mounts();
+    print_cgroup_v2_controllers();
+}
+
+pub fn print_cgroups_setup() {
     let cgroup_setup = libcgroups::common::get_cgroup_setup();
     if let Ok(cgroup_setup) = &cgroup_setup {
         println!("{:<18}{}", "Cgroup setup", cgroup_setup);
     }
+}
 
+pub fn print_cgroup_mounts() {
     println!("Cgroup mounts");
     if let Ok(v1_mounts) = libcgroups::v1::util::list_supported_mount_points() {
         let mut v1_mounts: Vec<String> = v1_mounts
@@ -122,6 +130,11 @@ pub fn print_cgroups() {
     if let Ok(mount_point) = &unified {
         println!("  {:<16}{}", "unified", mount_point.display());
     }
+}
+
+pub fn print_cgroup_v2_controllers() {
+    let cgroup_setup = libcgroups::common::get_cgroup_setup();
+    let unified = libcgroups::v2::util::get_unified_mount_point();
 
     if let Ok(cgroup_setup) = cgroup_setup {
         if let Ok(unified) = &unified {
