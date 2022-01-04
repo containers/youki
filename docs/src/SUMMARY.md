@@ -12,6 +12,7 @@
     - [libcontainer](./user/libcontainer.md)
     - [liboci-cli](./user/liboci_cli.md)
     - [libseccomp](./user/libseccomp.md)
+  - [Webassembly](./user/webassembly.md)
 
 ---
 
