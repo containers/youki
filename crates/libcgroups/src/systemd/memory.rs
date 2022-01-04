@@ -82,7 +82,7 @@ impl Memory {
             // as memory limit would be either bigger (invariant violation) or zero which would
             // leave the container with no memory and no swap.
             // if swap is greater than zero and memory limit is unspecified swap cannot be
-            // calulated. If memory limit is zero the container would have only swap. If
+            // calculated. If memory limit is zero the container would have only swap. If
             // memory is unlimited it would be bigger than swap.
             (_, Some(0)) | (None | Some(0) | Some(-1), Some(1..=i64::MAX)) => bail!(
                 "cgroup v2 swap value cannot be calculated from swap of {} and limit of {}",

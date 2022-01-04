@@ -1,6 +1,6 @@
 # youki
 
-This is the core crate that contains the youki binary itself. This provides the user interface, as well as binds the ther crates together to actually perform the work of creation and management of containers. THus this provides implementation of all the commands supported by youki.
+This is the core crate that contains the youki binary itself. This provides the user interface, as well as binds the other crates together to actually perform the work of creation and management of containers. THus this provides implementation of all the commands supported by youki.
 
 The simple control flow of youki can be explained as :
 

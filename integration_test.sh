@@ -45,7 +45,7 @@ test_cases=(
   "linux_ns_nopath/linux_ns_nopath.t"
   "linux_ns_path/linux_ns_path.t"
   "linux_ns_path_type/linux_ns_path_type.t"
-  # This test case requires that an apparmor profile named 'acme_secure_profile' has been installed on the system. It needs to allow the capabilites
+  # This test case requires that an apparmor profile named 'acme_secure_profile' has been installed on the system. It needs to allow the capabilities
   # validated by runtime-tools otherwise the test case will fail despite the profile being available.
   # "linux_process_apparmor_profile/linux_process_apparmor_profile.t"
   "linux_readonly_paths/linux_readonly_paths.t"
@@ -76,7 +76,7 @@ test_cases=(
   "state/state.t"
 )
 
-check_enviroment() {
+check_environment() {
   test_case=$1
   if [[ $test_case =~ .*(memory|hugetlb).t ]]; then
     if [[ ! -e "/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes" ]]; then
@@ -94,8 +94,8 @@ done
 
 
 for case in "${test_cases[@]}"; do
-  if ! check_enviroment $case; then
-    echo "Skip $case bacause your enviroment doesn't support this test case"
+  if ! check_environment $case; then
+    echo "Skip $case bacause your environment doesn't support this test case"
     continue
   fi
 

@@ -133,7 +133,7 @@ pub fn check_container_created(data: &ContainerData) -> Result<()> {
         Ok(exit_status) => {
             if !exit_status.success() {
                 bail!(
-                    "container creation was not successfull. Exit code was {:?}",
+                    "container creation was not successful. Exit code was {:?}",
                     exit_status.code()
                 )
             }

@@ -51,7 +51,7 @@ fn get_open_fds() -> Result<Vec<i32>> {
 // stay open: stdio, stdout, and stderr. We would further preserve the next
 // "preserve_fds" number of fds. Set the rest of fd with CLOEXEC flag, so they
 // will be closed after execve into the container payload. We can't close the
-// fds immediatly since we at least still need it for the pipe used to wait on
+// fds immediately since we at least still need it for the pipe used to wait on
 // starting the container.
 fn cleanup_file_descriptors(preserve_fds: i32) -> Result<()> {
     let open_fds = get_open_fds().with_context(|| "Failed to obtain opened fds")?;
@@ -366,7 +366,7 @@ pub fn container_init_process(
         }
     };
 
-    // Clean up and handle perserved fds. We only mark the fd as CLOSEXEC, so we
+    // Clean up and handle preserved fds. We only mark the fd as CLOSEXEC, so we
     // don't have to worry about when the fd will be closed.
     cleanup_file_descriptors(preserve_fds).with_context(|| "Failed to clean up extra fds")?;
 

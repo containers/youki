@@ -13,7 +13,7 @@ use std::os::unix::io;
 
 #[derive(Debug)]
 struct Compare {
-    // The zero-indexed index of the syscall arguement.
+    // The zero-indexed index of the syscall argument.
     arg: libc::c_uint,
     op: Option<scmp_compare>,
     datum_a: Option<scmp_datum_t>,
@@ -299,7 +299,7 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
         for syscall in syscalls {
             let action = translate_action(syscall.action(), syscall.errno_ret());
             if action == default_action {
-                // When the action is the same as the default action, the rule is redundent. We can
+                // When the action is the same as the default action, the rule is redundant. We can
                 // skip this here to avoid failing when we add the rules.
                 log::warn!(
                     "Detect a seccomp action that is the same as the default action: {:?}",

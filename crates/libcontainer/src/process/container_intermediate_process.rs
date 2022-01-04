@@ -61,7 +61,7 @@ pub fn container_intermediate_process(
         // process, We want to make sure continue as the root user inside the
         // new user namespace. This is required because the process of
         // configuring the container process will require root, even though the
-        // root in the user namespace likely is mapped to an non-priviliged user
+        // root in the user namespace likely is mapped to an non-privileged user
         // on the parent user namespace.
         command.set_id(Uid::from_raw(0), Gid::from_raw(0)).context(
             "failed to configure uid and gid root in the beginning of a new user namespace",
