@@ -163,7 +163,7 @@ youki is named after the Japanese word 'youki', which means 'a container'. In Ja
 <pre><code class="language-console">$ hyperfine --prepare 'sudo sync; echo 3 | sudo tee /proc/sys/vm/drop_caches' --warmup 10 --min-runs 100 'sudo ./youki create -b tutorial a &amp;&amp; sudo ./youki start a &amp;&amp; sudo ./youki delete -f a'
 </code></pre>
 </li>
-<li>Enviroment<br />
+<li>Environment
 <code>console $ ./youki info Version 0.0.1 Kernel-Release 5.11.0-41-generic Kernel-Version #45-Ubuntu SMP Fri Nov 5 11:37:01 UTC 2021 Architecture x86_64 Operating System Ubuntu 21.04 Cores 12 Total Memory 32025 Cgroup setup hybrid Cgroup mounts blkio /sys/fs/cgroup/blkio cpu /sys/fs/cgroup/cpu,cpuacct cpuacct /sys/fs/cgroup/cpu,cpuacct cpuset /sys/fs/cgroup/cpuset devices /sys/fs/cgroup/devices freezer /sys/fs/cgroup/freezer hugetlb /sys/fs/cgroup/hugetlb memory /sys/fs/cgroup/memory net_cls /sys/fs/cgroup/net_cls,net_prio net_prio /sys/fs/cgroup/net_cls,net_prio perf_event /sys/fs/cgroup/perf_event pids /sys/fs/cgroup/pids unified /sys/fs/cgroup/unified CGroup v2 controllers cpu detached cpuset detached hugetlb detached io detached memory detached pids detached device attached Namespaces enabled mount enabled uts enabled ipc enabled user enabled pid enabled network enabled cgroup enabled $ ./youki --version youki version 0.0.1 commit: 0.0.1-0-0be33bf $ runc -v runc version 1.0.0-rc93 commit: 12644e614e25b05da6fd08a38ffa0cfe1903fdec spec: 1.0.2-dev go: go1.13.15 libseccomp: 2.5.1 $ crun --version crun version 0.19.1.45-4cc7 commit: 4cc7fa1124cce75dc26e12186d9cbeabded2b710 spec: 1.0.0 +SYSTEMD +SELINUX +APPARMOR +CAP +SECCOMP +EBPF +CRIU +YAJL </code></li>
 </ul>
 </details>
@@ -192,7 +192,7 @@ youki is named after the Japanese word 'youki', which means 'a container'. In Ja
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="basic-setup"><a class="header" href="#basic-setup">Basic Setup</a></h1>
 <p>This explains the requirements for compiling Youki as a binary, to use it as a low-level container runtime, or to depend once of its crates as dependency for your own project.</p>
-<p>Youki currently only supports Linux Platfrom, and to use it on other platform you will need to use some kind of virtualization. The repo itself provides Vagrantfile that provides basic setup to use Youki on non-Linux system using Vagrant. The last sub-section explains using this vagrantfile.</p>
+<p>Youki currently only supports Linux Platform, and to use it on other platform you will need to use some kind of virtualization. The repo itself provides Vagrantfile that provides basic setup to use Youki on non-Linux system using Vagrant. The last sub-section explains using this vagrantfile.</p>
 <p>Also note that Youki currently only supports and expects systemd as init system, and would not work on other systems. There is currently work on-going to put systemd dependent features behind a feature flag, but till then you will need a systemd enabled system to work with Youki.</p>
 <h3 id="requirements"><a class="header" href="#requirements">Requirements</a></h3>
 <p>As Youki is written in Rust, you will need to install and setup Rust toolchain to compile it. The instructions for that can be found on Rust's official site <a href="https://www.rust-lang.org/tools/install">here</a>.</p>
@@ -606,7 +606,7 @@ cd -
 <p>common traits and functions which are used by both v1 and v2 such as</p>
 <ul>
 <li>Trait CgroupManager, this abstracts over the underlying implementation of interacting with specific version of cgroups, and gives functions to add certain process to a certain cgroup, apply resource restrictions, get statistics of a cgroups, freeze a cgroup, remove a cgroup or get list of all processes belonging to a cgroup. v1 and v2 modules both contain a version specific cgroup manager which implements this trait, and thus either can be given to functions or structs which expects a cgroup manager, depending on which cgroups the host system uses.</li>
-<li>Apart from the trait, this also contians functions which help with reading cgroups files, and write data to a cgroup file, which are used throughout this crate.</li>
+<li>Apart from the trait, this also contains functions which help with reading cgroups files, and write data to a cgroup file, which are used throughout this crate.</li>
 <li>A function to detect which cgroup setup (v1, v2 or hybrid) is on the host system, as well as a function to get the corresponding cgroups manager.</li>
 </ul>
 </li>
@@ -643,7 +643,7 @@ cd -
 <ul>
 <li>rootfs, which is a ramfs like simple filesystem used by kernel during initialization</li>
 <li>hooks, which allow running of specified program at certain points in the container lifecycle, such as before and after creation, start etc.</li>
-<li>singals, which provide a wrapper to convert to and from signal numbers and text representation of signal names</li>
+<li>signals, which provide a wrapper to convert to and from signal numbers and text representation of signal names</li>
 <li>capabilities, which has functions related to set and reset specific capabilities, as well as to drop extra privileges
 <ul>
 <li><a href="https://blog.container-solutions.com/linux-capabilities-in-practice">Simple explanation of capabilities</a></li>
@@ -690,7 +690,7 @@ cd -
 <p>Seccomp is a linux kernel feature that allows a process a one-way transition into secure mode, where restrictions are applied to the syscalls the process can make, as well as restrictions on the file descriptors. Specifically, it can exit, sigreturn and read/write already open file descriptors. This way the process can be isolated and restricted on how it interacts with rest of the system on a kernel level.</p>
 <p>This crate does not actually implement any particular feature, but provides Rust FFI bindings for seccomp module. These are primarily generated by using rsut-bindgen on seccomp C header file, and then manually fixed where any issues were found. More information about seccomp can be found in its <a href="https://man7.org/linux/man-pages/man2/seccomp.2.html">man page</a>.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="youki-2"><a class="header" href="#youki-2">youki</a></h1>
-<p>This is the core crate that contains the youki binary itself. This provides the user interface, as well as binds the ther crates together to actually perform the work of creation and management of containers. THus this provides implementation of all the commands supported by youki.</p>
+<p>This is the core crate that contains the youki binary itself. This provides the user interface, as well as binds the other crates together to actually perform the work of creation and management of containers. THus this provides implementation of all the commands supported by youki.</p>
 <p>The simple control flow of youki can be explained as :</p>
 <p align="center">
   <img src="developer/../assets/control_flow.drawio.svg">
