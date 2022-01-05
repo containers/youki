@@ -1,5 +1,6 @@
 use crate::utils::test_inside_container;
 use anyhow::bail;
+use nix::sys::stat::SFlag;
 use oci_spec::runtime::LinuxBuilder;
 use oci_spec::runtime::{Spec, SpecBuilder};
 use std::path::PathBuf;
@@ -117,7 +118,7 @@ fn check_readonly_rel_path() -> TestResult {
             io::Result::Err(e) => {
                 let err = e.kind();
                 if let io::ErrorKind::NotFound = err {
-                    return Ok(());
+                    Ok(())
                 } else {
                     bail!("expected not found error, got {:?}", err);
                 }
@@ -162,7 +163,7 @@ fn check_readonly_symlinks() -> TestResult {
             io::Result::Err(e) => {
                 let err = e.kind();
                 if let io::ErrorKind::NotFound = err {
-                    return Ok(());
+                    Ok(())
                 } else {
                     bail!("expected not found error, got {:?}", err);
                 }
@@ -179,39 +180,26 @@ fn test_node(mode: u32) -> TestResult {
     let spec = get_spec(ro_paths);
 
     test_inside_container(spec, &|bundle| {
+        use std::os::unix::fs::OpenOptionsExt;
         use std::{fs, io};
 
         let bundle_path = bundle.as_ref();
         let test_file = bundle_path.join(&ro_device);
-        // NOTE
-        // yes, I know using unsafe willy-nilly is a bad idea,
-        // especially given that OpenOptionsExt in std::os::unix::fs does provide a method
-        // to set mode in open options, like this :
 
-        // use std::os::unix::fs::OpenOptionsExt;
-        // let mut opts = fs::OpenOptions::new();
-        // opts.mode(mode);
-        // opts.create(true);
-        // if let io::Result::Err(e) = opts.open(&test_file) {
-        //     bail!(
-        //         "could not create device node at {:?} with mode {}, got error {:?}",
-        //         test_file,
-        //         mode ^ 0o666,
-        //         e
-        //     );
-        // }
-
-        // but that gives OsErr 22, invalid arguments.
-        // That is why we directly use mknod from lib here
-
-        let _path = test_file.to_string_lossy().as_ptr() as *const i8;
-        let r = unsafe { libc::mknod(_path, mode, 0) };
-        if r != 0 {
+        let mut opts = fs::OpenOptions::new();
+        opts.mode(mode);
+        opts.create(true);
+        if let io::Result::Err(e) = fs::OpenOptions::new()
+            .mode(mode)
+            .create(true)
+            .write(true)
+            .open(&test_file)
+        {
             bail!(
-                "error in creating a device node at {:?} with mode {:?}, got return code {}",
+                "could not create device node at {:?} with mode {}, got error {:?}",
                 test_file,
-                mode,
-                r
+                mode ^ 0o666,
+                e
             );
         }
 
@@ -226,9 +214,9 @@ fn test_node(mode: u32) -> TestResult {
 
 fn check_readonly_device_nodes() -> TestResult {
     let modes = [
-        libc::S_IFBLK | 0o666,
-        libc::S_IFCHR | 0o666,
-        libc::S_IFIFO | 0o666,
+        SFlag::S_IFBLK.bits() | 0o666,
+        SFlag::S_IFCHR.bits() | 0o666,
+        SFlag::S_IFIFO.bits() | 0o666,
     ];
     for mode in modes {
         let res = test_node(mode);
@@ -244,32 +232,16 @@ pub fn get_ro_paths_test<'a>() -> TestGroup<'a> {
     let ro_paths = Test::new("readonly_paths", Box::new(check_readonly_paths));
     let ro_rel_paths = Test::new("readonly_rel_paths", Box::new(check_readonly_rel_path));
     let ro_symlinks = Test::new("readonly_symlinks", Box::new(check_readonly_symlinks));
-    // let ro_device_nodes = Test::new(
-    //     "readonly_device_nodes",
-    //     Box::new(check_readonly_device_nodes),
-    // );
-    let ro_device_nodes_blk = Test::new(
-        "readonly_device_nodes_blk",
-        Box::new(|| test_node(libc::S_IFBLK | 0o666)),
-    );
-    let ro_device_nodes_chr = Test::new(
-        "readonly_device_node_chr",
-        Box::new(|| test_node(libc::S_IFCHR | 0o666)),
-    );
-
-    let ro_device_nodes_fifo = Test::new(
-        "readonly_device_nodes_fifo",
-        Box::new(|| test_node(libc::S_IFIFO | 0o666)),
+    let ro_device_nodes = Test::new(
+        "readonly_device_nodes",
+        Box::new(check_readonly_device_nodes),
     );
     let mut tg = TestGroup::new("readonly_paths");
     tg.add(vec![
         Box::new(ro_paths),
         Box::new(ro_rel_paths),
         Box::new(ro_symlinks),
-        // Box::new(ro_device_nodes),
-        Box::new(ro_device_nodes_blk),
-        Box::new(ro_device_nodes_chr),
-        Box::new(ro_device_nodes_fifo),
+        Box::new(ro_device_nodes),
     ]);
     tg
 }

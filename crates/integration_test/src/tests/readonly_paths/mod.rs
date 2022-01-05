@@ -1,2 +1,2 @@
-mod readonly_paths;
-pub use readonly_paths::get_ro_paths_test;
+mod readonly_paths_tests;
+pub use readonly_paths_tests::get_ro_paths_test;

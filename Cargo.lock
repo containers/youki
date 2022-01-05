@@ -652,7 +652,6 @@ dependencies = [
  "clap",
  "clap_derive",
  "flate2",
- "libc",
  "libcgroups",
  "libcontainer",
  "log",
