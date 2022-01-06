@@ -1,7 +1,7 @@
 use super::{generate_uuid, prepare_bundle, set_config};
 ///! Contains utility functions for testing
 ///! Similar to https://github.com/opencontainers/runtime-tools/blob/master/validation/util/test.go
-use super::{get_runtime_path, TempDir};
+use super::{get_runtime_path, get_runtimetest_path, TempDir};
 use anyhow::{anyhow, bail, Context, Result};
 use oci_spec::runtime::Spec;
 use serde::{Deserialize, Serialize};
@@ -45,9 +45,13 @@ pub struct ContainerData {
 /// Starts the runtime with given directory as root directory
 pub fn create_container<P: AsRef<Path>>(id: &Uuid, dir: P) -> Result<Child> {
     let res = Command::new(get_runtime_path())
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        // set stdio so that we can get o/p of runtimetest
+        // in test_inside_container function
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        // set log level to error only, otherwise
+        // we get warnings in stderr
+        .env("YOUKI_LOG_LEVEL", "error")
         .arg("--root")
         .arg(dir.as_ref().join("runtime"))
         .arg("create")
@@ -105,8 +109,6 @@ pub fn get_state<P: AsRef<Path>>(id: &Uuid, dir: P) -> Result<(String, String)> 
 
 pub fn start_container<P: AsRef<Path>>(id: &Uuid, dir: P) -> Result<Child> {
     let res = Command::new(get_runtime_path())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
         .arg("--root")
         .arg(dir.as_ref().join("runtime"))
         .arg("start")
@@ -144,36 +146,59 @@ pub fn test_outside_container(
 // mostly needs a name that better expresses what this actually does
 pub fn test_inside_container(
     spec: Spec,
-    execute_test: &dyn Fn(&TempDir) -> Result<()>,
+    setup_for_test: &dyn Fn(&TempDir) -> Result<()>,
 ) -> TestResult {
     let id = generate_uuid();
     let bundle = prepare_bundle(&id).unwrap();
 
-    test_result!(execute_test(&bundle));
+    // This will do the required setup for the test
+    test_result!(setup_for_test(&bundle));
 
     set_config(&bundle, &spec).unwrap();
-    let create_result = create_container(&id, &bundle).unwrap().wait();
-    let (out, err) = get_state(&id, &bundle).unwrap();
-    let state: Option<State> = match serde_json::from_str(&out) {
-        Ok(v) => Some(v),
-        Err(_) => None,
-    };
-    let data = ContainerData {
-        id: id.to_string(),
-        state,
-        state_err: err,
-        create_result,
-    };
-    test_result!(check_container_created(&data));
-    let start_result = match start_container(&id, &bundle).unwrap().wait_with_output() {
-        std::io::Result::Ok(c) => c,
-        std::io::Result::Err(e) => return TestResult::Failed(anyhow!(e)),
+    // as we have to run runtimetest inside the container, and is expects
+    // the config.json to be at path /config.json we save it there
+    let path = bundle
+        .as_ref()
+        .join("bundle")
+        .join("rootfs")
+        .join("config.json");
+    spec.save(path).unwrap();
+
+    let runtimetest_path = get_runtimetest_path();
+    // The config will directly use runtime as the command to be run, so we have to
+    // save the runtimetest binary at its /bin
+    std::fs::copy(
+        runtimetest_path,
+        bundle
+            .as_ref()
+            .join("bundle")
+            .join("rootfs")
+            .join("bin")
+            .join("runtimetest"),
+    )
+    .unwrap();
+    let create_process = create_container(&id, &bundle).unwrap();
+    // here we do not wait for the process by calling wait() as in the test_outside_container
+    // function because we need the output of the runtimetest. If we call wait, it will return
+    // and we won't have an easy way of getting the stdio of the runtimetest.
+    // Thus to make sure the container is created, we just wait for sometime, and
+    // assume that the create command was successful. If it wasn't we can catch that error
+    // in the start_container, as we can not start a non-created container anyways
+    std::thread::sleep(std::time::Duration::from_millis(2000));
+    match start_container(&id, &bundle).unwrap().wait_with_output() {
+        Ok(c) => c,
+        Err(e) => return TestResult::Failed(anyhow!("container start failed : {:?}", e)),
     };
 
-    let stderr = String::from_utf8_lossy(&start_result.stderr);
+    let create_output = create_process
+        .wait_with_output()
+        .context("getting output after starting the container failed")
+        .unwrap();
+
+    let stderr = String::from_utf8_lossy(&create_output.stderr);
     if !stderr.is_empty() {
         return TestResult::Failed(anyhow!(
-            "container start stderr was not empty : found {}",
+            "container stderr was not empty, found : {}",
             stderr
         ));
     }
@@ -203,7 +228,7 @@ pub fn check_container_created(data: &ContainerData) -> Result<()> {
         Ok(exit_status) => {
             if !exit_status.success() {
                 bail!(
-                    "container creation was not successfull. Exit code was {:?}",
+                    "container creation was not successful. Exit code was {:?}",
                     exit_status.code()
                 )
             }

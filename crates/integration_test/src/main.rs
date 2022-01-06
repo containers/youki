@@ -7,7 +7,7 @@ use crate::tests::pidfile::get_pidfile_test;
 use crate::tests::readonly_paths::get_ro_paths_test;
 use crate::tests::seccomp_notify::get_seccomp_notify_test;
 use crate::tests::tlb::get_tlb_test;
-use crate::utils::support::set_runtime_path;
+use crate::utils::support::{set_runtime_path, set_runtimetest_path};
 use anyhow::{Context, Result};
 use clap::Parser;
 use integration_test::logger;
@@ -28,15 +28,20 @@ struct Opts {
 
 #[derive(Parser, Debug)]
 enum SubCommand {
+    /// run the integration tests
     Run(Run),
+    /// list available integration tests
     List,
 }
 
 #[derive(Parser, Debug)]
 struct Run {
     /// Path for the container runtime to be tested
-    #[clap(short, long)]
+    #[clap(long)]
     runtime: PathBuf,
+    /// Path for the runtimetest binary, which will be used to run tests inside the container
+    #[clap(long)]
+    runtimetest: PathBuf,
     /// Selected tests to be run, format should be
     /// space separated groups, eg
     /// -t group1::test1,test3 group2 group3::test5
@@ -107,19 +112,27 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn run(opts: &Run, test_manager: &TestManager) -> Result<()> {
-    match std::fs::canonicalize(&opts.runtime) {
-        // runtime path is relative or resolved correctly
-        Ok(path) => set_runtime_path(&path),
-        // runtime path is name of program which probably exists in $PATH
-        Err(_) => match which::which(&opts.runtime) {
-            Ok(path) => set_runtime_path(&path),
+fn get_abs_path(rel_path: &PathBuf) -> PathBuf {
+    match std::fs::canonicalize(rel_path) {
+        // path is relative or resolved correctly
+        Ok(path) => path,
+        // path is name of program which probably exists in $PATH
+        Err(_) => match which::which(rel_path) {
+            Ok(path) => path,
             Err(e) => {
-                eprintln!("Error in finding runtime : {}\nexiting.", e);
+                eprintln!("Error in finding path {:?} : {}\nexiting.", rel_path, e);
                 std::process::exit(66);
             }
         },
     }
+}
+
+fn run(opts: &Run, test_manager: &TestManager) -> Result<()> {
+    let runtime_path = get_abs_path(&opts.runtime);
+    set_runtime_path(&runtime_path);
+
+    let runtimetest_path = get_abs_path(&opts.runtimetest);
+    set_runtimetest_path(&runtimetest_path);
 
     if let Some(tests) = &opts.tests {
         let tests_to_run = parse_tests(tests);

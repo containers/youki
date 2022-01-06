@@ -2,7 +2,7 @@ use crate::utils::test_inside_container;
 use anyhow::bail;
 use nix::sys::stat::SFlag;
 use oci_spec::runtime::LinuxBuilder;
-use oci_spec::runtime::{Spec, SpecBuilder};
+use oci_spec::runtime::{ProcessBuilder, Spec, SpecBuilder};
 use std::path::PathBuf;
 use test_framework::{Test, TestGroup, TestResult};
 
@@ -13,6 +13,12 @@ fn get_spec(readonly_paths: Vec<String>) -> Spec {
                 .readonly_paths(readonly_paths)
                 .build()
                 .expect("could not build"),
+        )
+        .process(
+            ProcessBuilder::default()
+                .args(vec!["runtimetest".to_string()])
+                .build()
+                .unwrap(),
         )
         .build()
         .unwrap()
