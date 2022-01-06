@@ -1,6 +1,6 @@
 # Runtime test
 
-This is the binary which runs the tests inside the container process, and checks that constraints and restrictions are upheld from inside the container.
+This is the binary which runs the tests inside the container process, and checks that constraints and restrictions are upheld from inside the container. This is supposed to be rust version of [runtimetest command](https://github.com/opencontainers/runtime-tools/tree/master/cmd/runtimetest) from runtime tools.
 
 This is primarily used from the `test_inside_container` function related tests in the integration tests.
 

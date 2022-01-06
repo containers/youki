@@ -56,9 +56,8 @@ fn check_readonly_paths() -> TestResult {
     ];
 
     let spec = get_spec(ro_paths);
-    test_inside_container(spec, &|bundle| {
+    test_inside_container(spec, &|bundle_path| {
         use std::{fs, io};
-        let bundle_path = bundle.as_ref();
         let test_dir = bundle_path.join(&ro_dir_sub);
 
         match fs::create_dir_all(&test_dir) {
@@ -108,9 +107,8 @@ fn check_readonly_rel_path() -> TestResult {
     let ro_paths = vec![ro_rel_path.to_string()];
     let spec = get_spec(ro_paths);
 
-    test_inside_container(spec, &|bundle| {
+    test_inside_container(spec, &|bundle_path| {
         use std::{fs, io};
-        let bundle_path = bundle.as_ref();
         let test_file = bundle_path.join(ro_rel_path);
 
         match fs::metadata(&test_file) {
@@ -140,9 +138,8 @@ fn check_readonly_symlinks() -> TestResult {
 
     let spec = get_spec(ro_paths);
 
-    test_inside_container(spec, &|bundle| {
+    test_inside_container(spec, &|bundle_path| {
         use std::{fs, io};
-        let bundle_path = bundle.as_ref();
         let test_file = bundle_path.join(ro_symlink);
 
         match std::os::unix::fs::symlink("../readonly_symlink", &test_file) {
@@ -185,11 +182,9 @@ fn test_node(mode: u32) -> TestResult {
 
     let spec = get_spec(ro_paths);
 
-    test_inside_container(spec, &|bundle| {
+    test_inside_container(spec, &|bundle_path| {
         use std::os::unix::fs::OpenOptionsExt;
         use std::{fs, io};
-
-        let bundle_path = bundle.as_ref();
         let test_file = bundle_path.join(&ro_device);
 
         let mut opts = fs::OpenOptions::new();

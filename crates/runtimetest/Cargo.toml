@@ -6,3 +6,5 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+oci-spec = { git = "https://github.com/containers/oci-spec-rs", rev = "54c5e386f01ab37c9305cc4a83404eb157e42440" }
+nix = "0.23.1"
