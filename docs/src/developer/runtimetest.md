@@ -6,7 +6,14 @@ This crate provides a binary which is used by integration tests to verify that t
 
 This binary must be compiled with the option of static linking to crt0 given to the rustc. If compiled without it, it will add a linking to /lib64/ld-linux-x86-64.so . The binary compiled this way cannot be run inside the container process, as they do not have access to /lib64/... Thus the runtime test must be statically linked to crt0.
 
-Also this option can be given through .cargo/config.toml rustflags option, but this works only if the cargo build is invoked within the runtimetest directory. If invoked from the project root, the .cargo/config in the project root will take preference and the rustflags will be ignored.
+While developing, originally this was added to the common workspace of all crates in youki. But then it was realized that this was quite inefficient because :
+
+- All packages except runtimetest will be compiled with dynamic linking
+- Runtimetest will be compiled with static linking
+
+Now runtimetest needs at least `oci-spec` and `nix` package for its operations, which are also dependencies of other packages in the workspace. Thus both of these, and recursively their dependencies must be compiled twice, each time, once for dynamic linking and once for static. The took a long time in the compilation stage, especially when developing / adding new tests. Separating runtimetest from the workspace allows it to have a separate target/ directory, where it can store the statically compiled dependencies, and the workspace can have its target/ directory, where it can store its dynamically compiled dependencies. That way only the crates which have changes need to be compiled (runtimetest or integration test), and not their dependencies.
+
+In case in future this separation is not required, or some other configuration is chosen, make sure the multiple compilation issue does not arise, or the advantages of new method outweigh the time spent in double compilation.
 
 To see if a binary can be run inside the container process, run
 

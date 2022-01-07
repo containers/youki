@@ -3,7 +3,7 @@ cd ../../
 ./build.sh --release
 cp ./youki ./crates/integration_test/youki
 cp ./youki_integration_test ./crates/integration_test/youki_integration_test
-cp ./runtimetest ./crates/integration_test/runtimetest
+cp ./runtimetest_tool ./crates/integration_test/runtimetest
 cd ./crates/integration_test
 
 RUNTIME=./youki

@@ -19,8 +19,6 @@ This package must be compiled as a statically linked binary, as otherwise the ru
 
 **Note** that the dynamically linked binary does not give a `segmentation fault` or similar error when tried to run inside the container, but instead gives `no such file or directory found` or `executable not found` error, even though the executable exists in the container. This made this tricky to debug correctly when originally developing, so if you decide on chaing the compilation or configuration of this , please make absolutely sure that the changes work and do not accidentally break something.
 
-**Another Note** is that `cargo build` must be run from inside this directory only to make the binary be a statically linked binary. This is due to the fact that to make it statically linked, appropriate rustflags must be set in the .cargo/config.toml . But in case of a workspace, as like this, when run `cargo build` from project root, it ignores crate specific config, and only checks the project root .cargo/config , which currently does not allow setting rustflags for specific crate, which means either all binaries must be statically linked, or none can be. Thus currently the only way is to run the build command inside this directory.
-
 you can use
 
 ```bash
