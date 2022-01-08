@@ -4,7 +4,7 @@ mod utils;
 use oci_spec::runtime::Spec;
 use std::path::PathBuf;
 
-const SPEC_PATH: &'static str = "/config.json";
+const SPEC_PATH: &str = "/config.json";
 
 fn get_spec() -> Spec {
     let path = PathBuf::from(SPEC_PATH);

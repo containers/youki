@@ -1,5 +1,5 @@
 use crate::utils::test_inside_container;
-use anyhow::bail;
+use anyhow::{anyhow, bail};
 use nix::sys::stat::SFlag;
 use oci_spec::runtime::LinuxBuilder;
 use oci_spec::runtime::{ProcessBuilder, Spec, SpecBuilder};
@@ -138,7 +138,7 @@ fn check_readonly_symlinks() -> TestResult {
 
     let spec = get_spec(ro_paths);
 
-    test_inside_container(spec, &|bundle_path| {
+    let res = test_inside_container(spec, &|bundle_path| {
         use std::{fs, io};
         let test_file = bundle_path.join(ro_symlink);
 
@@ -172,7 +172,14 @@ fn check_readonly_symlinks() -> TestResult {
                 }
             }
         }
-    })
+    });
+    if let TestResult::Passed = res {
+        TestResult::Failed(anyhow!(
+            "expected error in container creation with invalid symlink, found no error"
+        ))
+    } else {
+        TestResult::Passed
+    }
 }
 
 fn test_node(mode: u32) -> TestResult {

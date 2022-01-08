@@ -109,6 +109,8 @@ pub fn get_state<P: AsRef<Path>>(id: &Uuid, dir: P) -> Result<(String, String)> 
 
 pub fn start_container<P: AsRef<Path>>(id: &Uuid, dir: P) -> Result<Child> {
     let res = Command::new(get_runtime_path())
+        .stderr(Stdio::piped())
+        .stdout(Stdio::piped())
         .arg("--root")
         .arg(dir.as_ref().join("runtime"))
         .arg("start")
@@ -187,7 +189,7 @@ pub fn test_inside_container(
     // Thus to make sure the container is created, we just wait for sometime, and
     // assume that the create command was successful. If it wasn't we can catch that error
     // in the start_container, as we can not start a non-created container anyways
-    std::thread::sleep(std::time::Duration::from_millis(2000));
+    std::thread::sleep(std::time::Duration::from_millis(1000));
     match start_container(&id, &bundle).unwrap().wait_with_output() {
         Ok(c) => c,
         Err(e) => return TestResult::Failed(anyhow!("container start failed : {:?}", e)),

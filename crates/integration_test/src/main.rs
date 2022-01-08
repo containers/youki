@@ -11,7 +11,7 @@ use crate::utils::support::{set_runtime_path, set_runtimetest_path};
 use anyhow::{Context, Result};
 use clap::Parser;
 use integration_test::logger;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use test_framework::TestManager;
 use tests::cgroups;
 
@@ -112,7 +112,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn get_abs_path(rel_path: &PathBuf) -> PathBuf {
+fn get_abs_path(rel_path: &Path) -> PathBuf {
     match std::fs::canonicalize(rel_path) {
         // path is relative or resolved correctly
         Ok(path) => path,

@@ -1,4 +1,5 @@
-use crate::utils::{test_read_access, test_write_access, AccessibilityStatus};
+use crate::utils::{test_read_access, test_write_access};
+use nix::errno::Errno;
 use oci_spec::runtime::Spec;
 
 pub fn validate_readonly_paths(spec: &Spec) {
@@ -14,43 +15,47 @@ pub fn validate_readonly_paths(spec: &Spec) {
         eprintln!("in readonly paths, expected some readonly paths to be set, found none");
         return;
     }
+    // TODO when https://github.com/rust-lang/rust/issues/86442 stabilizes,
+    // change manual matching of i32 to e.kind() and match statement
 
     for path in ro_paths {
-        match test_read_access(path) {
-            std::io::Result::Err(e) => {
+        if let std::io::Result::Err(e) = test_read_access(path) {
+            let errno = Errno::from_i32(e.raw_os_error().unwrap());
+            // In the integration tests we test for both existing and non-existing readonly paths
+            // to be specified in the spec, so we allow ENOENT here
+            if errno == Errno::ENOENT {
+                /* This is expected */
+            } else {
                 eprintln!(
                     "in readonly paths, error in testing read access for path {} : {:?}",
                     path, e
                 );
                 return;
             }
-            Ok(readability) => {
-                match readability {
-                    AccessibilityStatus::Accessible => { /* This is expected */ }
-                    AccessibilityStatus::Blocked => {
-                        eprintln!("in readonly paths, path {} expected to be readable, found non readable",path);
-                        return;
-                    }
-                }
-            }
+        } else {
+            /* Expected */
         }
-        match test_write_access(path) {
-            std::io::Result::Err(e) => {
+
+        if let std::io::Result::Err(e) = test_write_access(path) {
+            let errno = Errno::from_i32(e.raw_os_error().unwrap());
+            // In the integration tests we test for both existing and non-existing readonly paths
+            // being specified in the spec, so we allow ENOENT, and we expect EROFS as the paths
+            // should be read-only
+            if errno == Errno::ENOENT || errno == Errno::EROFS {
+                /* This is expected */
+            } else {
                 eprintln!(
                     "in readonly paths, error in testing write access for path {} : {:?}",
                     path, e
                 );
                 return;
             }
-            Ok(readability) => {
-                match readability {
-                    AccessibilityStatus::Accessible => {
-                        eprintln!("in readonly paths, path {} expected to not be writable, found writable",path);
-                        return;
-                    }
-                    AccessibilityStatus::Blocked => { /* This is expected */ }
-                }
-            }
+        } else {
+            eprintln!(
+                "in readonly paths, path {} expected to not be writable, found writable",
+                path
+            );
+            return;
         }
     }
 }
