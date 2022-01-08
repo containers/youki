@@ -1,6 +1,6 @@
-use super::{generate_uuid, prepare_bundle, set_config};
 ///! Contains utility functions for testing
 ///! Similar to https://github.com/opencontainers/runtime-tools/blob/master/validation/util/test.go
+use super::{generate_uuid, prepare_bundle, set_config};
 use super::{get_runtime_path, get_runtimetest_path};
 use anyhow::{anyhow, bail, Context, Result};
 use oci_spec::runtime::Spec;
@@ -157,7 +157,6 @@ pub fn test_inside_container(
     test_result!(setup_for_test(
         &bundle.as_ref().join("bundle").join("rootfs")
     ));
-    // std::thread::sleep_ms(50000);
 
     set_config(&bundle, &spec).unwrap();
     // as we have to run runtimetest inside the container, and is expects
