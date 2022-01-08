@@ -12,6 +12,7 @@ RUNTIME=./youki
 # test.sh build
 # test.sh run
 # test.sh run runtime-name
+# test.sh runtime-name
 
 if [[ "$1" = "build" ]]; then
     exit 0
@@ -21,14 +22,14 @@ fi
 # else the consider first argument as runtime name
 if [[ -n "$2" ]]; then
     RUNTIME="$2"
-elif [[-n "$1" ]]
+elif [[ -n "$1" ]]; then
     RUNTIME="$1"
 fi
 
 
 logfile="./test_log.log"
 touch $logfile
-sudo ./youki_integration_test run --runtime $RUNTIME --runtimetest ./runtimetest > $logfile
+sudo ./youki_integration_test run --runtime "$RUNTIME" --runtimetest "./runtimetest" > $logfile
 if [ 0 -ne $(grep "not ok" $logfile | wc -l ) ]; then
     cat $logfile
     exit 1

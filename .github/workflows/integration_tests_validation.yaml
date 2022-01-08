@@ -18,6 +18,7 @@ jobs:
         with:
           filters: |
             ./integration_test: crates/integration_test/**
+            ./runtimetest : runtimetest/**
   validate:
     needs: [changes]
     if: ${{ !contains(needs.changes.outputs.dirs, '[]') }}

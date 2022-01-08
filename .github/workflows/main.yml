@@ -21,7 +21,8 @@ jobs:
             ./crates/libcontainer: crates/libcontainer/**
             ./crates/libcgroups: crates/libcgroups/**
             ./crates/libseccomp: crates/libseccomp/**
-            ./crates/integration_test: crates/integration_test/**        
+            ./crates/integration_test: crates/integration_test/**
+            ./runtimetest : runtimetest/**        
   check:
     needs: [changes]
     if: ${{ !contains(needs.changes.outputs.dirs, '[]') }}
