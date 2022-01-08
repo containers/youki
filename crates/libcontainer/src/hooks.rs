@@ -7,7 +7,7 @@ use std::{
 };
 
 use crate::{container::Container, utils};
-// A special error used to signal a timeout. We want to differenciate between a
+// A special error used to signal a timeout. We want to differentiate between a
 // timeout vs. other error.
 #[derive(Debug)]
 pub struct HookTimeoutError;
@@ -28,7 +28,7 @@ pub fn run_hooks(hooks: Option<&Vec<Hook>>, container: Option<&Container>) -> Re
     if let Some(hooks) = hooks {
         for hook in hooks {
             let mut hook_command = process::Command::new(&hook.path());
-            // Based on OCI spec, the first arguement of the args vector is the
+            // Based on OCI spec, the first argument of the args vector is the
             // arg0, which can be different from the path.  For example, path
             // may be "/usr/bin/true" and arg0 is set to "true". However, rust
             // command differenciates arg0 from args, where rust command arg

@@ -26,7 +26,7 @@ const BLKIO_THROTTLE_WRITE_IOPS: &str = "blkio.throttle.write_iops_device";
 // Number of I/O operations performed on a device by the cgroup
 // Format: Major:Minor Type Ops
 const BLKIO_THROTTLE_IO_SERVICED: &str = "blkio.throttle.io_serviced";
-// Number of bytes transfered to/from a device by the cgroup
+// Number of bytes transferred to/from a device by the cgroup
 // Format: Major:Minor Type Bytes
 const BLKIO_THROTTLE_IO_SERVICE_BYTES: &str = "blkio.throttle.io_service_bytes";
 
@@ -54,7 +54,7 @@ const BLKIO_TIME: &str = "blkio.time_recursive";
 // Number of sectors transferred to/from a device by the cgroup
 // Format: Major:Minor Sectors
 const BLKIO_SECTORS: &str = "blkio.sectors_recursive";
-// Number of bytes transfered to/from a device by the cgroup
+// Number of bytes transferred to/from a device by the cgroup
 /// Format: Major:Minor Type Bytes
 const BLKIO_IO_SERVICE_BYTES: &str = "blkio.io_service_bytes_recursive";
 // Number of I/O operations performed on a device by the cgroup

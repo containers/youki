@@ -544,7 +544,7 @@ mod tests {
         struct Testcase {
             name: String,
             input: LinuxCapabilities,
-            // be awared of that calling sequence in the drop_privileges function
+            // be aware that the calling sequence in the drop_privileges function
             // will affect the output sequence from test_command.get_set_capability_args()
             want: Vec<(CapSet, Vec<SpecCapability>)>,
         }
@@ -639,7 +639,7 @@ mod tests {
 
             for (i, want) in test.want.iter().enumerate().take(test.want.len()) {
                 // because CapSet has no Eq, PartialEq attributes,
-                // so using String to do the comparsion.
+                // so using String to do the comparison.
                 let want_cap_set = format!("{:?}", want.0);
                 let got_cap_set = format!("{:?}", got[i].0);
                 let want_caps = &want.1;

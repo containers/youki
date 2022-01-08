@@ -106,7 +106,7 @@ pub struct PidStats {
 /// Reports block io stats for a cgroup
 #[derive(Debug, Default, PartialEq, Eq, Serialize)]
 pub struct BlkioStats {
-    // Number of bytes transfered to/from a device by the cgroup
+    // Number of bytes transferred to/from a device by the cgroup
     pub service_bytes: Vec<BlkioDeviceStat>,
     // Number of I/O operations performed on a device by the cgroup
     pub serviced: Vec<BlkioDeviceStat>,

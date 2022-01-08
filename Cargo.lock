@@ -407,9 +407,9 @@ dependencies = [
 
 [[package]]
 name = "fixedbitset"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "398ea4fabe40b9b0d885340a2a991a44c8a645624075ad966d21f88688e2b69e"
+checksum = "279fb028e20b3c4c320317955b77c5e0c9701f05a1d309905d6fc702cdc5053e"
 
 [[package]]
 name = "flate2"
@@ -657,7 +657,7 @@ dependencies = [
  "log",
  "nix",
  "num_cpus",
- "oci-spec 0.5.2 (git+https://github.com/containers/oci-spec-rs?rev=54c5e386f01ab37c9305cc4a83404eb157e42440)",
+ "oci-spec 0.5.2",
  "once_cell",
  "pnet",
  "procfs",
@@ -702,9 +702,9 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libbpf-sys"
-version = "0.6.0-1"
+version = "0.6.1-1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2cd400737426f2a92b5b41071a0a63c9b493b7c67ff3e428967fded73af0668"
+checksum = "1b1cbfb63e05a1ddea29411862a04f70824e8f37a6514ebcd338fb3a8c4d44a2"
 dependencies = [
  "cc",
  "pkg-config",
@@ -730,7 +730,7 @@ dependencies = [
  "libc",
  "log",
  "nix",
- "oci-spec 0.5.2 (git+https://github.com/containers/oci-spec-rs?rev=12dcd858543db0e7bfb1ef053d1b748f2fda74ee)",
+ "oci-spec 0.5.3",
  "procfs",
  "quickcheck",
  "rbpf",
@@ -755,7 +755,7 @@ dependencies = [
  "log",
  "mio",
  "nix",
- "oci-spec 0.5.2 (git+https://github.com/containers/oci-spec-rs?rev=12dcd858543db0e7bfb1ef053d1b748f2fda74ee)",
+ "oci-spec 0.5.3",
  "path-clean",
  "prctl",
  "procfs",
@@ -938,11 +938,10 @@ dependencies = [
 [[package]]
 name = "oci-spec"
 version = "0.5.2"
-source = "git+https://github.com/containers/oci-spec-rs?rev=12dcd858543db0e7bfb1ef053d1b748f2fda74ee#12dcd858543db0e7bfb1ef053d1b748f2fda74ee"
+source = "git+https://github.com/containers/oci-spec-rs?rev=54c5e386f01ab37c9305cc4a83404eb157e42440#54c5e386f01ab37c9305cc4a83404eb157e42440"
 dependencies = [
  "derive_builder",
  "getset",
- "quickcheck",
  "serde",
  "serde_json",
  "thiserror",
@@ -950,11 +949,13 @@ dependencies = [
 
 [[package]]
 name = "oci-spec"
-version = "0.5.2"
-source = "git+https://github.com/containers/oci-spec-rs?rev=54c5e386f01ab37c9305cc4a83404eb157e42440#54c5e386f01ab37c9305cc4a83404eb157e42440"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8057bb0f33d7ecdf1f0f7cc74ea5cced7c6c694245e2a8d14700507c3bde32e3"
 dependencies = [
  "derive_builder",
  "getset",
+ "quickcheck",
  "serde",
  "serde_json",
  "thiserror",
@@ -1024,9 +1025,9 @@ checksum = "d4fd5641d01c8f18a23da7b6fe29298ff4b55afcccdf78973b24cf3175fee32e"
 
 [[package]]
 name = "pin-project-lite"
-version = "0.2.7"
+version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d31d11c69a6b52a174b42bdc0c30e5e11670f90788b2c471c31c1d17d449443"
+checksum = "e280fbe77cc62c91527259e9442153f4688736748d24660126286329742b4c6c"
 
 [[package]]
 name = "pin-utils"
@@ -1325,18 +1326,18 @@ checksum = "568a8e6258aa33c13358f81fd834adb854c6f7c9468520910a9b1e8fac068012"
 
 [[package]]
 name = "serde"
-version = "1.0.132"
+version = "1.0.133"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b9875c23cf305cd1fd7eb77234cbb705f21ea6a72c637a5c6db5fe4b8e7f008"
+checksum = "97565067517b60e2d1ea8b268e59ce036de907ac523ad83a0475da04e818989a"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.132"
+version = "1.0.133"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ecc0db5cb2556c0e558887d9bbdcf6ac4471e83ff66cf696e5419024d1606276"
+checksum = "ed201699328568d8d08208fdd080e3ff594e6c422e438b6705905da01005d537"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1345,9 +1346,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.73"
+version = "1.0.74"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bcbd0344bc6533bc7ec56df11d42fb70f1b912351c0825ccb7211b59d8af7cf5"
+checksum = "ee2bb9cd061c5865d345bb02ca49fcef1391741b672b54a0bf7b679badec3142"
 dependencies = [
  "itoa",
  "ryu",
@@ -1396,9 +1397,9 @@ checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
 name = "syn"
-version = "1.0.84"
+version = "1.0.85"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ecb2e6da8ee5eb9a61068762a32fa9619cc591ceb055b3687f4cd4051ec2e06b"
+checksum = "a684ac3dcd8913827e18cd09a68384ee66c1de24157e3c556c9ab16d85695fb7"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1671,7 +1672,7 @@ dependencies = [
  "liboci-cli",
  "log",
  "nix",
- "oci-spec 0.5.2 (git+https://github.com/containers/oci-spec-rs?rev=12dcd858543db0e7bfb1ef053d1b748f2fda74ee)",
+ "oci-spec 0.5.3",
  "once_cell",
  "pentacle",
  "procfs",

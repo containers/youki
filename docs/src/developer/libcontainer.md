@@ -16,7 +16,7 @@ This crate also provides an interface for Apparmor which is another Linux Kernel
 
 - rootfs, which is a ramfs like simple filesystem used by kernel during initialization
 - hooks, which allow running of specified program at certain points in the container lifecycle, such as before and after creation, start etc.
-- singals, which provide a wrapper to convert to and from signal numbers and text representation of signal names
+- signals, which provide a wrapper to convert to and from signal numbers and text representation of signal names
 - capabilities, which has functions related to set and reset specific capabilities, as well as to drop extra privileges
   - [Simple explanation of capabilities](https://blog.container-solutions.com/linux-capabilities-in-practice)
   - [man page for capabilities](https://man7.org/linux/man-pages/man7/capabilities.7.html)
