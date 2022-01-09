@@ -4,10 +4,10 @@ This provides a test suite to test low level OCI spec compliant container runtim
 
 ## Usage
 
-```sh
+```console
 # in root folder
 $ ./build.sh
-$ cd youki_integration_test
+$ cd crates/youki_integration_test
 $ cp ../youki .
 $ ./build.sh
 # currently root access is required
