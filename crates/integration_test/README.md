@@ -46,7 +46,8 @@ This framework also has some test utils, meant to help doing common operations i
 - kill_container: runs the runtime command with kill argument, with given id and with given bundle directory
 - delete_container : runs the runtime command with delete argument, with given id and with given bundle directory
 - get_state : runs the runtime command with state argument, with given id and with given bundle directory
-- test_outside_container : this is meant to mimic [validateOutsideContainer](https://github.com/opencontainers/runtime-tools/blob/59cdde06764be8d761db120664020f0415f36045/validation/util/test.go#L263) function of original tests.
+- test_outside_container : this is meant to mimic [RuntimeOutsideValidate](https://github.com/opencontainers/runtime-tools/blob/59cdde06764be8d761db120664020f0415f36045/validation/util/test.go#L263) function of original tests.
+- test_inside_container : this is meant to mimic [RuntimeInsideValidate](https://github.com/opencontainers/runtime-tools/blob/59cdde06764be8d761db120664020f0415f36045/validation/util/test.go#L180) function of original tests.
 - check_container_created: this checks if the container was created successfully.
 - test_result!: this is a macro, that allows you to convert from a Result<T,E> to a TestResult
 
@@ -73,25 +74,6 @@ Usually the test creation workflow will be something like :
 
 This lists some of the things that can be tricky, and can cause issues in running tests. **In case you encounter something, please update this list**.
 
-- The create command should always have its stdout and stderror as null, and should always be waited by `wait`, and not `wait_with_output` on it after spawning. The reason is, runtime process forks itself to create the container, and then keeps running to start, get state etc for the container. Thus if we try to `wait_with_output` on it, it hangs until that process keeps running. Trying to kill tests by `Ctrl+C` will cause the system to stay in modified state (/tmp directories, cgroup directories etc). In case you do this and need to end tests, open a new terminal and send a kill signal to the runtime process, that way it will exit and tests will continue.
+- The create command should be waited by `wait`, and not `wait_with_output` on it after spawning if you are simply creating the container. The reason is, runtime process forks itself to create the container, and then keeps running to start the container. Thus if we try to `wait_with_output` on it, without having called `start` on it, it hangs. Trying to kill tests by `Ctrl+C` will cause the system to stay in modified state (/tmp directories, cgroup directories etc). In case you do this and need to end tests, open a new terminal and send a kill signal to the runtime process, that way that youki process will exit and the tests will continue.
 
 - The kill and state commands take time. Thus whenever running these, call `wait` or `wait_with_output` on the spawned process to make sure you do not accidentally modify the directories that these use. One example is when running tests, as temp directory deletes itself when dropped, it can cause a race condition when state, or kill command is spawned and not waited. This will cause the directory in /tmp to be deleted first in the drop, and then to get created again due to kill / state command. _In the start of this implementation this problem caused several days to be spent on debugging where the directory in /tmp is getting created from_.
-
-## Test list
-
-Update when adding a new test.
-Currently, there are the following test groups and tests:
-
-- lifecycle
-  - create
-  - start
-  - kill
-  - state
-  - delete
-- create
-  - empty_id
-  - valid_id
-  - duplicate_id
-- huge_tlb
-  - invalid_tlb
-  - valid_tlb
