@@ -7,7 +7,7 @@ use std::{
 
 use anyhow::{anyhow, bail, Context, Result};
 use dbus::arg::RefArg;
-use nix::unistd::Pid;
+use nix::{unistd::Pid, NixPath};
 use std::path::{Path, PathBuf};
 
 use super::{
@@ -65,41 +65,49 @@ impl TryFrom<&Path> for CgroupsPath {
     type Error = anyhow::Error;
 
     fn try_from(cgroups_path: &Path) -> Result<Self, Self::Error> {
-        // cgroups path may never be empty as it is defaulted to `/youki`
-        // see 'get_cgroup_path' under utils.rs.
         // if cgroups_path was provided it should be of the form [slice]:[prefix]:[name],
         // for example: "system.slice:docker:1234".
-        let mut parent = "";
-        let prefix;
-        let name;
-        if cgroups_path.starts_with("/youki") {
-            prefix = "youki";
-            name = cgroups_path
-                .strip_prefix("/youki/")?
-                .to_str()
-                .ok_or_else(|| anyhow!("failed to parse cgroups path {:?}", cgroups_path))?;
-        } else {
-            let parts = cgroups_path
-                .to_str()
-                .ok_or_else(|| anyhow!("failed to parse cgroups path {:?}", cgroups_path))?
-                .split(':')
-                .collect::<Vec<&str>>();
-            parent = parts[0];
-            prefix = parts[1];
-            name = parts[2];
+        if cgroups_path.len() == 0 {
+            bail!("no cgroups path has been provided");
         }
 
-        Ok(CgroupsPath {
-            parent: parent.to_owned(),
-            prefix: prefix.to_owned(),
-            name: name.to_owned(),
-        })
+        let parts = cgroups_path
+            .to_str()
+            .ok_or_else(|| anyhow!("failed to parse cgroups path {:?}", cgroups_path))?
+            .split(':')
+            .collect::<Vec<&str>>();
+
+        let destructured_path = match parts.len() {
+            2 => CgroupsPath {
+                parent: "".to_owned(),
+                prefix: parts[0].to_owned(),
+                name: parts[1].to_owned(),
+            },
+            3 => CgroupsPath {
+                parent: parts[0].to_owned(),
+                prefix: parts[1].to_owned(),
+                name: parts[2].to_owned(),
+            },
+            _ => bail!("cgroup path {:?} is invalid", cgroups_path),
+        };
+
+        Ok(destructured_path)
     }
 }
 
 impl Display for CgroupsPath {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}:{}:{}", self.parent, self.prefix, self.name)
+    }
+}
+
+/// ensures that a parent unit for the current unit is specified
+fn ensure_parent_unit(cgroups_path: &mut CgroupsPath, use_system: bool) {
+    if cgroups_path.parent.is_empty() {
+        cgroups_path.parent = match use_system {
+            true => "system.slice".to_owned(),
+            false => "user.slice".to_owned(),
+        }
     }
 }
 
@@ -125,10 +133,12 @@ impl Manager {
         container_name: String,
         use_system: bool,
     ) -> Result<Self> {
-        let destructured_path = cgroups_path
+        let mut destructured_path = cgroups_path
             .as_path()
             .try_into()
             .with_context(|| format!("failed to destructure cgroups path {:?}", cgroups_path))?;
+        ensure_parent_unit(&mut destructured_path, use_system);
+
         let client = match use_system {
             true => Client::new_system().context("failed to create system dbus client")?,
             false => Client::new_session().context("failed to create session dbus client")?,
@@ -170,17 +180,10 @@ impl Manager {
         cgroups_path: &CgroupsPath,
         client: &dyn SystemdClient,
     ) -> Result<(PathBuf, PathBuf)> {
-        let mut parent = match client.is_system() {
-            true => PathBuf::from("/system.slice"),
-            false => PathBuf::from("/user.slice"),
-        };
-
         // if the user provided a '.slice' (as in a branch of a tree)
         // we need to convert it to a filesystem path.
-        if !cgroups_path.parent.is_empty() {
-            parent = Self::expand_slice(&cgroups_path.parent)?;
-        }
 
+        let parent = Self::expand_slice(&cgroups_path.parent)?;
         let systemd_root = client.control_cgroup_root()?;
         let unit_name = Self::get_unit_name(cgroups_path);
 
@@ -472,10 +475,11 @@ mod tests {
     }
 
     #[test]
-    fn get_cgroups_path_works_with_scope() -> Result<()> {
-        let cgroups_path = Path::new(":docker:foo")
+    fn get_cgroups_path_works_without_parent() -> Result<()> {
+        let mut cgroups_path = Path::new(":docker:foo")
             .try_into()
             .context("construct path")?;
+        ensure_parent_unit(&mut cgroups_path, true);
 
         assert_eq!(
             Manager::construct_cgroups_path(&cgroups_path, &TestSystemdClient {})?.0,
