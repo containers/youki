@@ -52,7 +52,7 @@ impl Manager {
     fn create_unified_cgroup(&self, pid: Pid) -> Result<()> {
         let controllers: Vec<String> = util::get_available_controllers(&self.root_path)?
             .iter()
-            .map(|c| format!("{}{}", "+", c.to_string()))
+            .map(|c| format!("{}{}", "+", c))
             .collect();
 
         Self::write_controllers(&self.root_path, &controllers)?;
