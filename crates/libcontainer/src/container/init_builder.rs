@@ -106,7 +106,8 @@ impl<'a> InitContainerBuilder<'a> {
         let mut spec = Spec::load(&source_spec_path)?;
         Self::validate_spec(&spec).context("failed to validate runtime spec")?;
 
-        spec.canonicalize_rootfs(&self.bundle)?;
+        spec.canonicalize_rootfs(&self.bundle)
+            .context("failed to canonicalize rootfs")?;
         Ok(spec)
     }
 
