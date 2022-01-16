@@ -11,6 +11,7 @@ use tar::Archive;
 use uuid::Uuid;
 
 static RUNTIME_PATH: OnceCell<PathBuf> = OnceCell::new();
+static RUNTIMETEST_PATH: OnceCell<PathBuf> = OnceCell::new();
 
 pub fn set_runtime_path(path: &Path) {
     RUNTIME_PATH.set(path.to_owned()).unwrap();
@@ -18,6 +19,14 @@ pub fn set_runtime_path(path: &Path) {
 
 pub fn get_runtime_path() -> &'static PathBuf {
     RUNTIME_PATH.get().expect("Runtime path is not set")
+}
+
+pub fn set_runtimetest_path(path: &Path) {
+    RUNTIMETEST_PATH.set(path.to_owned()).unwrap();
+}
+
+pub fn get_runtimetest_path() -> &'static PathBuf {
+    RUNTIMETEST_PATH.get().expect("Runtimetest path is not set")
 }
 
 #[allow(dead_code)]

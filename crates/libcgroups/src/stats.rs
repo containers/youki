@@ -481,7 +481,7 @@ mod tests {
 
     #[test]
     fn test_parse_space_separated_as_nested_keyed_data() {
-        let tmp = create_temp_dir("test_parse_newline_separated_as_nested_keyed_data").unwrap();
+        let tmp = create_temp_dir("test_parse_space_separated_as_nested_keyed_data").unwrap();
         let file_content = ["key1", "key2", "key3", "key4"].join(" ");
         let file_path = set_fixture(&tmp, "space_separated", &file_content).unwrap();
 
@@ -501,7 +501,7 @@ mod tests {
 
     #[test]
     fn test_parse_flat_keyed_as_nested_keyed_data() {
-        let tmp = create_temp_dir("test_parse_newline_separated_as_nested_keyed_data").unwrap();
+        let tmp = create_temp_dir("test_parse_flat_keyed_as_nested_keyed_data").unwrap();
         let file_content = ["key1 1", "key2 2", "key3 3"].join("\n");
         let file_path = set_fixture(&tmp, "newline_separated", &file_content).unwrap();
 

@@ -1,0 +1,14 @@
+[package]
+name = "runtimetest"
+version = "0.0.1"
+edition = "2021"
+
+# This package is not part of any workspace, so we specify it so
+[workspace]
+members = []
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+oci-spec = "0.5.3"
+nix = "0.23.1"

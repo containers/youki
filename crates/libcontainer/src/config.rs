@@ -22,7 +22,7 @@ pub struct YoukiConfig {
 }
 
 impl<'a> YoukiConfig {
-    pub fn from_spec(spec: &'a Spec, container_id: &str) -> Result<Self> {
+    pub fn from_spec(spec: &'a Spec, container_id: &str, rootless: bool) -> Result<Self> {
         Ok(YoukiConfig {
             hooks: spec.hooks().clone(),
             cgroup_path: utils::get_cgroup_path(
@@ -31,6 +31,7 @@ impl<'a> YoukiConfig {
                     .context("no linux in spec")?
                     .cgroups_path(),
                 container_id,
+                rootless,
             ),
         })
     }
@@ -61,7 +62,7 @@ mod tests {
     fn test_config_from_spec() -> Result<()> {
         let container_id = "sample";
         let spec = Spec::default();
-        let config = YoukiConfig::from_spec(&spec, container_id)?;
+        let config = YoukiConfig::from_spec(&spec, container_id, false)?;
         assert_eq!(&config.hooks, spec.hooks());
         dbg!(&config.cgroup_path);
         assert_eq!(config.cgroup_path, PathBuf::from(container_id));
@@ -73,7 +74,7 @@ mod tests {
         let container_id = "sample";
         let tmp = create_temp_dir("test_config_save_and_load").expect("create test directory");
         let spec = Spec::default();
-        let config = YoukiConfig::from_spec(&spec, container_id)?;
+        let config = YoukiConfig::from_spec(&spec, container_id, false)?;
         config.save(&tmp)?;
         let act = YoukiConfig::load(&tmp)?;
         assert_eq!(act, config);

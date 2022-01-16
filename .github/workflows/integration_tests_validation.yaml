@@ -18,6 +18,7 @@ jobs:
         with:
           filters: |
             ./integration_test: crates/integration_test/**
+            ./runtimetest : runtimetest/**
   validate:
     needs: [changes]
     if: ${{ !contains(needs.changes.outputs.dirs, '[]') }}
@@ -35,7 +36,9 @@ jobs:
         uses: Swatinem/rust-cache@v1
       - run: sudo apt-get -y update
       - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev libseccomp-dev
+      - name: Build
+        run: ./build.sh
       - name: Validate tests on runc
-        run: cd ./crates/integration_test && ./run_tests.sh runc
+        run: cd ./crates/integration_test && sudo ./tests.sh run runc
       - name: Validate tests on youki
-        run: cd ./crates/integration_test && ./run_tests.sh ./youki
+        run: cd ./crates/integration_test && sudo ./tests.sh run ../../youki

@@ -47,9 +47,6 @@ impl<'a> InitContainerBuilder<'a> {
             .set_systemd(self.use_systemd)
             .set_annotations(spec.annotations().clone());
 
-        let config = YoukiConfig::from_spec(&spec, container.id())?;
-        config.save(&container_dir)?;
-
         unistd::chdir(&container_dir)?;
         let notify_path = container_dir.join(NOTIFY_FILE);
         // convert path of root file system of the container to absolute path
@@ -68,6 +65,9 @@ impl<'a> InitContainerBuilder<'a> {
         };
 
         let rootless = Rootless::new(&spec)?;
+        let config = YoukiConfig::from_spec(&spec, container.id(), rootless.is_some())?;
+        config.save(&container_dir)?;
+
         let mut builder_impl = ContainerBuilderImpl {
             init: true,
             syscall: self.base.syscall,

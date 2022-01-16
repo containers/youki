@@ -1,7 +1,6 @@
 use super::{Container, ContainerStatus};
 use crate::config::YoukiConfig;
 use crate::hooks;
-use crate::utils;
 use anyhow::{bail, Context, Result};
 use libcgroups;
 use nix::sys::signal;
@@ -48,8 +47,6 @@ impl Container {
                     format!("failed to remove container dir {}", self.root.display())
                 })?;
 
-                let cgroups_path = utils::get_cgroup_path(&Some(config.cgroup_path), self.id());
-
                 // remove the cgroup created for the container
                 // check https://man7.org/linux/man-pages/man7/cgroups.7.html
                 // creating and removing cgroups section for more information on cgroups
@@ -57,13 +54,13 @@ impl Container {
                     .systemd()
                     .context("container state does not contain cgroup manager")?;
                 let cmanager = libcgroups::common::create_cgroup_manager(
-                    &cgroups_path,
+                    &config.cgroup_path,
                     use_systemd,
                     self.id(),
                 )
                 .context("failed to create cgroup manager")?;
                 cmanager.remove().with_context(|| {
-                    format!("failed to remove cgroup {}", cgroups_path.display())
+                    format!("failed to remove cgroup {}", config.cgroup_path.display())
                 })?;
 
                 if let Some(hooks) = config.hooks.as_ref() {
