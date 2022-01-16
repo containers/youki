@@ -22,14 +22,14 @@ jobs:
             ./crates/libcgroups: crates/libcgroups/**
             ./crates/libseccomp: crates/libseccomp/**
             ./crates/integration_test: crates/integration_test/**
-            ./runtimetest : runtimetest/**        
+            ./runtimetest : runtimetest/**
   check:
     needs: [changes]
     if: ${{ !contains(needs.changes.outputs.dirs, '[]') }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust: [1.56.1, 1.57.0]
+        rust: [1.56.1, 1.58.0]
         dirs: ${{ fromJSON(needs.changes.outputs.dirs) }}
     steps:
       - uses: actions/checkout@v2
@@ -52,7 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust: [1.56.1, 1.57.0]
+        rust: [1.56.1, 1.58.0]
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -102,7 +102,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust: [1.56.1, 1.57.0]
+        rust: [1.56.1, 1.58.0]
     steps:
       - uses: actions/checkout@v2
         with:
@@ -124,6 +124,6 @@ jobs:
         run: ./build.sh --release
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.11.0'
+          go-version: "1.11.0"
       - name: Run integration tests
         run: ./integration_test.sh
