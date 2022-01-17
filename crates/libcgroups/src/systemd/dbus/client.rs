@@ -9,6 +9,8 @@ use std::time::Duration;
 pub trait SystemdClient {
     fn is_system(&self) -> bool;
 
+    fn transient_unit_exists(&self, unit_name: &str) -> bool;
+
     fn start_transient_unit(
         &self,
         container_name: &str,
@@ -65,6 +67,11 @@ impl Client {
 impl SystemdClient for Client {
     fn is_system(&self) -> bool {
         self.system
+    }
+
+    fn transient_unit_exists(&self, unit_name: &str) -> bool {
+        let proxy = self.create_proxy();
+        proxy.get_unit(unit_name).is_ok()
     }
 
     /// start_transient_unit is a higher level API for starting a unit
