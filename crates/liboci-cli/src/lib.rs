@@ -1,7 +1,6 @@
+use clap::Parser;
 use std::fmt::Debug;
 use std::path::PathBuf;
-
-use clap::Parser;
 
 // Subcommands that are specified in https://github.com/opencontainers/runtime-tools/blob/master/docs/command-line-interface.md
 
@@ -14,19 +13,21 @@ mod state;
 pub use {create::Create, delete::Delete, kill::Kill, start::Start, state::State};
 
 // Other common subcommands that aren't specified in the document
+mod checkpoint;
 mod events;
 mod exec;
 mod list;
 mod pause;
 mod ps;
+mod restore;
 mod resume;
 mod run;
 mod spec;
 mod update;
 
 pub use {
-    events::Events, exec::Exec, list::List, pause::Pause, ps::Ps, resume::Resume, run::Run,
-    spec::Spec, update::Update,
+    checkpoint::Checkpoint, events::Events, exec::Exec, list::List, pause::Pause, ps::Ps,
+    restore::Restore, resume::Resume, run::Run, spec::Spec, update::Update,
 };
 
 // Subcommands parsed by liboci-cli, based on the [OCI
@@ -48,12 +49,14 @@ pub enum StandardCmd {
 // and other runtimes.
 #[derive(Parser, Debug)]
 pub enum CommonCmd {
+    Checkpoint(Checkpoint),
     Events(Events),
     Exec(Exec),
     List(List),
     Pause(Pause),
     #[clap(setting = clap::AppSettings::AllowLeadingHyphen)]
     Ps(Ps),
+    Restore(Restore),
     Resume(Resume),
     Run(Run),
     Update(Update),

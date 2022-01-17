@@ -7,6 +7,7 @@ use std::{
 use libcgroups::common::CgroupManager;
 use libcontainer::container::Container;
 
+pub mod checkpoint;
 pub mod completion;
 pub mod create;
 pub mod delete;
@@ -17,6 +18,7 @@ pub mod kill;
 pub mod list;
 pub mod pause;
 pub mod ps;
+pub mod restore;
 pub mod resume;
 pub mod run;
 pub mod spec_json;
