@@ -370,11 +370,13 @@ impl CgroupManager for Manager {
 
     fn remove(&self) -> Result<()> {
         log::debug!("remove {}", self.unit_name);
-        self.client
-            .stop_transient_unit(&self.unit_name)
-            .with_context(|| {
-                format!("could not remove control group {}", self.destructured_path)
-            })?;
+        if self.client.transient_unit_exists(&self.unit_name) {
+            self.client
+                .stop_transient_unit(&self.unit_name)
+                .with_context(|| {
+                    format!("could not remove control group {}", self.destructured_path)
+                })?;
+        }
 
         Ok(())
     }
@@ -402,6 +404,10 @@ mod tests {
 
     impl SystemdClient for TestSystemdClient {
         fn is_system(&self) -> bool {
+            true
+        }
+
+        fn transient_unit_exists(&self, _: &str) -> bool {
             true
         }
 
