@@ -232,7 +232,7 @@ impl Manager {
         let controllers: Vec<String> = self
             .get_available_controllers(&full_boundary_path)?
             .into_iter()
-            .map(|c| format!("{}{}", "+", c.to_string()))
+            .map(|c| format!("{}{}", "+", c))
             .collect();
 
         Self::write_controllers(&full_boundary_path, &controllers)?;
