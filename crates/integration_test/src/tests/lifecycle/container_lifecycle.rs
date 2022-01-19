@@ -24,9 +24,9 @@ impl Default for ContainerLifecycle {
 impl ContainerLifecycle {
     pub fn new() -> Self {
         let id = generate_uuid();
-        let temp_dir = prepare_bundle(&id).unwrap();
+        let bundle_dir = prepare_bundle(&id).unwrap();
         ContainerLifecycle {
-            project_path: temp_dir,
+            project_path: bundle_dir,
             container_id: id.to_string(),
         }
     }

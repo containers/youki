@@ -1,7 +1,7 @@
 use super::{create_temp_dir, TempDir};
 use anyhow::{Context, Result};
 use flate2::read::GzDecoder;
-use oci_spec::runtime::Spec;
+use oci_spec::runtime::{Process, Spec};
 use once_cell::sync::OnceCell;
 use rand::Rng;
 use std::env;
@@ -75,6 +75,12 @@ pub fn prepare_bundle(id: &Uuid) -> Result<TempDir> {
             temp_dir.as_ref()
         )
     })?;
+
+    let mut spec = Spec::default();
+    let mut process = Process::default();
+    process.set_args(Some(vec!["sleep".into(), "5".into()]));
+    spec.set_process(Some(process));
+    set_config(&temp_dir, &spec).unwrap();
 
     Ok(temp_dir)
 }
