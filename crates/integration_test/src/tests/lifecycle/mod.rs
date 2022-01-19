@@ -2,6 +2,7 @@ mod container_create;
 mod container_lifecycle;
 mod create;
 mod delete;
+mod exec;
 mod kill;
 mod start;
 mod state;
