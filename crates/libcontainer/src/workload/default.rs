@@ -6,10 +6,12 @@ use oci_spec::runtime::Spec;
 
 use super::{Executor, EMPTY};
 
+const EXECUTOR_NAME: &str = "default";
+
 pub struct DefaultExecutor {}
 
 impl Executor for DefaultExecutor {
-    fn exec(&self, spec: &Spec) -> Result<()> {
+    fn exec(spec: &Spec) -> Result<()> {
         log::debug!("Executing workload with default handler");
         let args = spec
             .process()
@@ -35,11 +37,11 @@ impl Executor for DefaultExecutor {
         unreachable!();
     }
 
-    fn can_handle(&self, _: &Spec) -> Result<bool> {
+    fn can_handle(_: &Spec) -> Result<bool> {
         Ok(true)
     }
 
-    fn name(&self) -> &str {
-        "default"
+    fn name() -> &'static str {
+        EXECUTOR_NAME
     }
 }

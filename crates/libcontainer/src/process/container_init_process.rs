@@ -1,7 +1,7 @@
 use super::args::ContainerArgs;
 use crate::apparmor;
 use crate::syscall::Syscall;
-use crate::workload::{CompositeExecutor, Executor};
+use crate::workload::ExecutorManager;
 use crate::{
     capabilities, hooks, namespaces::Namespaces, process::channel, rootfs::RootFS,
     rootless::Rootless, seccomp, tty, utils,
@@ -415,7 +415,7 @@ pub fn container_init_process(
     }
 
     if proc.args().is_some() {
-        CompositeExecutor::default().exec(spec)
+        ExecutorManager::exec(spec)
     } else {
         bail!("on non-Windows, at least one process arg entry is required")
     }

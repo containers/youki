@@ -13,65 +13,21 @@ static EMPTY: Vec<String> = Vec::new();
 
 pub trait Executor {
     /// Executes the workload
-    fn exec(&self, spec: &Spec) -> Result<()>;
+    fn exec(spec: &Spec) -> Result<()>;
     /// Checks if the handler is able to handle the workload
-    fn can_handle(&self, spec: &Spec) -> Result<bool>;
+    fn can_handle(spec: &Spec) -> Result<bool>;
     /// The name of the handler
-    fn name(&self) -> &str;
+    fn name() -> &'static str;
 }
-pub struct CompositeExecutor {
-    executors: Vec<Box<dyn Executor>>,
-}
+pub struct ExecutorManager {}
 
-impl Executor for CompositeExecutor {
-    fn exec(&self, spec: &Spec) -> Result<()> {
-        for executor in &self.executors {
-            if executor
-                .can_handle(spec)
-                .with_context(|| format!("executor {} failed on selection", executor.name()))?
-            {
-                let result = executor.exec(spec);
-                if result.is_err() {
-                    let error_msg = if executor.name() == "default" {
-                        "executor default failed on exec. This might have been caused \
-                            by another handler not being able to match on your request"
-                            .to_string()
-                    } else {
-                        format!("executor {} failed on exec", executor.name())
-                    };
-
-                    return result.context(error_msg);
-                } else {
-                    return Ok(());
-                }
-            }
+impl ExecutorManager {
+    pub fn exec(spec: &Spec) -> Result<()> {
+        #[cfg(feature = "wasm-wasmer")]
+        if WasmerExecutor::can_handle(spec)? {
+            return WasmerExecutor::exec(spec).context("wasmer execution failed");
         }
 
-        unreachable!("no suitable execution handler has been registered");
-    }
-
-    fn can_handle(&self, spec: &Spec) -> Result<bool> {
-        Ok(self
-            .executors
-            .iter()
-            .any(|h| h.can_handle(spec).unwrap_or_default()))
-    }
-
-    fn name(&self) -> &str {
-        "composite"
-    }
-}
-
-impl Default for CompositeExecutor {
-    fn default() -> Self {
-        let handlers: Vec<Box<dyn Executor>> = vec![
-            #[cfg(feature = "wasm-wasmer")]
-            Box::new(WasmerExecutor {}),
-            Box::new(DefaultExecutor {}),
-        ];
-
-        Self {
-            executors: handlers,
-        }
+        DefaultExecutor::exec(spec).context("default execution failed")
     }
 }

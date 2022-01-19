@@ -5,10 +5,12 @@ use wasmer_wasi::WasiState;
 
 use super::{Executor, EMPTY};
 
+const EXECUTOR_NAME: &str = "wasmer";
+
 pub struct WasmerExecutor {}
 
 impl Executor for WasmerExecutor {
-    fn exec(&self, spec: &Spec) -> Result<()> {
+    fn exec(spec: &Spec) -> Result<()> {
         log::debug!("Executing workload with wasmer handler");
         let process = spec.process().as_ref();
 
@@ -59,7 +61,7 @@ impl Executor for WasmerExecutor {
         Ok(())
     }
 
-    fn can_handle(&self, spec: &Spec) -> Result<bool> {
+    fn can_handle(spec: &Spec) -> Result<bool> {
         if let Some(annotations) = spec.annotations() {
             if let Some(handler) = annotations.get("run.oci.handler") {
                 return Ok(handler == "wasm");
@@ -73,8 +75,8 @@ impl Executor for WasmerExecutor {
         Ok(false)
     }
 
-    fn name(&self) -> &str {
-        "wasmer"
+    fn name() -> &'static str {
+        EXECUTOR_NAME
     }
 }
 
@@ -93,8 +95,7 @@ mod tests {
             .build()
             .context("build spec")?;
 
-        let handler = WasmerExecutor {};
-        assert!(handler.can_handle(&spec).context("can handle")?);
+        assert!(WasmerExecutor::can_handle(&spec).context("can handle")?);
 
         Ok(())
     }
@@ -108,8 +109,7 @@ mod tests {
             .build()
             .context("build spec")?;
 
-        let handler = WasmerExecutor {};
-        assert!(handler.can_handle(&spec).context("can handle")?);
+        assert!(WasmerExecutor::can_handle(&spec).context("can handle")?);
 
         Ok(())
     }
@@ -118,8 +118,7 @@ mod tests {
     fn test_can_handle_no_execute() -> Result<()> {
         let spec = SpecBuilder::default().build().context("build spec")?;
 
-        let handler = WasmerExecutor {};
-        assert!(!handler.can_handle(&spec).context("can handle")?);
+        assert!(!WasmerExecutor::can_handle(&spec).context("can handle")?);
 
         Ok(())
     }
