@@ -96,7 +96,7 @@ impl<'a> TenantContainerBuilder<'a> {
             .load_container_state(container_dir.clone())
             .context("failed to load container state")?;
         let mut spec = self
-            .load_init_spec(&container_dir)
+            .load_init_spec(&container)
             .context("failed to load init spec")?;
         self.adapt_spec_for_tenant(&mut spec, &container)
             .context("failed to adapt spec for tenant")?;
@@ -146,10 +146,14 @@ impl<'a> TenantContainerBuilder<'a> {
         Ok(container_dir)
     }
 
-    fn load_init_spec(&self, container_dir: &Path) -> Result<Spec> {
-        let spec_path = container_dir.join("config.json");
+    fn load_init_spec(&self, container: &Container) -> Result<Spec> {
+        let spec_path = container.bundle().join("config.json");
 
-        let spec = Spec::load(spec_path).context("failed to load spec")?;
+        let mut spec = Spec::load(&spec_path)
+            .with_context(|| format!("failed to load spec from {:?}", spec_path))?;
+
+        spec.canonicalize_rootfs(container.bundle())
+            .context("failed to canonicalize rootfs")?;
         Ok(spec)
     }
 

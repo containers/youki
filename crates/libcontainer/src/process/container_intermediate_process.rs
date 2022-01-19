@@ -46,7 +46,7 @@ pub fn container_intermediate_process(
     if let Some(user_namespace) = namespaces.get(LinuxNamespaceType::User) {
         namespaces
             .unshare_or_setns(user_namespace)
-            .with_context(|| format!("Failed to enter user namespace: {:?}", user_namespace))?;
+            .with_context(|| format!("failed to enter user namespace: {:?}", user_namespace))?;
         if user_namespace.path().is_none() {
             log::debug!("creating new user namespace");
             // child needs to be dumpable, otherwise the non root parent is not
@@ -80,7 +80,7 @@ pub fn container_intermediate_process(
     if let Some(pid_namespace) = namespaces.get(LinuxNamespaceType::Pid) {
         namespaces
             .unshare_or_setns(pid_namespace)
-            .with_context(|| format!("Failed to enter pid namespace: {:?}", pid_namespace))?;
+            .with_context(|| format!("failed to enter pid namespace: {:?}", pid_namespace))?;
     }
 
     // We have to record the pid of the child (container init process), since
