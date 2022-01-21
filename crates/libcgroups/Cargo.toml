@@ -1,7 +1,8 @@
 [package]
 name = "libcgroups"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2021"
+rust-version = "1.58.1"
 autoexamples = false
 
 [features]
