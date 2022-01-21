@@ -11,7 +11,7 @@ pub fn default_devices() -> Vec<LinuxDevice> {
             .typ(LinuxDeviceType::C)
             .major(1)
             .minor(3)
-            .file_mode(0o066u32)
+            .file_mode(0o0666u32)
             .build()
             .unwrap(),
         LinuxDeviceBuilder::default()
@@ -19,7 +19,7 @@ pub fn default_devices() -> Vec<LinuxDevice> {
             .typ(LinuxDeviceType::C)
             .major(1)
             .minor(5)
-            .file_mode(0o066u32)
+            .file_mode(0o0666u32)
             .build()
             .unwrap(),
         LinuxDeviceBuilder::default()
@@ -27,7 +27,7 @@ pub fn default_devices() -> Vec<LinuxDevice> {
             .typ(LinuxDeviceType::C)
             .major(1)
             .minor(7)
-            .file_mode(0o066u32)
+            .file_mode(0o0666u32)
             .build()
             .unwrap(),
         LinuxDeviceBuilder::default()
@@ -35,7 +35,7 @@ pub fn default_devices() -> Vec<LinuxDevice> {
             .typ(LinuxDeviceType::C)
             .major(5)
             .minor(0)
-            .file_mode(0o066u32)
+            .file_mode(0o0666u32)
             .build()
             .unwrap(),
         LinuxDeviceBuilder::default()
@@ -43,7 +43,7 @@ pub fn default_devices() -> Vec<LinuxDevice> {
             .typ(LinuxDeviceType::C)
             .major(1)
             .minor(9)
-            .file_mode(0o066u32)
+            .file_mode(0o0666u32)
             .build()
             .unwrap(),
         LinuxDeviceBuilder::default()
@@ -51,7 +51,7 @@ pub fn default_devices() -> Vec<LinuxDevice> {
             .typ(LinuxDeviceType::C)
             .major(1)
             .minor(8)
-            .file_mode(0o066u32)
+            .file_mode(0o0666u32)
             .build()
             .unwrap(),
     ]
