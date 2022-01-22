@@ -14,6 +14,7 @@ use nix::{
 };
 use oci_spec::runtime::{LinuxNamespaceType, Spec, User};
 use std::collections::HashMap;
+use std::os::unix::io::AsRawFd;
 use std::{
     env, fs,
     path::{Path, PathBuf},
@@ -184,6 +185,27 @@ fn apply_rest_namespaces(
     Ok(())
 }
 
+fn reopen_dev_null() -> Result<()> {
+    // At this point we should be inside of the container and now
+    // we can re-open /dev/null if it is in use to the /dev/null
+    // in the container.
+
+    let dev_null = fs::File::open("/dev/null")?;
+    let dev_null_fstat_info = nix::sys::stat::fstat(dev_null.as_raw_fd())?;
+
+    // Check if stdin, stdout or stderr point to /dev/null
+    for fd in 0..2 {
+        let fstat_info = nix::sys::stat::fstat(fd)?;
+
+        if dev_null_fstat_info.st_rdev == fstat_info.st_rdev {
+            // This FD points to /dev/null outside of the container.
+            // Let's point to /dev/null inside of the container.
+            nix::unistd::dup2(dev_null.as_raw_fd(), fd)?;
+        }
+    }
+    Ok(())
+}
+
 pub fn container_init_process(
     args: &ContainerArgs,
     main_sender: &mut channel::MainSender,
@@ -247,6 +269,8 @@ pub fn container_init_process(
         rootfs
             .adjust_root_mount_propagation(linux)
             .context("Failed to set propagation type of root mount")?;
+
+        reopen_dev_null()?;
 
         if let Some(kernel_params) = linux.sysctl() {
             sysctl(kernel_params)
