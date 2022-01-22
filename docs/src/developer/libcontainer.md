@@ -28,7 +28,7 @@ This crate also provides an interface for Apparmor which is another Linux Kernel
 - [pid namespace man page](https://man7.org/linux/man-pages/man7/pid_namespaces.7.html)
 - [CLONE_NEWUSER flag](https://man7.org/linux/man-pages/man2/clone.2.html)
 
-Note: clone(2) offers us the ability to enter into user and pid namespace by creatng only one process. However, clone(2) can only create new pid namespace, but cannot enter into existing pid namespaces. Therefore, to enter into existing pid namespaces, we would need to fork twice. Currently, there is no getting around this limitation.
+> Note: clone(2) offers us the ability to enter into user and pid namespace by creating only one process. However, clone(2) can only create new pid namespace, but cannot enter into existing pid namespaces. Therefore, to enter into existing pid namespaces, we would need to fork twice. Currently, there is no getting around this limitation.
 
 - [fork(2) man page](https://man7.org/linux/man-pages/man2/fork.2.html)
 - [clone(2) man page](https://man7.org/linux/man-pages/man2/clone.2.html)
