@@ -8,6 +8,7 @@ use crate::{
 use anyhow::{bail, Context, Result};
 use nix::mount::MsFlags;
 use nix::sched::CloneFlags;
+use nix::unistd::setsid;
 use nix::{
     fcntl,
     unistd::{self, Gid, Uid},
@@ -221,9 +222,10 @@ pub fn container_init_process(
     let container = args.container.as_ref();
     let namespaces = Namespaces::from(linux.namespaces().as_ref());
 
+    setsid().context("failed to create session")?;
     // set up tty if specified
     if let Some(csocketfd) = args.console_socket {
-        tty::setup_console(&csocketfd).with_context(|| "Failed to set up tty")?;
+        tty::setup_console(&csocketfd).with_context(|| "failed to set up tty")?;
     }
 
     apply_rest_namespaces(&namespaces, spec, syscall)?;

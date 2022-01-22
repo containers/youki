@@ -10,8 +10,8 @@ use anyhow::{bail, Result};
 use nix::errno::Errno;
 use nix::sys::socket;
 use nix::sys::uio;
+use nix::unistd::close;
 use nix::unistd::dup2;
-use nix::unistd::{close, setsid};
 
 const STDIN: i32 = 0;
 const STDOUT: i32 = 1;
@@ -65,7 +65,6 @@ pub fn setup_console(console_fd: &RawFd) -> Result<()> {
     )
     .context("failed to send pty master")?;
 
-    setsid()?;
     if unsafe { libc::ioctl(openpty_result.slave, libc::TIOCSCTTY) } < 0 {
         log::warn!("could not TIOCSCTTY");
     };
