@@ -97,26 +97,24 @@ impl<'a> From<&'a Linux> for Rootless<'a> {
     }
 }
 
-#[cfg(test)]
-fn get_uid_path(pid: &Pid) -> PathBuf {
-    let tempdir = utils::create_temp_dir(format!("{pid}_uid_path").as_str()).unwrap();
-    tempdir.join("uid_map")
-}
-
 #[cfg(not(test))]
 fn get_uid_path(pid: &Pid) -> PathBuf {
     PathBuf::from(format!("/proc/{pid}/uid_map"))
 }
 
 #[cfg(test)]
-fn get_gid_path(pid: &Pid) -> PathBuf {
-    let tempdir = utils::create_temp_dir(format!("{pid}_gid_path").as_str()).unwrap();
-    tempdir.join("gid_map")
+fn get_uid_path(pid: &Pid) -> PathBuf {
+    utils::get_temp_dir_path(format!("{pid}_mapping_path").as_str()).join("uid_map")
 }
 
 #[cfg(not(test))]
 fn get_gid_path(pid: &Pid) -> PathBuf {
     PathBuf::from(format!("/proc/{pid}/gid_map"))
+}
+
+#[cfg(test)]
+fn get_gid_path(pid: &Pid) -> PathBuf {
+    utils::get_temp_dir_path(format!("{pid}_mapping_path").as_str()).join("gid_map")
 }
 
 /// Checks if rootless mode should be used
@@ -302,9 +300,14 @@ fn write_id_mapping(
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
+    use nix::unistd::getpid;
     use oci_spec::runtime::{
         LinuxBuilder, LinuxIdMappingBuilder, LinuxNamespaceBuilder, SpecBuilder,
     };
+
+    use crate::utils::TempDir;
 
     use super::*;
 
@@ -412,6 +415,83 @@ mod tests {
         )
         .is_err());
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_write_uid_mapping() -> Result<()> {
+        let userns = LinuxNamespaceBuilder::default()
+            .typ(LinuxNamespaceType::User)
+            .build()?;
+        let host_uid = 3333_u32;
+        let host_gid = 3334_u32;
+        let container_id = 0_u32;
+        let size = 10_u32;
+        let uid_mappings = vec![LinuxIdMappingBuilder::default()
+            .host_id(host_uid)
+            .container_id(container_id)
+            .size(size)
+            .build()?];
+        let gid_mappings = vec![LinuxIdMappingBuilder::default()
+            .host_id(host_gid)
+            .container_id(container_id)
+            .size(size)
+            .build()?];
+        let linux = LinuxBuilder::default()
+            .namespaces(vec![userns])
+            .uid_mappings(uid_mappings)
+            .gid_mappings(gid_mappings)
+            .build()?;
+        let spec = SpecBuilder::default().linux(linux).build()?;
+        let rootless = Rootless::new(&spec)?.unwrap();
+        let pid = getpid();
+        let tempdir = TempDir::new(get_uid_path(&pid).parent().unwrap())?;
+        let uid_map_path = tempdir.join("uid_map");
+        let _ = fs::File::create(&uid_map_path)?;
+        rootless.write_uid_mapping(pid)?;
+        assert_eq!(
+            format!("{container_id} {host_uid} {size}"),
+            fs::read_to_string(uid_map_path)?
+        );
+        rootless.write_gid_mapping(pid)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_write_gid_mapping() -> Result<()> {
+        let userns = LinuxNamespaceBuilder::default()
+            .typ(LinuxNamespaceType::User)
+            .build()?;
+        let host_uid = 3333_u32;
+        let host_gid = 3334_u32;
+        let container_id = 0_u32;
+        let size = 10_u32;
+        let uid_mappings = vec![LinuxIdMappingBuilder::default()
+            .host_id(host_uid)
+            .container_id(container_id)
+            .size(size)
+            .build()?];
+        let gid_mappings = vec![LinuxIdMappingBuilder::default()
+            .host_id(host_gid)
+            .container_id(container_id)
+            .size(size)
+            .build()?];
+        let linux = LinuxBuilder::default()
+            .namespaces(vec![userns])
+            .uid_mappings(uid_mappings)
+            .gid_mappings(gid_mappings)
+            .build()?;
+        let spec = SpecBuilder::default().linux(linux).build()?;
+        let rootless = Rootless::new(&spec)?.unwrap();
+        let pid = getpid();
+        let tempdir = TempDir::new(get_uid_path(&pid).parent().unwrap())?;
+        let uid_map_path = tempdir.join("uid_map");
+        let _ = fs::File::create(&uid_map_path)?;
+        rootless.write_gid_mapping(pid)?;
+        assert_eq!(
+            format!("{container_id} {host_uid} {size}"),
+            fs::read_to_string(uid_map_path)?
+        );
         Ok(())
     }
 }

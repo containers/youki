@@ -263,8 +263,12 @@ impl Deref for TempDir {
 }
 
 pub fn create_temp_dir(test_name: &str) -> Result<TempDir> {
-    let dir = TempDir::new(std::env::temp_dir().join(test_name))?;
+    let dir = TempDir::new(get_temp_dir_path(test_name))?;
     Ok(dir)
+}
+
+pub fn get_temp_dir_path(test_name: &str) -> PathBuf {
+    std::env::temp_dir().join(test_name)
 }
 
 #[cfg(test)]
