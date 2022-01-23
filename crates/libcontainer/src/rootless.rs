@@ -58,7 +58,7 @@ impl<'a> Rootless<'a> {
         if let Some(uid_mappings) = self.uid_mappings {
             write_id_mapping(
                 target_pid,
-                &format!("/proc/{}/uid_map", target_pid),
+                get_uid_path(&target_pid).as_path(),
                 uid_mappings,
                 self.newuidmap.as_deref(),
             )
@@ -72,7 +72,7 @@ impl<'a> Rootless<'a> {
         if let Some(gid_mappings) = self.gid_mappings {
             return write_id_mapping(
                 target_pid,
-                &format!("/proc/{}/gid_map", target_pid),
+                get_gid_path(&target_pid).as_path(),
                 gid_mappings,
                 self.newgidmap.as_deref(),
             );
@@ -95,6 +95,28 @@ impl<'a> From<&'a Linux> for Rootless<'a> {
             privileged: nix::unistd::geteuid().is_root(),
         }
     }
+}
+
+#[cfg(test)]
+fn get_uid_path(pid: &Pid) -> PathBuf {
+    let tempdir = utils::create_temp_dir(format!("{pid}_uid_path").as_str()).unwrap();
+    tempdir.join("uid_map")
+}
+
+#[cfg(not(test))]
+fn get_uid_path(pid: &Pid) -> PathBuf {
+    PathBuf::from(format!("/proc/{pid}/uid_map"))
+}
+
+#[cfg(test)]
+fn get_gid_path(pid: &Pid) -> PathBuf {
+    let tempdir = utils::create_temp_dir(format!("{pid}_gid_path").as_str()).unwrap();
+    tempdir.join("gid_map")
+}
+
+#[cfg(not(test))]
+fn get_gid_path(pid: &Pid) -> PathBuf {
+    PathBuf::from(format!("/proc/{pid}/gid_map"))
 }
 
 /// Checks if rootless mode should be used
@@ -240,7 +262,7 @@ fn lookup_map_binary(binary: &str) -> Result<Option<PathBuf>> {
 
 fn write_id_mapping(
     pid: Pid,
-    map_file: &str,
+    map_file: &Path,
     mappings: &[LinuxIdMapping],
     map_binary: Option<&Path>,
 ) -> Result<()> {
