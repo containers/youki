@@ -143,7 +143,6 @@ fn validate_spec_for_rootless(spec: &Spec) -> Result<()> {
     if uid_mappings.is_empty() {
         bail!("rootless containers require at least one uid mapping");
     }
-
     if gid_mappings.is_empty() {
         bail!("rootless containers require at least one gid mapping")
     }
@@ -277,4 +276,120 @@ fn write_id_mapping(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use oci_spec::runtime::{
+        LinuxBuilder, LinuxIdMappingBuilder, LinuxNamespaceBuilder, SpecBuilder,
+    };
+
+    use super::*;
+
+    #[test]
+    fn test_validate_ok() -> Result<()> {
+        let userns = LinuxNamespaceBuilder::default()
+            .typ(LinuxNamespaceType::User)
+            .build()?;
+        let uid_mappings = vec![LinuxIdMappingBuilder::default()
+            .host_id(3333_u32)
+            .container_id(0_u32)
+            .size(10_u32)
+            .build()?];
+        let gid_mappings = vec![LinuxIdMappingBuilder::default()
+            .host_id(3333_u32)
+            .container_id(0_u32)
+            .size(10_u32)
+            .build()?];
+        let linux = LinuxBuilder::default()
+            .namespaces(vec![userns])
+            .uid_mappings(uid_mappings)
+            .gid_mappings(gid_mappings)
+            .build()?;
+        let spec = SpecBuilder::default().linux(linux).build()?;
+        assert!(validate_spec_for_rootless(&spec).is_ok());
+        Ok(())
+    }
+
+    #[test]
+    fn test_validate_err() -> Result<()> {
+        let userns = LinuxNamespaceBuilder::default()
+            .typ(LinuxNamespaceType::User)
+            .build()?;
+        let uid_mappings = vec![LinuxIdMappingBuilder::default()
+            .host_id(3333_u32)
+            .container_id(0_u32)
+            .size(10_u32)
+            .build()?];
+        let gid_mappings = vec![LinuxIdMappingBuilder::default()
+            .host_id(3333_u32)
+            .container_id(0_u32)
+            .size(10_u32)
+            .build()?];
+
+        let linux_not_include_usend = LinuxBuilder::default()
+            .namespaces(vec![])
+            .uid_mappings(uid_mappings.clone())
+            .gid_mappings(gid_mappings.clone())
+            .build()?;
+        assert!(validate_spec_for_rootless(
+            &SpecBuilder::default()
+                .linux(linux_not_include_usend)
+                .build()
+                .unwrap()
+        )
+        .is_err());
+
+        let linux_uid_empty = LinuxBuilder::default()
+            .namespaces(vec![userns.clone()])
+            .uid_mappings(vec![])
+            .gid_mappings(gid_mappings.clone())
+            .build()?;
+        assert!(validate_spec_for_rootless(
+            &SpecBuilder::default()
+                .linux(linux_uid_empty)
+                .build()
+                .unwrap()
+        )
+        .is_err());
+
+        let linux_gid_empty = LinuxBuilder::default()
+            .namespaces(vec![userns.clone()])
+            .uid_mappings(uid_mappings.clone())
+            .gid_mappings(vec![])
+            .build()?;
+        assert!(validate_spec_for_rootless(
+            &SpecBuilder::default()
+                .linux(linux_gid_empty)
+                .build()
+                .unwrap()
+        )
+        .is_err());
+
+        let linux_uid_none = LinuxBuilder::default()
+            .namespaces(vec![userns.clone()])
+            .gid_mappings(gid_mappings)
+            .build()?;
+        assert!(validate_spec_for_rootless(
+            &SpecBuilder::default()
+                .linux(linux_uid_none)
+                .build()
+                .unwrap()
+        )
+        .is_err());
+
+        let linux_gid_none = LinuxBuilder::default()
+            .namespaces(vec![userns])
+            .uid_mappings(uid_mappings)
+            .build()?;
+        assert!(validate_spec_for_rootless(
+            &SpecBuilder::default()
+                .linux(linux_gid_none)
+                .build()
+                .unwrap()
+        )
+        .is_err());
+
+        Ok(())
+    }
 }
