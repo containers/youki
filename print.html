@@ -246,7 +246,7 @@ liboci-cli = { git = &quot;https://github.com/containers/Youki.git&quot; }
 <hr />
 <h3 id="using-vagrant-to-run-youki-on-non-linux-platform"><a class="header" href="#using-vagrant-to-run-youki-on-non-linux-platform">Using Vagrant to run Youki on non-Linux Platform</a></h3>
 <p>As explained before, Youki only support Linux, and to build/use it on non-Linux Platforms, you will need to use some kind of virtualization. The repo provides a Vagrantfile to do the required VM setup using Vagrant, which can be installed from <a href="https://www.vagrantup.com/docs/installation">here</a>.</p>
-<p>Once installed ans setup, you can run vagrant commands in the cloned directory to run Youki inside the VM created by vagrant :</p>
+<p>Once installed and setup, you can run vagrant commands in the cloned directory to run Youki inside the VM created by vagrant :</p>
 <pre><code class="language-console"># in the youki directory
 
 # for rootless mode, which is default
@@ -348,7 +348,7 @@ sudo ./youki delete tutorial_container
 <div style="break-before: page; page-break-before: always;"></div><h1 id="crates-provided"><a class="header" href="#crates-provided">Crates provided</a></h1>
 <p>Youki repo itself is a Cargo workspace, comprising of several sub-crates, each one for some specific functionality. The youki binary depends on this to provide the low-level functionality, and you can use these crate as a dependency for your own projects as well.</p>
 <p>For more information on how to add a sub-crate as a dependency in your project, see <a href="user/./basic_usage.html">Basic Usage</a>.</p>
-<p>The sub-section in this part briefly explains some of the crates, and some of the functionality they expose. This should be good enough to get a general idea of each crate. To get a detailed information about the structs, functions and modules each crate exposes, unfortunately, for the time being, you will need to go through the source itself ; but we are working on creating better docs.</p>
+<p>The subsection in this part briefly explains some of the crates, and some of the functionality they expose. This should be good enough to get a general idea of each crate. To get detailed information about the structs, functions and modules each crate exposes, unfortunately, for the time being, you will need to go through the source itself, but we are working on creating better docs.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="libcgroups"><a class="header" href="#libcgroups">libcgroups</a></h1>
 <p>libcgroups is the crate that contains functionality to work with Linux cgroups. This provide an easy to use interface over reading and writing cgroups files, as well as various structs that represent the cgroups data.</p>
 <p>The modules that it exposes are :</p>
@@ -360,17 +360,17 @@ sudo ./youki delete tutorial_container
 <li>v1</li>
 <li>v2</li>
 </ul>
-<p>Following is a short explanation of these modules</p>
+<p>Following is a short explanation of these modules.</p>
 <h3 id="common"><a class="header" href="#common">common</a></h3>
-<p>This module contains functionality that is general to any type of cgroup. SOme of the things this provides are</p>
+<p>This module contains functionality that is general to any type of cgroup. Some of the things it provides are:</p>
 <ul>
 <li>
-<p>trait CgroupManager : this gives and interface for the following</p>
+<p>trait <code>CgroupManager</code> which gives and interface for the following:</p>
 <ul>
 <li>add a task to a cgroup</li>
 <li>apply resource restriction</li>
 <li>remove a cgroup</li>
-<li>freezer cgroup state control</li>
+<li>control freezer cgroup state</li>
 <li>get stats from a cgroup</li>
 <li>get pids belonging to the cgroup</li>
 </ul>
@@ -390,22 +390,22 @@ sudo ./youki delete tutorial_container
 <p>Some of the things it exposes are</p>
 <ul>
 <li>
-<p>struct <code>Stats</code> which contains following individual structs</p>
+<p>struct <code>Stats</code> which contains following structs:</p>
 <ul>
 <li>
-<p>CpuStats : contains cpu usage and throttling information</p>
+<p><code>CpuStats</code> : contains cpu usage and throttling information</p>
 </li>
 <li>
-<p>MemoryStats : contains usage of memory, swap and memory combined, kernel memory, kernel tcp memory and other memory stats</p>
+<p><code>MemoryStats</code> : contains usage of memory, swap and memory combined, kernel memory, kernel tcp memory and other memory stats</p>
 </li>
 <li>
-<p>PidStats : contains current number of active pids and allowed number of pids</p>
+<p><code>PidStats</code> : contains current number of active pids and allowed number of pids</p>
 </li>
 <li>
-<p>BlkioStats : contains block io related stats, such as : number of bytes transferred from/to by a device in cgroup, number of io operations done by a device in cgroup, device access and queue information etc.</p>
+<p><code>BlkioStats</code> : contains block io related stats, such as number of bytes transferred from/to a device in cgroup, number of io operations done by a device in cgroup, device access and queue information etc.</p>
 </li>
 <li>
-<p>HugeTlbStats : containing stats for Huge TLB such as usage, max_usage and fail count</p>
+<p><code>HugeTlbStats</code> : containing stats for Huge TLB such as usage, max_usage, and fail count</p>
 </li>
 </ul>
 </li>
@@ -413,7 +413,7 @@ sudo ./youki delete tutorial_container
 <p>function <code>supported_page_size</code> which returns hugepage size supported by the system</p>
 </li>
 <li>
-<p>utility functions to operate with data in cgroups files such as</p>
+<p>utility functions to operate with data in cgroups files such as:</p>
 <ul>
 <li>
 <p><code>parse_single_value</code> : reads file expecting it to have a single value, and returns the value</p>
@@ -431,75 +431,75 @@ sudo ./youki delete tutorial_container
 </li>
 </ul>
 <h3 id="systemd"><a class="header" href="#systemd">systemd</a></h3>
-<p>This is the module used by youki to interact with sytemd, and it exposes several functions to interact</p>
+<p>This is the module used by youki to interact with systemd, and it exposes several functions to interact:</p>
 <ul>
 <li>
 <p>function <code>booted</code> to check if the system was booted with systemd or not</p>
 </li>
 <li>
-<p>module controller_type, which contains <code>enum ControllerType</code> which is used to specify cgroup controllers available on a system</p>
+<p>module <code>controller_type</code>, which contains enum <code>ControllerType</code> which is used to specify cgroup controllers available on a system</p>
 </li>
 <li>
-<p>module manager, which contains <code>struct Manager</code>, which is the cgroup manager, and contain information such as the root cgroups path, path for the specific cgroups, client to communicate with systemd etc. This also implements CgroupManager trait, and thus can be used for cgroups related operations.</p>
+<p>module <code>manager</code>, which contains <code>Manager</code> struct, which is the cgroup manager, and contain information such as the root cgroups path, path for the specific cgroups, client to communicate with systemd etc. This also implements <code>CgroupManager</code> trait, and thus can be used for cgroups related operations.</p>
 </li>
 </ul>
 <h3 id="test_manager"><a class="header" href="#test_manager">test_manager</a></h3>
-<p>This exposes a TestManager struct which can be used as dummy for cgroup testing purposes, which also implements CgroupManager.</p>
+<p>This exposes a <code>TestManager</code> struct which can be used as dummy for cgroup testing purposes, which also implements <code>CgroupManager</code>.</p>
 <h3 id="v1-and-v2"><a class="header" href="#v1-and-v2">v1 and v2</a></h3>
-<p>These two modules contains functionalities specific to cgroups version 1 and version 2. Both of these expose respective cgroup managers, which can be used to manage that type of cgroup, as well as sme utility functions related to respective cgroup version, such as <code>get_mount_points</code> (for v1 and v2), <code>get_subsystem_mount points (for v1) and </code>get_available_controllers` (for v2) etc.</p>
-<p>The v2 module also exposes devices module, which gives functionality for working with bpf ; such as load a bpf program, query info of a bpf program, attach and detach a bpf program to a cgroup, etc.</p>
+<p>These two modules contains functionalities specific to cgroups version 1 and version 2. Both of these expose respective cgroup managers, which can be used to manage that type of cgroup, as well as some utility functions related to respective cgroup version, such as <code>get_mount_points</code> (for v1 and v2), <code>get_subsystem_mount points</code> (for v1), and <code>get_available_controllers</code> (for v2) etc.</p>
+<p>The v2 module also exposes devices module, which provides functionality for working with bpf, such as load a bpf program, query info of a bpf program, attach and detach a bpf program to a cgroup, etc.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="libcontainer"><a class="header" href="#libcontainer">libcontainer</a></h1>
 <p>This crate provides functionality for creating and managing containers. Youki itself uses this crate to manage and control the containers.</p>
 <p>This exposes several modules, each dealing with a specific aspect of working with containers.</p>
 <ul>
 <li>
-<p>apparmor : functions that deal with apparmor, which is a Linux Kernel security module to control program capabilities with per program profiles.</p>
+<p><code>apparmor</code> : functions that deal with apparmor, which is a Linux Kernel security module to control program capabilities with per program profiles.</p>
 </li>
 <li>
-<p>capabilities : this has functions related to setting and resetting specific capabilities, as well as to drop extra privileges from container process.</p>
+<p><code>capabilities</code> : this has functions related to setting and resetting specific capabilities, as well as to drop extra privileges from container process.</p>
 </li>
 <li>
-<p>config : this exposes YoukiConfig struct, which contains a subset of the data in the config.json. This is the subset that is needed when starting or managing containers after creation, and rather than parsing and passing around whole config.json, this smaller YoukiConfig is passed, which is comparatively faster.</p>
+<p><code>config</code> : this exposes <code>YoukiConfig</code> struct, which contains a subset of the data in the <code>config.json</code>. This is the subset that is needed when starting or managing containers after creation, and rather than parsing and passing around whole <code>config.json</code>, the smaller <code>YoukiConfig</code> is passed, which is comparatively faster.</p>
 </li>
 <li>
-<p>container : This is the core of the container module, and contains sub-modules and structs that deal with the container lifecycle including creating, starting, stopping and deleting containers.</p>
+<p><code>container</code> : This is the core of the container module, and contains sub-modules and structs that deal with the container lifecycle including creating, starting, stopping and deleting containers.</p>
 </li>
 <li>
-<p>hooks : exposes function run_hooks, which is used to run various container lifecycle hooks as specified in oci-spec.</p>
+<p><code>hooks</code> : exposes function <code>run_hooks</code>, which is used to run various container lifecycle hooks as specified in oci-spec.</p>
 </li>
 <li>
-<p>namespaces : exposes Namespaces struct, which deals with applying namespaces to a container process.</p>
+<p><code>namespaces</code> : exposes <code>Namespaces</code> struct, which deals with applying namespaces to a container process.</p>
 </li>
 <li>
-<p>notify_socket : this has NotifyListener struct, which is used internally to communicate between the main youki process and the forked container processes.</p>
+<p><code>notify_socket</code> : this contains <code>NotifyListener</code> struct, which is used internally to communicate between the main youki process and the forked container processes.</p>
 </li>
 <li>
-<p>process : a module which exposes functions related to forking the process, setting up the namespaces and starting the container process with correct namespaces.</p>
+<p><code>process</code> : a module which exposes functions related to forking the process, setting up the namespaces and starting the container process with correct namespaces.</p>
 </li>
 <li>
-<p>rootfs : this contains modules which deal with rootfs, which is minimal filesystem that is provided to the container.</p>
+<p><code>rootfs</code> : this contains modules which deal with rootfs, which is minimal filesystem that is provided to the container.</p>
 </li>
 <li>
-<p>rootless : this deals with running containers in a rootless configuration, that is running containers without needing root permissions.</p>
+<p><code>rootless</code> : this deals with running containers in a rootless configuration, that is running containers without needing root permissions.</p>
 </li>
 <li>
-<p>seccomp : this deals with setting up seccomp for container process, and this this uses libseccomp crate in turn to do that.</p>
+<p><code>seccomp</code> : this deals with setting up seccomp for container process. It uses libseccomp crate in order to do that.</p>
 </li>
 <li>
-<p>signal : this provide simple wrappers for unix signal, so that parsing them from their names or signal numbers is easier.</p>
+<p><code>signal</code> : this provides simple wrappers for unix signal, so that parsing them from their names or signal numbers is easier.</p>
 </li>
 <li>
-<p>syscall : this provides a trait Syscall, which is used to abstract over several functionalities which need to call libc functions. This allows the other parts of library to use those functions without having to deal with implementation details.</p>
+<p><code>syscall</code> : this provides a trait <code>Syscall</code>, which is used to abstract over several functionalities which need to call libc functions. This allows the other parts of library to use those functions without having to deal with implementation details.</p>
 </li>
 <li>
-<p>tty : this deals with setting up the tty for the container process.</p>
+<p><code>tty</code> : this deals with setting up the tty for the container process.</p>
 </li>
 <li>
-<p>utils : provides various utility functions such as <code>parse_env</code> to parse the env variables, <code>do_exec</code> to do an exec syscall and execute a binary in the container process, <code>get_cgroups_path</code>, <code>create_dir_all_with_mode</code> etc.</p>
+<p><code>utils</code> : provides various utility functions, such as <code>parse_env</code> to parse the env variables, <code>do_exec</code> to do an exec syscall and execute a binary in the container process, <code>get_cgroups_path</code>, <code>create_dir_all_with_mode</code> etc.</p>
 </li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="liboci-cli"><a class="header" href="#liboci-cli">liboci-cli</a></h1>
-<p>This module provides the structs for command line arguments for OCI container runtimes as specified in the OCI Runtime Command Line Interface The exposed structures are with Clap Parser derived, so that they can be directly used for parsing oci-commandline arguments.</p>
+<p>This module provides the structs for command line arguments for OCI container runtimes as specified in the OCI Runtime Command Line Interface. The exposed structures derive <code>clap::Parser</code>, so that they can be directly used for parsing oci-commandline arguments.</p>
 <h3 id="implemented-subcommands"><a class="header" href="#implemented-subcommands">Implemented subcommands</a></h3>
 <table><thead><tr><th style="text-align: center">Command</th><th style="text-align: center">liboci-cli</th><th style="text-align: center">CLI Specification</th><th style="text-align: center">runc</th><th style="text-align: center">crun</th><th style="text-align: center">youki</th></tr></thead><tbody>
 <tr><td style="text-align: center">create</td><td style="text-align: center">✅</td><td style="text-align: center">✅</td><td style="text-align: center">✅</td><td style="text-align: center">✅</td><td style="text-align: center">✅</td></tr>
@@ -547,7 +547,7 @@ sudo ./youki delete tutorial_container
 <p>Before you start working on developing youki, you should go through <a href="developer/../user/introduction">the User documentation</a> as it specifies the requirements and setup for running youki. For developing youki, you will need to install the dependencies and clone the repo, as specified in the <a href="developer/../user/basic_setup.html">Basic Setup</a> and <a href="developer/../user/basic_usage.html">Basic Usage</a> sections.</p>
 <h2 id="resources"><a class="header" href="#resources">Resources</a></h2>
 <h4 id="oci"><a class="header" href="#oci">OCI</a></h4>
-<p>Open containers initiative is project, which provides a standardization and standardized specification for operating-system-level virtualization. That way components that confirm to the specification provided by OCI spec, can interoperate with each other easily, and developing of new applications becomes easier. For example youuki can be used inplace of runc in Docker, as all three : Docker, runc and youki are OCI compliant, and have a standard interface.</p>
+<p>Open containers initiative is project, which provides a standardization and standardized specification for operating-system-level virtualization. That way components that confirm to the specification provided by OCI spec, can interoperate with each other easily, and developing of new applications becomes easier. For example youki can be used inplace of runc in Docker, as all three : Docker, runc and youki are OCI compliant, and have a standard interface.</p>
 <p>Their main GitHub page is at <a href="https://github.com/opencontainers">https://github.com/opencontainers</a>, and more information about the runtime specifications can be found at <a href="https://github.com/opencontainers/runtime-spec/blob/master/runtime.md">https://github.com/opencontainers/runtime-spec/blob/master/runtime.md</a>.</p>
 <p>As youki needs to deal with a lot of low level programming interfaces of Linux Kernel, another good place know is the online man pages project, which can be found at <a href="https://man7.org/">https://man7.org/</a>. Man pages provide detailed information about the programming interfaces of various features of Linux Kernel. You can simply search <code>man &lt;feature-name&gt;</code> using a search engine, or you can search at the site itself, at <a href="https://man7.org/linux/man-pages/index.html">https://man7.org/linux/man-pages/index.html</a>. These can be very helpful to know about the behavior and usage of and reasoning behind various kernel features used throughout youki.</p>
 <p>Happy developing!!!</p>
@@ -566,15 +566,15 @@ sudo ./youki delete tutorial_container
 <div style="break-before: page; page-break-before: always;"></div><h1 id="good-places-to-start"><a class="header" href="#good-places-to-start">Good places to start</a></h1>
 <p>First of all, welcome to youki! Hope you have fun while developing and contributing :)</p>
 <p>This lists some of the known places that are long-running and would be useful for beginners. But as the things under development can change any time, the best place to check are the issues on the <a href="https://github.com/containers/youki/issues">GitHub repo</a>. You can find issues with labels <code>good fist issue</code> or <code>help wanted</code> and start working on them.</p>
-<p>You can also search for <code>TODO</code> or <code>FIXME</code> comments in the source, and try working on them, but not all of them are easy places to start, can some of them can be particularly tricky to fix.</p>
+<p>You can also search for <code>TODO</code> or <code>FIXME</code> comments in the source, and try working on them, but not all of them are easy places to start, and some of them can be particularly tricky to fix.</p>
 <hr />
 <p>This lists known parts of youki that can be good for beginners at the time of the writing. Please update as things change.</p>
 <h4 id="documentation-comments"><a class="header" href="#documentation-comments">Documentation Comments</a></h4>
 <p>Currently youki is decently commented, and those explain most of the public facing API and structs. But there are still places which can use more doc comments, and examples showing usage, so people can use the docs generated by <code>cargo doc</code> as a guide.</p>
-<p>If you don't know much about container runtime or low level system working, then this can be a good place to start. While going through the code an documenting it, you can learn about it. Make sure that you update this documentation with useful links that you found while commenting some code if it has some peculiar behavior, or it is hard to understand without knowing some background.</p>
+<p>If you don't know much about container runtime or low level system working, then this can be a good place to start. While going through the code and documenting it, you can learn about it. Make sure that you update this documentation with useful links that you found while commenting some code if it has some peculiar behavior, or it is hard to understand without knowing some background.</p>
 <h4 id="integration-tests"><a class="header" href="#integration-tests">Integration Tests</a></h4>
-<p>You can find more detailed information about this in the integration_test crate, but in brief, we currently use <a href="https://github.com/opencontainers/runtime-tools">OCI-runtime-tools</a> provided integration tests to validate that youki is OCI spec compliant. But those are written in Go, which makes the developer depend on two language env to compile youki and test it. These tests also have some issues which makes them hard to use on some system setups.</p>
-<p>Thus we are porting those test to Rust, so that it can be an Rust implementation of OCI-runtime integration tests, as well as be easy to run on local systems for testing. If you know Go and Rust this can be a great place to start. Check out the <a href="https://github.com/containers/youki/issues/361">tracking issue</a>.</p>
+<p>You can find more detailed information about this in the <code>integration_test</code> crate, but in brief, we currently use <a href="https://github.com/opencontainers/runtime-tools">OCI-runtime-tools</a> provided integration tests to validate that youki is OCI spec compliant. But those are written in Go, which makes the developer depend on two language env to compile youki and test it. These tests also have some issues which makes them hard to use on some system setups.</p>
+<p>Thus we are porting those test to Rust, so that it can be a Rust implementation of OCI-runtime integration tests, as well as be easy to run on local systems for testing. If you know Go and Rust this can be a great place to start. Check out the <a href="https://github.com/containers/youki/issues/361">tracking issue</a>.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="this-documentation"><a class="header" href="#this-documentation">This Documentation</a></h1>
 <p>This documentation is created using mdbook and aims to provide a concise reference for users and developers of youki. For more information on mdbook itself, you can check out the <a href="https://rust-lang.github.io/mdBook/">mdbook documentation</a>.</p>
 <p>Please make sure that you update this documentation along with newly added features and resources that you found helpful while developing, so that it will be helpful for newcomers.</p>
@@ -595,7 +595,7 @@ git push -f origin gh-pages
 cd -
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="crate-specific-information"><a class="header" href="#crate-specific-information">Crate Specific Information</a></h1>
-<p>This section contains sub-sections for each individual crate in the youki workspace. Each of the seb-section will have information and resources on that particular crate.</p>
+<p>This section contains subsections for each individual crate in the youki workspace. Each of the subsection will have information and resources on that particular crate.</p>
 <p>In case you are working with some specific crate, you can find resources about it in its section. Also make sure you add any resources that you find when working on them as well.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="libcgroups-1"><a class="header" href="#libcgroups-1">libcgroups</a></h1>
 <p>This crate provides an interface for working with cgroups in Linux. cgroups or control groups is a Linux kernel feature which can be used to fine-control resources and permissions given to a particular process or a group of processes. You can read more about them on the <a href="https://man7.org/linux/man-pages/man7/cgroups.7.html">cgroups man page</a>.</p>
@@ -603,9 +603,9 @@ cd -
 <p>This crates exposes several functions and modules that can be used to work with cgroups :</p>
 <ul>
 <li>
-<p>common traits and functions which are used by both v1 and v2 such as</p>
+<p>Common traits and functions which are used by both v1 and v2 such as</p>
 <ul>
-<li>Trait CgroupManager, this abstracts over the underlying implementation of interacting with specific version of cgroups, and gives functions to add certain process to a certain cgroup, apply resource restrictions, get statistics of a cgroups, freeze a cgroup, remove a cgroup or get list of all processes belonging to a cgroup. v1 and v2 modules both contain a version specific cgroup manager which implements this trait, and thus either can be given to functions or structs which expects a cgroup manager, depending on which cgroups the host system uses.</li>
+<li>Trait <code>CgroupManager</code>, this abstracts over the underlying implementation of interacting with specific version of cgroups, and gives functions to add certain process to a certain cgroup, apply resource restrictions, get statistics of a cgroups, freeze a cgroup, remove a cgroup or get list of all processes belonging to a cgroup. v1 and v2 modules both contain a version specific cgroup manager which implements this trait, and thus either can be given to functions or structs which expects a cgroup manager, depending on which cgroups the host system uses.</li>
 <li>Apart from the trait, this also contains functions which help with reading cgroups files, and write data to a cgroup file, which are used throughout this crate.</li>
 <li>A function to detect which cgroup setup (v1, v2 or hybrid) is on the host system, as well as a function to get the corresponding cgroups manager.</li>
 </ul>
@@ -661,7 +661,9 @@ cd -
 <li><a href="https://man7.org/linux/man-pages/man7/pid_namespaces.7.html">pid namespace man page</a></li>
 <li><a href="https://man7.org/linux/man-pages/man2/clone.2.html">CLONE_NEWUSER flag</a></li>
 </ul>
-<p>Note: clone(2) offers us the ability to enter into user and pid namespace by creatng only one process. However, clone(2) can only create new pid namespace, but cannot enter into existing pid namespaces. Therefore, to enter into existing pid namespaces, we would need to fork twice. Currently, there is no getting around this limitation.</p>
+<blockquote>
+<p>Note: clone(2) offers us the ability to enter into user and pid namespace by creating only one process. However, clone(2) can only create new pid namespace, but cannot enter into existing pid namespaces. Therefore, to enter into existing pid namespaces, we would need to fork twice. Currently, there is no getting around this limitation.</p>
+</blockquote>
 <ul>
 <li><a href="https://man7.org/linux/man-pages/man2/fork.2.html">fork(2) man page</a></li>
 <li><a href="https://man7.org/linux/man-pages/man2/clone.2.html">clone(2) man page</a></li>
@@ -684,19 +686,19 @@ cd -
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="liboci-cli-1"><a class="header" href="#liboci-cli-1">liboci-cli</a></h1>
 <p>This crate was separated from original youki crate, and now contains a standalone implementation of structs needed for parsing commandline arguments for OCI-spec compliant runtime commandline interface. This is in turn used by youki to parse the command line arguments passed to it, but can be used in any other projects where there is need to parse OCI spec based commandline arguments.</p>
-<p>This primarily uses the crate clap-v3 for parsing the actual commandline arguments given to the runtime.</p>
+<p>This primarily uses the <a href="https://docs.rs/clap/latest/clap/index.html">crate clap-v3</a> for parsing the actual commandline arguments given to the runtime.</p>
 <p>You can refer to <a href="https://github.com/opencontainers/runtime-tools/blob/master/docs/command-line-interface.md">OCI Commandline interface guide</a> to know more about the exact specification.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="libseccomp-1"><a class="header" href="#libseccomp-1">libseccomp</a></h1>
 <p>Seccomp is a linux kernel feature that allows a process a one-way transition into secure mode, where restrictions are applied to the syscalls the process can make, as well as restrictions on the file descriptors. Specifically, it can exit, sigreturn and read/write already open file descriptors. This way the process can be isolated and restricted on how it interacts with rest of the system on a kernel level.</p>
 <p>This crate does not actually implement any particular feature, but provides Rust FFI bindings for seccomp module. These are primarily generated by using rsut-bindgen on seccomp C header file, and then manually fixed where any issues were found. More information about seccomp can be found in its <a href="https://man7.org/linux/man-pages/man2/seccomp.2.html">man page</a>.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="youki-2"><a class="header" href="#youki-2">youki</a></h1>
-<p>This is the core crate that contains the youki binary itself. This provides the user interface, as well as binds the other crates together to actually perform the work of creation and management of containers. THus this provides implementation of all the commands supported by youki.</p>
+<p>This is the core crate that contains the youki binary itself. This provides the user interface, as well as binds the other crates together to actually perform the work of creation and management of containers. Thus, this provides implementation of all the commands supported by youki.</p>
 <p>The simple control flow of youki can be explained as :</p>
 <p align="center">
   <img src="developer/../assets/control_flow.drawio.svg">
 </p>
 <p>When given the create command, Youki will load the specification, configuration, sockets etc., and use clone syscall to create an intermediate process. This process will set the cgroups and capabilities, and then fork to the init process. Reason to create this intermediate prcoess is that the clone syscall cannot enter into existing pid namespace that has been created for the container. Thus first we need to make a transition to that namespace in the intermediate process and fork that to the container process. After that the main youki process is requested the uid and gid mappings, and after receiving them the intermediate process sets these mapping, fork the init process and return pid of this init process to the main youki process before exiting.</p>
-<p>THe init process then transition completely into the new namespace setup for the container (the init process only transitions the pid namespace). It changes the root mountpoint for the process using <a href="https://man7.org/linux/man-pages/man2/pivot_root.2.html">pivot_root</a>, so that the container process can get impression that it has a complete root path access. After that the init process sets up the capabilities and seccomp, and sends the seccomp notify fd to the main youki process. When the seccomp agent running on the host system sets up the seccomp profile, it notifies the init process, after which it can execute the programto be executed inside the container. Thus the init process then sends ready notification to the main youki process, and waits for the start signal.</p>
+<p>The init process then transition completely into the new namespace setup for the container (the init process only transitions the pid namespace). It changes the root mountpoint for the process using <a href="https://man7.org/linux/man-pages/man2/pivot_root.2.html">pivot_root</a>, so that the container process can get impression that it has a complete root path access. After that the init process sets up the capabilities and seccomp, and sends the seccomp notify fd to the main youki process. When the seccomp agent running on the host system sets up the seccomp profile, it notifies the init process, after which it can execute the programto be executed inside the container. Thus the init process then sends ready notification to the main youki process, and waits for the start signal.</p>
 <p>The main youki process which started creating the container, when receives the ready signals update the pid file of the container process and exits. This concludes the creation of the container.</p>
 <p>To start the container, when youki start it executed along with the container id, start signal is sent to the waiting container init process, and the the youki process exists.</p>
 <p>When the init process receives the start signal, it execs the program to be run in the container, and then exits.</p>
@@ -713,11 +715,11 @@ cd -
 <p>As these tests are under development, these are validated on a standard runtime such as runc in the GitHub CI, so validate the tests themselves.</p>
 <h2 id="notes-2"><a class="header" href="#notes-2">Notes</a></h2>
 <h3 id="about-the-create-container-function"><a class="header" href="#about-the-create-container-function">About the create container function</a></h3>
-<p>The test_utils provides a create_container function which can be used to run the <code>youki create</code> command. It returns the child process struct, which can be either <code>wait()</code> or <code>wait_with_output()</code> to wait for it finishing. Unless you know what are you doing, it is recommended to call <code>wait()</code> on it, as otherwise the process will hang. As explained in the <a href="developer/../youki.html">youki docs</a> , the <code>youki create</code> process, after starting forks, and the forked process keeps waiting for another youki process to send it the <code>start</code> signal , and after receiving it, that forked process execs the container program. If you are simply trying to create a container, such as in case of <code>test_outside_runtime</code> then calling <code>wait_with_output()</code> will cause it to hand. If you are actually going to start a container, and need output from the container process, then you must keep the <code>Child struct</code> returned by <code>create</code> function and call <code>wait_with_output()</code> on it <strong>AFTER</strong> you have called the start command on that container, which will give you the <code>stdout</code> and <code>stderr</code> of the process running inside the container.</p>
-<p>To understand how this works, take a look at <a href="https://github.com/opencontainers/runc/blob/master/docs/terminals.md">handling stdio</a> of the runc, specially the <a href="https://github.com/opencontainers/runc/blob/master/docs/terminals.md#detached-pass-through">detached pass-through mode</a> section. As explained in it, we setup the stdio for the original youki process in <code>youki create</code> by setting the stdio to <code>Stdio::piped()</code> in the <code>create</code> function. then we set the <code>terminal</code> option to <code>false</code> (which is the default anyways) in the spec, which makes it run in the pass-through mode. Then when the create process is done its work, and its forked process is waiting for the start signal, it uses the same stdio pipes. Thus calling <code>wait_with_output()</code> without starting will keep it hanged up, and after calling start, stdio of the program to be run inside the container can be obtained from the <code>youki create</code>'s process.</p>
+<p>The test_utils provides a <code>create_container</code> function which can be used to run the <code>youki create</code> command. It returns the child process struct, which can be either <code>wait()</code> or <code>wait_with_output()</code> to wait for it finishing. Unless you know what are you doing, it is recommended to call <code>wait()</code> on it, as otherwise the process will hang. As explained in the <a href="developer/../youki.html">youki docs</a> , the <code>youki create</code> process, after starting forks, and the forked process keeps waiting for another youki process to send it the <code>start</code> signal , and after receiving it, that forked process execs the container program. If you are simply trying to create a container, such as in case of <code>test_outside_runtime</code> then calling <code>wait_with_output()</code> will cause it to hang. If you are actually going to start a container, and need output from the container process, then you must keep the <code>Child struct</code> returned by <code>create</code> function and call <code>wait_with_output()</code> on it <strong>AFTER</strong> you have called the start command on that container, which will give you the <code>stdout</code> and <code>stderr</code> of the process running inside the container.</p>
+<p>To understand how this works, take a look at <a href="https://github.com/opencontainers/runc/blob/master/docs/terminals.md">handling stdio</a> of the runc, specially the <a href="https://github.com/opencontainers/runc/blob/master/docs/terminals.md#detached-pass-through">detached pass-through mode</a> section. As explained in it, we setup the stdio for the original youki process in <code>youki create</code> by setting the stdio to <code>Stdio::piped()</code> in the <code>create</code> function. Then we set the <code>terminal</code> option to <code>false</code> (which is the default anyway) in the spec, which makes it run in the pass-through mode. Then when the create process is done its work, and its forked process is waiting for the start signal, it uses the same stdio pipes. Thus calling <code>wait_with_output()</code> without starting will keep it hanged up, and after calling start, stdio of the program to be run inside the container can be obtained from the <code>youki create</code>'s process.</p>
 <h3 id="how-test-inside-container-works"><a class="header" href="#how-test-inside-container-works">How test inside container works</a></h3>
-<p>We use test_inside_container for making sure that the restrictions and constraints are uphold from inside the container process.
-For that, first whichever integration test needs to use it, must define the runtimetest as the container process in the spec, and then use <code>test_inside_container</code> function. It requires a function which will do the necessary setup for the tests that are to be run inside. Then the counterpart for the test should be added to the <code>runtimetest</code> crate, which will run inside the container and and if there is any error, print it to the <code>stderr</code>. The <code>test_inside_container</code> function will wait for the tests to be over and then check the <code>stderr</code> to be empty. If it is not, the the test is assumed to fail.</p>
+<p>We use <code>test_inside_container</code> for making sure that the restrictions and constraints are uphold from inside the container process.
+For that, first whichever integration test needs to use it, must define the runtimetest as the container process in the spec, and then use <code>test_inside_container</code> function. It requires a function which will do the necessary setup for the tests that are to be run inside. Then the counterpart for the test should be added to the <code>runtimetest</code> crate, which will run inside the container and if there is any error, print it to the <code>stderr</code>. The <code>test_inside_container</code> function will wait for the tests to be over and then check the <code>stderr</code> to be empty. If it is not, the test is assumed to fail.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="runtime-test"><a class="header" href="#runtime-test">Runtime Test</a></h1>
 <p>This crate provides a binary which is used by integration tests to verify that the restrictions and constraints applied to the container are upheld by the container process, from inside the container process. This runs the tests one-by-one, and the failing test prints the error to the stderr.</p>
 <h2 id="notes-3"><a class="header" href="#notes-3">Notes</a></h2>

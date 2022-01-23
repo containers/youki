@@ -163,7 +163,9 @@
 <li><a href="https://man7.org/linux/man-pages/man7/pid_namespaces.7.html">pid namespace man page</a></li>
 <li><a href="https://man7.org/linux/man-pages/man2/clone.2.html">CLONE_NEWUSER flag</a></li>
 </ul>
-<p>Note: clone(2) offers us the ability to enter into user and pid namespace by creatng only one process. However, clone(2) can only create new pid namespace, but cannot enter into existing pid namespaces. Therefore, to enter into existing pid namespaces, we would need to fork twice. Currently, there is no getting around this limitation.</p>
+<blockquote>
+<p>Note: clone(2) offers us the ability to enter into user and pid namespace by creating only one process. However, clone(2) can only create new pid namespace, but cannot enter into existing pid namespaces. Therefore, to enter into existing pid namespaces, we would need to fork twice. Currently, there is no getting around this limitation.</p>
+</blockquote>
 <ul>
 <li><a href="https://man7.org/linux/man-pages/man2/fork.2.html">fork(2) man page</a></li>
 <li><a href="https://man7.org/linux/man-pages/man2/clone.2.html">clone(2) man page</a></li>

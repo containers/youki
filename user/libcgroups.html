@@ -145,17 +145,17 @@
 <li>v1</li>
 <li>v2</li>
 </ul>
-<p>Following is a short explanation of these modules</p>
+<p>Following is a short explanation of these modules.</p>
 <h3 id="common"><a class="header" href="#common">common</a></h3>
-<p>This module contains functionality that is general to any type of cgroup. SOme of the things this provides are</p>
+<p>This module contains functionality that is general to any type of cgroup. Some of the things it provides are:</p>
 <ul>
 <li>
-<p>trait CgroupManager : this gives and interface for the following</p>
+<p>trait <code>CgroupManager</code> which gives and interface for the following:</p>
 <ul>
 <li>add a task to a cgroup</li>
 <li>apply resource restriction</li>
 <li>remove a cgroup</li>
-<li>freezer cgroup state control</li>
+<li>control freezer cgroup state</li>
 <li>get stats from a cgroup</li>
 <li>get pids belonging to the cgroup</li>
 </ul>
@@ -175,22 +175,22 @@
 <p>Some of the things it exposes are</p>
 <ul>
 <li>
-<p>struct <code>Stats</code> which contains following individual structs</p>
+<p>struct <code>Stats</code> which contains following structs:</p>
 <ul>
 <li>
-<p>CpuStats : contains cpu usage and throttling information</p>
+<p><code>CpuStats</code> : contains cpu usage and throttling information</p>
 </li>
 <li>
-<p>MemoryStats : contains usage of memory, swap and memory combined, kernel memory, kernel tcp memory and other memory stats</p>
+<p><code>MemoryStats</code> : contains usage of memory, swap and memory combined, kernel memory, kernel tcp memory and other memory stats</p>
 </li>
 <li>
-<p>PidStats : contains current number of active pids and allowed number of pids</p>
+<p><code>PidStats</code> : contains current number of active pids and allowed number of pids</p>
 </li>
 <li>
-<p>BlkioStats : contains block io related stats, such as : number of bytes transferred from/to by a device in cgroup, number of io operations done by a device in cgroup, device access and queue information etc.</p>
+<p><code>BlkioStats</code> : contains block io related stats, such as number of bytes transferred from/to a device in cgroup, number of io operations done by a device in cgroup, device access and queue information etc.</p>
 </li>
 <li>
-<p>HugeTlbStats : containing stats for Huge TLB such as usage, max_usage and fail count</p>
+<p><code>HugeTlbStats</code> : containing stats for Huge TLB such as usage, max_usage, and fail count</p>
 </li>
 </ul>
 </li>
@@ -198,7 +198,7 @@
 <p>function <code>supported_page_size</code> which returns hugepage size supported by the system</p>
 </li>
 <li>
-<p>utility functions to operate with data in cgroups files such as</p>
+<p>utility functions to operate with data in cgroups files such as:</p>
 <ul>
 <li>
 <p><code>parse_single_value</code> : reads file expecting it to have a single value, and returns the value</p>
@@ -216,23 +216,23 @@
 </li>
 </ul>
 <h3 id="systemd"><a class="header" href="#systemd">systemd</a></h3>
-<p>This is the module used by youki to interact with sytemd, and it exposes several functions to interact</p>
+<p>This is the module used by youki to interact with systemd, and it exposes several functions to interact:</p>
 <ul>
 <li>
 <p>function <code>booted</code> to check if the system was booted with systemd or not</p>
 </li>
 <li>
-<p>module controller_type, which contains <code>enum ControllerType</code> which is used to specify cgroup controllers available on a system</p>
+<p>module <code>controller_type</code>, which contains enum <code>ControllerType</code> which is used to specify cgroup controllers available on a system</p>
 </li>
 <li>
-<p>module manager, which contains <code>struct Manager</code>, which is the cgroup manager, and contain information such as the root cgroups path, path for the specific cgroups, client to communicate with systemd etc. This also implements CgroupManager trait, and thus can be used for cgroups related operations.</p>
+<p>module <code>manager</code>, which contains <code>Manager</code> struct, which is the cgroup manager, and contain information such as the root cgroups path, path for the specific cgroups, client to communicate with systemd etc. This also implements <code>CgroupManager</code> trait, and thus can be used for cgroups related operations.</p>
 </li>
 </ul>
 <h3 id="test_manager"><a class="header" href="#test_manager">test_manager</a></h3>
-<p>This exposes a TestManager struct which can be used as dummy for cgroup testing purposes, which also implements CgroupManager.</p>
+<p>This exposes a <code>TestManager</code> struct which can be used as dummy for cgroup testing purposes, which also implements <code>CgroupManager</code>.</p>
 <h3 id="v1-and-v2"><a class="header" href="#v1-and-v2">v1 and v2</a></h3>
-<p>These two modules contains functionalities specific to cgroups version 1 and version 2. Both of these expose respective cgroup managers, which can be used to manage that type of cgroup, as well as sme utility functions related to respective cgroup version, such as <code>get_mount_points</code> (for v1 and v2), <code>get_subsystem_mount points (for v1) and </code>get_available_controllers` (for v2) etc.</p>
-<p>The v2 module also exposes devices module, which gives functionality for working with bpf ; such as load a bpf program, query info of a bpf program, attach and detach a bpf program to a cgroup, etc.</p>
+<p>These two modules contains functionalities specific to cgroups version 1 and version 2. Both of these expose respective cgroup managers, which can be used to manage that type of cgroup, as well as some utility functions related to respective cgroup version, such as <code>get_mount_points</code> (for v1 and v2), <code>get_subsystem_mount points</code> (for v1), and <code>get_available_controllers</code> (for v2) etc.</p>
+<p>The v2 module also exposes devices module, which provides functionality for working with bpf, such as load a bpf program, query info of a bpf program, attach and detach a bpf program to a cgroup, etc.</p>
 
                     </main>
 
