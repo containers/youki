@@ -92,7 +92,7 @@ use liboci_cli::{...}
 
 As explained before, Youki only support Linux, and to build/use it on non-Linux Platforms, you will need to use some kind of virtualization. The repo provides a Vagrantfile to do the required VM setup using Vagrant, which can be installed from [here](https://www.vagrantup.com/docs/installation).
 
-Once installed ans setup, you can run vagrant commands in the cloned directory to run Youki inside the VM created by vagrant :
+Once installed and setup, you can run vagrant commands in the cloned directory to run Youki inside the VM created by vagrant :
 
 ```console
 # in the youki directory

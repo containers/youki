@@ -11,18 +11,18 @@ The modules that it exposes are :
 - v1
 - v2
 
-Following is a short explanation of these modules
+Following is a short explanation of these modules.
 
 ### common
 
-This module contains functionality that is general to any type of cgroup. SOme of the things this provides are
+This module contains functionality that is general to any type of cgroup. Some of the things it provides are:
 
-- trait CgroupManager : this gives and interface for the following
+- trait `CgroupManager` which gives and interface for the following:
 
   - add a task to a cgroup
   - apply resource restriction
   - remove a cgroup
-  - freezer cgroup state control
+  - control freezer cgroup state
   - get stats from a cgroup
   - get pids belonging to the cgroup
 
@@ -36,21 +36,21 @@ This module has functionalities related to statistics data of the cgroups, and s
 
 Some of the things it exposes are
 
-- struct `Stats` which contains following individual structs
+- struct `Stats` which contains following structs:
 
-  - CpuStats : contains cpu usage and throttling information
+  - `CpuStats` : contains cpu usage and throttling information
 
-  - MemoryStats : contains usage of memory, swap and memory combined, kernel memory, kernel tcp memory and other memory stats
+  - `MemoryStats` : contains usage of memory, swap and memory combined, kernel memory, kernel tcp memory and other memory stats
 
-  - PidStats : contains current number of active pids and allowed number of pids
+  - `PidStats` : contains current number of active pids and allowed number of pids
 
-  - BlkioStats : contains block io related stats, such as : number of bytes transferred from/to by a device in cgroup, number of io operations done by a device in cgroup, device access and queue information etc.
+  - `BlkioStats` : contains block io related stats, such as number of bytes transferred from/to a device in cgroup, number of io operations done by a device in cgroup, device access and queue information etc.
 
-  - HugeTlbStats : containing stats for Huge TLB such as usage, max_usage and fail count
+  - `HugeTlbStats` : containing stats for Huge TLB such as usage, max_usage, and fail count
 
 - function `supported_page_size` which returns hugepage size supported by the system
 
-- utility functions to operate with data in cgroups files such as
+- utility functions to operate with data in cgroups files such as:
 
   - `parse_single_value` : reads file expecting it to have a single value, and returns the value
 
@@ -62,20 +62,20 @@ Some of the things it exposes are
 
 ### systemd
 
-This is the module used by youki to interact with sytemd, and it exposes several functions to interact
+This is the module used by youki to interact with systemd, and it exposes several functions to interact:
 
 - function `booted` to check if the system was booted with systemd or not
 
-- module controller_type, which contains `enum ControllerType` which is used to specify cgroup controllers available on a system
+- module `controller_type`, which contains enum `ControllerType` which is used to specify cgroup controllers available on a system
 
-- module manager, which contains `struct Manager`, which is the cgroup manager, and contain information such as the root cgroups path, path for the specific cgroups, client to communicate with systemd etc. This also implements CgroupManager trait, and thus can be used for cgroups related operations.
+- module `manager`, which contains `Manager` struct, which is the cgroup manager, and contain information such as the root cgroups path, path for the specific cgroups, client to communicate with systemd etc. This also implements `CgroupManager` trait, and thus can be used for cgroups related operations.
 
 ### test_manager
 
-This exposes a TestManager struct which can be used as dummy for cgroup testing purposes, which also implements CgroupManager.
+This exposes a `TestManager` struct which can be used as dummy for cgroup testing purposes, which also implements `CgroupManager`.
 
 ### v1 and v2
 
-These two modules contains functionalities specific to cgroups version 1 and version 2. Both of these expose respective cgroup managers, which can be used to manage that type of cgroup, as well as sme utility functions related to respective cgroup version, such as `get_mount_points` (for v1 and v2), `get_subsystem_mount points (for v1) and `get_available_controllers` (for v2) etc.
+These two modules contains functionalities specific to cgroups version 1 and version 2. Both of these expose respective cgroup managers, which can be used to manage that type of cgroup, as well as some utility functions related to respective cgroup version, such as `get_mount_points` (for v1 and v2), `get_subsystem_mount points` (for v1), and `get_available_controllers` (for v2) etc.
 
-The v2 module also exposes devices module, which gives functionality for working with bpf ; such as load a bpf program, query info of a bpf program, attach and detach a bpf program to a cgroup, etc.
+The v2 module also exposes devices module, which provides functionality for working with bpf, such as load a bpf program, query info of a bpf program, attach and detach a bpf program to a cgroup, etc.

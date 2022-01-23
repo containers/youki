@@ -38,13 +38,13 @@ pub trait CgroupManager {
     /// Removes the cgroup
     fn remove(&self) -> Result<()>;
 
-    // Sets the freezer cgroup to the specified state
+    /// Sets the freezer cgroup to the specified state
     fn freeze(&self, state: FreezerState) -> Result<()>;
 
     /// Retrieve statistics for the cgroup
     fn stats(&self) -> Result<Stats>;
 
-    // Gets the PIDs inside the cgroup
+    /// Gets the PIDs inside the cgroup
     fn get_all_pids(&self) -> Result<Vec<Pid>>;
 }
 

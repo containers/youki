@@ -240,7 +240,7 @@ pub fn parse_single_value(file_path: &Path) -> Result<u64> {
     })
 }
 
-/// Parses a file that is structed according to the flat keyed format
+/// Parses a file that is structured according to the flat keyed format
 pub fn parse_flat_keyed_data(file_path: &Path) -> Result<HashMap<String, u64>> {
     let mut stats = HashMap::new();
     let keyed_data = common::read_cgroup_file(file_path)?;

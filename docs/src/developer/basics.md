@@ -12,7 +12,7 @@ Before you start working on developing youki, you should go through [the User do
 
 #### OCI
 
-Open containers initiative is project, which provides a standardization and standardized specification for operating-system-level virtualization. That way components that confirm to the specification provided by OCI spec, can interoperate with each other easily, and developing of new applications becomes easier. For example youuki can be used inplace of runc in Docker, as all three : Docker, runc and youki are OCI compliant, and have a standard interface.
+Open containers initiative is project, which provides a standardization and standardized specification for operating-system-level virtualization. That way components that confirm to the specification provided by OCI spec, can interoperate with each other easily, and developing of new applications becomes easier. For example youki can be used inplace of runc in Docker, as all three : Docker, runc and youki are OCI compliant, and have a standard interface.
 
 Their main GitHub page is at [https://github.com/opencontainers](https://github.com/opencontainers), and more information about the runtime specifications can be found at [https://github.com/opencontainers/runtime-spec/blob/master/runtime.md](https://github.com/opencontainers/runtime-spec/blob/master/runtime.md).
 
