@@ -38,7 +38,8 @@ impl<'a> Rootless<'a> {
         if user_namespace.is_some() && user_namespace.unwrap().path().is_none() {
             log::debug!("rootless container should be created");
 
-            validate(spec).context("The spec failed to comply to rootless requirement")?;
+            validate_spec_for_rootless(spec)
+                .context("The spec failed to comply to rootless requirement")?;
             let mut rootless = Rootless::from(linux);
             if let Some((uid_binary, gid_binary)) = lookup_map_binaries(linux)? {
                 rootless.newuidmap = Some(uid_binary);
@@ -123,7 +124,7 @@ pub fn unprivileged_user_ns_enabled() -> Result<bool> {
 
 /// Validates that the spec contains the required information for
 /// running in rootless mode
-fn validate(spec: &Spec) -> Result<()> {
+fn validate_spec_for_rootless(spec: &Spec) -> Result<()> {
     let linux = spec.linux().as_ref().context("no linux in spec")?;
     let namespaces = Namespaces::from(linux.namespaces().as_ref());
     if namespaces.get(LinuxNamespaceType::User).is_none() {
