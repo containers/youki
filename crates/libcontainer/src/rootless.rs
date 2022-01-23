@@ -148,7 +148,7 @@ fn validate_spec_for_rootless(spec: &Spec) -> Result<()> {
         bail!("rootless containers require at least one gid mapping")
     }
 
-    validate_mounts(
+    validate_mounts_for_rootless(
         spec.mounts().as_ref().context("no mounts in spec")?,
         uid_mappings,
         gid_mappings,
@@ -183,7 +183,7 @@ fn validate_spec_for_rootless(spec: &Spec) -> Result<()> {
     Ok(())
 }
 
-fn validate_mounts(
+fn validate_mounts_for_rootless(
     mounts: &[Mount],
     uid_mappings: &[LinuxIdMapping],
     gid_mappings: &[LinuxIdMapping],
