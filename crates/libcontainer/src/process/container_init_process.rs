@@ -9,7 +9,9 @@ use crate::{
 use anyhow::{bail, Context, Result};
 use nix::mount::MsFlags;
 use nix::sched::CloneFlags;
+use nix::sys::stat::Mode;
 use nix::unistd::setsid;
+
 use nix::{
     fcntl,
     unistd::{self, Gid, Uid},
@@ -294,6 +296,14 @@ pub fn container_init_process(
             MsFlags::MS_RDONLY | MsFlags::MS_REMOUNT | MsFlags::MS_BIND,
             None,
         )?
+    }
+
+    if let Some(umask) = proc.user().umask() {
+        if let Some(mode) = Mode::from_bits(umask) {
+            nix::sys::stat::umask(mode);
+        } else {
+            bail!("invalid umask {}", umask);
+        }
     }
 
     if let Some(paths) = linux.readonly_paths() {
