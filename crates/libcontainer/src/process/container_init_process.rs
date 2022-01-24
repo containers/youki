@@ -1,6 +1,7 @@
 use super::args::ContainerArgs;
 use crate::apparmor;
 use crate::syscall::Syscall;
+use crate::workload::ExecutorManager;
 use crate::{
     capabilities, hooks, namespaces::Namespaces, process::channel, rootfs::RootFS,
     rootless::Rootless, seccomp, tty, utils,
@@ -259,22 +260,22 @@ pub fn container_init_process(
             // change the root of filesystem of the process to the rootfs
             syscall
                 .pivot_rootfs(rootfs_path)
-                .with_context(|| format!("Failed to pivot root to {:?}", rootfs_path))?;
+                .with_context(|| format!("failed to pivot root to {:?}", rootfs_path))?;
         } else {
             syscall
                 .chroot(rootfs_path)
-                .with_context(|| format!("Failed to chroot to {:?}", rootfs_path))?;
+                .with_context(|| format!("failed to chroot to {:?}", rootfs_path))?;
         }
 
         rootfs
             .adjust_root_mount_propagation(linux)
-            .context("Failed to set propagation type of root mount")?;
+            .context("failed to set propagation type of root mount")?;
 
         reopen_dev_null()?;
 
         if let Some(kernel_params) = linux.sysctl() {
             sysctl(kernel_params)
-                .with_context(|| format!("Failed to sysctl: {:?}", kernel_params))?;
+                .with_context(|| format!("failed to sysctl: {:?}", kernel_params))?;
         }
     }
 
@@ -297,7 +298,7 @@ pub fn container_init_process(
         // mount readonly path
         for path in paths {
             readonly_path(Path::new(path), syscall)
-                .with_context(|| format!("Failed to set read only path {:?}", path))?;
+                .with_context(|| format!("failed to set read only path {:?}", path))?;
         }
     }
 
@@ -305,7 +306,7 @@ pub fn container_init_process(
         // mount masked path
         for path in paths {
             masked_path(Path::new(path), linux.mount_label(), syscall)
-                .with_context(|| format!("Failed to set masked path {:?}", path))?;
+                .with_context(|| format!("failed to set masked path {:?}", path))?;
         }
     }
 
@@ -437,15 +438,11 @@ pub fn container_init_process(
         }
     }
 
-    if let Some(args) = proc.args() {
-        utils::do_exec(&args[0], args)?;
+    if proc.args().is_some() {
+        ExecutorManager::exec(spec)
     } else {
         bail!("on non-Windows, at least one process arg entry is required")
     }
-
-    // After do_exec is called, the process is replaced with the container
-    // payload through execvp, so it should never reach here.
-    unreachable!();
 }
 
 // Before 3.19 it was possible for an unprivileged user to enter an user namespace,
