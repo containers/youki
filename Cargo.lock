@@ -1052,6 +1052,7 @@ dependencies = [
  "procfs",
  "quickcheck",
  "rand",
+ "rust-criu",
  "serde",
  "serde_json",
  "serial_test",
@@ -1623,6 +1624,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "protobuf"
+version = "2.25.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "47c327e191621a2158159df97cdbc2e7074bb4e940275e35abf38eb3d2595754"
+
+[[package]]
+name = "protobuf-codegen"
+version = "2.25.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3df8c98c08bd4d6653c2dbae00bd68c1d1d82a360265a5b0bbc73d48c63cb853"
+dependencies = [
+ "protobuf",
+]
+
+[[package]]
+name = "protobuf-codegen-pure"
+version = "2.25.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "394a73e2a819405364df8d30042c0f1174737a763e0170497ec9d36f8a2ea8f7"
+dependencies = [
+ "protobuf",
+ "protobuf-codegen",
+]
+
+[[package]]
 name = "ptr_meta"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1819,6 +1845,16 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "rust-criu"
+version = "0.1.0"
+source = "git+https://github.com/checkpoint-restore/rust-criu#6df305772205620bea3a1c0e70ba81cd38f8417c"
+dependencies = [
+ "libc",
+ "protobuf",
+ "protobuf-codegen-pure",
 ]
 
 [[package]]
