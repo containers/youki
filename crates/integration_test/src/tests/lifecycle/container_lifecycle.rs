@@ -36,8 +36,8 @@ impl ContainerLifecycle {
     }
 
     #[allow(dead_code)]
-    pub fn exec(&self, cmd: &str) -> TestResult {
-        exec::exec(&self.project_path, &self.container_id, cmd)
+    pub fn exec(&self, cmd: Vec<&str>, expected_output: Option<&str>) -> TestResult {
+        exec::exec(&self.project_path, &self.container_id, cmd, expected_output)
     }
 
     pub fn start(&self) -> TestResult {
@@ -65,16 +65,18 @@ impl<'a> TestableGroup<'a> for ContainerLifecycle {
     fn get_name(&self) -> &'a str {
         "lifecycle"
     }
+
     fn run_all(&self) -> Vec<(&'a str, TestResult)> {
         vec![
             ("create", self.create()),
             ("start", self.start()),
-            // ("exec", self.exec("true")),
+            // ("exec", self.exec(vec!["echo", "Hello"], Some("Hello\n"))),
             ("kill", self.kill()),
             ("state", self.state()),
             ("delete", self.delete()),
         ]
     }
+
     fn run_selected(&self, selected: &[&str]) -> Vec<(&'a str, TestResult)> {
         let mut ret = Vec::new();
         for name in selected {
