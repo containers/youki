@@ -13,7 +13,7 @@ caps = "0.5.3"
 chrono = { version="0.4", features = ["serde"] }
 crossbeam-channel = "0.5"
 dbus = "0.9.5"
-fastrand = "1.6.0"
+fastrand = "1.7.0"
 futures = { version = "0.3", features = ["thread-pool"] }
 libc = "0.2.113"
 log = "0.4"
