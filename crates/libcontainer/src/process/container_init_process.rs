@@ -198,7 +198,7 @@ fn reopen_dev_null() -> Result<()> {
     let dev_null_fstat_info = nix::sys::stat::fstat(dev_null.as_raw_fd())?;
 
     // Check if stdin, stdout or stderr point to /dev/null
-    for fd in 0..2 {
+    for fd in 0..3 {
         let fstat_info = nix::sys::stat::fstat(fd)?;
 
         if dev_null_fstat_info.st_rdev == fstat_info.st_rdev {
