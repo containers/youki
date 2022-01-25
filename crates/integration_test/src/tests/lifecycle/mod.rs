@@ -1,3 +1,4 @@
+mod checkpoint;
 mod container_create;
 mod container_lifecycle;
 mod create;

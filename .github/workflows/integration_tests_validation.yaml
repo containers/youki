@@ -36,9 +36,14 @@ jobs:
         uses: Swatinem/rust-cache@v1
       - run: sudo apt-get -y update
       - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev libseccomp-dev
+      - name: Install runc 1.1.0
+        run: |
+          wget -q https://github.com/opencontainers/runc/releases/download/v1.1.0/runc.amd64
+          sudo mv runc.amd64 /usr/bin/runc
+          sudo chmod 755 /usr/bin/runc
       - name: Build
         run: ./build.sh
       - name: Validate tests on runc
-        run: cd ./crates/integration_test && sudo ./tests.sh run runc
+        run: runc --version && cd ./crates/integration_test && sudo ./tests.sh run runc
       - name: Validate tests on youki
         run: cd ./crates/integration_test && sudo ./tests.sh run ../../youki
