@@ -2340,9 +2340,9 @@ dependencies = [
 
 [[package]]
 name = "wasmer-compiler"
-version = "2.1.0"
+version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0f7a9201a79b68fe6427afa7835828b23647ef75f8a7aa212ec112f1625eeb1"
+checksum = "88c51cc589772c5f90bd329244c2416976d6cb2ee00d59429aaa8f421d9fe447"
 dependencies = [
  "enumset",
  "loupe",
@@ -2492,9 +2492,9 @@ dependencies = [
 
 [[package]]
 name = "wasmer-vm"
-version = "2.1.0"
+version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "721f7570037d25e5215f74e44af6d644a8cee10cc3df7825d03ff4179a8f6004"
+checksum = "cc8f964ebba70d9f81340228b98a164782591f00239fc7f01e1b67afcf0e0156"
 dependencies = [
  "backtrace",
  "cc",
