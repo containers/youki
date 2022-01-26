@@ -2382,9 +2382,9 @@ dependencies = [
 
 [[package]]
 name = "wasmer-derive"
-version = "2.1.0"
+version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "63990dd633cb4a8c45d2f58429aa9500385734050d0c3e434a97cd87dfecf9cc"
+checksum = "93f5cb7b09640e09f1215da95d6fb7477d2db572f064b803ff705f39ff079cc5"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",
