@@ -2394,9 +2394,9 @@ dependencies = [
 
 [[package]]
 name = "wasmer-engine"
-version = "2.1.0"
+version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae9202a77333cfad9a32d33862dda7c1a981c3f17139f3da44a447df6b56ae4d"
+checksum = "ab20311c354fe2c12bc766417e0a1a45f399c1cd8ff262127d1dc86d0588971a"
 dependencies = [
  "backtrace",
  "enumset",
