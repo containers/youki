@@ -2316,9 +2316,9 @@ checksum = "3d958d035c4438e28c70e4321a2911302f10135ce78a9c7834c0cab4123d06a2"
 
 [[package]]
 name = "wasmer"
-version = "2.1.0"
+version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03ea93a6ba209613d82b8fe128ec39be4297b0f6d9571ee0db963939ff02c25e"
+checksum = "23f0188c23fc1b7de9bd7f8b834d0b1cd5edbe66e287452e8ce36d24418114f7"
 dependencies = [
  "cfg-if 1.0.0",
  "indexmap",
@@ -2416,9 +2416,9 @@ dependencies = [
 
 [[package]]
 name = "wasmer-engine-dylib"
-version = "2.1.0"
+version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d633a81aa4278720ef476f9800efafccc4616d55f6e4fb079f6f268bd2df0a5c"
+checksum = "8dd5b7a74731e1dcccaf10a8ff5f72216c82f12972ce17cc81c6caa1afff75ea"
 dependencies = [
  "cfg-if 1.0.0",
  "enumset",
@@ -2439,9 +2439,9 @@ dependencies = [
 
 [[package]]
 name = "wasmer-engine-universal"
-version = "2.1.0"
+version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8d70c28b4a5c300b91f55dbefa947751485899bf3de6cfaf3b702d14833ddb7"
+checksum = "dfeae8d5b825ad7abcf9a34e66eb11e1507b21020efe7bbf9897e3dd8d7869e2"
 dependencies = [
  "cfg-if 1.0.0",
  "enumset",
