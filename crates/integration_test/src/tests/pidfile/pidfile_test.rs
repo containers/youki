@@ -1,6 +1,6 @@
 use crate::utils::{
-    create_temp_dir, delete_container, generate_uuid, get_runtime_path, get_state_output, kill_container,
-    prepare_bundle, State, TempDir,
+    create_temp_dir, delete_container, generate_uuid, get_runtime_path, get_state_output,
+    kill_container, prepare_bundle, State, TempDir,
 };
 use anyhow::anyhow;
 use std::process::{Command, Stdio};

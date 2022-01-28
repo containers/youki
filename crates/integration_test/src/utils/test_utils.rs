@@ -98,8 +98,7 @@ pub fn get_state<P: AsRef<Path>>(id: &str, dir: P) -> Result<Child> {
 
 pub fn get_state_output<P: AsRef<Path>>(id: &str, dir: P) -> Result<(String, String)> {
     sleep(SLEEP_TIME);
-    let output = get_state(id, dir)?
-        .wait_with_output()?;
+    let output = get_state(id, dir)?.wait_with_output()?;
     let stderr = String::from_utf8(output.stderr).context("failed to parse std error stream")?;
     let stdout = String::from_utf8(output.stdout).context("failed to parse std output stream")?;
     Ok((stdout, stderr))
@@ -116,7 +115,8 @@ pub fn start_container<P: AsRef<Path>>(id: &str, dir: P) -> Result<Child> {
 
 fn runtime_command<P: AsRef<Path>>(dir: P) -> Command {
     let mut command = Command::new(get_runtime_path());
-    command.stdout(Stdio::piped())
+    command
+        .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .arg("--root")
         .arg(dir.as_ref().join("runtime"));
@@ -143,8 +143,14 @@ pub fn test_outside_container(
         create_result,
     };
     let test_result = execute_test(data);
-    kill_container(&id.to_string(), &bundle).unwrap().wait().unwrap();
-    delete_container(&id.to_string(), &bundle).unwrap().wait().unwrap();
+    kill_container(&id.to_string(), &bundle)
+        .unwrap()
+        .wait()
+        .unwrap();
+    delete_container(&id.to_string(), &bundle)
+        .unwrap()
+        .wait()
+        .unwrap();
     test_result
 }
 
@@ -183,7 +189,7 @@ pub fn test_inside_container(
             .join("bin")
             .join("runtimetest"),
     )
-        .unwrap();
+    .unwrap();
     let create_process = create_container(&id, &bundle).unwrap();
     // here we do not wait for the process by calling wait() as in the test_outside_container
     // function because we need the output of the runtimetest. If we call wait, it will return
@@ -192,7 +198,10 @@ pub fn test_inside_container(
     // assume that the create command was successful. If it wasn't we can catch that error
     // in the start_container, as we can not start a non-created container anyways
     std::thread::sleep(std::time::Duration::from_millis(1000));
-    match start_container(&id.to_string(), &bundle).unwrap().wait_with_output() {
+    match start_container(&id.to_string(), &bundle)
+        .unwrap()
+        .wait_with_output()
+    {
         Ok(c) => c,
         Err(e) => return TestResult::Failed(anyhow!("container start failed : {:?}", e)),
     };
@@ -225,8 +234,14 @@ pub fn test_inside_container(
     if state.status != "stopped" {
         return TestResult::Failed(anyhow!("error : unexpected container status in test_inside_runtime : expected stopped, got {}, container state : {:?}",state.status,state));
     }
-    kill_container(&id.to_string(), &bundle).unwrap().wait().unwrap();
-    delete_container(&id.to_string(), &bundle).unwrap().wait().unwrap();
+    kill_container(&id.to_string(), &bundle)
+        .unwrap()
+        .wait()
+        .unwrap();
+    delete_container(&id.to_string(), &bundle)
+        .unwrap()
+        .wait()
+        .unwrap();
     TestResult::Passed
 }
 

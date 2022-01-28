@@ -1,7 +1,7 @@
+use crate::utils::test_utils::get_state;
 use std::io;
 use std::path::Path;
 use test_framework::TestResult;
-use crate::utils::test_utils::get_state;
 
 pub fn state(project_path: &Path, id: &str) -> TestResult {
     let res = get_state(id, project_path)

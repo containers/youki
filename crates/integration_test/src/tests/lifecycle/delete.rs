@@ -1,5 +1,5 @@
 use super::get_result_from_output;
-use crate::utils::{delete_container};
+use crate::utils::delete_container;
 use std::path::Path;
 use test_framework::TestResult;
 
