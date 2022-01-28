@@ -3,7 +3,7 @@ use std::thread::sleep;
 use std::time::Duration;
 use test_framework::{TestResult, TestableGroup};
 
-use super::{create, delete, kill, start, state};
+use super::{create, delete, exec, kill, start, state};
 
 // By experimenting, somewhere around 50 is enough for youki process
 // to get the kill signal and shut down
@@ -35,6 +35,11 @@ impl ContainerLifecycle {
         create::create(&self.project_path, &self.container_id)
     }
 
+    #[allow(dead_code)]
+    pub fn exec(&self, cmd: Vec<&str>, expected_output: Option<&str>) -> TestResult {
+        exec::exec(&self.project_path, &self.container_id, cmd, expected_output)
+    }
+
     pub fn start(&self) -> TestResult {
         start::start(&self.project_path, &self.container_id)
     }
@@ -60,15 +65,18 @@ impl<'a> TestableGroup<'a> for ContainerLifecycle {
     fn get_name(&self) -> &'a str {
         "lifecycle"
     }
+
     fn run_all(&self) -> Vec<(&'a str, TestResult)> {
         vec![
             ("create", self.create()),
             ("start", self.start()),
+            // ("exec", self.exec(vec!["echo", "Hello"], Some("Hello\n"))),
             ("kill", self.kill()),
             ("state", self.state()),
             ("delete", self.delete()),
         ]
     }
+
     fn run_selected(&self, selected: &[&str]) -> Vec<(&'a str, TestResult)> {
         let mut ret = Vec::new();
         for name in selected {
