@@ -1,18 +1,10 @@
-use crate::utils::get_runtime_path;
 use std::io;
 use std::path::Path;
-use std::process::{Command, Stdio};
 use test_framework::TestResult;
+use crate::utils::test_utils::get_state;
 
 pub fn state(project_path: &Path, id: &str) -> TestResult {
-    let res = Command::new(get_runtime_path())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .arg("--root")
-        .arg(project_path.join("runtime"))
-        .arg("state")
-        .arg(id)
-        .spawn()
+    let res = get_state(id, project_path)
         .expect("failed to execute state command")
         .wait_with_output();
     match res {
