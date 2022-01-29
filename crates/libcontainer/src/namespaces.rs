@@ -13,6 +13,16 @@ use nix::{fcntl, sched::CloneFlags, sys::stat, unistd};
 use oci_spec::runtime::{LinuxNamespace, LinuxNamespaceType};
 use std::collections;
 
+static ORDERED_NAMESPACES: &[CloneFlags] = &[
+    CloneFlags::CLONE_NEWUSER,
+    CloneFlags::CLONE_NEWPID,
+    CloneFlags::CLONE_NEWUTS,
+    CloneFlags::CLONE_NEWIPC,
+    CloneFlags::CLONE_NEWNET,
+    CloneFlags::CLONE_NEWCGROUP,
+    CloneFlags::CLONE_NEWNS,
+];
+
 /// Holds information about namespaces
 pub struct Namespaces {
     command: Box<dyn Syscall>,
@@ -21,12 +31,12 @@ pub struct Namespaces {
 
 fn get_clone_flag(namespace_type: LinuxNamespaceType) -> CloneFlags {
     match namespace_type {
-        LinuxNamespaceType::Pid => CloneFlags::CLONE_NEWPID,
         LinuxNamespaceType::User => CloneFlags::CLONE_NEWUSER,
+        LinuxNamespaceType::Pid => CloneFlags::CLONE_NEWPID,
         LinuxNamespaceType::Uts => CloneFlags::CLONE_NEWUTS,
-        LinuxNamespaceType::Cgroup => CloneFlags::CLONE_NEWCGROUP,
         LinuxNamespaceType::Ipc => CloneFlags::CLONE_NEWIPC,
         LinuxNamespaceType::Network => CloneFlags::CLONE_NEWNET,
+        LinuxNamespaceType::Cgroup => CloneFlags::CLONE_NEWCGROUP,
         LinuxNamespaceType::Mount => CloneFlags::CLONE_NEWNS,
     }
 }
@@ -49,14 +59,15 @@ impl From<Option<&Vec<LinuxNamespace>>> for Namespaces {
 
 impl Namespaces {
     pub fn apply_namespaces<F: Fn(CloneFlags) -> bool>(&self, filter: F) -> Result<()> {
-        let to_enter: collections::HashMap<&CloneFlags, &LinuxNamespace> = self
-            .namespace_map
+        let to_enter: Vec<(&CloneFlags, &LinuxNamespace)> = ORDERED_NAMESPACES
             .iter()
-            .filter(|(k, _)| filter(**k))
+            .filter(|c| filter(**c))
+            .filter_map(|c| self.namespace_map.get_key_value(c))
             .collect();
+
         for (ns_type, ns) in to_enter {
             self.unshare_or_setns(ns)
-                .with_context(|| format!("Failed to enter {:?} namespace: {:?}", ns_type, ns))?;
+                .with_context(|| format!("failed to enter {:?} namespace: {:?}", ns_type, ns))?;
         }
         Ok(())
     }
@@ -68,11 +79,11 @@ impl Namespaces {
         } else {
             let ns_path = namespace.path().as_ref().unwrap();
             let fd = fcntl::open(ns_path, fcntl::OFlag::empty(), stat::Mode::empty())
-                .with_context(|| format!("Failed to open namespace fd: {:?}", ns_path))?;
+                .with_context(|| format!("failed to open namespace fd: {:?}", ns_path))?;
             self.command
                 .set_ns(fd, get_clone_flag(namespace.typ()))
-                .with_context(|| "Failed to set namespace")?;
-            unistd::close(fd).with_context(|| "Failed to close namespace fd")?;
+                .with_context(|| "failed to set namespace")?;
+            unistd::close(fd).with_context(|| "failed to close namespace fd")?;
         }
 
         Ok(())
