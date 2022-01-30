@@ -11,7 +11,6 @@ use std::process::{Child, Command, ExitStatus, Stdio};
 use std::thread::sleep;
 use std::time::Duration;
 use test_framework::{test_result, TestResult};
-use uuid::Uuid;
 
 const SLEEP_TIME: Duration = Duration::from_millis(150);
 pub const CGROUP_ROOT: &str = "/sys/fs/cgroup";
@@ -43,7 +42,7 @@ pub struct ContainerData {
 }
 
 /// Starts the runtime with given directory as root directory
-pub fn create_container<P: AsRef<Path>>(id: &Uuid, dir: P) -> Result<Child> {
+pub fn create_container<P: AsRef<Path>>(id: &str, dir: P) -> Result<Child> {
     let res = Command::new(get_runtime_path())
         // set stdio so that we can get o/p of runtimetest
         // in test_inside_container function
@@ -55,7 +54,7 @@ pub fn create_container<P: AsRef<Path>>(id: &Uuid, dir: P) -> Result<Child> {
         .arg("--root")
         .arg(dir.as_ref().join("runtime"))
         .arg("create")
-        .arg(id.to_string())
+        .arg(id)
         .arg("--bundle")
         .arg(dir.as_ref().join("bundle"))
         .spawn()
@@ -64,55 +63,41 @@ pub fn create_container<P: AsRef<Path>>(id: &Uuid, dir: P) -> Result<Child> {
 }
 
 /// Sends a kill command to the given container process
-pub fn kill_container<P: AsRef<Path>>(id: &Uuid, dir: P) -> Result<Child> {
-    let res = Command::new(get_runtime_path())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .arg("--root")
-        .arg(dir.as_ref().join("runtime"))
+pub fn kill_container<P: AsRef<Path>>(id: &str, dir: P) -> Result<Child> {
+    let res = runtime_command(dir)
         .arg("kill")
-        .arg(id.to_string())
+        .arg(id)
         .arg("9")
         .spawn()
         .context("could not kill container")?;
     Ok(res)
 }
 
-pub fn delete_container<P: AsRef<Path>>(id: &Uuid, dir: P) -> Result<Child> {
-    let res = Command::new(get_runtime_path())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .arg("--root")
-        .arg(dir.as_ref().join("runtime"))
+pub fn delete_container<P: AsRef<Path>>(id: &str, dir: P) -> Result<Child> {
+    let res = runtime_command(dir)
         .arg("delete")
-        .arg(id.to_string())
+        .arg(id)
         .spawn()
         .context("could not delete container")?;
     Ok(res)
 }
 
-pub fn get_state<P: AsRef<Path>>(id: &Uuid, dir: P) -> Result<(String, String)> {
+pub fn get_state<P: AsRef<Path>>(id: &str, dir: P) -> Result<(String, String)> {
     sleep(SLEEP_TIME);
-    let output = Command::new(get_runtime_path())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .arg("--root")
-        .arg(dir.as_ref().join("runtime"))
+    let output = runtime_command(dir)
         .arg("state")
         .arg(id.to_string())
-        .spawn()?
-        .wait_with_output()?;
+        .spawn()
+        .context("could not get container state")?
+        .wait_with_output()
+        .context("failed while waiting for state command")?;
     let stderr = String::from_utf8(output.stderr).context("failed to parse std error stream")?;
     let stdout = String::from_utf8(output.stdout).context("failed to parse std output stream")?;
     Ok((stdout, stderr))
 }
 
-pub fn start_container<P: AsRef<Path>>(id: &Uuid, dir: P) -> Result<Child> {
-    let res = Command::new(get_runtime_path())
-        .stderr(Stdio::piped())
-        .stdout(Stdio::piped())
-        .arg("--root")
-        .arg(dir.as_ref().join("runtime"))
+pub fn start_container<P: AsRef<Path>>(id: &str, dir: P) -> Result<Child> {
+    let res = runtime_command(dir)
         .arg("start")
         .arg(id.to_string())
         .spawn()
@@ -120,15 +105,26 @@ pub fn start_container<P: AsRef<Path>>(id: &Uuid, dir: P) -> Result<Child> {
     Ok(res)
 }
 
+fn runtime_command<P: AsRef<Path>>(dir: P) -> Command {
+    let mut command = Command::new(get_runtime_path());
+    command
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .arg("--root")
+        .arg(dir.as_ref().join("runtime"));
+    command
+}
+
 pub fn test_outside_container(
     spec: Spec,
     execute_test: &dyn Fn(ContainerData) -> TestResult,
 ) -> TestResult {
     let id = generate_uuid();
+    let id_str = id.to_string();
     let bundle = prepare_bundle(&id).unwrap();
     set_config(&bundle, &spec).unwrap();
-    let create_result = create_container(&id, &bundle).unwrap().wait();
-    let (out, err) = get_state(&id, &bundle).unwrap();
+    let create_result = create_container(&id_str, &bundle).unwrap().wait();
+    let (out, err) = get_state(&id_str, &bundle).unwrap();
     let state: Option<State> = match serde_json::from_str(&out) {
         Ok(v) => Some(v),
         Err(_) => None,
@@ -140,8 +136,8 @@ pub fn test_outside_container(
         create_result,
     };
     let test_result = execute_test(data);
-    kill_container(&id, &bundle).unwrap().wait().unwrap();
-    delete_container(&id, &bundle).unwrap().wait().unwrap();
+    kill_container(&id_str, &bundle).unwrap().wait().unwrap();
+    delete_container(&id_str, &bundle).unwrap().wait().unwrap();
     test_result
 }
 
@@ -151,6 +147,7 @@ pub fn test_inside_container(
     setup_for_test: &dyn Fn(&Path) -> Result<()>,
 ) -> TestResult {
     let id = generate_uuid();
+    let id_str = id.to_string();
     let bundle = prepare_bundle(&id).unwrap();
 
     // This will do the required setup for the test
@@ -181,7 +178,7 @@ pub fn test_inside_container(
             .join("runtimetest"),
     )
     .unwrap();
-    let create_process = create_container(&id, &bundle).unwrap();
+    let create_process = create_container(&id_str, &bundle).unwrap();
     // here we do not wait for the process by calling wait() as in the test_outside_container
     // function because we need the output of the runtimetest. If we call wait, it will return
     // and we won't have an easy way of getting the stdio of the runtimetest.
@@ -189,7 +186,10 @@ pub fn test_inside_container(
     // assume that the create command was successful. If it wasn't we can catch that error
     // in the start_container, as we can not start a non-created container anyways
     std::thread::sleep(std::time::Duration::from_millis(1000));
-    match start_container(&id, &bundle).unwrap().wait_with_output() {
+    match start_container(&id_str, &bundle)
+        .unwrap()
+        .wait_with_output()
+    {
         Ok(c) => c,
         Err(e) => return TestResult::Failed(anyhow!("container start failed : {:?}", e)),
     };
@@ -207,7 +207,7 @@ pub fn test_inside_container(
         ));
     }
 
-    let (out, err) = get_state(&id, &bundle).unwrap();
+    let (out, err) = get_state(&id_str, &bundle).unwrap();
     if !err.is_empty() {
         return TestResult::Failed(anyhow!(
             "error in getting state after starting the container : {}",
@@ -215,15 +215,15 @@ pub fn test_inside_container(
         ));
     }
 
-    let state:State = match serde_json::from_str(&out) {
+    let state: State = match serde_json::from_str(&out) {
         Ok(v) => v,
         Err(e) => return TestResult::Failed(anyhow!("error in parsing state of container after start in test_inside_container : stdout : {}, parse error : {}",out,e)),
     };
     if state.status != "stopped" {
         return TestResult::Failed(anyhow!("error : unexpected container status in test_inside_runtime : expected stopped, got {}, container state : {:?}",state.status,state));
     }
-    kill_container(&id, &bundle).unwrap().wait().unwrap();
-    delete_container(&id, &bundle).unwrap().wait().unwrap();
+    kill_container(&id_str, &bundle).unwrap().wait().unwrap();
+    delete_container(&id_str, &bundle).unwrap().wait().unwrap();
     TestResult::Passed
 }
 

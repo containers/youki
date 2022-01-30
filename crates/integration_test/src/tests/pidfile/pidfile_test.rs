@@ -9,8 +9,9 @@ use uuid::Uuid;
 
 #[inline]
 fn cleanup(id: &Uuid, bundle: &TempDir) {
-    kill_container(id, bundle).unwrap().wait().unwrap();
-    delete_container(id, bundle).unwrap().wait().unwrap();
+    let str_id = id.to_string();
+    kill_container(&str_id, bundle).unwrap().wait().unwrap();
+    delete_container(&str_id, bundle).unwrap().wait().unwrap();
 }
 
 // here we have to manually create and manage the container
@@ -42,7 +43,7 @@ fn test_pidfile() -> TestResult {
         .wait()
         .unwrap();
 
-    let (out, err) = get_state(&container_id, &bundle).unwrap();
+    let (out, err) = get_state(&container_id.to_string(), &bundle).unwrap();
 
     if !err.is_empty() {
         cleanup(&container_id, &bundle);

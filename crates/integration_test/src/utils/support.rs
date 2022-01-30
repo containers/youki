@@ -78,7 +78,7 @@ pub fn prepare_bundle(id: &Uuid) -> Result<TempDir> {
 
     let mut spec = Spec::default();
     let mut process = Process::default();
-    process.set_args(Some(vec!["sleep".into(), "5".into()]));
+    process.set_args(Some(vec!["sleep".into(), "10".into()]));
     spec.set_process(Some(process));
     set_config(&temp_dir, &spec).unwrap();
 
