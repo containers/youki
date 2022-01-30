@@ -1,6 +1,6 @@
 use crate::utils::{
-    create_temp_dir, delete_container, generate_uuid, get_runtime_path, get_state_output,
-    kill_container, prepare_bundle, State, TempDir,
+    create_temp_dir, delete_container, generate_uuid, get_runtime_path, get_state, kill_container,
+    prepare_bundle, State, TempDir,
 };
 use anyhow::anyhow;
 use std::process::{Command, Stdio};
@@ -43,7 +43,7 @@ fn test_pidfile() -> TestResult {
         .wait()
         .unwrap();
 
-    let (out, err) = get_state_output(&container_id.to_string(), &bundle).unwrap();
+    let (out, err) = get_state(&container_id.to_string(), &bundle).unwrap();
 
     if !err.is_empty() {
         cleanup(&container_id, &bundle);
