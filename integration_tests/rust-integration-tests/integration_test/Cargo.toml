@@ -7,12 +7,12 @@ edition = "2021"
 anyhow = "1.0"
 chrono = { version="0.4" }
 flate2 = "1.0"
-libcgroups = { path = "../libcgroups" }
-libcontainer = { path = "../libcontainer" }
+libcgroups = { path = "../../../crates/libcgroups" }
+libcontainer = { path = "../../../crates/libcontainer" }
 log = { version = "0.4", features = ["std"] }
 nix = "0.23.1"
 num_cpus = "1.13"
-oci-spec = { git = "https://github.com/containers/oci-spec-rs", rev = "54c5e386f01ab37c9305cc4a83404eb157e42440" }
+oci-spec = "0.5.3"
 once_cell = "1.9.0"
 pnet = "0.29.0"
 procfs = "0.12.0"
