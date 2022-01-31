@@ -2,7 +2,11 @@
 
 [workspace]
 members = [
-    "./*"
+    "./libcgroups",
+    "./libcontainer",
+    "./liboci-cli",
+    "./libseccomp",
+    "./youki"
 ]
 
 
