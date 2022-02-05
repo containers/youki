@@ -205,6 +205,43 @@ impl Syscall for LinuxSyscall {
         Some(user)
     }
 
+    fn get_pwdir(&self, uid: uid_t) -> Option<Arc<OsStr>> {
+        let mut passwd = unsafe { mem::zeroed::<libc::passwd>() };
+        let mut buf = vec![0; 2048];
+        let mut result = ptr::null_mut::<libc::passwd>();
+
+        loop {
+            let r = unsafe {
+                libc::getpwuid_r(uid, &mut passwd, buf.as_mut_ptr(), buf.len(), &mut result)
+            };
+            println!("debug: passwd: {:?}", passwd);
+
+            if r != libc::ERANGE {
+                break;
+            }
+
+            let newsize = buf.len().checked_mul(2)?;
+            buf.resize(newsize, 0);
+        }
+
+        if result.is_null() {
+            // There is no such user, or an error has occurred.
+            // errno gets set if there’s an error.
+            return None;
+        }
+
+        if result != &mut passwd {
+            // The result of getpwuid_r should be its input passwd.
+            return None;
+        }
+
+        unsafe {
+            let pw = result.read();
+            let dir_home: Arc<OsStr> = Self::from_raw_buf(pw.pw_dir);
+            Some(dir_home)
+        }
+    }
+
     fn chroot(&self, path: &Path) -> Result<()> {
         unistd::chroot(path)?;
 
