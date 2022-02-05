@@ -306,6 +306,7 @@ mod tests {
     use oci_spec::runtime::{
         LinuxBuilder, LinuxIdMappingBuilder, LinuxNamespaceBuilder, SpecBuilder,
     };
+    use serial_test::serial;
 
     use crate::utils::TempDir;
 
@@ -419,6 +420,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_write_uid_mapping() -> Result<()> {
         let userns = LinuxNamespaceBuilder::default()
             .typ(LinuxNamespaceType::User)
@@ -458,6 +460,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_write_gid_mapping() -> Result<()> {
         let userns = LinuxNamespaceBuilder::default()
             .typ(LinuxNamespaceType::User)
@@ -484,13 +487,13 @@ mod tests {
         let spec = SpecBuilder::default().linux(linux).build()?;
         let rootless = Rootless::new(&spec)?.unwrap();
         let pid = getpid();
-        let tempdir = TempDir::new(get_uid_path(&pid).parent().unwrap())?;
-        let uid_map_path = tempdir.join("uid_map");
-        let _ = fs::File::create(&uid_map_path)?;
+        let tempdir = TempDir::new(get_gid_path(&pid).parent().unwrap())?;
+        let gid_map_path = tempdir.join("gid_map");
+        let _ = fs::File::create(&gid_map_path)?;
         rootless.write_gid_mapping(pid)?;
         assert_eq!(
-            format!("{container_id} {host_uid} {size}"),
-            fs::read_to_string(uid_map_path)?
+            format!("{container_id} {host_gid} {size}"),
+            fs::read_to_string(gid_map_path)?
         );
         Ok(())
     }
