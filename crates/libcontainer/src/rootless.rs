@@ -103,7 +103,7 @@ fn get_uid_path(pid: &Pid) -> PathBuf {
 }
 
 #[cfg(test)]
-fn get_uid_path(pid: &Pid) -> PathBuf {
+pub fn get_uid_path(pid: &Pid) -> PathBuf {
     utils::get_temp_dir_path(format!("{pid}_mapping_path").as_str()).join("uid_map")
 }
 
@@ -113,7 +113,7 @@ fn get_gid_path(pid: &Pid) -> PathBuf {
 }
 
 #[cfg(test)]
-fn get_gid_path(pid: &Pid) -> PathBuf {
+pub fn get_gid_path(pid: &Pid) -> PathBuf {
     utils::get_temp_dir_path(format!("{pid}_mapping_path").as_str()).join("gid_map")
 }
 
