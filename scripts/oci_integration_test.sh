@@ -1,10 +1,13 @@
 #!/bin/bash -eu
 
-ROOT=$(pwd)
-RUNTIME=${ROOT}/youki
+./build.sh
+
+SCRIPTS_DIR=$(pwd)
+RUNTIME=${SCRIPTS_DIR}/youki
+OCI_TEST_DIR=../integration_tests/oci-runtime-tools/src/github.com/opencontainers/runtime-tools
 PATTERN=${1:-.}
 
-cd integration_test/runtime-tools/src/github.com/opencontainers/runtime-tools
+cd $OCI_TEST_DIR
 
 test_cases=(
   "create/create.t"
@@ -106,7 +109,7 @@ for case in "${test_cases[@]}"; do
   echo "Running $case"
   logfile="./log/$case.log"
   mkdir -p "$(dirname $logfile)"
-  sudo RUST_BACKTRACE=1 RUNTIME=${RUNTIME} ${ROOT}/integration_test/runtime-tools/src/github.com/opencontainers/runtime-tools/validation/$case >$logfile 2>&1 || (cat $logfile && exit 1)
+  sudo RUST_BACKTRACE=1 RUNTIME=${RUNTIME} ../integration_test/runtime-tools/src/github.com/opencontainers/runtime-tools/validation/$case >$logfile 2>&1 || (cat $logfile && exit 1)
   if [ 0 -ne $(grep "not ok" $logfile | wc -l ) ]; then
       cat $logfile
       exit 1
