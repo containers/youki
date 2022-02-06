@@ -2,8 +2,8 @@
 
 use anyhow::Context;
 use anyhow::{bail, Result};
-use nix::sys::statfs;
 use nix::sys::stat::Mode;
+use nix::sys::statfs;
 use nix::unistd;
 use nix::unistd::{Uid, User};
 use std::collections::HashMap;
