@@ -121,10 +121,10 @@ pub fn parse_mount(m: &Mount) -> (MsFlags, String) {
 }
 
 /// Find parent mount of rootfs in given mount infos
-pub fn find_parent_mount<'a>(rootfs: &Path, mount_infos: &'a [MountInfo]) -> Result<&'a MountInfo> {
+pub fn find_parent_mount(rootfs: &Path, mount_infos: Vec<MountInfo>) -> Result<MountInfo> {
     // find the longest mount point
     let parent_mount_info = mount_infos
-        .iter()
+        .into_iter()
         .filter(|mi| rootfs.starts_with(&mi.mount_point))
         .max_by(|mi1, mi2| mi1.mount_point.len().cmp(&mi2.mount_point.len()))
         .ok_or_else(|| anyhow!("couldn't find parent mount of {}", rootfs.display()))?;
@@ -166,7 +166,7 @@ mod tests {
             },
         ];
 
-        let res = find_parent_mount(Path::new("/path/to/rootfs"), &mount_infos)
+        let res = find_parent_mount(Path::new("/path/to/rootfs"), mount_infos)
             .context("Failed to get parent mount")?;
         assert_eq!(res.mnt_id, 11);
         Ok(())
@@ -175,7 +175,7 @@ mod tests {
     #[test]
     fn test_find_parent_mount_with_empty_mount_infos() {
         let mount_infos = vec![];
-        let res = find_parent_mount(Path::new("/path/to/rootfs"), &mount_infos);
+        let res = find_parent_mount(Path::new("/path/to/rootfs"), mount_infos);
         assert!(res.is_err());
     }
 
