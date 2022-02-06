@@ -205,29 +205,6 @@ impl Syscall for LinuxSyscall {
         Some(user)
     }
 
-    fn get_pwdir(&self, uid: uid_t) -> Option<String> {
-        let mut buf = [0; 2048];
-        let mut result = ptr::null_mut();
-        let mut passwd: libc::passwd = unsafe { mem::zeroed() };
-        let r_code = unsafe {
-            libc::getpwuid_r(uid, &mut passwd, buf.as_mut_ptr(), buf.len(), &mut result)
-        };
-        if r_code != 0 || result.is_null() {
-            return None;
-        }
-
-        unsafe {
-            let dir = CStr::from_ptr(passwd.pw_dir);
-            match dir.to_str() {
-                Ok(x) => Some(x.to_string()),
-                Err(e) => {  // non-utf8
-                    log::warn!("error when get pw_dir: {}", e);
-                    None
-                }
-            }
-        }
-    }
-
     fn chroot(&self, path: &Path) -> Result<()> {
         unistd::chroot(path)?;
 

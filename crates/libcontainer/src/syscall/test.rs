@@ -171,10 +171,6 @@ impl Syscall for TestHelperSyscall {
         Some(OsString::from("youki").into())
     }
 
-    fn get_pwdir(&self, _: u32) -> Option<String> {
-        Some(String::from("/home/youki"))
-    }
-
     fn chroot(&self, _: &Path) -> anyhow::Result<()> {
         todo!()
     }
