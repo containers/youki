@@ -222,10 +222,13 @@ impl Syscall for LinuxSyscall {
         }
 
         unsafe {
-            let dir = OsStr::from_bytes(CStr::from_ptr(passwd.pw_dir).to_bytes());
+            let dir = CStr::from_ptr(passwd.pw_dir);
             match dir.to_str() {
-                Some(x) => Some(x.to_string()),
-                None => None,
+                Ok(x) => Some(x.to_string()),
+                Err(e) => {  // non-utf8
+                    log::warn!("error when get pw_dir: {}", e);
+                    None
+                }
             }
         }
     }

@@ -56,6 +56,24 @@ Then to start the original/normal Docker daemon, you can run
 sudo systemctl start docker
 ```
 
+#### Let docker permanently know youki as a runtime
+
+With a new version of docker, you can update file `/etc/docker/daemon.json`
+to let docker know youki. A sample content of it:
+```
+{
+  "default-runtime": "runc",
+  "runtimes": {
+    "youki": {
+      "path": "/path/to/youki/youki"
+    }
+  }
+}
+```
+
+After this (need to restart docker at the first time), you can use youki
+with docker: `docker run --runtime youki ...`.
+
 #### Using Youki Standalone
 
 Youki can also be used directly, without a higher-level runtime such as Docker to create, start, stop and delete the container, but the process can be tedious. Here we will show how you can do that, to run a simple container with desired program running in it.
