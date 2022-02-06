@@ -1,15 +1,21 @@
 #! /bin/sh
 
+ROOT=$(git rev-parse --show-toplevel)
+
+SCRIPT_DIR=${ROOT}/scripts
+
 if [ "$RUNTIME" = "" ]; then
-    RUNTIME="./youki"
+    RUNTIME="${SCRIPT_DIR}/youki"
 fi
 
-LOGFILE="./test.log"
+LOGFILE="${SCRIPT_DIR}/test.log"
 
-./build.sh
+cd ${SCRIPT_DIR}
 
-cp ../integration_tests/rust-integration-tests/integration_test/bundle.tar.gz ./bundle.tar.gz
-touch ./test.log
+${SCRIPT_DIR}/build.sh
+
+cp ${ROOT}/integration_tests/rust-integration-tests/integration_test/bundle.tar.gz ${SCRIPT_DIR}/bundle.tar.gz
+touch ${LOGFILE}
 
 YOUKI_LOG_LEVEL="error" sudo ./integration_test run --runtime $RUNTIME --runtimetest ./runtimetest > $LOGFILE
 

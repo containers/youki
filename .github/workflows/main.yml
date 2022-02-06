@@ -17,11 +17,13 @@ jobs:
         id: filter
         with:
           filters: |
-            ./crates/youki: crates/youki/**
-            ./crates/libcontainer: crates/libcontainer/**
-            ./crates/libcgroups: crates/libcgroups/**
-            ./crates/libseccomp: crates/libseccomp/**
-            ./rust_integration_tests: ./integration_tests/rust-integration-tests/**
+            crates/youki: crates/youki/**
+            crates/libcontainer: crates/libcontainer/**
+            crates/libcgroups: crates/libcgroups/**
+            crates/libseccomp: crates/libseccomp/**
+            integration_tests/rust-integration-tests/runtimetest: ./integration_tests/rust-integration-tests/runtimetest
+            integration_tests/rust-integration-tests/integration_test: ./integration_tests/rust-integration-tests/integration_test
+            integration_tests/rust-integration-tests/test_framework: ./integration_tests/rust-integration-tests/test_framework
   check:
     needs: [changes]
     if: ${{ !contains(needs.changes.outputs.dirs, '[]') }}
@@ -63,7 +65,7 @@ jobs:
       - run: sudo apt-get -y update
       - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev libseccomp-dev
       - name: Run tests
-        run: cargo test --all --all-features --no-fail-fast
+        run: cd ./crates && cargo test --all --all-features --no-fail-fast
   coverage:
     runs-on: ubuntu-latest
     name: Run test coverage
@@ -90,6 +92,7 @@ jobs:
         run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev libseccomp-dev
       - name: Run Test Coverage for youki
         run: |
+          cd ./crates
           cargo llvm-cov clean --workspace
           cargo llvm-cov --no-report
           cargo llvm-cov --no-run --lcov --ignore-filename-regex "libseccomp/src|integration_test/src|test_framework/src|systemd_api.rs" --output-path ./coverage.lcov
@@ -122,6 +125,6 @@ jobs:
       - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev libseccomp-dev
       - uses: actions/setup-go@v2
         with:
-          go-version: "1.11.0"
+          go-version: "1.17.6"
       - name: Run integration tests
-        run: ./scripts/oci_integration_test.sh
+        run: ./scripts/oci_integration_tests.sh

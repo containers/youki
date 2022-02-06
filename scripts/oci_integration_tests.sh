@@ -1,12 +1,13 @@
 #!/bin/bash -eu
 
-./build.sh
+ROOT=$(git rev-parse --show-toplevel)
 
-SCRIPTS_DIR=$(pwd)
+${ROOT}/scripts/build.sh
+
+SCRIPTS_DIR=${ROOT}/scripts
 RUNTIME=${SCRIPTS_DIR}/youki
-OCI_TEST_DIR=../integration_tests/oci-runtime-tools/src/github.com/opencontainers/runtime-tools
+OCI_TEST_DIR=${ROOT}/integration_tests/oci-runtime-tests/src/github.com/opencontainers/runtime-tools
 PATTERN=${1:-.}
-
 cd $OCI_TEST_DIR
 
 test_cases=(
@@ -89,8 +90,8 @@ check_environment() {
 }
 
 for case in "${test_cases[@]}"; do
-  if [[ ! -e "${ROOT}/integration_test/runtime-tools/src/github.com/opencontainers/runtime-tools/validation/$case" ]]; then
-    GO111MODULE=auto GOPATH=${ROOT}/integration_test/runtime-tools make runtimetest validation-executables
+  if [[ ! -e "${OCI_TEST_DIR}/validation/$case" ]]; then
+    GO111MODULE=auto GOPATH=${ROOT}/integration_tests/oci-runtime-tests make runtimetest validation-executables
     break
   fi
 done
@@ -109,7 +110,7 @@ for case in "${test_cases[@]}"; do
   echo "Running $case"
   logfile="./log/$case.log"
   mkdir -p "$(dirname $logfile)"
-  sudo RUST_BACKTRACE=1 RUNTIME=${RUNTIME} ../integration_test/runtime-tools/src/github.com/opencontainers/runtime-tools/validation/$case >$logfile 2>&1 || (cat $logfile && exit 1)
+  sudo RUST_BACKTRACE=1 RUNTIME=${RUNTIME} ${OCI_TEST_DIR}/validation/$case >$logfile 2>&1 || (cat $logfile && exit 1)
   if [ 0 -ne $(grep "not ok" $logfile | wc -l ) ]; then
       cat $logfile
       exit 1
