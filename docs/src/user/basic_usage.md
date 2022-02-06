@@ -58,8 +58,10 @@ sudo systemctl start docker
 
 #### Let docker permanently know youki as a runtime
 
-With a new version of docker, you can update file `/etc/docker/daemon.json`
-to let docker know youki. A sample content of it:
+With newer versions of docker, you can update file `/etc/docker/daemon.json` to
+let docker know youki
+([source](https://docs.docker.com/engine/reference/commandline/dockerd/#on-linux)).
+A sample content of it:
 ```
 {
   "default-runtime": "runc",

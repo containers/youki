@@ -209,15 +209,10 @@ impl Syscall for LinuxSyscall {
         let mut buf = [0; 2048];
         let mut result = ptr::null_mut();
         let mut passwd: libc::passwd = unsafe { mem::zeroed() };
-        let getpwuid_r_code = unsafe {
-            libc::getpwuid_r(
-                uid,
-                &mut passwd,
-                buf.as_mut_ptr(),
-                buf.len(),
-                &mut result)
+        let r_code = unsafe {
+            libc::getpwuid_r(uid, &mut passwd, buf.as_mut_ptr(), buf.len(), &mut result)
         };
-        if getpwuid_r_code != 0 || result.is_null() {
+        if r_code != 0 || result.is_null() {
             return None;
         }
 
