@@ -14,7 +14,7 @@ use libcgroups::common::{
 };
 use nix::{errno::Errno, mount::MsFlags};
 use oci_spec::runtime::{Mount as SpecMount, MountBuilder as SpecMountBuilder};
-use procfs::process::{MountOptFields, Process};
+use procfs::process::{MountInfo, MountOptFields, Process};
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 use std::{
@@ -313,9 +313,9 @@ impl Mount {
 
     /// Make parent mount of rootfs private if it was shared, which is required by pivot_root.
     /// It also makes sure following bind mount does not propagate in other namespaces.
-    pub fn make_parent_mount_private(&self, rootfs: &Path) -> Result<()> {
+    pub fn make_parent_mount_private(&self, rootfs: &Path) -> Result<Option<MountInfo>> {
         let mount_infos = Process::myself()?.mountinfo()?;
-        let parent_mount = find_parent_mount(rootfs, &mount_infos)?;
+        let parent_mount = find_parent_mount(rootfs, mount_infos)?;
 
         // check parent mount has 'shared' propagation type
         if parent_mount
@@ -330,9 +330,10 @@ impl Mount {
                 MsFlags::MS_PRIVATE,
                 None,
             )?;
+            Ok(Some(parent_mount))
+        } else {
+            Ok(None)
         }
-
-        Ok(())
     }
 
     fn mount_into_container(
@@ -526,26 +527,29 @@ mod tests {
     fn test_make_parent_mount_private() {
         let tmp_dir = create_temp_dir("test_make_parent_mount_private").unwrap();
         let m = Mount::new();
-        assert!(m.make_parent_mount_private(tmp_dir.path()).is_ok());
+        let result = m.make_parent_mount_private(tmp_dir.path());
+        assert!(result.is_ok());
 
-        let set = m
-            .syscall
-            .as_any()
-            .downcast_ref::<TestHelperSyscall>()
-            .unwrap()
-            .get_mount_args();
+        if let Ok(Some(_)) = result {
+            let set = m
+                .syscall
+                .as_any()
+                .downcast_ref::<TestHelperSyscall>()
+                .unwrap()
+                .get_mount_args();
 
-        assert_eq!(set.len(), 1);
+            assert_eq!(set.len(), 1);
 
-        let got = &set[0];
-        assert_eq!(got.source, None);
-        assert_eq!(got.fstype, None);
-        assert_eq!(got.flags, MsFlags::MS_PRIVATE);
-        assert_eq!(got.data, None);
+            let got = &set[0];
+            assert_eq!(got.source, None);
+            assert_eq!(got.fstype, None);
+            assert_eq!(got.flags, MsFlags::MS_PRIVATE);
+            assert_eq!(got.data, None);
 
-        // This can be either depending on the system, some systems mount tmpfs at /tmp others it's
-        // a plain directory. See https://github.com/containers/youki/issues/471
-        assert!(got.target == PathBuf::from("/") || got.target == PathBuf::from("/tmp"));
+            // This can be either depending on the system, some systems mount tmpfs at /tmp others it's
+            // a plain directory. See https://github.com/containers/youki/issues/471
+            assert!(got.target == PathBuf::from("/") || got.target == PathBuf::from("/tmp"));
+        }
     }
 
     #[test]
