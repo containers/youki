@@ -415,7 +415,7 @@ pub fn container_init_process(
     // add HOME in envs if not exists
     // TODO: check `HOME=` already exits in envs
     if let Some(dir_home) = syscall.get_pwdir(proc.user().uid()) {
-        envs.push(format!("HOME={}", dir_home.to_string_lossy()));
+        envs.push(format!("HOME={}", dir_home));
     } else {
         // for testing
         envs.push(format!("HOME={}", "/not-found"));

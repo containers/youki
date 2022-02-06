@@ -29,7 +29,7 @@ pub trait Syscall {
     fn set_hostname(&self, hostname: &str) -> Result<()>;
     fn set_rlimit(&self, rlimit: &LinuxRlimit) -> Result<()>;
     fn get_pwuid(&self, uid: u32) -> Option<Arc<OsStr>>;
-    fn get_pwdir(&self, uid: u32) -> Option<Arc<OsStr>>;
+    fn get_pwdir(&self, uid: u32) -> Option<String>;
     fn mount(
         &self,
         source: Option<&Path>,
