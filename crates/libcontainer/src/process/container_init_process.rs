@@ -412,13 +412,12 @@ pub fn container_init_process(
         unistd::chdir(proc.cwd()).with_context(|| format!("failed to chdir {:?}", proc.cwd()))?;
     }
 
-    // add HOME in envs if not exists
-    // TODO: check `HOME=` already exits in envs
-    if let Some(dir_home) = syscall.get_pwdir(proc.user().uid()) {
-        envs.push(format!("HOME={}", dir_home));
-    } else {
-        // for testing
-        envs.push(format!("HOME={}", "/not-found"));
+    // add HOME into envs if not exists
+    let home_in_envs = envs.iter().any(|x| x.starts_with("HOME="));
+    if !home_in_envs {
+        if let Some(dir_home) = syscall.get_pwdir(proc.user().uid()) {
+            envs.push(format!("HOME={}", dir_home));
+        }
     }
 
     // Reset the process env based on oci spec.

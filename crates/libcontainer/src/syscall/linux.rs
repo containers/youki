@@ -218,7 +218,7 @@ impl Syscall for LinuxSyscall {
                 &mut result)
         };
         if getpwuid_r_code != 0 || result.is_null() {
-            return None
+            return None;
         }
 
         unsafe {
