@@ -760,6 +760,7 @@ dependencies = [
  "prctl",
  "procfs",
  "quickcheck",
+ "rand",
  "serde",
  "serde_json",
  "serial_test",

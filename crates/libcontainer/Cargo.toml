@@ -32,3 +32,4 @@ serde_json = "1.0"
 oci-spec = { version = "0.5.3", features = ["proptests"] }
 quickcheck = "1"
 serial_test = "0.5.1"
+rand = "0.8.4"

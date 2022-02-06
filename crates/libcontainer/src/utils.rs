@@ -277,6 +277,7 @@ pub(crate) mod test_utils {
     use anyhow::Context;
     use anyhow::{bail, Result};
     use nix::sys::wait;
+    use rand::Rng;
     use serde::{Deserialize, Serialize};
 
     #[derive(Debug, Serialize, Deserialize)]
@@ -315,6 +316,10 @@ pub(crate) mod test_utils {
         };
 
         Ok(())
+    }
+
+    pub fn gen_u32() -> u32 {
+        rand::thread_rng().gen()
     }
 }
 

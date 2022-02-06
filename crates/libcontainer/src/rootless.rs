@@ -308,7 +308,7 @@ mod tests {
     };
     use serial_test::serial;
 
-    use crate::utils::TempDir;
+    use crate::utils::{test_utils::gen_u32, TempDir};
 
     use super::*;
 
@@ -318,12 +318,12 @@ mod tests {
             .typ(LinuxNamespaceType::User)
             .build()?;
         let uid_mappings = vec![LinuxIdMappingBuilder::default()
-            .host_id(3333_u32)
+            .host_id(gen_u32())
             .container_id(0_u32)
             .size(10_u32)
             .build()?];
         let gid_mappings = vec![LinuxIdMappingBuilder::default()
-            .host_id(3333_u32)
+            .host_id(gen_u32())
             .container_id(0_u32)
             .size(10_u32)
             .build()?];
@@ -343,12 +343,12 @@ mod tests {
             .typ(LinuxNamespaceType::User)
             .build()?;
         let uid_mappings = vec![LinuxIdMappingBuilder::default()
-            .host_id(3333_u32)
+            .host_id(gen_u32())
             .container_id(0_u32)
             .size(10_u32)
             .build()?];
         let gid_mappings = vec![LinuxIdMappingBuilder::default()
-            .host_id(3333_u32)
+            .host_id(gen_u32())
             .container_id(0_u32)
             .size(10_u32)
             .build()?];
@@ -360,7 +360,7 @@ mod tests {
             .build()?;
         assert!(validate_spec_for_rootless(
             &SpecBuilder::default()
-                .linux(linux_not_include_usend)
+                .linux(linux_no_userns)
                 .build()
                 .unwrap()
         )
@@ -425,8 +425,8 @@ mod tests {
         let userns = LinuxNamespaceBuilder::default()
             .typ(LinuxNamespaceType::User)
             .build()?;
-        let host_uid = 3333_u32;
-        let host_gid = 3334_u32;
+        let host_uid = gen_u32();
+        let host_gid = gen_u32();
         let container_id = 0_u32;
         let size = 10_u32;
         let uid_mappings = vec![LinuxIdMappingBuilder::default()
@@ -465,8 +465,8 @@ mod tests {
         let userns = LinuxNamespaceBuilder::default()
             .typ(LinuxNamespaceType::User)
             .build()?;
-        let host_uid = 3333_u32;
-        let host_gid = 3334_u32;
+        let host_uid = gen_u32();
+        let host_gid = gen_u32();
         let container_id = 0_u32;
         let size = 10_u32;
         let uid_mappings = vec![LinuxIdMappingBuilder::default()
