@@ -353,7 +353,7 @@ mod tests {
             .size(10_u32)
             .build()?];
 
-        let linux_not_include_usend = LinuxBuilder::default()
+        let linux_no_userns = LinuxBuilder::default()
             .namespaces(vec![])
             .uid_mappings(uid_mappings.clone())
             .gid_mappings(gid_mappings.clone())
