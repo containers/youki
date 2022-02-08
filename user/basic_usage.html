@@ -163,6 +163,22 @@
 <p>Then to start the original/normal Docker daemon, you can run</p>
 <pre><code class="language-console">sudo systemctl start docker
 </code></pre>
+<h4 id="let-docker-permanently-know-youki-as-a-runtime"><a class="header" href="#let-docker-permanently-know-youki-as-a-runtime">Let docker permanently know youki as a runtime</a></h4>
+<p>With newer versions of docker, you can update file <code>/etc/docker/daemon.json</code> to
+let docker know youki
+(<a href="https://docs.docker.com/engine/reference/commandline/dockerd/#on-linux">source</a>).
+A sample content of it:</p>
+<pre><code>{
+  &quot;default-runtime&quot;: &quot;runc&quot;,
+  &quot;runtimes&quot;: {
+    &quot;youki&quot;: {
+      &quot;path&quot;: &quot;/path/to/youki/youki&quot;
+    }
+  }
+}
+</code></pre>
+<p>After this (need to restart docker at the first time), you can use youki
+with docker: <code>docker run --runtime youki ...</code>.</p>
 <h4 id="using-youki-standalone"><a class="header" href="#using-youki-standalone">Using Youki Standalone</a></h4>
 <p>Youki can also be used directly, without a higher-level runtime such as Docker to create, start, stop and delete the container, but the process can be tedious. Here we will show how you can do that, to run a simple container with desired program running in it.</p>
 <p>Note that we will still be using Docker to generate the rootfs required for running the container.</p>
