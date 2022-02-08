@@ -16,9 +16,9 @@ fi
 # not a part of youki workspace. For the reasoning behind this,
 # please check the docs and readme
 
-cargo build --verbose $TGT $1
+cargo build $TGT $1 $2
 cd ./runtimetest
-cargo build --verbose $TGT $1
+cargo build $TGT $1 $2
 cd ..
 
 cp target/$TARGET/$VERSION/youki .
