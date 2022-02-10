@@ -280,8 +280,12 @@ impl Deref for TempDir {
 }
 
 pub fn create_temp_dir(test_name: &str) -> Result<TempDir> {
-    let dir = TempDir::new(std::env::temp_dir().join(test_name))?;
+    let dir = TempDir::new(get_temp_dir_path(test_name))?;
     Ok(dir)
+}
+
+pub fn get_temp_dir_path(test_name: &str) -> PathBuf {
+    std::env::temp_dir().join(test_name)
 }
 
 #[cfg(test)]
@@ -290,6 +294,7 @@ pub(crate) mod test_utils {
     use anyhow::Context;
     use anyhow::{bail, Result};
     use nix::sys::wait;
+    use rand::Rng;
     use serde::{Deserialize, Serialize};
 
     #[derive(Debug, Serialize, Deserialize)]
@@ -328,6 +333,10 @@ pub(crate) mod test_utils {
         };
 
         Ok(())
+    }
+
+    pub fn gen_u32() -> u32 {
+        rand::thread_rng().gen()
     }
 }
 
