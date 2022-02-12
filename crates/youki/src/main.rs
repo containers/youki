@@ -14,7 +14,6 @@ use std::path::{Path, PathBuf};
 
 use crate::commands::info;
 use libcontainer::rootless::rootless_required;
-use libcontainer::utils;
 use libcontainer::utils::create_dir_all_with_mode;
 use nix::sys::stat::Mode;
 use nix::unistd::getuid;
@@ -130,15 +129,15 @@ fn determine_root_path(root_path: Option<PathBuf>) -> Result<PathBuf> {
     if let Some(path) = root_path {
         return Ok(path);
     }
+    let uid = getuid().as_raw();
 
     if !rootless_required() {
-        let default = PathBuf::from("/run/youki");
-        utils::create_dir_all(&default)?;
-        return Ok(default);
+        let path = PathBuf::from("/run/youki");
+        create_dir_all_with_mode(&path, uid, Mode::S_IRWXU)?;
+        return Ok(path);
     }
 
     // see https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
-    let uid = getuid().as_raw();
     if let Ok(path) = std::env::var("XDG_RUNTIME_DIR") {
         let path = Path::new(&path).join("youki");
         if create_dir_all_with_mode(&path, uid, Mode::S_IRWXU).is_ok() {
