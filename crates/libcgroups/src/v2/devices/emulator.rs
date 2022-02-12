@@ -54,4 +54,69 @@ impl Emulator {
     }
 }
 
-// FIXME: add some tests
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use oci_spec::runtime::LinuxDeviceCgroupBuilder;
+
+    #[test]
+    fn test_with_default_allow() {
+        // act
+        let emulator = Emulator::with_default_allow(true);
+
+        // assert
+        assert_eq!(emulator.rules.len(), 0);
+        assert!(emulator.default_allow);
+    }
+
+    #[test]
+    fn test_type_a_rule() {
+        // arrange
+        let mut emulator = Emulator::with_default_allow(false);
+        let cgroup = LinuxDeviceCgroupBuilder::default()
+            .typ(LinuxDeviceType::A)
+            .build()
+            .unwrap();
+
+        // act
+        emulator.add_rule(&cgroup).expect("add type A rule");
+
+        // assert
+        assert_eq!(emulator.rules.len(), 0);
+        assert!(!emulator.default_allow);
+    }
+
+    #[test]
+    fn test_add_empty_rule() {
+        // arrange
+        let mut emulator = Emulator::with_default_allow(false);
+        let cgroup = LinuxDeviceCgroupBuilder::default().build().unwrap();
+
+        // act
+        emulator.add_rule(&cgroup).expect("add empty rule");
+
+        // assert
+        assert_eq!(emulator.rules.len(), 0);
+        assert!(!emulator.default_allow);
+    }
+
+    #[test]
+    fn test_add_some_rule() {
+        // arrange
+        let mut emulator = Emulator::with_default_allow(false);
+        let permission: &str = "PERMISSION";
+        let cgroup = LinuxDeviceCgroupBuilder::default()
+            .typ(LinuxDeviceType::B)
+            .access(permission)
+            .build()
+            .unwrap();
+
+        // act
+        emulator.add_rule(&cgroup).expect("add permission rule");
+
+        // assert
+        let top_rule = emulator.rules.first().unwrap();
+        assert_eq!(top_rule.access(), &Some(permission.to_string()));
+        assert!(!emulator.default_allow);
+    }
+}
