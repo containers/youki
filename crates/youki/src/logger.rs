@@ -159,7 +159,7 @@ mod tests {
     use serial_test::serial;
 
     use super::*;
-    use crate::utils::create_temp_dir;
+    use libcontainer::utils::create_temp_dir;
     use std::{env, path::Path};
 
     struct LogLevelGuard {
