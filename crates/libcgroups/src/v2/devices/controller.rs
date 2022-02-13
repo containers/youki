@@ -11,6 +11,12 @@ use oci_spec::runtime::LinuxDeviceCgroup;
 use crate::common::{default_allow_devices, default_devices, ControllerOpt};
 use crate::v2::controller::Controller;
 
+#[cfg(test)]
+use bpf::mock_prog::{attach, bump_memlock_rlimit, detach2, load, query};
+
+#[cfg(not(test))]
+use bpf::prog::{attach, bump_memlock_rlimit, detach2, load, query};
+
 const LICENSE: &str = "Apache";
 
 pub struct Devices {}
@@ -57,8 +63,8 @@ impl Devices {
 
         // Increase `ulimit -l` limit to avoid BPF_PROG_LOAD error (#2167).
         // This limit is not inherited into the container.
-        bpf::bump_memlock_rlimit()?;
-        let prog_fd = bpf::prog_load(LICENSE, prog.bytecodes())?;
+        bump_memlock_rlimit()?;
+        let prog_fd = load(LICENSE, prog.bytecodes())?;
 
         // FIXME: simple way to attach BPF program
         //  1. get list of existing attached programs
@@ -73,20 +79,95 @@ impl Devices {
         // IMHO, this is too complicated, and in most cases, we just attach program once without
         // already attached programs.
 
+        // get the fd of the cgroup root
         let fd = nix::dir::Dir::open(
             cgroup_root.as_os_str(),
             OFlag::O_RDONLY | OFlag::O_DIRECTORY,
             Mode::from_bits(0o600).unwrap(),
         )?;
 
-        let old_progs = bpf::prog_query(fd.as_raw_fd())?;
-        bpf::prog_attach(prog_fd, fd.as_raw_fd())?;
+        // collect the programs attached to this cgroup
+        let old_progs = query(fd.as_raw_fd())?;
+        // attach our new program
+        attach(prog_fd, fd.as_raw_fd())?;
+        // detach all previous programs
         for old_prog in old_progs {
-            bpf::prog_detach2(old_prog.fd, fd.as_raw_fd())?;
+            detach2(old_prog.fd, fd.as_raw_fd())?;
         }
 
         Ok(())
     }
 }
 
-// FIXME: add tests, but how to?
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test::setup;
+    use oci_spec::runtime::{LinuxDeviceCgroupBuilder, LinuxDeviceType};
+    use std::os::unix::io::RawFd;
+
+    use bpf::mock_prog;
+
+    #[test]
+    fn test_apply_devices() {
+        // arrange
+        let (tmp, _) = setup("test_apply_devices", "some.value");
+        let a_type = LinuxDeviceCgroupBuilder::default()
+            .typ(LinuxDeviceType::A)
+            .build()
+            .unwrap();
+        let file_descriptor: RawFd = 6;
+
+        // expect
+        let bump_memlock_rlimit = mock_prog::bump_memlock_rlimit_context();
+        let load = mock_prog::load_context();
+        let query = mock_prog::query_context();
+        let attach = mock_prog::attach_context();
+        let detach2 = mock_prog::detach2_context();
+        bump_memlock_rlimit.expect().once().returning(|| Ok(()));
+        load.expect()
+            .once()
+            .returning(move |_, _| Ok(file_descriptor));
+        query.expect().once().returning(|_| Ok(vec![]));
+        attach.expect().once().returning(|_, _| Ok(()));
+        detach2.expect().never();
+
+        // act
+        Devices::apply_devices(&tmp, &Some(vec![a_type])).expect("Could not apply devices");
+    }
+
+    #[test]
+    fn test_existing_programs() {
+        // arrange
+        let (tmp, _) = setup("test_existing_programs", "some.value");
+        let a_type = LinuxDeviceCgroupBuilder::default()
+            .typ(LinuxDeviceType::A)
+            .build()
+            .unwrap();
+        let file_descriptor: RawFd = 6;
+        let existing_program_1 = bpf::ProgramInfo {
+            id: u32::default(),
+            fd: i32::default(),
+        };
+
+        // expect
+        let bump_memlock_rlimit = mock_prog::bump_memlock_rlimit_context();
+        let load = mock_prog::load_context();
+        let query = mock_prog::query_context();
+        let attach = mock_prog::attach_context();
+        let detach2 = mock_prog::detach2_context();
+        bump_memlock_rlimit.expect().once().returning(|| Ok(()));
+        load.expect()
+            .once()
+            .returning(move |_, _| Ok(file_descriptor));
+        query
+            .expect()
+            .once()
+            .returning(move |_| Ok(vec![existing_program_1.clone()]));
+        attach.expect().once().returning(|_, _| Ok(()));
+        detach2.expect().once().returning(|_, _| Ok(()));
+
+        // act
+        Devices::apply_devices(&tmp, &Some(vec![a_type])).expect("Could not apply devices");
+    }
+}
