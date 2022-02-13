@@ -61,7 +61,7 @@ sudo systemctl start docker
 With newer versions of docker, you can update file `/etc/docker/daemon.json` to
 let docker know youki
 ([source](https://docs.docker.com/engine/reference/commandline/dockerd/#on-linux)).
-A sample content of it:
+You may need to create this file, if it does not yet exist. A sample content of it:
 ```
 {
   "default-runtime": "runc",
