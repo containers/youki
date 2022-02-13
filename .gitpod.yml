@@ -1,0 +1,9 @@
+image:
+  file: .gitpod.Dockerfile
+tasks:
+  - name: Build
+    init: cargo build 
+github:
+  prebuilds:
+    pullRequestsFromForks: true
+    addBadge: true
