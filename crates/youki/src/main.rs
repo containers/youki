@@ -213,6 +213,11 @@ mod tests {
 
     #[test]
     fn test_determine_root_path_non_rootless() -> Result<()> {
+        // If we do not have root privileges skip the test as it will not succeed.
+        if !getuid().is_root() {
+            return Ok(());
+        }
+
         let expected_path = PathBuf::from(get_temp_dir_path("default_youki_path"));
 
         let path = determine_root_path(None).context("failed with default non rootless path")?;
