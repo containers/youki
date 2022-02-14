@@ -12,10 +12,10 @@ use crate::common::{default_allow_devices, default_devices, ControllerOpt};
 use crate::v2::controller::Controller;
 
 #[cfg(test)]
-use bpf::mock_prog::{attach, bump_memlock_rlimit, detach2, load, query};
+use bpf::mock_prog as bpf_prog;
 
 #[cfg(not(test))]
-use bpf::prog::{attach, bump_memlock_rlimit, detach2, load, query};
+use bpf::prog as bpf_prog;
 
 const LICENSE: &str = "Apache";
 
@@ -63,8 +63,8 @@ impl Devices {
 
         // Increase `ulimit -l` limit to avoid BPF_PROG_LOAD error (#2167).
         // This limit is not inherited into the container.
-        bump_memlock_rlimit()?;
-        let prog_fd = load(LICENSE, prog.bytecodes())?;
+        bpf_prog::bump_memlock_rlimit()?;
+        let prog_fd = bpf_prog::load(LICENSE, prog.bytecodes())?;
 
         // FIXME: simple way to attach BPF program
         //  1. get list of existing attached programs
@@ -87,12 +87,12 @@ impl Devices {
         )?;
 
         // collect the programs attached to this cgroup
-        let old_progs = query(fd.as_raw_fd())?;
+        let old_progs = bpf_prog::query(fd.as_raw_fd())?;
         // attach our new program
-        attach(prog_fd, fd.as_raw_fd())?;
+        bpf_prog::attach(prog_fd, fd.as_raw_fd())?;
         // detach all previous programs
         for old_prog in old_progs {
-            detach2(old_prog.fd, fd.as_raw_fd())?;
+            bpf_prog::detach2(old_prog.fd, fd.as_raw_fd())?;
         }
 
         Ok(())
