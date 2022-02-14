@@ -203,7 +203,7 @@ mod tests {
 
     #[test]
     fn test_determine_root_path_use_specified_by_user() -> Result<()> {
-        let specified_path = PathBuf::from(get_temp_dir_path("provided_path"));
+        let specified_path = get_temp_dir_path("provided_path");
         let path = determine_root_path(Some(specified_path.clone()))
             .context("failed with specified path")?;
         assert_eq!(path, specified_path);
@@ -218,10 +218,10 @@ mod tests {
             return Ok(());
         }
 
-        let expected_path = PathBuf::from(get_temp_dir_path("default_youki_path"));
+        let expected_path = get_temp_dir_path("default_youki_path");
 
         let path = determine_root_path(None).context("failed with default non rootless path")?;
-        assert_eq!(path, expected_path.clone());
+        assert_eq!(path, expected_path);
         assert!(path.exists());
 
         fs::remove_dir(&expected_path).context("failed to remove dir")?;
@@ -257,7 +257,7 @@ mod tests {
         let _temp_dir =
             TempDir::new(&default_rootless_path).context("failed to create temp dir")?;
         let path = determine_root_path(None).context("failed with default rootless path")?;
-        assert_eq!(path, default_rootless_path.clone());
+        assert_eq!(path, default_rootless_path);
         assert!(path.exists());
 
         // Set invalid permissions to default rootless path so that it fails for the next test.
@@ -282,7 +282,7 @@ mod tests {
         // Create temp dir so it gets cleaned up. This is needed as we later switch permissions of this directory.
         let _temp_dir = TempDir::new(&expected_temp_path).context("failed to create temp dir")?;
         let path = determine_root_path(None).context("failed with temp path")?;
-        assert_eq!(path, expected_temp_path.clone());
+        assert_eq!(path, expected_temp_path);
 
         // Set invalid permissions to temp path so determine_root_path fails.
         fs::set_permissions(
