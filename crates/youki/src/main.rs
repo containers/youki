@@ -9,12 +9,12 @@ use anyhow::Context;
 use anyhow::Result;
 use clap::IntoApp;
 use clap::{crate_version, Parser};
+use nix::libc;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::commands::info;
 use libcontainer::rootless::rootless_required;
-use libcontainer::utils;
 use libcontainer::utils::create_dir_all_with_mode;
 use nix::sys::stat::Mode;
 use nix::unistd::getuid;
@@ -130,15 +130,15 @@ fn determine_root_path(root_path: Option<PathBuf>) -> Result<PathBuf> {
     if let Some(path) = root_path {
         return Ok(path);
     }
+    let uid = getuid().as_raw();
 
     if !rootless_required() {
-        let default = PathBuf::from("/run/youki");
-        utils::create_dir_all(&default)?;
-        return Ok(default);
+        let path = get_default_not_rootless_path();
+        create_dir_all_with_mode(&path, uid, Mode::S_IRWXU)?;
+        return Ok(path);
     }
 
     // see https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
-    let uid = getuid().as_raw();
     if let Ok(path) = std::env::var("XDG_RUNTIME_DIR") {
         let path = Path::new(&path).join("youki");
         if create_dir_all_with_mode(&path, uid, Mode::S_IRWXU).is_ok() {
@@ -147,7 +147,7 @@ fn determine_root_path(root_path: Option<PathBuf>) -> Result<PathBuf> {
     }
 
     // XDG_RUNTIME_DIR is not set, try the usual location
-    let path = PathBuf::from(format!("/run/user/{}/youki", uid));
+    let path = get_default_rootless_path(uid);
     if create_dir_all_with_mode(&path, uid, Mode::S_IRWXU).is_ok() {
         return Ok(path);
     }
@@ -167,4 +167,132 @@ fn determine_root_path(root_path: Option<PathBuf>) -> Result<PathBuf> {
     }
 
     bail!("could not find a storage location with suitable permissions for the current user");
+}
+
+#[cfg(not(test))]
+fn get_default_not_rootless_path() -> PathBuf {
+    PathBuf::from("/run/youki")
+}
+
+#[cfg(test)]
+fn get_default_not_rootless_path() -> PathBuf {
+    libcontainer::utils::get_temp_dir_path("default_youki_path")
+}
+
+#[cfg(not(test))]
+fn get_default_rootless_path(uid: libc::uid_t) -> PathBuf {
+    PathBuf::from(format!("/run/user/{}/youki", uid))
+}
+
+#[cfg(test)]
+fn get_default_rootless_path(uid: libc::uid_t) -> PathBuf {
+    libcontainer::utils::get_temp_dir_path(format!("default_rootless_youki_path_{}", uid).as_str())
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::determine_root_path;
+    use anyhow::{Context, Result};
+    use libcontainer::utils::{get_temp_dir_path, TempDir};
+    use nix::sys::stat::Mode;
+    use nix::unistd::getuid;
+    use std::fs;
+    use std::fs::Permissions;
+    use std::os::unix::fs::PermissionsExt;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_determine_root_path_use_specified_by_user() -> Result<()> {
+        let specified_path = get_temp_dir_path("provided_path");
+        let path = determine_root_path(Some(specified_path.clone()))
+            .context("failed with specified path")?;
+        assert_eq!(path, specified_path);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_determine_root_path_non_rootless() -> Result<()> {
+        // If we do not have root privileges skip the test as it will not succeed.
+        if !getuid().is_root() {
+            return Ok(());
+        }
+
+        let expected_path = get_temp_dir_path("default_youki_path");
+
+        let path = determine_root_path(None).context("failed with default non rootless path")?;
+        assert_eq!(path, expected_path);
+        assert!(path.exists());
+
+        fs::remove_dir(&expected_path).context("failed to remove dir")?;
+
+        // Setup TempDir with invalid permissions so it is cleaned up after test.
+        let _temp_dir = TempDir::new(&expected_path).context("failed to create temp dir")?;
+        fs::set_permissions(&expected_path, Permissions::from_mode(Mode::S_IRUSR.bits()))
+            .context("failed to set invalid permissions")?;
+
+        assert!(determine_root_path(None).is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_determine_root_path_rootless() -> Result<()> {
+        std::env::set_var("YOUKI_USE_ROOTLESS", "true");
+
+        // XDG_RUNTIME_DIR
+        let xdg_dir = get_temp_dir_path("xdg_runtime");
+        std::env::set_var("XDG_RUNTIME_DIR", &xdg_dir);
+        let path = determine_root_path(None).context("failed with $XDG_RUNTIME_DIR path")?;
+        assert_eq!(path, xdg_dir.join("youki"));
+        assert!(path.exists());
+
+        std::env::remove_var("XDG_RUNTIME_DIR");
+
+        // Default rootless location
+        let uid = getuid().as_raw();
+        let default_rootless_path =
+            get_temp_dir_path(format!("default_rootless_youki_path_{}", uid).as_str());
+        // Create temp dir so it gets cleaned up. This is needed as we later switch permissions of this directory.
+        let _temp_dir =
+            TempDir::new(&default_rootless_path).context("failed to create temp dir")?;
+        let path = determine_root_path(None).context("failed with default rootless path")?;
+        assert_eq!(path, default_rootless_path);
+        assert!(path.exists());
+
+        // Set invalid permissions to default rootless path so that it fails for the next test.
+        fs::set_permissions(
+            default_rootless_path,
+            Permissions::from_mode(Mode::S_IRUSR.bits()),
+        )
+        .context("failed to set invalid permissions")?;
+
+        // Use HOME env var
+        let home_path = get_temp_dir_path("youki_home");
+        fs::create_dir_all(&home_path).context("failed to create fake home path")?;
+        std::env::set_var("HOME", &home_path);
+        let path = determine_root_path(None).context("failed with $HOME path")?;
+        assert_eq!(path, home_path.join(".youki/run"));
+        assert!(path.exists());
+
+        std::env::remove_var("HOME");
+
+        // Use temp dir
+        let expected_temp_path = PathBuf::from(format!("/tmp/youki-{}", uid));
+        // Create temp dir so it gets cleaned up. This is needed as we later switch permissions of this directory.
+        let _temp_dir = TempDir::new(&expected_temp_path).context("failed to create temp dir")?;
+        let path = determine_root_path(None).context("failed with temp path")?;
+        assert_eq!(path, expected_temp_path);
+
+        // Set invalid permissions to temp path so determine_root_path fails.
+        fs::set_permissions(
+            expected_temp_path,
+            Permissions::from_mode(Mode::S_IRUSR.bits()),
+        )
+        .context("failed to set invalid permissions")?;
+
+        assert!(determine_root_path(None).is_err());
+
+        Ok(())
+    }
 }

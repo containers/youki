@@ -97,7 +97,7 @@ pub fn spec(args: liboci_cli::Spec) -> Result<()> {
 // Tests become unstable if not serial. The cause is not known.
 mod tests {
     use super::*;
-    use crate::utils::create_temp_dir;
+    use libcontainer::utils::create_temp_dir;
     use serial_test::serial;
 
     #[test]
