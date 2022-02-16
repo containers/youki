@@ -103,12 +103,15 @@ impl Devices {
 mod tests {
     use super::*;
     use crate::test::setup;
+    use serial_test::serial;
+
     use oci_spec::runtime::{LinuxDeviceCgroupBuilder, LinuxDeviceType};
     use std::os::unix::io::RawFd;
 
     use bpf::mock_prog;
 
     #[test]
+    #[serial(bpf)] // mock contexts are shared
     fn test_apply_devices() {
         // arrange
         let (tmp, _) = setup("test_apply_devices", "some.value");
@@ -137,6 +140,7 @@ mod tests {
     }
 
     #[test]
+    #[serial(bpf)] // mock contexts are shared
     fn test_existing_programs() {
         // arrange
         let (tmp, _) = setup("test_existing_programs", "some.value");
