@@ -6,7 +6,7 @@ edition = "2021"
 build = "build.rs"
 
 [dependencies]
-libc = "0.2.117"
+libc = "0.2.118"
 
 [build-dependencies]
 pkg-config = "0.3.24"

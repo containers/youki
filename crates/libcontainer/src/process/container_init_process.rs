@@ -412,8 +412,16 @@ pub fn container_init_process(
         unistd::chdir(proc.cwd()).with_context(|| format!("failed to chdir {:?}", proc.cwd()))?;
     }
 
+    // add HOME into envs if not exists
+    let home_in_envs = envs.iter().any(|x| x.starts_with("HOME="));
+    if !home_in_envs {
+        if let Some(dir_home) = utils::get_user_home(proc.user().uid()) {
+            envs.push(format!("HOME={}", dir_home.to_string_lossy()));
+        }
+    }
+
     // Reset the process env based on oci spec.
-    env::vars().for_each(|(key, _value)| std::env::remove_var(key));
+    env::vars().for_each(|(key, _value)| env::remove_var(key));
     utils::parse_env(&envs)
         .iter()
         .for_each(|(key, value)| env::set_var(key, value));

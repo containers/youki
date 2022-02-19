@@ -174,6 +174,7 @@ fn setup_mapping(rootless: &Rootless, pid: Pid) -> Result<()> {
 mod tests {
     use super::*;
     use crate::process::channel::{intermediate_channel, main_channel};
+    use crate::rootless::{get_gid_path, get_uid_path};
     use nix::{
         sched::{unshare, CloneFlags},
         unistd::{self, getgid, getuid},
@@ -183,6 +184,8 @@ mod tests {
     };
     use serial_test::serial;
     use std::fs;
+
+    use crate::utils::TempDir;
 
     #[test]
     #[serial]
@@ -204,8 +207,17 @@ mod tests {
             unistd::ForkResult::Parent { child } => {
                 parent_receiver.wait_for_mapping_request()?;
                 parent_receiver.close()?;
+
+                let tempdir = TempDir::new(get_uid_path(&child).parent().unwrap())?;
+                let uid_map_path = tempdir.join("uid_map");
+                let _ = fs::File::create(&uid_map_path)?;
+
+                let tempdir = TempDir::new(get_gid_path(&child).parent().unwrap())?;
+                let gid_map_path = tempdir.join("gid_map");
+                let _ = fs::File::create(&gid_map_path)?;
+
                 setup_mapping(&rootless, child)?;
-                let line = fs::read_to_string(format!("/proc/{}/uid_map", child.as_raw()))?;
+                let line = fs::read_to_string(uid_map_path)?;
                 let line_splited = line.split_whitespace();
                 for (act, expect) in line_splited.zip([
                     uid_mapping.container_id().to_string(),
@@ -249,8 +261,17 @@ mod tests {
             unistd::ForkResult::Parent { child } => {
                 parent_receiver.wait_for_mapping_request()?;
                 parent_receiver.close()?;
+
+                let tempdir = TempDir::new(get_uid_path(&child).parent().unwrap())?;
+                let uid_map_path = tempdir.join("uid_map");
+                let _ = fs::File::create(&uid_map_path)?;
+
+                let tempdir = TempDir::new(get_gid_path(&child).parent().unwrap())?;
+                let gid_map_path = tempdir.join("gid_map");
+                let _ = fs::File::create(&gid_map_path)?;
+
                 setup_mapping(&rootless, child)?;
-                let line = fs::read_to_string(format!("/proc/{}/gid_map", child.as_raw()))?;
+                let line = fs::read_to_string(gid_map_path)?;
                 let line_splited = line.split_whitespace();
                 for (act, expect) in line_splited.zip([
                     gid_mapping.container_id().to_string(),

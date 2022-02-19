@@ -5,6 +5,7 @@ use anyhow::{bail, Result};
 use nix::sys::stat::Mode;
 use nix::sys::statfs;
 use nix::unistd;
+use nix::unistd::{Uid, User};
 use std::collections::HashMap;
 use std::ffi::CString;
 use std::fs::{self, DirBuilder, File};
@@ -54,6 +55,22 @@ pub fn parse_env(envs: &[String]) -> HashMap<String, String> {
             })
         })
         .collect()
+}
+
+/// Get a nix::unistd::User via UID. Potential errors will be ignored.
+pub fn get_unix_user(uid: Uid) -> Option<User> {
+    match User::from_uid(uid) {
+        Ok(x) => x,
+        Err(_) => None,
+    }
+}
+
+/// Get home path of a User via UID.
+pub fn get_user_home(uid: u32) -> Option<PathBuf> {
+    match get_unix_user(Uid::from_raw(uid)) {
+        Some(user) => Some(user.dir),
+        None => None,
+    }
 }
 
 pub fn do_exec(path: impl AsRef<Path>, args: &[String]) -> Result<()> {
@@ -263,8 +280,12 @@ impl Deref for TempDir {
 }
 
 pub fn create_temp_dir(test_name: &str) -> Result<TempDir> {
-    let dir = TempDir::new(std::env::temp_dir().join(test_name))?;
+    let dir = TempDir::new(get_temp_dir_path(test_name))?;
     Ok(dir)
+}
+
+pub fn get_temp_dir_path(test_name: &str) -> PathBuf {
+    std::env::temp_dir().join(test_name)
 }
 
 #[cfg(test)]
@@ -273,6 +294,7 @@ pub(crate) mod test_utils {
     use anyhow::Context;
     use anyhow::{bail, Result};
     use nix::sys::wait;
+    use rand::Rng;
     use serde::{Deserialize, Serialize};
 
     #[derive(Debug, Serialize, Deserialize)]
@@ -312,11 +334,35 @@ pub(crate) mod test_utils {
 
         Ok(())
     }
+
+    pub fn gen_u32() -> u32 {
+        rand::thread_rng().gen()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    pub fn test_get_unix_user() {
+        let user = get_unix_user(Uid::from_raw(0));
+        assert_eq!(user.unwrap().name, "root");
+
+        // for a non-exist UID
+        let user = get_unix_user(Uid::from_raw(1000000000));
+        assert!(user.is_none());
+    }
+
+    #[test]
+    pub fn test_get_user_home() {
+        let dir = get_user_home(0);
+        assert_eq!(dir.unwrap().to_str().unwrap(), "/root");
+
+        // for a non-exist UID
+        let dir = get_user_home(1000000000);
+        assert!(dir.is_none());
+    }
 
     #[test]
     fn test_get_cgroup_path() {

@@ -38,7 +38,8 @@ impl<'a> Rootless<'a> {
         if user_namespace.is_some() && user_namespace.unwrap().path().is_none() {
             log::debug!("rootless container should be created");
 
-            validate(spec).context("The spec failed to comply to rootless requirement")?;
+            validate_spec_for_rootless(spec)
+                .context("The spec failed to comply to rootless requirement")?;
             let mut rootless = Rootless::from(linux);
             if let Some((uid_binary, gid_binary)) = lookup_map_binaries(linux)? {
                 rootless.newuidmap = Some(uid_binary);
@@ -57,7 +58,7 @@ impl<'a> Rootless<'a> {
         if let Some(uid_mappings) = self.uid_mappings {
             write_id_mapping(
                 target_pid,
-                &format!("/proc/{}/uid_map", target_pid),
+                get_uid_path(&target_pid).as_path(),
                 uid_mappings,
                 self.newuidmap.as_deref(),
             )
@@ -71,7 +72,7 @@ impl<'a> Rootless<'a> {
         if let Some(gid_mappings) = self.gid_mappings {
             return write_id_mapping(
                 target_pid,
-                &format!("/proc/{}/gid_map", target_pid),
+                get_gid_path(&target_pid).as_path(),
                 gid_mappings,
                 self.newgidmap.as_deref(),
             );
@@ -94,6 +95,26 @@ impl<'a> From<&'a Linux> for Rootless<'a> {
             privileged: nix::unistd::geteuid().is_root(),
         }
     }
+}
+
+#[cfg(not(test))]
+fn get_uid_path(pid: &Pid) -> PathBuf {
+    PathBuf::from(format!("/proc/{pid}/uid_map"))
+}
+
+#[cfg(test)]
+pub fn get_uid_path(pid: &Pid) -> PathBuf {
+    utils::get_temp_dir_path(format!("{pid}_mapping_path").as_str()).join("uid_map")
+}
+
+#[cfg(not(test))]
+fn get_gid_path(pid: &Pid) -> PathBuf {
+    PathBuf::from(format!("/proc/{pid}/gid_map"))
+}
+
+#[cfg(test)]
+pub fn get_gid_path(pid: &Pid) -> PathBuf {
+    utils::get_temp_dir_path(format!("{pid}_mapping_path").as_str()).join("gid_map")
 }
 
 /// Checks if rootless mode should be used
@@ -123,7 +144,7 @@ pub fn unprivileged_user_ns_enabled() -> Result<bool> {
 
 /// Validates that the spec contains the required information for
 /// running in rootless mode
-fn validate(spec: &Spec) -> Result<()> {
+fn validate_spec_for_rootless(spec: &Spec) -> Result<()> {
     let linux = spec.linux().as_ref().context("no linux in spec")?;
     let namespaces = Namespaces::from(linux.namespaces().as_ref());
     if namespaces.get(LinuxNamespaceType::User).is_none() {
@@ -142,12 +163,11 @@ fn validate(spec: &Spec) -> Result<()> {
     if uid_mappings.is_empty() {
         bail!("rootless containers require at least one uid mapping");
     }
-
     if gid_mappings.is_empty() {
         bail!("rootless containers require at least one gid mapping")
     }
 
-    validate_mounts(
+    validate_mounts_for_rootless(
         spec.mounts().as_ref().context("no mounts in spec")?,
         uid_mappings,
         gid_mappings,
@@ -182,7 +202,7 @@ fn validate(spec: &Spec) -> Result<()> {
     Ok(())
 }
 
-fn validate_mounts(
+fn validate_mounts_for_rootless(
     mounts: &[Mount],
     uid_mappings: &[LinuxIdMapping],
     gid_mappings: &[LinuxIdMapping],
@@ -240,7 +260,7 @@ fn lookup_map_binary(binary: &str) -> Result<Option<PathBuf>> {
 
 fn write_id_mapping(
     pid: Pid,
-    map_file: &str,
+    map_file: &Path,
     mappings: &[LinuxIdMapping],
     map_binary: Option<&Path>,
 ) -> Result<()> {
@@ -276,4 +296,205 @@ fn write_id_mapping(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use nix::unistd::getpid;
+    use oci_spec::runtime::{
+        LinuxBuilder, LinuxIdMappingBuilder, LinuxNamespaceBuilder, SpecBuilder,
+    };
+    use serial_test::serial;
+
+    use crate::utils::{test_utils::gen_u32, TempDir};
+
+    use super::*;
+
+    #[test]
+    fn test_validate_ok() -> Result<()> {
+        let userns = LinuxNamespaceBuilder::default()
+            .typ(LinuxNamespaceType::User)
+            .build()?;
+        let uid_mappings = vec![LinuxIdMappingBuilder::default()
+            .host_id(gen_u32())
+            .container_id(0_u32)
+            .size(10_u32)
+            .build()?];
+        let gid_mappings = vec![LinuxIdMappingBuilder::default()
+            .host_id(gen_u32())
+            .container_id(0_u32)
+            .size(10_u32)
+            .build()?];
+        let linux = LinuxBuilder::default()
+            .namespaces(vec![userns])
+            .uid_mappings(uid_mappings)
+            .gid_mappings(gid_mappings)
+            .build()?;
+        let spec = SpecBuilder::default().linux(linux).build()?;
+        assert!(validate_spec_for_rootless(&spec).is_ok());
+        Ok(())
+    }
+
+    #[test]
+    fn test_validate_err() -> Result<()> {
+        let userns = LinuxNamespaceBuilder::default()
+            .typ(LinuxNamespaceType::User)
+            .build()?;
+        let uid_mappings = vec![LinuxIdMappingBuilder::default()
+            .host_id(gen_u32())
+            .container_id(0_u32)
+            .size(10_u32)
+            .build()?];
+        let gid_mappings = vec![LinuxIdMappingBuilder::default()
+            .host_id(gen_u32())
+            .container_id(0_u32)
+            .size(10_u32)
+            .build()?];
+
+        let linux_no_userns = LinuxBuilder::default()
+            .namespaces(vec![])
+            .uid_mappings(uid_mappings.clone())
+            .gid_mappings(gid_mappings.clone())
+            .build()?;
+        assert!(validate_spec_for_rootless(
+            &SpecBuilder::default()
+                .linux(linux_no_userns)
+                .build()
+                .unwrap()
+        )
+        .is_err());
+
+        let linux_uid_empty = LinuxBuilder::default()
+            .namespaces(vec![userns.clone()])
+            .uid_mappings(vec![])
+            .gid_mappings(gid_mappings.clone())
+            .build()?;
+        assert!(validate_spec_for_rootless(
+            &SpecBuilder::default()
+                .linux(linux_uid_empty)
+                .build()
+                .unwrap()
+        )
+        .is_err());
+
+        let linux_gid_empty = LinuxBuilder::default()
+            .namespaces(vec![userns.clone()])
+            .uid_mappings(uid_mappings.clone())
+            .gid_mappings(vec![])
+            .build()?;
+        assert!(validate_spec_for_rootless(
+            &SpecBuilder::default()
+                .linux(linux_gid_empty)
+                .build()
+                .unwrap()
+        )
+        .is_err());
+
+        let linux_uid_none = LinuxBuilder::default()
+            .namespaces(vec![userns.clone()])
+            .gid_mappings(gid_mappings)
+            .build()?;
+        assert!(validate_spec_for_rootless(
+            &SpecBuilder::default()
+                .linux(linux_uid_none)
+                .build()
+                .unwrap()
+        )
+        .is_err());
+
+        let linux_gid_none = LinuxBuilder::default()
+            .namespaces(vec![userns])
+            .uid_mappings(uid_mappings)
+            .build()?;
+        assert!(validate_spec_for_rootless(
+            &SpecBuilder::default()
+                .linux(linux_gid_none)
+                .build()
+                .unwrap()
+        )
+        .is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    #[serial]
+    fn test_write_uid_mapping() -> Result<()> {
+        let userns = LinuxNamespaceBuilder::default()
+            .typ(LinuxNamespaceType::User)
+            .build()?;
+        let host_uid = gen_u32();
+        let host_gid = gen_u32();
+        let container_id = 0_u32;
+        let size = 10_u32;
+        let uid_mappings = vec![LinuxIdMappingBuilder::default()
+            .host_id(host_uid)
+            .container_id(container_id)
+            .size(size)
+            .build()?];
+        let gid_mappings = vec![LinuxIdMappingBuilder::default()
+            .host_id(host_gid)
+            .container_id(container_id)
+            .size(size)
+            .build()?];
+        let linux = LinuxBuilder::default()
+            .namespaces(vec![userns])
+            .uid_mappings(uid_mappings)
+            .gid_mappings(gid_mappings)
+            .build()?;
+        let spec = SpecBuilder::default().linux(linux).build()?;
+        let rootless = Rootless::new(&spec)?.unwrap();
+        let pid = getpid();
+        let tempdir = TempDir::new(get_uid_path(&pid).parent().unwrap())?;
+        let uid_map_path = tempdir.join("uid_map");
+        let _ = fs::File::create(&uid_map_path)?;
+        rootless.write_uid_mapping(pid)?;
+        assert_eq!(
+            format!("{container_id} {host_uid} {size}"),
+            fs::read_to_string(uid_map_path)?
+        );
+        rootless.write_gid_mapping(pid)?;
+        Ok(())
+    }
+
+    #[test]
+    #[serial]
+    fn test_write_gid_mapping() -> Result<()> {
+        let userns = LinuxNamespaceBuilder::default()
+            .typ(LinuxNamespaceType::User)
+            .build()?;
+        let host_uid = gen_u32();
+        let host_gid = gen_u32();
+        let container_id = 0_u32;
+        let size = 10_u32;
+        let uid_mappings = vec![LinuxIdMappingBuilder::default()
+            .host_id(host_uid)
+            .container_id(container_id)
+            .size(size)
+            .build()?];
+        let gid_mappings = vec![LinuxIdMappingBuilder::default()
+            .host_id(host_gid)
+            .container_id(container_id)
+            .size(size)
+            .build()?];
+        let linux = LinuxBuilder::default()
+            .namespaces(vec![userns])
+            .uid_mappings(uid_mappings)
+            .gid_mappings(gid_mappings)
+            .build()?;
+        let spec = SpecBuilder::default().linux(linux).build()?;
+        let rootless = Rootless::new(&spec)?.unwrap();
+        let pid = getpid();
+        let tempdir = TempDir::new(get_gid_path(&pid).parent().unwrap())?;
+        let gid_map_path = tempdir.join("gid_map");
+        let _ = fs::File::create(&gid_map_path)?;
+        rootless.write_gid_mapping(pid)?;
+        assert_eq!(
+            format!("{container_id} {host_gid} {size}"),
+            fs::read_to_string(gid_map_path)?
+        );
+        Ok(())
+    }
 }
