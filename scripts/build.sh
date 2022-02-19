@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/sh -eu
 
 ROOT=$(git rev-parse --show-toplevel)
 
