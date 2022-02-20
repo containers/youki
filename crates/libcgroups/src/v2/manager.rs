@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 use nix::unistd::Pid;
 
@@ -30,6 +30,9 @@ use crate::{
     common::{self, CgroupManager, ControllerOpt, FreezerState, PathBufExt, CGROUP_PROCS},
     stats::{Stats, StatsProvider},
 };
+
+pub const CGROUP_KILL: &str = "cgroup.kill";
+
 pub struct Manager {
     root_path: PathBuf,
     cgroup_path: PathBuf,
@@ -127,12 +130,17 @@ impl CgroupManager for Manager {
     fn remove(&self) -> Result<()> {
         if self.full_path.exists() {
             log::debug!("remove cgroup {:?}", self.full_path);
-            let procs_path = self.full_path.join(CGROUP_PROCS);
-            let procs = fs::read_to_string(&procs_path)?;
+            let kill_file = self.full_path.join(CGROUP_KILL);
+            if kill_file.exists() {
+                fs::write(kill_file, "1").context("failed to kill cgroup")?;
+            } else {
+                let procs_path = self.full_path.join(CGROUP_PROCS);
+                let procs = fs::read_to_string(&procs_path)?;
 
-            for line in procs.lines() {
-                let pid: i32 = line.parse()?;
-                let _ = nix::sys::signal::kill(Pid::from_raw(pid), nix::sys::signal::SIGKILL);
+                for line in procs.lines() {
+                    let pid: i32 = line.parse()?;
+                    let _ = nix::sys::signal::kill(Pid::from_raw(pid), nix::sys::signal::SIGKILL);
+                }
             }
 
             common::delete_with_retry(&self.full_path, 4, Duration::from_millis(100))?;
