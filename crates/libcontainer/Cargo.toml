@@ -37,5 +37,5 @@ wasmer-wasi = { version = "2.1.1", optional = true }
 [dev-dependencies]
 oci-spec = { version = "0.5.3", features = ["proptests"] }
 quickcheck = "1"
-serial_test = "0.5.1"
+serial_test = "0.6.0"
 rand = "0.8.5"
