@@ -109,12 +109,6 @@ jobs:
       - uses: actions/checkout@v2
         with:
           submodules: recursive
-      - name: Cache runtime-tools
-        id: cache-runtime-tools
-        uses: actions/cache@v2
-        with:
-          path: integration_test
-          key: ${{ runner.os }}-${{ matrix.rust }}-primes
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ matrix.rust }}

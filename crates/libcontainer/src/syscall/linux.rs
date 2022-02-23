@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::{any::Any, mem, path::Path, ptr};
 
 use anyhow::{anyhow, bail, Result};
-use caps::{CapSet, Capability, CapsHashSet};
+use caps::{CapSet, CapsHashSet};
 use libc::{c_char, uid_t};
 use nix::{
     errno::Errno,
@@ -132,15 +132,7 @@ impl Syscall for LinuxSyscall {
                 // for each such =, drop that capability
                 // after this, only those which are to be set will remain set
                 for c in all.difference(value) {
-                    match c {
-                        Capability::CAP_PERFMON
-                        | Capability::CAP_CHECKPOINT_RESTORE
-                        | Capability::CAP_BPF => {
-                            log::warn!("{:?} is not supported.", c);
-                            continue;
-                        }
-                        _ => caps::drop(None, CapSet::Bounding, *c)?,
-                    }
+                    caps::drop(None, CapSet::Bounding, *c)?
                 }
             }
             _ => {

@@ -170,6 +170,42 @@ impl FilterContext {
             }
         };
     }
+
+    /// Enable or disable the no new privileges attribute bit.
+    pub fn set_nnp_bit(&self, to: bool) -> Result<()> {
+        self.set_attr(scmp_filter_attr::SCMP_FLTATR_CTL_NNP, to as u32)
+            .context("set no new privileges bit")
+    }
+
+    /// Enable or disable the log attribute bit.
+    pub fn set_log_bit(&self, to: bool) -> Result<()> {
+        self.set_attr(scmp_filter_attr::SCMP_FLTATR_CTL_LOG, to as u32)
+            .context("set log bit")
+    }
+
+    /// Enable or disable the tsync attribute bit.
+    pub fn set_tsync_bit(&self, to: bool) -> Result<()> {
+        self.set_attr(scmp_filter_attr::SCMP_FLTATR_CTL_TSYNC, to as u32)
+            .context("set tsync bit")
+    }
+
+    /// Enable or disable the SSB (Speculative Store Bypass) attribute bit.
+    pub fn set_ssb_bit(&self, to: bool) -> Result<()> {
+        self.set_attr(scmp_filter_attr::SCMP_FLTATR_CTL_SSB, to as u32)
+            .context("set SSB bit")
+    }
+
+    /// Can be used to set any arbitrary seccomp filter attribute.
+    pub fn set_attr(&self, attr: scmp_filter_attr, value: u32) -> Result<()> {
+        let res = unsafe { seccomp_attr_set(self.ctx, attr, value) };
+        if res != 0 {
+            bail!(
+                "unable to set attribute on seccomp filter: {}",
+                nix::errno::from_i32(res)
+            )
+        }
+        Ok(())
+    }
 }
 
 fn translate_syscall(syscall_name: &str) -> Result<i32> {
@@ -261,16 +297,41 @@ fn check_seccomp(seccomp: &LinuxSeccomp) -> Result<()> {
     Ok(())
 }
 
-pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
-    if seccomp.flags().is_some() {
-        // runc did not support this, so let's skip it for now.
-        bail!("seccomp flags are not yet supported");
-    }
+/// All filter return actions except SECCOMP_RET_ALLOW should be logged. An administrator may
+/// override this filter flag by preventing specific actions from being logged via the
+/// /proc/sys/kernel/seccomp/actions_logged file. (since Linux 4.14)
+const SECCOMP_FILTER_FLAG_LOG: &str = "SECCOMP_FILTER_FLAG_LOG";
 
+/// When adding a new filter, synchronize all other threads of the calling process to the same
+/// seccomp filter tree. A "filter tree" is the ordered list of filters attached to a thread.
+/// (Attaching identical filters in separate seccomp() calls results in different filters from this
+/// perspective.)
+///
+/// If any thread cannot synchronize to the same filter tree, the call will not attach the new
+/// seccomp filter, and will fail, returning the first thread ID found that cannot synchronize.
+/// Synchronization will fail if another thread in the same process is in SECCOMP_MODE_STRICT or if
+/// it has attached new seccomp filters to itself, diverging from the calling thread's filter tree.
+const SECCOMP_FILTER_FLAG_TSYNC: &str = "SECCOMP_FILTER_FLAG_TSYNC";
+
+/// Disable Speculative Store Bypass mitigation. (since Linux 4.17)
+const SECCOMP_FILTER_FLAG_SPEC_ALLOW: &str = "SECCOMP_FILTER_FLAG_SPEC_ALLOW";
+
+pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
     check_seccomp(seccomp)?;
 
     let default_action = translate_action(seccomp.default_action(), seccomp.default_errno_ret());
     let mut ctx = FilterContext::default(default_action)?;
+
+    if let Some(flags) = seccomp.flags() {
+        for flag in flags {
+            match flag.as_ref() {
+                SECCOMP_FILTER_FLAG_LOG => ctx.set_log_bit(true)?,
+                SECCOMP_FILTER_FLAG_TSYNC => ctx.set_tsync_bit(true)?,
+                SECCOMP_FILTER_FLAG_SPEC_ALLOW => ctx.set_ssb_bit(true)?,
+                f => bail!("seccomp flag {} is not supported", f),
+            }
+        }
+    }
 
     if let Some(architectures) = seccomp.architectures() {
         for &arch in architectures {
@@ -287,13 +348,7 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
     // set it here.  If the seccomp load operation fails without enough
     // privilege, so be it. To prevent this automatic behavior, we unset the
     // value here.
-    let ret = unsafe { seccomp_attr_set(ctx.ctx, scmp_filter_attr::SCMP_FLTATR_CTL_NNP, 0) };
-    if ret != 0 {
-        bail!(
-            "failed to unset the no new privileges bit for seccomp: {}",
-            ret
-        );
-    }
+    ctx.set_nnp_bit(false)?;
 
     if let Some(syscalls) = seccomp.syscalls() {
         for syscall in syscalls {

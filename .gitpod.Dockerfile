@@ -7,3 +7,5 @@ RUN sudo apt-get update && sudo apt-get install -y \
       build-essential \
       libelf-dev \
       libseccomp-dev
+
+RUN rustup component add clippy rls rust-analysis rust-src rust-docs rustfmt
