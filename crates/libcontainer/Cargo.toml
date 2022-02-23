@@ -1,10 +1,16 @@
 [package]
 name = "libcontainer"
 version = "0.0.2"
+description = "Library for container control"
+license-file = "../../LICENSE"
+documentation = "https://docs.rs/libcontainer"
+repository = "https://github.com/containers/youki"
+homepage = "https://containers.github.io/youki"
+readme = "README.md"
 authors = ["youki team"]
 edition = "2021"
 rust-version = "1.58.1"
-description = "Library for container creation"
+keywords = ["youki", "container", "cgroups"]
 
 [features]
 default = []
