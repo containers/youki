@@ -29,7 +29,9 @@ libc = { version = "0.2.119", optional = true }
 [dev-dependencies]
 oci-spec = { version = "0.5.3", features = ["proptests"] }
 quickcheck = "1"
+mockall = { version = "0.11.0", features = [] }
 clap = "3.0.0-beta.5"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 env_logger = "0.9"
+serial_test = "0.5.1"
