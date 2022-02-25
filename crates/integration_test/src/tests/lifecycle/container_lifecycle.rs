@@ -3,7 +3,7 @@ use std::thread::sleep;
 use std::time::Duration;
 use test_framework::{TestResult, TestableGroup};
 
-use super::{create, delete, exec, kill, start, state};
+use super::{checkpoint, create, delete, exec, kill, start, state};
 
 // By experimenting, somewhere around 50 is enough for youki process
 // to get the kill signal and shut down
@@ -59,6 +59,14 @@ impl ContainerLifecycle {
     pub fn delete(&self) -> TestResult {
         delete::delete(&self.project_path, &self.container_id)
     }
+
+    pub fn checkpoint_leave_running(&self) -> TestResult {
+        checkpoint::checkpoint_leave_running(&self.project_path, &self.container_id)
+    }
+
+    pub fn checkpoint_leave_running_work_path_tmp(&self) -> TestResult {
+        checkpoint::checkpoint_leave_running_work_path_tmp(&self.project_path, &self.container_id)
+    }
 }
 
 impl<'a> TestableGroup<'a> for ContainerLifecycle {
@@ -71,6 +79,14 @@ impl<'a> TestableGroup<'a> for ContainerLifecycle {
             ("create", self.create()),
             ("start", self.start()),
             // ("exec", self.exec(vec!["echo", "Hello"], Some("Hello\n"))),
+            (
+                "checkpoint and leave running with --work-path /tmp",
+                self.checkpoint_leave_running_work_path_tmp(),
+            ),
+            (
+                "checkpoint and leave running",
+                self.checkpoint_leave_running(),
+            ),
             ("kill", self.kill()),
             ("state", self.state()),
             ("delete", self.delete()),
@@ -83,6 +99,14 @@ impl<'a> TestableGroup<'a> for ContainerLifecycle {
             match *name {
                 "create" => ret.push(("create", self.create())),
                 "start" => ret.push(("start", self.start())),
+                "checkpoint_leave_running_work_path_tmp" => ret.push((
+                    "checkpoint and leave running with --work-path /tmp",
+                    self.checkpoint_leave_running_work_path_tmp(),
+                )),
+                "checkpoint_leave_running" => ret.push((
+                    "checkpoint and leave running",
+                    self.checkpoint_leave_running(),
+                )),
                 "kill" => ret.push(("kill", self.kill())),
                 "state" => ret.push(("state", self.state())),
                 "delete" => ret.push(("delete", self.delete())),

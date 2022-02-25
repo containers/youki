@@ -198,6 +198,17 @@ impl Container {
     }
 }
 
+/// Checkpoint parameter structure
+pub struct CheckpointOptions {
+    pub ext_unix_sk: bool,
+    pub file_locks: bool,
+    pub image_path: PathBuf,
+    pub leave_running: bool,
+    pub shell_job: bool,
+    pub tcp_established: bool,
+    pub work_path: Option<PathBuf>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

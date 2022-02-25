@@ -8,6 +8,7 @@ pub mod builder;
 mod builder_impl;
 #[allow(clippy::module_inception)]
 mod container;
+mod container_checkpoint;
 mod container_delete;
 mod container_events;
 mod container_kill;
@@ -17,5 +18,6 @@ mod container_start;
 pub mod init_builder;
 pub mod state;
 pub mod tenant_builder;
+pub use container::CheckpointOptions;
 pub use container::Container;
 pub use state::{ContainerProcessState, ContainerStatus, State};

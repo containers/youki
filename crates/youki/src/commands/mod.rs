@@ -7,6 +7,7 @@ use std::{
 use libcgroups::common::CgroupManager;
 use libcontainer::container::Container;
 
+pub mod checkpoint;
 pub mod completion;
 pub mod create;
 pub mod delete;
