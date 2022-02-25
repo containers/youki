@@ -10,6 +10,7 @@ use test_framework::TestResult;
 // which is why we pass null, and use wait instead of wait_with_output
 pub fn create(project_path: &Path, id: &str) -> TestResult {
     let res = Command::new(get_runtime_path())
+        .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .arg("--root")

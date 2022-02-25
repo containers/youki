@@ -1,9 +1,17 @@
 [package]
 name = "libcgroups"
 version = "0.0.2"
+description = "Library for cgroup"
+license-file = "../../LICENSE"
+documentation = "https://docs.rs/libcgroups"
+repository = "https://github.com/containers/youki"
+homepage = "https://containers.github.io/youki"
+readme = "README.md"
+authors = ["youki team"]
 edition = "2021"
 rust-version = "1.58.1"
 autoexamples = false
+keywords = ["youki", "container", "cgroups"]
 
 [features]
 default = ["v1", "v2", "systemd"]
@@ -34,4 +42,4 @@ clap = "3.0.0-beta.5"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 env_logger = "0.9"
-serial_test = "0.5.1"
+serial_test = "0.6.0"

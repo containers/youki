@@ -1,10 +1,16 @@
 [package]
 name = "youki"
 version = "0.0.2"
+description = "A container runtime written in Rust"
+license-file = "../../LICENSE"
+documentation = "https://docs.rs/youki"
+repository = "https://github.com/containers/youki"
+homepage = "https://containers.github.io/youki"
+readme = "../../README.md"
 authors = ["youki team"]
 edition = "2021"
-description = "A container runtime written in Rust"
 build = "build.rs"
+keywords = ["youki", "container"]
 
 [dependencies.clap]
 version = "3.0.0-beta.5"

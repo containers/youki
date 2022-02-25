@@ -119,6 +119,7 @@ youki is not at the practical stage yet. However, it is getting closer to practi
 |         Hooks         | Add custom processing during container creation |                                                 ✅                                                  |
 |       Rootless        |   Running a container without root privileges   |                                                 ✅                                                  |
 |    OCI Compliance     |        Compliance with OCI Runtime Spec         |                                 ✅ 50 out of 50 test cases passing                                  |
+|   CRIU Integration    | Functionality to checkpoint/restore containers  |                         Initial checkpoint support as described in #641                             |
 
 # Design and implementation of youki
 

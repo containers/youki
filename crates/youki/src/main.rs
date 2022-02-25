@@ -108,6 +108,9 @@ fn main() -> Result<()> {
             StandardCmd::State(state) => commands::state::state(state, root_path),
         },
         SubCommand::Common(cmd) => match cmd {
+            CommonCmd::Checkpointt(checkpoint) => {
+                commands::checkpoint::checkpoint(checkpoint, root_path)
+            }
             CommonCmd::Events(events) => commands::events::events(events, root_path),
             CommonCmd::Exec(exec) => commands::exec::exec(exec, root_path),
             CommonCmd::List(list) => commands::list::list(list, root_path),

@@ -14,6 +14,7 @@ mod state;
 pub use {create::Create, delete::Delete, kill::Kill, start::Start, state::State};
 
 // Other common subcommands that aren't specified in the document
+mod checkpoint;
 mod events;
 mod exec;
 mod list;
@@ -25,8 +26,8 @@ mod spec;
 mod update;
 
 pub use {
-    events::Events, exec::Exec, list::List, pause::Pause, ps::Ps, resume::Resume, run::Run,
-    spec::Spec, update::Update,
+    checkpoint::Checkpoint, events::Events, exec::Exec, list::List, pause::Pause, ps::Ps,
+    resume::Resume, run::Run, spec::Spec, update::Update,
 };
 
 // Subcommands parsed by liboci-cli, based on the [OCI
@@ -48,6 +49,7 @@ pub enum StandardCmd {
 // and other runtimes.
 #[derive(Parser, Debug)]
 pub enum CommonCmd {
+    Checkpointt(Checkpoint),
     Events(Events),
     Exec(Exec),
     List(List),
