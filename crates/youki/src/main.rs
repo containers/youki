@@ -216,16 +216,14 @@ mod tests {
         // Make sure directory does not exist.
         remove_dir(&specified_path)?;
         let non_abs_path = specified_path.join("../provided_path");
-        let path = determine_root_path(Some(non_abs_path))
-            .context("failed with specified path")?;
+        let path = determine_root_path(Some(non_abs_path)).context("failed with specified path")?;
         assert_eq!(path, specified_path);
 
         // Return absolute path if directory exists.
         let specified_path = get_temp_dir_path("provided_path2");
         let _temp_dir = TempDir::new(&specified_path).context("failed to create temp dir")?;
         let non_abs_path = specified_path.join("../provided_path2");
-        let path = determine_root_path(Some(non_abs_path))
-            .context("failed with specified path")?;
+        let path = determine_root_path(Some(non_abs_path)).context("failed with specified path")?;
         assert_eq!(path, specified_path);
 
         Ok(())
