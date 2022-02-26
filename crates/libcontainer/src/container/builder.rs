@@ -1,7 +1,9 @@
 use crate::syscall::Syscall;
+use anyhow::{Context, Result};
 use std::path::PathBuf;
 
 use super::{init_builder::InitContainerBuilder, tenant_builder::TenantContainerBuilder};
+
 pub struct ContainerBuilder<'a> {
     /// Id of the container
     pub(super) container_id: String,
@@ -28,8 +30,8 @@ pub struct ContainerBuilder<'a> {
 /// use libcontainer::syscall::syscall::create_syscall;
 ///
 /// ContainerBuilder::new("74f1a4cb3801".to_owned(), create_syscall().as_ref())
-/// .with_root_path("/run/containers/youki")
-/// .with_pid_file(Some("/var/run/docker.pid"))
+/// .with_root_path("/run/containers/youki").expect("invalid root path")
+/// .with_pid_file(Some("/var/run/docker.pid")).expect("invalid pid file")
 /// .with_console_socket(Some("/var/run/docker/sock.tty"))
 /// .as_init("/var/run/docker/bundle")
 /// .build();
@@ -101,11 +103,14 @@ impl<'a> ContainerBuilder<'a> {
     /// # use libcontainer::syscall::syscall::create_syscall;
     ///
     /// ContainerBuilder::new("74f1a4cb3801".to_owned(), create_syscall().as_ref())
-    /// .with_root_path("/run/containers/youki");
+    /// .with_root_path("/run/containers/youki").expect("invalid root path");
     /// ```
-    pub fn with_root_path<P: Into<PathBuf>>(mut self, path: P) -> Self {
-        self.root_path = path.into();
-        self
+    pub fn with_root_path<P: Into<PathBuf>>(mut self, path: P) -> Result<Self> {
+        self.root_path = path
+            .into()
+            .canonicalize()
+            .context("failed to canonicalize root path")?;
+        Ok(self)
     }
 
     /// Sets the pid file which will be used to write the pid of the container
@@ -117,11 +122,19 @@ impl<'a> ContainerBuilder<'a> {
     /// # use libcontainer::syscall::syscall::create_syscall;
     ///
     /// ContainerBuilder::new("74f1a4cb3801".to_owned(), create_syscall().as_ref())
-    /// .with_pid_file(Some("/var/run/docker.pid"));
+    /// .with_pid_file(Some("/var/run/docker.pid")).expect("invalid pid file");
     /// ```
-    pub fn with_pid_file<P: Into<PathBuf>>(mut self, path: Option<P>) -> Self {
-        self.pid_file = path.map(|p| p.into());
-        self
+    pub fn with_pid_file<P: Into<PathBuf>>(mut self, path: Option<P>) -> Result<Self> {
+        self.pid_file = if let Some(p) = path {
+            Some(
+                p.into()
+                    .canonicalize()
+                    .context("failed canonicalize pid file path")?,
+            )
+        } else {
+            None
+        };
+        Ok(self)
     }
 
     /// Sets the console socket, which will be used to send the file descriptor
@@ -154,5 +167,44 @@ impl<'a> ContainerBuilder<'a> {
     pub fn with_preserved_fds(mut self, preserved_fds: i32) -> Self {
         self.preserve_fds = preserved_fds;
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::container::builder::ContainerBuilder;
+    use crate::syscall::syscall::create_syscall;
+    use crate::utils::TempDir;
+    use anyhow::{Context, Result};
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_builder_failable_functions() -> Result<()> {
+        let root_path_temp_dir = TempDir::new("root_path").context("failed to create temp dir")?;
+        let pid_file_temp_dir = TempDir::new("pid_file").context("failed to create temp dir")?;
+        let syscall = create_syscall();
+
+        ContainerBuilder::new("74f1a4cb3801".to_owned(), syscall.as_ref())
+            .with_root_path(root_path_temp_dir.path())?
+            .with_pid_file(Some(pid_file_temp_dir.path()))?
+            .with_console_socket(Some("/var/run/docker/sock.tty"))
+            .as_init("/var/run/docker/bundle");
+
+        // Accept None pid file.
+        ContainerBuilder::new("74f1a4cb3801".to_owned(), syscall.as_ref())
+            .with_pid_file::<PathBuf>(None)?;
+
+        let invalid_path_builder =
+            ContainerBuilder::new("74f1a4cb3801".to_owned(), syscall.as_ref())
+                .with_root_path("/not/existing/path");
+        assert!(invalid_path_builder.is_err());
+
+        let invalid_pid_file_builder =
+            ContainerBuilder::new("74f1a4cb3801".to_owned(), syscall.as_ref())
+                .with_root_path(root_path_temp_dir.path())?
+                .with_pid_file(Some("/not/existing/path"));
+        assert!(invalid_pid_file_builder.is_err());
+
+        Ok(())
     }
 }

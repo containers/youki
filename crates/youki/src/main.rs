@@ -130,10 +130,15 @@ fn main() -> Result<()> {
 }
 
 fn determine_root_path(root_path: Option<PathBuf>) -> Result<PathBuf> {
+    let uid = getuid().as_raw();
+
     if let Some(path) = root_path {
+        if !path.exists() {
+            create_dir_all_with_mode(&path, uid, Mode::S_IRWXU)?;
+        }
+        let path = path.canonicalize()?;
         return Ok(path);
     }
-    let uid = getuid().as_raw();
 
     if !rootless_required() {
         let path = get_default_not_rootless_path();
@@ -206,8 +211,20 @@ mod tests {
 
     #[test]
     fn test_determine_root_path_use_specified_by_user() -> Result<()> {
+        // Create directory if it does not exist and return absolute path.
         let specified_path = get_temp_dir_path("provided_path");
-        let path = determine_root_path(Some(specified_path.clone()))
+        // Make sure directory does not exist.
+        remove_dir(&specified_path)?;
+        let non_abs_path = specified_path.join("../provided_path");
+        let path = determine_root_path(Some(non_abs_path.clone()))
+            .context("failed with specified path")?;
+        assert_eq!(path, specified_path);
+
+        // Return absolute path if directory exists.
+        let specified_path = get_temp_dir_path("provided_path2");
+        let _temp_dir = TempDir::new(&specified_path).context("failed to create temp dir")?;
+        let non_abs_path = specified_path.join("../provided_path2");
+        let path = determine_root_path(Some(non_abs_path.clone()))
             .context("failed with specified path")?;
         assert_eq!(path, specified_path);
 
@@ -296,6 +313,13 @@ mod tests {
 
         assert!(determine_root_path(None).is_err());
 
+        Ok(())
+    }
+
+    fn remove_dir(path: &PathBuf) -> Result<()> {
+        if path.exists() {
+            fs::remove_dir(path).context("failed to remove directory")?;
+        }
         Ok(())
     }
 }
