@@ -207,7 +207,7 @@ mod tests {
     use std::fs;
     use std::fs::Permissions;
     use std::os::unix::fs::PermissionsExt;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
 
     #[test]
     fn test_determine_root_path_use_specified_by_user() -> Result<()> {
@@ -216,7 +216,7 @@ mod tests {
         // Make sure directory does not exist.
         remove_dir(&specified_path)?;
         let non_abs_path = specified_path.join("../provided_path");
-        let path = determine_root_path(Some(non_abs_path.clone()))
+        let path = determine_root_path(Some(non_abs_path))
             .context("failed with specified path")?;
         assert_eq!(path, specified_path);
 
@@ -224,7 +224,7 @@ mod tests {
         let specified_path = get_temp_dir_path("provided_path2");
         let _temp_dir = TempDir::new(&specified_path).context("failed to create temp dir")?;
         let non_abs_path = specified_path.join("../provided_path2");
-        let path = determine_root_path(Some(non_abs_path.clone()))
+        let path = determine_root_path(Some(non_abs_path))
             .context("failed with specified path")?;
         assert_eq!(path, specified_path);
 
@@ -316,7 +316,7 @@ mod tests {
         Ok(())
     }
 
-    fn remove_dir(path: &PathBuf) -> Result<()> {
+    fn remove_dir(path: &Path) -> Result<()> {
         if path.exists() {
             fs::remove_dir(path).context("failed to remove directory")?;
         }
