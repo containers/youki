@@ -106,10 +106,10 @@ impl<'a> ContainerBuilder<'a> {
     /// .with_root_path("/run/containers/youki").expect("invalid root path");
     /// ```
     pub fn with_root_path<P: Into<PathBuf>>(mut self, path: P) -> Result<Self> {
+        let path = path.into();
         self.root_path = path
-            .into()
             .canonicalize()
-            .context("failed to canonicalize root path")?;
+            .with_context(|| format!("failed to canonicalize root path {:?}", path))?;
         Ok(self)
     }
 
@@ -126,10 +126,10 @@ impl<'a> ContainerBuilder<'a> {
     /// ```
     pub fn with_pid_file<P: Into<PathBuf>>(mut self, path: Option<P>) -> Result<Self> {
         self.pid_file = if let Some(p) = path {
+            let path = p.into();
             Some(
-                p.into()
-                    .canonicalize()
-                    .context("failed canonicalize pid file path")?,
+                path.canonicalize()
+                    .with_context(|| format!("failed to canonicalize pid file path {:?}", path))?,
             )
         } else {
             None
