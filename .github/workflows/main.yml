@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust: [1.58.1]
+        rust: [1.58.1, 1.59.0]
         dirs: ${{ fromJSON(needs.changes.outputs.dirs) }}
     steps:
       - uses: actions/checkout@v2
@@ -52,7 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust: [1.58.1]
+        rust: [1.58.1, 1.59.0]
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -73,7 +73,7 @@ jobs:
       - name: Toolchain setup
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-01-14 
+          toolchain: nightly-2022-01-14
           override: true
           profile: minimal
           components: llvm-tools-preview
@@ -102,7 +102,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust: [1.58.1]
+        rust: [1.58.1, 1.59.0]
     steps:
       - uses: actions/checkout@v2
         with:
