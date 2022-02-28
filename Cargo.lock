@@ -925,7 +925,7 @@ dependencies = [
  "log",
  "nix",
  "num_cpus",
- "oci-spec 0.5.2",
+ "oci-spec",
  "once_cell",
  "pnet",
  "procfs",
@@ -1023,7 +1023,7 @@ dependencies = [
  "log",
  "mockall",
  "nix",
- "oci-spec 0.5.4",
+ "oci-spec",
  "procfs",
  "quickcheck",
  "rbpf",
@@ -1049,7 +1049,7 @@ dependencies = [
  "log",
  "mio",
  "nix",
- "oci-spec 0.5.4",
+ "oci-spec",
  "path-clean",
  "prctl",
  "procfs",
@@ -1120,9 +1120,9 @@ checksum = "9a7cbbd4ad467251987c6e5b47d53b11a5a05add08f2447a9e2d70aef1e0d138"
 
 [[package]]
 name = "libz-sys"
-version = "1.1.3"
+version = "1.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de5435b8549c16d423ed0c03dbaafe57cf6c3344744f1242520d59c9d8ecec66"
+checksum = "df2bf61678a0a521c3f7daf815d2e6717d85a272a7dcd02c9768272b32bd1e2a"
 dependencies = [
  "cc",
  "libc",
@@ -1353,21 +1353,9 @@ dependencies = [
 
 [[package]]
 name = "oci-spec"
-version = "0.5.2"
-source = "git+https://github.com/containers/oci-spec-rs?rev=54c5e386f01ab37c9305cc4a83404eb157e42440#54c5e386f01ab37c9305cc4a83404eb157e42440"
-dependencies = [
- "derive_builder",
- "getset",
- "serde",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
-name = "oci-spec"
-version = "0.5.4"
+version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b409d52fff741f330914aa6b8ab73e9113607bb13fbc09f95cdb04d16c8dd5d"
+checksum = "71a85b9f9654fe5c3eab8907369250c05aeda9d807b76bd06c740601f881dc02"
 dependencies = [
  "derive_builder",
  "getset",
@@ -2684,9 +2672,9 @@ dependencies = [
 
 [[package]]
 name = "wasmer-wasi"
-version = "2.1.1"
+version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c2b1d981ad312dac6e74a41a35b9bca41a6d1157c3e6a575fb1041e4b516610"
+checksum = "df791d89498c2a4288f89a5807e67248c1c75924316f67b9edcfc89198fd1711"
 dependencies = [
  "cfg-if 1.0.0",
  "generational-arena",
@@ -2802,7 +2790,7 @@ dependencies = [
  "liboci-cli",
  "log",
  "nix",
- "oci-spec 0.5.4",
+ "oci-spec",
  "once_cell",
  "pentacle",
  "procfs",

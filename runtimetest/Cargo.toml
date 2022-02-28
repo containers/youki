@@ -10,5 +10,5 @@ members = []
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-oci-spec = "0.5.3"
+oci-spec = "0.5.5"
 nix = "0.23.1"

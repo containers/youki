@@ -25,7 +25,7 @@ nix = "0.23.1"
 procfs = "0.12.0"
 log = "0.4"
 anyhow = "1.0"
-oci-spec = "0.5.3"
+oci-spec = "0.5.5"
 dbus = { version = "0.9.5", optional = true }
 fixedbitset = "0.4.1"
 serde = { version = "1.0", features = ["derive"] }
@@ -35,7 +35,7 @@ errno = { version = "0.2.8", optional = true }
 libc = { version = "0.2.119", optional = true }
 
 [dev-dependencies]
-oci-spec = { version = "0.5.3", features = ["proptests"] }
+oci-spec = { version = "0.5.5", features = ["proptests"] }
 quickcheck = "1"
 mockall = { version = "0.11.0", features = [] }
 clap = "3.0.0-beta.5"
