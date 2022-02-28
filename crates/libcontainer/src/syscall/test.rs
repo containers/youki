@@ -227,6 +227,10 @@ impl Syscall for TestHelperSyscall {
     fn set_groups(&self, groups: &[Gid]) -> anyhow::Result<()> {
         self.mocks.act(ArgName::Groups, Box::new(groups.to_vec()))
     }
+
+    fn close_range(&self, _: i32) -> anyhow::Result<()> {
+        todo!()
+    }
 }
 
 impl TestHelperSyscall {
