@@ -291,23 +291,6 @@ pub fn container_init_process(
         )
         .context("failed to configure uid and gid")?;
 
-    // Without no new privileges, seccomp is a privileged operation. We have to
-    // do this before dropping capabilities. Otherwise, we should do it later,
-    // as close to exec as possible.
-    if let Some(seccomp) = linux.seccomp() {
-        if proc.no_new_privileges().is_none() {
-            let notify_fd =
-                seccomp::initialize_seccomp(seccomp).context("failed to execute seccomp")?;
-            sync_seccomp(notify_fd, main_sender, init_receiver)
-                .context("failed to sync seccomp")?;
-        }
-    }
-
-    capabilities::reset_effective(syscall).context("Failed to reset effective capabilities")?;
-    if let Some(caps) = proc.capabilities() {
-        capabilities::drop_privileges(caps, syscall).context("Failed to drop capabilities")?;
-    }
-
     // Take care of LISTEN_FDS used for systemd-active-socket. If the value is
     // not 0, then we have to preserve those fds as well, and set up the correct
     // environment variables.
@@ -358,6 +341,23 @@ pub fn container_init_process(
     syscall
         .close_range(preserve_fds)
         .with_context(|| "failed to clean up extra fds")?;
+
+    // Without no new privileges, seccomp is a privileged operation. We have to
+    // do this before dropping capabilities. Otherwise, we should do it later,
+    // as close to exec as possible.
+    if let Some(seccomp) = linux.seccomp() {
+        if proc.no_new_privileges().is_none() {
+            let notify_fd =
+                seccomp::initialize_seccomp(seccomp).context("failed to execute seccomp")?;
+            sync_seccomp(notify_fd, main_sender, init_receiver)
+                .context("failed to sync seccomp")?;
+        }
+    }
+
+    capabilities::reset_effective(syscall).context("Failed to reset effective capabilities")?;
+    if let Some(caps) = proc.capabilities() {
+        capabilities::drop_privileges(caps, syscall).context("Failed to drop capabilities")?;
+    }
 
     // Change directory to process.cwd if process.cwd is not empty
     if do_chdir {
