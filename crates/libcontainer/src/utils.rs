@@ -181,15 +181,10 @@ pub fn secure_join<P: Into<PathBuf>>(rootfs: P, unsafe_path: P) -> Result<PathBu
             bail!("dereference too many symlinks, may be infinite loop");
         }
 
-        let part_path;
-        match part.next() {
-            Some(part) => {
-                part_path = PathBuf::from(part);
-            }
-            None => {
-                break;
-            }
-        }
+        let part_path = match part.next() {
+            None => break,
+            Some(part) => PathBuf::from(part),
+        };
 
         if !part_path.is_absolute() {
             if part_path.starts_with("..") {
