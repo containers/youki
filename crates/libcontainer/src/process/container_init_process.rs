@@ -24,7 +24,7 @@ use std::{
 fn sysctl(kernel_params: &HashMap<String, String>) -> Result<()> {
     let sys = PathBuf::from("/proc/sys");
     for (kernel_param, value) in kernel_params {
-        let path = sys.join(kernel_param.replace(".", "/"));
+        let path = sys.join(kernel_param.replace('.', "/"));
         log::debug!(
             "apply value {} to kernel parameter {}.",
             value,

@@ -83,11 +83,10 @@ impl<'a> TestManager<'a> {
             let mut collector = Vec::with_capacity(tests.len());
             for (test_group_name, tests) in &tests {
                 if let Some(tg) = self.test_groups.get(test_group_name) {
-                    let r;
-                    match tests {
-                        None => r = s.spawn(move |_| tg.run_all()),
-                        Some(tests) => r = s.spawn(move |_| tg.run_selected(tests)),
-                    }
+                    let r = match tests {
+                        None => s.spawn(move |_| tg.run_all()),
+                        Some(tests) => s.spawn(move |_| tg.run_selected(tests)),
+                    };
                     collector.push((test_group_name, r));
                 } else {
                     eprintln!("Error : Test Group {} not found, skipping", test_group_name);
