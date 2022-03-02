@@ -36,19 +36,19 @@ fn translate_arch(arch: Arch) -> ScmpArch {
 }
 
 fn translate_action(action: LinuxSeccompAction, errno: Option<u32>) -> Result<ScmpAction> {
-    let errno = Some(errno.map(|e| e as i32).unwrap_or(libc::EPERM as i32));
-    let action_str = match action {
-        LinuxSeccompAction::ScmpActKill => "SCMP_ACT_KILL",
-        LinuxSeccompAction::ScmpActTrap => "SCMP_ACT_TRAP",
-        LinuxSeccompAction::ScmpActErrno => "SCMP_ACT_ERRNO",
-        LinuxSeccompAction::ScmpActTrace => "SCMP_ACT_TRACE",
-        LinuxSeccompAction::ScmpActAllow => "SCMP_ACT_ALLOW",
-        LinuxSeccompAction::ScmpActKillProcess => "SCMP_ACT_KILL_PROCESS",
-        LinuxSeccompAction::ScmpActNotify => "SCMP_ACT_NOTIFY",
-        LinuxSeccompAction::ScmpActLog => "SCMP_ACT_LOG",
+    let errno = errno.map(|e| e as i32).unwrap_or(libc::EPERM);
+    let action = match action {
+        LinuxSeccompAction::ScmpActKill => ScmpAction::KillThread,
+        LinuxSeccompAction::ScmpActTrap => ScmpAction::Trap,
+        LinuxSeccompAction::ScmpActErrno => ScmpAction::Errno(errno),
+        LinuxSeccompAction::ScmpActTrace => ScmpAction::Trace(errno.try_into()?),
+        LinuxSeccompAction::ScmpActAllow => ScmpAction::Allow,
+        LinuxSeccompAction::ScmpActKillProcess => ScmpAction::KillProcess,
+        LinuxSeccompAction::ScmpActNotify => ScmpAction::Notify,
+        LinuxSeccompAction::ScmpActLog => ScmpAction::Log,
     };
-    ScmpAction::from_str(action_str, errno)
-        .with_context(|| format!("faild to tranlate ScmpAction from {action_str}"))
+
+    Ok(action)
 }
 
 fn translate_op(op: LinuxSeccompOperator, datum_b: Option<u64>) -> ScmpCompareOp {
