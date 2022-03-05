@@ -58,7 +58,7 @@ Once you have cloned the source, you can build it using
 ```console
 # go into the cloned directory
 cd youki
-
+cd scripts
 # build
 ./build.sh
 ```
@@ -107,5 +107,6 @@ VAGRANT_VAGRANTFILE=Vagrantfile.root vagrant ssh
 
 # in virtual machine
 cd youki
+cd scripts
 ./build.sh
 ```
