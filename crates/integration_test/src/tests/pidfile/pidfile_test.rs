@@ -3,7 +3,10 @@ use crate::utils::{
     prepare_bundle, State, TempDir,
 };
 use anyhow::anyhow;
-use std::process::{Command, Stdio};
+use std::{
+    fs::File,
+    process::{Command, Stdio},
+};
 use test_framework::{Test, TestGroup, TestResult};
 use uuid::Uuid;
 
@@ -24,6 +27,8 @@ fn test_pidfile() -> TestResult {
     // create temp dir for bundle and for storing the pid
     let bundle = prepare_bundle(&container_id).unwrap();
     let pidfile_dir = create_temp_dir(&pidfile_uuid).unwrap();
+    let pidfile_path = pidfile_dir.as_ref().join("pidfile");
+    let _ = File::create(&pidfile_path).unwrap();
 
     // start the container
     Command::new(get_runtime_path())
@@ -37,7 +42,7 @@ fn test_pidfile() -> TestResult {
         .arg("--bundle")
         .arg(bundle.as_ref().join("bundle"))
         .arg("--pid-file")
-        .arg(pidfile_dir.as_ref().join("pidfile"))
+        .arg(pidfile_path)
         .spawn()
         .unwrap()
         .wait()
