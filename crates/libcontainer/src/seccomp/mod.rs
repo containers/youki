@@ -1,269 +1,65 @@
 use anyhow::bail;
 use anyhow::Context;
 use anyhow::Result;
-use libseccomp::scmp_compare::*;
-use libseccomp::*;
-use nix::errno::Errno;
+use libseccomp::ScmpAction;
+use libseccomp::ScmpArch;
+use libseccomp::ScmpArgCompare;
+use libseccomp::ScmpCompareOp;
+use libseccomp::ScmpFilterContext;
+use libseccomp::ScmpSyscall;
 use oci_spec::runtime::Arch;
 use oci_spec::runtime::LinuxSeccomp;
 use oci_spec::runtime::LinuxSeccompAction;
 use oci_spec::runtime::LinuxSeccompOperator;
-use std::ffi::CString;
 use std::os::unix::io;
 
-#[derive(Debug)]
-struct Compare {
-    // The zero-indexed index of the syscall argument.
-    arg: libc::c_uint,
-    op: Option<scmp_compare>,
-    datum_a: Option<scmp_datum_t>,
-    datum_b: Option<scmp_datum_t>,
-}
-
-impl Compare {
-    pub fn new(args: u32) -> Self {
-        Compare {
-            arg: args as libc::c_uint,
-            op: None,
-            datum_a: None,
-            datum_b: None,
-        }
-    }
-
-    pub fn op(mut self, op: scmp_compare) -> Self {
-        self.op = Some(op);
-
-        self
-    }
-
-    pub fn datum_a(mut self, datum: scmp_datum_t) -> Self {
-        self.datum_a = Some(datum);
-
-        self
-    }
-
-    pub fn datum_b(mut self, datum: scmp_datum_t) -> Self {
-        self.datum_b = Some(datum);
-
-        self
-    }
-
-    pub fn build(self) -> Result<scmp_arg_cmp> {
-        if let Some((op, datum_a)) = self.op.zip(self.datum_a) {
-            Ok(scmp_arg_cmp {
-                arg: self.arg,
-                op,
-                datum_a,
-                // datum_b is optional for a number of op, since these op only
-                // requires one value. For example, the SCMP_OP_EQ or equal op
-                // requires only one value. We set the datum_b to 0 in the case
-                // that only one value is required.
-                datum_b: self.datum_b.unwrap_or(0),
-            })
-        } else {
-            bail!("op and datum_a is required: {:?}", self);
-        }
-    }
-}
-
-#[derive(Debug)]
-struct Rule {
-    action: u32,
-    syscall_nr: i32,
-    comparators: Vec<scmp_arg_cmp>,
-}
-
-impl Rule {
-    pub fn new(action: u32, syscall_number: i32) -> Self {
-        Rule {
-            action,
-            syscall_nr: syscall_number,
-            comparators: vec![],
-        }
-    }
-
-    pub fn add_comparator(&mut self, cmp: scmp_arg_cmp) {
-        self.comparators.push(cmp);
-    }
-}
-
-#[derive(Debug)]
-struct FilterContext {
-    ctx: scmp_filter_ctx,
-}
-
-impl FilterContext {
-    pub fn default(default_action: u32) -> Result<FilterContext> {
-        let filter_ctx = unsafe { seccomp_init(default_action) };
-        if filter_ctx.is_null() {
-            bail!("Failed to initialized seccomp profile")
-        }
-
-        Ok(FilterContext { ctx: filter_ctx })
-    }
-
-    pub fn add_rule(&mut self, rule: &Rule) -> Result<()> {
-        let res = match rule.comparators.len() {
-            0 => unsafe { seccomp_rule_add(self.ctx, rule.action, rule.syscall_nr, 0) },
-            _ => unsafe {
-                seccomp_rule_add_array(
-                    self.ctx,
-                    rule.action,
-                    rule.syscall_nr,
-                    rule.comparators.len() as u32,
-                    rule.comparators.as_ptr(),
-                )
-            },
-        };
-        if res != 0 {
-            bail!("Failed to add rule. Errno: {}, Rule: {:?}", res, rule);
-        }
-
-        Ok(())
-    }
-
-    pub fn add_arch(&mut self, arch: u32) -> Result<()> {
-        let res = unsafe { seccomp_arch_add(self.ctx, arch) };
-        if res != 0 && nix::Error::from_i32(res.abs()) != nix::Error::EEXIST {
-            // The architecture already existed in the profile, so we can
-            // safely ignore the error here. Otherwise, error out.
-            bail!("Failed to add architecture {}. Errno: {}", arch, res);
-        }
-
-        Ok(())
-    }
-
-    pub fn load(&self) -> Result<()> {
-        let res = unsafe { seccomp_load(self.ctx) };
-        if res != 0 {
-            bail!("Failed to load seccomp profile: {}", res);
-        }
-
-        Ok(())
-    }
-
-    pub fn notify_fd(&self) -> Result<Option<i32>> {
-        let res = unsafe { seccomp_notify_fd(self.ctx) };
-        if res > 0 {
-            return Ok(Some(res));
-        }
-
-        // -1 indicates the notify fd is not set. This can happen if no seccomp
-        // notify filter is set.
-        if res == -1 {
-            return Ok(None);
-        }
-
-        match nix::errno::from_i32(res.abs()) {
-            Errno::EINVAL => {
-                bail!("invalid seccomp context used to call notify fd");
-            }
-            Errno::EFAULT => {
-                bail!("internal libseccomp fault; likely no seccomp filter is loaded");
-            }
-            Errno::EOPNOTSUPP => {
-                bail!("seccomp notify filter not supported");
-            }
-
-            _ => {
-                bail!("unknown error from return code: {}", res);
-            }
-        };
-    }
-
-    /// Enable or disable the no new privileges attribute bit.
-    pub fn set_nnp_bit(&self, to: bool) -> Result<()> {
-        self.set_attr(scmp_filter_attr::SCMP_FLTATR_CTL_NNP, to as u32)
-            .context("set no new privileges bit")
-    }
-
-    /// Enable or disable the log attribute bit.
-    pub fn set_log_bit(&self, to: bool) -> Result<()> {
-        self.set_attr(scmp_filter_attr::SCMP_FLTATR_CTL_LOG, to as u32)
-            .context("set log bit")
-    }
-
-    /// Enable or disable the tsync attribute bit.
-    pub fn set_tsync_bit(&self, to: bool) -> Result<()> {
-        self.set_attr(scmp_filter_attr::SCMP_FLTATR_CTL_TSYNC, to as u32)
-            .context("set tsync bit")
-    }
-
-    /// Enable or disable the SSB (Speculative Store Bypass) attribute bit.
-    pub fn set_ssb_bit(&self, to: bool) -> Result<()> {
-        self.set_attr(scmp_filter_attr::SCMP_FLTATR_CTL_SSB, to as u32)
-            .context("set SSB bit")
-    }
-
-    /// Can be used to set any arbitrary seccomp filter attribute.
-    pub fn set_attr(&self, attr: scmp_filter_attr, value: u32) -> Result<()> {
-        let res = unsafe { seccomp_attr_set(self.ctx, attr, value) };
-        if res != 0 {
-            bail!(
-                "unable to set attribute on seccomp filter: {}",
-                nix::errno::from_i32(res)
-            )
-        }
-        Ok(())
-    }
-}
-
-fn translate_syscall(syscall_name: &str) -> Result<i32> {
-    let c_syscall_name = CString::new(syscall_name)
-        .with_context(|| format!("Failed to convert syscall {:?} to cstring", syscall_name))?;
-    let res = unsafe { seccomp_syscall_resolve_name(c_syscall_name.as_ptr()) };
-    if res == __NR_SCMP_ERROR {
-        bail!("Failed to resolve syscall from name: {:?}", syscall_name);
-    }
-
-    Ok(res)
-}
-
-fn translate_action(action: LinuxSeccompAction, errno: Option<u32>) -> u32 {
-    let errno = errno.unwrap_or(libc::EPERM as u32);
-    match action {
-        LinuxSeccompAction::ScmpActKill => SCMP_ACT_KILL,
-        LinuxSeccompAction::ScmpActTrap => SCMP_ACT_TRAP,
-        LinuxSeccompAction::ScmpActErrno => SCMP_ACT_ERRNO(errno),
-        LinuxSeccompAction::ScmpActTrace => SCMP_ACT_TRACE(errno),
-        LinuxSeccompAction::ScmpActAllow => SCMP_ACT_ALLOW,
-        LinuxSeccompAction::ScmpActKillProcess => SCMP_ACT_KILL_PROCESS,
-        LinuxSeccompAction::ScmpActNotify => SCMP_ACT_NOTIFY,
-        LinuxSeccompAction::ScmpActLog => SCMP_ACT_LOG,
-    }
-}
-
-fn translate_op(op: LinuxSeccompOperator) -> scmp_compare {
-    match op {
-        LinuxSeccompOperator::ScmpCmpNe => SCMP_CMP_NE,
-        LinuxSeccompOperator::ScmpCmpLt => SCMP_CMP_LT,
-        LinuxSeccompOperator::ScmpCmpLe => SCMP_CMP_LE,
-        LinuxSeccompOperator::ScmpCmpEq => SCMP_CMP_EQ,
-        LinuxSeccompOperator::ScmpCmpGe => SCMP_CMP_GE,
-        LinuxSeccompOperator::ScmpCmpGt => SCMP_CMP_GT,
-        LinuxSeccompOperator::ScmpCmpMaskedEq => SCMP_CMP_MASKED_EQ,
-    }
-}
-
-fn translate_arch(arch: Arch) -> scmp_arch {
+fn translate_arch(arch: Arch) -> ScmpArch {
     match arch {
-        Arch::ScmpArchNative => SCMP_ARCH_NATIVE,
-        Arch::ScmpArchX86 => SCMP_ARCH_X86,
-        Arch::ScmpArchX86_64 => SCMP_ARCH_X86_64,
-        Arch::ScmpArchX32 => SCMP_ARCH_X32,
-        Arch::ScmpArchArm => SCMP_ARCH_ARM,
-        Arch::ScmpArchAarch64 => SCMP_ARCH_AARCH64,
-        Arch::ScmpArchMips => SCMP_ARCH_MIPS,
-        Arch::ScmpArchMips64 => SCMP_ARCH_MIPS64,
-        Arch::ScmpArchMips64n32 => SCMP_ARCH_MIPS64N32,
-        Arch::ScmpArchMipsel => SCMP_ARCH_MIPSEL,
-        Arch::ScmpArchMipsel64 => SCMP_ARCH_MIPSEL64,
-        Arch::ScmpArchMipsel64n32 => SCMP_ARCH_MIPSEL64N32,
-        Arch::ScmpArchPpc => SCMP_ARCH_PPC,
-        Arch::ScmpArchPpc64 => SCMP_ARCH_PPC64,
-        Arch::ScmpArchPpc64le => SCMP_ARCH_PPC64LE,
-        Arch::ScmpArchS390 => SCMP_ARCH_S390,
-        Arch::ScmpArchS390x => SCMP_ARCH_S390X,
+        Arch::ScmpArchNative => ScmpArch::Native,
+        Arch::ScmpArchX86 => ScmpArch::X86,
+        Arch::ScmpArchX86_64 => ScmpArch::X8664,
+        Arch::ScmpArchX32 => ScmpArch::X32,
+        Arch::ScmpArchArm => ScmpArch::Arm,
+        Arch::ScmpArchAarch64 => ScmpArch::Aarch64,
+        Arch::ScmpArchMips => ScmpArch::Mips,
+        Arch::ScmpArchMips64 => ScmpArch::Mips64,
+        Arch::ScmpArchMips64n32 => ScmpArch::Mips64N32,
+        Arch::ScmpArchMipsel => ScmpArch::Mipsel,
+        Arch::ScmpArchMipsel64 => ScmpArch::Mipsel64,
+        Arch::ScmpArchMipsel64n32 => ScmpArch::Mipsel64N32,
+        Arch::ScmpArchPpc => ScmpArch::Ppc,
+        Arch::ScmpArchPpc64 => ScmpArch::Ppc64,
+        Arch::ScmpArchPpc64le => ScmpArch::Ppc64Le,
+        Arch::ScmpArchS390 => ScmpArch::S390,
+        Arch::ScmpArchS390x => ScmpArch::S390X,
+    }
+}
+
+fn translate_action(action: LinuxSeccompAction, errno: Option<u32>) -> Result<ScmpAction> {
+    let errno = errno.map(|e| e as i32).unwrap_or(libc::EPERM);
+    let action = match action {
+        LinuxSeccompAction::ScmpActKill => ScmpAction::KillThread,
+        LinuxSeccompAction::ScmpActTrap => ScmpAction::Trap,
+        LinuxSeccompAction::ScmpActErrno => ScmpAction::Errno(errno),
+        LinuxSeccompAction::ScmpActTrace => ScmpAction::Trace(errno.try_into()?),
+        LinuxSeccompAction::ScmpActAllow => ScmpAction::Allow,
+        LinuxSeccompAction::ScmpActKillProcess => ScmpAction::KillProcess,
+        LinuxSeccompAction::ScmpActNotify => ScmpAction::Notify,
+        LinuxSeccompAction::ScmpActLog => ScmpAction::Log,
+    };
+
+    Ok(action)
+}
+
+fn translate_op(op: LinuxSeccompOperator, datum_b: Option<u64>) -> ScmpCompareOp {
+    match op {
+        LinuxSeccompOperator::ScmpCmpNe => ScmpCompareOp::NotEqual,
+        LinuxSeccompOperator::ScmpCmpLt => ScmpCompareOp::Less,
+        LinuxSeccompOperator::ScmpCmpLe => ScmpCompareOp::LessOrEqual,
+        LinuxSeccompOperator::ScmpCmpEq => ScmpCompareOp::Equal,
+        LinuxSeccompOperator::ScmpCmpGe => ScmpCompareOp::GreaterEqual,
+        LinuxSeccompOperator::ScmpCmpGt => ScmpCompareOp::Greater,
+        LinuxSeccompOperator::ScmpCmpMaskedEq => ScmpCompareOp::MaskedEqual(datum_b.unwrap_or(0)),
     }
 }
 
@@ -319,15 +115,18 @@ const SECCOMP_FILTER_FLAG_SPEC_ALLOW: &str = "SECCOMP_FILTER_FLAG_SPEC_ALLOW";
 pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
     check_seccomp(seccomp)?;
 
-    let default_action = translate_action(seccomp.default_action(), seccomp.default_errno_ret());
-    let mut ctx = FilterContext::default(default_action)?;
+    let default_action = translate_action(seccomp.default_action(), seccomp.default_errno_ret())?;
+    let mut ctx = ScmpFilterContext::new_filter(translate_action(
+        seccomp.default_action(),
+        seccomp.default_errno_ret(),
+    )?)?;
 
     if let Some(flags) = seccomp.flags() {
         for flag in flags {
             match flag.as_ref() {
-                SECCOMP_FILTER_FLAG_LOG => ctx.set_log_bit(true)?,
-                SECCOMP_FILTER_FLAG_TSYNC => ctx.set_tsync_bit(true)?,
-                SECCOMP_FILTER_FLAG_SPEC_ALLOW => ctx.set_ssb_bit(true)?,
+                SECCOMP_FILTER_FLAG_LOG => ctx.set_ctl_log(true)?,
+                SECCOMP_FILTER_FLAG_TSYNC => ctx.set_ctl_tsync(true)?,
+                SECCOMP_FILTER_FLAG_SPEC_ALLOW => ctx.set_ctl_ssb(true)?,
                 f => bail!("seccomp flag {} is not supported", f),
             }
         }
@@ -335,8 +134,7 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
 
     if let Some(architectures) = seccomp.architectures() {
         for &arch in architectures {
-            let arch_token = translate_arch(arch);
-            ctx.add_arch(arch_token as u32)
+            ctx.add_arch(translate_arch(arch))
                 .context("failed to add arch to seccomp")?;
         }
     }
@@ -348,11 +146,11 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
     // set it here.  If the seccomp load operation fails without enough
     // privilege, so be it. To prevent this automatic behavior, we unset the
     // value here.
-    ctx.set_nnp_bit(false)?;
+    ctx.set_ctl_nnp(false)?;
 
     if let Some(syscalls) = seccomp.syscalls() {
         for syscall in syscalls {
-            let action = translate_action(syscall.action(), syscall.errno_ret());
+            let action = translate_action(syscall.action(), syscall.errno_ret())?;
             if action == default_action {
                 // When the action is the same as the default action, the rule is redundant. We can
                 // skip this here to avoid failing when we add the rules.
@@ -364,13 +162,13 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
             }
 
             for name in syscall.names() {
-                let syscall_number = match translate_syscall(name) {
+                let sc = match ScmpSyscall::from_name(name) {
                     Ok(x) => x,
                     Err(_) => {
                         // If we failed to resolve the syscall by name, likely the kernel
                         // doeesn't support this syscall. So it is safe to skip...
                         log::warn!(
-                            "Failed to resolve syscall, likely kernel doesn't support this. {:?}",
+                            "failed to resolve syscall, likely kernel doesn't support this. {:?}",
                             name
                         );
                         continue;
@@ -382,29 +180,23 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
                 match syscall.args() {
                     Some(args) => {
                         for arg in args {
-                            let mut rule = Rule::new(action, syscall_number);
-                            let cmp = Compare::new(arg.index() as u32)
-                                .op(translate_op(arg.op()))
-                                .datum_a(arg.value())
-                                .datum_b(arg.value_two().unwrap_or(0))
-                                .build()
-                                .context("Failed to build a seccomp compare rule")?;
-                            rule.add_comparator(cmp);
-                            ctx.add_rule(&rule).with_context(|| {
-                                format!(
-                                    "failed to add seccomp rule: {:?}. Syscall: {:?}",
-                                    &rule, name,
-                                )
-                            })?;
+                            let cmp = ScmpArgCompare::new(
+                                arg.index() as u32,
+                                translate_op(arg.op(), arg.value_two()),
+                                arg.value(),
+                            );
+                            ctx.add_rule_conditional(action, sc, &[cmp])
+                                .with_context(|| {
+                                    format!(
+                                        "failed to add seccomp action: {:?}. Cmp: {:?} Syscall: {name}",
+                                        &action, cmp,
+                                    )
+                                })?;
                         }
                     }
                     None => {
-                        let rule = Rule::new(action, syscall_number);
-                        ctx.add_rule(&rule).with_context(|| {
-                            format!(
-                                "failed to add seccomp rule: {:?}. Syscall: {:?}",
-                                &rule, name,
-                            )
+                        ctx.add_rule(action, sc).with_context(|| {
+                            format!("failed to add seccomp rule: {:?}. Syscall: {name}", &sc)
                         })?;
                     }
                 }
@@ -419,7 +211,10 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
     ctx.load().context("failed to load seccomp context")?;
 
     let fd = if is_notify(seccomp) {
-        ctx.notify_fd().context("failed to get seccomp notify fd")?
+        Some(
+            ctx.get_notify_fd()
+                .context("failed to get seccomp notify fd")?,
+        )
     } else {
         None
     };

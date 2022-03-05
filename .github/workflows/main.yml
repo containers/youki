@@ -20,7 +20,6 @@ jobs:
             ./crates/youki: crates/youki/**
             ./crates/libcontainer: crates/libcontainer/**
             ./crates/libcgroups: crates/libcgroups/**
-            ./crates/libseccomp: crates/libseccomp/**
             ./crates/integration_test: crates/integration_test/**
             ./runtimetest : runtimetest/**
   check:
@@ -93,7 +92,7 @@ jobs:
         run: |
           cargo llvm-cov clean --workspace
           cargo llvm-cov --no-report
-          cargo llvm-cov --no-run --lcov --ignore-filename-regex "libseccomp/src|integration_test/src|test_framework/src|systemd_api.rs" --output-path ./coverage.lcov
+          cargo llvm-cov --no-run --lcov --ignore-filename-regex "integration_test/src|test_framework/src|systemd_api.rs" --output-path ./coverage.lcov
       - name: Upload Youki Code Coverage Results
         uses: codecov/codecov-action@v2
         with:
