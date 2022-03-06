@@ -101,8 +101,6 @@ impl Devices {
 
 #[cfg(test)]
 mod tests {
-    use serial_test::serial;
-
     use super::*;
     use crate::test::setup;
     use serial_test::serial;

@@ -142,15 +142,15 @@ pub mod prog {
 
 #[cfg(test)]
 mod tests {
-    use serial_test::serial;
-
     use super::prog;
     use crate::v2::devices::mocks::{mock_libbpf_sys, mock_libc};
     use errno::{set_errno, Errno};
     use libc::{ENOSPC, ENOSYS};
 
+    use serial_test::serial;
+
     #[test]
-    #[serial] // mock contexts are shared
+    #[serial(libbpf_sys)] // mock contexts are shared
     fn test_bpf_load() {
         // eBPF uses 64-bit instructions
         let instruction_zero: &[u8] = &[0x0, 0x0, 0x0, 0x0];
@@ -172,7 +172,23 @@ mod tests {
     }
 
     #[test]
-    #[serial] // mock contexts are shared
+    #[serial(libbpf_sys)] // mock contexts are shared
+    fn test_bpf_attach() {
+        // arrange
+        let attach = mock_libbpf_sys::bpf_prog_attach_context();
+
+        // expect
+        attach.expect().once().returning(|_, _, _, _| 0);
+
+        // act
+        let r = prog::attach(0, 0);
+
+        // assert
+        assert!(r.is_ok());
+    }
+
+    #[test]
+    #[serial(libbpf_sys)] // mock contexts are shared
     fn test_bpf_load_error() {
         // eBPF uses 64-bit instructions
         let instruction_zero: &[u8] = &[0x0, 0x0, 0x0, 0x0];
@@ -194,7 +210,7 @@ mod tests {
     }
 
     #[test]
-    #[serial] // mock contexts are shared
+    #[serial(libbpf_sys)] // mock contexts are shared
     fn test_bpf_query() {
         // arrange
         let query = mock_libbpf_sys::bpf_prog_query_context();
@@ -240,7 +256,7 @@ mod tests {
     }
 
     #[test]
-    #[serial] // mock contexts are shared
+    #[serial(libbpf_sys)] // mock contexts are shared
     fn test_bpf_query_recoverable_error() {
         // arrange
         let query = mock_libbpf_sys::bpf_prog_query_context();
@@ -286,7 +302,7 @@ mod tests {
     }
 
     #[test]
-    #[serial] // mock contexts are shared
+    #[serial(libbpf_sys)] // mock contexts are shared
     fn test_bpf_query_other_error() {
         // arrange
         let query = mock_libbpf_sys::bpf_prog_query_context();
@@ -315,7 +331,7 @@ mod tests {
     }
 
     #[test]
-    #[serial] // mock contexts are shared
+    #[serial(libbpf_sys)] // mock contexts are shared
     fn test_bpf_detach2() {
         // arrange
         let detach2 = mock_libbpf_sys::bpf_prog_detach2_context();
@@ -331,7 +347,7 @@ mod tests {
     }
 
     #[test]
-    #[serial] // mock contexts are shared
+    #[serial(libbpf_sys)] // mock contexts are shared
     fn test_bpf_detach2_error() {
         // arrange
         let detach2 = mock_libbpf_sys::bpf_prog_detach2_context();
@@ -347,23 +363,7 @@ mod tests {
     }
 
     #[test]
-    #[serial] // mock contexts are shared
-    fn test_bpf_attach() {
-        // arrange
-        let attach = mock_libbpf_sys::bpf_prog_attach_context();
-
-        // expect
-        attach.expect().once().returning(|_, _, _, _| 0);
-
-        // act
-        let r = prog::attach(0, 0);
-
-        // assert
-        assert!(r.is_ok());
-    }
-
-    #[test]
-    #[serial] // mock contexts are shared
+    #[serial(libc)] // mock contexts are shared
     fn test_bump_memlock_rlimit() {
         // arrange
         let setrlimit = mock_libc::setrlimit_context();
@@ -379,7 +379,7 @@ mod tests {
     }
 
     #[test]
-    #[serial] // mock contexts are shared
+    #[serial(libc)] // mock contexts are shared
     fn test_bump_memlock_rlimit_error() {
         // arrange
         let setrlimit = mock_libc::setrlimit_context();
