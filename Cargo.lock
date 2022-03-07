@@ -925,7 +925,7 @@ dependencies = [
  "log",
  "nix",
  "num_cpus",
- "oci-spec 0.5.2",
+ "oci-spec",
  "once_cell",
  "pnet",
  "procfs",
@@ -1023,7 +1023,7 @@ dependencies = [
  "log",
  "mockall",
  "nix",
- "oci-spec 0.5.4",
+ "oci-spec",
  "procfs",
  "quickcheck",
  "rbpf",
@@ -1050,7 +1050,7 @@ dependencies = [
  "log",
  "mio",
  "nix",
- "oci-spec 0.5.4",
+ "oci-spec",
  "path-clean",
  "prctl",
  "procfs",
@@ -1355,21 +1355,9 @@ dependencies = [
 
 [[package]]
 name = "oci-spec"
-version = "0.5.2"
-source = "git+https://github.com/containers/oci-spec-rs?rev=54c5e386f01ab37c9305cc4a83404eb157e42440#54c5e386f01ab37c9305cc4a83404eb157e42440"
-dependencies = [
- "derive_builder",
- "getset",
- "serde",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
-name = "oci-spec"
-version = "0.5.4"
+version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b409d52fff741f330914aa6b8ab73e9113607bb13fbc09f95cdb04d16c8dd5d"
+checksum = "71a85b9f9654fe5c3eab8907369250c05aeda9d807b76bd06c740601f881dc02"
 dependencies = [
  "derive_builder",
  "getset",
@@ -2820,7 +2808,7 @@ dependencies = [
  "liboci-cli",
  "log",
  "nix",
- "oci-spec 0.5.4",
+ "oci-spec",
  "once_cell",
  "pentacle",
  "procfs",

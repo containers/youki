@@ -10,6 +10,7 @@ use libseccomp::ScmpSyscall;
 use oci_spec::runtime::Arch;
 use oci_spec::runtime::LinuxSeccomp;
 use oci_spec::runtime::LinuxSeccompAction;
+use oci_spec::runtime::LinuxSeccompFilterFlag;
 use oci_spec::runtime::LinuxSeccompOperator;
 use std::os::unix::io;
 
@@ -93,25 +94,6 @@ fn check_seccomp(seccomp: &LinuxSeccomp) -> Result<()> {
     Ok(())
 }
 
-/// All filter return actions except SECCOMP_RET_ALLOW should be logged. An administrator may
-/// override this filter flag by preventing specific actions from being logged via the
-/// /proc/sys/kernel/seccomp/actions_logged file. (since Linux 4.14)
-const SECCOMP_FILTER_FLAG_LOG: &str = "SECCOMP_FILTER_FLAG_LOG";
-
-/// When adding a new filter, synchronize all other threads of the calling process to the same
-/// seccomp filter tree. A "filter tree" is the ordered list of filters attached to a thread.
-/// (Attaching identical filters in separate seccomp() calls results in different filters from this
-/// perspective.)
-///
-/// If any thread cannot synchronize to the same filter tree, the call will not attach the new
-/// seccomp filter, and will fail, returning the first thread ID found that cannot synchronize.
-/// Synchronization will fail if another thread in the same process is in SECCOMP_MODE_STRICT or if
-/// it has attached new seccomp filters to itself, diverging from the calling thread's filter tree.
-const SECCOMP_FILTER_FLAG_TSYNC: &str = "SECCOMP_FILTER_FLAG_TSYNC";
-
-/// Disable Speculative Store Bypass mitigation. (since Linux 4.17)
-const SECCOMP_FILTER_FLAG_SPEC_ALLOW: &str = "SECCOMP_FILTER_FLAG_SPEC_ALLOW";
-
 pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
     check_seccomp(seccomp)?;
 
@@ -123,11 +105,10 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
 
     if let Some(flags) = seccomp.flags() {
         for flag in flags {
-            match flag.as_ref() {
-                SECCOMP_FILTER_FLAG_LOG => ctx.set_ctl_log(true)?,
-                SECCOMP_FILTER_FLAG_TSYNC => ctx.set_ctl_tsync(true)?,
-                SECCOMP_FILTER_FLAG_SPEC_ALLOW => ctx.set_ctl_ssb(true)?,
-                f => bail!("seccomp flag {} is not supported", f),
+            match flag {
+                LinuxSeccompFilterFlag::SeccompFilterFlagLog => ctx.set_ctl_log(true)?,
+                LinuxSeccompFilterFlag::SeccompFilterFlagTsync => ctx.set_ctl_tsync(true)?,
+                LinuxSeccompFilterFlag::SeccompFilterFlagSpecAllow => ctx.set_ctl_ssb(true)?,
             }
         }
     }
