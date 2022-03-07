@@ -4,6 +4,7 @@
 use std::{any::Any, ffi::OsStr, path::Path, sync::Arc};
 
 use anyhow::Result;
+use bitflags::bitflags;
 use caps::{CapSet, CapsHashSet};
 use nix::{
     mount::MsFlags,
@@ -41,6 +42,7 @@ pub trait Syscall {
     fn mknod(&self, path: &Path, kind: SFlag, perm: Mode, dev: u64) -> Result<()>;
     fn chown(&self, path: &Path, owner: Option<Uid>, group: Option<Gid>) -> Result<()>;
     fn set_groups(&self, groups: &[Gid]) -> Result<()>;
+    fn close_range(&self, preserve_fds: i32) -> Result<()>;
 }
 
 pub fn create_syscall() -> Box<dyn Syscall> {
@@ -50,3 +52,10 @@ pub fn create_syscall() -> Box<dyn Syscall> {
         Box::new(LinuxSyscall)
     }
 }
+
+bitflags! {
+pub struct CloseRange : usize {
+    const NONE = 0b00000000;
+    const UNSHARE = 0b00000010;
+    const CLOEXEC = 0b00000100;
+}}

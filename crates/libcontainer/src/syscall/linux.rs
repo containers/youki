@@ -1,14 +1,16 @@
 //! Implements Command trait for Linux systems
 #[cfg_attr(coverage, no_coverage)]
 use std::ffi::{CStr, OsStr};
+use std::fs;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::symlink;
 use std::sync::Arc;
 use std::{any::Any, mem, path::Path, ptr};
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use caps::{CapSet, CapsHashSet};
 use libc::{c_char, uid_t};
+use nix::fcntl;
 use nix::{
     errno::Errno,
     fcntl::{open, OFlag},
@@ -18,11 +20,13 @@ use nix::{
     unistd,
     unistd::{chown, fchdir, pivot_root, setgroups, sethostname, Gid, Uid},
 };
+use syscalls::{syscall, SYS_close_range};
 
 use oci_spec::runtime::LinuxRlimit;
 
 use super::Syscall;
-use crate::capabilities;
+use crate::syscall::syscall::CloseRange;
+use crate::{capabilities, utils};
 
 /// Empty structure to implement Command trait for
 #[derive(Clone)]
@@ -40,6 +44,51 @@ impl LinuxSyscall {
     unsafe fn passwd_to_user(passwd: libc::passwd) -> Arc<OsStr> {
         let name: Arc<OsStr> = Self::from_raw_buf(passwd.pw_name);
         name
+    }
+
+    fn emulate_close_range(preserve_fds: i32) -> Result<()> {
+        let open_fds = Self::get_open_fds().with_context(|| "failed to obtain opened fds")?;
+        // Include stdin, stdout, and stderr for fd 0, 1, and 2 respectively.
+        let min_fd = preserve_fds + 3;
+        let to_be_cleaned_up_fds: Vec<i32> = open_fds
+            .iter()
+            .filter_map(|&fd| if fd >= min_fd { Some(fd) } else { None })
+            .collect();
+
+        to_be_cleaned_up_fds.iter().for_each(|&fd| {
+            // Intentionally ignore errors here -- the cases where this might fail
+            // are basically file descriptors that have already been closed.
+            let _ = fcntl::fcntl(fd, fcntl::F_SETFD(fcntl::FdFlag::FD_CLOEXEC));
+        });
+
+        Ok(())
+    }
+
+    // Get a list of open fds for the calling process.
+    fn get_open_fds() -> Result<Vec<i32>> {
+        const PROCFS_FD_PATH: &str = "/proc/self/fd";
+        utils::ensure_procfs(Path::new(PROCFS_FD_PATH))
+            .with_context(|| format!("{} is not the actual procfs", PROCFS_FD_PATH))?;
+
+        let fds: Vec<i32> = fs::read_dir(PROCFS_FD_PATH)?
+            .filter_map(|entry| match entry {
+                Ok(entry) => Some(entry.path()),
+                Err(_) => None,
+            })
+            .filter_map(|path| path.file_name().map(|file_name| file_name.to_owned()))
+            .filter_map(|file_name| file_name.to_str().map(String::from))
+            .filter_map(|file_name| -> Option<i32> {
+                // Convert the file name from string into i32. Since we are looking
+                // at /proc/<pid>/fd, anything that's not a number (i32) can be
+                // ignored. We are only interested in opened fds.
+                match file_name.parse() {
+                    Ok(fd) => Some(fd),
+                    Err(_) => None,
+                }
+            })
+            .collect();
+
+        Ok(fds)
     }
 }
 
@@ -243,5 +292,104 @@ impl Syscall for LinuxSyscall {
             Ok(_) => Ok(()),
             Err(e) => Err(anyhow!(e)),
         }
+    }
+
+    fn close_range(&self, preserve_fds: i32) -> Result<()> {
+        let result = unsafe {
+            syscall!(
+                SYS_close_range,
+                3 + preserve_fds as usize,
+                usize::MAX,
+                CloseRange::CLOEXEC.bits()
+            )
+        };
+
+        match result {
+            Ok(_) => Ok(()),
+            Err(e) if e == syscalls::Errno::ENOSYS || e == syscalls::Errno::EINVAL => {
+                // close_range was introduced in kernel 5.9 and CLOSEEXEC was introduced in
+                // kernel 5.11. If the kernel is older we emulate close_range in userspace.
+                Self::emulate_close_range(preserve_fds)
+            }
+            Err(e) => bail!(e),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    // Note: We have to run these tests here as serial. The main issue is that
+    // these tests has a dependency on the system state. The
+    // cleanup_file_descriptors test is especially evil when running with other
+    // tests because it would ran around close down different fds.
+
+    use std::{fs, os::unix::prelude::AsRawFd};
+
+    use anyhow::{bail, Context, Result};
+    use nix::{fcntl, sys, unistd};
+    use serial_test::serial;
+
+    use crate::syscall::Syscall;
+
+    use super::LinuxSyscall;
+
+    #[test]
+    #[serial]
+    fn test_get_open_fds() -> Result<()> {
+        let file = fs::File::open("/dev/null")?;
+        let fd = file.as_raw_fd();
+        let open_fds = LinuxSyscall::get_open_fds()?;
+
+        if !open_fds.iter().any(|&v| v == fd) {
+            bail!("failed to find the opened dev null fds: {:?}", open_fds);
+        }
+
+        // explicitly close the file before the test case returns.
+        drop(file);
+
+        // The stdio fds should also be contained in the list of opened fds.
+        if !vec![0, 1, 2]
+            .iter()
+            .all(|&stdio_fd| open_fds.iter().any(|&open_fd| open_fd == stdio_fd))
+        {
+            bail!("failed to find the stdio fds: {:?}", open_fds);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    #[serial]
+    fn test_close_range_userspace() -> Result<()> {
+        // Open a fd without the CLOEXEC flag. Rust automatically adds the flag,
+        // so we use fcntl::open here for more control.
+        let fd = fcntl::open("/dev/null", fcntl::OFlag::O_RDWR, sys::stat::Mode::empty())?;
+        LinuxSyscall::emulate_close_range(0).context("failed to clean up the fds")?;
+
+        let fd_flag = fcntl::fcntl(fd, fcntl::F_GETFD)?;
+        if (fd_flag & fcntl::FdFlag::FD_CLOEXEC.bits()) == 0 {
+            bail!("CLOEXEC flag is not set correctly");
+        }
+
+        unistd::close(fd)?;
+        Ok(())
+    }
+
+    #[test]
+    #[serial]
+    fn test_close_range_native() -> Result<()> {
+        let fd = fcntl::open("/dev/null", fcntl::OFlag::O_RDWR, sys::stat::Mode::empty())?;
+        let syscall = LinuxSyscall {};
+        syscall
+            .close_range(0)
+            .context("failed to clean up the fds")?;
+
+        let fd_flag = fcntl::fcntl(fd, fcntl::F_GETFD)?;
+        if (fd_flag & fcntl::FdFlag::FD_CLOEXEC.bits()) == 0 {
+            bail!("CLOEXEC flag is not set correctly");
+        }
+
+        unistd::close(fd)?;
+        Ok(())
     }
 }

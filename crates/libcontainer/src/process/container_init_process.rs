@@ -12,10 +12,7 @@ use nix::sched::CloneFlags;
 use nix::sys::stat::Mode;
 use nix::unistd::setsid;
 
-use nix::{
-    fcntl,
-    unistd::{self, Gid, Uid},
-};
+use nix::unistd::{self, Gid, Uid};
 use oci_spec::runtime::{LinuxNamespaceType, Spec, User};
 use std::collections::HashMap;
 use std::os::unix::io::AsRawFd;
@@ -23,58 +20,6 @@ use std::{
     env, fs,
     path::{Path, PathBuf},
 };
-
-// Get a list of open fds for the calling process.
-fn get_open_fds() -> Result<Vec<i32>> {
-    const PROCFS_FD_PATH: &str = "/proc/self/fd";
-    utils::ensure_procfs(Path::new(PROCFS_FD_PATH))
-        .with_context(|| format!("{} is not the actual procfs", PROCFS_FD_PATH))?;
-
-    let fds: Vec<i32> = fs::read_dir(PROCFS_FD_PATH)?
-        .filter_map(|entry| match entry {
-            Ok(entry) => Some(entry.path()),
-            Err(_) => None,
-        })
-        .filter_map(|path| path.file_name().map(|file_name| file_name.to_owned()))
-        .filter_map(|file_name| file_name.to_str().map(String::from))
-        .filter_map(|file_name| -> Option<i32> {
-            // Convert the file name from string into i32. Since we are looking
-            // at /proc/<pid>/fd, anything that's not a number (i32) can be
-            // ignored. We are only interested in opened fds.
-            match file_name.parse() {
-                Ok(fd) => Some(fd),
-                Err(_) => None,
-            }
-        })
-        .collect();
-
-    Ok(fds)
-}
-
-// Cleanup any extra file descriptors, so the new container process will not
-// leak a file descriptor from before execve gets executed. The first 3 fd will
-// stay open: stdio, stdout, and stderr. We would further preserve the next
-// "preserve_fds" number of fds. Set the rest of fd with CLOEXEC flag, so they
-// will be closed after execve into the container payload. We can't close the
-// fds immediately since we at least still need it for the pipe used to wait on
-// starting the container.
-fn cleanup_file_descriptors(preserve_fds: i32) -> Result<()> {
-    let open_fds = get_open_fds().with_context(|| "Failed to obtain opened fds")?;
-    // Include stdin, stdout, and stderr for fd 0, 1, and 2 respectively.
-    let min_fd = preserve_fds + 3;
-    let to_be_cleaned_up_fds: Vec<i32> = open_fds
-        .iter()
-        .filter_map(|&fd| if fd >= min_fd { Some(fd) } else { None })
-        .collect();
-
-    to_be_cleaned_up_fds.iter().for_each(|&fd| {
-        // Intentionally ignore errors here -- the cases where this might fail
-        // are basically file descriptors that have already been closed.
-        let _ = fcntl::fcntl(fd, fcntl::F_SETFD(fcntl::FdFlag::FD_CLOEXEC));
-    });
-
-    Ok(())
-}
 
 fn sysctl(kernel_params: &HashMap<String, String>) -> Result<()> {
     let sys = PathBuf::from("/proc/sys");
@@ -346,23 +291,6 @@ pub fn container_init_process(
         )
         .context("failed to configure uid and gid")?;
 
-    // Without no new privileges, seccomp is a privileged operation. We have to
-    // do this before dropping capabilities. Otherwise, we should do it later,
-    // as close to exec as possible.
-    if let Some(seccomp) = linux.seccomp() {
-        if proc.no_new_privileges().is_none() {
-            let notify_fd =
-                seccomp::initialize_seccomp(seccomp).context("failed to execute seccomp")?;
-            sync_seccomp(notify_fd, main_sender, init_receiver)
-                .context("failed to sync seccomp")?;
-        }
-    }
-
-    capabilities::reset_effective(syscall).context("Failed to reset effective capabilities")?;
-    if let Some(caps) = proc.capabilities() {
-        capabilities::drop_privileges(caps, syscall).context("Failed to drop capabilities")?;
-    }
-
     // Take care of LISTEN_FDS used for systemd-active-socket. If the value is
     // not 0, then we have to preserve those fds as well, and set up the correct
     // environment variables.
@@ -403,9 +331,33 @@ pub fn container_init_process(
         }
     };
 
-    // Clean up and handle preserved fds. We only mark the fd as CLOSEXEC, so we
-    // don't have to worry about when the fd will be closed.
-    cleanup_file_descriptors(preserve_fds).with_context(|| "Failed to clean up extra fds")?;
+    // Cleanup any extra file descriptors, so the new container process will not
+    // leak a file descriptor from before execve gets executed. The first 3 fd will
+    // stay open: stdio, stdout, and stderr. We would further preserve the next
+    // "preserve_fds" number of fds. Set the rest of fd with CLOEXEC flag, so they
+    // will be closed after execve into the container payload. We can't close the
+    // fds immediately since we at least still need it for the pipe used to wait on
+    // starting the container.
+    syscall
+        .close_range(preserve_fds)
+        .with_context(|| "failed to clean up extra fds")?;
+
+    // Without no new privileges, seccomp is a privileged operation. We have to
+    // do this before dropping capabilities. Otherwise, we should do it later,
+    // as close to exec as possible.
+    if let Some(seccomp) = linux.seccomp() {
+        if proc.no_new_privileges().is_none() {
+            let notify_fd =
+                seccomp::initialize_seccomp(seccomp).context("failed to execute seccomp")?;
+            sync_seccomp(notify_fd, main_sender, init_receiver)
+                .context("failed to sync seccomp")?;
+        }
+    }
+
+    capabilities::reset_effective(syscall).context("Failed to reset effective capabilities")?;
+    if let Some(caps) = proc.capabilities() {
+        capabilities::drop_privileges(caps, syscall).context("Failed to drop capabilities")?;
+    }
 
     // Change directory to process.cwd if process.cwd is not empty
     if do_chdir {
@@ -556,56 +508,10 @@ mod tests {
         syscall::create_syscall,
         test::{ArgName, MountArgs, TestHelperSyscall},
     };
-    use nix::{fcntl, sys, unistd};
+    use nix::unistd;
     use oci_spec::runtime::{LinuxNamespaceBuilder, SpecBuilder, UserBuilder};
     use serial_test::serial;
-    use std::{fs, os::unix::prelude::AsRawFd};
-
-    // Note: We have to run these tests here as serial. The main issue is that
-    // these tests has a dependency on the system state. The
-    // cleanup_file_descriptors test is especially evil when running with other
-    // tests because it would ran around close down different fds.
-
-    #[test]
-    #[serial]
-    fn test_get_open_fds() -> Result<()> {
-        let file = fs::File::open("/dev/null")?;
-        let fd = file.as_raw_fd();
-        let open_fds = super::get_open_fds()?;
-
-        if !open_fds.iter().any(|&v| v == fd) {
-            bail!("Failed to find the opened dev null fds: {:?}", open_fds);
-        }
-
-        // explicitly close the file before the test case returns.
-        drop(file);
-
-        // The stdio fds should also be contained in the list of opened fds.
-        if !vec![0, 1, 2]
-            .iter()
-            .all(|&stdio_fd| open_fds.iter().any(|&open_fd| open_fd == stdio_fd))
-        {
-            bail!("Failed to find the stdio fds: {:?}", open_fds);
-        }
-
-        Ok(())
-    }
-
-    #[test]
-    #[serial]
-    fn test_cleanup_file_descriptors() -> Result<()> {
-        // Open a fd without the CLOEXEC flag. Rust automatically adds the flag,
-        // so we use fcntl::open here for more control.
-        let fd = fcntl::open("/dev/null", fcntl::OFlag::O_RDWR, sys::stat::Mode::empty())?;
-        cleanup_file_descriptors(fd - 1).with_context(|| "Failed to clean up the fds")?;
-        let fd_flag = fcntl::fcntl(fd, fcntl::F_GETFD)?;
-        if (fd_flag & fcntl::FdFlag::FD_CLOEXEC.bits()) != 0 {
-            bail!("CLOEXEC flag is not set correctly");
-        }
-
-        unistd::close(fd)?;
-        Ok(())
-    }
+    use std::fs;
 
     #[test]
     fn test_readonly_path() -> Result<()> {
