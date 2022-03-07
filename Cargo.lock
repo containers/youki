@@ -2684,9 +2684,9 @@ dependencies = [
 
 [[package]]
 name = "wasmer-wasi"
-version = "2.1.1"
+version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c2b1d981ad312dac6e74a41a35b9bca41a6d1157c3e6a575fb1041e4b516610"
+checksum = "df791d89498c2a4288f89a5807e67248c1c75924316f67b9edcfc89198fd1711"
 dependencies = [
  "cfg-if 1.0.0",
  "generational-arena",
