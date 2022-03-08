@@ -19,7 +19,7 @@ features = ["std", "suggestions", "derive", "cargo"]
 
 
 [dependencies]
-anyhow = "1.0.55"
+anyhow = "1.0.56"
 chrono = { version="0.4", features = ["serde"] }
 libcgroups = { version = "0.0.2", path = "../libcgroups" }
 libcontainer = { version = "0.0.2", path = "../libcontainer" }
@@ -39,5 +39,5 @@ clap_generate = { version = "3.0.0-beta.5" }
 serial_test = "0.6.0"
 
 [build-dependencies]
-anyhow = "1.0.55"
+anyhow = "1.0.56"
 vergen = "6.0"
