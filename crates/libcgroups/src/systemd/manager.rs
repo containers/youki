@@ -215,7 +215,7 @@ impl Manager {
         }
         for component in slice_name.split('-') {
             if component.is_empty() {
-                anyhow!("invalid slice name: {}", slice);
+                bail!("invalid slice name: {}", slice);
             }
             // Append the component to the path and to the prefix.
             path = format!("{}/{}{}{}", path, prefix, component, suffix);
