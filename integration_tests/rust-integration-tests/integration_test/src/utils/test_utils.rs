@@ -86,7 +86,7 @@ pub fn get_state<P: AsRef<Path>>(id: &str, dir: P) -> Result<(String, String)> {
     sleep(SLEEP_TIME);
     let output = runtime_command(dir)
         .arg("state")
-        .arg(id.to_string())
+        .arg(id)
         .spawn()
         .context("could not get container state")?
         .wait_with_output()
@@ -99,7 +99,7 @@ pub fn get_state<P: AsRef<Path>>(id: &str, dir: P) -> Result<(String, String)> {
 pub fn start_container<P: AsRef<Path>>(id: &str, dir: P) -> Result<Child> {
     let res = runtime_command(dir)
         .arg("start")
-        .arg(id.to_string())
+        .arg(id)
         .spawn()
         .context("could not start container")?;
     Ok(res)

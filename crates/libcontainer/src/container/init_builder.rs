@@ -39,10 +39,14 @@ impl<'a> InitContainerBuilder<'a> {
 
     /// Creates a new container
     pub fn build(self) -> Result<Container> {
-        let spec = self.load_spec()?;
-        let container_dir = self.create_container_dir()?;
+        let spec = self.load_spec().context("failed to load spec")?;
+        let container_dir = self
+            .create_container_dir()
+            .context("failed to create container dir")?;
 
-        let mut container = self.create_container_state(&container_dir)?;
+        let mut container = self
+            .create_container_state(&container_dir)
+            .context("failed to create container state")?;
         container
             .set_systemd(self.use_systemd)
             .set_annotations(spec.annotations().clone());
@@ -66,7 +70,9 @@ impl<'a> InitContainerBuilder<'a> {
 
         let rootless = Rootless::new(&spec)?;
         let config = YoukiConfig::from_spec(&spec, container.id(), rootless.is_some())?;
-        config.save(&container_dir)?;
+        config
+            .save(&container_dir)
+            .context("failed to save config")?;
 
         let mut builder_impl = ContainerBuilderImpl {
             init: true,
@@ -97,7 +103,8 @@ impl<'a> InitContainerBuilder<'a> {
             bail!("container {} already exists", self.base.container_id);
         }
 
-        utils::create_dir_all(&container_dir)?;
+        utils::create_dir_all(&container_dir).context("failed to create container dir")?;
+
         Ok(container_dir)
     }
 

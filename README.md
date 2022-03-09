@@ -72,6 +72,8 @@ youki is not at the practical stage yet. However, it is getting closer to practi
 
 The User and Developer Documentation for youki is hosted at [https://containers.github.io/youki/](https://containers.github.io/youki/)
 
+![Architecture](docs/.drawio.svg)
+
 # Getting Started
 
 Local build is only supported on Linux.

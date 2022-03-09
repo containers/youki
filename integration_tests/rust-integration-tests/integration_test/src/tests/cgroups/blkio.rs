@@ -76,9 +76,9 @@ fn supports_throttle_iops() -> bool {
 
 fn parse_device_data<'a>(device_type: &'static str, line: &'a str) -> Result<(i64, i64, &'a str)> {
     let (device_id, value) = line
-        .split_once(" ")
+        .split_once(' ')
         .with_context(|| format!("invalid {} device format : found {}", device_type, line))?;
-    let (major_str, minor_str) = device_id.split_once(":").with_context(|| {
+    let (major_str, minor_str) = device_id.split_once(':').with_context(|| {
         format!(
             "invalid major-minor number format for {} device : found {}",
             device_type, device_id

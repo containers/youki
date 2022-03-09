@@ -12,8 +12,8 @@ libcontainer = { path = "../../../crates/libcontainer" }
 log = { version = "0.4", features = ["std"] }
 nix = "0.23.1"
 num_cpus = "1.13"
-oci-spec = "0.5.3"
-once_cell = "1.9.0"
+oci-spec = "0.5.5"
+once_cell = "1.10.0"
 pnet = "0.29.0"
 procfs = "0.12.0"
 rand = "0.8.5"

@@ -32,7 +32,7 @@ impl Unified {
                 common::write_cgroup_file_str(cgroup_path.join(cgroup_file), value).map_err(
                     |e| {
                         let (subsystem, _) = cgroup_file
-                            .split_once(".")
+                            .split_once('.')
                             .with_context(|| {
                                 format!("failed to split {} with {}", cgroup_file, ".")
                             })

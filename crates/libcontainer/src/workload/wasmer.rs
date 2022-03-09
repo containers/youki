@@ -20,7 +20,7 @@ impl Executor for WasmerExecutor {
             .unwrap_or(&EMPTY)
             .iter()
             .filter_map(|e| {
-                e.split_once("=")
+                e.split_once('=')
                     .filter(|kv| !kv.0.contains('\u{0}') && !kv.1.contains('\u{0}'))
                     .map(|kv| (kv.0.trim(), kv.1.trim()))
             });

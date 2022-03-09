@@ -73,9 +73,8 @@ fn get_network_interfaces() -> Option<(String, String)> {
 fn test_network_cgroups() -> TestResult {
     let cgroup_name = "test_network_cgroups";
 
-    let interfaces = test_result!(get_network_interfaces().ok_or(anyhow!(
-        "Could not find network interfaces required for test"
-    )));
+    let interfaces = test_result!(get_network_interfaces()
+        .ok_or_else(|| anyhow!("Could not find network interfaces required for test")));
 
     let lo_if_name = &interfaces.0;
     let eth_if_name = &interfaces.1;
