@@ -148,7 +148,7 @@
 <pre><code class="language-console">sudo systemctl stop docker
 </code></pre>
 <p>After this you need to manually restart the docker daemon, but with Youki as its runtime. To do this, run following command in the youki/ directory after building youki</p>
-<pre><code class="language-console">dockerd --experimental --add-runtime=&quot;youki=$(pwd)/youki&quot; # run in the youki directory
+<pre><code class="language-console">dockerd --experimental --add-runtime=&quot;youki=$(pwd)/youki&quot; # run in the youki/scripts directory
 </code></pre>
 <p>This will start the daemon and hang up the console. You can either start this as a background process to continue using the same terminal, or use another terminal, which will make it easier to stop the docker daemon later.</p>
 <p>In case you don't stop the original daemon, you can get an error message after previous command</p>
@@ -182,7 +182,7 @@ with docker: <code>docker run --runtime youki ...</code>.</p>
 <h4 id="using-youki-standalone"><a class="header" href="#using-youki-standalone">Using Youki Standalone</a></h4>
 <p>Youki can also be used directly, without a higher-level runtime such as Docker to create, start, stop and delete the container, but the process can be tedious. Here we will show how you can do that, to run a simple container with desired program running in it.</p>
 <p>Note that we will still be using Docker to generate the rootfs required for running the container.</p>
-<p>To start, in the youki directory, make another directory named tutorial, and craete a sub-directory rootfs inside it</p>
+<p>To start, in the youki/scripts directory, make another directory named tutorial, and create a sub-directory rootfs inside it</p>
 <pre><code class="language-console">mkdir -p tutorial/rootfs
 </code></pre>
 <p>After that, you will need to use docker to create the required directory structure</p>
