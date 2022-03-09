@@ -17,8 +17,7 @@ jobs:
         id: filter
         with:
           filters: |
-            ./integration_test: crates/integration_test/**
-            ./runtimetest : runtimetest/**
+            ./integration_test: ./integration_tests/rust-integration-tests/**
   validate:
     needs: [changes]
     if: ${{ !contains(needs.changes.outputs.dirs, '[]') }}
@@ -41,9 +40,7 @@ jobs:
           wget -q https://github.com/opencontainers/runc/releases/download/v1.1.0/runc.amd64
           sudo mv runc.amd64 /usr/bin/runc
           sudo chmod 755 /usr/bin/runc
-      - name: Build
-        run: ./build.sh
       - name: Validate tests on runc
-        run: runc --version && cd ./crates/integration_test && sudo ./tests.sh run runc
+        run: cd scripts && ./rust_integration_tests.sh runc
       - name: Validate tests on youki
-        run: cd ./crates/integration_test && sudo ./tests.sh run ../../youki
+        run: cd scripts && ./rust_integration_tests.sh youki

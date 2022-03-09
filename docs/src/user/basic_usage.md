@@ -27,7 +27,7 @@ sudo systemctl stop docker
 After this you need to manually restart the docker daemon, but with Youki as its runtime. To do this, run following command in the youki/ directory after building youki
 
 ```console
-dockerd --experimental --add-runtime="youki=$(pwd)/youki" # run in the youki directory
+dockerd --experimental --add-runtime="youki=$(pwd)/youki" # run in the youki/scripts directory
 ```
 
 This will start the daemon and hang up the console. You can either start this as a background process to continue using the same terminal, or use another terminal, which will make it easier to stop the docker daemon later.
@@ -62,6 +62,7 @@ With newer versions of docker, you can update file `/etc/docker/daemon.json` to
 let docker know youki
 ([source](https://docs.docker.com/engine/reference/commandline/dockerd/#on-linux)).
 You may need to create this file, if it does not yet exist. A sample content of it:
+
 ```
 {
   "default-runtime": "runc",
@@ -82,7 +83,7 @@ Youki can also be used directly, without a higher-level runtime such as Docker t
 
 Note that we will still be using Docker to generate the rootfs required for running the container.
 
-To start, in the youki directory, make another directory named tutorial, and craete a sub-directory rootfs inside it
+To start, in the youki/scripts directory, make another directory named tutorial, and create a sub-directory rootfs inside it
 
 ```console
 mkdir -p tutorial/rootfs

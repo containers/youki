@@ -1,0 +1,13 @@
+
+
+[workspace]
+members = [
+    "./libcgroups",
+    "./libcontainer",
+    "./liboci-cli",
+    "./youki"
+]
+
+
+[profile.release]
+lto = true

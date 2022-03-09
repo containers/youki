@@ -7,8 +7,8 @@ edition = "2021"
 anyhow = "1.0"
 chrono = { version="0.4" }
 flate2 = "1.0"
-libcgroups = { path = "../libcgroups" }
-libcontainer = { path = "../libcontainer" }
+libcgroups = { path = "../../../crates/libcgroups" }
+libcontainer = { path = "../../../crates/libcontainer" }
 log = { version = "0.4", features = ["std"] }
 nix = "0.23.1"
 num_cpus = "1.13"

@@ -12,7 +12,7 @@ tags.temp
 
 youki
 !youki/
-youki_integration_test
+integration_test
 runtimetest_tool
 runtimetest
 !runtimetest/
