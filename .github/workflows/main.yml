@@ -20,9 +20,9 @@ jobs:
             crates/youki: crates/youki/**
             crates/libcontainer: crates/libcontainer/**
             crates/libcgroups: crates/libcgroups/**
-            integration_tests/rust-integration-tests/runtimetest: ./integration_tests/rust-integration-tests/runtimetest
-            integration_tests/rust-integration-tests/integration_test: ./integration_tests/rust-integration-tests/integration_test
-            integration_tests/rust-integration-tests/test_framework: ./integration_tests/rust-integration-tests/test_framework
+            tests/rust-integration-tests/runtimetest: ./tests/rust-integration-tests/runtimetest
+            tests/rust-integration-tests/integration_test: ./tests/rust-integration-tests/integration_test
+            tests/rust-integration-tests/test_framework: ./tests/rust-integration-tests/test_framework
   check:
     needs: [changes]
     if: ${{ !contains(needs.changes.outputs.dirs, '[]') }}
@@ -120,4 +120,4 @@ jobs:
         with:
           go-version: "1.17.6"
       - name: Run integration tests
-        run: ./scripts/oci_integration_tests.sh
+        run: make oci-integration-test

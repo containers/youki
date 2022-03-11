@@ -2,26 +2,22 @@
 
 ROOT=$(git rev-parse --show-toplevel)
 
-SCRIPT_DIR=${ROOT}/scripts
-
 if [ "$1" = "" ]; then
     echo "please specify runtime"
     exit 1
 fi
+ROOT=${2-$(git rev-parse --show-toplevel)}
 
-LOGFILE="${SCRIPT_DIR}/test.log"
+LOGFILE="${ROOT}/test.log"
 
-cd ${SCRIPT_DIR}
+cd ${ROOT}
 
-${SCRIPT_DIR}/build.sh
-
-cp ${ROOT}/integration_tests/rust-integration-tests/integration_test/bundle.tar.gz ${SCRIPT_DIR}/bundle.tar.gz
+if [ ! -f ${ROOT}/bundle.tar.gz ]; then
+    cp $(git rev-parse --show-toplevel)/tests/rust-integration-tests/integration_test/bundle.tar.gz ${ROOT}/bundle.tar.gz
+fi
 touch ${LOGFILE}
 
-YOUKI_LOG_LEVEL="error" sudo ./integration_test run --runtime "$1" --runtimetest ./runtimetest > $LOGFILE
-
-# remove the files copied
-./clean.sh
+YOUKI_LOG_LEVEL="error" sudo ${ROOT}/integration_test run --runtime "$1" --runtimetest ./runtimetest > $LOGFILE
 
 if [ 0 -ne $(grep "not ok" $LOGFILE | wc -l ) ]; then
     cat $LOGFILE

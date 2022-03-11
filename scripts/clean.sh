@@ -2,9 +2,9 @@
 # we don't set -eu here, as some of the binaries might be potentially be missing
 # and that is fine, that means they are already removed.
 
-rm ./youki
-rm ./integration_test
-rm ./runtimetest
-rm ./bundle.tar.gz
-rm ./test.log
+for bin in youki integration_test runtimetest bundle.tar.gz test.log; do
+    if [ -f $bin ]; then
+        rm ${1}/$bin
+    fi
+done
 exit 0 # unconditionally return zero

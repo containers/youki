@@ -20,3 +20,6 @@ runtimetest
 .vscode
 
 *~
+
+bundle.tar.gz
+test.log
