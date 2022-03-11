@@ -108,7 +108,8 @@ $ sudo dnf install   \
       systemd-devel  \
       dbus-devel     \
       elfutils-libelf-devel \
-      libseccomp-devel
+      libseccomp-devel \
+      glibc-static
 ```
 
 ## Build
