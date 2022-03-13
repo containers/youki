@@ -1,7 +1,10 @@
 ROOT = $(shell git rev-parse --show-toplevel)
 
 build:
-	./scripts/build.sh $(ROOT)
+	./scripts/build.sh -o $(ROOT)
+
+release-build:
+	./scripts/build.sh -o $(ROOT) -r
 
 test-all: test oci-integration-test integration-test
 
