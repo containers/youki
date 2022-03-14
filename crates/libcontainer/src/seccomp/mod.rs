@@ -155,11 +155,20 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
                         continue;
                     }
                 };
-                // Not clear why but if there are multiple arg attached to one
-                // syscall rule, we have to add them seperatly. add_rule will
-                // return EINVAL. runc does the same but doesn't explain why.
                 match syscall.args() {
                     Some(args) => {
+                        // The `seccomp_rule_add` requires us to break multiple
+                        // args attaching to the same rules into multiple rules.
+                        // Breaking this rule will cause `seccomp_rule_add` to
+                        // return EINVAL.
+                        //
+                        // From the man page: when adding syscall argument
+                        // comparisons to the filter it is important to remember
+                        // that while it is possible to have multiple
+                        // comparisons in a single rule, you can only compare
+                        // each argument once in a single rule.  In other words,
+                        // you can not have multiple comparisons of the 3rd
+                        // syscall argument in a single rule.
                         for arg in args {
                             let cmp = ScmpArgCompare::new(
                                 arg.index() as u32,
