@@ -6,6 +6,7 @@ on:
 jobs:
   changes:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     outputs:
       dirs: ${{ steps.filter.outputs.changes }}
     steps:
@@ -19,6 +20,7 @@ jobs:
     needs: [changes]
     if: ${{ !contains(needs.changes.outputs.dirs, '[]') }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
     steps:
@@ -26,7 +28,7 @@ jobs:
       - name: Setup mdBook
         uses: peaceiris/actions-mdbook@v1
         with:
-          mdbook-version: 'latest'
+          mdbook-version: "latest"
       - name: Build mdbook
         working-directory: ./docs
         run: mdbook build
