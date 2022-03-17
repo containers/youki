@@ -18,7 +18,7 @@ ${SCRIPT_DIR}/build.sh
 cp ${ROOT}/integration_tests/rust-integration-tests/integration_test/bundle.tar.gz ${SCRIPT_DIR}/bundle.tar.gz
 touch ${LOGFILE}
 
-YOUKI_LOG_LEVEL="error" sudo ./integration_test run --runtime "$1" --runtimetest ./runtimetest > $LOGFILE
+sudo YOUKI_LOG_LEVEL="error" ./integration_test run --runtime "$1" --runtimetest ./runtimetest > $LOGFILE
 
 # remove the files copied
 ./clean.sh
