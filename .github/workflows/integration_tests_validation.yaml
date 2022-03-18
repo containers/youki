@@ -9,6 +9,7 @@ on:
 jobs:
   changes:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     outputs:
       dirs: ${{ steps.filter.outputs.changes }}
     steps:
@@ -22,6 +23,7 @@ jobs:
     needs: [changes]
     if: ${{ !contains(needs.changes.outputs.dirs, '[]') }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       matrix:
         rust: [1.58.1, 1.59.0]

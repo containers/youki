@@ -17,7 +17,7 @@ if [ ! -f ${ROOT}/bundle.tar.gz ]; then
 fi
 touch ${LOGFILE}
 
-YOUKI_LOG_LEVEL="error" sudo ${ROOT}/integration_test run --runtime "$1" --runtimetest ./runtimetest > $LOGFILE
+sudo YOUKI_LOG_LEVEL="error" ${ROOT}/integration_test run --runtime "$1" --runtimetest ./runtimetest > $LOGFILE
 
 if [ 0 -ne $(grep "not ok" $LOGFILE | wc -l ) ]; then
     cat $LOGFILE

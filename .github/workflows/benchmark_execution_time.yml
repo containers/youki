@@ -8,62 +8,64 @@ jobs:
   building-pr-branch:
     if: (github.event.issue.pull_request != null) && github.event.comment.body == '!github easy-benchmark'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
-    - name: Checkout to PR branch
-      uses: actions/checkout@v2
+      - name: Checkout to PR branch
+        uses: actions/checkout@v2
 
-    - name: Setup Linux env
-      run: |
-        sudo apt -y update
-        sudo apt install libsystemd-dev librust-libdbus-sys-dev libseccomp-dev
+      - name: Setup Linux env
+        run: |
+          sudo apt -y update
+          sudo apt install libsystemd-dev librust-libdbus-sys-dev libseccomp-dev
 
-    - name: Setting rust toolchain
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        override: true
-        profile: minimal
+      - name: Setting rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          profile: minimal
 
-    - name: Building PR branch
-      run: ./build.sh --release
+      - name: Building PR branch
+        run: ./build.sh --release
 
-    - name: Uploading PR build to artifact
-      uses: actions/upload-artifact@v2
-      with:
-        name: pr-youki
-        path: ./youki
+      - name: Uploading PR build to artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: pr-youki
+          path: ./youki
 
   building-main-branch:
     if: (github.event.issue.pull_request != null) && github.event.comment.body == '!github easy-benchmark'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
-    - name: Checkout to main branch
-      uses: actions/checkout@v2
-      with:
-        ref: main
+      - name: Checkout to main branch
+        uses: actions/checkout@v2
+        with:
+          ref: main
 
-    - name: Setup Linux env
-      run: |
-        sudo apt -y update
-        sudo apt install libsystemd-dev librust-libdbus-sys-dev libseccomp-dev
+      - name: Setup Linux env
+        run: |
+          sudo apt -y update
+          sudo apt install libsystemd-dev librust-libdbus-sys-dev libseccomp-dev
 
-    - name: Setting rust toolchain
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        override: true
-        profile: minimal
+      - name: Setting rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          profile: minimal
 
-    - name: Building main branch
-      run: ./build.sh --release
+      - name: Building main branch
+        run: ./build.sh --release
 
-    - name: Uploading main build to artifact
-      uses: actions/upload-artifact@v2
-      with:
-        name: main-youki
-        path: ./youki
+      - name: Uploading main build to artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: main-youki
+          path: ./youki
 
   benchmark-exec:
     if: (github.event.issue.pull_request != null) && github.event.comment.body == '!github easy-benchmark'
@@ -71,83 +73,84 @@ jobs:
       - building-pr-branch
       - building-main-branch
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
-    - name: Setup Linux env
-      run: |
-        sudo apt -y update
-        sudo apt install jq podman
+      - name: Setup Linux env
+        run: |
+          sudo apt -y update
+          sudo apt install jq podman
 
-    - name: Checkout to PR branch
-      uses: actions/checkout@v2
+      - name: Checkout to PR branch
+        uses: actions/checkout@v2
 
-    - name: Downloading PR build from artifact
-      uses: actions/download-artifact@v2
-      with:
-        name: pr-youki
-        path: ./pr_youki
+      - name: Downloading PR build from artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: pr-youki
+          path: ./pr_youki
 
-    - name: Downloading main build from artifact
-      uses: actions/download-artifact@v2
-      with:
-        name: main-youki
-        path: ./main_youki
+      - name: Downloading main build from artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: main-youki
+          path: ./main_youki
 
-    - name: Preparing binaries
-      run: |
-        mv ./main_youki/youki ./youki_main
-        mv ./pr_youki/youki ./youki_pr
-        chmod +x ./youki_main
-        chmod +x ./youki_pr
+      - name: Preparing binaries
+        run: |
+          mv ./main_youki/youki ./youki_main
+          mv ./pr_youki/youki ./youki_pr
+          chmod +x ./youki_main
+          chmod +x ./youki_pr
 
-    - name: Preparing benchmark bundle
-      run: |
-        mkdir -p ./benchmark_exec_bundle/rootfs
-        cd benchmark_exec_bundle
-        sudo bash -c 'podman export $(podman create busybox) | tar -C rootfs -xvf -'
-        ../youki_main spec 
-        sed -i 's/"sh"/"sh", "-c", "echo Hi, my PID is $$; echo Bye Bye"/' config.json
-        sed -i 's/"terminal": true/"terminal": false/' config.json
-          
-    - name: Installing hyperfine
-      run: |
-        curl -s https://api.github.com/repos/sharkdp/hyperfine/releases/latest \
-        | jq -r '.assets[] | select(.name? | match("hyperfine-musl_.*_amd64.deb")) | .browser_download_url' \
-        | wget -qi - -O hyperfine.deb
-        sudo dpkg -i hyperfine.deb
+      - name: Preparing benchmark bundle
+        run: |
+          mkdir -p ./benchmark_exec_bundle/rootfs
+          cd benchmark_exec_bundle
+          sudo bash -c 'podman export $(podman create busybox) | tar -C rootfs -xvf -'
+          ../youki_main spec 
+          sed -i 's/"sh"/"sh", "-c", "echo Hi, my PID is $$; echo Bye Bye"/' config.json
+          sed -i 's/"terminal": true/"terminal": false/' config.json
 
-    - name: Running benchmark
-      run: |
-        hyperfine --prepare 'sudo sync; echo 3 | sudo tee /proc/sys/vm/drop_caches' \
-        --export-markdown bench_exec_result.md \
-        --warmup 10 \
-        --min-runs 100 \
-        --command-name 'main youki build' \
-        'sudo ./youki_main run -b benchmark_exec_bundle main_container && sudo ./youki_main delete -f main_container' \
-        --command-name 'pr youki build' \
-        'sudo ./youki_pr run -b benchmark_exec_bundle pr_container && sudo ./youki_pr delete -f pr_container'
+      - name: Installing hyperfine
+        run: |
+          curl -s https://api.github.com/repos/sharkdp/hyperfine/releases/latest \
+          | jq -r '.assets[] | select(.name? | match("hyperfine-musl_.*_amd64.deb")) | .browser_download_url' \
+          | wget -qi - -O hyperfine.deb
+          sudo dpkg -i hyperfine.deb
 
-    - name: Adding info into result
-      run: |
-        sed -i '1i > commit (${{ github.event.pull_request.head.sha }})\n' bench_exec_result.md
+      - name: Running benchmark
+        run: |
+          hyperfine --prepare 'sudo sync; echo 3 | sudo tee /proc/sys/vm/drop_caches' \
+          --export-markdown bench_exec_result.md \
+          --warmup 10 \
+          --min-runs 100 \
+          --command-name 'main youki build' \
+          'sudo ./youki_main run -b benchmark_exec_bundle main_container && sudo ./youki_main delete -f main_container' \
+          --command-name 'pr youki build' \
+          'sudo ./youki_pr run -b benchmark_exec_bundle pr_container && sudo ./youki_pr delete -f pr_container'
 
-    # since the GITHUB_TOKEN is needed to let the bot commit messages in the PR
-    # but right now it is controlled by the organization.
-    # TODO: change back to use this when the permission granted
-    # - name: Writing report to PR comment
-    #   uses: marocchino/sticky-pull-request-comment@v2 
-    #   with:
-    #     append: true
-    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    #     path: ./bench_exec_result.md 
+      - name: Adding info into result
+        run: |
+          sed -i '1i > commit (${{ github.event.pull_request.head.sha }})\n' bench_exec_result.md
 
-    # temp solution, print the benchmark result in the terminal.
-    # glow is the prettiest markdown rendering tool I know.
-    # TODO: remove this step when GITHUB_TOKEN permission granted
-    - name: Printing report in the terminal
-      run: |
-        curl -s https://api.github.com/repos/charmbracelet/glow/releases/latest \
-        | jq -r '.assets[] | select(.name? | match("glow_.*_linux_amd64.deb")) | .browser_download_url' \
-        | wget -qi - -O glow.deb
-        sudo dpkg -i glow.deb
-        glow bench_exec_result.md
+      # since the GITHUB_TOKEN is needed to let the bot commit messages in the PR
+      # but right now it is controlled by the organization.
+      # TODO: change back to use this when the permission granted
+      # - name: Writing report to PR comment
+      #   uses: marocchino/sticky-pull-request-comment@v2
+      #   with:
+      #     append: true
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #     path: ./bench_exec_result.md
+
+      # temp solution, print the benchmark result in the terminal.
+      # glow is the prettiest markdown rendering tool I know.
+      # TODO: remove this step when GITHUB_TOKEN permission granted
+      - name: Printing report in the terminal
+        run: |
+          curl -s https://api.github.com/repos/charmbracelet/glow/releases/latest \
+          | jq -r '.assets[] | select(.name? | match("glow_.*_linux_amd64.deb")) | .browser_download_url' \
+          | wget -qi - -O glow.deb
+          sudo dpkg -i glow.deb
+          glow bench_exec_result.md

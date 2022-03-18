@@ -9,6 +9,7 @@ on:
 jobs:
   changes:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     outputs:
       dirs: ${{ steps.filter.outputs.changes }}
     steps:
@@ -27,6 +28,7 @@ jobs:
     needs: [changes]
     if: ${{ !contains(needs.changes.outputs.dirs, '[]') }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       matrix:
         rust: [1.58.1, 1.59.0]
@@ -50,6 +52,7 @@ jobs:
         run: cargo clippy --all-targets --all-features -- -D warnings
   tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       matrix:
         rust: [1.58.1, 1.59.0]
@@ -67,6 +70,7 @@ jobs:
         run: cd ./crates && cargo test --all --all-features --no-fail-fast
   coverage:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     name: Run test coverage
     steps:
       - uses: actions/checkout@v2
@@ -101,6 +105,7 @@ jobs:
           file: ./coverage.lcov
   integration_tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       matrix:
         rust: [1.58.1, 1.59.0]
