@@ -1,14 +1,46 @@
-#! /bin/sh -eu
+#!/bin/bash
+
+set -e
 
 ROOT=$(git rev-parse --show-toplevel)
 
-cd ${ROOT}/crates
-make release
-mv ./youki_bin ${ROOT}/scripts/youki
+usage_exit() {
+    echo "Usage: $0 [-r] [-o dir]" 1>&2
+    exit 1
+}
 
-cd ${ROOT}/integration_tests/rust-integration-tests
-make FLAG=--release all
-mv ./runtimetest_bin ${ROOT}/scripts/runtimetest
-mv ./integration_test_bin ${ROOT}/scripts/integration_test
+VERSION=debug
+
+# while getopts orh OPT; do
+while getopts ro:h OPT; do
+    case $OPT in
+        o) output=${OPTARG}
+            ;;
+        r) VERSION=release
+            ;;
+        h) usage_exit
+            ;;
+        \?) usage_exit
+            ;;
+    esac
+done
+
+shift $((OPTIND - 1))
+
+OUTPUT=${output:-$ROOT/bin}
+[ ! -d $OUTPUT ] && mkdir -p $OUTPUT
+
+cd ${ROOT}/crates
+make ${VERSION}
+mv ./youki_bin ${OUTPUT}/youki
+
+cd ${ROOT}/tests/rust-integration-tests
+if [ ${VERSION} = release ]; then
+    make FLAG=--${VERSION} all
+else
+    make all
+fi
+mv ./runtimetest_bin ${OUTPUT}/runtimetest
+mv ./integration_test_bin ${OUTPUT}/integration_test
 
 exit 0

@@ -2,12 +2,9 @@
 
 ROOT=$(git rev-parse --show-toplevel)
 
-${ROOT}/scripts/build.sh
-
-SCRIPTS_DIR=${ROOT}/scripts
-RUNTIME=${SCRIPTS_DIR}/youki
-OCI_TEST_DIR=${ROOT}/integration_tests/oci-runtime-tests/src/github.com/opencontainers/runtime-tools
-PATTERN=${1:-.}
+RUNTIME=${1:-.}/youki
+OCI_TEST_DIR=${ROOT}/tests/oci-runtime-tests/src/github.com/opencontainers/runtime-tools
+PATTERN=${2:-.}
 cd $OCI_TEST_DIR
 
 test_cases=(
@@ -91,7 +88,7 @@ check_environment() {
 
 for case in "${test_cases[@]}"; do
   if [[ ! -e "${OCI_TEST_DIR}/validation/$case" ]]; then
-    GO111MODULE=auto GOPATH=${ROOT}/integration_tests/oci-runtime-tests make runtimetest validation-executables
+    GO111MODULE=auto GOPATH=${ROOT}/tests/oci-runtime-tests make runtimetest validation-executables
     break
   fi
 done
