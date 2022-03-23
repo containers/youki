@@ -5,18 +5,13 @@ on:
     tags: ["v[0-9]+.[0-9]+.[0-9]+*"]
 
 jobs:
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-
   check:
     name: Check
-    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+        with:
+          submodules: recursive
       - run: sudo apt-get -y update
       - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev libseccomp-dev
       - name: Set up cargo
@@ -24,16 +19,8 @@ jobs:
         with:
           toolchain: stable
           override: true
-      - name: Release build
-        run: ./build.sh --release
-      - name: Cargo check
-        uses: actions-rs/cargo@v1
-        with:
-          command: check
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: -- --skip integration
+      - name: test
+        run: make test-all
 
   upload:
     name: Upload
@@ -49,7 +36,7 @@ jobs:
           toolchain: stable
           override: true
       - name: Release build
-        run: ./build.sh --release
+        run: make release-build
       - name: Create output directory
         run: mkdir output
       - name: Copy files to output
