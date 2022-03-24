@@ -1,7 +1,15 @@
 version: 2
 updates:
   - package-ecosystem: cargo
-    directory: "/"
+    directory: "crates/"
+    schedule:
+      interval: daily
+    open-pull-requests-limit: 10
+    allow:
+      - dependency-type: direct
+      - dependency-type: indirect
+  - package-ecosystem: cargo
+    directory: "tests/rust-integration-tests"
     schedule:
       interval: daily
     open-pull-requests-limit: 10
