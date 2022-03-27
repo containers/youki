@@ -54,7 +54,7 @@ pub enum CommonCmd {
     Exec(Exec),
     List(List),
     Pause(Pause),
-    #[clap(setting = clap::AppSettings::AllowLeadingHyphen)]
+    #[clap(setting = clap::AppSettings::AllowHyphenValues)]
     Ps(Ps),
     Resume(Resume),
     Run(Run),

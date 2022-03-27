@@ -1,6 +1,7 @@
 use anyhow::Result;
-use clap::{App, Parser};
-use clap_generate::{generate, Shell};
+use clap::{Command, Parser};
+
+use clap_complete::{generate, Shell};
 use std::io;
 
 #[derive(Debug, Parser)]
@@ -10,7 +11,7 @@ pub struct Completion {
     pub shell: Shell,
 }
 
-pub fn completion(args: Completion, app: &mut App) -> Result<()> {
+pub fn completion(args: Completion, app: &mut Command) -> Result<()> {
     generate(
         args.shell,
         app,
