@@ -42,7 +42,9 @@ jobs:
           wget -q https://github.com/opencontainers/runc/releases/download/v1.1.0/runc.amd64
           sudo mv runc.amd64 /usr/bin/runc
           sudo chmod 755 /usr/bin/runc
+      - name: Build youki and tests
+        run: ./scripts/build.sh -o "$(git rev-parse --show-toplevel)"/scripts -r
       - name: Validate tests on runc
-        run: cd scripts && ./rust_integration_tests.sh runc
+        run: make validate-rust-tests
       - name: Validate tests on youki
         run: make integration-test

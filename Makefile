@@ -17,5 +17,8 @@ oci-integration-test: release-build
 integration-test: release-build
 	./scripts/rust_integration_tests.sh $(ROOT)/youki
 
+validate-rust-tests: release-build
+	./scripts/rust_integration_tests.sh runc
+
 clean:
 	./scripts/clean.sh $(ROOT)
