@@ -9,6 +9,6 @@ pub struct Ps {
     #[clap(forbid_empty_values = true, required = true)]
     pub container_id: String,
     /// options will be passed to the ps utility
-    #[clap(setting = clap::ArgSettings::Last)]
+    #[clap(last = true)]
     pub ps_options: Vec<String>,
 }
