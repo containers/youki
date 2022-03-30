@@ -82,7 +82,7 @@ fn main() -> Result<()> {
     pentacle::ensure_sealed().context("failed to seal /proc/self/exe")?;
 
     let opts = Opts::parse();
-    let mut app = Opts::into_app();
+    let mut app = Opts::command();
 
     if let Err(e) = crate::logger::init(opts.global.debug, opts.global.log, opts.global.log_format)
     {
