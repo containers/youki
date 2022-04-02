@@ -8,6 +8,21 @@ Youki is a low level container runtime, which deals with the creation and manage
 
 Before you start working on developing youki, you should go through [the User documentation](../user/introduction) as it specifies the requirements and setup for running youki. For developing youki, you will need to install the dependencies and clone the repo, as specified in the [Basic Setup](../user/basic_setup.md) and [Basic Usage](../user/basic_usage.md) sections.
 
+## Testing while developing
+
+While developing youki, you might need to compile and test the code from time to time, to make sure it is working and and something is not accidentally broken. Currently there are two ways to verify that :
+
+- Unit tests, which test individual components of youki
+- Integration tests, which test complete functionality of youki commands from start to end.
+
+As steps to run these tests can be a bit tedious, a Makefile in project root provides an easy way to run these quickly. The Makefile currently states three individual test :
+
+- test : The unit tests
+- oci-integration-test : The integration tests provided by OCI, these are current standards to make sure youki is OCI compliant.
+- integration-test : This is the Rust port of OCI tests, as there are some issues in the OCI tests. See [integration_test](./integration_test.md) page.
+
+All three can be run by using `make test-all`, or you can run the individual command to run specific tests.
+
 ## Resources
 
 #### OCI

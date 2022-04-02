@@ -1,5 +1,7 @@
 # Runtime Test
 
+**Note** that this resides in /tests/rust-integration-tests/runtimetest at the time of writing.
+
 This crate provides a binary which is used by integration tests to verify that the restrictions and constraints applied to the container are upheld by the container process, from inside the container process. This runs the tests one-by-one, and the failing test prints the error to the stderr.
 
 ## Notes

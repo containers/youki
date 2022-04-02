@@ -11,3 +11,4 @@ This is divided into following sub-sections :
   - libcontainer
   - liboci-cli
   - libseccomp
+- Webassembly : This explains how to use webassembly module with youki.

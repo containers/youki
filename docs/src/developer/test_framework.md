@@ -1,5 +1,7 @@
 # test_framework
 
+**Note** that this resides in /tests/rust-integration-tests/test_framework at the time of writing.
+
 This crate contains the testing framework specifically developed for porting the OCI integration test to rust. This contains structs to represent the individual tests, group of tests and a test manager that has responsibility to run tests. This Also exposes traits which can be used to implement custom test structs or test group structs if needed.
 
 By default the test groups are run in parallel using the [crossbeam crate](https://www.crates.io/crates/crossbeam), and the default test_group implementation also runs individual tests parallelly.

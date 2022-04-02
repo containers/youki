@@ -18,9 +18,10 @@
 
 - [Developer Documentation](./developer/introduction.md)
   - [Basics](./developer/basics.md)
-  - [Unwritten Rule](./developer/unwritten_rules.md)
+  - [Unwritten Rules](./developer/unwritten_rules.md)
   - [Good places to start](./developer/good_places_to_start.md)
   - [This Documentation](./developer/documentation_mdbook.md)
+  - [Repository Structure](./developer/repo_structure.md)
   - [Crate Specific Information](./developer/crate_specific_information.md)
     - [libcgroups](./developer/libcgroups.md)
     - [libcontainer](./developer/libcontainer.md)
