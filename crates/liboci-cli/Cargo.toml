@@ -1,6 +1,6 @@
 [package]
 name = "liboci-cli"
-version = "0.0.2"
+version = "0.0.3"
 description = "Parse command line arguments for OCI container runtimes"
 license-file = "../../LICENSE"
 documentation = "https://docs.rs/liboci-cli"
