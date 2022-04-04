@@ -11,7 +11,6 @@ usage_exit() {
 
 VERSION=debug
 
-# while getopts orh OPT; do
 while getopts ro:h OPT; do
     case $OPT in
         o) output=${OPTARG}
@@ -30,9 +29,12 @@ shift $((OPTIND - 1))
 OUTPUT=${output:-$ROOT/bin}
 [ ! -d $OUTPUT ] && mkdir -p $OUTPUT
 
-cd ${ROOT}/crates
-make ${VERSION}
-mv ./youki_bin ${OUTPUT}/youki
+if [ ${VERSION} = release ]; then
+    cargo build --${VERSION}
+else
+    cargo build
+fi
+cp ${ROOT}/target/${VERSION}/youki .
 
 cd ${ROOT}/tests/rust-integration-tests
 if [ ${VERSION} = release ]; then

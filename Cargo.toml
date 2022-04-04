@@ -2,15 +2,25 @@
 name = "youki"
 version = "0.0.3"
 description = "A container runtime written in Rust"
-license-file = "../../LICENSE"
+license-file = "LICENSE"
 documentation = "https://docs.rs/youki"
 repository = "https://github.com/containers/youki"
 homepage = "https://containers.github.io/youki"
-readme = "../../README.md"
+readme = "README.md"
 authors = ["youki team"]
 edition = "2021"
 build = "build.rs"
 keywords = ["youki", "container"]
+
+[workspace]
+members = [
+    "crates/libcgroups",
+    "crates/libcontainer",
+    "crates/liboci-cli",
+]
+exclude = [
+    "tests/rust-integration-tests/",
+]
 
 [dependencies.clap]
 version = "3.1.8"
@@ -20,9 +30,9 @@ features = ["std", "suggestions", "derive", "cargo"]
 [dependencies]
 anyhow = "1.0.56"
 chrono = { version="0.4", features = ["serde"] }
-libcgroups = { version = "0.0.3", path = "../libcgroups" }
-libcontainer = { version = "0.0.3", path = "../libcontainer" }
-liboci-cli = { version = "0.0.3", path = "../liboci-cli" }
+libcgroups = { version = "0.0.3", path = "crates/libcgroups" }
+libcontainer = { version = "0.0.3", path = "crates/libcontainer" }
+liboci-cli = { version = "0.0.3", path = "crates/liboci-cli" }
 log = { version = "0.4", features = ["std"]}
 nix = "0.23.1"
 oci-spec = "0.5.5"
@@ -40,3 +50,6 @@ serial_test = "0.6.0"
 [build-dependencies]
 anyhow = "1.0.56"
 vergen = "7.0"
+
+[profile.release]
+lto = true
