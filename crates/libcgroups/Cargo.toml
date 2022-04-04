@@ -38,7 +38,7 @@ libc = { version = "0.2.121", optional = true }
 oci-spec = { version = "0.5.5", features = ["proptests"] }
 quickcheck = "1"
 mockall = { version = "0.11.0", features = [] }
-clap = "3.1.7"
+clap = "3.1.8"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 env_logger = "0.9"
