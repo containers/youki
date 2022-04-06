@@ -504,9 +504,9 @@ dependencies = [
 
 [[package]]
 name = "enumset"
-version = "1.0.9"
+version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42f0ae74db31a8ba0093a411d594a1d6d65c207611816ebf4e75381f3f72b1fe"
+checksum = "e8b6b2301b38343c1f00b2cc5116d6c28306758344db73e3347f21aa1e60e756"
 dependencies = [
  "enumset_derive",
 ]
