@@ -32,7 +32,7 @@ serde = { version = "1.0", features = ["derive"] }
 rbpf = {version = "0.1.0", optional = true }
 libbpf-sys = { version = "0.6.1-2", optional = true }
 errno = { version = "0.2.8", optional = true }
-libc = { version = "0.2.121", optional = true }
+libc = { version = "0.2.122", optional = true }
 
 [dev-dependencies]
 oci-spec = { version = "0.5.5", features = ["proptests"] }
