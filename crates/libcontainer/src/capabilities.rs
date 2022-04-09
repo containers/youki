@@ -123,7 +123,7 @@ impl CapabilityExt for SpecCapability {
 
 /// reset capabilities of process calling this to effective capabilities
 /// effective capability set is set of capabilities used by kernel to perform checks
-/// see https://man7.org/linux/man-pages/man7/capabilities.7.html for more information
+/// see <https://man7.org/linux/man-pages/man7/capabilities.7.html> for more information
 pub fn reset_effective<S: Syscall + ?Sized>(syscall: &S) -> Result<()> {
     log::debug!("reset all caps");
     syscall.set_capability(CapSet::Effective, &caps::all())?;
