@@ -13,6 +13,7 @@ use super::Controller;
 const CGROUP_CPU_SHARES: &str = "cpu.shares";
 const CGROUP_CPU_QUOTA: &str = "cpu.cfs_quota_us";
 const CGROUP_CPU_PERIOD: &str = "cpu.cfs_period_us";
+const CGROUP_CPU_BURST: &str = "cpu.cfs_burst_us";
 const CGROUP_CPU_RT_RUNTIME: &str = "cpu.rt_runtime_us";
 const CGROUP_CPU_RT_PERIOD: &str = "cpu.rt_period_us";
 const CGROUP_CPU_STAT: &str = "cpu.stat";
@@ -111,6 +112,10 @@ impl Cpu {
             if cpu_quota != 0 {
                 common::write_cgroup_file(root_path.join(CGROUP_CPU_QUOTA), cpu_quota)?;
             }
+        }
+
+        if let Some(cpu_burst) = cpu.burst() {
+            common::write_cgroup_file(root_path.join(CGROUP_CPU_BURST), cpu_burst)?;
         }
 
         if let Some(rt_runtime) = cpu.realtime_runtime() {
@@ -241,5 +246,23 @@ mod tests {
             throttled_time: 1080,
         };
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_set_burst() {
+        // arrange
+        let expected_burst: u64 = 100_000;
+        let (tmp, max) = setup("test_set_burst", CGROUP_CPU_BURST);
+        let cpu = LinuxCpuBuilder::default()
+            .burst(expected_burst)
+            .build()
+            .unwrap();
+
+        // act
+        Cpu::apply(&tmp, &cpu).expect("apply cpu");
+
+        // assert
+        let actual_burst = fs::read_to_string(max).expect("read burst");
+        assert_eq!(actual_burst, expected_burst.to_string());
     }
 }
