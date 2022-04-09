@@ -94,7 +94,7 @@ impl LinuxSyscall {
 
 impl Syscall for LinuxSyscall {
     /// To enable dynamic typing,
-    /// see https://doc.rust-lang.org/std/any/index.html for more information
+    /// see <https://doc.rust-lang.org/std/any/index.html> for more information
     fn as_any(&self) -> &dyn Any {
         self
     }
