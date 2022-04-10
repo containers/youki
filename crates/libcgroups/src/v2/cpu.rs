@@ -12,6 +12,7 @@ use super::controller::Controller;
 
 const CGROUP_CPU_WEIGHT: &str = "cpu.weight";
 const CGROUP_CPU_MAX: &str = "cpu.max";
+const CGROUP_CPU_BURST: &str = "cpu.max.burst";
 const UNRESTRICTED_QUOTA: &str = "max";
 const MAX_CPU_WEIGHT: u64 = 10000;
 
@@ -89,6 +90,10 @@ impl Cpu {
         // 10000 50000 -> 20% of one CPU every 50ms
         if let Some(cpu_max) = new_cpu_max {
             common::write_cgroup_file_str(&cpu_max_file, &cpu_max)?;
+        }
+
+        if let Some(burst) = cpu.burst() {
+            common::write_cgroup_file(path.join(CGROUP_CPU_BURST), burst)?;
         }
 
         Ok(())
@@ -273,5 +278,17 @@ mod tests {
         };
 
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_burst() {
+        let expected = 100000u64;
+        let (tmp, burst_file) = setup("test_burst", CGROUP_CPU_BURST);
+        let cpu = LinuxCpuBuilder::default().burst(expected).build().unwrap();
+
+        Cpu::apply(&tmp, &cpu).expect("apply cpu");
+
+        let actual = fs::read_to_string(burst_file).expect("read burst file");
+        assert_eq!(actual, expected.to_string());
     }
 }
