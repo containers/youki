@@ -59,7 +59,7 @@ Once you have cloned the source, you can build it using
 # go into the cloned directory
 cd youki
 make build # or release-build
-./youki -h # you can get information about youki command
+./youki -h # get information about youki command
 ```
 
 This will build the Youki binary, and put it at the root level of the cloned directory, that is in the youki/ .

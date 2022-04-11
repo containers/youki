@@ -20,7 +20,7 @@ Make sure that you comment copiously, and explain the peculiar behavior of your 
 
 #### Scripts
 
-In any script, any makefile etc, make sure to `set -e` at start of it. This will make script abort after any command fails, rather than continuing with incorrect state and creating knock-on errors.
+In any script, any makefile etc, make sure to `set -e` at the start. This will abort the script after any command fails, rather than continuing with incorrect state and creating knock-on errors.
 
 #### Update This Documentation
 

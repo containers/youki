@@ -10,16 +10,16 @@ Before you start working on developing youki, you should go through [the User do
 
 ## Testing while developing
 
-While developing youki, you might need to compile and test the code from time to time, to make sure it is working and and something is not accidentally broken. Currently there are two ways to verify that :
+While developing youki, you might need to compile and test the code from time to time, to make sure it is working and and something is not accidentally broken. Currently there are two ways to verify that:
 
 - Unit tests, which test individual components of youki
-- Integration tests, which test complete functionality of youki commands from start to end.
+- Integration tests, which test the complete functionality of youki commands from start to end.
 
-As steps to run these tests can be a bit tedious, a Makefile in project root provides an easy way to run these quickly. The Makefile currently states three individual test :
+As the steps to run these tests can be a bit tedious, a makefile in project the root provides an easy way to run these quickly. The makefile currently states three individual test :
 
-- test : The unit tests
-- oci-integration-test : The integration tests provided by OCI, these are current standards to make sure youki is OCI compliant.
-- integration-test : This is the Rust port of OCI tests, as there are some issues in the OCI tests. See [integration_test](./integration_test.md) page.
+- test: The unit tests
+- oci-integration-test: The integration tests provided by OCI, these are the current standard to make sure youki is OCI compliant.
+- integration-test: This is the Rust port of the OCI runtime tests, as there are some issues in the OCI tests. See [integration_test](./integration_test.md) page.
 
 All three can be run by using `make test-all`, or you can run the individual command to run specific tests.
 
