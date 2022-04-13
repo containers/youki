@@ -58,9 +58,8 @@ Once you have cloned the source, you can build it using
 ```console
 # go into the cloned directory
 cd youki
-cd scripts
-# build
-./build.sh
+make build # or release-build
+./youki -h # get information about youki command
 ```
 
 This will build the Youki binary, and put it at the root level of the cloned directory, that is in the youki/ .
@@ -106,7 +105,6 @@ VAGRANT_VAGRANTFILE=Vagrantfile.root vagrant up
 VAGRANT_VAGRANTFILE=Vagrantfile.root vagrant ssh
 
 # in virtual machine
-cd youki
-cd scripts
-./build.sh
+$ cd youki
+$ make build # or release-build
 ```
