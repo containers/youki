@@ -1,4 +1,4 @@
-use crate::syscall::Syscall;
+use crate::{syscall::Syscall, utils::PathBufExt};
 use anyhow::{Context, Result};
 use std::path::PathBuf;
 
@@ -108,8 +108,9 @@ impl<'a> ContainerBuilder<'a> {
     pub fn with_root_path<P: Into<PathBuf>>(mut self, path: P) -> Result<Self> {
         let path = path.into();
         self.root_path = path
-            .canonicalize()
-            .with_context(|| format!("failed to canonicalize root path {:?}", path))?;
+            .canonicalize_safely()
+            .with_context(|| format!("failed to canonicalize root path {path:?}"))?;
+
         Ok(self)
     }
 
@@ -125,15 +126,17 @@ impl<'a> ContainerBuilder<'a> {
     /// .with_pid_file(Some("/var/run/docker.pid")).expect("invalid pid file");
     /// ```
     pub fn with_pid_file<P: Into<PathBuf>>(mut self, path: Option<P>) -> Result<Self> {
-        self.pid_file = if let Some(p) = path {
-            let path = p.into();
-            Some(
-                path.canonicalize()
-                    .with_context(|| format!("failed to canonicalize pid file path {:?}", path))?,
-            )
-        } else {
-            None
+        self.pid_file = match path {
+            Some(path) => {
+                let p = path.into();
+                Some(
+                    p.canonicalize_safely()
+                        .with_context(|| format!("failed to canonicalize pid file {p:?}"))?,
+                )
+            }
+            None => None,
         };
+
         Ok(self)
     }
 
@@ -179,7 +182,7 @@ mod tests {
     use std::path::PathBuf;
 
     #[test]
-    fn test_builder_failable_functions() -> Result<()> {
+    fn test_failable_functions() -> Result<()> {
         let root_path_temp_dir = TempDir::new("root_path").context("failed to create temp dir")?;
         let pid_file_temp_dir = TempDir::new("pid_file").context("failed to create temp dir")?;
         let syscall = create_syscall();
@@ -190,20 +193,37 @@ mod tests {
             .with_console_socket(Some("/var/run/docker/sock.tty"))
             .as_init("/var/run/docker/bundle");
 
-        // Accept None pid file.
+        // accept None pid file.
         ContainerBuilder::new("74f1a4cb3801".to_owned(), syscall.as_ref())
             .with_pid_file::<PathBuf>(None)?;
 
-        let invalid_path_builder =
-            ContainerBuilder::new("74f1a4cb3801".to_owned(), syscall.as_ref())
-                .with_root_path("/not/existing/path");
-        assert!(invalid_path_builder.is_err());
+        // accept absolute root path which does not exist
+        let abs_root_path = PathBuf::from("/not/existing/path");
+        let path_builder = ContainerBuilder::new("74f1a4cb3801".to_owned(), syscall.as_ref())
+            .with_root_path(&abs_root_path)
+            .context("build container")?;
+        assert_eq!(path_builder.root_path, abs_root_path);
 
-        let invalid_pid_file_builder =
-            ContainerBuilder::new("74f1a4cb3801".to_owned(), syscall.as_ref())
-                .with_root_path(root_path_temp_dir.path())?
-                .with_pid_file(Some("/not/existing/path"));
-        assert!(invalid_pid_file_builder.is_err());
+        // accept relative root path which does not exist
+        let cwd = std::env::current_dir().context("get current dir")?;
+        let path_builder = ContainerBuilder::new("74f1a4cb3801".to_owned(), syscall.as_ref())
+            .with_root_path("./not/existing/path")
+            .context("build container")?;
+        assert_eq!(path_builder.root_path, cwd.join("not/existing/path"));
+
+        // accept absolute pid path which does not exist
+        let abs_pid_path = PathBuf::from("/not/existing/path");
+        let path_builder = ContainerBuilder::new("74f1a4cb3801".to_owned(), syscall.as_ref())
+            .with_pid_file(Some(&abs_pid_path))
+            .context("build container")?;
+        assert_eq!(path_builder.pid_file, Some(abs_pid_path));
+
+        // accept relative pid path which does not exist
+        let cwd = std::env::current_dir().context("get current dir")?;
+        let path_builder = ContainerBuilder::new("74f1a4cb3801".to_owned(), syscall.as_ref())
+            .with_pid_file(Some("./not/existing/path"))
+            .context("build container")?;
+        assert_eq!(path_builder.pid_file, Some(cwd.join("not/existing/path")));
 
         Ok(())
     }
