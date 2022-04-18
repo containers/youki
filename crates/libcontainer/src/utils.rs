@@ -14,11 +14,13 @@ use std::ops::Deref;
 use std::os::linux::fs::MetadataExt;
 use std::os::unix::fs::DirBuilderExt;
 use std::os::unix::prelude::{AsRawFd, OsStrExt};
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 pub trait PathBufExt {
     fn as_relative(&self) -> Result<&Path>;
     fn join_safely<P: AsRef<Path>>(&self, p: P) -> Result<PathBuf>;
+    fn canonicalize_safely(&self) -> Result<PathBuf>;
+    fn normalize(&self) -> PathBuf;
 }
 
 impl PathBufExt for Path {
@@ -41,6 +43,52 @@ impl PathBufExt for Path {
             .strip_prefix("/")
             .with_context(|| format!("failed to strip prefix from {}", path.display()))?;
         Ok(self.join(stripped))
+    }
+
+    /// Canonicalizes existing and not existing paths
+    fn canonicalize_safely(&self) -> Result<PathBuf> {
+        if self.exists() {
+            self.canonicalize()
+                .with_context(|| format!("failed to canonicalize path {:?}", self))
+        } else {
+            if self.is_relative() {
+                let p = std::env::current_dir()
+                    .context("could not get current directory")?
+                    .join(self);
+                return Ok(p.normalize());
+            }
+
+            Ok(self.normalize())
+        }
+    }
+
+    /// Normalizes a path. In contrast to canonicalize the path does not need to exist.
+    // adapted from https://github.com/rust-lang/cargo/blob/fede83ccf973457de319ba6fa0e36ead454d2e20/src/cargo/util/paths.rs#L61
+    fn normalize(&self) -> PathBuf {
+        let mut components = self.components().peekable();
+        let mut ret = if let Some(c @ Component::Prefix(..)) = components.peek().cloned() {
+            components.next();
+            PathBuf::from(c.as_os_str())
+        } else {
+            PathBuf::new()
+        };
+
+        for component in components {
+            match component {
+                Component::Prefix(..) => unreachable!(),
+                Component::RootDir => {
+                    ret.push(component.as_os_str());
+                }
+                Component::CurDir => {}
+                Component::ParentDir => {
+                    ret.pop();
+                }
+                Component::Normal(c) => {
+                    ret.push(c);
+                }
+            }
+        }
+        ret
     }
 }
 
