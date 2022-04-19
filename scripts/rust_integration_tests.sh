@@ -10,14 +10,12 @@ ROOT=${2-$(git rev-parse --show-toplevel)}
 
 LOGFILE="${ROOT}/test.log"
 
-cd ${ROOT}
-
 if [ ! -f ${ROOT}/bundle.tar.gz ]; then
-    cp $(git rev-parse --show-toplevel)/tests/rust-integration-tests/integration_test/bundle.tar.gz ${ROOT}/bundle.tar.gz
+    cp ${ROOT}/tests/rust-integration-tests/integration_test/bundle.tar.gz ${ROOT}/bundle.tar.gz
 fi
 touch ${LOGFILE}
 
-sudo YOUKI_LOG_LEVEL="error" ${ROOT}/integration_test run --runtime "$1" --runtimetest ./runtimetest > $LOGFILE
+sudo YOUKI_LOG_LEVEL="error" ${ROOT}/integration_test run --runtime "$1" --runtimetest ${ROOT}/runtimetest > $LOGFILE
 
 if [ 0 -ne $(grep "not ok" $LOGFILE | wc -l ) ]; then
     cat $LOGFILE
