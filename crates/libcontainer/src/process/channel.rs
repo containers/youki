@@ -1,11 +1,12 @@
 use crate::process::message::Message;
 use anyhow::{bail, Context, Result};
 use nix::{
-    sys::{socket, uio},
+    sys::socket::{self, UnixAddr},
     unistd::{self, Pid},
 };
 use serde::{Deserialize, Serialize};
 use std::{
+    io::{IoSlice, IoSliceMut},
     marker::PhantomData,
     os::unix::prelude::{AsRawFd, RawFd},
 };
@@ -255,13 +256,13 @@ impl<T> Sender<T>
 where
     T: Serialize,
 {
-    fn send_iovec(&mut self, iov: &[uio::IoVec<&[u8]>], fds: Option<&[RawFd]>) -> Result<usize> {
+    fn send_iovec(&mut self, iov: &[IoSlice], fds: Option<&[RawFd]>) -> Result<usize> {
         let cmsgs = if let Some(fds) = fds {
             vec![socket::ControlMessage::ScmRights(fds)]
         } else {
             vec![]
         };
-        socket::sendmsg(self.sender, iov, &cmsgs, socket::MsgFlags::empty(), None)
+        socket::sendmsg::<UnixAddr>(self.sender, iov, &cmsgs, socket::MsgFlags::empty(), None)
             .map_err(|e| e.into())
     }
 
@@ -269,13 +270,13 @@ where
         let len = data.len() as u64;
         // Here we prefix the length of the data onto the serialized data.
         let iov = [
-            uio::IoVec::from_slice(unsafe {
+            IoSlice::new(unsafe {
                 std::slice::from_raw_parts(
                     (&len as *const u64) as *const u8,
                     std::mem::size_of::<u64>(),
                 )
             }),
-            uio::IoVec::from_slice(data),
+            IoSlice::new(data),
         ];
         self.send_iovec(&iov[..], fds)
     }
@@ -305,25 +306,26 @@ where
 {
     fn peek_size_iovec(&mut self) -> Result<u64> {
         let mut len: u64 = 0;
-        let iov = [uio::IoVec::from_mut_slice(unsafe {
+        let mut iov = [IoSliceMut::new(unsafe {
             std::slice::from_raw_parts_mut(
                 (&mut len as *mut u64) as *mut u8,
                 std::mem::size_of::<u64>(),
             )
         })];
-        let _ = socket::recvmsg(self.receiver, &iov, None, socket::MsgFlags::MSG_PEEK)?;
+        let _ =
+            socket::recvmsg::<UnixAddr>(self.receiver, &mut iov, None, socket::MsgFlags::MSG_PEEK)?;
         match len {
             0 => bail!("channel connection broken"),
             _ => Ok(len),
         }
     }
 
-    fn recv_into_iovec<F>(&mut self, iov: &[uio::IoVec<&mut [u8]>]) -> Result<(usize, Option<F>)>
+    fn recv_into_iovec<F>(&mut self, iov: &mut [IoSliceMut]) -> Result<(usize, Option<F>)>
     where
         F: Default + AsMut<[RawFd]>,
     {
         let mut cmsgspace = nix::cmsg_space!(F);
-        let msg = socket::recvmsg(
+        let msg = socket::recvmsg::<UnixAddr>(
             self.receiver,
             iov,
             Some(&mut cmsgspace),
@@ -347,7 +349,6 @@ where
             .map(|fds| {
                 let mut fds_array: F = Default::default();
                 <F as AsMut<[RawFd]>>::as_mut(&mut fds_array).clone_from_slice(&fds);
-
                 fds_array
             });
 
@@ -362,16 +363,16 @@ where
         let mut len: u64 = 0;
         let mut buf = vec![0u8; msg_len as usize];
         let (bytes, fds) = {
-            let iov = [
-                uio::IoVec::from_mut_slice(unsafe {
+            let mut iov = [
+                IoSliceMut::new(unsafe {
                     std::slice::from_raw_parts_mut(
                         (&mut len as *mut u64) as *mut u8,
                         std::mem::size_of::<u64>(),
                     )
                 }),
-                uio::IoVec::from_mut_slice(&mut buf),
+                IoSliceMut::new(&mut buf),
             ];
-            self.recv_into_iovec(&iov)?
+            self.recv_into_iovec(&mut iov)?
         };
 
         match bytes {

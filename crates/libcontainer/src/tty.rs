@@ -1,5 +1,6 @@
 //! tty (teletype) for user-system interaction
 
+use std::io::IoSlice;
 use std::os::unix::fs::symlink;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::prelude::RawFd;
@@ -8,8 +9,7 @@ use std::path::Path;
 use anyhow::Context;
 use anyhow::{bail, Result};
 use nix::errno::Errno;
-use nix::sys::socket;
-use nix::sys::uio;
+use nix::sys::socket::{self, UnixAddr};
 use nix::unistd::close;
 use nix::unistd::dup2;
 
@@ -32,10 +32,7 @@ pub fn setup_console_socket(
         socket::SockFlag::empty(),
         None,
     )?;
-    csocketfd = match socket::connect(
-        csocketfd,
-        &socket::SockAddr::Unix(socket::UnixAddr::new(socket_name)?),
-    ) {
+    csocketfd = match socket::connect(csocketfd, &socket::UnixAddr::new(socket_name)?) {
         Err(errno) => {
             if !matches!(errno, Errno::ENOENT) {
                 bail!("failed to open {}", socket_name);
@@ -53,10 +50,10 @@ pub fn setup_console(console_fd: &RawFd) -> Result<()> {
     let openpty_result =
         nix::pty::openpty(None, None).context("could not create pseudo terminal")?;
     let pty_name: &[u8] = b"/dev/ptmx";
-    let iov = [uio::IoVec::from_slice(pty_name)];
+    let iov = [IoSlice::new(pty_name)];
     let fds = [openpty_result.master];
     let cmsg = socket::ControlMessage::ScmRights(&fds);
-    socket::sendmsg(
+    socket::sendmsg::<UnixAddr>(
         console_fd.as_raw_fd(),
         &iov,
         &[cmsg],

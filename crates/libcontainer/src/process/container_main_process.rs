@@ -6,11 +6,11 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use nix::{
-    sys::{socket, uio},
+    sys::socket::{self, UnixAddr},
     unistd::{self, Pid},
 };
 use oci_spec::runtime;
-use std::path::Path;
+use std::{io::IoSlice, path::Path};
 
 pub fn container_main_process(container_args: &ContainerArgs) -> Result<Pid> {
     // We use a set of channels to communicate between parent and child process.
@@ -130,8 +130,7 @@ fn sync_seccomp_send_msg(listener_path: &Path, msg: &[u8], fd: i32) -> Result<()
         None,
     )
     .context("failed to create unix domain socket for seccomp listener")?;
-    let unix_addr =
-        socket::SockAddr::new_unix(listener_path).context("failed to create unix addr")?;
+    let unix_addr = socket::UnixAddr::new(listener_path).context("failed to create unix addr")?;
     socket::connect(socket, &unix_addr).with_context(|| {
         format!(
             "failed to connect to seccomp notify listerner path: {:?}",
@@ -142,10 +141,10 @@ fn sync_seccomp_send_msg(listener_path: &Path, msg: &[u8], fd: i32) -> Result<()
     // SCM_RIGHTS message.
     // Ref: https://man7.org/linux/man-pages/man3/sendmsg.3p.html
     // Ref: https://man7.org/linux/man-pages/man3/cmsg.3.html
-    let iov = [uio::IoVec::from_slice(msg)];
+    let iov = [IoSlice::new(msg)];
     let fds = [fd];
     let cmsgs = socket::ControlMessage::ScmRights(&fds);
-    socket::sendmsg(socket, &iov, &[cmsgs], socket::MsgFlags::empty(), None)
+    socket::sendmsg::<UnixAddr>(socket, &iov, &[cmsgs], socket::MsgFlags::empty(), None)
         .context("failed to write container state to seccomp listener")?;
     // The spec requires the listener socket to be closed immediately after sending.
     let _ = unistd::close(socket);
