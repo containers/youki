@@ -30,10 +30,22 @@ pub fn print_youki() {
 
 /// Print Kernel Release, Version and Architecture
 pub fn print_kernel() {
-    let uname = nix::sys::utsname::uname();
-    println!("{:<18}{}", "Kernel-Release", uname.release());
-    println!("{:<18}{}", "Kernel-Version", uname.version());
-    println!("{:<18}{}", "Architecture", uname.machine());
+    let uname = nix::sys::utsname::uname().unwrap();
+    println!(
+        "{:<18}{}",
+        "Kernel-Release",
+        uname.release().to_string_lossy()
+    );
+    println!(
+        "{:<18}{}",
+        "Kernel-Version",
+        uname.version().to_string_lossy()
+    );
+    println!(
+        "{:<18}{}",
+        "Architecture",
+        uname.machine().to_string_lossy()
+    );
 }
 
 /// Prints OS Distribution information
@@ -165,7 +177,10 @@ pub fn print_cgroup_v2_controllers() {
 
 fn read_kernel_config() -> Option<String> {
     let uname = nix::sys::utsname::uname();
-    let kernel_config = Path::new("/boot").join(format!("config-{}", uname.release()));
+    let kernel_config = Path::new("/boot").join(format!(
+        "config-{}",
+        uname.unwrap().release().to_string_lossy()
+    ));
     if !kernel_config.exists() {
         return None;
     }
