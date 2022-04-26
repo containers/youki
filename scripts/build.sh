@@ -10,8 +10,7 @@ usage_exit() {
 }
 
 VERSION=debug
-
-# while getopts orh OPT; do
+TARGET=x86_64-unknown-linux-gnu
 while getopts ro:h OPT; do
     case $OPT in
         o) output=${OPTARG}
@@ -27,20 +26,18 @@ done
 
 shift $((OPTIND - 1))
 
+OPTION=""
+if [ ${VERSION} = release ]; then
+    OPTION="--${VERSION}"
+fi
+
 OUTPUT=${output:-$ROOT/bin}
 [ ! -d $OUTPUT ] && mkdir -p $OUTPUT
 
-cd ${ROOT}/crates
-make ${VERSION}
-mv ./youki_bin ${OUTPUT}/youki
+cargo build --target ${TARGET} ${OPTION} --bin youki
+cargo build --target ${TARGET} ${OPTION} --bin integration_test
+RUSTFLAGS="-Ctarget-feature=+crt-static" cargo build --target ${TARGET} ${OPTION} --bin runtimetest
 
-cd ${ROOT}/tests/rust-integration-tests
-if [ ${VERSION} = release ]; then
-    make FLAG=--${VERSION} all
-else
-    make all
-fi
-mv ./runtimetest_bin ${OUTPUT}/runtimetest
-mv ./integration_test_bin ${OUTPUT}/integration_test
+mv ${ROOT}/target/${TARGET}/${VERSION}/{youki,integration_test,runtimetest} ${OUTPUT}/
 
 exit 0

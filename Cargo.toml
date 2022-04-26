@@ -1,0 +1,5 @@
+[workspace]
+members = ["tests/rust-integration-tests/*", "crates/*"]
+
+[profile.release]
+lto = true

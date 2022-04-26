@@ -7,4 +7,6 @@ for bin in youki integration_test runtimetest bundle.tar.gz test.log; do
         rm ${1}/$bin
     fi
 done
+cargo clean
+
 exit 0 # unconditionally return zero
