@@ -1,10 +1,10 @@
 use anyhow::{bail, Context, Result};
 use libcontainer::container::ContainerProcessState;
 use nix::{
-    sys::{socket, uio},
+    sys::socket::{self, UnixAddr},
     unistd,
 };
-use std::{os::unix::prelude::RawFd, path::Path};
+use std::{io::IoSliceMut, os::unix::prelude::RawFd, path::Path};
 
 const DEFAULT_BUFFER_SIZE: usize = 4096;
 
@@ -16,7 +16,7 @@ pub type SeccompAgentResult = Result<(ContainerProcessState, RawFd)>;
 // returning, since we only expect at most 1 connection to the listener based on
 // the spec.
 pub fn recv_seccomp_listener(seccomp_listener: &Path) -> SeccompAgentResult {
-    let addr = socket::SockAddr::new_unix(seccomp_listener)?;
+    let addr = socket::UnixAddr::new(seccomp_listener)?;
     let socket = socket::socket(
         socket::AddressFamily::Unix,
         socket::SockType::Stream,
@@ -37,10 +37,10 @@ pub fn recv_seccomp_listener(seccomp_listener: &Path) -> SeccompAgentResult {
     };
     let mut cmsgspace = nix::cmsg_space!([RawFd; 1]);
     let mut buf = vec![0u8; DEFAULT_BUFFER_SIZE];
-    let iov = [uio::IoVec::from_mut_slice(&mut buf)];
-    let msg = match socket::recvmsg(
+    let mut iov = [IoSliceMut::new(&mut buf)];
+    let msg = match socket::recvmsg::<UnixAddr>(
         conn,
-        &iov,
+        &mut iov,
         Some(&mut cmsgspace),
         socket::MsgFlags::MSG_CMSG_CLOEXEC,
     ) {
