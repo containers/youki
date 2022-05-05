@@ -36,7 +36,61 @@ Here is why we are writing a new container runtime in Rust.
     $ hyperfine --prepare 'sudo sync; echo 3 | sudo tee /proc/sys/vm/drop_caches' --warmup 10 --min-runs 100 'sudo ./youki create -b tutorial a && sudo ./youki start a && sudo ./youki delete -f a'
     ```
   - Environment
-  `console $ ./youki info Version 0.0.1 Kernel-Release 5.11.0-41-generic Kernel-Version #45-Ubuntu SMP Fri Nov 5 11:37:01 UTC 2021 Architecture x86_64 Operating System Ubuntu 21.04 Cores 12 Total Memory 32025 Cgroup setup hybrid Cgroup mounts blkio /sys/fs/cgroup/blkio cpu /sys/fs/cgroup/cpu,cpuacct cpuacct /sys/fs/cgroup/cpu,cpuacct cpuset /sys/fs/cgroup/cpuset devices /sys/fs/cgroup/devices freezer /sys/fs/cgroup/freezer hugetlb /sys/fs/cgroup/hugetlb memory /sys/fs/cgroup/memory net_cls /sys/fs/cgroup/net_cls,net_prio net_prio /sys/fs/cgroup/net_cls,net_prio perf_event /sys/fs/cgroup/perf_event pids /sys/fs/cgroup/pids unified /sys/fs/cgroup/unified CGroup v2 controllers cpu detached cpuset detached hugetlb detached io detached memory detached pids detached device attached Namespaces enabled mount enabled uts enabled ipc enabled user enabled pid enabled network enabled cgroup enabled $ ./youki --version youki version 0.0.1 commit: 0.0.1-0-0be33bf $ runc -v runc version 1.0.0-rc93 commit: 12644e614e25b05da6fd08a38ffa0cfe1903fdec spec: 1.0.2-dev go: go1.13.15 libseccomp: 2.5.1 $ crun --version crun version 0.19.1.45-4cc7 commit: 4cc7fa1124cce75dc26e12186d9cbeabded2b710 spec: 1.0.0 +SYSTEMD +SELINUX +APPARMOR +CAP +SECCOMP +EBPF +CRIU +YAJL `
+    ```console
+    $ ./youki info
+    Version           0.0.1
+    Kernel-Release    5.11.0-41-generic
+    Kernel-Version    #45-Ubuntu SMP Fri Nov 5 11:37:01 UTC 2021
+    Architecture      x86_64
+    Operating System  Ubuntu 21.04
+    Cores             12
+    Total Memory      32025
+    Cgroup setup      hybrid
+    Cgroup mounts
+      blkio           /sys/fs/cgroup/blkio
+      cpu             /sys/fs/cgroup/cpu,cpuacct
+      cpuacct         /sys/fs/cgroup/cpu,cpuacct
+      cpuset          /sys/fs/cgroup/cpuset
+      devices         /sys/fs/cgroup/devices
+      freezer         /sys/fs/cgroup/freezer
+      hugetlb         /sys/fs/cgroup/hugetlb
+      memory          /sys/fs/cgroup/memory
+      net_cls         /sys/fs/cgroup/net_cls,net_prio
+      net_prio        /sys/fs/cgroup/net_cls,net_prio
+      perf_event      /sys/fs/cgroup/perf_event
+      pids            /sys/fs/cgroup/pids
+      unified         /sys/fs/cgroup/unified
+    CGroup v2 controllers
+      cpu             detached
+      cpuset          detached
+      hugetlb         detached
+      io              detached
+      memory          detached
+      pids            detached
+      device          attached
+    Namespaces        enabled
+      mount           enabled
+      uts             enabled
+      ipc             enabled
+      user            enabled
+      pid             enabled
+      network         enabled
+      cgroup          enabled
+    $ ./youki --version
+    youki version 0.0.1
+    commit: 0.0.1-0-0be33bf
+    $ runc -v
+    runc version 1.0.0-rc93
+    commit: 12644e614e25b05da6fd08a38ffa0cfe1903fdec
+    spec: 1.0.2-dev
+    go: go1.13.15
+    libseccomp: 2.5.1
+    $ crun --version
+    crun version 0.19.1.45-4cc7
+    commit: 4cc7fa1124cce75dc26e12186d9cbeabded2b710
+    spec: 1.0.0
+    +SYSTEMD +SELINUX +APPARMOR +CAP +SECCOMP +EBPF +CRIU +YAJL
+    ```
   </details>
 
 - The development of [railcar](https://github.com/oracle/railcar) has been suspended. This project was very nice but is no longer being developed. This project is inspired by it.
