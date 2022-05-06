@@ -48,7 +48,7 @@ impl NotifyListener {
         Ok(())
     }
 
-    pub fn close(&mut self) -> Result<()> {
+    pub fn close(&self) -> Result<()> {
         close(self.socket.as_raw_fd())?;
         Ok(())
     }
@@ -73,11 +73,6 @@ impl NotifySocket {
         stream.write_all(b"start container")?;
         log::debug!("notify finished");
         unistd::chdir(&cwd)?;
-        Ok(())
-    }
-
-    pub fn notify_container_finish(&mut self) -> Result<()> {
-        // self.socket.write_all(b"finish container")?;
         Ok(())
     }
 }
