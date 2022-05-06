@@ -401,6 +401,7 @@ pub fn container_init_process(
 
     // listing on the notify socket for container start command
     args.notify_socket.wait_for_container_start()?;
+    args.notify_socket.close()?;
 
     // create_container hook needs to be called after the namespace setup, but
     // before pivot_root is called. This runs in the container namespaces.
