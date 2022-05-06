@@ -77,18 +77,16 @@ jobs:
       - name: Toolchain setup
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-01-14
+          toolchain: nightly-2022-05-06
           override: true
           profile: minimal
           components: llvm-tools-preview
       - name: Cache youki
         uses: Swatinem/rust-cache@v1
       - name: install cargo-llvm-cov
-        env:
-          CARGO_LLVM_COV_VERSION: 0.1.5
-        run: |
-          wget https://github.com/taiki-e/cargo-llvm-cov/releases/download/v${CARGO_LLVM_COV_VERSION}/cargo-llvm-cov-x86_64-unknown-linux-gnu.tar.gz -qO- | tar -xzvf -
-          mv cargo-llvm-cov ~/.cargo/bin
+        uses: taiki-e/install-action@v1
+        with:
+          tool: cargo-llvm-cov@0.3.2
       - name: Update System Libraries
         run: sudo apt-get -y update
       - name: Install System Libraries
