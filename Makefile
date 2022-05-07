@@ -14,6 +14,9 @@ test: build
 oci-integration-test: release-build
 	./scripts/oci_integration_tests.sh $(ROOT)
 
+oci-test-cov: build
+	./scripts/oci_integration_tests.sh $(ROOT)
+
 integration-test: release-build
 	./scripts/rust_integration_tests.sh $(ROOT)/youki
 
