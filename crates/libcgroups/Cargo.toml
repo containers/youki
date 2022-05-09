@@ -38,7 +38,7 @@ libc = { version = "0.2.125", optional = true }
 oci-spec = { git = "https://github.com/containers/oci-spec-rs", rev = "89376af", features = ["proptests"] }
 quickcheck = "1"
 mockall = { version = "0.11.0", features = [] }
-clap = "3.1.15"
+clap = "3.1.17"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 env_logger = "0.9"
