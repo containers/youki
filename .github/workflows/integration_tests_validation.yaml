@@ -44,5 +44,7 @@ jobs:
           sudo chmod 755 /usr/bin/runc
       - name: Validate tests on runc
         run: make validate-rust-tests
+      - name: Build
+        run: make release-build
       - name: Validate tests on youki
         run: make integration-test

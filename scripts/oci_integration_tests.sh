@@ -86,6 +86,13 @@ check_environment() {
   fi
 }
 
+if [[ ! -e $RUNTIME ]]; then
+  if ! which $RUNTIME ; then
+    echo "$RUNTIME not found"
+    exit 1
+  fi
+fi
+
 for case in "${test_cases[@]}"; do
   if [[ ! -e "${OCI_TEST_DIR}/validation/$case" ]]; then
     GO111MODULE=auto GOPATH=${ROOT}/tests/oci-runtime-tests make runtimetest validation-executables
