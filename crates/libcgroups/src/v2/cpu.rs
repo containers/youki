@@ -13,6 +13,7 @@ use super::controller::Controller;
 const CGROUP_CPU_WEIGHT: &str = "cpu.weight";
 const CGROUP_CPU_MAX: &str = "cpu.max";
 const CGROUP_CPU_BURST: &str = "cpu.max.burst";
+const CGROUP_CPU_IDLE: &str = "cpu.idle";
 const UNRESTRICTED_QUOTA: &str = "max";
 const MAX_CPU_WEIGHT: u64 = 10000;
 
@@ -94,6 +95,10 @@ impl Cpu {
 
         if let Some(burst) = cpu.burst() {
             common::write_cgroup_file(path.join(CGROUP_CPU_BURST), burst)?;
+        }
+
+        if let Some(idle) = cpu.idle() {
+            common::write_cgroup_file(path.join(CGROUP_CPU_IDLE), idle)?;
         }
 
         Ok(())

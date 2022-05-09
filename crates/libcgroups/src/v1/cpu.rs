@@ -17,6 +17,7 @@ const CGROUP_CPU_BURST: &str = "cpu.cfs_burst_us";
 const CGROUP_CPU_RT_RUNTIME: &str = "cpu.rt_runtime_us";
 const CGROUP_CPU_RT_PERIOD: &str = "cpu.rt_period_us";
 const CGROUP_CPU_STAT: &str = "cpu.stat";
+const CGROUP_CPU_IDLE: &str = "cpu.idle";
 
 pub struct Cpu {}
 
@@ -40,6 +41,7 @@ impl Controller for Cpu {
                 || cpu.quota().is_some()
                 || cpu.realtime_period().is_some()
                 || cpu.realtime_runtime().is_some()
+                || cpu.idle().is_some()
             {
                 return Some(cpu);
             }
@@ -128,6 +130,10 @@ impl Cpu {
             if rt_period != 0 {
                 common::write_cgroup_file(root_path.join(CGROUP_CPU_RT_PERIOD), rt_period)?;
             }
+        }
+
+        if let Some(idle) = cpu.idle() {
+            common::write_cgroup_file(root_path.join(CGROUP_CPU_IDLE), idle)?;
         }
 
         Ok(())
