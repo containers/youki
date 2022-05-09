@@ -1955,8 +1955,9 @@ dependencies = [
 [[package]]
 name = "rust-criu"
 version = "0.1.0"
-source = "git+https://github.com/checkpoint-restore/rust-criu#6df305772205620bea3a1c0e70ba81cd38f8417c"
+source = "git+https://github.com/checkpoint-restore/rust-criu#3f1340b167a6a607cb3a8153e31b974e6632ed6b"
 dependencies = [
+ "anyhow",
  "libc",
  "protobuf",
  "protobuf-codegen-pure",
