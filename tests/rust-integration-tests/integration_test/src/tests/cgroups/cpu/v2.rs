@@ -23,6 +23,8 @@ use test_framework::{assert_result_eq, test_result, ConditionalTest, TestGroup, 
 use super::create_spec;
 
 const DEFAULT_PERIOD: u64 = 100_000;
+const CPU: &str = "cpu";
+const CGROUP_CPU_IDLE: &str = "cpu.idle";
 
 // SPEC: The runtime spec does not specify what should happen if the cpu weight is outside
 // of the valid range of values [1, 10000]. We assume that a value of zero means that no action
@@ -31,6 +33,35 @@ const DEFAULT_PERIOD: u64 = 100_000;
 // It also does not specify what should happen if the cpu quota or cpu period is negative or zero.
 // We assume that a negative value means that it should be set to the default value and zero means
 // that it should be unchanged.
+
+/// Tests if a cpu idle value is successfully set
+fn test_cpu_idle_set() -> TestResult {
+    let idle: i64 = 1;
+    let cpu = test_result!(LinuxCpuBuilder::default()
+        .idle(idle)
+        .build()
+        .context("build cpu spec"));
+
+    let spec = test_result!(create_spec("test_cpu_idle_set", cpu));
+    test_outside_container(spec, &|data| {
+        test_result!(check_container_created(&data));
+        test_result!(check_cpu_idle("test_cpu_idle_set", idle));
+        TestResult::Passed
+    })
+}
+
+/// Tests default idle value is correct
+fn test_cpu_idle_default() -> TestResult {
+    let default_idle = 0;
+    let cpu = test_result!(LinuxCpuBuilder::default().build().context("build cpu spec"));
+
+    let spec = test_result!(create_spec("test_cpu_idle_default", cpu));
+    test_outside_container(spec, &|data| {
+        test_result!(check_container_created(&data));
+        test_result!(check_cpu_idle("test_cpu_idle_default", default_idle));
+        TestResult::Passed
+    })
+}
 
 /// Tests if a cpu weight that is in the valid range [1, 10000] is successfully set
 fn test_cpu_weight_valid_set() -> TestResult {
@@ -239,6 +270,15 @@ fn check_cpu_weight(cgroup_name: &str, expected_weight: u64) -> Result<()> {
     assert_result_eq!(actual_weight, expected_weight, "unexpected cpu weight")
 }
 
+fn check_cpu_idle(cgroup_name: &str, expected_value: i64) -> Result<()> {
+    let data = read_cgroup_data(cgroup_name, "cpu.idle")?;
+    assert_result_eq!(
+        data.parse::<i64>()
+            .with_context(|| format!("failed to parse {:?}", data))?,
+        expected_value
+    )
+}
+
 fn check_cpu_max(cgroup_name: &str, expected_quota: i64, expected_period: u64) -> Result<()> {
     let data = read_cgroup_data(cgroup_name, "cpu.max")?;
     let parts: Vec<&str> = data.split_whitespace().collect();
@@ -336,6 +376,13 @@ fn can_run() -> bool {
     true
 }
 
+fn can_run_idle() -> bool {
+    let idle_path = Path::new(common::DEFAULT_CGROUP_ROOT)
+        .join(CPU)
+        .join(CGROUP_CPU_IDLE);
+    can_run() && idle_path.exists()
+}
+
 pub fn get_test_group<'a>() -> TestGroup<'a> {
     let mut test_group = TestGroup::new("cgroup_v2_cpu");
     let test_cpu_weight_valid_set = ConditionalTest::new(
@@ -392,6 +439,18 @@ pub fn get_test_group<'a>() -> TestGroup<'a> {
         Box::new(test_cpu_period_and_quota_valid_set),
     );
 
+    let test_cpu_idle_set = ConditionalTest::new(
+        "test_cpu_idle_set",
+        Box::new(can_run_idle),
+        Box::new(test_cpu_idle_set),
+    );
+
+    let test_cpu_idle_default = ConditionalTest::new(
+        "test_cpu_idle_default",
+        Box::new(can_run_idle),
+        Box::new(test_cpu_idle_default),
+    );
+
     test_group.add(vec![
         Box::new(test_cpu_weight_valid_set),
         Box::new(test_cpu_weight_zero_ignored),
@@ -402,6 +461,8 @@ pub fn get_test_group<'a>() -> TestGroup<'a> {
         Box::new(test_cpu_period_valid_set),
         Box::new(test_cpu_period_unspecified_unchanged),
         Box::new(test_cpu_period_and_quota_valid_set),
+        Box::new(test_cpu_idle_set),
+        Box::new(test_cpu_idle_default),
     ]);
     test_group
 }

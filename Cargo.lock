@@ -382,16 +382,6 @@ dependencies = [
 
 [[package]]
 name = "darling"
-version = "0.12.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f2c43f534ea4b0b049015d00269734195e6d3f0f6635cb692251aca6f9f8b3c"
-dependencies = [
- "darling_core 0.12.4",
- "darling_macro 0.12.4",
-]
-
-[[package]]
-name = "darling"
 version = "0.13.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a01d95850c592940db9b8194bc39f4bc0e89dee5c4265e4b1807c34a9aba453c"
@@ -408,20 +398,6 @@ checksum = "f1a5d2e8b5a94b2261efb20e99a01255b9c5293797d69bbf04600567b2f9b8d7"
 dependencies = [
  "darling_core 0.14.0",
  "darling_macro 0.14.0",
-]
-
-[[package]]
-name = "darling_core"
-version = "0.12.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e91455b86830a1c21799d94524df0845183fa55bafd9aa137b01c7d1065fa36"
-dependencies = [
- "fnv",
- "ident_case",
- "proc-macro2",
- "quote",
- "strsim",
- "syn",
 ]
 
 [[package]]
@@ -448,17 +424,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "strsim",
- "syn",
-]
-
-[[package]]
-name = "darling_macro"
-version = "0.12.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29b5acf0dea37a7f66f7b25d2c5e93fd46f8f6968b1a5d7a3e02e97768afc95a"
-dependencies = [
- "darling_core 0.12.4",
- "quote",
  "syn",
 ]
 
@@ -497,32 +462,11 @@ dependencies = [
 
 [[package]]
 name = "derive_builder"
-version = "0.10.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d13202debe11181040ae9063d739fa32cfcaaebe2275fe387703460ae2365b30"
-dependencies = [
- "derive_builder_macro 0.10.2",
-]
-
-[[package]]
-name = "derive_builder"
 version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d07adf7be193b71cc36b193d0f5fe60b918a3a9db4dad0449f57bcfd519704a3"
 dependencies = [
- "derive_builder_macro 0.11.2",
-]
-
-[[package]]
-name = "derive_builder_core"
-version = "0.10.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "66e616858f6187ed828df7c64a6d71720d83767a7f19740b2d1b6fe6327b36e5"
-dependencies = [
- "darling 0.12.4",
- "proc-macro2",
- "quote",
- "syn",
+ "derive_builder_macro",
 ]
 
 [[package]]
@@ -539,21 +483,11 @@ dependencies = [
 
 [[package]]
 name = "derive_builder_macro"
-version = "0.10.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58a94ace95092c5acb1e97a7e846b310cfbd499652f72297da7493f618a98d73"
-dependencies = [
- "derive_builder_core 0.10.2",
- "syn",
-]
-
-[[package]]
-name = "derive_builder_macro"
 version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f0314b72bed045f3a68671b3c86328386762c93f82d98c65c3cb5e5f573dd68"
 dependencies = [
- "derive_builder_core 0.11.2",
+ "derive_builder_core",
  "syn",
 ]
 
@@ -996,7 +930,7 @@ dependencies = [
  "log",
  "nix",
  "num_cpus",
- "oci-spec 0.5.5",
+ "oci-spec",
  "once_cell",
  "pnet",
  "procfs",
@@ -1094,7 +1028,7 @@ dependencies = [
  "log",
  "mockall",
  "nix",
- "oci-spec 0.5.6",
+ "oci-spec",
  "procfs",
  "quickcheck",
  "rbpf",
@@ -1121,7 +1055,7 @@ dependencies = [
  "log",
  "mio",
  "nix",
- "oci-spec 0.5.6",
+ "oci-spec",
  "path-clean",
  "prctl",
  "procfs",
@@ -1415,23 +1349,10 @@ dependencies = [
 
 [[package]]
 name = "oci-spec"
-version = "0.5.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71a85b9f9654fe5c3eab8907369250c05aeda9d807b76bd06c740601f881dc02"
-dependencies = [
- "derive_builder 0.10.2",
- "getset",
- "serde",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
-name = "oci-spec"
 version = "0.5.6"
 source = "git+https://github.com/containers/oci-spec-rs?rev=6df620e#6df620e6d372fe080322f2a4b5e164f11f209bb0"
 dependencies = [
- "derive_builder 0.11.2",
+ "derive_builder",
  "getset",
  "quickcheck",
  "serde",
@@ -1938,7 +1859,7 @@ name = "runtimetest"
 version = "0.0.1"
 dependencies = [
  "nix",
- "oci-spec 0.5.5",
+ "oci-spec",
 ]
 
 [[package]]
@@ -2927,7 +2848,7 @@ dependencies = [
  "liboci-cli",
  "log",
  "nix",
- "oci-spec 0.5.6",
+ "oci-spec",
  "once_cell",
  "pentacle",
  "procfs",

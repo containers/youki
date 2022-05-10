@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use libcgroups::common;
 use num_cpus;
 use test_framework::{test_result, ConditionalTest, TestGroup, TestResult};
 
@@ -44,6 +45,7 @@ fn test_cpu_cgroups() -> TestResult {
             1024,
             100000,
             50000,
+            None,
             "0",
             "0",
             realtime_period,
@@ -53,6 +55,7 @@ fn test_cpu_cgroups() -> TestResult {
             1024,
             100000,
             50000,
+            None,
             &cpu_range,
             "0",
             realtime_period,
@@ -62,6 +65,7 @@ fn test_cpu_cgroups() -> TestResult {
             1024,
             100000,
             200000,
+            None,
             "0",
             "0",
             realtime_period,
@@ -71,6 +75,7 @@ fn test_cpu_cgroups() -> TestResult {
             1024,
             100000,
             200000,
+            None,
             &cpu_range,
             "0",
             realtime_period,
@@ -80,6 +85,7 @@ fn test_cpu_cgroups() -> TestResult {
             1024,
             500000,
             50000,
+            None,
             "0",
             "0",
             realtime_period,
@@ -89,6 +95,7 @@ fn test_cpu_cgroups() -> TestResult {
             1024,
             500000,
             50000,
+            None,
             &cpu_range,
             "0",
             realtime_period,
@@ -98,6 +105,7 @@ fn test_cpu_cgroups() -> TestResult {
             1024,
             500000,
             200000,
+            None,
             "0",
             "0",
             realtime_period,
@@ -107,6 +115,7 @@ fn test_cpu_cgroups() -> TestResult {
             1024,
             500000,
             200000,
+            None,
             &cpu_range,
             "0",
             realtime_period,
@@ -116,6 +125,7 @@ fn test_cpu_cgroups() -> TestResult {
             2048,
             100000,
             50000,
+            None,
             "0",
             "0",
             realtime_period,
@@ -125,6 +135,7 @@ fn test_cpu_cgroups() -> TestResult {
             2048,
             100000,
             50000,
+            None,
             &cpu_range,
             "0",
             realtime_period,
@@ -134,6 +145,7 @@ fn test_cpu_cgroups() -> TestResult {
             2048,
             100000,
             200000,
+            None,
             "0",
             "0",
             realtime_period,
@@ -143,6 +155,7 @@ fn test_cpu_cgroups() -> TestResult {
             2048,
             100000,
             200000,
+            None,
             &cpu_range,
             "0",
             realtime_period,
@@ -152,6 +165,7 @@ fn test_cpu_cgroups() -> TestResult {
             2048,
             500000,
             50000,
+            None,
             "0",
             "0",
             realtime_period,
@@ -161,6 +175,7 @@ fn test_cpu_cgroups() -> TestResult {
             2048,
             500000,
             50000,
+            None,
             &cpu_range,
             "0",
             realtime_period,
@@ -170,6 +185,7 @@ fn test_cpu_cgroups() -> TestResult {
             2048,
             500000,
             200000,
+            None,
             "0",
             "0",
             realtime_period,
@@ -179,6 +195,7 @@ fn test_cpu_cgroups() -> TestResult {
             2048,
             500000,
             200000,
+            None,
             &cpu_range,
             "0",
             realtime_period,
@@ -212,8 +229,67 @@ fn test_empty_cpu() -> TestResult {
     })
 }
 
+// Tests if a cpu idle value can be set
+fn test_cpu_idle_set() -> TestResult {
+    let idle: i64 = 1;
+    let realtime_period = get_realtime_period();
+    let realtime_runtime = get_realtime_runtime();
+
+    let cgroup_name = "test_cpu_idle_set";
+
+    let cpu = test_result!(create_cpu_spec(
+        2048,
+        500000,
+        200000,
+        Some(idle),
+        "0",
+        "0",
+        realtime_period,
+        realtime_runtime,
+    ));
+
+    let spec = test_result!(create_spec(cgroup_name, cpu));
+    test_outside_container(spec, &|data| {
+        test_result!(check_container_created(&data));
+        TestResult::Passed
+    })
+}
+
+/// Tests default idle value
+fn test_cpu_idle_default() -> TestResult {
+    let realtime_period = get_realtime_period();
+    let realtime_runtime = get_realtime_runtime();
+
+    let cgroup_name = "test_cpu_idle_default";
+
+    let cpu = test_result!(create_cpu_spec(
+        2048,
+        500000,
+        200000,
+        None,
+        "0",
+        "0",
+        realtime_period,
+        realtime_runtime,
+    ));
+    let spec = test_result!(create_spec(cgroup_name, cpu));
+    test_outside_container(spec, &|data| {
+        test_result!(check_container_created(&data));
+        TestResult::Passed
+    })
+}
+
 fn can_run() -> bool {
     Path::new(CPU_CGROUP_PREFIX).exists()
+}
+
+fn can_run_idle() -> bool {
+    const CPU: &str = "cpu";
+    const CGROUP_CPU_IDLE: &str = "cpu.idle";
+    let idle_path = Path::new(common::DEFAULT_CGROUP_ROOT)
+        .join(CPU)
+        .join(CGROUP_CPU_IDLE);
+    can_run() && idle_path.exists()
 }
 
 pub fn get_test_group<'a>() -> TestGroup<'a> {
@@ -230,7 +306,24 @@ pub fn get_test_group<'a>() -> TestGroup<'a> {
         Box::new(test_empty_cpu),
     );
 
-    test_group.add(vec![Box::new(linux_cgroups_cpus), Box::new(empty_cpu)]);
+    let cpu_idle_default = ConditionalTest::new(
+        "test_cpu_idle_default",
+        Box::new(can_run_idle),
+        Box::new(test_cpu_idle_default),
+    );
+
+    let cpu_idle_set = ConditionalTest::new(
+        "test_cpu_idle_set",
+        Box::new(can_run_idle),
+        Box::new(test_cpu_idle_set),
+    );
+
+    test_group.add(vec![
+        Box::new(linux_cgroups_cpus),
+        Box::new(empty_cpu),
+        Box::new(cpu_idle_set),
+        Box::new(cpu_idle_default),
+    ]);
 
     test_group
 }
