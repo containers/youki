@@ -17,6 +17,7 @@ const CGROUP_CPU_BURST: &str = "cpu.cfs_burst_us";
 const CGROUP_CPU_RT_RUNTIME: &str = "cpu.rt_runtime_us";
 const CGROUP_CPU_RT_PERIOD: &str = "cpu.rt_period_us";
 const CGROUP_CPU_STAT: &str = "cpu.stat";
+const CGROUP_CPU_IDLE: &str = "cpu.idle";
 
 pub struct Cpu {}
 
@@ -40,6 +41,7 @@ impl Controller for Cpu {
                 || cpu.quota().is_some()
                 || cpu.realtime_period().is_some()
                 || cpu.realtime_runtime().is_some()
+                || cpu.idle().is_some()
             {
                 return Some(cpu);
             }
@@ -130,6 +132,10 @@ impl Cpu {
             }
         }
 
+        if let Some(idle) = cpu.idle() {
+            common::write_cgroup_file(root_path.join(CGROUP_CPU_IDLE), idle)?;
+        }
+
         Ok(())
     }
 }
@@ -207,6 +213,33 @@ mod tests {
         let content = fs::read_to_string(max)
             .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_RT_RUNTIME));
         assert_eq!(content, RUNTIME.to_string());
+    }
+
+    #[test]
+    fn test_set_cpu_idle() {
+        // arrange
+        const IDLE: i64 = 1;
+        const CPU: &str = "cpu";
+
+        if !Path::new(common::DEFAULT_CGROUP_ROOT)
+            .join(CPU)
+            .join(CGROUP_CPU_IDLE)
+            .exists()
+        {
+            // skip test_set_cpu_idle due to not found cpu.idle, maybe due to old kernel version
+            return;
+        }
+
+        let (tmp, max) = setup("test_set_cpu_idle", CGROUP_CPU_IDLE);
+        let cpu = LinuxCpuBuilder::default().idle(IDLE).build().unwrap();
+
+        // act
+        Cpu::apply(&tmp, &cpu).expect("apply cpu");
+
+        // assert
+        let content = fs::read_to_string(max)
+            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_IDLE));
+        assert_eq!(content, IDLE.to_string());
     }
 
     #[test]

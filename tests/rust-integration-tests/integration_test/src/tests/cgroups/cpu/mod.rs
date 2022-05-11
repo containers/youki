@@ -12,6 +12,7 @@ fn create_cpu_spec(
     shares: u64,
     quota: i64,
     period: u64,
+    idle_opt: Option<i64>,
     cpus: &str,
     mems: &str,
     realtime_period_opt: Option<u64>,
@@ -23,6 +24,10 @@ fn create_cpu_spec(
         .period(period)
         .cpus(cpus)
         .mems(mems);
+
+    if let Some(idle) = idle_opt {
+        builder = builder.idle(idle);
+    }
 
     if let Some(realtime_period) = realtime_period_opt {
         builder = builder.realtime_period(realtime_period);

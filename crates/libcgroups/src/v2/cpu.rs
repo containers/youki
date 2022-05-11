@@ -13,6 +13,7 @@ use super::controller::Controller;
 const CGROUP_CPU_WEIGHT: &str = "cpu.weight";
 const CGROUP_CPU_MAX: &str = "cpu.max";
 const CGROUP_CPU_BURST: &str = "cpu.max.burst";
+const CGROUP_CPU_IDLE: &str = "cpu.idle";
 const UNRESTRICTED_QUOTA: &str = "max";
 const MAX_CPU_WEIGHT: u64 = 10000;
 
@@ -96,6 +97,10 @@ impl Cpu {
             common::write_cgroup_file(path.join(CGROUP_CPU_BURST), burst)?;
         }
 
+        if let Some(idle) = cpu.idle() {
+            common::write_cgroup_file(path.join(CGROUP_CPU_IDLE), idle)?;
+        }
+
         Ok(())
     }
 
@@ -151,6 +156,33 @@ mod tests {
         let content = fs::read_to_string(weight)
             .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_WEIGHT));
         assert_eq!(content, 840.to_string());
+    }
+
+    #[test]
+    fn test_set_cpu_idle() {
+        // arrange
+        const IDLE: i64 = 1;
+        const CPU: &str = "cpu";
+
+        if !Path::new(common::DEFAULT_CGROUP_ROOT)
+            .join(CPU)
+            .join(CGROUP_CPU_IDLE)
+            .exists()
+        {
+            // skip test_set_cpu_idle due to not found cpu.idle, maybe due to old kernel version
+            return;
+        }
+
+        let (tmp, max) = setup("test_set_cpu_idle", CGROUP_CPU_IDLE);
+        let cpu = LinuxCpuBuilder::default().idle(IDLE).build().unwrap();
+
+        // act
+        Cpu::apply(&tmp, &cpu).expect("apply cpu");
+
+        // assert
+        let content = fs::read_to_string(max)
+            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_IDLE));
+        assert_eq!(content, format!("{}", IDLE))
     }
 
     #[test]

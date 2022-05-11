@@ -4,5 +4,5 @@ version = "0.0.1"
 edition = "2021"
 
 [dependencies]
-oci-spec = "0.5.5"
+oci-spec = { git = "https://github.com/containers/oci-spec-rs", rev = "6df620e" }
 nix = "0.24.1"
