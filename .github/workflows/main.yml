@@ -93,7 +93,6 @@ jobs:
         run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev libseccomp-dev
       - name: Run Test Coverage for youki
         run: |
-          cd ./crates
           cargo llvm-cov clean --workspace
           cargo llvm-cov --no-report
           cargo llvm-cov --no-run --lcov --ignore-filename-regex "libcgroups/src/systemd/dbus/systemd_api.rs" --output-path ./coverage.lcov
