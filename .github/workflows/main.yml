@@ -86,7 +86,7 @@ jobs:
       - name: install cargo-llvm-cov
         uses: taiki-e/install-action@v1
         with:
-          tool: cargo-llvm-cov@0.3.2
+          tool: cargo-llvm-cov@0.4.0
       - name: Update System Libraries
         run: sudo apt-get -y update
       - name: Install System Libraries
