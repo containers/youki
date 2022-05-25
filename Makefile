@@ -11,13 +11,13 @@ test-all: test oci-integration-test integration-test
 test: build
 	cd crates && cargo test
 
-oci-integration-test: release-build
+oci-integration-test:
 	./scripts/oci_integration_tests.sh $(ROOT)
 
-integration-test: release-build
+integration-test:
 	./scripts/rust_integration_tests.sh $(ROOT)/youki
 
-validate-rust-tests: release-build
+validate-rust-tests:
 	./scripts/rust_integration_tests.sh runc
 
 clean:

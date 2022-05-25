@@ -27,7 +27,7 @@ jobs:
           profile: minimal
 
       - name: Building PR branch
-        run: ./build.sh --release
+        run: make release-build
 
       - name: Uploading PR build to artifact
         uses: actions/upload-artifact@v2

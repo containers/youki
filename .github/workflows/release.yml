@@ -19,6 +19,8 @@ jobs:
         with:
           toolchain: stable
           override: true
+      - name: Build
+        run: make release-build
       - name: test
         run: make test-all
 
