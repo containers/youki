@@ -1,4 +1,3 @@
-#![cfg_attr(coverage, feature(no_coverage))]
 pub mod apparmor;
 pub mod capabilities;
 pub mod config;

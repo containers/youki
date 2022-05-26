@@ -1,5 +1,4 @@
 //! Implements Command trait for Linux systems
-#[cfg_attr(coverage, no_coverage)]
 use std::ffi::{CStr, OsStr};
 use std::fs;
 use std::os::unix::ffi::OsStrExt;
