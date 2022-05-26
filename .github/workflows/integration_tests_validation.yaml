@@ -26,7 +26,7 @@ jobs:
     timeout-minutes: 15
     strategy:
       matrix:
-        rust: [1.59.0, 1.61.0]
+        rust: [1.60.0, 1.61.0]
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -42,9 +42,9 @@ jobs:
           wget -q https://github.com/opencontainers/runc/releases/download/v1.1.0/runc.amd64
           sudo mv runc.amd64 /usr/bin/runc
           sudo chmod 755 /usr/bin/runc
-      - name: Validate tests on runc
-        run: make validate-rust-tests
       - name: Build
         run: make release-build
+      - name: Validate tests on runc
+        run: make validate-rust-tests
       - name: Validate tests on youki
         run: make integration-test
