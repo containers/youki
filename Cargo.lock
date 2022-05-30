@@ -1411,12 +1411,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "paste"
-version = "1.0.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c520e05135d6e763148b6426a837e239041653ba7becd2e538c076c738025fc"
-
-[[package]]
 name = "path-clean"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2138,12 +2132,11 @@ dependencies = [
 
 [[package]]
 name = "syscalls"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a837f64f72473acde47fbd13431e83fc9081e52ae49ea1430003831536ed04d7"
+checksum = "7e60450613516f4168b6b9ec7b1b5a1a1351cc3011371e4a791e53c6f9dc35cd"
 dependencies = [
  "cc",
- "paste",
 ]
 
 [[package]]

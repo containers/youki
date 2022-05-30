@@ -19,7 +19,7 @@ use nix::{
     unistd,
     unistd::{chown, fchdir, pivot_root, setgroups, sethostname, Gid, Uid},
 };
-use syscalls::{syscall, SYS_close_range};
+use syscalls::{syscall, Sysno::close_range};
 
 use oci_spec::runtime::LinuxRlimit;
 
@@ -296,7 +296,7 @@ impl Syscall for LinuxSyscall {
     fn close_range(&self, preserve_fds: i32) -> Result<()> {
         let result = unsafe {
             syscall!(
-                SYS_close_range,
+                close_range,
                 3 + preserve_fds as usize,
                 usize::MAX,
                 CloseRange::CLOEXEC.bits()
