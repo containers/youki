@@ -1,5 +1,3 @@
-
-
 /tutorial
 .idea/
 
@@ -10,16 +8,13 @@ tags
 tags.lock
 tags.temp
 
-youki
-!youki/
-integration_test
-runtimetest_tool
-runtimetest
-!runtimetest/
+/youki
+/integration_test
+/runtimetest
 
 .vscode
 
 *~
 
-bundle.tar.gz
-test.log
+/bundle.tar.gz
+/test.log
