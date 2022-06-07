@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use anyhow::{anyhow, Context, Result};
-use pnet::datalink;
+use pnet_datalink::interfaces;
 
 use oci_spec::runtime::{
     LinuxBuilder, LinuxInterfacePriorityBuilder, LinuxNamespace, LinuxNamespaceType,
@@ -63,7 +63,7 @@ fn create_spec(
 
 // Gets the loopback interface and the first ethernet/wlan interface if it exists
 fn get_network_interfaces() -> Option<(String, String)> {
-    let interfaces = datalink::interfaces();
+    let interfaces = interfaces();
     let lo_if_name = interfaces.get(0).map(|iface| &iface.name)?;
     let eth_if_name = interfaces.get(1).map(|iface| &iface.name)?;
 
