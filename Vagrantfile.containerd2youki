@@ -1,0 +1,51 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure("2") do |config|
+    config.vm.box = "generic/ubuntu2204"
+    config.vm.synced_folder '.', '/vagrant/youki', disabled: true
+
+    config.vm.provider "virtualbox" do |v|
+      v.memory = 4096
+      v.cpus = 2
+    end
+
+    config.vm.provision "shell", inline: <<-SHELL
+      set -e -u -o pipefail
+      apt-get update && apt-get install -y \
+        make \
+        pkg-config         \
+        libsystemd-dev     \
+        libdbus-glib-1-dev \
+        build-essential    \
+        libelf-dev \
+        libseccomp-dev \
+        libbtrfs-dev \
+        btrfs-progs
+      wget --quiet https://go.dev/dl/go1.18.1.linux-amd64.tar.gz -O /tmp/go1.18.1.linux-amd64.tar.gz
+      rm -rf /usr/local/go && tar -C /usr/local -xzf /tmp/go1.18.1.linux-amd64.tar.gz
+      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+      echo "export PATH=$PATH:$HOME/.cargo/bin:/usr/local/go/bin" >> ~/.bashrc
+      echo "export GOPATH=$HOME/go" >> ~/.bashrc
+      export PATH=$PATH:$HOME/.cargo/bin:/usr/local/go/bin
+      export GOPATH=$HOME/go
+
+      rm -rf /root/containerd2youki
+      git clone https://github.com/containerd/containerd \
+        /root/go/src/github.com/containerd/containerd -b v1.5.11
+      git clone https://github.com/containers/youki \
+        /root/containerd2youki/youki
+
+      cd /root/go/src/github.com/containerd/containerd
+      make
+      make binaries
+      make install
+      ./script/setup/install-cni
+      ./script/setup/install-critools
+      rm -rf /bin/runc /sbin/runc /usr/sbin/runc /usr/bin/runc
+
+      cd /root/containerd2youki/youki
+      make release-build
+      cp youki /usr/bin/runc
+    SHELL
+end
