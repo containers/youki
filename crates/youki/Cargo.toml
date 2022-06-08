@@ -39,4 +39,4 @@ serial_test = "0.7.0"
 
 [build-dependencies]
 anyhow = "1.0.57"
-vergen = "7.1"
+vergen = "7.2"
