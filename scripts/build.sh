@@ -11,6 +11,7 @@ usage_exit() {
 
 VERSION=debug
 TARGET=x86_64-unknown-linux-gnu
+RUNTIMETEST_TARGET="$ROOT/runtimetest-target"
 while getopts ro:h OPT; do
     case $OPT in
         o) output=${OPTARG}
@@ -36,8 +37,9 @@ OUTPUT=${output:-$ROOT/bin}
 
 cargo build --target ${TARGET} ${OPTION} --bin youki
 cargo build --target ${TARGET} ${OPTION} --bin integration_test
-RUSTFLAGS="-Ctarget-feature=+crt-static" cargo build --target ${TARGET} ${OPTION} --bin runtimetest
+CARGO_TARGET_DIR=${RUNTIMETEST_TARGET} RUSTFLAGS="-Ctarget-feature=+crt-static" cargo build --target ${TARGET} ${OPTION} --bin runtimetest
 
-mv ${ROOT}/target/${TARGET}/${VERSION}/{youki,integration_test,runtimetest} ${OUTPUT}/
+mv ${ROOT}/target/${TARGET}/${VERSION}/{youki,integration_test} ${OUTPUT}/
+mv ${RUNTIMETEST_TARGET}/${TARGET}/${VERSION}/runtimetest ${OUTPUT}/
 
 exit 0
