@@ -1,6 +1,7 @@
 mod tests;
 mod utils;
 
+use crate::tests::hooks::get_hooks_tests;
 use crate::tests::lifecycle::{ContainerCreate, ContainerLifecycle};
 use crate::tests::linux_ns_itype::get_ns_itype_tests;
 use crate::tests::pidfile::get_pidfile_test;
@@ -78,6 +79,7 @@ fn main() -> Result<()> {
     let huge_tlb = get_tlb_test();
     let pidfile = get_pidfile_test();
     let ns_itype = get_ns_itype_tests();
+    let hooks = get_hooks_tests();
     let cgroup_v1_pids = cgroups::pids::get_test_group();
     let cgroup_v1_cpu = cgroups::cpu::v1::get_test_group();
     let cgroup_v2_cpu = cgroups::cpu::v2::get_test_group();
@@ -92,6 +94,7 @@ fn main() -> Result<()> {
     tm.add_test_group(&huge_tlb);
     tm.add_test_group(&pidfile);
     tm.add_test_group(&ns_itype);
+    tm.add_test_group(&hooks);
     tm.add_test_group(&cgroup_v1_pids);
     tm.add_test_group(&cgroup_v1_cpu);
     tm.add_test_group(&cgroup_v2_cpu);
