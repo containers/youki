@@ -15,7 +15,6 @@ pub fn exec(args: Exec, root_path: PathBuf) -> Result<()> {
         .with_env(args.env.clone().into_iter().collect())
         .with_process(args.process.as_ref())
         .with_no_new_privs(args.no_new_privs)
-        .with_process(args.process.as_ref())
         .with_container_args(args.command.clone())
         .build()
 }
