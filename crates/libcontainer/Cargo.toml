@@ -27,7 +27,7 @@ fastrand = "1.7.0"
 futures = { version = "0.3", features = ["thread-pool"] }
 libc = "0.2.126"
 log = "0.4"
-mio = { version = "0.8.3", features = ["os-ext", "os-poll"] }
+mio = { version = "0.8.4", features = ["os-ext", "os-poll"] }
 nix = "0.24.1"
 oci-spec = { git = "https://github.com/containers/oci-spec-rs", rev = "6df620e", features = ["runtime"] }
 path-clean = "0.1.0"
