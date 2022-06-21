@@ -3,7 +3,6 @@ name = "libcontainer"
 version = "0.0.3"
 description = "Library for container control"
 license-file = "../../LICENSE"
-documentation = "https://docs.rs/libcontainer"
 repository = "https://github.com/containers/youki"
 homepage = "https://containers.github.io/youki"
 readme = "README.md"
@@ -29,7 +28,7 @@ libc = "0.2.126"
 log = "0.4"
 mio = { version = "0.8.4", features = ["os-ext", "os-poll"] }
 nix = "0.24.1"
-oci-spec = { git = "https://github.com/containers/oci-spec-rs", rev = "6df620e", features = ["runtime"] }
+oci-spec = { version = "0.5.6", features = ["runtime"] }
 path-clean = "0.1.0"
 procfs = "0.12.0"
 prctl = "1.0.0"
@@ -38,12 +37,12 @@ libseccomp = { version = "0.2.3" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 syscalls = "0.6.1"
-rust-criu = { git = "https://github.com/checkpoint-restore/rust-criu", version = "0.1.0" }
+rust-criu = "0.1.0"
 wasmer = { version = "2.2.0", optional = true }
 wasmer-wasi = { version = "2.3.0", optional = true }
 
 [dev-dependencies]
-oci-spec = { git = "https://github.com/containers/oci-spec-rs", rev = "6df620e", features = ["proptests", "runtime"] }
+oci-spec = { version = "0.5.6", features = ["proptests", "runtime"] }
 quickcheck = "1"
 serial_test = "0.7.0"
 rand = "0.8.5"
