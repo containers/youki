@@ -35,7 +35,7 @@ tabwriter = "1"
 clap_complete = "3.2.2"
 
 [dev-dependencies]
-serial_test = "0.7.0"
+serial_test = "0.8.0"
 
 [build-dependencies]
 anyhow = "1.0.58"
