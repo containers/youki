@@ -112,7 +112,10 @@ fn main() -> Result<()> {
                 commands::checkpoint::checkpoint(checkpoint, root_path)
             }
             CommonCmd::Events(events) => commands::events::events(events, root_path),
-            CommonCmd::Exec(exec) => commands::exec::exec(exec, root_path),
+            CommonCmd::Exec(exec) => {
+                let exit_code = commands::exec::exec(exec, root_path)?;
+                std::process::exit(exit_code)
+            }
             CommonCmd::List(list) => commands::list::list(list, root_path),
             CommonCmd::Pause(pause) => commands::pause::pause(pause, root_path),
             CommonCmd::Ps(ps) => commands::ps::ps(ps, root_path),

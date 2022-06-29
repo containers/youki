@@ -1,6 +1,6 @@
 use anyhow::{bail, Context, Result};
 use caps::Capability;
-use nix::unistd;
+use nix::unistd::{self, Pid};
 use oci_spec::runtime::{
     Capabilities as SpecCapabilities, Capability as SpecCapability, LinuxBuilder,
     LinuxCapabilities, LinuxCapabilitiesBuilder, LinuxNamespace, LinuxNamespaceBuilder,
@@ -89,7 +89,7 @@ impl<'a> TenantContainerBuilder<'a> {
     }
 
     /// Joins an existing container
-    pub fn build(self) -> Result<()> {
+    pub fn build(self) -> Result<Pid> {
         let container_dir = self
             .lookup_container_dir()
             .context("failed to look up container dir")?;
@@ -131,11 +131,12 @@ impl<'a> TenantContainerBuilder<'a> {
             preserve_fds: self.base.preserve_fds,
         };
 
-        builder_impl.create()?;
+        let pid = builder_impl.create()?;
 
         let mut notify_socket = NotifySocket::new(notify_path);
         notify_socket.notify_container_start()?;
-        Ok(())
+
+        Ok(pid)
     }
 
     fn lookup_container_dir(&self) -> Result<PathBuf> {
