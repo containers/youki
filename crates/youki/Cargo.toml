@@ -13,7 +13,7 @@ build = "build.rs"
 keywords = ["youki", "container"]
 
 [dependencies.clap]
-version = "3.2.6"
+version = "3.2.7"
 default-features = false
 features = ["std", "suggestions", "derive", "cargo"]
 
