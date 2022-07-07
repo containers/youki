@@ -150,7 +150,7 @@ impl Container {
                 if let Ok(proc) = Process::new(pid.as_raw()) {
                     use procfs::process::ProcState;
 
-                    match proc.stat.state()? {
+                    match proc.stat()?.state()? {
                         ProcState::Zombie | ProcState::Dead => ContainerStatus::Stopped,
                         _ => match self.status() {
                             ContainerStatus::Creating
