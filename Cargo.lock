@@ -1955,6 +1955,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_repr"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2ad84e47328a31223de7fed7a4f5087f2d6ddfe586cf3ca25b7a165bc0a5aed"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "serial_test"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2090,11 +2101,13 @@ dependencies = [
 
 [[package]]
 name = "syscalls"
-version = "0.6.2"
+version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f67239055428803ea49dad42d8425fad26979b48c4b659a04dea98318f982a65"
+checksum = "495fc16567694dd41768c94a9db146a8545be252f97b8169b5ff5c3d77fd3117"
 dependencies = [
  "cc",
+ "serde",
+ "serde_repr",
 ]
 
 [[package]]
