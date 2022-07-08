@@ -9,4 +9,4 @@ github:
     addBadge: true
 vscode:
   extensions:
-    - matklad.rust-analyzer
+    - rust-lang.rust-analyzer
