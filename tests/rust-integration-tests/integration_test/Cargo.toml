@@ -12,7 +12,7 @@ libcontainer = { path = "../../../crates/libcontainer" }
 log = { version = "0.4", features = ["std"] }
 nix = "0.24.1"
 num_cpus = "1.13"
-oci-spec = { git = "https://github.com/containers/oci-spec-rs", rev = "6df620e" }
+oci-spec = "0.5.7"
 once_cell = "1.13.0"
 pnet_datalink = "0.31.0"
 procfs = "0.13.0"

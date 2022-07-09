@@ -109,3 +109,23 @@ jobs:
           asset_path: ./${{ steps.info.outputs.outputdir }}.tar.gz
           asset_name: ${{ steps.info.outputs.outputdir }}.tar.gz
           asset_content_type: application/gzip
+
+  publish:
+    name: Publish Packages
+    needs: check
+    runs-on: ubuntu-latest
+    env:
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up cargo
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Publish libcgroups
+        run: cargo publish -p libcgroups --no-verify
+      - name: Publish libcontainer
+        run: cargo publish -p libcontainer --no-verify
+      - name: Publish liboci-cli
+        run: cargo publish -p liboci-cli --no-verify
