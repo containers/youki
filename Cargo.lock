@@ -1826,9 +1826,9 @@ dependencies = [
 
 [[package]]
 name = "rust-criu"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1945086f734e2d9d2790db859b70997be38bee89a6ae021bbb1a94d62ccd8fc7"
+checksum = "fbc1b354f74682f913331b8cec1fbf6e45a52c9a829cfe7d6391fe867a951c2c"
 dependencies = [
  "anyhow",
  "libc",
