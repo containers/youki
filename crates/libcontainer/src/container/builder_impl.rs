@@ -105,7 +105,7 @@ impl<'a> ContainerBuilderImpl<'a> {
             prctl::set_dumpable(false).unwrap();
         }
 
-        // This intermediate_args will be passed to the container intermediate process,
+        // This container_args will be passed to the container processes,
         // therefore we will have to move all the variable by value. Since self
         // is a shared reference, we have to clone these variables here.
         let container_args = ContainerArgs {

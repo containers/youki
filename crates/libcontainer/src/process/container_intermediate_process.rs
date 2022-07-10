@@ -11,12 +11,12 @@ use super::container_init_process::container_init_process;
 
 pub fn container_intermediate_process(
     args: &ContainerArgs,
-    intermediate_sender: &mut channel::IntermediateSender,
-    intermediate_receiver: &mut channel::IntermediateReceiver,
-    init_sender: &mut channel::InitSender,
-    init_receiver: &mut channel::InitReceiver,
+    intermediate_chan: &mut (channel::IntermediateSender, channel::IntermediateReceiver),
+    init_chan: &mut (channel::InitSender, channel::InitReceiver),
     main_sender: &mut channel::MainSender,
 ) -> Result<()> {
+    let (inter_sender, inter_receiver) = intermediate_chan;
+    let (init_sender, init_receiver) = init_chan;
     let command = &args.syscall;
     let spec = &args.spec;
     let linux = spec.linux().as_ref().context("no linux in spec")?;
@@ -53,7 +53,7 @@ pub fn container_intermediate_process(
             // allowed to write the uid/gid maps
             prctl::set_dumpable(true).unwrap();
             main_sender.identifier_mapping_request()?;
-            intermediate_receiver.wait_for_mapping_ack()?;
+            inter_receiver.wait_for_mapping_ack()?;
             prctl::set_dumpable(false).unwrap();
         }
 
@@ -92,7 +92,7 @@ pub fn container_intermediate_process(
         init_sender
             .close()
             .context("failed to close receiver in init process")?;
-        intermediate_sender
+        inter_sender
             .close()
             .context("failed to close sender in the intermediate process")?;
         container_init_process(args, main_sender, init_receiver)
@@ -108,7 +108,7 @@ pub fn container_intermediate_process(
     main_sender
         .close()
         .context("failed to close unused main sender")?;
-    intermediate_sender
+    inter_sender
         .close()
         .context("failed to close sender in the intermediate process")?;
     init_sender
