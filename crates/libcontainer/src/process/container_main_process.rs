@@ -19,16 +19,14 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<Pid> {
     // At minimum, we have to close down any unused senders. The corresponding
     // receivers will be cleaned up once the senders are closed down.
     let (main_sender, main_receiver) = &mut channel::main_channel()?;
-    let (intermediate_sender, intermediate_receiver) = &mut channel::intermediate_channel()?;
-    let (init_sender, init_receiver) = &mut channel::init_channel()?;
+    let inter_chan = &mut channel::intermediate_channel()?;
+    let init_chan = &mut channel::init_channel()?;
 
     let intermediate_pid = fork::container_fork(|| {
         container_intermediate_process::container_intermediate_process(
             container_args,
-            intermediate_sender,
-            intermediate_receiver,
-            init_sender,
-            init_receiver,
+            inter_chan,
+            init_chan,
             main_sender,
         )
     })?;
@@ -38,18 +36,21 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<Pid> {
         .close()
         .context("failed to close unused sender")?;
 
+    let (inter_sender, _) = inter_chan;
+    let (init_sender, _) = init_chan;
+
     // If creating a rootless container, the intermediate process will ask
     // the main process to set up uid and gid mapping, once the intermediate
     // process enters into a new user namespace.
     if let Some(rootless) = &container_args.rootless {
         main_receiver.wait_for_mapping_request()?;
         setup_mapping(rootless, intermediate_pid)?;
-        intermediate_sender.mapping_written()?;
+        inter_sender.mapping_written()?;
     }
 
     // At this point, we don't need to send any message to intermediate process anymore,
     // so we want to close this sender at the earliest point.
-    intermediate_sender
+    inter_sender
         .close()
         .context("failed to close unused intermediate sender")?;
 
