@@ -27,7 +27,7 @@ futures = { version = "0.3", features = ["thread-pool"] }
 libc = "0.2.126"
 log = "0.4"
 mio = { version = "0.8.4", features = ["os-ext", "os-poll"] }
-nix = "0.24.1"
+nix = "0.24.2"
 oci-spec = { version = "0.5.7", features = ["runtime"] }
 path-clean = "0.1.0"
 procfs = "0.13.0"
