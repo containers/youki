@@ -56,7 +56,7 @@ impl Executor for WasmerExecutor {
             .context("could not retrieve wasm module main function")?;
         start
             .call(&[])
-            .context("wasm module was not executed successfuly")?;
+            .context("wasm module was not executed successfully")?;
 
         Ok(())
     }

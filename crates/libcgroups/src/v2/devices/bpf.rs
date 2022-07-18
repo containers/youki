@@ -165,7 +165,7 @@ mod tests {
         load.expect().once().returning(|_, _, _, _, _, _, _| 32);
 
         // act
-        let fd = prog::load(license, &instructions).expect("succesfully calls load");
+        let fd = prog::load(license, &instructions).expect("successfully calls load");
 
         // assert
         assert_eq!(fd, 32);
@@ -248,7 +248,7 @@ mod tests {
         });
 
         // act
-        let info = prog::query(0).expect("Able to succesfully query");
+        let info = prog::query(0).expect("Able to successfully query");
 
         // assert
         assert_eq!(info.first().unwrap().id, 1);
@@ -294,7 +294,7 @@ mod tests {
         });
 
         // act
-        let info = prog::query(0).expect("Able to succesfully query");
+        let info = prog::query(0).expect("Able to successfully query");
 
         // assert
         assert_eq!(info.first().unwrap().id, 1);
