@@ -1003,9 +1003,9 @@ checksum = "884e2677b40cc8c339eaefcb701c32ef1fd2493d71118dc0ca4b6a736c93bd67"
 
 [[package]]
 name = "libbpf-sys"
-version = "0.8.1+v0.8.0"
+version = "0.8.2+v0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c7e278968e49b5a174d1e47c6c8ef3e6922c439343644af1cb27a98928914a1"
+checksum = "ba21fd78ad2c7e9d090754cdafb084f8e39e19fc8b040a1b7177b8c21104a5e3"
 dependencies = [
  "cc",
  "pkg-config",
