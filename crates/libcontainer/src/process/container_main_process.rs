@@ -6,8 +6,11 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use nix::{
-    sys::socket::{self, UnixAddr},
-    unistd::{self, Pid},
+    sys::{
+        socket::{self, UnixAddr},
+        stat,
+    },
+    unistd::{self, mkfifo, Pid},
 };
 use oci_spec::runtime;
 use std::{io::IoSlice, path::Path};
@@ -22,12 +25,32 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<Pid> {
     let inter_chan = &mut channel::intermediate_channel()?;
     let init_chan = &mut channel::init_channel()?;
 
+    // TODO: implement Option version
+    let mut fifo_fd = 0;
+    // let container_root = &container_args
+    //     .container
+    //     .as_ref()
+    //     .context("container state is required")?
+    //     .root;
+    let container_root = &std::path::Path::new("/run/youki/tutorial_container/");
+    let fifo_path = container_root.join("state.fifo");
+    if container_args.init {
+        mkfifo(&fifo_path, stat::Mode::S_IRWXU).context("failed to create the fifo file.")?;
+    }
+
+    let mut open_flags = nix::fcntl::OFlag::empty();
+    open_flags.insert(nix::fcntl::OFlag::O_PATH);
+    open_flags.insert(nix::fcntl::OFlag::O_CLOEXEC);
+    fifo_fd = nix::fcntl::open(&fifo_path, open_flags, stat::Mode::S_IRWXU)?;
+    log::debug!("fifo_fd: {}", fifo_fd);
+
     let intermediate_pid = fork::container_fork(|| {
         container_intermediate_process::container_intermediate_process(
             container_args,
             inter_chan,
             init_chan,
             main_sender,
+            fifo_fd,
         )
     })?;
     // Close down unused fds. The corresponding fds are duplicated to the

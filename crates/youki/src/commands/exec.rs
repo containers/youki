@@ -3,12 +3,15 @@ use nix::{
     libc,
     poll::{PollFd, PollFlags},
 };
-use std::{os::unix::prelude::RawFd, path::PathBuf};
+use std::{fs::OpenOptions, io::Read, os::unix::prelude::RawFd, path::PathBuf};
 
 use libcontainer::{container::builder::ContainerBuilder, syscall::syscall::create_syscall};
 use liboci_cli::Exec;
 
+use super::load_container;
+
 pub fn exec(args: Exec, root_path: PathBuf) -> Result<i32> {
+    let container = load_container(&root_path, &args.container_id)?;
     let syscall = create_syscall();
     let pid = ContainerBuilder::new(args.container_id.clone(), syscall.as_ref())
         .with_root_path(root_path)?
@@ -25,6 +28,13 @@ pub fn exec(args: Exec, root_path: PathBuf) -> Result<i32> {
     let pidfd = pidfd_open(pid.as_raw(), 0)?;
     let poll_fd = PollFd::new(pidfd, PollFlags::POLLIN);
     nix::poll::poll(&mut [poll_fd], -1).context("failed to wait for the container id")?;
+
+    let fifo_path = &container.root.join("state.fifo");
+    println!("fifo_path: {:?}", fifo_path);
+    let mut f = OpenOptions::new().read(true).open(fifo_path)?;
+    let mut contents = String::new();
+    f.read_to_string(&mut contents)?;
+    println!("get the value: {:?}", contents);
 
     // TODO
     Ok(0)
