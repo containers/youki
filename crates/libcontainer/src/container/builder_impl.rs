@@ -8,6 +8,7 @@ use crate::{
     utils,
 };
 use anyhow::{bail, Context, Result};
+use nix::unistd::Pid;
 use oci_spec::runtime::Spec;
 use std::{fs, io::Write, os::unix::prelude::RawFd, path::PathBuf};
 
@@ -40,19 +41,19 @@ pub(super) struct ContainerBuilderImpl<'a> {
 }
 
 impl<'a> ContainerBuilderImpl<'a> {
-    pub(super) fn create(&mut self) -> Result<()> {
-        if let Err(outer) = self.run_container().context("failed to create container") {
-            if let Err(inner) = self.cleanup_container() {
-                return Err(outer.context(inner));
+    pub(super) fn create(&mut self) -> Result<Pid> {
+        match self.run_container().context("failed to create container") {
+            Ok(pid) => Ok(pid),
+            Err(outer) => {
+                if let Err(inner) = self.cleanup_container() {
+                    return Err(outer.context(inner));
+                }
+                Err(outer)
             }
-
-            return Err(outer);
         }
-
-        Ok(())
     }
 
-    fn run_container(&mut self) -> Result<()> {
+    fn run_container(&mut self) -> Result<Pid> {
         let linux = self.spec.linux().as_ref().context("no linux in spec")?;
         let cgroups_path = utils::get_cgroup_path(
             linux.cgroups_path(),
@@ -138,7 +139,7 @@ impl<'a> ContainerBuilderImpl<'a> {
                 .context("Failed to save container state")?;
         }
 
-        Ok(())
+        Ok(init_pid)
     }
 
     fn cleanup_container(&self) -> Result<()> {
