@@ -7,4 +7,4 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.58"
-crossbeam = "0.8.1"
+crossbeam = "0.8.2"
