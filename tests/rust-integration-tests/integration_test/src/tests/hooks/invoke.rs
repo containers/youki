@@ -83,7 +83,7 @@ fn get_test<'a>(test_name: &'static str) -> Test<'a> {
                 log
             };
             delete_hook_output_file();
-            if log != "pre-start1 called\npre-start2 called\npost-start1 called\npost-start2 called\npost-stop1 called\npost-stop2 called\n".to_string() {
+            if log != "pre-start1 called\npre-start2 called\npost-start1 called\npost-start2 called\npost-stop1 called\npost-stop2 called\n" {
 					return TestResult::Failed(anyhow!(
 						"error : hooks must be called in the listed order"
 					));

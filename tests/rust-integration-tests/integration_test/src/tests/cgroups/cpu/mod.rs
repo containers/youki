@@ -8,6 +8,7 @@ use oci_spec::runtime::{
 pub mod v1;
 pub mod v2;
 
+#[allow(clippy::too_many_arguments)]
 fn create_cpu_spec(
     shares: u64,
     quota: i64,

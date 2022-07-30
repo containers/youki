@@ -1,4 +1,5 @@
 //! Contains Functionality of list container command
+use std::fmt::Write as _;
 use std::fs;
 use std::io;
 use std::io::Write;
@@ -40,15 +41,16 @@ pub fn list(_: List, root_path: PathBuf) -> Result<()> {
             "".to_owned()
         };
 
-        content.push_str(&format!(
-            "{}\t{}\t{}\t{}\t{}\t{}\n",
+        let _ = writeln!(
+            content,
+            "{}\t{}\t{}\t{}\t{}\t{}",
             container.id(),
             pid,
             container.status(),
             container.bundle().display(),
             created,
             user_name.to_string_lossy()
-        ));
+        );
     }
 
     let mut tab_writer = TabWriter::new(io::stdout());
