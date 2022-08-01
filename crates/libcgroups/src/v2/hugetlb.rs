@@ -47,7 +47,7 @@ impl HugeTlb {
         let page_size: String = hugetlb
             .page_size()
             .chars()
-            .take_while(|c| c.is_digit(10))
+            .take_while(|c| c.is_ascii_digit())
             .collect();
         let page_size: u64 = page_size.parse()?;
         if !Self::is_power_of_two(page_size) {
@@ -135,7 +135,7 @@ mod tests {
             let page_size: String = hugetlb
             .page_size()
             .chars()
-            .take_while(|c| c.is_digit(10))
+            .take_while(|c| c.is_ascii_digit())
             .collect();
             let page_size: u64 = page_size.parse().expect("parse page size");
 
