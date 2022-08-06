@@ -11,6 +11,7 @@ use procfs::process::Namespace;
 use std::{
     collections::HashMap,
     convert::TryFrom,
+    ffi::{OsStr, OsString},
     fs,
     os::unix::prelude::RawFd,
     path::{Path, PathBuf},
@@ -321,11 +322,14 @@ impl<'a> TenantContainerBuilder<'a> {
         Ok(None)
     }
 
-    fn get_namespaces(&self, init_namespaces: Vec<Namespace>) -> Result<Vec<LinuxNamespace>> {
+    fn get_namespaces(
+        &self,
+        init_namespaces: HashMap<OsString, Namespace>,
+    ) -> Result<Vec<LinuxNamespace>> {
         let mut tenant_namespaces = Vec::with_capacity(init_namespaces.len());
 
         for &ns_type in NAMESPACE_TYPES {
-            if let Some(init_ns) = init_namespaces.iter().find(|n| n.ns_type == ns_type) {
+            if let Some(init_ns) = init_namespaces.get(OsStr::new(ns_type)) {
                 let tenant_ns = LinuxNamespaceType::try_from(ns_type)?;
                 tenant_namespaces.push(
                     LinuxNamespaceBuilder::default()
