@@ -21,7 +21,7 @@ cgroupsv2_devices = ["rbpf", "libbpf-sys", "errno", "libc"]
 
 [dependencies]
 nix = "0.24.2"
-procfs = "0.13.2"
+procfs = "0.14.0"
 log = "0.4"
 anyhow = "1.0"
 oci-spec = { version = "0.5.7", features = ["runtime"] }

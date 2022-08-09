@@ -98,7 +98,7 @@ mod tests {
     fn setup(testname: &str) -> Result<(TempDir, PathBuf, PathBuf)> {
         let testdir = create_temp_dir(testname)?;
         let rundir_path = Path::join(&testdir, "run");
-        let _ = fs::create_dir(&rundir_path)?;
+        fs::create_dir(&rundir_path)?;
         let socket_path = Path::new(&rundir_path).join("socket");
         let _ = File::create(&socket_path);
         env::set_current_dir(&testdir)?;
