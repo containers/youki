@@ -8,7 +8,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: sudo apt-get -y update
-      - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev libseccomp-dev libgpgme-dev
+      - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev libseccomp-dev libgpgme-dev bats
       - run: make build 
       - run: sudo cp youki /usr/local/bin
       - name: Clone podman repository
@@ -22,8 +22,6 @@ jobs:
         run: make binaries 
       - name: Install tools
         run: make install.tools
-      - name: Install bats
-        run: sudo ./hack/install_bats.sh
       - name: Run podman test
         run: sudo OCI_RUNTIME=/usr/local/bin/youki ./hack/bats 2>&1 | tee build.log 
       - name: Adding Summary
