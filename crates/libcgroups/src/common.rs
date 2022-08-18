@@ -420,7 +420,7 @@ pub(crate) fn delete_with_retry<P: AsRef<Path>, L: Into<Option<Duration>>>(
         }
 
         std::thread::sleep(delay);
-        attempts += attempts;
+        attempts += 1;
         delay *= attempts;
         if delay > limit {
             delay = limit;
