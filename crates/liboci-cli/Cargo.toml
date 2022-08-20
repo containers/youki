@@ -11,6 +11,6 @@ edition = "2021"
 keywords = ["youki", "container", "oci"]
 
 [dependencies.clap]
-version = "3.2.16"
+version = "3.2.17"
 default-features = false
 features = ["std", "suggestions", "derive", "cargo"]
