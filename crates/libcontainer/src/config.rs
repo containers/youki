@@ -14,7 +14,7 @@ const YOUKI_CONFIG_NAME: &str = "youki_config.json";
 
 /// A configuration for passing information obtained during container creation to other commands.
 /// Keeping the information to a minimum improves performance.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct YoukiConfig {
     pub hooks: Option<Hooks>,
