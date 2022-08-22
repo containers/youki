@@ -30,13 +30,13 @@ mio = { version = "0.8.4", features = ["os-ext", "os-poll"] }
 nix = "0.24.2"
 oci-spec = { version = "0.5.7", features = ["runtime"] }
 path-clean = "0.1.0"
-procfs = "0.14.0"
+procfs = "0.14.1"
 prctl = "1.0.0"
 libcgroups = { version = "0.0.3", path = "../libcgroups" }
 libseccomp = { version = "0.2.3" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-syscalls = "0.6.5"
+syscalls = "0.6.6"
 rust-criu = "0.2.0"
 wasmer = { version = "2.2.0", optional = true }
 wasmer-wasi = { version = "2.3.0", optional = true }
