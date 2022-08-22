@@ -8,13 +8,13 @@ pub struct ContainerCreate {
     container_id: String,
 }
 
-impl<'a> Default for ContainerCreate {
+impl Default for ContainerCreate {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'a> ContainerCreate {
+impl ContainerCreate {
     pub fn new() -> Self {
         let id = generate_uuid();
         let temp_dir = prepare_bundle(&id).unwrap();
