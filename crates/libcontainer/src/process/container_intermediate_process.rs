@@ -1,7 +1,7 @@
 use crate::{namespaces::Namespaces, process::channel, process::fork};
 use anyhow::{Context, Error, Result};
 use libcgroups::common::CgroupManager;
-use nix::sys::wait::{waitpid,  WaitStatus};
+use nix::sys::wait::{waitpid, WaitStatus};
 use nix::unistd::{Gid, Pid, Uid};
 use oci_spec::runtime::{LinuxNamespaceType, LinuxResources};
 use procfs::process::Process;
@@ -15,6 +15,7 @@ pub fn container_intermediate_process(
     intermediate_chan: &mut (channel::IntermediateSender, channel::IntermediateReceiver),
     init_chan: &mut (channel::InitSender, channel::InitReceiver),
     main_sender: &mut channel::MainSender,
+    wait: bool,
 ) -> Result<WaitStatus> {
     let (inter_sender, inter_receiver) = intermediate_chan;
     let (init_sender, init_receiver) = init_chan;
@@ -117,7 +118,13 @@ pub fn container_intermediate_process(
         .close()
         .context("failed to close unused init sender")?;
 
-    Ok(waitpid(pid, None)?)
+    if wait {
+        Ok(waitpid(pid, None)?)
+    } else {
+        // we don't actually want to wait, so
+        // pid and status doesn't really matter
+        Ok(WaitStatus::Exited(Pid::from_raw(0), 0))
+    }
 }
 
 fn apply_cgroups<C: CgroupManager + ?Sized>(

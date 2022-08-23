@@ -10,12 +10,12 @@ use nix::{
         socket::{self, UnixAddr},
         wait::WaitStatus,
     },
-    unistd::{self,Pid},
+    unistd::{self, Pid},
 };
 use oci_spec::runtime;
 use std::{io::IoSlice, path::Path};
 
-pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, Pid)> {
+pub fn container_main_process(container_args: &ContainerArgs, wait: bool) -> Result<(Pid, Pid)> {
     // We use a set of channels to communicate between parent and child process.
     // Each channel is uni-directional. Because we will pass these channel to
     // forked process, we have to be deligent about closing any unused channel.
@@ -31,6 +31,7 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, Pi
             inter_chan,
             init_chan,
             main_sender,
+            wait,
         )?;
         match t {
             WaitStatus::Exited(_, s) => Ok(s),
