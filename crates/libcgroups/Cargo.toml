@@ -20,7 +20,7 @@ systemd = ["v2", "dbus"]
 cgroupsv2_devices = ["rbpf", "libbpf-sys", "errno", "libc"]
 
 [dependencies]
-nix = "0.24.2"
+nix = "0.25.0"
 procfs = "0.14.1"
 log = "0.4"
 anyhow = "1.0"
