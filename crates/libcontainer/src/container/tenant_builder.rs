@@ -129,7 +129,6 @@ impl<'a> TenantContainerBuilder<'a> {
             notify_path: notify_path.clone(),
             container: None,
             preserve_fds: self.base.preserve_fds,
-            is_exec_builder: true,
         };
 
         let pid = builder_impl.create()?;

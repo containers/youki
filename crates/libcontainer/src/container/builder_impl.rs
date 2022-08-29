@@ -38,8 +38,6 @@ pub(super) struct ContainerBuilderImpl<'a> {
     pub container: Option<Container>,
     /// File descriptos preserved/passed to the container init process.
     pub preserve_fds: i32,
-    /// Denotes if the builder is for the exec call or not
-    pub is_exec_builder: bool,
 }
 
 impl<'a> ContainerBuilderImpl<'a> {
@@ -124,10 +122,8 @@ impl<'a> ContainerBuilderImpl<'a> {
             cgroup_manager: cmanager,
         };
 
-        let (intermediate, init_pid) = process::container_main_process::container_main_process(
-            &container_args,
-            self.is_exec_builder,
-        )?;
+        let (intermediate, init_pid) =
+            process::container_main_process::container_main_process(&container_args, !self.init)?;
 
         // if file to write the pid to is specified, write pid of the child
         if let Some(pid_file) = &self.pid_file {
