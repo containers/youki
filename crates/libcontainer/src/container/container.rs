@@ -42,7 +42,8 @@ impl Container {
         container_root: &Path,
     ) -> Result<Self> {
         let container_root = fs::canonicalize(container_root)?;
-        let state = State::new(container_id, status, pid, bundle.to_path_buf());
+
+        let state = State::new(container_id, status, pid, fs::canonicalize(bundle)?);
         Ok(Self {
             state,
             root: container_root,
@@ -238,7 +239,10 @@ mod tests {
         // testing id
         assert_eq!(container.id(), "container_id");
         // testing bundle path
-        assert_eq!(container.bundle(), &PathBuf::from("."));
+        assert_eq!(
+            container.bundle(),
+            &fs::canonicalize(PathBuf::from(".")).unwrap()
+        );
         // testing root path
         assert_eq!(container.root, fs::canonicalize(PathBuf::from("."))?);
         // testing created
