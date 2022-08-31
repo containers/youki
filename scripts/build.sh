@@ -14,8 +14,8 @@ TARGET=x86_64-unknown-linux-gnu
 RUNTIMETEST_TARGET="$ROOT/runtimetest-target"
 while getopts f:ro:h OPT; do
     case $OPT in
-	f) features=${OPTARG}
-	    ;;
+        f) features=${OPTARG}
+            ;;
         o) output=${OPTARG}
             ;;
         r) VERSION=release
