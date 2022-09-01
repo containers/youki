@@ -150,12 +150,12 @@ youki is named after the Japanese word 'youki', which means 'a container'. In Ja
 </li>
 <li>
 <p>youki has the potential to be faster and use less memory than runc, and therefore work in environments with tight memory usage requirements. Here is a simple benchmark of a container from creation to deletion.</p>
-<table><thead><tr><th style="text-align: center">Runtime</th><th style="text-align: center">Time (mean ± σ)</th><th style="text-align: center">Range (min … max)</th></tr></thead><tbody>
+<div class="table-wrapper"><table><thead><tr><th style="text-align: center">Runtime</th><th style="text-align: center">Time (mean ± σ)</th><th style="text-align: center">Range (min … max)</th></tr></thead><tbody>
 <tr><td style="text-align: center">youki</td><td style="text-align: center">198.4 ms ± 52.1 ms</td><td style="text-align: center">97.2 ms … 296.1 ms</td></tr>
 <tr><td style="text-align: center">runc</td><td style="text-align: center">352.3 ms ± 53.3 ms</td><td style="text-align: center">248.3 ms … 772.2 ms</td></tr>
 <tr><td style="text-align: center">crun</td><td style="text-align: center">153.5 ms ± 21.6 ms</td><td style="text-align: center">80.9 ms … 196.6 ms</td></tr>
 </tbody></table>
-<details>
+</div><details>
 <summary>Details about the benchmark</summary>
 <ul>
 <li>A command used for the benchmark
