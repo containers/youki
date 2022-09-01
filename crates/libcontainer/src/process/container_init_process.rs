@@ -15,10 +15,7 @@ use nix::unistd::setsid;
 use nix::unistd::{self, Gid, Uid};
 use oci_spec::runtime::{LinuxNamespaceType, Spec, User};
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::Write;
 use std::os::unix::io::AsRawFd;
-use std::os::unix::prelude::FromRawFd;
 use std::{
     env, fs,
     path::{Path, PathBuf},
@@ -162,7 +159,6 @@ pub fn container_init_process(
     args: &ContainerArgs,
     main_sender: &mut channel::MainSender,
     init_receiver: &mut channel::InitReceiver,
-    fifo_fd: i32,
 ) -> Result<()> {
     let syscall = args.syscall;
     let spec = args.spec;
@@ -417,12 +413,7 @@ pub fn container_init_process(
 
     if proc.args().is_some() {
         ExecutorManager::exec(spec)?;
-        if fifo_fd != 0 {
-            let f = &mut unsafe { File::from_raw_fd(fifo_fd) };
-            // TODO: impl
-            write!(f, "1")?;
-        }
-        Ok(())
+        unreachable!("process image should have been replaced after exec");
     } else {
         bail!("on non-Windows, at least one process arg entry is required")
     }

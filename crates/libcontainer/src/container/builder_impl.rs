@@ -122,7 +122,8 @@ impl<'a> ContainerBuilderImpl<'a> {
             cgroup_manager: cmanager,
         };
 
-        let init_pid = process::container_main_process::container_main_process(&container_args)?;
+        let (intermediate, init_pid) =
+            process::container_main_process::container_main_process(&container_args)?;
 
         // if file to write the pid to is specified, write pid of the child
         if let Some(pid_file) = &self.pid_file {
@@ -139,7 +140,7 @@ impl<'a> ContainerBuilderImpl<'a> {
                 .context("Failed to save container state")?;
         }
 
-        Ok(init_pid)
+        Ok(intermediate)
     }
 
     fn cleanup_container(&self) -> Result<()> {
