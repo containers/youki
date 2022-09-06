@@ -9,6 +9,9 @@ use nix::unistd::Pid;
 // correctly send to the new process, especially Rust borrow checker will be a
 // lot of hassel to deal with every details.
 pub fn container_fork<F: FnOnce() -> Result<i32>>(cb: F) -> Result<Pid> {
+    // here we return the child's pid in case of parent, the i32 in return signature,
+    // and for child, we run the callback function, and exit with the same exit code
+    // given by it. If there was any error when trying to run callback, exit with -1
     match unsafe { unistd::fork()? } {
         unistd::ForkResult::Parent { child } => Ok(child),
         unistd::ForkResult::Child => {
@@ -17,7 +20,7 @@ pub fn container_fork<F: FnOnce() -> Result<i32>>(cb: F) -> Result<Pid> {
                     log::debug!("failed to run fork: {:?}", error);
                     -1
                 }
-                Ok(ec) => ec,
+                Ok(exit_code) => exit_code,
             };
             std::process::exit(ret);
         }

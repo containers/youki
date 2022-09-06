@@ -26,14 +26,13 @@ pub fn container_main_process(container_args: &ContainerArgs, wait: bool) -> Res
     let init_chan = &mut channel::init_channel()?;
 
     let intermediate_pid = fork::container_fork(|| {
-        let t = container_intermediate_process::container_intermediate_process(
+        match container_intermediate_process::container_intermediate_process(
             container_args,
             inter_chan,
             init_chan,
             main_sender,
             wait,
-        )?;
-        match t {
+        )? {
             WaitStatus::Exited(_, s) => Ok(s),
             WaitStatus::Signaled(_, sig, _) => Ok(sig as i32),
             _ => Ok(0),
@@ -99,6 +98,12 @@ pub fn container_main_process(container_args: &ContainerArgs, wait: bool) -> Res
 
     log::debug!("init pid is {:?}", init_pid);
 
+    // here we send both intermediate and init pid, because :
+    // init pid is required for writing it to pid_file (if) given by the high-level runtime
+    // intermediate pid is required in the case when we call exec, as we nned to wait for the
+    // intermediate process to exit, which itself waits for child process (the exec process) to exit
+    // in order to get the proper exit code. We cannot simply wait for the init_pid , that is the actual container
+    // process, as it is not (direect) child of our process
     Ok((intermediate_pid, init_pid))
 }
 
