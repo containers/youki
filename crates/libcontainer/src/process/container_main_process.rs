@@ -8,7 +8,7 @@ use anyhow::{Context, Result};
 use nix::{
     sys::{
         socket::{self, UnixAddr},
-        wait::WaitStatus,
+        wait::{waitpid, WaitStatus},
     },
     unistd::{self, Pid},
 };
@@ -26,16 +26,21 @@ pub fn container_main_process(container_args: &ContainerArgs, wait: bool) -> Res
     let init_chan = &mut channel::init_channel()?;
 
     let intermediate_pid = fork::container_fork(|| {
-        match container_intermediate_process::container_intermediate_process(
+        let container_pid = container_intermediate_process::container_intermediate_process(
             container_args,
             inter_chan,
             init_chan,
             main_sender,
-            wait,
-        )? {
-            WaitStatus::Exited(_, s) => Ok(s),
-            WaitStatus::Signaled(_, sig, _) => Ok(sig as i32),
-            _ => Ok(0),
+        )?;
+
+        if wait {
+            match waitpid(container_pid, None)? {
+                WaitStatus::Exited(_, s) => Ok(s),
+                WaitStatus::Signaled(_, sig, _) => Ok(sig as i32),
+                _ => Ok(0),
+            }
+        } else {
+            Ok(0)
         }
     })?;
     // Close down unused fds. The corresponding fds are duplicated to the
