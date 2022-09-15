@@ -17,7 +17,7 @@ default-features = false
 features = ["std", "suggestions", "derive", "cargo"]
 
 [dependencies]
-anyhow = "1.0.60"
+anyhow = "1.0.65"
 chrono = { version="0.4", features = ["serde"] }
 libcgroups = { version = "0.0.3", path = "../libcgroups" }
 libcontainer = { version = "0.0.3", path = "../libcontainer" }
@@ -37,5 +37,5 @@ clap_complete = "3.2.4"
 serial_test = "0.9.0"
 
 [build-dependencies]
-anyhow = "1.0.60"
+anyhow = "1.0.65"
 vergen = "7.2.1"
