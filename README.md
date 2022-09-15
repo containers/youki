@@ -114,13 +114,13 @@ youki is not at the practical stage yet. However, it is getting closer to practi
 |      Namespaces       |         Isolation of various resources          |                                                 ✅                                                  |
 |     Capabilities      |            Limiting root privileges             |                                                 ✅                                                  |
 |      Cgroups v1       |            Resource limitations, etc            |                                                 ✅                                                  |
-|      Cgroups v2       |             Improved version of v1              | Support is complete except for devices. WIP on [#78](https://github.com/containers/youki/issues/78) |
+|      Cgroups v2       |             Improved version of v1              | Support is complete except for devices. WIP on [#230](https://github.com/containers/youki/issues/230) |
 | Systemd cgroup driver |        Setting up a cgroup using systemd        |                                                 ✅                                                  |
 |        Seccomp        |             Filtering system calls              |                                                 ✅                                                  |
 |         Hooks         | Add custom processing during container creation |                                                 ✅                                                  |
 |       Rootless        |   Running a container without root privileges   |                                                 ✅                                                  |
 |    OCI Compliance     |        Compliance with OCI Runtime Spec         |                                 ✅ 50 out of 50 test cases passing                                  |
-|   CRIU Integration    | Functionality to checkpoint/restore containers  |                           Initial checkpoint support as described in #641                           |
+|   CRIU Integration    | Functionality to checkpoint/restore containers  |                           Initial checkpoint support as described in [#641](https://github.com/containers/youki/pull/641)                           |
 
 # Design and implementation of youki
 
