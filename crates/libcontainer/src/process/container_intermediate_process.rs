@@ -116,7 +116,7 @@ pub fn container_intermediate_process(
         .close()
         .context("failed to close unused init sender")?;
 
-    return Ok(pid);
+    Ok(pid)
 }
 
 fn apply_cgroups<C: CgroupManager + ?Sized>(
