@@ -412,7 +412,8 @@ pub fn container_init_process(
     }
 
     if proc.args().is_some() {
-        ExecutorManager::exec(spec)
+        ExecutorManager::exec(spec)?;
+        unreachable!("process image should have been replaced after exec");
     } else {
         bail!("on non-Windows, at least one process arg entry is required")
     }

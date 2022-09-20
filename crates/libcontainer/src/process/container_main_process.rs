@@ -6,13 +6,16 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use nix::{
-    sys::socket::{self, UnixAddr},
+    sys::{
+        socket::{self, UnixAddr},
+        wait::{waitpid, WaitStatus},
+    },
     unistd::{self, Pid},
 };
 use oci_spec::runtime;
 use std::{io::IoSlice, path::Path};
 
-pub fn container_main_process(container_args: &ContainerArgs) -> Result<Pid> {
+pub fn container_main_process(container_args: &ContainerArgs, wait: bool) -> Result<(Pid, Pid)> {
     // We use a set of channels to communicate between parent and child process.
     // Each channel is uni-directional. Because we will pass these channel to
     // forked process, we have to be deligent about closing any unused channel.
@@ -23,12 +26,22 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<Pid> {
     let init_chan = &mut channel::init_channel()?;
 
     let intermediate_pid = fork::container_fork(|| {
-        container_intermediate_process::container_intermediate_process(
+        let container_pid = container_intermediate_process::container_intermediate_process(
             container_args,
             inter_chan,
             init_chan,
             main_sender,
-        )
+        )?;
+
+        if wait {
+            match waitpid(container_pid, None)? {
+                WaitStatus::Exited(_, s) => Ok(s),
+                WaitStatus::Signaled(_, sig, _) => Ok(sig as i32),
+                _ => Ok(0),
+            }
+        } else {
+            Ok(0)
+        }
     })?;
     // Close down unused fds. The corresponding fds are duplicated to the
     // child process during fork.
@@ -90,7 +103,13 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<Pid> {
 
     log::debug!("init pid is {:?}", init_pid);
 
-    Ok(init_pid)
+    // here we send both intermediate and init pid, because :
+    // init pid is required for writing it to pid_file (if) given by the high-level runtime
+    // intermediate pid is required in the case when we call exec, as we nned to wait for the
+    // intermediate process to exit, which itself waits for child process (the exec process) to exit
+    // in order to get the proper exit code. We cannot simply wait for the init_pid , that is the actual container
+    // process, as it is not (direect) child of our process
+    Ok((intermediate_pid, init_pid))
 }
 
 fn sync_seccomp(
