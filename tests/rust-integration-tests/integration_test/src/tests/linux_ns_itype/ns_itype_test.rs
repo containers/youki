@@ -29,7 +29,7 @@ fn get_spec() -> Spec {
     r
 }
 
-fn get_test<'a>(test_name: &'static str) -> Test<'a> {
+fn get_test(test_name: &'static str) -> Test {
     Test::new(
         test_name,
         Box::new(move || {
@@ -65,7 +65,7 @@ fn get_test<'a>(test_name: &'static str) -> Test<'a> {
     )
 }
 
-pub fn get_ns_itype_tests<'a>() -> TestGroup<'a> {
+pub fn get_ns_itype_tests() -> TestGroup {
     let mut tg = TestGroup::new("ns_itype");
     let tests: Vec<_> = vec![Box::new(get_test("ns_itype"))];
     tg.add(tests);

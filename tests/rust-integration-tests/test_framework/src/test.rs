@@ -5,22 +5,22 @@ use crate::testable::{TestResult, Testable};
 type TestFn = dyn Sync + Send + Fn() -> TestResult;
 
 /// Basic Template structure for a test
-pub struct Test<'a> {
+pub struct Test {
     /// name of the test
-    name: &'a str,
+    name: &'static str,
     /// Actual test function
     test_fn: Box<TestFn>,
 }
 
-impl<'a> Test<'a> {
+impl Test {
     /// create new test
-    pub fn new(name: &'a str, test_fn: Box<TestFn>) -> Self {
+    pub fn new(name: &'static str, test_fn: Box<TestFn>) -> Self {
         Test { name, test_fn }
     }
 }
 
-impl<'a> Testable<'a> for Test<'a> {
-    fn get_name(&self) -> &'a str {
+impl Testable for Test {
+    fn get_name(&self) -> &'static str {
         self.name
     }
 

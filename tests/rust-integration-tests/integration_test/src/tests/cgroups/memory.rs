@@ -67,7 +67,7 @@ fn can_run() -> bool {
     Path::new(CGROUP_MEMORY_LIMIT).exists() && Path::new(CGROUP_MEMORY_SWAPPINESS).exists()
 }
 
-pub fn get_test_group<'a>() -> TestGroup<'a> {
+pub fn get_test_group() -> TestGroup {
     let mut test_group = TestGroup::new("cgroup_v1_memory");
     let linux_cgroups_memory = ConditionalTest::new(
         "test_linux_cgroups_memory",

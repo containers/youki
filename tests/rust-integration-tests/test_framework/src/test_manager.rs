@@ -4,21 +4,21 @@ use anyhow::Result;
 use crossbeam::thread;
 use std::collections::BTreeMap;
 
-type TestableGroupType<'a> = dyn TestableGroup<'a> + Sync + Send + 'a;
+type TestableGroupType = dyn TestableGroup + Sync + Send;
 
 /// This manages all test groups, and thus the tests
-pub struct TestManager<'a> {
-    test_groups: BTreeMap<&'a str, &'a TestableGroupType<'a>>,
+pub struct TestManager {
+    test_groups: BTreeMap<&'static str, Box<TestableGroupType>>,
     cleanup: Vec<Box<dyn Fn() -> Result<()>>>,
 }
 
-impl<'a> Default for TestManager<'a> {
+impl Default for TestManager {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'a> TestManager<'a> {
+impl TestManager {
     /// Create new TestManager
     pub fn new() -> Self {
         TestManager {
@@ -28,7 +28,7 @@ impl<'a> TestManager<'a> {
     }
 
     /// add a test group to the test manager
-    pub fn add_test_group(&mut self, tg: &'a TestableGroupType<'a>) {
+    pub fn add_test_group(&mut self, tg: Box<TestableGroupType>) {
         self.test_groups.insert(tg.get_name(), tg);
     }
 
@@ -38,7 +38,7 @@ impl<'a> TestManager<'a> {
 
     /// Prints the given test results, usually used to print
     /// results of a test group
-    fn print_test_result(&self, name: &str, res: &[(&'a str, TestResult)]) {
+    fn print_test_result(&self, name: &str, res: &[(&'static str, TestResult)]) {
         println!("# Start group {}", name);
         let len = res.len();
         for (idx, (name, res)) in res.iter().enumerate() {

@@ -104,7 +104,7 @@ fn test_seccomp_notify() -> Result<()> {
     Ok(())
 }
 
-pub fn get_seccomp_notify_test<'a>() -> TestGroup<'a> {
+pub fn get_seccomp_notify_test() -> TestGroup {
     let seccomp_notify_test = Test::new(
         "seccomp_notify",
         Box::new(|| {

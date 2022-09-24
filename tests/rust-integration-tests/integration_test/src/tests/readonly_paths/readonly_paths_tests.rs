@@ -236,7 +236,7 @@ fn check_readonly_device_nodes() -> TestResult {
     TestResult::Passed
 }
 
-pub fn get_ro_paths_test<'a>() -> TestGroup<'a> {
+pub fn get_ro_paths_test() -> TestGroup {
     let ro_paths = Test::new("readonly_paths", Box::new(check_readonly_paths));
     let ro_rel_paths = Test::new("readonly_rel_paths", Box::new(check_readonly_rel_path));
     let ro_symlinks = Test::new("readonly_symlinks", Box::new(check_readonly_symlinks));

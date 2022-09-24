@@ -94,7 +94,7 @@ fn test_pidfile() -> TestResult {
     TestResult::Passed
 }
 
-pub fn get_pidfile_test<'a>() -> TestGroup<'a> {
+pub fn get_pidfile_test() -> TestGroup {
     let pidfile = Test::new("pidfile", Box::new(test_pidfile));
     let mut tg = TestGroup::new("pidfile");
     tg.add(vec![Box::new(pidfile)]);
