@@ -8,7 +8,7 @@ use std::{any::Any, mem, path::Path, ptr};
 
 use anyhow::{anyhow, bail, Context, Result};
 use caps::{CapSet, CapsHashSet};
-use libc::{c_char, uid_t};
+use libc::{c_char, uid_t, setdomainname, EFAULT, EINVAL, EPERM};
 use nix::fcntl;
 use nix::{
     errno::Errno,
@@ -195,6 +195,25 @@ impl Syscall for LinuxSyscall {
         if let Err(e) = sethostname(hostname) {
             bail!("Failed to set {} as hostname. {:?}", hostname, e)
         }
+        Ok(())
+    }
+
+    /// Sets domainname for process (see
+    /// [setdomainname(2)](https://man7.org/linux/man-pages/man2/setdomainname.2.html)).
+    fn set_domainname(&self, domainname: &str) -> Result<()> {
+        let ptr = domainname.as_bytes().as_ptr() as *const c_char;
+        let len = domainname.len();
+        let res = unsafe { setdomainname(ptr, len) };
+        if res == EFAULT {
+            bail!("Failed to set {} as domainname. domainname pointed outside of user address space.", domainname)
+        }
+        if res == EINVAL {
+            bail!("Failed to set {} as domainname. domainname len was negative or too large.", domainname)
+        }
+        if res == EPERM {
+            bail!("Failed to set {} as domainname. the caller did not have the CAP_SYS_ADMIN capability.", domainname)
+        }
+
         Ok(())
     }
 

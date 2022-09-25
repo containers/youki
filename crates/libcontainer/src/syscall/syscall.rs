@@ -28,6 +28,7 @@ pub trait Syscall {
     fn unshare(&self, flags: CloneFlags) -> Result<()>;
     fn set_capability(&self, cset: CapSet, value: &CapsHashSet) -> Result<()>;
     fn set_hostname(&self, hostname: &str) -> Result<()>;
+    fn set_domainname(&self, domainname: &str) -> Result<()>;
     fn set_rlimit(&self, rlimit: &LinuxRlimit) -> Result<()>;
     fn get_pwuid(&self, uid: u32) -> Option<Arc<OsStr>>;
     fn mount(

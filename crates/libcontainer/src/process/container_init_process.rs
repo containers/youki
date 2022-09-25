@@ -129,6 +129,10 @@ fn apply_rest_namespaces(
             if let Some(hostname) = spec.hostname() {
                 syscall.set_hostname(hostname)?;
             }
+
+            if let Some(domainname) = spec.domainname() {
+                syscall.set_domainname(domainname)?;
+            }
         }
     }
     Ok(())

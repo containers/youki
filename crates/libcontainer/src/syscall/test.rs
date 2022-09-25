@@ -59,6 +59,7 @@ pub enum ArgName {
     Mknod,
     Chown,
     Hostname,
+    Domainname,
     Groups,
     Capability,
 }
@@ -73,6 +74,7 @@ impl ArgName {
             ArgName::Mknod,
             ArgName::Chown,
             ArgName::Hostname,
+            ArgName::Domainname,
             ArgName::Groups,
             ArgName::Capability,
         ]
@@ -161,6 +163,11 @@ impl Syscall for TestHelperSyscall {
     fn set_hostname(&self, hostname: &str) -> anyhow::Result<()> {
         self.mocks
             .act(ArgName::Hostname, Box::new(hostname.to_owned()))
+    }
+
+    fn set_domainname(&self, domainname: &str) -> anyhow::Result<()> {
+        self.mocks
+            .act(ArgName::Domainname, Box::new(domainname.to_owned()))
     }
 
     fn set_rlimit(&self, _rlimit: &LinuxRlimit) -> anyhow::Result<()> {
@@ -309,6 +316,15 @@ impl TestHelperSyscall {
     pub fn get_hostname_args(&self) -> Vec<String> {
         self.mocks
             .fetch(ArgName::Hostname)
+            .values
+            .iter()
+            .map(|x| x.downcast_ref::<String>().unwrap().clone())
+            .collect::<Vec<String>>()
+    }
+
+    pub fn get_domainname_args(&self) -> Vec<String> {
+        self.mocks
+            .fetch(ArgName::Domainname)
             .values
             .iter()
             .map(|x| x.downcast_ref::<String>().unwrap().clone())
