@@ -580,6 +580,14 @@ mod tests {
             .get_hostname_args();
         assert_eq!(1, got_hostnames.len());
         assert_eq!("youki".to_string(), got_hostnames[0]);
+
+        let got_domainnames = syscall
+            .as_ref()
+            .as_any()
+            .downcast_ref::<TestHelperSyscall>()
+            .unwrap()
+            .get_domainname_args();
+        assert_eq!(0, got_domainnames.len());
         Ok(())
     }
 
