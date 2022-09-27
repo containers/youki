@@ -8,7 +8,7 @@ use std::{any::Any, mem, path::Path, ptr};
 
 use anyhow::{anyhow, bail, Context, Result};
 use caps::{CapSet, CapsHashSet};
-use libc::{c_char, uid_t};
+use libc::{c_char, setdomainname, uid_t};
 use nix::fcntl;
 use nix::{
     errno::Errno,
@@ -196,6 +196,27 @@ impl Syscall for LinuxSyscall {
             bail!("Failed to set {} as hostname. {:?}", hostname, e)
         }
         Ok(())
+    }
+
+    /// Sets domainname for process (see
+    /// [setdomainname(2)](https://man7.org/linux/man-pages/man2/setdomainname.2.html)).
+    fn set_domainname(&self, domainname: &str) -> Result<()> {
+        let ptr = domainname.as_bytes().as_ptr() as *const c_char;
+        let len = domainname.len();
+        let res = unsafe { setdomainname(ptr, len) };
+
+        match res {
+            0 => Ok(()),
+            -1 => bail!(
+                "Failed to set {} as domainname. {}",
+                domainname,
+                std::io::Error::last_os_error()
+            ),
+            _ => bail!(
+                "Failed to set {} as domainname. unexpected error occor.",
+                domainname
+            ),
+        }
     }
 
     /// Sets resource limit for process
