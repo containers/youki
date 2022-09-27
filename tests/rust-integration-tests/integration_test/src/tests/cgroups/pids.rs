@@ -150,7 +150,7 @@ fn can_run() -> bool {
     Path::new("/sys/fs/cgroup/pids").exists()
 }
 
-pub fn get_test_group<'a>() -> TestGroup<'a> {
+pub fn get_test_group() -> TestGroup {
     let mut test_group = TestGroup::new("cgroup_v1_pids");
     let positive_limit = ConditionalTest::new(
         "positive_pid_limit",

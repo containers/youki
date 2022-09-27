@@ -89,25 +89,25 @@ fn main() -> Result<()> {
     let seccomp_notify = get_seccomp_notify_test();
     let ro_paths = get_ro_paths_test();
 
-    tm.add_test_group(&cl);
-    tm.add_test_group(&cc);
-    tm.add_test_group(&huge_tlb);
-    tm.add_test_group(&pidfile);
-    tm.add_test_group(&ns_itype);
-    tm.add_test_group(&hooks);
-    tm.add_test_group(&cgroup_v1_pids);
-    tm.add_test_group(&cgroup_v1_cpu);
-    tm.add_test_group(&cgroup_v2_cpu);
-    tm.add_test_group(&cgroup_v1_memory);
-    tm.add_test_group(&cgroup_v1_network);
-    tm.add_test_group(&cgroup_v1_blkio);
-    tm.add_test_group(&seccomp_notify);
-    tm.add_test_group(&ro_paths);
+    tm.add_test_group(Box::new(cl));
+    tm.add_test_group(Box::new(cc));
+    tm.add_test_group(Box::new(huge_tlb));
+    tm.add_test_group(Box::new(pidfile));
+    tm.add_test_group(Box::new(ns_itype));
+    tm.add_test_group(Box::new(hooks));
+    tm.add_test_group(Box::new(cgroup_v1_pids));
+    tm.add_test_group(Box::new(cgroup_v1_cpu));
+    tm.add_test_group(Box::new(cgroup_v2_cpu));
+    tm.add_test_group(Box::new(cgroup_v1_memory));
+    tm.add_test_group(Box::new(cgroup_v1_network));
+    tm.add_test_group(Box::new(cgroup_v1_blkio));
+    tm.add_test_group(Box::new(seccomp_notify));
+    tm.add_test_group(Box::new(ro_paths));
 
     tm.add_cleanup(Box::new(cgroups::cleanup_v1));
     tm.add_cleanup(Box::new(cgroups::cleanup_v2));
 
-    match &opts.command {
+    match opts.command {
         SubCommand::Run(args) => run(args, &tm).context("run tests")?,
         SubCommand::List => list(&tm).context("list tests")?,
     }
@@ -130,15 +130,15 @@ fn get_abs_path(rel_path: &Path) -> PathBuf {
     }
 }
 
-fn run(opts: &Run, test_manager: &TestManager) -> Result<()> {
+fn run(opts: Run, test_manager: &TestManager) -> Result<()> {
     let runtime_path = get_abs_path(&opts.runtime);
     set_runtime_path(&runtime_path);
 
     let runtimetest_path = get_abs_path(&opts.runtimetest);
     set_runtimetest_path(&runtimetest_path);
 
-    if let Some(tests) = &opts.tests {
-        let tests_to_run = parse_tests(tests);
+    if let Some(tests) = opts.tests {
+        let tests_to_run = parse_tests(&tests);
         test_manager.run_selected(tests_to_run);
     } else {
         test_manager.run_all();

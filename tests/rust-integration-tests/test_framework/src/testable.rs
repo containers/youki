@@ -27,8 +27,8 @@ impl<T> From<Result<T>> for TestResult {
 /// This trait indicates that something can be run as a test, or is 'testable'
 /// This forms the basis of the framework, as all places where tests are done,
 /// expect structs which implement this
-pub trait Testable<'a> {
-    fn get_name(&self) -> &'a str;
+pub trait Testable {
+    fn get_name(&self) -> &'static str;
     fn can_run(&self) -> bool {
         true
     }
@@ -37,10 +37,10 @@ pub trait Testable<'a> {
 
 /// This trait indicates that something forms a group of tests.
 /// Test groups are used to group tests in sensible manner as well as provide namespacing to tests
-pub trait TestableGroup<'a> {
-    fn get_name(&self) -> &'a str;
-    fn run_all(&'a self) -> Vec<(&'a str, TestResult)>;
-    fn run_selected(&'a self, selected: &[&str]) -> Vec<(&'a str, TestResult)>;
+pub trait TestableGroup {
+    fn get_name(&self) -> &'static str;
+    fn run_all(&self) -> Vec<(&'static str, TestResult)>;
+    fn run_selected(&self, selected: &[&str]) -> Vec<(&'static str, TestResult)>;
 }
 
 #[macro_export]

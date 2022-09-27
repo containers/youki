@@ -292,7 +292,7 @@ fn can_run_idle() -> bool {
     can_run() && idle_path.exists()
 }
 
-pub fn get_test_group<'a>() -> TestGroup<'a> {
+pub fn get_test_group() -> TestGroup {
     let mut test_group = TestGroup::new("cgroup_v1_cpu");
     let linux_cgroups_cpus = ConditionalTest::new(
         "test_linux_cgroups_cpus",

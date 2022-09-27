@@ -596,7 +596,7 @@ fn test_blkio(test_name: &str, rate: u64, empty: bool) -> TestResult {
     })
 }
 
-pub fn get_test_group<'a>() -> TestGroup<'a> {
+pub fn get_test_group() -> TestGroup {
     let mut test_group = TestGroup::new("cgroup_v1_blkio");
     let non_empty_100kb = ConditionalTest::new(
         "non_empty_100kb",

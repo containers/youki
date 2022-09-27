@@ -63,12 +63,12 @@ impl ContainerCreate {
     }
 }
 
-impl<'a> TestableGroup<'a> for ContainerCreate {
-    fn get_name(&self) -> &'a str {
+impl TestableGroup for ContainerCreate {
+    fn get_name(&self) -> &'static str {
         "create"
     }
 
-    fn run_all(&self) -> Vec<(&'a str, TestResult)> {
+    fn run_all(&self) -> Vec<(&'static str, TestResult)> {
         vec![
             ("empty_id", self.create_empty_id()),
             ("valid_id", self.create_valid_id()),
@@ -76,7 +76,7 @@ impl<'a> TestableGroup<'a> for ContainerCreate {
         ]
     }
 
-    fn run_selected(&self, selected: &[&str]) -> Vec<(&'a str, TestResult)> {
+    fn run_selected(&self, selected: &[&str]) -> Vec<(&'static str, TestResult)> {
         let mut ret = Vec::new();
         for name in selected {
             match *name {

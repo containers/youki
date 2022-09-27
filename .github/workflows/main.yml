@@ -31,7 +31,7 @@ jobs:
     timeout-minutes: 15
     strategy:
       matrix:
-        rust: [1.62.1, 1.63.0]
+        rust: [1.63.0, 1.64.0]
         dirs: ${{ fromJSON(needs.changes.outputs.dirs) }}
     steps:
       - uses: actions/checkout@v2
@@ -55,7 +55,7 @@ jobs:
     timeout-minutes: 15
     strategy:
       matrix:
-        rust: [1.62.1, 1.63.0]
+        rust: [1.63.0, 1.64.0]
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -105,7 +105,7 @@ jobs:
     timeout-minutes: 15
     strategy:
       matrix:
-        rust: [1.62.1, 1.63.0]
+        rust: [1.63.0, 1.64.0]
     steps:
       - uses: actions/checkout@v2
         with:

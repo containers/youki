@@ -143,7 +143,7 @@ fn can_run() -> bool {
     iface_exists && cgroup_paths_exists
 }
 
-pub fn get_test_group<'a>() -> TestGroup<'a> {
+pub fn get_test_group() -> TestGroup {
     let mut test_group = TestGroup::new("cgroup_v1_network");
     let linux_cgroups_network = ConditionalTest::new(
         "test_linux_cgroups_network",

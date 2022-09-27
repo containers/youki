@@ -105,7 +105,7 @@ impl Container {
             let command = create_syscall();
             let user_name = command.get_pwuid(uid);
             if let Some(user_name) = user_name {
-                return Some((&*user_name).to_owned());
+                return Some((*user_name).to_owned());
             }
         }
 

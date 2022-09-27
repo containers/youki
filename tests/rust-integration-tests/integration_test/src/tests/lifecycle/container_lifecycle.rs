@@ -69,12 +69,12 @@ impl ContainerLifecycle {
     }
 }
 
-impl<'a> TestableGroup<'a> for ContainerLifecycle {
-    fn get_name(&self) -> &'a str {
+impl TestableGroup for ContainerLifecycle {
+    fn get_name(&self) -> &'static str {
         "lifecycle"
     }
 
-    fn run_all(&self) -> Vec<(&'a str, TestResult)> {
+    fn run_all(&self) -> Vec<(&'static str, TestResult)> {
         vec![
             ("create", self.create()),
             ("start", self.start()),
@@ -93,7 +93,7 @@ impl<'a> TestableGroup<'a> for ContainerLifecycle {
         ]
     }
 
-    fn run_selected(&self, selected: &[&str]) -> Vec<(&'a str, TestResult)> {
+    fn run_selected(&self, selected: &[&str]) -> Vec<(&'static str, TestResult)> {
         let mut ret = Vec::new();
         for name in selected {
             match *name {

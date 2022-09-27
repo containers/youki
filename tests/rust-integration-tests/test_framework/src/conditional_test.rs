@@ -7,18 +7,18 @@ type TestFn = dyn Fn() -> TestResult + Sync + Send;
 type CheckFn = dyn Fn() -> bool + Sync + Send;
 
 /// Basic Template structure for tests which need to be run conditionally
-pub struct ConditionalTest<'a> {
+pub struct ConditionalTest {
     /// name of the test
-    name: &'a str,
+    name: &'static str,
     /// actual test function
     test_fn: Box<TestFn>,
     /// function to check if a test can be run or not
     check_fn: Box<CheckFn>,
 }
 
-impl<'a> ConditionalTest<'a> {
+impl ConditionalTest {
     /// Create a new condition test
-    pub fn new(name: &'a str, check_fn: Box<CheckFn>, test_fn: Box<TestFn>) -> Self {
+    pub fn new(name: &'static str, check_fn: Box<CheckFn>, test_fn: Box<TestFn>) -> Self {
         ConditionalTest {
             name,
             check_fn,
@@ -27,8 +27,8 @@ impl<'a> ConditionalTest<'a> {
     }
 }
 
-impl<'a> Testable<'a> for ConditionalTest<'a> {
-    fn get_name(&self) -> &'a str {
+impl Testable for ConditionalTest {
+    fn get_name(&self) -> &'static str {
         self.name
     }
 

@@ -61,7 +61,7 @@ fn get_spec() -> Spec {
         .unwrap()
 }
 
-fn get_test<'a>(test_name: &'static str) -> Test<'a> {
+fn get_test(test_name: &'static str) -> Test {
     Test::new(
         test_name,
         Box::new(move || {
@@ -84,16 +84,16 @@ fn get_test<'a>(test_name: &'static str) -> Test<'a> {
             };
             delete_hook_output_file();
             if log != "pre-start1 called\npre-start2 called\npost-start1 called\npost-start2 called\npost-stop1 called\npost-stop2 called\n" {
-					return TestResult::Failed(anyhow!(
-						"error : hooks must be called in the listed order"
-					));
-				}
+                return TestResult::Failed(anyhow!(
+                        "error : hooks must be called in the listed order"
+                        ));
+            }
             TestResult::Passed
         }),
     )
 }
 
-pub fn get_hooks_tests<'a>() -> TestGroup<'a> {
+pub fn get_hooks_tests() -> TestGroup {
     let mut tg = TestGroup::new("hooks");
     tg.add(vec![Box::new(get_test("hooks"))]);
     tg
