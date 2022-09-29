@@ -190,7 +190,7 @@ checksum = "86447ad904c7fb335a790c9d7fe3d0d971dc523b8ccd1561a520de9a85302750"
 dependencies = [
  "atty",
  "bitflags",
- "clap_derive",
+ "clap_derive 3.2.18",
  "clap_lex",
  "indexmap",
  "once_cell",
@@ -213,6 +213,19 @@ name = "clap_derive"
 version = "3.2.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ea0c8bce528c4be4da13ea6fead8965e95b6073585a2f05204bd8f4119f82a65"
+dependencies = [
+ "heck",
+ "proc-macro-error",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "clap_derive"
+version = "4.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ca689d7434ce44517a12a89456b2be4d1ea1cafcd8f581978c03d45f5a5c12a7"
 dependencies = [
  "heck",
  "proc-macro-error",
@@ -975,7 +988,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "clap",
- "clap_derive",
+ "clap_derive 4.0.1",
  "flate2",
  "libcgroups",
  "libcontainer",
