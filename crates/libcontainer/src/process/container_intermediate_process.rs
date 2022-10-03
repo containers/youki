@@ -2,6 +2,10 @@ use crate::{namespaces::Namespaces, process::channel, process::fork};
 use anyhow::{Context, Error, Result};
 use libcgroups::common::CgroupManager;
 use nix::unistd::{Gid, Pid, Uid};
+use nix::{
+    unistd::{pipe2,write,read,close},
+    fcntl::OFlag
+};
 use oci_spec::runtime::{LinuxNamespaceType, LinuxResources};
 use procfs::process::Process;
 use std::convert::From;
@@ -83,6 +87,8 @@ pub fn container_intermediate_process(
             .with_context(|| format!("failed to enter pid namespace: {:?}", pid_namespace))?;
     }
 
+    let (read_end,write_end) = pipe2(OFlag::O_CLOEXEC)?;
+
     // We have to record the pid of the child (container init process), since
     // the child will be inside the pid namespace. We can't rely on child_ready
     // to send us the correct pid.
@@ -95,15 +101,31 @@ pub fn container_intermediate_process(
         inter_sender
             .close()
             .context("failed to close sender in the intermediate process")?;
-        container_init_process(args, main_sender, init_receiver)?;
-        Ok(0)
+        match container_init_process(args, main_sender, init_receiver){
+            Ok(_)=>unreachable!("successful exec should never reach here"),
+            Err(e)=>{
+                let buf = format!("{}",e);
+                write(write_end, buf.as_bytes())?;
+                close(write_end)?;
+                Err(e)
+            }
+        }
     })?;
-    // Once we fork the container init process, the job for intermediate process
-    // is done. We notify the container main process about the pid we just
-    // forked for container init process.
-    main_sender
-        .intermediate_ready(pid)
-        .context("failed to send child ready from intermediate process")?;
+
+    let mut buf = Vec::new();
+
+    match read(read_end, &mut buf)?{
+        0 =>{
+            // Once we fork the container init process, the job for intermediate process
+            // is done. We notify the container main process about the pid we just
+            // forked for container init process.
+            main_sender
+            .intermediate_ready(pid)
+            .context("failed to send child ready from intermediate process")?;
+        }
+        _=>main_sender.exec_failed(String::from_utf8(buf)?)?
+    }
+    
 
     // Close unused senders here so we don't have lingering socket around.
     main_sender
@@ -115,7 +137,6 @@ pub fn container_intermediate_process(
     init_sender
         .close()
         .context("failed to close unused init sender")?;
-
     Ok(pid)
 }
 
