@@ -223,9 +223,9 @@ dependencies = [
 
 [[package]]
 name = "clap_derive"
-version = "4.0.8"
+version = "4.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92289ffc6fb4a85d85c246ddb874c05a87a2e540fb6ad52f7ca07c8c1e1840b1"
+checksum = "a4a307492e1a34939f79d3b6b9650bd2b971513cd775436bf2b78defeb5af00b"
 dependencies = [
  "heck",
  "proc-macro-error",
@@ -986,7 +986,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "clap",
- "clap_derive 4.0.8",
+ "clap_derive 4.0.9",
  "flate2",
  "libcgroups",
  "libcontainer",
