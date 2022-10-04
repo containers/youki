@@ -19,6 +19,13 @@ pub fn exec(args: Exec, root_path: PathBuf) -> Result<i32> {
         .with_container_args(args.command.clone())
         .build()?;
 
+    // do not wait if detach is given, 
+    // although will still report exec errors from above '?'
+    // TODO add better explanation here
+    if args.detach{
+        return Ok(0);
+    }
+
     match waitpid(pid, None)? {
         WaitStatus::Exited(_, status) => Ok(status),
         WaitStatus::Signaled(_, sig, _) => Ok(sig as i32),

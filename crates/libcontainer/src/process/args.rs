@@ -27,4 +27,6 @@ pub struct ContainerArgs<'a> {
     pub rootless: &'a Option<Rootless<'a>>,
     /// Cgroup Manager
     pub cgroup_manager: Box<dyn CgroupManager>,
+
+    pub exec_fd:Option<RawFd>
 }

@@ -87,6 +87,7 @@ impl<'a> InitContainerBuilder<'a> {
             notify_path,
             container: Some(container.clone()),
             preserve_fds: self.base.preserve_fds,
+            exec_fd:None
         };
 
         builder_impl.create()?;

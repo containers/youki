@@ -1,6 +1,7 @@
 use anyhow::{bail, Context, Result};
 use caps::Capability;
-use nix::unistd::{self, Pid};
+use nix::unistd::{self, Pid,pipe2,read,close};
+use nix::fcntl::OFlag;
 use oci_spec::runtime::{
     Capabilities as SpecCapabilities, Capability as SpecCapability, LinuxBuilder,
     LinuxCapabilities, LinuxCapabilitiesBuilder, LinuxNamespace, LinuxNamespaceBuilder,
@@ -116,6 +117,8 @@ impl<'a> TenantContainerBuilder<'a> {
         let use_systemd = self.should_use_systemd(&container);
         let rootless = Rootless::new(&spec)?;
 
+        let (read_end,write_end) = pipe2(OFlag::O_CLOEXEC)?;
+
         let mut builder_impl = ContainerBuilderImpl {
             init: false,
             syscall: self.base.syscall,
@@ -129,14 +132,23 @@ impl<'a> TenantContainerBuilder<'a> {
             notify_path: notify_path.clone(),
             container: None,
             preserve_fds: self.base.preserve_fds,
+            exec_fd:Some(write_end)
         };
+        
+        
 
         let pid = builder_impl.create()?;
 
         let mut notify_socket = NotifySocket::new(notify_path);
         notify_socket.notify_container_start()?;
 
-        Ok(pid)
+        close(write_end)?;
+        
+        let mut buf = [0;1024];
+        match read(read_end, &mut buf)?{
+            0 =>Ok(pid),
+            _=>bail!("{}",String::from_utf8_lossy(&buf).to_string())
+        }
     }
 
     fn lookup_container_dir(&self) -> Result<PathBuf> {
