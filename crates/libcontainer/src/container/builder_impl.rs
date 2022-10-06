@@ -39,7 +39,7 @@ pub(super) struct ContainerBuilderImpl<'a> {
     /// File descriptos preserved/passed to the container init process.
     pub preserve_fds: i32,
 
-    pub exec_fd:Option<RawFd>
+    pub exec_fd: Option<RawFd>,
 }
 
 impl<'a> ContainerBuilderImpl<'a> {
@@ -122,7 +122,7 @@ impl<'a> ContainerBuilderImpl<'a> {
             container: &self.container,
             rootless: &self.rootless,
             cgroup_manager: cmanager,
-            exec_fd:self.exec_fd
+            exec_fd: self.exec_fd,
         };
 
         let (intermediate, init_pid) =

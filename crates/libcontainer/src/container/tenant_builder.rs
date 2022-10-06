@@ -1,7 +1,7 @@
 use anyhow::{bail, Context, Result};
 use caps::Capability;
-use nix::unistd::{self, Pid,pipe2,read,close};
 use nix::fcntl::OFlag;
+use nix::unistd::{self, close, pipe2, read, Pid};
 use oci_spec::runtime::{
     Capabilities as SpecCapabilities, Capability as SpecCapability, LinuxBuilder,
     LinuxCapabilities, LinuxCapabilitiesBuilder, LinuxNamespace, LinuxNamespaceBuilder,
@@ -117,7 +117,7 @@ impl<'a> TenantContainerBuilder<'a> {
         let use_systemd = self.should_use_systemd(&container);
         let rootless = Rootless::new(&spec)?;
 
-        let (read_end,write_end) = pipe2(OFlag::O_CLOEXEC)?;
+        let (read_end, write_end) = pipe2(OFlag::O_CLOEXEC)?;
 
         let mut builder_impl = ContainerBuilderImpl {
             init: false,
@@ -132,10 +132,8 @@ impl<'a> TenantContainerBuilder<'a> {
             notify_path: notify_path.clone(),
             container: None,
             preserve_fds: self.base.preserve_fds,
-            exec_fd:Some(write_end)
+            exec_fd: Some(write_end),
         };
-        
-        
 
         let pid = builder_impl.create()?;
 
@@ -143,11 +141,11 @@ impl<'a> TenantContainerBuilder<'a> {
         notify_socket.notify_container_start()?;
 
         close(write_end)?;
-        
-        let mut buf = [0;1024];
-        match read(read_end, &mut buf)?{
-            0 =>Ok(pid),
-            _=>bail!("{}",String::from_utf8_lossy(&buf).to_string())
+
+        let mut buf = [0; 1024];
+        match read(read_end, &mut buf)? {
+            0 => Ok(pid),
+            _ => bail!("{}", String::from_utf8_lossy(&buf).to_string()),
         }
     }
 

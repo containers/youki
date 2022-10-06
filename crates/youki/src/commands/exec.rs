@@ -19,10 +19,10 @@ pub fn exec(args: Exec, root_path: PathBuf) -> Result<i32> {
         .with_container_args(args.command.clone())
         .build()?;
 
-    // do not wait if detach is given, 
+    // do not wait if detach is given,
     // although will still report exec errors from above '?'
     // TODO add better explanation here
-    if args.detach{
+    if args.detach {
         return Ok(0);
     }
 

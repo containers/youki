@@ -1,10 +1,8 @@
 use crate::{namespaces::Namespaces, process::channel, process::fork};
 use anyhow::{Context, Error, Result};
 use libcgroups::common::CgroupManager;
+use nix::unistd::{close, write};
 use nix::unistd::{Gid, Pid, Uid};
-use nix::{
-    unistd::{write,close},
-};
 use oci_spec::runtime::{LinuxNamespaceType, LinuxResources};
 use procfs::process::Process;
 use std::convert::From;
@@ -98,11 +96,11 @@ pub fn container_intermediate_process(
         inter_sender
             .close()
             .context("failed to close sender in the intermediate process")?;
-        match container_init_process(args, main_sender, init_receiver){
-            Ok(_)=>unreachable!("successful exec should never reach here"),
-            Err(e)=>{
-                if let Some(write_end) = args.exec_fd{
-                    let buf = format!("{}",e);
+        match container_init_process(args, main_sender, init_receiver) {
+            Ok(_) => unreachable!("successful exec should never reach here"),
+            Err(e) => {
+                if let Some(write_end) = args.exec_fd {
+                    let buf = format!("{}", e);
                     write(write_end, buf.as_bytes())?;
                     close(write_end)?;
                 }
@@ -112,10 +110,10 @@ pub fn container_intermediate_process(
     })?;
 
     // close the fd here, otherwise the  main/interacting process hangs
-    if let Some(fd) = args.exec_fd{
+    if let Some(fd) = args.exec_fd {
         close(fd)?;
     }
-    
+
     main_sender
         .intermediate_ready(pid)
         .context("failed to send child ready from intermediate process")?;

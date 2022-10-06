@@ -28,5 +28,5 @@ pub struct ContainerArgs<'a> {
     /// Cgroup Manager
     pub cgroup_manager: Box<dyn CgroupManager>,
 
-    pub exec_fd:Option<RawFd>
+    pub exec_fd: Option<RawFd>,
 }
