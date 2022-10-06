@@ -111,6 +111,11 @@ pub fn container_intermediate_process(
         }
     })?;
 
+    // close the fd here, otherwise the  main/interacting process hangs
+    if let Some(fd) = args.exec_fd{
+        close(fd)?;
+    }
+    
     main_sender
         .intermediate_ready(pid)
         .context("failed to send child ready from intermediate process")?;
