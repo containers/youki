@@ -92,7 +92,7 @@ impl<'a> TenantContainerBuilder<'a> {
         self
     }
 
-    pub fn detached(mut self, detached: bool) -> Self {
+    pub fn with_detach(mut self, detached: bool) -> Self {
         self.detached = detached;
         self
     }

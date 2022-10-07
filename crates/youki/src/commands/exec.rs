@@ -12,6 +12,7 @@ pub fn exec(args: Exec, root_path: PathBuf) -> Result<i32> {
         .with_console_socket(args.console_socket.as_ref())
         .with_pid_file(args.pid_file.as_ref())?
         .as_tenant()
+        .with_detach(args.detach)
         .with_cwd(args.cwd.as_ref())
         .with_env(args.env.clone().into_iter().collect())
         .with_process(args.process.as_ref())
