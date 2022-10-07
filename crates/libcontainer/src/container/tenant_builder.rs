@@ -19,6 +19,7 @@ use std::{
     str::FromStr,
 };
 
+use crate::process::args::ContainerType;
 use crate::{capabilities::CapabilityExt, container::builder_impl::ContainerBuilderImpl};
 use crate::{notify_socket::NotifySocket, rootless::Rootless, tty, utils};
 
@@ -38,6 +39,7 @@ pub struct TenantContainerBuilder<'a> {
     no_new_privs: Option<bool>,
     capabilities: Vec<String>,
     process: Option<PathBuf>,
+    detached: bool,
 }
 
 impl<'a> TenantContainerBuilder<'a> {
@@ -53,6 +55,7 @@ impl<'a> TenantContainerBuilder<'a> {
             no_new_privs: None,
             capabilities: Vec::new(),
             process: None,
+            detached: false,
         }
     }
 
@@ -89,6 +92,11 @@ impl<'a> TenantContainerBuilder<'a> {
         self
     }
 
+    pub fn detached(mut self, detached: bool) -> Self {
+        self.detached = detached;
+        self
+    }
+
     /// Joins an existing container
     pub fn build(self) -> Result<Pid> {
         let container_dir = self
@@ -120,7 +128,10 @@ impl<'a> TenantContainerBuilder<'a> {
         let (read_end, write_end) = pipe2(OFlag::O_CLOEXEC)?;
 
         let mut builder_impl = ContainerBuilderImpl {
-            init: false,
+            container_type: ContainerType::TenantContainer {
+                detached: self.detached,
+                exec_notify_fd: write_end,
+            },
             syscall: self.base.syscall,
             container_id: self.base.container_id,
             pid_file: self.base.pid_file,
@@ -132,7 +143,6 @@ impl<'a> TenantContainerBuilder<'a> {
             notify_path: notify_path.clone(),
             container: None,
             preserve_fds: self.base.preserve_fds,
-            exec_fd: Some(write_end),
         };
 
         let pid = builder_impl.create()?;

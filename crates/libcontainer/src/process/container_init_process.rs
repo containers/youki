@@ -1,4 +1,4 @@
-use super::args::ContainerArgs;
+use super::args::{ContainerArgs, ContainerType};
 use crate::apparmor;
 use crate::syscall::Syscall;
 use crate::workload::ExecutorManager;
@@ -186,7 +186,7 @@ pub fn container_init_process(
         let _ = prctl::set_no_new_privileges(true);
     }
 
-    if args.init {
+    if matches!(args.container_type, ContainerType::InitContainer) {
         // create_container hook needs to be called after the namespace setup, but
         // before pivot_root is called. This runs in the container namespaces.
         if let Some(hooks) = hooks {
@@ -409,7 +409,7 @@ pub fn container_init_process(
 
     // create_container hook needs to be called after the namespace setup, but
     // before pivot_root is called. This runs in the container namespaces.
-    if args.init {
+    if matches!(args.container_type, ContainerType::InitContainer) {
         if let Some(hooks) = hooks {
             hooks::run_hooks(hooks.start_container().as_ref(), container)?
         }

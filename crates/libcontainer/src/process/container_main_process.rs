@@ -1,6 +1,9 @@
 use crate::{
     container::ContainerProcessState,
-    process::{args::ContainerArgs, channel, container_intermediate_process, fork},
+    process::{
+        args::{ContainerArgs, ContainerType},
+        channel, container_intermediate_process, fork,
+    },
     rootless::Rootless,
     seccomp, utils,
 };
@@ -15,7 +18,7 @@ use nix::{
 use oci_spec::runtime;
 use std::{io::IoSlice, path::Path};
 
-pub fn container_main_process(container_args: &ContainerArgs, wait: bool) -> Result<(Pid, Pid)> {
+pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, Pid)> {
     // We use a set of channels to communicate between parent and child process.
     // Each channel is uni-directional. Because we will pass these channel to
     // forked process, we have to be deligent about closing any unused channel.
@@ -33,7 +36,13 @@ pub fn container_main_process(container_args: &ContainerArgs, wait: bool) -> Res
             main_sender,
         )?;
 
-        if wait {
+        if matches!(
+            container_args.container_type,
+            ContainerType::TenantContainer {
+                detached: false,
+                exec_notify_fd: _
+            }
+        ) {
             match waitpid(container_pid, None)? {
                 WaitStatus::Exited(_, s) => Ok(s),
                 WaitStatus::Signaled(_, sig, _) => Ok(sig as i32),

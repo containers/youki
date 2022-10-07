@@ -7,7 +7,7 @@ use oci_spec::runtime::{LinuxNamespaceType, LinuxResources};
 use procfs::process::Process;
 use std::convert::From;
 
-use super::args::ContainerArgs;
+use super::args::{ContainerArgs, ContainerType};
 use super::container_init_process::container_init_process;
 
 pub fn container_intermediate_process(
@@ -36,7 +36,7 @@ pub fn container_intermediate_process(
     apply_cgroups(
         args.cgroup_manager.as_ref(),
         linux.resources().as_ref(),
-        args.init,
+        matches!(args.container_type, ContainerType::InitContainer),
     )
     .context("failed to apply cgroups")?;
 
@@ -99,19 +99,27 @@ pub fn container_intermediate_process(
         match container_init_process(args, main_sender, init_receiver) {
             Ok(_) => unreachable!("successful exec should never reach here"),
             Err(e) => {
-                if let Some(write_end) = args.exec_fd {
+                if let ContainerType::TenantContainer {
+                    detached: _,
+                    exec_notify_fd,
+                } = args.container_type
+                {
                     let buf = format!("{}", e);
-                    write(write_end, buf.as_bytes())?;
-                    close(write_end)?;
+                    write(exec_notify_fd, buf.as_bytes())?;
+                    close(exec_notify_fd)?;
                 }
                 Err(e)
             }
         }
     })?;
 
-    // close the fd here, otherwise the  main/interacting process hangs
-    if let Some(fd) = args.exec_fd {
-        close(fd)?;
+    // close the  exec_notify_fd in this process
+    if let ContainerType::TenantContainer {
+        detached: _,
+        exec_notify_fd,
+    } = args.container_type
+    {
+        close(exec_notify_fd)?;
     }
 
     main_sender

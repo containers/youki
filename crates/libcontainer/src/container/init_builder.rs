@@ -7,7 +7,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{apparmor, config::YoukiConfig, notify_socket::NOTIFY_FILE, rootless, tty, utils};
+use crate::{
+    apparmor, config::YoukiConfig, notify_socket::NOTIFY_FILE, process::args::ContainerType,
+    rootless, tty, utils,
+};
 
 use super::{
     builder::ContainerBuilder, builder_impl::ContainerBuilderImpl, Container, ContainerStatus,
@@ -75,7 +78,7 @@ impl<'a> InitContainerBuilder<'a> {
             .context("failed to save config")?;
 
         let mut builder_impl = ContainerBuilderImpl {
-            init: true,
+            container_type: ContainerType::InitContainer,
             syscall: self.base.syscall,
             container_id: self.base.container_id,
             pid_file: self.base.pid_file,
@@ -87,7 +90,6 @@ impl<'a> InitContainerBuilder<'a> {
             notify_path,
             container: Some(container.clone()),
             preserve_fds: self.base.preserve_fds,
-            exec_fd: None,
         };
 
         builder_impl.create()?;
