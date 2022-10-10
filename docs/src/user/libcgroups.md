@@ -32,7 +32,7 @@ This module contains functionality that is general to any type of cgroup. Some o
 
 ### stats
 
-This module has functionalities related to statistics data of the cgroups, and struts representing it.
+This module has functionalities related to statistics data of the cgroups, and structs representing it.
 
 Some of the things it exposes are
 
