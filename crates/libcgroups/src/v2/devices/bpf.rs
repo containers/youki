@@ -24,26 +24,31 @@ pub mod prog {
     // TODO: consider use of #[mockall_double]
     #[cfg(test)]
     use crate::v2::devices::mocks::mock_libbpf_sys::{
-        bpf_load_program, bpf_prog_attach, bpf_prog_detach2, bpf_prog_get_fd_by_id, bpf_prog_query,
+        bpf_prog_attach, bpf_prog_detach2, bpf_prog_get_fd_by_id, bpf_prog_load, bpf_prog_query,
     };
     #[cfg(not(test))]
     use libbpf_sys::{
-        bpf_load_program, bpf_prog_attach, bpf_prog_detach2, bpf_prog_get_fd_by_id, bpf_prog_query,
+        bpf_prog_attach, bpf_prog_detach2, bpf_prog_get_fd_by_id, bpf_prog_load, bpf_prog_query,
     };
 
     pub fn load(license: &str, insns: &[u8]) -> Result<RawFd> {
         let insns_cnt = insns.len() / std::mem::size_of::<bpf_insn>();
         let insns = insns as *const _ as *const bpf_insn;
+        let opts = libbpf_sys::bpf_prog_load_opts {
+            kern_version: 0,
+            log_buf: ptr::null_mut::<i8>(),
+            log_size: 0,
+            ..Default::default()
+        };
         #[allow(unused_unsafe)]
         let prog_fd = unsafe {
-            bpf_load_program(
+            bpf_prog_load(
                 BPF_PROG_TYPE_CGROUP_DEVICE,
+                ptr::null::<i8>(),
+                license as *const _ as *const i8,
                 insns,
                 insns_cnt as u64,
-                license as *const _ as *const i8,
-                0,
-                ptr::null_mut::<i8>(),
-                0,
+                &opts,
             )
         };
 
@@ -159,10 +164,10 @@ mod tests {
         // arrange
         let license = "Apache";
         let instructions = [instruction_zero, instruction_one].concat();
-        let load = mock_libbpf_sys::bpf_load_program_context();
+        let load = mock_libbpf_sys::bpf_prog_load_context();
 
         // expect
-        load.expect().once().returning(|_, _, _, _, _, _, _| 32);
+        load.expect().once().returning(|_, _, _, _, _, _| 32);
 
         // act
         let fd = prog::load(license, &instructions).expect("successfully calls load");
@@ -197,10 +202,10 @@ mod tests {
         // arrange
         let license = "Apache";
         let instructions = [instruction_zero, instruction_one].concat();
-        let load = mock_libbpf_sys::bpf_load_program_context();
+        let load = mock_libbpf_sys::bpf_prog_load_context();
 
         // expect
-        load.expect().once().returning(|_, _, _, _, _, _, _| -1);
+        load.expect().once().returning(|_, _, _, _, _, _| -1);
 
         // act
         let error_result = prog::load(license, &instructions);

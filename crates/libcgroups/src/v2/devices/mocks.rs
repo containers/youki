@@ -14,14 +14,13 @@ pub mod libc {
 
 #[cfg_attr(test, automock())]
 pub mod libbpf_sys {
-    pub fn bpf_load_program(
+    pub fn bpf_prog_load(
         _type_: libbpf_sys::bpf_prog_type,
+        _name: *const i8,
+        _license: *const ::std::os::raw::c_char,
         _insns: *const libbpf_sys::bpf_insn,
         _insns_cnt: libbpf_sys::size_t,
-        _license: *const ::std::os::raw::c_char,
-        _kern_version: libbpf_sys::__u32,
-        _log_buf: *mut ::std::os::raw::c_char,
-        _log_buf_sz: libbpf_sys::size_t,
+        _opts: *const libbpf_sys::bpf_prog_load_opts,
     ) -> ::std::os::raw::c_int {
         unimplemented!();
     }
