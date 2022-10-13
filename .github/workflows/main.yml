@@ -13,7 +13,7 @@ jobs:
     outputs:
       dirs: ${{ steps.filter.outputs.changes }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: dorny/paths-filter@v2
         id: filter
         with:
@@ -34,7 +34,7 @@ jobs:
         rust: [1.63.0, 1.64.0]
         dirs: ${{ fromJSON(needs.changes.outputs.dirs) }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ matrix.rust }}
@@ -57,7 +57,7 @@ jobs:
       matrix:
         rust: [1.63.0, 1.64.0]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ matrix.rust }}
@@ -73,7 +73,7 @@ jobs:
     timeout-minutes: 15
     name: Run test coverage
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Toolchain setup
         uses: actions-rs/toolchain@v1
         with:
@@ -107,7 +107,7 @@ jobs:
       matrix:
         rust: [1.63.0, 1.64.0]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           submodules: recursive
       - uses: actions-rs/toolchain@v1
