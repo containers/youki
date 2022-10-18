@@ -43,6 +43,9 @@ syscalls = "0.6.7"
 rust-criu = "0.2.0"
 wasmer = { version = "2.2.0", optional = true }
 wasmer-wasi = { version = "2.3.0", optional = true }
+wasmedge-sys = "0.10.0"
+wasmedge-sdk = "0.5.0"
+wasmedge-types = "0.3.0"
 
 [dev-dependencies]
 oci-spec = { version = "0.5.8", features = ["proptests", "runtime"] }
