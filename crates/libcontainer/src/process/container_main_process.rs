@@ -38,11 +38,9 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, Pi
 
         if matches!(
             container_args.container_type,
-            ContainerType::TenantContainer {
-                detached: false,
-                exec_notify_fd: _
-            }
-        ) {
+            ContainerType::TenantContainer { exec_notify_fd: _ }
+        ) && !container_args.detached
+        {
             match waitpid(container_pid, None)? {
                 WaitStatus::Exited(_, s) => Ok(s),
                 WaitStatus::Signaled(_, sig, _) => Ok(sig as i32),

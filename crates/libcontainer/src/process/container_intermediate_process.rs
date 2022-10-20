@@ -99,11 +99,7 @@ pub fn container_intermediate_process(
         match container_init_process(args, main_sender, init_receiver) {
             Ok(_) => unreachable!("successful exec should never reach here"),
             Err(e) => {
-                if let ContainerType::TenantContainer {
-                    detached: _,
-                    exec_notify_fd,
-                } = args.container_type
-                {
+                if let ContainerType::TenantContainer { exec_notify_fd } = args.container_type {
                     let buf = format!("{}", e);
                     write(exec_notify_fd, buf.as_bytes())?;
                     close(exec_notify_fd)?;
@@ -114,11 +110,7 @@ pub fn container_intermediate_process(
     })?;
 
     // close the  exec_notify_fd in this process
-    if let ContainerType::TenantContainer {
-        detached: _,
-        exec_notify_fd,
-    } = args.container_type
-    {
+    if let ContainerType::TenantContainer { exec_notify_fd } = args.container_type {
         close(exec_notify_fd)?;
     }
 

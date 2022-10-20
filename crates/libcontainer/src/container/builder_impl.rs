@@ -41,6 +41,8 @@ pub(super) struct ContainerBuilderImpl<'a> {
     pub container: Option<Container>,
     /// File descriptos preserved/passed to the container init process.
     pub preserve_fds: i32,
+    /// If the container is to be run in detached mode
+    pub detached: bool,
 }
 
 impl<'a> ContainerBuilderImpl<'a> {
@@ -123,6 +125,7 @@ impl<'a> ContainerBuilderImpl<'a> {
             container: &self.container,
             rootless: &self.rootless,
             cgroup_manager: cmanager,
+            detached: self.detached,
         };
 
         let (intermediate, init_pid) =

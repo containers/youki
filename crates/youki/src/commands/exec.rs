@@ -20,9 +20,10 @@ pub fn exec(args: Exec, root_path: PathBuf) -> Result<i32> {
         .with_container_args(args.command.clone())
         .build()?;
 
-    // do not wait if detach is given,
-    // although will still report exec errors from above '?'
-    // TODO add better explanation here
+    // See https://github.com/containers/youki/pull/1252 for a detailed explanation
+    // basically, if there is any error in starting exec, the build above will return error
+    // however, if the process does start, and detach is given, we do not wait for it
+    // if not detached, then we wait for it using waitpid below
     if args.detach {
         return Ok(0);
     }

@@ -90,6 +90,7 @@ impl<'a> InitContainerBuilder<'a> {
             notify_path,
             container: Some(container.clone()),
             preserve_fds: self.base.preserve_fds,
+            detached: false, // TODO this should be set properly based on how the command is given
         };
 
         builder_impl.create()?;

@@ -9,10 +9,7 @@ use crate::{container::Container, notify_socket::NotifyListener, syscall::Syscal
 #[derive(Debug, Copy, Clone)]
 pub enum ContainerType {
     InitContainer,
-    TenantContainer {
-        detached: bool,
-        exec_notify_fd: RawFd,
-    },
+    TenantContainer { exec_notify_fd: RawFd },
 }
 
 pub struct ContainerArgs<'a> {
@@ -36,4 +33,6 @@ pub struct ContainerArgs<'a> {
     pub rootless: &'a Option<Rootless<'a>>,
     /// Cgroup Manager
     pub cgroup_manager: Box<dyn CgroupManager>,
+    /// If the container is to be run in detached mode
+    pub detached: bool,
 }

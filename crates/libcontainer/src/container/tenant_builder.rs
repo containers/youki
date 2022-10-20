@@ -129,7 +129,6 @@ impl<'a> TenantContainerBuilder<'a> {
 
         let mut builder_impl = ContainerBuilderImpl {
             container_type: ContainerType::TenantContainer {
-                detached: self.detached,
                 exec_notify_fd: write_end,
             },
             syscall: self.base.syscall,
@@ -143,6 +142,7 @@ impl<'a> TenantContainerBuilder<'a> {
             notify_path: notify_path.clone(),
             container: None,
             preserve_fds: self.base.preserve_fds,
+            detached: self.detached,
         };
 
         let pid = builder_impl.create()?;
@@ -152,10 +152,22 @@ impl<'a> TenantContainerBuilder<'a> {
 
         close(write_end)?;
 
-        let mut buf = [0; 1024];
-        match read(read_end, &mut buf)? {
-            0 => Ok(pid),
-            _ => bail!("{}", String::from_utf8_lossy(&buf).to_string()),
+        let mut err_str_buf = Vec::new();
+
+        loop {
+            let mut buf = [0; 3];
+            match read(read_end, &mut buf)? {
+                0 => {
+                    if err_str_buf.is_empty() {
+                        return Ok(pid);
+                    } else {
+                        bail!(String::from_utf8_lossy(&err_str_buf).to_string());
+                    }
+                }
+                _ => {
+                    err_str_buf.extend(buf.into_iter());
+                }
+            }
         }
     }
 
