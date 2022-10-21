@@ -7,6 +7,8 @@ use wasmedge_sdk::{
     params, Vm,
 };
 
+// use wasmedge_sys::{Config, Store, Vm};
+
 use super::Executor;
 
 const EXECUTOR_NAME: &str = "wasmedge";
@@ -44,20 +46,23 @@ fn env_to_wasi(spec: &Spec) -> Vec<String> {
 
 impl Executor for WasmEdge {
     fn exec(spec: &Spec) -> Result<()> {
-        let host_options = HostRegistrationConfigOptions::default().wasi(true);
-        let config = ConfigBuilder::new(CommonConfigOptions::default())
-            .with_host_registration_config(host_options)
-            .build()?;
-        let mut vm = Vm::new(Some(config))?;
-
+        // parse wasi parameters
         let args = get_args(&spec);
         let mut cmd = args[0].clone();
         if let Some(stripped) = args[0].strip_prefix(std::path::MAIN_SEPARATOR) {
             cmd = stripped.to_string();
         }
-
         let envs = env_to_wasi(&spec);
 
+        // create configuration with `wasi` option enabled
+        let config = ConfigBuilder::new(CommonConfigOptions::default())
+            .with_host_registration_config(HostRegistrationConfigOptions::default().wasi(true))
+            .build()?;
+
+        // create a vm with the config settings
+        let mut vm = Vm::new(Some(config))?;
+
+        // initialize the wasi module with the parsed parameters
         let mut wasi_instance = vm.wasi_module()?;
         wasi_instance.initialize(
             Some(args.iter().map(|s| s as &str).collect()),
@@ -65,9 +70,12 @@ impl Executor for WasmEdge {
             Some(vec![&cmd]),
         );
 
-        let vm = vm.register_module_from_file("main", &cmd)?;
+        let mut vm = vm.register_module_from_file("main", &cmd)?;
 
-        vm.run_func(Some("main"), "_start", params!())?;
+        let ins = vm.named_module("main")?;
+        ins.func("_start")
+            .expect("Not found '_start' func in the 'main' module instance")
+            .call(&mut vm, params!())?;
 
         Ok(())
     }
