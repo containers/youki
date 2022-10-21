@@ -182,11 +182,11 @@ pub fn create_cgroup_manager<P: Into<PathBuf>>(
     match cgroup_setup {
         CgroupSetup::Legacy | CgroupSetup::Hybrid => create_v1_cgroup_manager(cgroup_path),
         CgroupSetup::Unified => {
-            if systemd_cgroup {
-                return create_systemd_cgroup_manager(cgroup_path, container_name);
+            // ref https://github.com/opencontainers/runtime-spec/blob/main/config-linux.md#cgroups-path
+            if cgroup_path.is_absolute() || !systemd_cgroup {
+                return create_v2_cgroup_manager(cgroup_path);
             }
-
-            create_v2_cgroup_manager(cgroup_path)
+            create_systemd_cgroup_manager(cgroup_path, container_name)
         }
     }
 }
