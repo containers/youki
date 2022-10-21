@@ -1,6 +1,7 @@
 use anyhow::{bail, Context, Result};
 use caps::Capability;
-use nix::unistd::{self, Pid};
+use nix::fcntl::OFlag;
+use nix::unistd::{self, close, pipe2, read, Pid};
 use oci_spec::runtime::{
     Capabilities as SpecCapabilities, Capability as SpecCapability, LinuxBuilder,
     LinuxCapabilities, LinuxCapabilitiesBuilder, LinuxNamespace, LinuxNamespaceBuilder,
@@ -18,6 +19,7 @@ use std::{
     str::FromStr,
 };
 
+use crate::process::args::ContainerType;
 use crate::{capabilities::CapabilityExt, container::builder_impl::ContainerBuilderImpl};
 use crate::{notify_socket::NotifySocket, rootless::Rootless, tty, utils};
 
@@ -37,6 +39,7 @@ pub struct TenantContainerBuilder<'a> {
     no_new_privs: Option<bool>,
     capabilities: Vec<String>,
     process: Option<PathBuf>,
+    detached: bool,
 }
 
 impl<'a> TenantContainerBuilder<'a> {
@@ -52,6 +55,7 @@ impl<'a> TenantContainerBuilder<'a> {
             no_new_privs: None,
             capabilities: Vec::new(),
             process: None,
+            detached: false,
         }
     }
 
@@ -88,6 +92,11 @@ impl<'a> TenantContainerBuilder<'a> {
         self
     }
 
+    pub fn with_detach(mut self, detached: bool) -> Self {
+        self.detached = detached;
+        self
+    }
+
     /// Joins an existing container
     pub fn build(self) -> Result<Pid> {
         let container_dir = self
@@ -116,8 +125,12 @@ impl<'a> TenantContainerBuilder<'a> {
         let use_systemd = self.should_use_systemd(&container);
         let rootless = Rootless::new(&spec)?;
 
+        let (read_end, write_end) = pipe2(OFlag::O_CLOEXEC)?;
+
         let mut builder_impl = ContainerBuilderImpl {
-            init: false,
+            container_type: ContainerType::TenantContainer {
+                exec_notify_fd: write_end,
+            },
             syscall: self.base.syscall,
             container_id: self.base.container_id,
             pid_file: self.base.pid_file,
@@ -129,6 +142,7 @@ impl<'a> TenantContainerBuilder<'a> {
             notify_path: notify_path.clone(),
             container: None,
             preserve_fds: self.base.preserve_fds,
+            detached: self.detached,
         };
 
         let pid = builder_impl.create()?;
@@ -136,7 +150,25 @@ impl<'a> TenantContainerBuilder<'a> {
         let mut notify_socket = NotifySocket::new(notify_path);
         notify_socket.notify_container_start()?;
 
-        Ok(pid)
+        close(write_end)?;
+
+        let mut err_str_buf = Vec::new();
+
+        loop {
+            let mut buf = [0; 3];
+            match read(read_end, &mut buf)? {
+                0 => {
+                    if err_str_buf.is_empty() {
+                        return Ok(pid);
+                    } else {
+                        bail!(String::from_utf8_lossy(&err_str_buf).to_string());
+                    }
+                }
+                _ => {
+                    err_str_buf.extend(buf.into_iter());
+                }
+            }
+        }
     }
 
     fn lookup_container_dir(&self) -> Result<PathBuf> {

@@ -1,12 +1,13 @@
 use crate::{namespaces::Namespaces, process::channel, process::fork};
 use anyhow::{Context, Error, Result};
 use libcgroups::common::CgroupManager;
+use nix::unistd::{close, write};
 use nix::unistd::{Gid, Pid, Uid};
 use oci_spec::runtime::{LinuxNamespaceType, LinuxResources};
 use procfs::process::Process;
 use std::convert::From;
 
-use super::args::ContainerArgs;
+use super::args::{ContainerArgs, ContainerType};
 use super::container_init_process::container_init_process;
 
 pub fn container_intermediate_process(
@@ -35,7 +36,7 @@ pub fn container_intermediate_process(
     apply_cgroups(
         args.cgroup_manager.as_ref(),
         linux.resources().as_ref(),
-        args.init,
+        matches!(args.container_type, ContainerType::InitContainer),
     )
     .context("failed to apply cgroups")?;
 
@@ -95,12 +96,24 @@ pub fn container_intermediate_process(
         inter_sender
             .close()
             .context("failed to close sender in the intermediate process")?;
-        container_init_process(args, main_sender, init_receiver)?;
-        Ok(0)
+        match container_init_process(args, main_sender, init_receiver) {
+            Ok(_) => unreachable!("successful exec should never reach here"),
+            Err(e) => {
+                if let ContainerType::TenantContainer { exec_notify_fd } = args.container_type {
+                    let buf = format!("{}", e);
+                    write(exec_notify_fd, buf.as_bytes())?;
+                    close(exec_notify_fd)?;
+                }
+                Err(e)
+            }
+        }
     })?;
-    // Once we fork the container init process, the job for intermediate process
-    // is done. We notify the container main process about the pid we just
-    // forked for container init process.
+
+    // close the  exec_notify_fd in this process
+    if let ContainerType::TenantContainer { exec_notify_fd } = args.container_type {
+        close(exec_notify_fd)?;
+    }
+
     main_sender
         .intermediate_ready(pid)
         .context("failed to send child ready from intermediate process")?;
@@ -115,7 +128,6 @@ pub fn container_intermediate_process(
     init_sender
         .close()
         .context("failed to close unused init sender")?;
-
     Ok(pid)
 }
 

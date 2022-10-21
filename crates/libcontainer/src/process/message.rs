@@ -9,4 +9,5 @@ pub enum Message {
     MappingWritten,
     SeccompNotify,
     SeccompNotifyDone,
+    ExecFailed(String),
 }

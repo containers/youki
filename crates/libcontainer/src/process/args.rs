@@ -6,9 +6,15 @@ use std::path::PathBuf;
 use crate::rootless::Rootless;
 use crate::{container::Container, notify_socket::NotifyListener, syscall::Syscall};
 
+#[derive(Debug, Copy, Clone)]
+pub enum ContainerType {
+    InitContainer,
+    TenantContainer { exec_notify_fd: RawFd },
+}
+
 pub struct ContainerArgs<'a> {
-    /// Flag indicating if an init or a tenant container should be created
-    pub init: bool,
+    /// Indicates if an init or a tenant container should be created
+    pub container_type: ContainerType,
     /// Interface to operating system primitives
     pub syscall: &'a dyn Syscall,
     /// OCI complient runtime spec
@@ -27,4 +33,6 @@ pub struct ContainerArgs<'a> {
     pub rootless: &'a Option<Rootless<'a>>,
     /// Cgroup Manager
     pub cgroup_manager: Box<dyn CgroupManager>,
+    /// If the container is to be run in detached mode
+    pub detached: bool,
 }

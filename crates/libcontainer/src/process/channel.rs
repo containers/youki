@@ -62,6 +62,11 @@ impl MainSender {
         Ok(())
     }
 
+    pub fn exec_failed(&mut self, err: String) -> Result<()> {
+        self.sender.send(Message::ExecFailed(err))?;
+        Ok(())
+    }
+
     pub fn close(&self) -> Result<()> {
         self.sender.close()
     }
@@ -82,6 +87,7 @@ impl MainReceiver {
 
         match msg {
             Message::IntermediateReady(pid) => Ok(Pid::from_raw(pid)),
+            Message::ExecFailed(err) => bail!("exec process failed with error {}", err),
             _ => bail!(
                 "receive unexpected message {:?} waiting for intermediate ready",
                 msg

@@ -2,7 +2,10 @@ use super::{Container, ContainerStatus};
 use crate::{
     hooks,
     notify_socket::NotifyListener,
-    process::{self, args::ContainerArgs},
+    process::{
+        self,
+        args::{ContainerArgs, ContainerType},
+    },
     rootless::Rootless,
     syscall::Syscall,
     utils,
@@ -14,7 +17,7 @@ use std::{fs, io::Write, os::unix::prelude::RawFd, path::PathBuf};
 
 pub(super) struct ContainerBuilderImpl<'a> {
     /// Flag indicating if an init or a tenant container should be created
-    pub init: bool,
+    pub container_type: ContainerType,
     /// Interface to operating system primitives
     pub syscall: &'a dyn Syscall,
     /// Flag indicating if systemd should be used for cgroup management
@@ -38,6 +41,8 @@ pub(super) struct ContainerBuilderImpl<'a> {
     pub container: Option<Container>,
     /// File descriptos preserved/passed to the container init process.
     pub preserve_fds: i32,
+    /// If the container is to be run in detached mode
+    pub detached: bool,
 }
 
 impl<'a> ContainerBuilderImpl<'a> {
@@ -67,7 +72,7 @@ impl<'a> ContainerBuilderImpl<'a> {
         )?;
         let process = self.spec.process().as_ref().context("No process in spec")?;
 
-        if self.init {
+        if matches!(self.container_type, ContainerType::InitContainer) {
             if let Some(hooks) = self.spec.hooks() {
                 hooks::run_hooks(hooks.create_runtime().as_ref(), self.container.as_ref())?
             }
@@ -110,7 +115,7 @@ impl<'a> ContainerBuilderImpl<'a> {
         // therefore we will have to move all the variable by value. Since self
         // is a shared reference, we have to clone these variables here.
         let container_args = ContainerArgs {
-            init: self.init,
+            container_type: self.container_type,
             syscall: self.syscall,
             spec: self.spec,
             rootfs: &self.rootfs,
@@ -120,10 +125,11 @@ impl<'a> ContainerBuilderImpl<'a> {
             container: &self.container,
             rootless: &self.rootless,
             cgroup_manager: cmanager,
+            detached: self.detached,
         };
 
         let (intermediate, init_pid) =
-            process::container_main_process::container_main_process(&container_args, !self.init)?;
+            process::container_main_process::container_main_process(&container_args)?;
 
         // if file to write the pid to is specified, write pid of the child
         if let Some(pid_file) = &self.pid_file {
