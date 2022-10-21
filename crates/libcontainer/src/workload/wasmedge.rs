@@ -7,13 +7,11 @@ use wasmedge_sdk::{
     params, Vm,
 };
 
-// use wasmedge_sys::{Config, Store, Vm};
-
 use super::Executor;
 
 const EXECUTOR_NAME: &str = "wasmedge";
 
-pub struct WasmEdge {}
+pub struct WasmEdgeExecutor {}
 
 fn get_root(spec: &Spec) -> &PathBuf {
     let root = spec.root().as_ref().unwrap();
@@ -44,7 +42,7 @@ fn env_to_wasi(spec: &Spec) -> Vec<String> {
     env.to_vec()
 }
 
-impl Executor for WasmEdge {
+impl Executor for WasmEdgeExecutor {
     fn exec(spec: &Spec) -> Result<()> {
         // parse wasi parameters
         let args = get_args(&spec);
@@ -80,9 +78,23 @@ impl Executor for WasmEdge {
         Ok(())
     }
 
-    fn can_handle(_: &Spec) -> Result<bool> {
-        Ok(true)
+    fn can_handle(spec: &Spec) -> Result<bool> {
+        if let Some(annotations) = spec.annotations() {
+            if let Some(handler) = annotations.get("run.oci.handler") {
+                return Ok(handler == "wasm");
+            }
+
+            if let Some(variant) = annotations.get("module.wasm.image/variant") {
+                return Ok(variant == "compat");
+            }
+        }
+
+        Ok(false)
     }
+
+    // fn can_handle(_: &Spec) -> Result<bool> {
+    //     Ok(true)
+    // }
 
     fn name() -> &'static str {
         EXECUTOR_NAME
