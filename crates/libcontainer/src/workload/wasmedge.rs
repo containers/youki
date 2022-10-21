@@ -92,10 +92,6 @@ impl Executor for WasmEdgeExecutor {
         Ok(false)
     }
 
-    // fn can_handle(_: &Spec) -> Result<bool> {
-    //     Ok(true)
-    // }
-
     fn name() -> &'static str {
         EXECUTOR_NAME
     }
