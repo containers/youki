@@ -30,5 +30,5 @@ default-features = false
 features = ["std", "suggestions", "derive", "cargo"]
 
 [dependencies.clap_derive]
-version = "4.0.13"
+version = "4.0.18"
 default-features = true
