@@ -6,13 +6,19 @@ There are 3 things you need to do to run a WebAssembly module with youki.
 2. Build a container image with the WebAssembly module
 3. Run the container with youki
 
-## Build youki with wasm-wasmer feature flag enabled
+## Build youki with `wasm-wasmedge` or `wasm-wasmer` feature flag enabled
 
-Run `build.sh` with `-f wasm-wasmer` option.
+- Run `build.sh` with `-f wasm-wasmedge` option.
 
-```console
-./script/build.sh -o -r . -f wasm-wasmer
-```
+    ```console
+    ./script/build.sh -o -r . -f wasm-wasmedge
+    ```
+
+- Run `build.sh` with `-f wasm-wasmer` option.
+
+    ```console
+    ./script/build.sh -o -r . -f wasm-wasmer
+    ```
 
 ## Build a container image with the WebAssembly module
 
