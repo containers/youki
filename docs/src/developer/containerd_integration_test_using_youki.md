@@ -8,11 +8,5 @@ Find the cause of not supporting Kubernetes by integration test of CRI Runtime.
 ## local
 
 ```console
-VAGRANT_VAGRANTFILE=Vagrantfile.containerd2youki vagrant up
-vagrant ssh
-
-# in VM
-sudo -i
-cd /root/go/src/github.com/containerd/containerd/
-make TEST_RUNTIME=io.containerd.runc.v2 TESTFLAGS="-timeout 120m" integration
+make containerd-test
 ```
