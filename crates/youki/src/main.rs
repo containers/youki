@@ -97,7 +97,7 @@ fn main() -> Result<()> {
     let root_path = determine_root_path(opts.global.root)?;
     let systemd_cgroup = opts.global.systemd_cgroup;
 
-    match opts.subcmd {
+    let cmd_result = match opts.subcmd {
         SubCommand::Standard(cmd) => match cmd {
             StandardCmd::Create(create) => {
                 commands::create::create(create, root_path, systemd_cgroup)
@@ -132,7 +132,12 @@ fn main() -> Result<()> {
         SubCommand::Completion(completion) => {
             commands::completion::completion(completion, &mut app)
         }
+    };
+
+    if let Err(ref e) = cmd_result {
+        log::error!("error in executing command: {:?}", e);
     }
+    cmd_result
 }
 
 fn determine_root_path(root_path: Option<PathBuf>) -> Result<PathBuf> {
