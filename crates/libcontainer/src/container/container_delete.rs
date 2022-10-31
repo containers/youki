@@ -28,9 +28,7 @@ impl Container {
         self.refresh_status()
             .context("failed to refresh container status")?;
         if self.can_kill() && force {
-            let sig = signal::Signal::SIGKILL;
-            log::debug!("kill signal {} to {}", sig, self.pid().unwrap());
-            signal::kill(self.pid().unwrap(), sig)?;
+            self.do_kill(signal::Signal::SIGKILL, true)?;
             self.set_status(ContainerStatus::Stopped).save()?;
         }
         log::debug!("container status: {:?}", self.status());
@@ -68,7 +66,7 @@ impl Container {
                         .with_context(|| "failed to run post stop hooks")?;
                 }
             }
-            std::process::exit(0)
+            Ok(())
         } else {
             bail!(
                 "{} could not be deleted because it was {:?}",
