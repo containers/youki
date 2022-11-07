@@ -69,7 +69,7 @@ impl NotifySocket {
         log::debug!("notify container start");
         let cwd = env::current_dir()?;
         unistd::chdir(self.path.parent().unwrap())?;
-        let mut stream = UnixStream::connect(&self.path.file_name().unwrap())?;
+        let mut stream = UnixStream::connect(self.path.file_name().unwrap())?;
         stream.write_all(b"start container")?;
         log::debug!("notify finished");
         unistd::chdir(&cwd)?;

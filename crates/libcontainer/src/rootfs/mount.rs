@@ -373,21 +373,20 @@ impl Mount {
                 Path::new(&dest)
             };
 
-            create_dir_all(&dir)
+            create_dir_all(dir)
                 .with_context(|| format!("failed to create dir for bind mount: {:?}", dir))?;
 
             if src.is_file() {
                 OpenOptions::new()
                     .create(true)
                     .write(true)
-                    .open(&dest)
+                    .open(dest)
                     .with_context(|| format!("failed to create file for bind mount: {:?}", src))?;
             }
 
             src
         } else {
-            create_dir_all(&dest)
-                .with_context(|| format!("Failed to create device: {:?}", dest))?;
+            create_dir_all(dest).with_context(|| format!("Failed to create device: {:?}", dest))?;
 
             PathBuf::from(source)
         };
@@ -560,7 +559,7 @@ mod tests {
         let mounter = Mount::new();
 
         let spec_cgroup_mount = SpecMountBuilder::default()
-            .destination(&container_cgroup)
+            .destination(container_cgroup)
             .source("cgroup")
             .typ("cgroup")
             .build()
@@ -611,7 +610,7 @@ mod tests {
         let mounter = Mount::new();
 
         let spec_cgroup_mount = SpecMountBuilder::default()
-            .destination(&container_cgroup)
+            .destination(container_cgroup)
             .source("cgroup")
             .typ("cgroup")
             .build()

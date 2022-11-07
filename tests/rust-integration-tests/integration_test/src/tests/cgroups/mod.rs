@@ -32,7 +32,7 @@ pub fn cleanup_v2() -> Result<()> {
             .map(fs::remove_dir)
             .collect();
 
-        fs::remove_dir(&runtime_test)
+        fs::remove_dir(runtime_test)
             .with_context(|| format!("failed to delete {:?}", runtime_test))?;
     }
 

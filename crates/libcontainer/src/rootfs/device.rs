@@ -109,7 +109,7 @@ fn create_container_dev_path(rootfs: &Path, dev: &LinuxDevice) -> Result<PathBuf
         .with_context(|| format!("could not join {:?} with {:?}", rootfs, dev.path()))?;
 
     crate::utils::create_dir_all(
-        &full_container_path
+        full_container_path
             .parent()
             .unwrap_or_else(|| Path::new("")),
     )?;

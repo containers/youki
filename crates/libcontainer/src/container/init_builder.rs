@@ -57,7 +57,7 @@ impl<'a> InitContainerBuilder<'a> {
         unistd::chdir(&container_dir)?;
         let notify_path = container_dir.join(NOTIFY_FILE);
         // convert path of root file system of the container to absolute path
-        let rootfs = fs::canonicalize(&spec.root().as_ref().context("no root in spec")?.path())?;
+        let rootfs = fs::canonicalize(spec.root().as_ref().context("no root in spec")?.path())?;
 
         // if socket file path is given in commandline options,
         // get file descriptors of console socket
