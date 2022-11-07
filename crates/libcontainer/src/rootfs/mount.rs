@@ -1,26 +1,24 @@
-use super::{
-    symlink::Symlink,
-    utils::{find_parent_mount, parse_mount},
-};
-use crate::utils::PathBufExt;
+#[cfg(feature = "v1")]
+use super::symlink::Symlink;
+use super::utils::{find_parent_mount, parse_mount};
 use crate::{
     syscall::{syscall::create_syscall, Syscall},
     utils,
+    utils::PathBufExt,
 };
-use anyhow::{anyhow, bail, Context, Result};
-use libcgroups::common::{
-    CgroupSetup::{Hybrid, Legacy, Unified},
-    DEFAULT_CGROUP_ROOT,
-};
+#[cfg(feature = "v2")]
+use anyhow::anyhow;
+use anyhow::{bail, Context, Result};
+use libcgroups::common::CgroupSetup::{Hybrid, Legacy, Unified};
+#[cfg(feature = "v1")]
+use libcgroups::common::DEFAULT_CGROUP_ROOT;
 use nix::{errno::Errno, mount::MsFlags};
 use oci_spec::runtime::{Mount as SpecMount, MountBuilder as SpecMountBuilder};
 use procfs::process::{MountInfo, MountOptFields, Process};
-use std::borrow::Cow;
+use std::fs::{canonicalize, create_dir_all, OpenOptions};
 use std::path::{Path, PathBuf};
-use std::{
-    collections::HashMap,
-    fs::{canonicalize, create_dir_all, OpenOptions},
-};
+#[cfg(feature = "v1")]
+use std::{borrow::Cow, collections::HashMap};
 
 #[derive(Debug)]
 pub struct MountOptions<'a> {
@@ -55,12 +53,20 @@ impl Mount {
                 match libcgroups::common::get_cgroup_setup()
                     .context("failed to determine cgroup setup")?
                 {
-                    Legacy | Hybrid => self
-                        .mount_cgroup_v1(mount, options)
-                        .context("failed to mount cgroup v1")?,
-                    Unified => self
-                        .mount_cgroup_v2(mount, options, flags, &data)
-                        .context("failed to mount cgroup v2")?,
+                    Legacy | Hybrid => {
+                        #[cfg(not(feature = "v1"))]
+                        panic!("libcontainer can't run in a Legacy or Hybrid cgroup setup without the v1 feature");
+                        #[cfg(feature = "v1")]
+                        self.mount_cgroup_v1(mount, options)
+                            .context("failed to mount cgroup v1")?
+                    }
+                    Unified => {
+                        #[cfg(not(feature = "v2"))]
+                        panic!("libcontainer can't run in a Unified cgroup setup without the v2 feature");
+                        #[cfg(feature = "v2")]
+                        self.mount_cgroup_v2(mount, options, flags, &data)
+                            .context("failed to mount cgroup v2")?
+                    }
                 }
             }
             _ => {
@@ -82,6 +88,8 @@ impl Mount {
 
         Ok(())
     }
+
+    #[cfg(feature = "v1")]
     fn mount_cgroup_v1(&self, cgroup_mount: &SpecMount, options: &MountOptions) -> Result<()> {
         log::debug!("Mounting cgroup v1 filesystem");
         // create tmpfs into which the cgroup subsystems will be mounted
@@ -158,6 +166,7 @@ impl Mount {
 
     // On some distros cgroup subsystems are comounted e.g. cpu,cpuacct or net_cls,net_prio. These systems
     // have to be comounted in the container as well as the kernel will reject trying to mount them separately.
+    #[cfg(feature = "v1")]
     fn setup_namespaced_subsystem(
         &self,
         cgroup_mount: &SpecMount,
@@ -198,6 +207,7 @@ impl Mount {
         .with_context(|| format!("failed to mount {:?}", subsystem_mount))
     }
 
+    #[cfg(feature = "v1")]
     fn setup_emulated_subsystem(
         &self,
         cgroup_mount: &SpecMount,
@@ -256,6 +266,7 @@ impl Mount {
         Ok(())
     }
 
+    #[cfg(feature = "v2")]
     fn mount_cgroup_v2(
         &self,
         cgroup_mount: &SpecMount,
@@ -424,6 +435,7 @@ impl Mount {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "v1")]
     use std::fs;
 
     use super::*;
@@ -552,6 +564,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "v1")]
     fn test_namespaced_subsystem_success() -> Result<()> {
         let tmp = create_temp_dir("test_namespaced_subsystem_success")?;
         let container_cgroup = Path::new("/container_cgroup");
@@ -599,6 +612,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "v1")]
     fn test_emulated_subsystem_success() -> Result<()> {
         // arrange
         let tmp = create_temp_dir("test_emulated_subsystem")?;
@@ -661,6 +675,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "v1")]
     fn test_mount_cgroup_v1() -> Result<()> {
         // arrange
         let tmp = create_temp_dir("test_mount_cgroup_v1")?;
@@ -730,6 +745,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "v2")]
     fn test_mount_cgroup_v2() -> Result<()> {
         // arrange
         let tmp = create_temp_dir("test_mount_cgroup_v2")?;
