@@ -11,9 +11,10 @@ use nix::{
     sys::statfs::{statfs, CGROUP2_SUPER_MAGIC, TMPFS_MAGIC},
     unistd::Pid,
 };
+use oci_spec::runtime::LinuxResources;
+#[cfg(any(feature = "cgroupsv2_devices", feature = "v1"))]
 use oci_spec::runtime::{
     LinuxDevice, LinuxDeviceBuilder, LinuxDeviceCgroup, LinuxDeviceCgroupBuilder, LinuxDeviceType,
-    LinuxResources,
 };
 
 #[cfg(feature = "systemd")]
@@ -299,6 +300,7 @@ impl PathBufExt for PathBuf {
     }
 }
 
+#[cfg(any(feature = "cgroupsv2_devices", feature = "v1"))]
 pub(crate) fn default_allow_devices() -> Vec<LinuxDeviceCgroup> {
     vec![
         LinuxDeviceCgroupBuilder::default()
@@ -350,6 +352,7 @@ pub(crate) fn default_allow_devices() -> Vec<LinuxDeviceCgroup> {
     ]
 }
 
+#[cfg(any(feature = "cgroupsv2_devices", feature = "v1"))]
 pub(crate) fn default_devices() -> Vec<LinuxDevice> {
     vec![
         LinuxDeviceBuilder::default()
