@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use anyhow::Result;
 use oci_spec::runtime::Spec;
 use wasmedge_sdk::{
@@ -12,36 +10,6 @@ use super::Executor;
 const EXECUTOR_NAME: &str = "wasmedge";
 
 pub struct WasmEdgeExecutor {}
-
-fn get_root(spec: &Spec) -> &PathBuf {
-    let root = spec.root().as_ref().unwrap();
-    root.path()
-}
-
-fn get_args(spec: &Spec) -> &[String] {
-    let p = match spec.process() {
-        None => return &[],
-        Some(p) => p,
-    };
-
-    match p.args() {
-        None => &[],
-        Some(args) => args.as_slice(),
-    }
-}
-
-fn env_to_wasi(spec: &Spec) -> Vec<String> {
-    let default = vec![];
-    let env = spec
-        .process()
-        .as_ref()
-        .unwrap()
-        .env()
-        .as_ref()
-        .unwrap_or(&default);
-    env.to_vec()
-}
-
 impl Executor for WasmEdgeExecutor {
     fn exec(spec: &Spec) -> Result<()> {
         // parse wasi parameters
@@ -65,7 +33,7 @@ impl Executor for WasmEdgeExecutor {
         wasi_instance.initialize(
             Some(args.iter().map(|s| s as &str).collect()),
             Some(envs.iter().map(|s| s as &str).collect()),
-            Some(vec![&cmd]),
+            None,
         );
 
         let mut vm = vm.register_module_from_file("main", &cmd)?;
@@ -95,4 +63,28 @@ impl Executor for WasmEdgeExecutor {
     fn name() -> &'static str {
         EXECUTOR_NAME
     }
+}
+
+fn get_args(spec: &Spec) -> &[String] {
+    let p = match spec.process() {
+        None => return &[],
+        Some(p) => p,
+    };
+
+    match p.args() {
+        None => &[],
+        Some(args) => args.as_slice(),
+    }
+}
+
+fn env_to_wasi(spec: &Spec) -> Vec<String> {
+    let default = vec![];
+    let env = spec
+        .process()
+        .as_ref()
+        .unwrap()
+        .env()
+        .as_ref()
+        .unwrap_or(&default);
+    env.to_vec()
 }
