@@ -27,7 +27,7 @@ pub fn run_hooks(hooks: Option<&Vec<Hook>>, container: Option<&Container>) -> Re
 
     if let Some(hooks) = hooks {
         for hook in hooks {
-            let mut hook_command = process::Command::new(&hook.path());
+            let mut hook_command = process::Command::new(hook.path());
             // Based on OCI spec, the first argument of the args vector is the
             // arg0, which can be different from the path.  For example, path
             // may be "/usr/bin/true" and arg0 is set to "true". However, rust

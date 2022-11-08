@@ -90,7 +90,7 @@ fn check_readonly_paths() -> TestResult {
             }
         }
 
-        let test_file = bundle_path.join(&ro_file);
+        let test_file = bundle_path.join(ro_file);
         match fs::File::create(&test_file) {
             io::Result::Ok(_) => { /*This is expected*/ }
             io::Result::Err(e) => {
@@ -134,7 +134,7 @@ fn check_readonly_rel_path() -> TestResult {
 fn check_readonly_symlinks() -> TestResult {
     let root = PathBuf::from("/");
     let ro_symlink = "readonly_symlink";
-    let ro_paths = vec![root.join(&ro_symlink).to_string_lossy().to_string()];
+    let ro_paths = vec![root.join(ro_symlink).to_string_lossy().to_string()];
 
     let spec = get_spec(ro_paths);
 
@@ -185,14 +185,14 @@ fn check_readonly_symlinks() -> TestResult {
 fn test_node(mode: u32) -> TestResult {
     let root = PathBuf::from("/");
     let ro_device = "readonly_device";
-    let ro_paths = vec![root.join(&ro_device).to_string_lossy().to_string()];
+    let ro_paths = vec![root.join(ro_device).to_string_lossy().to_string()];
 
     let spec = get_spec(ro_paths);
 
     test_inside_container(spec, &|bundle_path| {
         use std::os::unix::fs::OpenOptionsExt;
         use std::{fs, io};
-        let test_file = bundle_path.join(&ro_device);
+        let test_file = bundle_path.join(ro_device);
 
         let mut opts = fs::OpenOptions::new();
         opts.mode(mode);
