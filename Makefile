@@ -6,10 +6,13 @@ build:
 release-build:
 	./scripts/build.sh -o $(ROOT) -r
 
-test-all: test oci-integration-test integration-test
+test-all: test oci-integration-test integration-test features-test
 
 test: build
 	cd crates && cargo test
+
+features-test: build
+	./scripts/features_test.sh
 
 oci-integration-test:
 	./scripts/oci_integration_tests.sh $(ROOT)
