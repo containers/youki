@@ -1627,9 +1627,9 @@ dependencies = [
 
 [[package]]
 name = "predicates-core"
-version = "1.0.3"
+version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da1c2388b1513e1b605fcec39a95e0a9e8ef088f71443ef37099fa9ae6673fcb"
+checksum = "a6e7125585d872860e9955ca571650b27a4979c5823084168c5ed5bbfb016b56"
 
 [[package]]
 name = "predicates-tree"
