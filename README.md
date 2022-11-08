@@ -6,7 +6,7 @@
 [![codecov](https://codecov.io/gh/containers/youki/branch/main/graph/badge.svg)](https://codecov.io/gh/containers/youki)
 
 <p align="center">
-  <img src="docs/youki_flat.png" width="230" height="230">
+  <img src="docs/youki_flat_full.png" width="450">
 </p>
 
 youki is an implementation of the [OCI runtime-spec](https://github.com/opencontainers/runtime-spec) in Rust, similar to [runc](https://github.com/opencontainers/runc).  
