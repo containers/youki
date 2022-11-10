@@ -57,7 +57,15 @@ impl Container {
         let pid = self.pid().unwrap();
 
         log::debug!("kill signal {} to {}", signal, pid);
-        signal::kill(pid, signal)?;
+        let res = signal::kill(pid, signal);
+
+        match res {
+            Err(nix::errno::Errno::ESRCH) => {
+                /* the process does not exist, which is what we want */
+            }
+            _ => res?,
+        }
+
         // For cgroup V1, a frozon process cannot respond to signals,
         // so we need to thaw it. Only thaw the cgroup for SIGKILL.
         if self.status() == ContainerStatus::Paused && signal == signal::Signal::SIGKILL {
@@ -95,7 +103,14 @@ impl Container {
         let pids = cmanger.get_all_pids()?;
         pids.iter().try_for_each(|&pid| {
             log::debug!("kill signal {} to {}", signal, pid);
-            signal::kill(pid, signal)
+            let res = signal::kill(pid, signal);
+            match res {
+                Err(nix::errno::Errno::ESRCH) => {
+                    /* the process does not exist, which is what we want */
+                    Ok(())
+                }
+                _ => res,
+            }
         })?;
         let ret = cmanger.freeze(libcgroups::common::FreezerState::Thawed);
         if ret.is_err() {
