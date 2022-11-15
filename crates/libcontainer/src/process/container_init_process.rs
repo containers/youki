@@ -15,6 +15,7 @@ use nix::unistd::setsid;
 use nix::unistd::{self, Gid, Uid};
 use oci_spec::runtime::{LinuxNamespaceType, Spec, User};
 use std::collections::HashMap;
+use std::os::unix::fs::PermissionsExt;
 use std::os::unix::io::AsRawFd;
 use std::{
     env, fs,
@@ -391,6 +392,37 @@ pub fn container_init_process(
                 seccomp::initialize_seccomp(seccomp).context("failed to execute seccomp")?;
             sync_seccomp(notify_fd, main_sender, init_receiver)
                 .context("failed to sync seccomp")?;
+        }
+    }
+
+    // this checks if the binary to run actually exists and if we have permissions to
+    // run it. Taken from https://github.com/opencontainers/runc/blob/main/libcontainer/standard_init_linux.go#L195-L206
+    if let Some(args) = proc.args() {
+        let path_var = {
+            let mut ret: &str = "";
+            for var in &envs {
+                if var.starts_with("PATH=") {
+                    ret = var;
+                }
+            }
+            ret.trim_start_matches("PATH=")
+        };
+        let executable_path = utils::get_executable_path(&args[0], path_var);
+        match executable_path {
+            None => bail!(
+                "executable '{}' for container process does not exist",
+                args[0]
+            ),
+            Some(path) => {
+                let metadata = path.metadata()?;
+                let permissions = metadata.permissions();
+                // we have to check if it a file, as dir have there executable bit set,
+                // and check if x in rwx is unset. Logic is taken
+                // from https://docs.rs/is_executable/latest/src/is_executable/lib.rs.html#90
+                if !metadata.is_file() || permissions.mode() & 0o001 == 0 {
+                    bail!("file {:?} does not have executable permission set", path);
+                }
+            }
         }
     }
 

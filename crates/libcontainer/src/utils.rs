@@ -331,6 +331,20 @@ pub fn get_temp_dir_path(test_name: &str) -> PathBuf {
     std::env::temp_dir().join(test_name)
 }
 
+pub fn get_executable_path(name: &str, path_var: &str) -> Option<PathBuf> {
+    // if path has / in it, we have to assume absolute path, as per runc impl
+    if name.contains('/') && PathBuf::from(name).exists() {
+        return Some(PathBuf::from(name));
+    }
+    for path in path_var.split(':') {
+        let potential_path = PathBuf::from(path).join(name);
+        if potential_path.exists() {
+            return Some(potential_path);
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 pub(crate) mod test_utils {
     use crate::process::channel;
