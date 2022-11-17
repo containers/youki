@@ -174,7 +174,7 @@ impl Syscall for LinuxSyscall {
             // so we do it differently
             CapSet::Bounding => {
                 // get all capabilities
-                let all = caps::all();
+                let all = caps::read(None, CapSet::Bounding)?;
                 // the difference will give capabilities
                 // which are to be unset
                 // for each such =, drop that capability
