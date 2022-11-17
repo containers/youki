@@ -16,7 +16,7 @@ keywords = ["youki", "container", "cgroups"]
 default = ["v1", "v2", "systemd"]
 v1 = []
 v2 = []
-systemd = ["v2", "dbus"]
+systemd = ["v2", "dep:dbus"]
 cgroupsv2_devices = ["rbpf", "libbpf-sys", "errno", "libc"]
 
 [dependencies]

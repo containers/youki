@@ -1,11 +1,14 @@
 //! Contains functions related to printing information about system running Youki
-use std::{collections::HashSet, fs, path::Path};
+#[cfg(feature = "v2")]
+use std::collections::HashSet;
+use std::{fs, path::Path};
 
 use anyhow::Result;
 use clap::Parser;
 use libcontainer::rootless;
 use procfs::{CpuInfo, Meminfo};
 
+#[cfg(feature = "v2")]
 use libcgroups::{common::CgroupSetup, v2::controller_type::ControllerType};
 /// Show information about the system
 #[derive(Parser, Debug)]
@@ -114,6 +117,7 @@ pub fn print_hardware() {
 pub fn print_cgroups() {
     print_cgroups_setup();
     print_cgroup_mounts();
+    #[cfg(feature = "v2")]
     print_cgroup_v2_controllers();
 }
 
@@ -126,6 +130,7 @@ pub fn print_cgroups_setup() {
 
 pub fn print_cgroup_mounts() {
     println!("Cgroup mounts");
+    #[cfg(feature = "v1")]
     if let Ok(v1_mounts) = libcgroups::v1::util::list_supported_mount_points() {
         let mut v1_mounts: Vec<String> = v1_mounts
             .iter()
@@ -138,12 +143,13 @@ pub fn print_cgroup_mounts() {
         }
     }
 
-    let unified = libcgroups::v2::util::get_unified_mount_point();
-    if let Ok(mount_point) = &unified {
+    #[cfg(feature = "v2")]
+    if let Ok(mount_point) = libcgroups::v2::util::get_unified_mount_point() {
         println!("  {:<16}{}", "unified", mount_point.display());
     }
 }
 
+#[cfg(feature = "v2")]
 pub fn print_cgroup_v2_controllers() {
     let cgroup_setup = libcgroups::common::get_cgroup_setup();
     let unified = libcgroups::v2::util::get_unified_mount_point();

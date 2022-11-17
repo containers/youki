@@ -23,6 +23,7 @@ impl Symlink {
     }
 
     // Create symlinks for subsystems that have been comounted e.g. cpu -> cpu,cpuacct, cpuacct -> cpu,cpuacct
+    #[cfg(feature = "v1")]
     pub fn setup_comount_symlinks(&self, cgroup_root: &Path, subsystem_name: &str) -> Result<()> {
         if !subsystem_name.contains(',') {
             return Ok(());
@@ -83,13 +84,17 @@ impl Symlink {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "v1")]
     use crate::syscall::linux::LinuxSyscall;
+    use crate::syscall::test::TestHelperSyscall;
+    #[cfg(feature = "v1")]
+    use crate::utils::create_temp_dir;
     use crate::utils::TempDir;
-    use crate::{syscall::test::TestHelperSyscall, utils::create_temp_dir};
     use nix::{
         fcntl::{open, OFlag},
         sys::stat::Mode,
     };
+    #[cfg(feature = "v1")]
     use std::fs;
     use std::path::PathBuf;
 
@@ -166,6 +171,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "v1")]
     fn setup_comounted_symlinks_success() -> Result<()> {
         // arrange
         let tmp = create_temp_dir("setup_comounted_symlinks_success")?;
@@ -208,6 +214,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "v1")]
     fn setup_comounted_symlinks_no_comounts() -> Result<()> {
         // arrange
         let tmp = create_temp_dir("setup_comounted_symlinks_no_comounts")?;

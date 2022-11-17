@@ -1146,7 +1146,6 @@ dependencies = [
  "caps",
  "chrono",
  "crossbeam-channel",
- "dbus",
  "fastrand",
  "futures",
  "libc",
