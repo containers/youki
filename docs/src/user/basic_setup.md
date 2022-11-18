@@ -46,7 +46,7 @@ Currently Youki can only be installed from the source code itself, so you will n
 To clone the repository, run
 
 ```console
-git clone git@github.com:containers/youki.git
+git clone https://github.com/containers/youki.git
 ```
 
 This will create a directory named youki in the directory you ran the command in. This youki directory will be referred to as root directory throughout the documentation.
