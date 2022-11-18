@@ -10,7 +10,7 @@ usage_exit() {
 }
 
 VERSION=debug
-TARGET=x86_64-unknown-linux-gnu
+TARGET="$(uname -m)-unknown-linux-gnu"
 RUNTIMETEST_TARGET="$ROOT/runtimetest-target"
 while getopts f:ro:h OPT; do
     case $OPT in
