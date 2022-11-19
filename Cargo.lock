@@ -3277,6 +3277,7 @@ name = "youki"
 version = "0.0.3"
 dependencies = [
  "anyhow",
+ "caps",
  "chrono",
  "clap",
  "clap_complete",

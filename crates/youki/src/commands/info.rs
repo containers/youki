@@ -4,6 +4,7 @@ use std::collections::HashSet;
 use std::{fs, path::Path};
 
 use anyhow::Result;
+use caps::Capability;
 use clap::Parser;
 use libcontainer::rootless;
 use procfs::{CpuInfo, Meminfo};
@@ -21,6 +22,7 @@ pub fn info(_: Info) -> Result<()> {
     print_hardware();
     print_cgroups();
     print_namespaces();
+    print_capabilities();
 
     Ok(())
 }
@@ -220,6 +222,37 @@ pub fn print_namespaces() {
         // While the CONFIG_CGROUP_NS kernel feature exists, it is obsolete and should not be used. CGroup namespaces
         // are instead enabled with CONFIG_CGROUPS.
         print_feature_status(&content, "CONFIG_CGROUPS", FeatureDisplay::new("cgroup"))
+    }
+}
+
+pub fn print_capabilities() {
+    println!("Capabilities");
+    if let Ok(current) = caps::read(None, caps::CapSet::Bounding) {
+        fn get_cap_supported(caps: &caps::CapsHashSet, cap: caps::Capability) -> &'static str {
+            if caps.contains(&cap) {
+                "available"
+            } else {
+                "unsupported"
+            }
+        }
+
+        println!(
+            "{:<17} {}",
+            "CAP_BPF",
+            get_cap_supported(&current, caps::Capability::CAP_BPF)
+        );
+        println!(
+            "{:<17} {}",
+            "CAP_PERFMON",
+            get_cap_supported(&current, caps::Capability::CAP_PERFMON)
+        );
+        println!(
+            "{:<17} {}",
+            "CAP_CHECKPOINT_RESTORE",
+            get_cap_supported(&current, caps::Capability::CAP_CHECKPOINT_RESTORE)
+        );
+    } else {
+        println!("<cannot find cap info>");
     }
 }
 
