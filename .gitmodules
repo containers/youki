@@ -1,5 +1,5 @@
 [submodule "integration_tests/oci-runtime-tests"]
 	path = tests/oci-runtime-tests/src/github.com/opencontainers/runtime-tools
-	url = git@github.com:opencontainers/runtime-tools.git
+	url = https://github.com/opencontainers/runtime-tools.git
 	ignore = dirty
 

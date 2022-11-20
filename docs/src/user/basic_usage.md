@@ -8,7 +8,7 @@ Youki can run in two modes, namely rootful mode, and rootless mode. The primary 
 
 #### Using youki with a high-level runtime
 
-We will first see how to use Youki with a high-level runtime such as Docker. You can install Docker from [here](https://www.vagrantup.com/docs/installation).
+We will first see how to use Youki with a high-level runtime such as Docker. You can install Docker from [here](https://docs.docker.com/engine/install/).
 
 By default, after installation the docker sets up so that its daemon process will start running in background after booting up. By default, this configures Docker to use its default low-level runtime, and to use Youki instead , we will first need to stop the running Docker daemon.
 
