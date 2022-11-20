@@ -139,7 +139,7 @@
 <p>You can use Youki with Docker, or Podman, but for the purpose of the examples, we will illustrate using Docker.</p>
 <p>Youki can run in two modes, namely rootful mode, and rootless mode. The primary difference from the user-perspective in these is that as the name suggests, rootless mode does not require root/admin permissions, while rootful mode needs the root permissions. Both of these are shown in the examples below.</p>
 <h4 id="using-youki-with-a-high-level-runtime"><a class="header" href="#using-youki-with-a-high-level-runtime">Using youki with a high-level runtime</a></h4>
-<p>We will first see how to use Youki with a high-level runtime such as Docker. You can install Docker from <a href="https://www.vagrantup.com/docs/installation">here</a>.</p>
+<p>We will first see how to use Youki with a high-level runtime such as Docker. You can install Docker from <a href="https://docs.docker.com/engine/install/">here</a>.</p>
 <p>By default, after installation the docker sets up so that its daemon process will start running in background after booting up. By default, this configures Docker to use its default low-level runtime, and to use Youki instead , we will first need to stop the running Docker daemon.</p>
 <p>As Youki needs systemd to compile, this assumes that you are running on a systemd based system. So you an first check if the docker daemon is running or not by running</p>
 <pre><code class="language-console">systemctl status docker

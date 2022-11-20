@@ -220,7 +220,7 @@ youki is named after the Japanese word 'youki', which means 'a container'. In Ja
 <h3 id="getting-the-source"><a class="header" href="#getting-the-source">Getting the source</a></h3>
 <p>Currently Youki can only be installed from the source code itself, so you will need to clone the Youki GitHub repository to get the source code for using it as a runtime. If you are using any crates of Youki as dependency you need to do this step, as Cargo will automatically clone the repository for you.</p>
 <p>To clone the repository, run</p>
-<pre><code class="language-console">git clone git@github.com:containers/youki.git
+<pre><code class="language-console">git clone https://github.com/containers/youki.git
 </code></pre>
 <p>This will create a directory named youki in the directory you ran the command in. This youki directory will be referred to as root directory throughout the documentation.</p>
 <h3 id="installing-the-source"><a class="header" href="#installing-the-source">Installing the source</a></h3>
@@ -266,7 +266,7 @@ $ make build # or release-build
 <p>You can use Youki with Docker, or Podman, but for the purpose of the examples, we will illustrate using Docker.</p>
 <p>Youki can run in two modes, namely rootful mode, and rootless mode. The primary difference from the user-perspective in these is that as the name suggests, rootless mode does not require root/admin permissions, while rootful mode needs the root permissions. Both of these are shown in the examples below.</p>
 <h4 id="using-youki-with-a-high-level-runtime"><a class="header" href="#using-youki-with-a-high-level-runtime">Using youki with a high-level runtime</a></h4>
-<p>We will first see how to use Youki with a high-level runtime such as Docker. You can install Docker from <a href="https://www.vagrantup.com/docs/installation">here</a>.</p>
+<p>We will first see how to use Youki with a high-level runtime such as Docker. You can install Docker from <a href="https://docs.docker.com/engine/install/">here</a>.</p>
 <p>By default, after installation the docker sets up so that its daemon process will start running in background after booting up. By default, this configures Docker to use its default low-level runtime, and to use Youki instead , we will first need to stop the running Docker daemon.</p>
 <p>As Youki needs systemd to compile, this assumes that you are running on a systemd based system. So you an first check if the docker daemon is running or not by running</p>
 <pre><code class="language-console">systemctl status docker
