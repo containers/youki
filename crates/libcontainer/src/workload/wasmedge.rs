@@ -13,12 +13,12 @@ pub struct WasmEdgeExecutor {}
 impl Executor for WasmEdgeExecutor {
     fn exec(spec: &Spec) -> Result<()> {
         // parse wasi parameters
-        let args = get_args(&spec);
+        let args = get_args(spec);
         let mut cmd = args[0].clone();
         if let Some(stripped) = args[0].strip_prefix(std::path::MAIN_SEPARATOR) {
             cmd = stripped.to_string();
         }
-        let envs = env_to_wasi(&spec);
+        let envs = env_to_wasi(spec);
 
         // create configuration with `wasi` option enabled
         let config = ConfigBuilder::new(CommonConfigOptions::default())
