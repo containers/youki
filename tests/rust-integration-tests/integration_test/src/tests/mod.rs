@@ -6,3 +6,4 @@ pub mod pidfile;
 pub mod readonly_paths;
 pub mod seccomp_notify;
 pub mod tlb;
+pub mod hostname;

@@ -20,4 +20,5 @@ fn get_spec() -> Spec {
 fn main() {
     let spec = get_spec();
     tests::validate_readonly_paths(&spec);
+    tests::validate_hostname(&spec);
 }
