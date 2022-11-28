@@ -15,7 +15,6 @@ use nix::unistd::setsid;
 use nix::unistd::{self, Gid, Uid};
 use oci_spec::runtime::{LinuxNamespaceType, Spec, User};
 use std::collections::HashMap;
-use std::os::unix::fs::PermissionsExt;
 use std::os::unix::io::AsRawFd;
 use std::{
     env, fs,
@@ -395,8 +394,8 @@ pub fn container_init_process(
         }
     }
 
-    // this checks if the binary to run actually exists and if we have permissions to
-    // run it. Taken from https://github.com/opencontainers/runc/blob/main/libcontainer/standard_init_linux.go#L195-L206
+    // this checks if the binary to run actually exists and if we have permissions to run it.
+    // Taken from https://github.com/opencontainers/runc/blob/25c9e888686773e7e06429133578038a9abc091d/libcontainer/standard_init_linux.go#L195-L206
     if let Some(args) = proc.args() {
         let path_var = {
             let mut ret: &str = "";
@@ -405,7 +404,7 @@ pub fn container_init_process(
                     ret = var;
                 }
             }
-            ret.trim_start_matches("PATH=")
+            ret
         };
         let executable_path = utils::get_executable_path(&args[0], path_var);
         match executable_path {
@@ -414,12 +413,7 @@ pub fn container_init_process(
                 args[0]
             ),
             Some(path) => {
-                let metadata = path.metadata()?;
-                let permissions = metadata.permissions();
-                // we have to check if it a file, as dir have there executable bit set,
-                // and check if x in rwx is unset. Logic is taken
-                // from https://docs.rs/is_executable/latest/src/is_executable/lib.rs.html#90
-                if !metadata.is_file() || permissions.mode() & 0o001 == 0 {
+                if !utils::is_executable(&path)? {
                     bail!("file {:?} does not have executable permission set", path);
                 }
             }

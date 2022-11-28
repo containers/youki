@@ -54,7 +54,7 @@ test_cases=(
   "linux_seccomp/linux_seccomp.t"
   "linux_sysctl/linux_sysctl.t"
   "linux_uid_mappings/linux_uid_mappings.t"
-  #"misc_props/misc_props.t" runc also fails this, check out https://github.com/containers/youki/pull/1347#issuecomment-1315332775
+  # "misc_props/misc_props.t" runc also fails this, check out https://github.com/containers/youki/pull/1347#issuecomment-1315332775
   "mounts/mounts.t"
   # This test case passed on local box, but not on Github Action. `runc` also fails on Github Action, so likely it is an issue with the test.
   # "pidfile/pidfile.t"
