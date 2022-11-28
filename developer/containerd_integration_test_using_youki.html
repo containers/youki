@@ -139,13 +139,7 @@
 Find the cause of not supporting Kubernetes by integration test of CRI Runtime.</p>
 <p><a href="https://github.com/containers/youki/issues/531">pass the integration test of containerd · Issue #531 · containers/youki</a></p>
 <h2 id="local"><a class="header" href="#local">local</a></h2>
-<pre><code class="language-console">VAGRANT_VAGRANTFILE=Vagrantfile.containerd2youki vagrant up
-vagrant ssh
-
-# in VM
-sudo -i
-cd /root/go/src/github.com/containerd/containerd/
-make TEST_RUNTIME=io.containerd.runc.v2 TESTFLAGS=&quot;-timeout 120m&quot; integration
+<pre><code class="language-console">make containerd-test
 </code></pre>
 
                     </main>
