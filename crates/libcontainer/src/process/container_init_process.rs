@@ -394,6 +394,32 @@ pub fn container_init_process(
         }
     }
 
+    // this checks if the binary to run actually exists and if we have permissions to run it.
+    // Taken from https://github.com/opencontainers/runc/blob/25c9e888686773e7e06429133578038a9abc091d/libcontainer/standard_init_linux.go#L195-L206
+    if let Some(args) = proc.args() {
+        let path_var = {
+            let mut ret: &str = "";
+            for var in &envs {
+                if var.starts_with("PATH=") {
+                    ret = var;
+                }
+            }
+            ret
+        };
+        let executable_path = utils::get_executable_path(&args[0], path_var);
+        match executable_path {
+            None => bail!(
+                "executable '{}' for container process does not exist",
+                args[0]
+            ),
+            Some(path) => {
+                if !utils::is_executable(&path)? {
+                    bail!("file {:?} does not have executable permission set", path);
+                }
+            }
+        }
+    }
+
     // Notify main process that the init process is ready to execute the
     // payload.  Note, because we are already inside the pid namespace, the pid
     // outside the pid namespace should be recorded by the intermediate process
