@@ -25,3 +25,9 @@ validate-rust-tests:
 
 clean:
 	./scripts/clean.sh $(ROOT)
+
+containerd-test:
+	VAGRANT_VAGRANTFILE=Vagrantfile.containerd2youki vagrant up
+	VAGRANT_VAGRANTFILE=Vagrantfile.containerd2youki vagrant provision --provision-with test
+
+
