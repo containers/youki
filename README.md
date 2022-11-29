@@ -170,7 +170,7 @@ $ sudo dnf install   \
 ```console
 $ git clone git@github.com:containers/youki.git
 $ cd youki
-$ make build # or release-build
+$ make youki-dev # or youki-release
 $ ./youki -h # you can get information about youki command
 ```
 
@@ -183,7 +183,7 @@ Let's try to run a container that executes `sleep 30` with youki. This tutorial 
 ```console
 $ git clone git@github.com:containers/youki.git
 $ cd youki
-$ make build # or release-build
+$ make youki-dev # or youki-release
 
 $ mkdir -p tutorial/rootfs
 $ cd tutorial
@@ -273,7 +273,7 @@ Go and node-tap are required to run integration tests. See the [opencontainers/r
 
 ```console
 $ git submodule update --init --recursive
-$ make oci-integration-test
+$ make oci-tests
 ```
 
 ### Setting up Vagrant
@@ -294,7 +294,7 @@ $ VAGRANT_VAGRANTFILE=Vagrantfile.root vagrant ssh
 
 # in virtual machine
 $ cd youki
-$ make build # or release-build
+$ make youki-dev # or youki-release
 ```
 
 # Community

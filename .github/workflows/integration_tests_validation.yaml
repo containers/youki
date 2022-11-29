@@ -43,8 +43,8 @@ jobs:
           sudo mv runc.amd64 /usr/bin/runc
           sudo chmod 755 /usr/bin/runc
       - name: Build
-        run: make release-build
+        run: make youki-release runtimetest rust-oci-tests-bin
       - name: Validate tests on runc
-        run: make validate-rust-tests
+        run: make validate-rust-oci-runc
       - name: Validate tests on youki
-        run: make integration-test
+        run: make rust-oci-tests

@@ -58,7 +58,7 @@ Once you have cloned the source, you can build it using
 ```console
 # go into the cloned directory
 cd youki
-make build # or release-build
+make youki-dev # or youki-release
 ./youki -h # get information about youki command
 ```
 
@@ -106,5 +106,5 @@ VAGRANT_VAGRANTFILE=Vagrantfile.root vagrant ssh
 
 # in virtual machine
 $ cd youki
-$ make build # or release-build
+$ make youki-dev # or youki-release
 ```

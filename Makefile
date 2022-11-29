@@ -1,33 +1,53 @@
 ROOT = $(shell git rev-parse --show-toplevel)
 
-build:
-	./scripts/build.sh -o $(ROOT)
+# builds
 
-release-build:
-	./scripts/build.sh -o $(ROOT) -r
+build: youki-release
 
-test-all: test oci-integration-test integration-test features-test
+youki: youki-dev # helper
 
-test: build
-	cd crates && cargo test
+youki-dev:
+	./scripts/build.sh -o $(ROOT) -c youki
 
-features-test: build
+youki-release:
+	./scripts/build.sh -o $(ROOT) -r -c youki
+
+runtimetest:
+	./scripts/build.sh -o $(ROOT) -r -c runtimetest
+
+rust-oci-tests-bin:
+	./scripts/build.sh -o $(ROOT) -r -c integration-test
+
+all: youki-release rust-oci-tests-bin runtimetest
+
+# Tests
+unittest:
+	cd ./crates && cargo test --all-targets --all-features
+
+featuretest:
 	./scripts/features_test.sh
 
-oci-integration-test:
+oci-tests: youki-release
 	./scripts/oci_integration_tests.sh $(ROOT)
 
-integration-test:
+rust-oci-tests: youki-release runtimetest rust-oci-tests-bin
 	./scripts/rust_integration_tests.sh $(ROOT)/youki
 
-validate-rust-tests:
+validate-rust-oci-runc: runtimetest rust-oci-tests-bin
 	./scripts/rust_integration_tests.sh runc
 
-clean:
-	./scripts/clean.sh $(ROOT)
-
-containerd-test:
+containerd-test: youki-dev
 	VAGRANT_VAGRANTFILE=Vagrantfile.containerd2youki vagrant up
 	VAGRANT_VAGRANTFILE=Vagrantfile.containerd2youki vagrant provision --provision-with test
 
+test-oci: oci-tests rust-oci-tests
 
+test-all: unittest featuretest oci-tests containerd-test # currently not doing rust-oci here
+
+# Misc
+
+lint:
+	cargo clippy --all-targets --all-features
+
+clean:
+	./scripts/clean.sh $(ROOT)
