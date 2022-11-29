@@ -67,7 +67,9 @@ jobs:
       - run: sudo apt-get -y update
       - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev libseccomp-dev
       - name: Run tests
-        run: cd ./crates && cargo test --all --all-features --no-fail-fast
+        run: |
+          export LD_LIBRARY_PATH=$HOME/.wasmedge/lib
+          cd ./crates && cargo test --all --all-features --no-fail-fast
   coverage:
     runs-on: ubuntu-latest
     timeout-minutes: 15
