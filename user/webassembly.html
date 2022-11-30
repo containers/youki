@@ -5,7 +5,6 @@
         <meta charset="UTF-8">
         <title>Webassembly - Youki User and Developer Documentation</title>
         <!-- Custom HTML head -->
-        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
         <meta name="description" content="">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff" />
@@ -28,13 +27,13 @@
     </head>
     <body>
         <!-- Provide site root to javascript -->
-        <script type="text/javascript">
+        <script>
             var path_to_root = "../";
             var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
         </script>
 
         <!-- Work around some values being stored in localStorage wrapped in quotes -->
-        <script type="text/javascript">
+        <script>
             try {
                 var theme = localStorage.getItem('mdbook-theme');
                 var sidebar = localStorage.getItem('mdbook-sidebar');
@@ -50,7 +49,7 @@
         </script>
 
         <!-- Set the theme before any content is loaded, prevents flash -->
-        <script type="text/javascript">
+        <script>
             var theme;
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
@@ -62,7 +61,7 @@
         </script>
 
         <!-- Hide / unhide sidebar before it is displayed -->
-        <script type="text/javascript">
+        <script>
             var html = document.querySelector('html');
             var sidebar = 'hidden';
             if (document.body.clientWidth >= 1080) {
@@ -93,7 +92,7 @@
                             <i class="fa fa-paint-brush"></i>
                         </button>
                         <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
-                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
@@ -124,7 +123,7 @@
                     </div>
                 </div>
                 <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
-                <script type="text/javascript">
+                <script>
                     document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
                     document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
                     Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
@@ -141,10 +140,28 @@
 <li>Build a container image with the WebAssembly module</li>
 <li>Run the container with youki</li>
 </ol>
-<h2 id="build-youki-with-wasm-wasmer-feature-flag-enabled"><a class="header" href="#build-youki-with-wasm-wasmer-feature-flag-enabled">Build youki with wasm-wasmer feature flag enabled</a></h2>
+<h2 id="build-youki-with-wasm-wasmedge-or-wasm-wasmer-feature-flag-enabled"><a class="header" href="#build-youki-with-wasm-wasmedge-or-wasm-wasmer-feature-flag-enabled">Build youki with <code>wasm-wasmedge</code> or <code>wasm-wasmer</code> feature flag enabled</a></h2>
+<ul>
+<li>
+<p>Run <code>build.sh</code> with <code>-f wasm-wasmedge</code> option.</p>
+<pre><code class="language-console">./script/build.sh -o -r . -f wasm-wasmedge
+</code></pre>
+<blockquote>
+<p>The <code>wasm-wasmedge</code> feature will install WasmEdge Runtime library in the <code>$HOME/.wasmedge</code> directory. 
+To make the library avaible in your system, run the following command:</p>
+<pre><code class="language-bash">export LD_LIBRARY_PATH=$HOME/.wasmedge/lib
+</code></pre>
+<p>or</p>
+<pre><code class="language-bash">source $HOME/.wasmedge/env
+</code></pre>
+</blockquote>
+</li>
+<li>
 <p>Run <code>build.sh</code> with <code>-f wasm-wasmer</code> option.</p>
 <pre><code class="language-console">./script/build.sh -o -r . -f wasm-wasmer
 </code></pre>
+</li>
+</ul>
 <h2 id="build-a-container-image-with-the-webassembly-module"><a class="header" href="#build-a-container-image-with-the-webassembly-module">Build a container image with the WebAssembly module</a></h2>
 <p>If you want to run a webassembly module with youki, your config.json has to include either <strong>runc.oci.handler</strong> or <strong>module.wasm.image/variant=compat&quot;</strong>. </p>
 <p>It also needs to specifiy a valid .wasm (webassembly binary) or .wat (webassembly test) module as entrypoint for the container. If a wat module is specified it will be compiled to a wasm module by youki before it is executed. The module also needs to be available in the root filesystem of the container obviously.</p>
@@ -177,8 +194,7 @@ vi src/main.rs
     for envs in std::env::vars() {
         println!(&quot;{:?}&quot;, envs);
     }  
-}
-</code></pre></pre>
+}</code></pre></pre>
 <p>Then compile the program to WASI.</p>
 <pre><code class="language-console">cargo build --target wasm32-wasi
 </code></pre>
@@ -227,15 +243,15 @@ ENTRYPOINT [&quot;wasm-module.wasm&quot;]
 
         </div>
 
-        <script type="text/javascript">
+        <script>
             window.playground_copyable = true;
         </script>
-        <script src="../elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
-        <script src="../mark.min.js" type="text/javascript" charset="utf-8"></script>
-        <script src="../searcher.js" type="text/javascript" charset="utf-8"></script>
-        <script src="../clipboard.min.js" type="text/javascript" charset="utf-8"></script>
-        <script src="../highlight.js" type="text/javascript" charset="utf-8"></script>
-        <script src="../book.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
 
         <!-- Custom JS scripts -->
     </body>
