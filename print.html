@@ -226,7 +226,7 @@ youki is named after the Japanese word 'youki', which means 'a container'. In Ja
 <p>Once you have cloned the source, you can build it using</p>
 <pre><code class="language-console"># go into the cloned directory
 cd youki
-make build # or release-build
+make youki-dev # or youki-release
 ./youki -h # get information about youki command
 </code></pre>
 <p>This will build the Youki binary, and put it at the root level of the cloned directory, that is in the youki/ .</p>
@@ -258,7 +258,7 @@ VAGRANT_VAGRANTFILE=Vagrantfile.root vagrant ssh
 
 # in virtual machine
 $ cd youki
-$ make build # or release-build
+$ make youki-dev # or youki-release
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="basic-usage"><a class="header" href="#basic-usage">Basic Usage</a></h1>
 <p>This explains using Youki as a low-level container runtime. Youki can be used by itself to create, start and run containers, but doing so can be tedious, and thus you might want to use a higher-level runtime with Youki set as its runtime, so that you can get a convenient and easy interface.</p>
@@ -547,7 +547,7 @@ sudo ./youki delete tutorial_container
 <ul>
 <li>
 <p>Run <code>build.sh</code> with <code>-f wasm-wasmedge</code> option.</p>
-<pre><code class="language-console">./script/build.sh -o -r . -f wasm-wasmedge
+<pre><code class="language-console">./scripts/build.sh -o . -r -f wasm-wasmedge
 </code></pre>
 <blockquote>
 <p>The <code>wasm-wasmedge</code> feature will install WasmEdge Runtime library in the <code>$HOME/.wasmedge</code> directory. 
@@ -561,7 +561,7 @@ To make the library avaible in your system, run the following command:</p>
 </li>
 <li>
 <p>Run <code>build.sh</code> with <code>-f wasm-wasmer</code> option.</p>
-<pre><code class="language-console">./script/build.sh -o -r . -f wasm-wasmer
+<pre><code class="language-console">./scripts/build.sh -o . -r -f wasm-wasmer
 </code></pre>
 </li>
 </ul>
