@@ -11,14 +11,17 @@ usage_exit() {
 
 VERSION=debug
 TARGET="$(uname -m)-unknown-linux-gnu"
+CRATE="youki"
 RUNTIMETEST_TARGET="$ROOT/runtimetest-target"
-while getopts f:ro:h OPT; do
+while getopts f:ro:c:h OPT; do
     case $OPT in
         f) features=${OPTARG}
             ;;
         o) output=${OPTARG}
             ;;
         r) VERSION=release
+            ;;
+        c) CRATE=${OPTARG}
             ;;
         h) usage_exit
             ;;
@@ -44,11 +47,23 @@ echo "* features: ${features}"
 OUTPUT=${output:-$ROOT/bin}
 [ ! -d $OUTPUT ] && mkdir -p $OUTPUT
 
-cargo build --target ${TARGET} ${OPTION} ${FEATURES} --bin youki
-cargo build --target ${TARGET} ${OPTION} ${FEATURES} --bin integration_test
-CARGO_TARGET_DIR=${RUNTIMETEST_TARGET} RUSTFLAGS="-Ctarget-feature=+crt-static" cargo build --target ${TARGET} ${OPTION} ${FEATURES} --bin runtimetest
 
-mv ${ROOT}/target/${TARGET}/${VERSION}/{youki,integration_test} ${OUTPUT}/
-mv ${RUNTIMETEST_TARGET}/${TARGET}/${VERSION}/runtimetest ${OUTPUT}/
+if [ "$CRATE" == "youki" ]; then
+    rm -f ${OUTPUT}/youki
+    cargo build --target ${TARGET} ${OPTION} ${FEATURES} --bin youki
+    mv ${ROOT}/target/${TARGET}/${VERSION}/youki ${OUTPUT}/
+fi
+
+if [ "$CRATE" == "integration-test" ]; then
+    rm -f ${OUTPUT}/integration_test
+    cargo build --target ${TARGET} ${OPTION} ${FEATURES} --bin integration_test
+    mv ${ROOT}/target/${TARGET}/${VERSION}/integration_test ${OUTPUT}/
+fi
+
+if [ "$CRATE" == "runtimetest" ]; then
+    rm -f ${OUTPUT}/runtimetest
+    CARGO_TARGET_DIR=${RUNTIMETEST_TARGET} RUSTFLAGS="-Ctarget-feature=+crt-static" cargo build --target ${TARGET} ${OPTION} ${FEATURES} --bin runtimetest
+    mv ${RUNTIMETEST_TARGET}/${TARGET}/${VERSION}/runtimetest ${OUTPUT}/
+fi
 
 exit 0

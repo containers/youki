@@ -20,7 +20,7 @@ jobs:
           toolchain: stable
           override: true
       - name: Build
-        run: make release-build
+        run: make youki-release
       - name: test
         run: make test-all
 

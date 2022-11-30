@@ -27,7 +27,7 @@ jobs:
           profile: minimal
 
       - name: Building PR branch
-        run: make release-build
+        run: make youki-release
 
       - name: Uploading PR build to artifact
         uses: actions/upload-artifact@v2
@@ -59,7 +59,7 @@ jobs:
           profile: minimal
 
       - name: Building main branch
-        run: ./build.sh --release
+        run: make youki-release
 
       - name: Uploading main build to artifact
         uses: actions/upload-artifact@v2
