@@ -6,13 +6,29 @@ There are 3 things you need to do to run a WebAssembly module with youki.
 2. Build a container image with the WebAssembly module
 3. Run the container with youki
 
-## Build youki with wasm-wasmer feature flag enabled
+## Build youki with `wasm-wasmedge` or `wasm-wasmer` feature flag enabled
 
-Run `build.sh` with `-f wasm-wasmer` option.
+- Run `build.sh` with `-f wasm-wasmedge` option.
 
-```console
-./script/build.sh -o -r . -f wasm-wasmer
-```
+    ```console
+    ./script/build.sh -o -r . -f wasm-wasmedge
+    ```
+    > The `wasm-wasmedge` feature will install WasmEdge Runtime library in the `$HOME/.wasmedge` directory. 
+    > To make the library avaible in your system, run the following command:
+    > ```bash
+    > export LD_LIBRARY_PATH=$HOME/.wasmedge/lib
+    > ```
+    > or
+    > ```bash
+    > source $HOME/.wasmedge/env
+    > ```
+    >
+
+- Run `build.sh` with `-f wasm-wasmer` option.
+
+    ```console
+    ./script/build.sh -o -r . -f wasm-wasmer
+    ```
 
 ## Build a container image with the WebAssembly module
 
