@@ -11,10 +11,7 @@ pub fn validate_readonly_paths(spec: &Spec) {
             return;
         }
     };
-    if ro_paths.is_empty() {
-        eprintln!("in readonly paths, expected some readonly paths to be set, found none");
-        return;
-    }
+
     // TODO when https://github.com/rust-lang/rust/issues/86442 stabilizes,
     // change manual matching of i32 to e.kind() and match statement
 

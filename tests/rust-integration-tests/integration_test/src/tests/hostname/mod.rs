@@ -7,12 +7,9 @@ fn create_spec(hostname: &str) -> Spec {
     SpecBuilder::default()
         .hostname(hostname)
         .linux(
+            // Need to reset the read-only paths
             LinuxBuilder::default()
-                .readonly_paths(vec![
-                    "/proc/bus".to_string(),
-                    "/proc/fs".to_string(),
-                    "/proc/sys".to_string(),
-                ])
+                .readonly_paths(vec![])
                 .build()
                 .expect("error in building linux config"),
         )
