@@ -224,17 +224,18 @@ pub fn print_namespaces() {
     }
 }
 
+#[inline]
+fn get_cap_supported(caps: &caps::CapsHashSet, cap: caps::Capability) -> &'static str {
+    if caps.contains(&cap) {
+        "available"
+    } else {
+        "unsupported"
+    }
+}
+
 pub fn print_capabilities() {
     println!("Capabilities");
     if let Ok(current) = caps::read(None, caps::CapSet::Bounding) {
-        fn get_cap_supported(caps: &caps::CapsHashSet, cap: caps::Capability) -> &'static str {
-            if caps.contains(&cap) {
-                "available"
-            } else {
-                "unsupported"
-            }
-        }
-
         println!(
             "{:<17} {}",
             "CAP_BPF",
