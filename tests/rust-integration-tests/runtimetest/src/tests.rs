@@ -12,9 +12,12 @@ pub fn validate_readonly_paths(spec: &Spec) {
         }
     };
 
+    if ro_paths.is_empty() {
+        return;
+    }
+
     // TODO when https://github.com/rust-lang/rust/issues/86442 stabilizes,
     // change manual matching of i32 to e.kind() and match statement
-
     for path in ro_paths {
         if let std::io::Result::Err(e) = test_read_access(path) {
             let errno = Errno::from_i32(e.raw_os_error().unwrap());
