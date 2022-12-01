@@ -4,7 +4,6 @@ use std::collections::HashSet;
 use std::{fs, path::Path};
 
 use anyhow::Result;
-use caps::Capability;
 use clap::Parser;
 use libcontainer::rootless;
 use procfs::{CpuInfo, Meminfo};
