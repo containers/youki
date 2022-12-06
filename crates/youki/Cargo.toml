@@ -1,6 +1,6 @@
 [package]
 name = "youki"
-version = "0.0.3"
+version = "0.0.4"
 description = "A container runtime written in Rust"
 license-file = "../../LICENSE"
 repository = "https://github.com/containers/youki"
@@ -25,9 +25,9 @@ features = ["std", "suggestions", "derive", "cargo"]
 [dependencies]
 anyhow = "1.0.65"
 chrono = { version = "0.4", features = ["serde"] }
-libcgroups = { version = "0.0.3", path = "../libcgroups", default-features = false }
-libcontainer = { version = "0.0.3", path = "../libcontainer", default-features = false }
-liboci-cli = { version = "0.0.3", path = "../liboci-cli" }
+libcgroups = { version = "0.0.4", path = "../libcgroups", default-features = false }
+libcontainer = { version = "0.0.4", path = "../libcontainer", default-features = false }
+liboci-cli = { version = "0.0.4", path = "../liboci-cli" }
 log = { version = "0.4", features = ["std"] }
 nix = "0.25.0"
 oci-spec = { version = "0.5.8", features = ["runtime"] }
