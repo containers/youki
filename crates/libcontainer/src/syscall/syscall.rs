@@ -6,6 +6,7 @@ use std::{any::Any, ffi::OsStr, path::Path, sync::Arc};
 use anyhow::Result;
 use bitflags::bitflags;
 use caps::{CapSet, CapsHashSet};
+use libc;
 use nix::{
     mount::MsFlags,
     sched::CloneFlags,
@@ -15,7 +16,10 @@ use nix::{
 
 use oci_spec::runtime::LinuxRlimit;
 
-use crate::syscall::{linux::LinuxSyscall, test::TestHelperSyscall};
+use crate::syscall::{
+    linux::{LinuxSyscall, MountAttr},
+    test::TestHelperSyscall,
+};
 
 /// This specifies various kernel/other functionalities required for
 /// container management
@@ -44,6 +48,14 @@ pub trait Syscall {
     fn chown(&self, path: &Path, owner: Option<Uid>, group: Option<Gid>) -> Result<()>;
     fn set_groups(&self, groups: &[Gid]) -> Result<()>;
     fn close_range(&self, preserve_fds: i32) -> Result<()>;
+    fn mount_setattr(
+        &self,
+        dirfd: i32,
+        pathname: &Path,
+        flags: u32,
+        mount_attr: &MountAttr,
+        size: libc::size_t,
+    ) -> Result<()>;
 }
 
 pub fn create_syscall() -> Box<dyn Syscall> {

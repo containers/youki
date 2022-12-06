@@ -2,13 +2,13 @@ mod tests;
 mod utils;
 
 use crate::tests::hooks::get_hooks_tests;
+use crate::tests::hostname::get_hostname_test;
 use crate::tests::lifecycle::{ContainerCreate, ContainerLifecycle};
 use crate::tests::linux_ns_itype::get_ns_itype_tests;
 use crate::tests::pidfile::get_pidfile_test;
 use crate::tests::readonly_paths::get_ro_paths_test;
 use crate::tests::seccomp_notify::get_seccomp_notify_test;
 use crate::tests::tlb::get_tlb_test;
-use crate::tests::hostname::get_hostname_test;
 use crate::utils::support::{set_runtime_path, set_runtimetest_path};
 use anyhow::{Context, Result};
 use clap::Parser;

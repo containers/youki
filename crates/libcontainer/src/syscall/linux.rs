@@ -1,8 +1,9 @@
 //! Implements Command trait for Linux systems
-use std::ffi::{CStr, OsStr};
+use std::ffi::{CStr, CString, OsStr};
 use std::fs;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::symlink;
+use std::os::unix::io::RawFd;
 use std::sync::Arc;
 use std::{any::Any, mem, path::Path, ptr};
 
@@ -19,13 +20,40 @@ use nix::{
     unistd,
     unistd::{chown, fchdir, pivot_root, setgroups, sethostname, Gid, Uid},
 };
-use syscalls::{syscall, Sysno::close_range};
+use syscalls::{syscall, Sysno, Sysno::close_range};
 
 use oci_spec::runtime::LinuxRlimit;
 
 use super::Syscall;
 use crate::syscall::syscall::CloseRange;
 use crate::{capabilities, utils};
+
+// Constants used by mount_setattr(2).
+pub const MOUNT_ATTR_RDONLY: u64 = 0x00000001; // Mount read-only.
+pub const MOUNT_ATTR_NOSUID: u64 = 0x00000002; // Ignore suid and sgid bits.
+pub const MOUNT_ATTR_NODEV: u64 = 0x00000004; // Disallow access to device special files.
+pub const MOUNT_ATTR_NOEXEC: u64 = 0x00000008; // Disallow program execution.
+pub const MOUNT_ATTR__ATIME: u64 = 0x00000070; // Setting on how atime should be updated.
+pub const MOUNT_ATTR_RELATIME: u64 = 0x00000000; // - Update atime relative to mtime/ctime.
+pub const MOUNT_ATTR_NOATIME: u64 = 0x00000010; // - Do not update access times.
+pub const MOUNT_ATTR_STRICTATIME: u64 = 0x00000020; // - Always perform atime updates.
+pub const MOUNT_ATTR_NODIRATIME: u64 = 0x00000080; // Do not update directory access times.
+pub const MOUNT_ATTR_NOSYMFOLLOW: u64 = 0x00200000; // Prevents following symbolic links.
+pub const AT_RECURSIVE: u32 = 0x00008000; // Change the mount properties of the entire mount tree.
+
+#[repr(C)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+// A structure used as te third argument of mount_setattr(2).
+pub struct MountAttr {
+    // Mount properties to set.
+    pub attr_set: u64,
+    // Mount properties to clear.
+    pub attr_clr: u64,
+    // Mount propagation type.
+    pub propagation: u64,
+    // User namespace file descriptor.
+    pub userns_fd: u64,
+}
 
 /// Empty structure to implement Command trait for
 #[derive(Clone)]
@@ -331,6 +359,37 @@ impl Syscall for LinuxSyscall {
                 // kernel 5.11. If the kernel is older we emulate close_range in userspace.
                 Self::emulate_close_range(preserve_fds)
             }
+            Err(e) => bail!(e),
+        }
+    }
+
+    fn mount_setattr(
+        &self,
+        dirfd: RawFd,
+        pathname: &Path,
+        flags: u32,
+        mount_attr: &MountAttr,
+        size: libc::size_t,
+    ) -> Result<()> {
+        let path_pathbuf = pathname.to_path_buf();
+        let path_str = path_pathbuf.to_str();
+        let path_c_string = match path_str {
+            Some(path_str) => CString::new(path_str)?,
+            None => bail!("Invalid filename"),
+        };
+        let result = unsafe {
+            syscall!(
+                Sysno::mount_setattr,
+                dirfd,
+                path_c_string.as_ptr(),
+                flags,
+                mount_attr as *const MountAttr,
+                size
+            )
+        };
+
+        match result {
+            Ok(_) => Ok(()),
             Err(e) => bail!(e),
         }
     }

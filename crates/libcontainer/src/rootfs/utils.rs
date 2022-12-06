@@ -4,6 +4,18 @@ use oci_spec::runtime::{LinuxDevice, LinuxDeviceBuilder, LinuxDeviceType, Mount}
 use procfs::process::MountInfo;
 use std::path::{Path, PathBuf};
 
+use crate::syscall::linux;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MountOptionConfig {
+    // Mount Flags.
+    pub flags: MsFlags,
+    // Mount data applied to the mount.
+    pub data: String,
+    // RecAttr represents mount properties to be applied recrusively.
+    pub rec_attr: Option<linux::MountAttr>,
+}
+
 pub fn default_devices() -> Vec<LinuxDevice> {
     vec![
         LinuxDeviceBuilder::default()
@@ -66,9 +78,11 @@ pub fn to_sflag(dev_type: LinuxDeviceType) -> SFlag {
     }
 }
 
-pub fn parse_mount(m: &Mount) -> (MsFlags, String) {
+pub fn parse_mount(m: &Mount) -> MountOptionConfig {
     let mut flags = MsFlags::empty();
     let mut data = Vec::new();
+    let mut mount_attr: Option<linux::MountAttr> = None;
+
     if let Some(options) = &m.options() {
         for s in options {
             if let Some((is_clear, flag)) = match s.as_str() {
@@ -112,12 +126,64 @@ pub fn parse_mount(m: &Mount) -> (MsFlags, String) {
                 } else {
                     flags |= flag;
                 }
-            } else {
-                data.push(s.as_str());
-            };
+                continue;
+            }
+
+            if let Some((is_clear, flag)) = match s.as_str() {
+                "rro" => Some((false, linux::MOUNT_ATTR_RDONLY)),
+                "rrw" => Some((true, linux::MOUNT_ATTR_RDONLY)),
+                "rnosuid" => Some((false, linux::MOUNT_ATTR_NOSUID)),
+                "rsuid" => Some((true, linux::MOUNT_ATTR_NOSUID)),
+                "rnodev" => Some((false, linux::MOUNT_ATTR_NODEV)),
+                "rdev" => Some((true, linux::MOUNT_ATTR_NODEV)),
+                "rnoexec" => Some((false, linux::MOUNT_ATTR_NOEXEC)),
+                "rexec" => Some((true, linux::MOUNT_ATTR_NOEXEC)),
+                "rnodiratime" => Some((false, linux::MOUNT_ATTR_NODIRATIME)),
+                "rdiratime" => Some((true, linux::MOUNT_ATTR_NODIRATIME)),
+                "rrelatime" => Some((false, linux::MOUNT_ATTR_RELATIME)),
+                "rnorelatime" => Some((true, linux::MOUNT_ATTR_RELATIME)),
+                "rnoatime" => Some((false, linux::MOUNT_ATTR_NOATIME)),
+                "ratime" => Some((true, linux::MOUNT_ATTR_NOATIME)),
+                "rstrictatime" => Some((false, linux::MOUNT_ATTR_STRICTATIME)),
+                "rnostrictatime" => Some((true, linux::MOUNT_ATTR_STRICTATIME)),
+                "rnosymfollow" => Some((false, linux::MOUNT_ATTR_NOSYMFOLLOW)),
+                "rsymfollow" => Some((true, linux::MOUNT_ATTR_NOSYMFOLLOW)),
+                // No support for MOUNT_ATTR_IDMAP yet (needs UserNS FD)
+                _ => None,
+            } {
+                if mount_attr.is_none() {
+                    mount_attr = Some(linux::MountAttr {
+                        attr_set: 0,
+                        attr_clr: 0,
+                        propagation: 0,
+                        userns_fd: 0,
+                    });
+                }
+
+                if let Some(mount_attr) = &mut mount_attr {
+                    if is_clear {
+                        mount_attr.attr_clr |= flag;
+                    } else {
+                        mount_attr.attr_set |= flag;
+                        if flag & linux::MOUNT_ATTR__ATIME == flag {
+                            // https://man7.org/linux/man-pages/man2/mount_setattr.2.html
+                            // cannot simply specify the access-time setting in attr_set, but must
+                            // also include MOUNT_ATTR__ATIME in the attr_clr field.
+                            mount_attr.attr_clr |= linux::MOUNT_ATTR__ATIME;
+                        }
+                    }
+                }
+                continue;
+            }
+
+            data.push(s.as_str());
         }
     }
-    (flags, data.join(","))
+    MountOptionConfig {
+        flags,
+        data: data.join(","),
+        rec_attr: mount_attr,
+    }
 }
 
 /// Find parent mount of rootfs in given mount infos
@@ -193,141 +259,214 @@ mod tests {
 
     #[test]
     fn test_parse_mount() {
-        assert_eq!(
-            (MsFlags::empty(), "".to_string()),
-            parse_mount(
-                &MountBuilder::default()
-                    .destination(PathBuf::from("/proc"))
-                    .typ("proc")
-                    .source(PathBuf::from("proc"))
-                    .build()
-                    .unwrap()
-            )
+        let mount_option_config = parse_mount(
+            &MountBuilder::default()
+                .destination(PathBuf::from("/proc"))
+                .typ("proc")
+                .source(PathBuf::from("proc"))
+                .build()
+                .unwrap(),
         );
         assert_eq!(
-            (MsFlags::MS_NOSUID, "mode=755,size=65536k".to_string()),
-            parse_mount(
-                &MountBuilder::default()
-                    .destination(PathBuf::from("/dev"))
-                    .typ("tmpfs")
-                    .source(PathBuf::from("tmpfs"))
-                    .options(vec![
-                        "nosuid".to_string(),
-                        "strictatime".to_string(),
-                        "mode=755".to_string(),
-                        "size=65536k".to_string(),
-                    ])
-                    .build()
-                    .unwrap()
-            )
+            MountOptionConfig {
+                flags: MsFlags::empty(),
+                data: "".to_string(),
+                rec_attr: None,
+            },
+            mount_option_config
+        );
+
+        let mount_option_config = parse_mount(
+            &MountBuilder::default()
+                .destination(PathBuf::from("/dev"))
+                .typ("tmpfs")
+                .source(PathBuf::from("tmpfs"))
+                .options(vec![
+                    "nosuid".to_string(),
+                    "strictatime".to_string(),
+                    "mode=755".to_string(),
+                    "size=65536k".to_string(),
+                ])
+                .build()
+                .unwrap(),
         );
         assert_eq!(
-            (
-                MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC,
-                "newinstance,ptmxmode=0666,mode=0620,gid=5".to_string()
-            ),
-            parse_mount(
-                &MountBuilder::default()
-                    .destination(PathBuf::from("/dev/pts"))
-                    .typ("devpts")
-                    .source(PathBuf::from("devpts"))
-                    .options(vec![
-                        "nosuid".to_string(),
-                        "noexec".to_string(),
-                        "newinstance".to_string(),
-                        "ptmxmode=0666".to_string(),
-                        "mode=0620".to_string(),
-                        "gid=5".to_string(),
-                    ])
-                    .build()
-                    .unwrap()
-            )
+            MountOptionConfig {
+                flags: MsFlags::MS_NOSUID,
+                data: "mode=755,size=65536k".to_string(),
+                rec_attr: None,
+            },
+            mount_option_config
+        );
+
+        let mount_option_config = parse_mount(
+            &MountBuilder::default()
+                .destination(PathBuf::from("/dev/pts"))
+                .typ("devpts")
+                .source(PathBuf::from("devpts"))
+                .options(vec![
+                    "nosuid".to_string(),
+                    "noexec".to_string(),
+                    "newinstance".to_string(),
+                    "ptmxmode=0666".to_string(),
+                    "mode=0620".to_string(),
+                    "gid=5".to_string(),
+                ])
+                .build()
+                .unwrap(),
         );
         assert_eq!(
-            (
-                MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
-                "mode=1777,size=65536k".to_string()
-            ),
-            parse_mount(
-                &MountBuilder::default()
-                    .destination(PathBuf::from("/dev/shm"))
-                    .typ("tmpfs")
-                    .source(PathBuf::from("shm"))
-                    .options(vec![
-                        "nosuid".to_string(),
-                        "noexec".to_string(),
-                        "nodev".to_string(),
-                        "mode=1777".to_string(),
-                        "size=65536k".to_string(),
-                    ])
-                    .build()
-                    .unwrap()
-            )
+            MountOptionConfig {
+                flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC,
+                data: "newinstance,ptmxmode=0666,mode=0620,gid=5".to_string(),
+                rec_attr: None
+            },
+            mount_option_config
+        );
+
+        let mount_option_config = parse_mount(
+            &MountBuilder::default()
+                .destination(PathBuf::from("/dev/shm"))
+                .typ("tmpfs")
+                .source(PathBuf::from("shm"))
+                .options(vec![
+                    "nosuid".to_string(),
+                    "noexec".to_string(),
+                    "nodev".to_string(),
+                    "mode=1777".to_string(),
+                    "size=65536k".to_string(),
+                ])
+                .build()
+                .unwrap(),
         );
         assert_eq!(
-            (
-                MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
-                "".to_string()
-            ),
-            parse_mount(
-                &MountBuilder::default()
-                    .destination(PathBuf::from("/dev/mqueue"))
-                    .typ("mqueue")
-                    .source(PathBuf::from("mqueue"))
-                    .options(vec![
-                        "nosuid".to_string(),
-                        "noexec".to_string(),
-                        "nodev".to_string(),
-                    ])
-                    .build()
-                    .unwrap()
-            )
+            MountOptionConfig {
+                flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
+                data: "mode=1777,size=65536k".to_string(),
+                rec_attr: None
+            },
+            mount_option_config
+        );
+
+        let mount_option_config = parse_mount(
+            &MountBuilder::default()
+                .destination(PathBuf::from("/dev/mqueue"))
+                .typ("mqueue")
+                .source(PathBuf::from("mqueue"))
+                .options(vec![
+                    "nosuid".to_string(),
+                    "noexec".to_string(),
+                    "nodev".to_string(),
+                ])
+                .build()
+                .unwrap(),
         );
         assert_eq!(
-            (
-                MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV | MsFlags::MS_RDONLY,
-                "".to_string()
-            ),
-            parse_mount(
-                &MountBuilder::default()
-                    .destination(PathBuf::from("/sys"))
-                    .typ("sysfs")
-                    .source(PathBuf::from("sysfs"))
-                    .options(vec![
-                        "nosuid".to_string(),
-                        "noexec".to_string(),
-                        "nodev".to_string(),
-                        "ro".to_string(),
-                    ])
-                    .build()
-                    .unwrap()
-            )
+            MountOptionConfig {
+                flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
+                data: "".to_string(),
+                rec_attr: None
+            },
+            mount_option_config
+        );
+
+        let mount_option_config = parse_mount(
+            &MountBuilder::default()
+                .destination(PathBuf::from("/sys"))
+                .typ("sysfs")
+                .source(PathBuf::from("sysfs"))
+                .options(vec![
+                    "nosuid".to_string(),
+                    "noexec".to_string(),
+                    "nodev".to_string(),
+                    "ro".to_string(),
+                ])
+                .build()
+                .unwrap(),
         );
         assert_eq!(
-            (
-                MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV | MsFlags::MS_RDONLY,
-                "".to_string()
-            ),
-            parse_mount(
-                &MountBuilder::default()
-                    .destination(PathBuf::from("/sys/fs/cgroup"))
-                    .typ("cgroup")
-                    .source(PathBuf::from("cgroup"))
-                    .options(vec![
-                        "nosuid".to_string(),
-                        "noexec".to_string(),
-                        "nodev".to_string(),
-                        "relatime".to_string(),
-                        "ro".to_string(),
-                    ])
-                    .build()
-                    .unwrap()
-            )
+            MountOptionConfig {
+                flags: MsFlags::MS_NOSUID
+                    | MsFlags::MS_NOEXEC
+                    | MsFlags::MS_NODEV
+                    | MsFlags::MS_RDONLY,
+                data: "".to_string(),
+                rec_attr: None,
+            },
+            mount_option_config
         );
+
+        let mount_option_config = parse_mount(
+            &MountBuilder::default()
+                .destination(PathBuf::from("/sys/fs/cgroup"))
+                .typ("cgroup")
+                .source(PathBuf::from("cgroup"))
+                .options(vec![
+                    "nosuid".to_string(),
+                    "noexec".to_string(),
+                    "nodev".to_string(),
+                    "relatime".to_string(),
+                    "ro".to_string(),
+                ])
+                .build()
+                .unwrap(),
+        );
+        assert_eq!(
+            MountOptionConfig {
+                flags: MsFlags::MS_NOSUID
+                    | MsFlags::MS_NOEXEC
+                    | MsFlags::MS_NODEV
+                    | MsFlags::MS_RDONLY,
+                data: "".to_string(),
+                rec_attr: None
+            },
+            mount_option_config,
+        );
+
         // this case is just for coverage purpose
+        let mount_option_config = parse_mount(
+            &MountBuilder::default()
+                .options(vec![
+                    "defaults".to_string(),
+                    "ro".to_string(),
+                    "rw".to_string(),
+                    "suid".to_string(),
+                    "nosuid".to_string(),
+                    "dev".to_string(),
+                    "nodev".to_string(),
+                    "exec".to_string(),
+                    "noexec".to_string(),
+                    "sync".to_string(),
+                    "async".to_string(),
+                    "dirsync".to_string(),
+                    "remount".to_string(),
+                    "mand".to_string(),
+                    "nomand".to_string(),
+                    "atime".to_string(),
+                    "noatime".to_string(),
+                    "diratime".to_string(),
+                    "nodiratime".to_string(),
+                    "bind".to_string(),
+                    "rbind".to_string(),
+                    "unbindable".to_string(),
+                    "runbindable".to_string(),
+                    "private".to_string(),
+                    "rprivate".to_string(),
+                    "shared".to_string(),
+                    "rshared".to_string(),
+                    "slave".to_string(),
+                    "rslave".to_string(),
+                    "relatime".to_string(),
+                    "norelatime".to_string(),
+                    "strictatime".to_string(),
+                    "nostrictatime".to_string(),
+                ])
+                .build()
+                .unwrap(),
+        );
         assert_eq!(
-            (
-                MsFlags::MS_NOSUID
+            MountOptionConfig {
+                flags: MsFlags::MS_NOSUID
                     | MsFlags::MS_NODEV
                     | MsFlags::MS_NOEXEC
                     | MsFlags::MS_REMOUNT
@@ -336,48 +475,67 @@ mod tests {
                     | MsFlags::MS_NODIRATIME
                     | MsFlags::MS_BIND
                     | MsFlags::MS_UNBINDABLE,
-                "".to_string()
-            ),
-            parse_mount(
-                &MountBuilder::default()
-                    .options(vec![
-                        "defaults".to_string(),
-                        "ro".to_string(),
-                        "rw".to_string(),
-                        "suid".to_string(),
-                        "nosuid".to_string(),
-                        "dev".to_string(),
-                        "nodev".to_string(),
-                        "exec".to_string(),
-                        "noexec".to_string(),
-                        "sync".to_string(),
-                        "async".to_string(),
-                        "dirsync".to_string(),
-                        "remount".to_string(),
-                        "mand".to_string(),
-                        "nomand".to_string(),
-                        "atime".to_string(),
-                        "noatime".to_string(),
-                        "diratime".to_string(),
-                        "nodiratime".to_string(),
-                        "bind".to_string(),
-                        "rbind".to_string(),
-                        "unbindable".to_string(),
-                        "runbindable".to_string(),
-                        "private".to_string(),
-                        "rprivate".to_string(),
-                        "shared".to_string(),
-                        "rshared".to_string(),
-                        "slave".to_string(),
-                        "rslave".to_string(),
-                        "relatime".to_string(),
-                        "norelatime".to_string(),
-                        "strictatime".to_string(),
-                        "nostrictatime".to_string(),
-                    ])
-                    .build()
-                    .unwrap()
-            )
+                data: "".to_string(),
+                rec_attr: None,
+            },
+            mount_option_config
+        );
+
+        // this case is just for coverage purpose
+        let mount_option_config = parse_mount(
+            &MountBuilder::default()
+                .options(vec![
+                    "rro".to_string(),
+                    "rrw".to_string(),
+                    "rnosuid".to_string(),
+                    "rsuid".to_string(),
+                    "rnodev".to_string(),
+                    "rdev".to_string(),
+                    "rnoexec".to_string(),
+                    "rexec".to_string(),
+                    "rnodiratime".to_string(),
+                    "rdiratime".to_string(),
+                    "rrelatime".to_string(),
+                    "rnorelatime".to_string(),
+                    "rnoatime".to_string(),
+                    "ratime".to_string(),
+                    "rstrictatime".to_string(),
+                    "rnostrictatime".to_string(),
+                    "rnosymfollow".to_string(),
+                    "rsymfollow".to_string(),
+                ])
+                .build()
+                .unwrap(),
+        );
+        assert_eq!(
+            MountOptionConfig {
+                flags: MsFlags::empty(),
+                data: "".to_string(),
+                rec_attr: Some(linux::MountAttr {
+                    attr_set: linux::MOUNT_ATTR_RDONLY
+                        | linux::MOUNT_ATTR_NOSUID
+                        | linux::MOUNT_ATTR_NODEV
+                        | linux::MOUNT_ATTR_NOEXEC
+                        | linux::MOUNT_ATTR_NODIRATIME
+                        | linux::MOUNT_ATTR_RELATIME
+                        | linux::MOUNT_ATTR_NOATIME
+                        | linux::MOUNT_ATTR_STRICTATIME
+                        | linux::MOUNT_ATTR_NOSYMFOLLOW,
+                    attr_clr: linux::MOUNT_ATTR_RDONLY
+                        | linux::MOUNT_ATTR_NOSUID
+                        | linux::MOUNT_ATTR_NODEV
+                        | linux::MOUNT_ATTR_NOEXEC
+                        | linux::MOUNT_ATTR_NODIRATIME
+                        | linux::MOUNT_ATTR_RELATIME
+                        | linux::MOUNT_ATTR_NOATIME
+                        | linux::MOUNT_ATTR_STRICTATIME
+                        | linux::MOUNT_ATTR_NOSYMFOLLOW
+                        | linux::MOUNT_ATTR__ATIME,
+                    propagation: 0,
+                    userns_fd: 0,
+                }),
+            },
+            mount_option_config
         );
     }
 }
