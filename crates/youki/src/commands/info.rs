@@ -21,6 +21,7 @@ pub fn info(_: Info) -> Result<()> {
     print_hardware();
     print_cgroups();
     print_namespaces();
+    print_capabilities();
 
     Ok(())
 }
@@ -220,6 +221,38 @@ pub fn print_namespaces() {
         // While the CONFIG_CGROUP_NS kernel feature exists, it is obsolete and should not be used. CGroup namespaces
         // are instead enabled with CONFIG_CGROUPS.
         print_feature_status(&content, "CONFIG_CGROUPS", FeatureDisplay::new("cgroup"))
+    }
+}
+
+#[inline]
+fn is_cap_available(caps: &caps::CapsHashSet, cap: caps::Capability) -> &'static str {
+    if caps.contains(&cap) {
+        "available"
+    } else {
+        "unavailable"
+    }
+}
+
+pub fn print_capabilities() {
+    println!("Capabilities");
+    if let Ok(current) = caps::read(None, caps::CapSet::Bounding) {
+        println!(
+            "{:<17} {}",
+            "CAP_BPF",
+            is_cap_available(&current, caps::Capability::CAP_BPF)
+        );
+        println!(
+            "{:<17} {}",
+            "CAP_PERFMON",
+            is_cap_available(&current, caps::Capability::CAP_PERFMON)
+        );
+        println!(
+            "{:<17} {}",
+            "CAP_CHECKPOINT_RESTORE",
+            is_cap_available(&current, caps::Capability::CAP_CHECKPOINT_RESTORE)
+        );
+    } else {
+        println!("<cannot find cap info>");
     }
 }
 
