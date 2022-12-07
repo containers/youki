@@ -225,11 +225,11 @@ pub fn print_namespaces() {
 }
 
 #[inline]
-fn get_cap_supported(caps: &caps::CapsHashSet, cap: caps::Capability) -> &'static str {
+fn is_cap_available(caps: &caps::CapsHashSet, cap: caps::Capability) -> &'static str {
     if caps.contains(&cap) {
         "available"
     } else {
-        "unsupported"
+        "unavailable"
     }
 }
 
@@ -239,17 +239,17 @@ pub fn print_capabilities() {
         println!(
             "{:<17} {}",
             "CAP_BPF",
-            get_cap_supported(&current, caps::Capability::CAP_BPF)
+            is_cap_available(&current, caps::Capability::CAP_BPF)
         );
         println!(
             "{:<17} {}",
             "CAP_PERFMON",
-            get_cap_supported(&current, caps::Capability::CAP_PERFMON)
+            is_cap_available(&current, caps::Capability::CAP_PERFMON)
         );
         println!(
             "{:<17} {}",
             "CAP_CHECKPOINT_RESTORE",
-            get_cap_supported(&current, caps::Capability::CAP_CHECKPOINT_RESTORE)
+            is_cap_available(&current, caps::Capability::CAP_CHECKPOINT_RESTORE)
         );
     } else {
         println!("<cannot find cap info>");
