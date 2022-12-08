@@ -588,4 +588,52 @@ mod tests {
         let result = parse_device_number("a:b");
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_parse_psi_full_stats() {
+        let tmp = create_temp_dir("test_parse_psi_full_stats").unwrap();
+        let file_content = [
+            "some avg10=80.00 avg60=50.00 avg300=90.00 total=0",
+            "full avg10=10.00 avg60=30.00 avg300=50.00 total=0",
+        ]
+        .join("\n");
+        let psi_file = set_fixture(&tmp, "psi.pressure", &file_content).unwrap();
+
+        let result = psi_stats(&psi_file).unwrap();
+        assert_eq!(
+            result,
+            PSIStats {
+                some: PSIData {
+                    avg10: 80.0,
+                    avg60: 50.0,
+                    avg300: 90.0
+                },
+                full: PSIData {
+                    avg10: 10.0,
+                    avg60: 30.0,
+                    avg300: 50.0
+                },
+            }
+        )
+    }
+
+    #[test]
+    fn test_parse_psi_only_some() {
+        let tmp = create_temp_dir("test_parse_psi_only_some").unwrap();
+        let file_content = ["some avg10=80.00 avg60=50.00 avg300=90.00 total=0"].join("\n");
+        let psi_file = set_fixture(&tmp, "psi.pressure", &file_content).unwrap();
+
+        let result = psi_stats(&psi_file).unwrap();
+        assert_eq!(
+            result,
+            PSIStats {
+                some: PSIData {
+                    avg10: 80.0,
+                    avg60: 50.0,
+                    avg300: 90.0
+                },
+                full: PSIData::default(),
+            }
+        )
+    }
 }

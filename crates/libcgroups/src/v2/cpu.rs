@@ -306,6 +306,7 @@ mod tests {
         let tmp = create_temp_dir("test_stat_usage").expect("create temp directory for test");
         let content = ["usage_usec 7730", "user_usec 4387", "system_usec 3498"].join("\n");
         set_fixture(&tmp, CPU_STAT, &content).expect("create stat file");
+        set_fixture(&tmp, CPU_PSI, "").expect("create psi file");
 
         let actual = Cpu::stats(&tmp).expect("get cgroup stats");
         let expected = CpuUsage {

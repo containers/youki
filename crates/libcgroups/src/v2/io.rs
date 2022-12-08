@@ -317,6 +317,7 @@ mod test {
         ]
         .join("\n");
         set_fixture(&tmp, "io.stat", &stat_content).unwrap();
+        set_fixture(&tmp, CGROUP_IO_PSI, "").expect("create psi file");
 
         let mut actual = Io::stats(&tmp).expect("get cgroup stats");
         let expected = BlkioStats {
