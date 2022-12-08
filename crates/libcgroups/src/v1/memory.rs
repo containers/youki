@@ -125,6 +125,7 @@ impl StatsProvider for Memory {
             cache: stats["cache"],
             hierarchy,
             stats,
+            ..Default::default()
         })
     }
 }

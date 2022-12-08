@@ -3,7 +3,7 @@ use std::{borrow::Cow, path::Path};
 
 use crate::{
     common::{self, ControllerOpt},
-    stats::{CpuUsage, StatsProvider},
+    stats::{self, CpuStats, StatsProvider},
 };
 
 use oci_spec::runtime::LinuxCpu;
@@ -18,6 +18,7 @@ const UNRESTRICTED_QUOTA: &str = "max";
 const MAX_CPU_WEIGHT: u64 = 10000;
 
 const CPU_STAT: &str = "cpu.stat";
+const CPU_PSI: &str = "cpu.pressure";
 
 pub struct Cpu {}
 
@@ -32,10 +33,10 @@ impl Controller for Cpu {
 }
 
 impl StatsProvider for Cpu {
-    type Stats = CpuUsage;
+    type Stats = CpuStats;
 
     fn stats(cgroup_path: &Path) -> Result<Self::Stats> {
-        let mut stats = CpuUsage::default();
+        let mut stats = CpuStats::default();
 
         let stat_content = common::read_cgroup_file(cgroup_path.join(CPU_STAT))?;
         for entry in stat_content.lines() {
@@ -46,13 +47,15 @@ impl StatsProvider for Cpu {
 
             let value = parts[1].parse()?;
             match parts[0] {
-                "usage_usec" => stats.usage_total = value,
-                "user_usec" => stats.usage_user = value,
-                "system_usec" => stats.usage_kernel = value,
+                "usage_usec" => stats.usage.usage_total = value,
+                "user_usec" => stats.usage.usage_user = value,
+                "system_usec" => stats.usage.usage_kernel = value,
                 _ => continue,
             }
         }
 
+        stats.psi =
+            stats::psi_stats(&cgroup_path.join(CPU_PSI)).context("could not read cpu psi")?;
         Ok(stats)
     }
 }
@@ -137,7 +140,10 @@ impl Cpu {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test::{create_temp_dir, set_fixture, setup};
+    use crate::{
+        stats::CpuUsage,
+        test::{create_temp_dir, set_fixture, setup},
+    };
     use oci_spec::runtime::LinuxCpuBuilder;
     use std::fs;
 
@@ -309,7 +315,7 @@ mod tests {
             ..Default::default()
         };
 
-        assert_eq!(actual, expected);
+        assert_eq!(actual.usage, expected);
     }
 
     #[test]
