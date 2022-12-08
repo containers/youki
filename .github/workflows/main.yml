@@ -8,7 +8,7 @@ on:
 
 jobs:
   changes:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 15
     outputs:
       dirs: ${{ steps.filter.outputs.changes }}
@@ -27,7 +27,7 @@ jobs:
   check:
     needs: [changes]
     if: ${{ !contains(needs.changes.outputs.dirs, '[]') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 15
     strategy:
       matrix:
@@ -51,7 +51,7 @@ jobs:
         working-directory: ${{matrix.dirs}}
         run: cargo clippy --all-targets --all-features -- -D warnings
   tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 15
     strategy:
       matrix:
@@ -71,7 +71,7 @@ jobs:
           export LD_LIBRARY_PATH=$HOME/.wasmedge/lib
           cd ./crates && cargo test --all --all-features --no-fail-fast
   coverage:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 15
     name: Run test coverage
     steps:
@@ -103,7 +103,7 @@ jobs:
         with:
           file: ./coverage.lcov
   integration_tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 15
     strategy:
       matrix:
