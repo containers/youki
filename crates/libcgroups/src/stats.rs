@@ -392,7 +392,7 @@ fn parse_psi(stat_line: &str) -> Result<PSIData> {
         }
     }
 
-    return Ok(psi_data);
+    Ok(psi_data)
 }
 
 #[cfg(test)]
