@@ -8,7 +8,7 @@ on:
 
 jobs:
   changes:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 15
     outputs:
       dirs: ${{ steps.filter.outputs.changes }}
@@ -22,7 +22,7 @@ jobs:
   validate:
     needs: [changes]
     if: ${{ !contains(needs.changes.outputs.dirs, '[]') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 15
     strategy:
       matrix:
