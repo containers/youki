@@ -2,17 +2,22 @@ use anyhow::{anyhow, Result};
 use nix::{mount::MsFlags, sys::stat::SFlag, NixPath};
 use oci_spec::runtime::{LinuxDevice, LinuxDeviceBuilder, LinuxDeviceType, Mount};
 use procfs::process::MountInfo;
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
-use crate::syscall::linux;
+use crate::syscall::linux::{self, MountAttrOption};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MountOptionConfig {
-    // Mount Flags.
+    /// Mount Flags.
     pub flags: MsFlags,
-    // Mount data applied to the mount.
+
+    /// Mount data applied to the mount.
     pub data: String,
-    // RecAttr represents mount properties to be applied recrusively.
+
+    /// RecAttr represents mount properties to be applied recrusively.
     pub rec_attr: Option<linux::MountAttr>,
 }
 
@@ -129,28 +134,20 @@ pub fn parse_mount(m: &Mount) -> MountOptionConfig {
                 continue;
             }
 
-            if let Some((is_clear, flag)) = match s.as_str() {
-                "rro" => Some((false, linux::MOUNT_ATTR_RDONLY)),
-                "rrw" => Some((true, linux::MOUNT_ATTR_RDONLY)),
-                "rnosuid" => Some((false, linux::MOUNT_ATTR_NOSUID)),
-                "rsuid" => Some((true, linux::MOUNT_ATTR_NOSUID)),
-                "rnodev" => Some((false, linux::MOUNT_ATTR_NODEV)),
-                "rdev" => Some((true, linux::MOUNT_ATTR_NODEV)),
-                "rnoexec" => Some((false, linux::MOUNT_ATTR_NOEXEC)),
-                "rexec" => Some((true, linux::MOUNT_ATTR_NOEXEC)),
-                "rnodiratime" => Some((false, linux::MOUNT_ATTR_NODIRATIME)),
-                "rdiratime" => Some((true, linux::MOUNT_ATTR_NODIRATIME)),
-                "rrelatime" => Some((false, linux::MOUNT_ATTR_RELATIME)),
-                "rnorelatime" => Some((true, linux::MOUNT_ATTR_RELATIME)),
-                "rnoatime" => Some((false, linux::MOUNT_ATTR_NOATIME)),
-                "ratime" => Some((true, linux::MOUNT_ATTR_NOATIME)),
-                "rstrictatime" => Some((false, linux::MOUNT_ATTR_STRICTATIME)),
-                "rnostrictatime" => Some((true, linux::MOUNT_ATTR_STRICTATIME)),
-                "rnosymfollow" => Some((false, linux::MOUNT_ATTR_NOSYMFOLLOW)),
-                "rsymfollow" => Some((true, linux::MOUNT_ATTR_NOSYMFOLLOW)),
-                // No support for MOUNT_ATTR_IDMAP yet (needs UserNS FD)
-                _ => None,
-            } {
+            if let Ok(mount_attr_option) = linux::MountAttrOption::from_str(s.as_str()) {
+                let (is_clear, flag) = match mount_attr_option {
+                    MountAttrOption::MountArrtRdonly(is_clear, flag) => (is_clear, flag),
+                    MountAttrOption::MountAttrNosuid(is_clear, flag) => (is_clear, flag),
+                    MountAttrOption::MountAttrNodev(is_clear, flag) => (is_clear, flag),
+                    MountAttrOption::MountAttrNoexec(is_clear, flag) => (is_clear, flag),
+                    MountAttrOption::MountAttrAtime(is_clear, flag) => (is_clear, flag),
+                    MountAttrOption::MountAttrRelatime(is_clear, flag) => (is_clear, flag),
+                    MountAttrOption::MountAttrNoatime(is_clear, flag) => (is_clear, flag),
+                    MountAttrOption::MountAttrStrictAtime(is_clear, flag) => (is_clear, flag),
+                    MountAttrOption::MountAttrNoDiratime(is_clear, flag) => (is_clear, flag),
+                    MountAttrOption::MountAttrNosymfollow(is_clear, flag) => (is_clear, flag),
+                };
+
                 if mount_attr.is_none() {
                     mount_attr = Some(linux::MountAttr {
                         attr_set: 0,
@@ -199,6 +196,8 @@ pub fn find_parent_mount(rootfs: &Path, mount_infos: Vec<MountInfo>) -> Result<M
 
 #[cfg(test)]
 mod tests {
+    use crate::syscall::linux::MountAttr;
+
     use super::*;
     use anyhow::Context;
     use oci_spec::runtime::MountBuilder;
@@ -511,29 +510,7 @@ mod tests {
             MountOptionConfig {
                 flags: MsFlags::empty(),
                 data: "".to_string(),
-                rec_attr: Some(linux::MountAttr {
-                    attr_set: linux::MOUNT_ATTR_RDONLY
-                        | linux::MOUNT_ATTR_NOSUID
-                        | linux::MOUNT_ATTR_NODEV
-                        | linux::MOUNT_ATTR_NOEXEC
-                        | linux::MOUNT_ATTR_NODIRATIME
-                        | linux::MOUNT_ATTR_RELATIME
-                        | linux::MOUNT_ATTR_NOATIME
-                        | linux::MOUNT_ATTR_STRICTATIME
-                        | linux::MOUNT_ATTR_NOSYMFOLLOW,
-                    attr_clr: linux::MOUNT_ATTR_RDONLY
-                        | linux::MOUNT_ATTR_NOSUID
-                        | linux::MOUNT_ATTR_NODEV
-                        | linux::MOUNT_ATTR_NOEXEC
-                        | linux::MOUNT_ATTR_NODIRATIME
-                        | linux::MOUNT_ATTR_RELATIME
-                        | linux::MOUNT_ATTR_NOATIME
-                        | linux::MOUNT_ATTR_STRICTATIME
-                        | linux::MOUNT_ATTR_NOSYMFOLLOW
-                        | linux::MOUNT_ATTR__ATIME,
-                    propagation: 0,
-                    userns_fd: 0,
-                }),
+                rec_attr: Some(MountAttr::all())
             },
             mount_option_config
         );

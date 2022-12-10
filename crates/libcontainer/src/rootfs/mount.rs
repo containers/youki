@@ -12,9 +12,8 @@ use anyhow::{bail, Context, Result};
 use libcgroups::common::CgroupSetup::{Hybrid, Legacy, Unified};
 #[cfg(feature = "v1")]
 use libcgroups::common::DEFAULT_CGROUP_ROOT;
-use nix::{errno::Errno, mount::MsFlags};
+use nix::{dir::Dir, errno::Errno, fcntl::OFlag, mount::MsFlags, sys::stat::Mode};
 use oci_spec::runtime::{Mount as SpecMount, MountBuilder as SpecMountBuilder};
-use openat::Dir;
 use procfs::process::{MountInfo, MountOptFields, Process};
 use std::fs::{canonicalize, create_dir_all, OpenOptions};
 use std::mem;
@@ -463,7 +462,7 @@ impl Mount {
         }
 
         if let Some(mount_attr) = &mount_option_config.rec_attr {
-            let open_dir = Dir::open(dest)?;
+            let open_dir = Dir::open(dest, OFlag::O_DIRECTORY, Mode::empty())?;
             let dir_fd_pathbuf = PathBuf::from(format!("/proc/self/fd/{}", open_dir.as_raw_fd()));
             self.syscall.mount_setattr(
                 -1,
