@@ -14,6 +14,7 @@ const CGROUP_MEMORY_SWAP: &str = "memory.swap.max";
 const CGROUP_MEMORY_MAX: &str = "memory.max";
 const CGROUP_MEMORY_LOW: &str = "memory.low";
 const MEMORY_STAT: &str = "memory.stat";
+const MEMORY_PSI: &str = "memory.pressure";
 
 pub struct Memory {}
 
@@ -37,6 +38,8 @@ impl StatsProvider for Memory {
             memswap: Self::get_memory_data(cgroup_path, "memory.swap", "fail")?,
             hierarchy: true,
             stats: stats::parse_flat_keyed_data(&cgroup_path.join(MEMORY_STAT))?,
+            psi: stats::psi_stats(&cgroup_path.join(MEMORY_PSI))
+                .context("could not read memory psi")?,
             ..Default::default()
         };
 

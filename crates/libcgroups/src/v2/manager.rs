@@ -164,7 +164,7 @@ impl CgroupManager for Manager {
 
         for subsystem in CONTROLLER_TYPES {
             match subsystem {
-                ControllerType::Cpu => stats.cpu.usage = Cpu::stats(&self.full_path)?,
+                ControllerType::Cpu => stats.cpu = Cpu::stats(&self.full_path)?,
                 ControllerType::HugeTlb => stats.hugetlb = HugeTlb::stats(&self.full_path)?,
                 ControllerType::Pids => stats.pids = Pids::stats(&self.full_path)?,
                 ControllerType::Memory => stats.memory = Memory::stats(&self.full_path)?,
