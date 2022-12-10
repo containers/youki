@@ -42,7 +42,7 @@ impl Executor for WasmerExecutor {
             .finalize()?;
 
         let store = Store::default();
-        let module = Module::from_file(&store, &args[0]).context("could not load wasm module")?;
+        let module = Module::from_file(&store, &args[0]).with_context(|| format!("could not load wasm module from {}", &args[0]))?;
 
         let imports = wasm_env
             .import_object(&module)
