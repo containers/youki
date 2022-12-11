@@ -51,20 +51,29 @@ impl Executor for WasmtimeExecutor {
             .with_context(|| format!("could not load wasm module from {}", &cmd))?;
 
         let mut linker = Linker::new(&engine);
-        wasmtime_wasi::add_to_linker(&mut linker, |s| s).context("cannot add wasi context to linker")?;
+        wasmtime_wasi::add_to_linker(&mut linker, |s| s)
+            .context("cannot add wasi context to linker")?;
 
         let wasi = WasiCtxBuilder::new()
             .inherit_stdio()
-            .args(&args).context("cannot add args to wasi context")?
-            .envs(&envs).context("cannot add environment variables to wasi context")?
+            .args(args)
+            .context("cannot add args to wasi context")?
+            .envs(&envs)
+            .context("cannot add environment variables to wasi context")?
             .build();
 
         let mut store = Store::new(&engine, wasi);
-    
-        let instance = linker.instantiate(&mut store, &module).context("wasm module could not be instantiated")?;
-        let start = instance.get_func(&mut store, "_start").ok_or(anyhow!("could not retrieve wasm module main function"))?;
 
-        start.call(&mut store, &mut[], &mut[]).context("wasm module was not executed successfully")
+        let instance = linker
+            .instantiate(&mut store, &module)
+            .context("wasm module could not be instantiated")?;
+        let start = instance
+            .get_func(&mut store, "_start")
+            .ok_or_else(|| anyhow!("could not retrieve wasm module main function"))?;
+
+        start
+            .call(&mut store, &[], &mut [])
+            .context("wasm module was not executed successfully")
     }
 
     fn can_handle(spec: &Spec) -> Result<bool> {

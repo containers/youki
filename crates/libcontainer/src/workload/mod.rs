@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use oci_spec::runtime::Spec;
 
-use self::{default::DefaultExecutor};
+use self::default::DefaultExecutor;
 #[cfg(feature = "wasm-wasmedge")]
 use self::wasmedge::WasmEdgeExecutor;
 #[cfg(feature = "wasm-wasmer")]
