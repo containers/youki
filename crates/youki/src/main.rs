@@ -3,6 +3,7 @@
 //! This crate provides a container runtime which can be used by a high-level container runtime to run containers.
 mod commands;
 mod logger;
+mod workload;
 
 use anyhow::bail;
 use anyhow::Context;

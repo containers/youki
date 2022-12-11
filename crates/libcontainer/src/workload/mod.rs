@@ -1,51 +1,32 @@
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use oci_spec::runtime::Spec;
 
-use self::default::DefaultExecutor;
-#[cfg(feature = "wasm-wasmedge")]
-use self::wasmedge::WasmEdgeExecutor;
-#[cfg(feature = "wasm-wasmer")]
-use self::wasmer::WasmerExecutor;
-#[cfg(feature = "wasm-wasmtime")]
-use self::wasmtime::WasmtimeExecutor;
-
 pub mod default;
-#[cfg(feature = "wasm-wasmedge")]
-pub mod wasmedge;
-#[cfg(feature = "wasm-wasmer")]
-pub mod wasmer;
-#[cfg(feature = "wasm-wasmtime")]
-pub mod wasmtime;
 
-static EMPTY: Vec<String> = Vec::new();
+pub static EMPTY: Vec<String> = Vec::new();
 
 pub trait Executor {
     /// Executes the workload
-    fn exec(spec: &Spec) -> Result<()>;
+    fn exec(&self, spec: &Spec) -> Result<()>;
+
     /// Checks if the handler is able to handle the workload
-    fn can_handle(spec: &Spec) -> Result<bool>;
+    fn can_handle(&self, spec: &Spec) -> Result<bool>;
+
     /// The name of the handler
-    fn name() -> &'static str;
+    fn name(&self) -> &'static str;
 }
-pub struct ExecutorManager {}
+
+pub struct ExecutorManager {
+    pub executors: Vec<Box<dyn Executor>>,
+}
 
 impl ExecutorManager {
-    pub fn exec(spec: &Spec) -> Result<()> {
-        #[cfg(feature = "wasm-wasmer")]
-        if WasmerExecutor::can_handle(spec)? {
-            return WasmerExecutor::exec(spec).context("wasmer execution failed");
+    pub fn exec(&self, spec: &Spec) -> Result<()> {
+        for executor in self.executors.iter() {
+            if executor.can_handle(spec)? {
+                return executor.exec(spec).context("execution failed");
+            }
         }
-
-        #[cfg(feature = "wasm-wasmedge")]
-        if WasmEdgeExecutor::can_handle(spec)? {
-            return WasmEdgeExecutor::exec(spec).context("wasmedge execution failed");
-        }
-
-        #[cfg(feature = "wasm-wasmtime")]
-        if WasmtimeExecutor::can_handle(spec)? {
-            return WasmtimeExecutor::exec(spec).context("wasmtime execution failed");
-        }
-
-        DefaultExecutor::exec(spec).context("default execution failed")
+        bail!("cannot find executor")
     }
 }

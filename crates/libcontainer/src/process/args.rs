@@ -4,6 +4,7 @@ use std::os::unix::prelude::RawFd;
 use std::path::PathBuf;
 
 use crate::rootless::Rootless;
+use crate::workload::ExecutorManager;
 use crate::{container::Container, notify_socket::NotifyListener, syscall::Syscall};
 
 #[derive(Debug, Copy, Clone)]
@@ -35,4 +36,6 @@ pub struct ContainerArgs<'a> {
     pub cgroup_manager: Box<dyn CgroupManager>,
     /// If the container is to be run in detached mode
     pub detached: bool,
+    /// TODO: Comment
+    pub executor_manager: &'a ExecutorManager,
 }

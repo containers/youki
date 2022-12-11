@@ -5,21 +5,27 @@ use std::path::PathBuf;
 use libcontainer::{container::builder::ContainerBuilder, syscall::syscall::create_syscall};
 use liboci_cli::Exec;
 
+use crate::workload::executor::default_executors;
+
 pub fn exec(args: Exec, root_path: PathBuf) -> Result<i32> {
     let syscall = create_syscall();
-    let pid = ContainerBuilder::new(args.container_id.clone(), syscall.as_ref())
-        .with_root_path(root_path)?
-        .with_console_socket(args.console_socket.as_ref())
-        .with_pid_file(args.pid_file.as_ref())?
-        .validate_id()?
-        .as_tenant()
-        .with_detach(args.detach)
-        .with_cwd(args.cwd.as_ref())
-        .with_env(args.env.clone().into_iter().collect())
-        .with_process(args.process.as_ref())
-        .with_no_new_privs(args.no_new_privs)
-        .with_container_args(args.command.clone())
-        .build()?;
+    let pid = ContainerBuilder::new(
+        args.container_id.clone(),
+        syscall.as_ref(),
+        default_executors(),
+    )
+    .with_root_path(root_path)?
+    .with_console_socket(args.console_socket.as_ref())
+    .with_pid_file(args.pid_file.as_ref())?
+    .validate_id()?
+    .as_tenant()
+    .with_detach(args.detach)
+    .with_cwd(args.cwd.as_ref())
+    .with_env(args.env.clone().into_iter().collect())
+    .with_process(args.process.as_ref())
+    .with_no_new_privs(args.no_new_privs)
+    .with_container_args(args.command.clone())
+    .build()?;
 
     // See https://github.com/containers/youki/pull/1252 for a detailed explanation
     // basically, if there is any error in starting exec, the build above will return error

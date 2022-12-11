@@ -9,6 +9,7 @@ use crate::{
     rootless::Rootless,
     syscall::Syscall,
     utils,
+    workload::ExecutorManager,
 };
 use anyhow::{bail, Context, Result};
 use nix::unistd::Pid;
@@ -43,6 +44,8 @@ pub(super) struct ContainerBuilderImpl<'a> {
     pub preserve_fds: i32,
     /// If the container is to be run in detached mode
     pub detached: bool,
+    /// TODO: Comment
+    pub executor_manager: ExecutorManager,
 }
 
 impl<'a> ContainerBuilderImpl<'a> {
@@ -126,6 +129,7 @@ impl<'a> ContainerBuilderImpl<'a> {
             rootless: &self.rootless,
             cgroup_manager: cmanager,
             detached: self.detached,
+            executor_manager: &self.executor_manager,
         };
 
         let init_pid = process::container_main_process::container_main_process(&container_args)?;

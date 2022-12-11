@@ -16,9 +16,14 @@ impl Container {
     /// ```no_run
     /// use libcontainer::container::builder::ContainerBuilder;
     /// use libcontainer::syscall::syscall::create_syscall;
+    /// use libcontainer::workload::default::DefaultExecutor;
     ///
     /// # fn main() -> anyhow::Result<()> {
-    /// let mut container = ContainerBuilder::new("74f1a4cb3801".to_owned(), create_syscall().as_ref())
+    /// let mut container = ContainerBuilder::new(
+    ///     "74f1a4cb3801".to_owned(),
+    ///     create_syscall().as_ref(),
+    ///     vec![Box::new(DefaultExecutor::default())],
+    /// )
     /// .as_init("/var/run/docker/bundle")
     /// .build()?;
     ///

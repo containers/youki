@@ -144,6 +144,7 @@ impl<'a> TenantContainerBuilder<'a> {
             container: None,
             preserve_fds: self.base.preserve_fds,
             detached: self.detached,
+            executor_manager: self.base.executor_manager,
         };
 
         let pid = builder_impl.create()?;
