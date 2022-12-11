@@ -1,18 +1,20 @@
 use anyhow::{Context, Result};
 use oci_spec::runtime::Spec;
 
-use self::{default::DefaultExecutor, wasmtime::WasmtimeExecutor};
+use self::{default::DefaultExecutor};
 #[cfg(feature = "wasm-wasmedge")]
 use self::wasmedge::WasmEdgeExecutor;
 #[cfg(feature = "wasm-wasmer")]
 use self::wasmer::WasmerExecutor;
+#[cfg(feature = "wasm-wasmtime")]
+use self::wasmtime::WasmtimeExecutor;
 
 pub mod default;
 #[cfg(feature = "wasm-wasmedge")]
 pub mod wasmedge;
 #[cfg(feature = "wasm-wasmer")]
 pub mod wasmer;
-
+#[cfg(feature = "wasm-wasmtime")]
 pub mod wasmtime;
 
 static EMPTY: Vec<String> = Vec::new();
@@ -39,6 +41,7 @@ impl ExecutorManager {
             return WasmEdgeExecutor::exec(spec).context("wasmedge execution failed");
         }
 
+        #[cfg(feature = "wasm-wasmtime")]
         if WasmtimeExecutor::can_handle(spec)? {
             return WasmtimeExecutor::exec(spec).context("wasmtime execution failed");
         }
