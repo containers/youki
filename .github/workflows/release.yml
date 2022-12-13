@@ -22,7 +22,7 @@ jobs:
       - name: Build
         run: make youki-release
       - name: test
-        run: make test-all
+        run: make unittest featuretest oci-tests
 
   upload:
     name: Upload

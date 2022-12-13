@@ -22,7 +22,7 @@ all: youki-release rust-oci-tests-bin runtimetest
 
 # Tests
 unittest:
-	LD_LIBRARY_PATH=$HOME/.wasmedge/lib cd ./crates && cargo test --all --all-targets --all-features
+	cd ./crates && LD_LIBRARY_PATH=${HOME}/.wasmedge/lib cargo test --all --all-targets --all-features
 
 featuretest:
 	./scripts/features_test.sh
