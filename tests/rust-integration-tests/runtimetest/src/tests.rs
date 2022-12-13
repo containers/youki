@@ -68,7 +68,7 @@ pub fn validate_hostname(spec: &Spec) {
         }
         let actual_hostname = nix::unistd::gethostname().expect("failed to get current hostname");
         let actual_hostname = actual_hostname.to_str().unwrap();
-        if &actual_hostname != expected_hostname {
+        if actual_hostname != expected_hostname {
             eprintln!(
                 "Unexpected hostname, expected: {:?} found: {:?}",
                 expected_hostname, actual_hostname

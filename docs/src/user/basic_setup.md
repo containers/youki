@@ -23,7 +23,8 @@ $ sudo apt-get install   \
       libdbus-glib-1-dev \
       build-essential    \
       libelf-dev \
-      libseccomp-dev
+      libseccomp-dev \
+      libclang-dev
 ```
 
 #### Fedora, Centos, RHEL and related distributions
@@ -34,7 +35,8 @@ $ sudo dnf install   \
       systemd-devel  \
       dbus-devel     \
       elfutils-libelf-devel \
-      libseccomp-devel
+      libseccomp-devel \
+      libclang-dev
 ```
 
 ---
