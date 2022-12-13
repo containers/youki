@@ -4,7 +4,7 @@ use anyhow::{bail, Context, Result};
 
 use crate::{
     common::{self, ControllerOpt},
-    stats::{self, BlkioDeviceStat, BlkioStats, StatsProvider},
+    stats::{self, psi_stats, BlkioDeviceStat, BlkioStats, StatsProvider},
 };
 
 use super::controller::Controller;
@@ -13,6 +13,7 @@ use oci_spec::runtime::LinuxBlockIo;
 const CGROUP_BFQ_IO_WEIGHT: &str = "io.bfq.weight";
 const CGROUP_IO_WEIGHT: &str = "io.weight";
 const CGROUP_IO_STAT: &str = "io.stat";
+const CGROUP_IO_PSI: &str = "io.pressure";
 
 pub struct Io {}
 
@@ -71,6 +72,7 @@ impl StatsProvider for Io {
         let stats = BlkioStats {
             service_bytes,
             serviced,
+            psi: psi_stats(&cgroup_path.join(CGROUP_IO_PSI)).context("could not read io psi")?,
             ..Default::default()
         };
 
@@ -315,6 +317,7 @@ mod test {
         ]
         .join("\n");
         set_fixture(&tmp, "io.stat", &stat_content).unwrap();
+        set_fixture(&tmp, CGROUP_IO_PSI, "").expect("create psi file");
 
         let mut actual = Io::stats(&tmp).expect("get cgroup stats");
         let expected = BlkioStats {

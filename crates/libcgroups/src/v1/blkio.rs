@@ -181,6 +181,7 @@ impl Blkio {
             wait_time: Self::parse_blkio_file(&cgroup_path.join(BLKIO_WAIT_TIME))?,
             queued: Self::parse_blkio_file(&cgroup_path.join(BLKIO_QUEUED))?,
             merged: Self::parse_blkio_file(&cgroup_path.join(BLKIO_MERGED))?,
+            ..Default::default()
         };
 
         Ok(stats)

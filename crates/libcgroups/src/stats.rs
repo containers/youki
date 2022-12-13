@@ -32,6 +32,8 @@ pub struct CpuStats {
     pub usage: CpuUsage,
     /// Cpu Throttling statistics for the cgroup
     pub throttling: CpuThrottling,
+    /// Pressure Stall Information
+    pub psi: PSIStats,
 }
 
 /// Reports the cpu usage for a cgroup
@@ -79,6 +81,8 @@ pub struct MemoryStats {
     pub hierarchy: bool,
     /// Various memory statistics
     pub stats: HashMap<String, u64>,
+    /// Pressure Stall Information
+    pub psi: PSIStats,
 }
 
 /// Reports memory stats for one type of memory
@@ -104,7 +108,7 @@ pub struct PidStats {
 }
 
 /// Reports block io stats for a cgroup
-#[derive(Debug, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Default, PartialEq, Serialize)]
 pub struct BlkioStats {
     // Number of bytes transferred to/from a device by the cgroup
     pub service_bytes: Vec<BlkioDeviceStat>,
@@ -122,6 +126,8 @@ pub struct BlkioStats {
     pub queued: Vec<BlkioDeviceStat>,
     // Number of requests merged into requests for I/O operations
     pub merged: Vec<BlkioDeviceStat>,
+    /// Pressure Stall Information
+    pub psi: PSIStats,
 }
 
 /// Reports single stat value for a specific device
@@ -160,6 +166,26 @@ pub struct HugeTlbStats {
     pub max_usage: u64,
     /// Number of allocation failures due to HugeTlb usage limit
     pub fail_count: u64,
+}
+
+/// Reports Pressure Stall Information for a cgroup
+#[derive(Debug, Default, PartialEq, Serialize)]
+pub struct PSIStats {
+    /// Percentage of walltime that some (one or more) tasks were delayed due to lack of resources
+    pub some: PSIData,
+    /// Percentage of walltime in which all tasks were delayed by lack of resources
+    pub full: PSIData,
+}
+
+///
+#[derive(Debug, Default, PartialEq, Serialize)]
+pub struct PSIData {
+    /// Running average over the last 10 seconds
+    pub avg10: f64,
+    /// Running average over the last 60 seconds
+    pub avg60: f64,
+    /// Running average over the last 300 seconds
+    pub avg300: f64,
 }
 
 /// Reports which hugepage sizes are supported by the system
@@ -325,6 +351,48 @@ pub fn pid_stats(cgroup_path: &Path) -> Result<PidStats> {
     }
 
     Ok(stats)
+}
+
+pub fn psi_stats(psi_file: &Path) -> Result<PSIStats> {
+    let mut stats = PSIStats::default();
+
+    let psi = common::read_cgroup_file(psi_file)?;
+    for line in psi.lines() {
+        match &line[0..4] {
+            "some" => stats.some = parse_psi(&line[4..])?,
+            "full" => stats.full = parse_psi(&line[4..])?,
+            _ => continue,
+        }
+    }
+
+    Ok(stats)
+}
+
+fn parse_psi(stat_line: &str) -> Result<PSIData> {
+    let mut psi_data = PSIData::default();
+
+    for kv in stat_line.split_ascii_whitespace() {
+        match kv.split_once('=') {
+            Some(("avg10", v)) => {
+                psi_data.avg10 = v
+                    .parse()
+                    .with_context(|| format!("invalid psi value {v}"))?
+            }
+            Some(("avg60", v)) => {
+                psi_data.avg60 = v
+                    .parse()
+                    .with_context(|| format!("invalid psi value {v}"))?
+            }
+            Some(("avg300", v)) => {
+                psi_data.avg300 = v
+                    .parse()
+                    .with_context(|| format!("invalid psi value {v}"))?
+            }
+            _ => continue,
+        }
+    }
+
+    Ok(psi_data)
 }
 
 #[cfg(test)]
@@ -519,5 +587,53 @@ mod tests {
     fn test_parse_invalid_device_number() {
         let result = parse_device_number("a:b");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_psi_full_stats() {
+        let tmp = create_temp_dir("test_parse_psi_full_stats").unwrap();
+        let file_content = [
+            "some avg10=80.00 avg60=50.00 avg300=90.00 total=0",
+            "full avg10=10.00 avg60=30.00 avg300=50.00 total=0",
+        ]
+        .join("\n");
+        let psi_file = set_fixture(&tmp, "psi.pressure", &file_content).unwrap();
+
+        let result = psi_stats(&psi_file).unwrap();
+        assert_eq!(
+            result,
+            PSIStats {
+                some: PSIData {
+                    avg10: 80.0,
+                    avg60: 50.0,
+                    avg300: 90.0
+                },
+                full: PSIData {
+                    avg10: 10.0,
+                    avg60: 30.0,
+                    avg300: 50.0
+                },
+            }
+        )
+    }
+
+    #[test]
+    fn test_parse_psi_only_some() {
+        let tmp = create_temp_dir("test_parse_psi_only_some").unwrap();
+        let file_content = ["some avg10=80.00 avg60=50.00 avg300=90.00 total=0"].join("\n");
+        let psi_file = set_fixture(&tmp, "psi.pressure", &file_content).unwrap();
+
+        let result = psi_stats(&psi_file).unwrap();
+        assert_eq!(
+            result,
+            PSIStats {
+                some: PSIData {
+                    avg10: 80.0,
+                    avg60: 50.0,
+                    avg300: 90.0
+                },
+                full: PSIData::default(),
+            }
+        )
     }
 }

@@ -7,7 +7,7 @@ on:
 jobs:
   check:
     name: Check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
         with:
@@ -27,7 +27,7 @@ jobs:
   upload:
     name: Upload
     needs: check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
       - run: sudo apt-get -y update
@@ -54,7 +54,7 @@ jobs:
 
   release:
     name: Create Draft Release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     needs:
       - upload
     outputs:
@@ -101,7 +101,7 @@ jobs:
   publish:
     name: Publish Packages
     needs: check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     env:
       CARGO_REGISTRY_TOKEN: 'DUMMY Token' #${{ secrets.CARGO_REGISTRY_TOKEN }}
     steps:
