@@ -1,12 +1,14 @@
 //! Implements Command trait for Linux systems
-use std::ffi::{CStr, OsStr};
+use std::ffi::{CStr, CString, OsStr};
 use std::fs;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::symlink;
+use std::os::unix::io::RawFd;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::{any::Any, mem, path::Path, ptr};
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Error, Result};
 use caps::{CapSet, CapsHashSet};
 use libc::{c_char, setdomainname, uid_t};
 use nix::fcntl;
@@ -19,13 +21,160 @@ use nix::{
     unistd,
     unistd::{chown, fchdir, pivot_root, setgroups, sethostname, Gid, Uid},
 };
-use syscalls::{syscall, Sysno::close_range};
+use syscalls::{syscall, Sysno, Sysno::close_range};
 
 use oci_spec::runtime::LinuxRlimit;
 
 use super::Syscall;
 use crate::syscall::syscall::CloseRange;
 use crate::{capabilities, utils};
+
+// Flags used in mount_setattr(2).
+// see https://man7.org/linux/man-pages/man2/mount_setattr.2.html.
+pub const AT_RECURSIVE: u32 = 0x00008000; // Change the mount properties of the entire mount tree.
+pub const MOUNT_ATTR__ATIME: u64 = 0x00000070; // Setting on how atime should be updated.
+const MOUNT_ATTR_RDONLY: u64 = 0x00000001;
+const MOUNT_ATTR_NOSUID: u64 = 0x00000002;
+const MOUNT_ATTR_NODEV: u64 = 0x00000004;
+const MOUNT_ATTR_NOEXEC: u64 = 0x00000008;
+const MOUNT_ATTR_RELATIME: u64 = 0x00000000;
+const MOUNT_ATTR_NOATIME: u64 = 0x00000010;
+const MOUNT_ATTR_STRICTATIME: u64 = 0x00000020;
+const MOUNT_ATTR_NODIRATIME: u64 = 0x00000080;
+const MOUNT_ATTR_NOSYMFOLLOW: u64 = 0x00200000;
+
+/// Constants used by mount_setattr(2).
+pub enum MountAttrOption {
+    /// Mount read-only.
+    MountArrtRdonly(bool, u64),
+
+    /// Ignore suid and sgid bits.
+    MountAttrNosuid(bool, u64),
+
+    /// Disallow access to device special files.
+    MountAttrNodev(bool, u64),
+
+    /// Disallow program execution.
+    MountAttrNoexec(bool, u64),
+
+    /// Setting on how atime should be updated.
+    MountAttrAtime(bool, u64),
+
+    /// Update atime relative to mtime/ctime.
+    MountAttrRelatime(bool, u64),
+
+    /// Do not update access times.
+    MountAttrNoatime(bool, u64),
+
+    /// Always perform atime updates.
+    MountAttrStrictAtime(bool, u64),
+
+    /// Do not update directory access times.
+    MountAttrNoDiratime(bool, u64),
+
+    /// Prevents following symbolic links.
+    MountAttrNosymfollow(bool, u64),
+}
+
+impl FromStr for MountAttrOption {
+    type Err = Error;
+
+    fn from_str(option: &str) -> Result<Self, Self::Err> {
+        match option {
+            "rro" => Ok(MountAttrOption::MountArrtRdonly(false, MOUNT_ATTR_RDONLY)),
+            "rrw" => Ok(MountAttrOption::MountArrtRdonly(true, MOUNT_ATTR_RDONLY)),
+            "rnosuid" => Ok(MountAttrOption::MountAttrNosuid(false, MOUNT_ATTR_NOSUID)),
+            "rsuid" => Ok(MountAttrOption::MountAttrNosuid(true, MOUNT_ATTR_NOSUID)),
+            "rnodev" => Ok(MountAttrOption::MountAttrNodev(false, MOUNT_ATTR_NODEV)),
+            "rdev" => Ok(MountAttrOption::MountAttrNodev(true, MOUNT_ATTR_NODEV)),
+            "rnoexec" => Ok(MountAttrOption::MountAttrNoexec(false, MOUNT_ATTR_NOEXEC)),
+            "rexec" => Ok(MountAttrOption::MountAttrNoexec(true, MOUNT_ATTR_NOEXEC)),
+            "rnodiratime" => Ok(MountAttrOption::MountAttrNoDiratime(
+                false,
+                MOUNT_ATTR_NODIRATIME,
+            )),
+            "rdiratime" => Ok(MountAttrOption::MountAttrNoDiratime(
+                true,
+                MOUNT_ATTR_NODIRATIME,
+            )),
+            "rrelatime" => Ok(MountAttrOption::MountAttrRelatime(
+                false,
+                MOUNT_ATTR_RELATIME,
+            )),
+            "rnorelatime" => Ok(MountAttrOption::MountAttrRelatime(
+                true,
+                MOUNT_ATTR_RELATIME,
+            )),
+            "rnoatime" => Ok(MountAttrOption::MountAttrNoatime(false, MOUNT_ATTR_NOATIME)),
+            "ratime" => Ok(MountAttrOption::MountAttrNoatime(true, MOUNT_ATTR_NOATIME)),
+            "rstrictatime" => Ok(MountAttrOption::MountAttrStrictAtime(
+                false,
+                MOUNT_ATTR_STRICTATIME,
+            )),
+            "rnostrictatime" => Ok(MountAttrOption::MountAttrStrictAtime(
+                true,
+                MOUNT_ATTR_STRICTATIME,
+            )),
+            "rnosymfollow" => Ok(MountAttrOption::MountAttrNosymfollow(
+                false,
+                MOUNT_ATTR_NOSYMFOLLOW,
+            )),
+            "rsymfollow" => Ok(MountAttrOption::MountAttrNosymfollow(
+                true,
+                MOUNT_ATTR_NOSYMFOLLOW,
+            )),
+            // No support for MOUNT_ATTR_IDMAP yet (needs UserNS FD)
+            _ => Err(anyhow!("Unexpected option.")),
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+/// A structure used as te third argument of mount_setattr(2).
+pub struct MountAttr {
+    /// Mount properties to set.
+    pub attr_set: u64,
+
+    /// Mount properties to clear.
+    pub attr_clr: u64,
+
+    /// Mount propagation type.
+    pub propagation: u64,
+
+    /// User namespace file descriptor.
+    pub userns_fd: u64,
+}
+
+impl MountAttr {
+    /// Return MountAttr with the flag raised.
+    /// This function is used in test code.
+    pub fn all() -> Self {
+        MountAttr {
+            attr_set: MOUNT_ATTR_RDONLY
+                | MOUNT_ATTR_NOSUID
+                | MOUNT_ATTR_NODEV
+                | MOUNT_ATTR_NOEXEC
+                | MOUNT_ATTR_NODIRATIME
+                | MOUNT_ATTR_RELATIME
+                | MOUNT_ATTR_NOATIME
+                | MOUNT_ATTR_STRICTATIME
+                | MOUNT_ATTR_NOSYMFOLLOW,
+            attr_clr: MOUNT_ATTR_RDONLY
+                | MOUNT_ATTR_NOSUID
+                | MOUNT_ATTR_NODEV
+                | MOUNT_ATTR_NOEXEC
+                | MOUNT_ATTR_NODIRATIME
+                | MOUNT_ATTR_RELATIME
+                | MOUNT_ATTR_NOATIME
+                | MOUNT_ATTR_STRICTATIME
+                | MOUNT_ATTR_NOSYMFOLLOW
+                | MOUNT_ATTR__ATIME,
+            propagation: 0,
+            userns_fd: 0,
+        }
+    }
+}
 
 /// Empty structure to implement Command trait for
 #[derive(Clone)]
@@ -331,6 +480,38 @@ impl Syscall for LinuxSyscall {
                 // kernel 5.11. If the kernel is older we emulate close_range in userspace.
                 Self::emulate_close_range(preserve_fds)
             }
+            Err(e) => bail!(e),
+        }
+    }
+
+    fn mount_setattr(
+        &self,
+        dirfd: RawFd,
+        pathname: &Path,
+        flags: u32,
+        mount_attr: &MountAttr,
+        size: libc::size_t,
+    ) -> Result<()> {
+        let path_pathbuf = pathname.to_path_buf();
+        let path_str = path_pathbuf.to_str();
+        let path_c_string = match path_str {
+            Some(path_str) => CString::new(path_str)?,
+            None => bail!("Invalid filename"),
+        };
+        let result = unsafe {
+            // TODO: nix/libc crate hasn't supported mount_setattr system call yet.
+            syscall!(
+                Sysno::mount_setattr,
+                dirfd,
+                path_c_string.as_ptr(),
+                flags,
+                mount_attr as *const MountAttr,
+                size
+            )
+        };
+
+        match result {
+            Ok(_) => Ok(()),
             Err(e) => bail!(e),
         }
     }

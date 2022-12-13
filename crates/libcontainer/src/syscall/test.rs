@@ -17,7 +17,7 @@ use nix::{
 
 use oci_spec::runtime::LinuxRlimit;
 
-use super::Syscall;
+use super::{linux, Syscall};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct MountArgs {
@@ -236,6 +236,17 @@ impl Syscall for TestHelperSyscall {
     }
 
     fn close_range(&self, _: i32) -> anyhow::Result<()> {
+        todo!()
+    }
+
+    fn mount_setattr(
+        &self,
+        _: i32,
+        _: &Path,
+        _: u32,
+        _: &linux::MountAttr,
+        _: libc::size_t,
+    ) -> anyhow::Result<()> {
         todo!()
     }
 }
