@@ -57,8 +57,6 @@ jobs:
     runs-on: ubuntu-20.04
     needs:
       - upload
-    outputs:
-      version: ${{ steps.info.outputs.version }}
     steps:
       - uses: actions/checkout@v3
 
@@ -93,7 +91,7 @@ jobs:
       - name: Create Release Draft
         uses: softprops/action-gh-release@v1
         with:
-          name: ${{ steps.info.outputs.version }} Release
+          name: ${{ env.VERSION }} Release
           draft: true
           # token: ${{ secrets.GITHUB_TOKEN }}
           files: ./${{ env.OUTPUTDIR }}.tar.gz
