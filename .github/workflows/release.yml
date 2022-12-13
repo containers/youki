@@ -5,28 +5,28 @@ on:
     tags: ["v[0-9]+.[0-9]+.[0-9]+*"]
 
 jobs:
-  check:
-    name: Check
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          submodules: recursive
-      - run: sudo apt-get -y update
-      - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev libseccomp-dev
-      - name: Set up cargo
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-      - name: Build
-        run: make youki-release
-      - name: test
-        run: make test-all
+  # check:
+  #   name: Check
+  #   runs-on: ubuntu-20.04
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #       with:
+  #         submodules: recursive
+  #     - run: sudo apt-get -y update
+  #     - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev libseccomp-dev
+  #     - name: Set up cargo
+  #       uses: actions-rs/toolchain@v1
+  #       with:
+  #         toolchain: stable
+  #         override: true
+  #     - name: Build
+  #       run: make youki-release
+  #     - name: test
+  #       run: make test-all
 
   upload:
     name: Upload
-    needs: check
+    # needs: check
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
@@ -98,24 +98,24 @@ jobs:
           # token: ${{ secrets.GITHUB_TOKEN }}
           files: ./${{ env.OUTPUTDIR }}.tar.gz
 
-  publish:
-    name: Publish Packages
-    needs: check
-    runs-on: ubuntu-20.04
-    env:
-      CARGO_REGISTRY_TOKEN: 'DUMMY Token' #${{ secrets.CARGO_REGISTRY_TOKEN }}
-    steps:
-      - uses: actions/checkout@v3
-      - name: Set up cargo
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-      - name: Publish libcgroups
-        run: cargo publish -p libcgroups --no-verify
-      - name: Publish libcontainer
-        run: cargo publish -p libcontainer --no-verify
-      - name: Publish liboci-cli
-        run: cargo publish -p liboci-cli --no-verify
-      - name: Publish youki
-        run: cargo publish -p youki --no-verify
+  # publish:
+  #   name: Publish Packages
+  #   needs: check
+  #   runs-on: ubuntu-20.04
+  #   env:
+  #     CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #     - name: Set up cargo
+  #       uses: actions-rs/toolchain@v1
+  #       with:
+  #         toolchain: stable
+  #         override: true
+  #     - name: Publish libcgroups
+  #       run: cargo publish -p libcgroups --no-verify
+  #     - name: Publish libcontainer
+  #       run: cargo publish -p libcontainer --no-verify
+  #     - name: Publish liboci-cli
+  #       run: cargo publish -p liboci-cli --no-verify
+  #     - name: Publish youki
+  #       run: cargo publish -p youki --no-verify
