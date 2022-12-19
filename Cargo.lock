@@ -2060,6 +2060,9 @@ dependencies = [
 name = "runtimetest"
 version = "0.0.1"
 dependencies = [
+ "anyhow",
+ "clap",
+ "clap_derive 4.0.21",
  "nix",
  "oci-spec",
 ]

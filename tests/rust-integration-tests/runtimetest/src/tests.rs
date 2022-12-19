@@ -1,6 +1,9 @@
-use crate::utils::{test_read_access, test_write_access};
+use crate::utils::{self, test_read_access, test_write_access};
+use anyhow::{bail, Result};
 use nix::errno::Errno;
 use oci_spec::runtime::Spec;
+use std::fs::read_dir;
+use std::path::Path;
 
 pub fn validate_readonly_paths(spec: &Spec) {
     let linux = spec.linux().as_ref().unwrap();
@@ -73,6 +76,54 @@ pub fn validate_hostname(spec: &Spec) {
                 "Unexpected hostname, expected: {:?} found: {:?}",
                 expected_hostname, actual_hostname
             );
+        }
+    }
+}
+
+/// Run argument test recursively for files after base_dir
+fn do_test_mounts_recursive(base_dir: &Path, test_fn: &dyn Fn(&Path) -> Result<()>) -> Result<()> {
+    let rd = read_dir(base_dir).unwrap();
+    for d in rd {
+        let d = d.unwrap();
+        let f_type = d.file_type().unwrap();
+        if f_type.is_dir() {
+            do_test_mounts_recursive(d.path().as_path(), test_fn)?;
+        }
+
+        if f_type.is_file() {
+            test_fn(d.path().as_path())?;
+        }
+    }
+
+    Ok(())
+}
+
+pub fn validate_mounts_recursive(spec: &Spec) {
+    if let Some(mounts) = spec.mounts() {
+        for m in mounts {
+            if let Some(options) = m.options() {
+                for o in options {
+                    match o.as_str() {
+                        "rro" => {
+                            if let Err(e) =
+                                do_test_mounts_recursive(m.destination(), &|test_file_path| {
+                                    if utils::test_write_access(test_file_path.to_str().unwrap())
+                                        .is_ok()
+                                    {
+                                        // Return Err if writeable
+                                        bail!("Unexpectedl writeable");
+                                    }
+                                    Ok(())
+                                })
+                            {
+                                eprintln!("mounts_recursive rro error: {}", e);
+                            }
+                        }
+                        "rrw" => { /* TODO... */ }
+                        _ => {}
+                    }
+                }
+            }
         }
     }
 }

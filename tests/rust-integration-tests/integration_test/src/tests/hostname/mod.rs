@@ -15,7 +15,7 @@ fn create_spec(hostname: &str) -> Spec {
         )
         .process(
             ProcessBuilder::default()
-                .args(vec!["runtimetest".to_string()])
+                .args(vec!["runtimetest".to_string(), "set_host_name".to_string()])
                 .build()
                 .expect("error in creating process config"),
         )
