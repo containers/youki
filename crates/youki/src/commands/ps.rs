@@ -52,5 +52,5 @@ fn get_pid_index(title: &str) -> Result<usize> {
             return Ok(index);
         }
     }
-    bail!("could't find PID field in ps output");
+    bail!("couldn't find PID field in ps output");
 }

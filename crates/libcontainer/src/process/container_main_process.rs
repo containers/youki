@@ -112,7 +112,7 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, Pi
 
     // here we send both intermediate and init pid, because :
     // init pid is required for writing it to pid_file (if) given by the high-level runtime
-    // intermediate pid is required in the case when we call exec, as we nned to wait for the
+    // intermediate pid is required in the case when we call exec, as we need to wait for the
     // intermediate process to exit, which itself waits for child process (the exec process) to exit
     // in order to get the proper exit code. We cannot simply wait for the init_pid , that is the actual container
     // process, as it is not (direect) child of our process
@@ -160,7 +160,7 @@ fn sync_seccomp_send_msg(listener_path: &Path, msg: &[u8], fd: i32) -> Result<()
     let unix_addr = socket::UnixAddr::new(listener_path).context("failed to create unix addr")?;
     socket::connect(socket, &unix_addr).with_context(|| {
         format!(
-            "failed to connect to seccomp notify listerner path: {:?}",
+            "failed to connect to seccomp notify listener path: {:?}",
             listener_path
         )
     })?;
@@ -270,7 +270,7 @@ mod tests {
 
     #[test]
     #[serial]
-    fn setup_gid_mapping_should_successed() -> Result<()> {
+    fn setup_gid_mapping_should_succeeded() -> Result<()> {
         let gid_mapping = LinuxIdMappingBuilder::default()
             .host_id(getgid())
             .container_id(0u32)

@@ -43,7 +43,7 @@ impl RootFS {
             Some("shared") => flags |= MsFlags::MS_SHARED,
             Some("private") => flags |= MsFlags::MS_PRIVATE,
             Some("slave" | "unbindable") | None => flags |= MsFlags::MS_SLAVE,
-            Some(uknown) => bail!("unknown rootfs_propagation: {}", uknown),
+            Some(unknown) => bail!("unknown rootfs_propagation: {}", unknown),
         }
 
         self.syscall

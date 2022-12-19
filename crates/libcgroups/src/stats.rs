@@ -294,7 +294,7 @@ pub fn parse_flat_keyed_data(file_path: &Path) -> Result<HashMap<String, u64>> {
     Ok(stats)
 }
 
-/// Parses a file that is structed according to the nested keyed format
+/// Parses a file that is structured according to the nested keyed format
 pub fn parse_nested_keyed_data(file_path: &Path) -> Result<HashMap<String, Vec<String>>> {
     let mut stats: HashMap<String, Vec<String>> = HashMap::new();
     let keyed_data = common::read_cgroup_file(file_path)?;
@@ -317,7 +317,7 @@ pub fn parse_nested_keyed_data(file_path: &Path) -> Result<HashMap<String, Vec<S
     Ok(stats)
 }
 
-/// Parses a file that is structed according to the nested keyed format
+/// Parses a file that is structured according to the nested keyed format
 /// # Example
 /// ```
 /// use libcgroups::stats::parse_device_number;

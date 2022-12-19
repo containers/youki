@@ -17,7 +17,7 @@ pub struct ContainerArgs<'a> {
     pub container_type: ContainerType,
     /// Interface to operating system primitives
     pub syscall: &'a dyn Syscall,
-    /// OCI complient runtime spec
+    /// OCI compliant runtime spec
     pub spec: &'a Spec,
     /// Root filesystem of the container
     pub rootfs: &'a PathBuf,

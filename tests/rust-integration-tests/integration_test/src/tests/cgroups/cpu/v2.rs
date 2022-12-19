@@ -143,7 +143,7 @@ fn test_cpu_quota_valid_set() -> TestResult {
     })
 }
 
-/// Tests if the cpu quota is the defalt value (max) if a cpu quota of zero has been specified
+/// Tests if the cpu quota is the default value (max) if a cpu quota of zero has been specified
 fn test_cpu_quota_zero_default_set() -> TestResult {
     let cpu_quota = 0;
     let cpu = test_result!(LinuxCpuBuilder::default()

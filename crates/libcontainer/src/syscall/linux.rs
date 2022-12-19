@@ -131,7 +131,7 @@ impl FromStr for MountAttrOption {
 
 #[repr(C)]
 #[derive(Debug, Clone, PartialEq, Eq)]
-/// A structure used as te third argument of mount_setattr(2).
+/// A structure used as the third argument of mount_setattr(2).
 pub struct MountAttr {
     /// Mount properties to set.
     pub attr_set: u64,

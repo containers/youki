@@ -39,7 +39,7 @@ pub fn get_subsystem_mount_point(subsystem: &ControllerType) -> Result<PathBuf> 
         .find(|m| {
             if m.fs_type == "cgroup" {
                 // Some systems mount net_prio and net_cls in the same directory
-                // other systems mount them in their own diretories. This
+                // other systems mount them in their own directories. This
                 // should handle both cases.
                 if subsystem == "net_cls" {
                     return m.mount_point.ends_with("net_cls,net_prio")

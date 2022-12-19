@@ -103,7 +103,7 @@ done
 
 for case in "${test_cases[@]}"; do
   if ! check_environment $case; then
-    echo "Skip $case bacause your environment doesn't support this test case"
+    echo "Skip $case because your environment doesn't support this test case"
     continue
   fi
 

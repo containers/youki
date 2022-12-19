@@ -16,7 +16,7 @@ This crates exposes several functions and modules that can be used to work with 
 
   - CPU stats including usage and throttling
   - Memory stats including usage of normal and swap memory, usage of kernel memory, page cache in bytes etc
-  - Pid stat including current active pids nd maximum allowed pids
+  - Pid stat including current active pids 2nd maximum allowed pids
   - Block IO stats such as number of bytest transferred to/from a device in the cgroup, io operations performed by a device in the cgroup, amount of time cgroup had access to a device etc
   - Huge TLB stats such as usage and maximum usage etc.
   - Function to get pid stats

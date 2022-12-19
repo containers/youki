@@ -1,7 +1,7 @@
 use anyhow::Result;
 use oci_spec::runtime::{LinuxDeviceCgroup, LinuxDeviceType};
 
-// For cgroup v1 compatibility, runc implements a device emulator to caculate the final rules given
+// For cgroup v1 compatibility, runc implements a device emulator to calculate the final rules given
 // a list of user-defined rules.
 // https://github.com/opencontainers/runc/commit/2353ffec2bb670a200009dc7a54a56b93145f141
 //

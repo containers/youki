@@ -31,7 +31,7 @@ pub fn run_hooks(hooks: Option<&Vec<Hook>>, container: Option<&Container>) -> Re
             // Based on OCI spec, the first argument of the args vector is the
             // arg0, which can be different from the path.  For example, path
             // may be "/usr/bin/true" and arg0 is set to "true". However, rust
-            // command differenciates arg0 from args, where rust command arg
+            // command differentiates arg0 from args, where rust command arg
             // doesn't include arg0. So we have to make the split arg0 from the
             // rest of args.
             if let Some((arg0, args)) = hook.args().as_ref().and_then(|a| a.split_first()) {

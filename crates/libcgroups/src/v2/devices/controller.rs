@@ -71,7 +71,7 @@ impl Devices {
         //  2. attach this program (not use BPF_F_REPLACE, see below)
         //  3. detach all programs of 1
         //
-        // runc will use BPF_F_REPLACE to replace currently attached progam if:
+        // runc will use BPF_F_REPLACE to replace currently attached program if:
         //   1. BPF_F_REPLACE is supported by kernel
         //   2. there is exactly one attached program
         // https://github.com/opencontainers/runc/blob/8e6871a3b14bb74e0ef358aca3b9f8f9cb80f041/libcontainer/cgroups/ebpf/ebpf_linux.go#L165

@@ -37,7 +37,7 @@ impl CpuSet {
         properties: &mut HashMap<&str, Box<dyn RefArg>>,
     ) -> Result<()> {
         if systemd_version <= 243 {
-            bail!("setting cpuset restrictions requires systemd version greather than 243");
+            bail!("setting cpuset restrictions requires systemd version greater than 243");
         }
 
         if let Some(cpus) = cpu.cpus() {

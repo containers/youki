@@ -68,7 +68,7 @@ impl Display for CgroupSetup {
     }
 }
 
-/// FreezerState is given freezer contoller
+/// FreezerState is given freezer controller
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FreezerState {
     /// Tasks in cgroup are undefined
@@ -88,7 +88,7 @@ pub struct ControllerOpt<'a> {
     pub disable_oom_killer: bool,
     /// Specify an oom_score_adj for container.
     pub oom_score_adj: Option<i32>,
-    /// FreezerState is given to freezer contoller for suspending process.
+    /// FreezerState is given to freezer controller for suspending process.
     pub freezer_state: Option<FreezerState>,
 }
 

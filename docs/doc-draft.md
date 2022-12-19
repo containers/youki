@@ -25,7 +25,7 @@ sequenceDiagram
 participant U as User
 participant D as Docker
 participant Y_Main as Youki(Main Process)
-participant Y_Intermediate as Youki(Intermeidate Process)
+participant Y_Intermediate as Youki(Intermediate Process)
 participant Y_init as Youki(Init Process)
 
 

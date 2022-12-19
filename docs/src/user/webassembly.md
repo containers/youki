@@ -14,7 +14,7 @@ There are 3 things you need to do to run a WebAssembly module with youki.
     ./scripts/build.sh -o . -r -f wasm-wasmedge
     ```
     > The `wasm-wasmedge` feature will install WasmEdge Runtime library in the `$HOME/.wasmedge` directory. 
-    > To make the library avaible in your system, run the following command:
+    > To make the library available in your system, run the following command:
     > ```bash
     > export LD_LIBRARY_PATH=$HOME/.wasmedge/lib
     > ```
@@ -34,7 +34,7 @@ There are 3 things you need to do to run a WebAssembly module with youki.
 
 If you want to run a webassembly module with youki, your config.json has to include either **runc.oci.handler** or **module.wasm.image/variant=compat"**. 
 
-It also needs to specifiy a valid .wasm (webassembly binary) or .wat (webassembly test) module as entrypoint for the container. If a wat module is specified it will be compiled to a wasm module by youki before it is executed. The module also needs to be available in the root filesystem of the container obviously.
+It also needs to specify a valid .wasm (webassembly binary) or .wat (webassembly test) module as entrypoint for the container. If a wat module is specified it will be compiled to a wasm module by youki before it is executed. The module also needs to be available in the root filesystem of the container obviously.
 
 
 ```json

@@ -17,7 +17,7 @@ There is currently no convention of explicit indication of tests passing, the pa
 
 This package must be compiled as a statically linked binary, as otherwise the rust compile will make it dynamically link to /lib64/ld-linux-x86-64.so , which is not available inside the container, and thus making the binary not usable inside the container process.
 
-**Note** that the dynamically linked binary does not give a `segmentation fault` or similar error when tried to run inside the container, but instead gives `no such file or directory found` or `executable not found` error, even though the executable exists in the container. This made this tricky to debug correctly when originally developing, so if you decide on chaing the compilation or configuration of this , please make absolutely sure that the changes work and do not accidentally break something.
+**Note** that the dynamically linked binary does not give a `segmentation fault` or similar error when tried to run inside the container, but instead gives `no such file or directory found` or `executable not found` error, even though the executable exists in the container. This made this tricky to debug correctly when originally developing, so if you decide on chaining the compilation or configuration of this , please make absolutely sure that the changes work and do not accidentally break something.
 
 you can use
 
