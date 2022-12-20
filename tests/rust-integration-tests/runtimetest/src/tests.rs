@@ -80,18 +80,18 @@ pub fn validate_hostname(spec: &Spec) {
     }
 }
 
-/// Run argument test recursively for files after base_dir
+// Run argument test recursively for files after base_dir
 fn do_test_mounts_recursive(base_dir: &Path, test_fn: &dyn Fn(&Path) -> Result<()>) -> Result<()> {
-    let rd = read_dir(base_dir).unwrap();
-    for d in rd {
-        let d = d.unwrap();
-        let f_type = d.file_type().unwrap();
+    let dirs = read_dir(base_dir).unwrap();
+    for dir in dirs {
+        let dir = dir.unwrap();
+        let f_type = dir.file_type().unwrap();
         if f_type.is_dir() {
-            do_test_mounts_recursive(d.path().as_path(), test_fn)?;
+            do_test_mounts_recursive(dir.path().as_path(), test_fn)?;
         }
 
         if f_type.is_file() {
-            test_fn(d.path().as_path())?;
+            test_fn(dir.path().as_path())?;
         }
     }
 
@@ -100,26 +100,45 @@ fn do_test_mounts_recursive(base_dir: &Path, test_fn: &dyn Fn(&Path) -> Result<(
 
 pub fn validate_mounts_recursive(spec: &Spec) {
     if let Some(mounts) = spec.mounts() {
-        for m in mounts {
-            if let Some(options) = m.options() {
-                for o in options {
-                    match o.as_str() {
+        for mount in mounts {
+            if let Some(options) = mount.options() {
+                for option in options {
+                    match option.as_str() {
                         "rro" => {
                             if let Err(e) =
-                                do_test_mounts_recursive(m.destination(), &|test_file_path| {
+                                do_test_mounts_recursive(mount.destination(), &|test_file_path| {
                                     if utils::test_write_access(test_file_path.to_str().unwrap())
                                         .is_ok()
                                     {
                                         // Return Err if writeable
-                                        bail!("Unexpectedl writeable");
+                                        bail!(
+                                            "path {:?} expected to be read-only, found writable",
+                                            test_file_path
+                                        );
                                     }
                                     Ok(())
                                 })
                             {
-                                eprintln!("mounts_recursive rro error: {}", e);
+                                eprintln!("error in testing rro recursive mounting : {}", e);
                             }
                         }
-                        "rrw" => { /* TODO... */ }
+                        "rnosuid" => {
+                            if let Err(e) =
+                                do_test_mounts_recursive(mount.destination(), &|test_file_path| {
+                                    if utils::test_file_suid(test_file_path.to_str().unwrap())
+                                        .unwrap()
+                                    {
+                                        bail!(
+                                            "path {:?} expected to be nosuid, found suid",
+                                            test_file_path
+                                        );
+                                    }
+                                    Ok(())
+                                })
+                            {
+                                eprintln!("error in testing rnosuid recursive mounting : {}", e);
+                            }
+                        }
                         _ => {}
                     }
                 }
