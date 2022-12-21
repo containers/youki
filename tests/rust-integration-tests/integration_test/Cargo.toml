@@ -11,7 +11,7 @@ libcgroups = { path = "../../../crates/libcgroups" }
 libcontainer = { path = "../../../crates/libcontainer" }
 log = { version = "0.4", features = ["std"] }
 nix = "0.25.0"
-num_cpus = "1.14"
+num_cpus = "1.15"
 oci-spec = "0.5.8"
 once_cell = "1.16.0"
 pnet_datalink = "0.31.0"
