@@ -80,11 +80,3 @@ pub fn test_write_access(path: &str) -> Result<(), std::io::Error> {
         ),
     ))
 }
-
-pub fn test_file_suid(path: &str) -> Result<bool, std::io::Error> {
-    let file = fs::File::open(path)?;
-    if (file.metadata()?.permissions().mode() & Mode::S_ISUID.bits()) == Mode::S_ISUID.bits() {
-        return Ok(true);
-    }
-    Ok(false)
-}

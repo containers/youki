@@ -122,23 +122,7 @@ pub fn validate_mounts_recursive(spec: &Spec) {
                                 eprintln!("error in testing rro recursive mounting : {}", e);
                             }
                         }
-                        "rnosuid" => {
-                            if let Err(e) =
-                                do_test_mounts_recursive(mount.destination(), &|test_file_path| {
-                                    if utils::test_file_suid(test_file_path.to_str().unwrap())
-                                        .unwrap()
-                                    {
-                                        bail!(
-                                            "path {:?} expected to be nosuid, found suid",
-                                            test_file_path
-                                        );
-                                    }
-                                    Ok(())
-                                })
-                            {
-                                eprintln!("error in testing rnosuid recursive mounting : {}", e);
-                            }
-                        }
+                        "rrw" => { /*TODO..*/ }
                         _ => {}
                     }
                 }
