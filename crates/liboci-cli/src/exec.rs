@@ -18,7 +18,7 @@ pub struct Exec {
     /// The file to which the pid of the container process should be written to
     pub pid_file: Option<PathBuf>,
     /// Environment variables that should be set in the container
-    #[clap(short, long, parse(try_from_str = parse_key_val), number_of_values = 1)]
+    #[clap(short, long, value_parser = parse_key_val::<String, String>, number_of_values = 1)]
     pub env: Vec<(String, String)>,
     /// Prevent the process from gaining additional privileges
     #[clap(long)]
@@ -30,7 +30,7 @@ pub struct Exec {
     #[clap(short, long)]
     pub detach: bool,
     /// Identifier of the container
-    #[clap(forbid_empty_values = true, required = true)]
+    #[clap(value_parser = clap::builder::NonEmptyStringValueParser::new(), required = true)]
     pub container_id: String,
     /// Command that should be executed in the container
     #[clap(required = false)]

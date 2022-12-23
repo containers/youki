@@ -4,7 +4,7 @@ use std::path::PathBuf;
 /// Checkpoint a running container
 #[derive(Parser, Debug)]
 pub struct Checkpoint {
-    #[clap(forbid_empty_values = true, required = true)]
+    #[clap(value_parser = clap::builder::NonEmptyStringValueParser::new(), required = true)]
     pub container_id: String,
     /// Allow external unix sockets
     #[clap(long)]
