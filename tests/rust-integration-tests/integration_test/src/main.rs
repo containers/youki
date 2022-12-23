@@ -47,7 +47,7 @@ struct Run {
     /// Selected tests to be run, format should be
     /// space separated groups, eg
     /// -t group1::test1,test3 group2 group3::test5
-    #[clap(short, long, multiple_values = true, value_delimiter = ' ')]
+    #[clap(short, long, num_args(1..), value_delimiter = ' ')]
     tests: Option<Vec<String>>,
 }
 
