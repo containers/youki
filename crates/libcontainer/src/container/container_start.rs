@@ -52,7 +52,7 @@ impl Container {
 
         unistd::chdir(self.root.as_os_str())?;
 
-        let mut notify_socket = NotifySocket::new(&self.root.join(NOTIFY_FILE));
+        let mut notify_socket = NotifySocket::new(self.root.join(NOTIFY_FILE));
         notify_socket.notify_container_start()?;
         self.set_status(ContainerStatus::Running)
             .save()

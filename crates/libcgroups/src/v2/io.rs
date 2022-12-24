@@ -102,7 +102,7 @@ impl Io {
             for wd in weight_device {
                 common::write_cgroup_file(
                     root_path.join(CGROUP_BFQ_IO_WEIGHT),
-                    &format!("{}:{} {}", wd.major(), wd.minor(), wd.weight().unwrap()),
+                    format!("{}:{} {}", wd.major(), wd.minor(), wd.weight().unwrap()),
                 )?;
             }
         }
@@ -131,7 +131,7 @@ impl Io {
             for trbd in throttle_read_bps_device {
                 common::write_cgroup_file(
                     Self::io_max_path(root_path),
-                    &format!("{}:{} rbps={}", trbd.major(), trbd.minor(), trbd.rate()),
+                    format!("{}:{} rbps={}", trbd.major(), trbd.minor(), trbd.rate()),
                 )?;
             }
         }

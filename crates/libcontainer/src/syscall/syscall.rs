@@ -60,7 +60,7 @@ pub trait Syscall {
 
 pub fn create_syscall() -> Box<dyn Syscall> {
     if cfg!(test) {
-        Box::new(TestHelperSyscall::default())
+        Box::<TestHelperSyscall>::default()
     } else {
         Box::new(LinuxSyscall)
     }

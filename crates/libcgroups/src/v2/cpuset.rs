@@ -57,7 +57,7 @@ mod tests {
         CpuSet::apply(&tmp, &cpuset).expect("apply cpuset");
 
         // assert
-        let content = fs::read_to_string(&cpus)
+        let content = fs::read_to_string(cpus)
             .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPUSET_CPUS));
         assert_eq!(content, "1-3");
     }
@@ -75,7 +75,7 @@ mod tests {
         CpuSet::apply(&tmp, &cpuset).expect("apply cpuset");
 
         // assert
-        let content = fs::read_to_string(&mems)
+        let content = fs::read_to_string(mems)
             .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPUSET_MEMS));
         assert_eq!(content, "1-3");
     }

@@ -49,7 +49,7 @@ fn check_readonly_paths() -> TestResult {
 
     let ro_paths = vec![
         root.join(&ro_dir_top).to_string_lossy().to_string(),
-        root.join(&ro_file_top).to_string_lossy().to_string(),
+        root.join(ro_file_top).to_string_lossy().to_string(),
         root.join(&ro_dir_sub).to_string_lossy().to_string(),
         root.join(&ro_file_sub).to_string_lossy().to_string(),
         root.join(&ro_file_sub_sub).to_string_lossy().to_string(),
@@ -75,7 +75,7 @@ fn check_readonly_paths() -> TestResult {
         }
 
         let test_sub_sub_file = bundle_path.join(&ro_file_sub_sub);
-        match fs::File::create(&test_sub_sub_file) {
+        match fs::File::create(test_sub_sub_file) {
             io::Result::Ok(_) => { /*This is expected*/ }
             io::Result::Err(e) => {
                 bail!(e)
@@ -83,7 +83,7 @@ fn check_readonly_paths() -> TestResult {
         }
 
         let test_sub_file = bundle_path.join(&ro_file_sub);
-        match fs::File::create(&test_sub_file) {
+        match fs::File::create(test_sub_file) {
             io::Result::Ok(_) => { /*This is expected*/ }
             io::Result::Err(e) => {
                 bail!(e)
@@ -91,7 +91,7 @@ fn check_readonly_paths() -> TestResult {
         }
 
         let test_file = bundle_path.join(ro_file);
-        match fs::File::create(&test_file) {
+        match fs::File::create(test_file) {
             io::Result::Ok(_) => { /*This is expected*/ }
             io::Result::Err(e) => {
                 bail!(e)
@@ -155,7 +155,7 @@ fn check_readonly_symlinks() -> TestResult {
             }
         };
 
-        match fs::metadata(&r_path) {
+        match fs::metadata(r_path) {
             io::Result::Ok(md) => {
                 bail!(
                     "reading symlink for {:?} should have given error, found {:?} instead",

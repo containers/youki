@@ -114,7 +114,7 @@ impl<'a> InitContainerBuilder<'a> {
 
     fn load_spec(&self) -> Result<Spec> {
         let source_spec_path = self.bundle.join("config.json");
-        let mut spec = Spec::load(&source_spec_path)?;
+        let mut spec = Spec::load(source_spec_path)?;
         Self::validate_spec(&spec).context("failed to validate runtime spec")?;
 
         spec.canonicalize_rootfs(&self.bundle)

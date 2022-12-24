@@ -33,7 +33,7 @@ mod tests {
 
         PerfEvent::add_task(pid, &tmp).expect("apply perf_event");
 
-        let content = fs::read_to_string(&procs)
+        let content = fs::read_to_string(procs)
             .unwrap_or_else(|_| panic!("read {} file content", CGROUP_PROCS));
         assert_eq!(content, "1000");
     }

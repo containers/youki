@@ -48,7 +48,7 @@ impl Pids {
             "max".to_string()
         };
 
-        common::write_cgroup_file_str(&root_path.join(CGROUP_PIDS_MAX), &limit)?;
+        common::write_cgroup_file_str(root_path.join(CGROUP_PIDS_MAX), &limit)?;
         Ok(())
     }
 }

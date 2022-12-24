@@ -386,7 +386,7 @@ impl<'a> TenantContainerBuilder<'a> {
 
     fn setup_notify_listener(container_dir: &Path) -> Result<PathBuf> {
         let notify_name = Self::generate_name(container_dir, TENANT_NOTIFY);
-        let socket_path = container_dir.join(&notify_name);
+        let socket_path = container_dir.join(notify_name);
 
         Ok(socket_path)
     }

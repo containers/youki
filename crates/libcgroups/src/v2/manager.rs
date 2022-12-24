@@ -80,7 +80,7 @@ impl Manager {
             }
         }
 
-        common::write_cgroup_file(&self.full_path.join(CGROUP_PROCS), pid)?;
+        common::write_cgroup_file(self.full_path.join(CGROUP_PROCS), pid)?;
         Ok(())
     }
 
@@ -135,7 +135,7 @@ impl CgroupManager for Manager {
                 fs::write(kill_file, "1").context("failed to kill cgroup")?;
             } else {
                 let procs_path = self.full_path.join(CGROUP_PROCS);
-                let procs = fs::read_to_string(&procs_path)?;
+                let procs = fs::read_to_string(procs_path)?;
 
                 for line in procs.lines() {
                     let pid: i32 = line.parse()?;

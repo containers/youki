@@ -178,7 +178,7 @@ mod tests {
         let cpu = tmp.join("cpu");
         let cpuacct = tmp.join("cpuacct");
         let cpu_cpuacct = tmp.join("cpu,cpuacct");
-        fs::create_dir_all(&cpu_cpuacct)?;
+        fs::create_dir_all(cpu_cpuacct)?;
         let symlink = Symlink::with_syscall(Box::new(LinuxSyscall));
 
         // act
