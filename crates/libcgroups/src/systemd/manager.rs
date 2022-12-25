@@ -280,7 +280,7 @@ impl Manager {
         }
 
         let mut controllers = Vec::new();
-        for controller in fs::read_to_string(&controllers_path)?.split_whitespace() {
+        for controller in fs::read_to_string(controllers_path)?.split_whitespace() {
             match controller {
                 "cpu" => controllers.push(ControllerType::Cpu),
                 "memory" => controllers.push(ControllerType::Memory),

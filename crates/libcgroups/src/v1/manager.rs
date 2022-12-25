@@ -153,7 +153,7 @@ impl CgroupManager for Manager {
             if cgroup_path.1.exists() {
                 log::debug!("remove cgroup {:?}", cgroup_path.1);
                 let procs_path = cgroup_path.1.join(CGROUP_PROCS);
-                let procs = fs::read_to_string(&procs_path)?;
+                let procs = fs::read_to_string(procs_path)?;
 
                 for line in procs.lines() {
                     let pid: i32 = line.parse()?;

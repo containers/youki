@@ -34,7 +34,7 @@ impl Container {
         // mounts can change and CRIU will just mount whatever we tell it to mount based on
         // information found in 'config.json'.
         let source_spec_path = self.bundle().join("config.json");
-        let spec = Spec::load(&source_spec_path)?;
+        let spec = Spec::load(source_spec_path)?;
         let mounts = spec.mounts().clone();
         for m in mounts.unwrap() {
             match m.typ().as_deref() {

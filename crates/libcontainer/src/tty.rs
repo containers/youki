@@ -24,7 +24,7 @@ pub fn setup_console_socket(
     socket_name: &str,
 ) -> Result<RawFd> {
     let linked = container_dir.join(socket_name);
-    symlink(console_socket_path, &linked)?;
+    symlink(console_socket_path, linked)?;
 
     let mut csocketfd = socket::socket(
         socket::AddressFamily::Unix,

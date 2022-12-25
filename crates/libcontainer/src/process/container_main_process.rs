@@ -240,7 +240,7 @@ mod tests {
 
                 let tempdir = TempDir::new(get_gid_path(&child).parent().unwrap())?;
                 let gid_map_path = tempdir.join("gid_map");
-                let _ = fs::File::create(&gid_map_path)?;
+                let _ = fs::File::create(gid_map_path)?;
 
                 setup_mapping(&rootless, child)?;
                 let line = fs::read_to_string(uid_map_path)?;
@@ -290,7 +290,7 @@ mod tests {
 
                 let tempdir = TempDir::new(get_uid_path(&child).parent().unwrap())?;
                 let uid_map_path = tempdir.join("uid_map");
-                let _ = fs::File::create(&uid_map_path)?;
+                let _ = fs::File::create(uid_map_path)?;
 
                 let tempdir = TempDir::new(get_gid_path(&child).parent().unwrap())?;
                 let gid_map_path = tempdir.join("gid_map");
