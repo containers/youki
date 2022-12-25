@@ -7,10 +7,10 @@ use oci_spec::runtime::{
     Spec, SpecBuilder,
 };
 use std::collections::hash_set::HashSet;
-use std::fs;
 use std::os::unix::prelude::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::fs;
 use test_framework::{Test, TestGroup, TestResult};
 
 fn get_spec(added_mounts: Vec<Mount>, process_args: Vec<String>) -> Spec {
@@ -202,12 +202,54 @@ fn check_recursive_nosuid() -> TestResult {
     result
 }
 
+fn check_recursive_noexec() -> TestResult {
+    let rnoexec_test_base_dir = PathBuf::from_str("/tmp").unwrap();
+    let rnoexec_dir_path = rnoexec_test_base_dir.join("rnoexec_dir");
+    let rnoexec_subdir_path = rnoexec_dir_path.join("rnoexec_subdir");
+    let mount_dest_path = PathBuf::from_str("/mnt").unwrap();
+
+    let mount_options = vec!["rbind".to_string(), "rnoexec".to_string()];
+    let mut mount_spec = Mount::default();
+    mount_spec
+        .set_destination(mount_dest_path.clone())
+        .set_typ(None)
+        .set_source(Some(rnoexec_dir_path.clone()))
+        .set_options(Some(mount_options.clone()));
+    let spec = get_spec(
+        vec![mount_spec],
+        vec!["runtimetest".to_string(), "mounts_recursive".to_string()],
+    );
+
+    let result = test_inside_container(spec, &|bundle_path| {
+        setup_mount(&rnoexec_dir_path, &rnoexec_subdir_path);
+
+        let executable_file_name = "echo";
+        let executable_file_path = bundle_path.join("bin").join(executable_file_name);
+        let in_container_executable_file_path = rnoexec_dir_path.join(executable_file_name);
+        let in_container_executable_subdir_file_path =
+            rnoexec_subdir_path.join(executable_file_name);
+
+        fs::copy(&executable_file_path, &in_container_executable_file_path)?;
+        fs::copy(
+            &executable_file_path,
+            &in_container_executable_subdir_file_path,
+        )?;
+
+        Ok(())
+    });
+
+    clean_mount(&rnoexec_dir_path, &rnoexec_subdir_path);
+
+    result
+}
+
 pub fn get_mounts_recursive_test() -> TestGroup {
     let rro_test = Test::new("rro_test", Box::new(check_recursive_readonly));
     let rnosuid_test = Test::new("rnosuid_test", Box::new(check_recursive_nosuid));
+    let rnoexec_test = Test::new("rnoexec_test", Box::new(check_recursive_noexec));
 
     let mut tg = TestGroup::new("mounts_recursive");
-    tg.add(vec![Box::new(rro_test), Box::new(rnosuid_test)]);
+    tg.add(vec![Box::new(rro_test), Box::new(rnosuid_test), Box::new(rnoexec_test)]);
 
     tg
 }

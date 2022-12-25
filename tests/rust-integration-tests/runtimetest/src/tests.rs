@@ -122,7 +122,21 @@ pub fn validate_mounts_recursive(spec: &Spec) {
                                 eprintln!("error in testing rro recursive mounting : {}", e);
                             }
                         }
-                        "rrw" => { /*TODO..*/ }
+                        "rnoexec" => {
+                            if let Err(e) = do_test_mounts_recursive(
+                                mount.destination(),
+                                &|test_file_path| {
+                                    if utils::test_file_executable(test_file_path.to_str().unwrap())
+                                        .is_ok()
+                                    {
+                                        bail!("path {:?} expected to be not executable, found executable", test_file_path);
+                                    }
+                                    Ok(())
+                                },
+                            ) {
+                                eprintln!("error in testing rnoexec recursive mounting: {}", e);
+                            }
+                        }
                         _ => {}
                     }
                 }

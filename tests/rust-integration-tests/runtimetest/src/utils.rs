@@ -1,9 +1,7 @@
-use std::fs;
-use std::os::unix::prelude::PermissionsExt;
 use std::path::PathBuf;
+use std::process::Command;
 
 use nix::sys::stat::stat;
-use nix::sys::stat::Mode;
 use nix::sys::stat::SFlag;
 
 fn test_file_read_access(path: &str) -> Result<(), std::io::Error> {
@@ -78,5 +76,18 @@ pub fn test_write_access(path: &str) -> Result<(), std::io::Error> {
             "cannot test write access for {:?}, has mode {:x}",
             path, mode
         ),
+    ))
+}
+
+pub fn test_file_executable(path: &str) -> Result<(), std::io::Error> {
+    let fstat = stat(path)?;
+    let mode = fstat.st_mode;
+    if is_file_like(mode) {
+        Command::new(path).output()?;
+    }
+
+    Err(std::io::Error::new(
+        std::io::ErrorKind::Other,
+        format!("{:?} is directory, so cannot execute", path),
     ))
 }
