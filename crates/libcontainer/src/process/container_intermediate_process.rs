@@ -97,7 +97,7 @@ pub fn container_intermediate_process(
             .close()
             .context("failed to close sender in the intermediate process")?;
         match container_init_process(args, main_sender, init_receiver) {
-            Ok(_) => unreachable!("successful exec should never reach here"),
+            Ok(_) => Ok(0),
             Err(e) => {
                 if let ContainerType::TenantContainer { exec_notify_fd } = args.container_type {
                     let buf = format!("{}", e);

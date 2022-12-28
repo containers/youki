@@ -1,5 +1,5 @@
 [workspace]
-members = ["tests/rust-integration-tests/*", "crates/*"]
+members = ["tests/rust-integration-tests/*", "crates/*", "tools/*"]
 
 [profile.release]
 lto = true

@@ -6,7 +6,7 @@ use crate::{
     capabilities, hooks, namespaces::Namespaces, process::channel, rootfs::RootFS,
     rootless::Rootless, seccomp, tty, utils,
 };
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Context, Ok, Result};
 use nix::mount::MsFlags;
 use nix::sched::CloneFlags;
 use nix::sys::stat::Mode;
@@ -279,7 +279,7 @@ pub fn container_init_process(
         // This may allow the user running youki to access directories
         // that the container user cannot access.
         match unistd::chdir(proc.cwd()) {
-            Ok(_) => false,
+            std::result::Result::Ok(_) => false,
             Err(nix::Error::EPERM) => true,
             Err(e) => bail!("failed to chdir: {}", e),
         }
@@ -299,9 +299,9 @@ pub fn container_init_process(
     // not 0, then we have to preserve those fds as well, and set up the correct
     // environment variables.
     let preserve_fds: i32 = match env::var("LISTEN_FDS") {
-        Ok(listen_fds_str) => {
+        std::result::Result::Ok(listen_fds_str) => {
             let listen_fds = match listen_fds_str.parse::<i32>() {
-                Ok(v) => v,
+                std::result::Result::Ok(v) => v,
                 Err(error) => {
                     log::warn!(
                         "LISTEN_FDS entered is not a fd. Ignore the value. {:?}",
@@ -442,8 +442,7 @@ pub fn container_init_process(
     }
 
     if proc.args().is_some() {
-        ExecutorManager::exec(spec)?;
-        unreachable!("process image should have been replaced after exec");
+        ExecutorManager::exec(spec)
     } else {
         bail!("on non-Windows, at least one process arg entry is required")
     }
