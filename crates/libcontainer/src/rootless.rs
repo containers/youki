@@ -29,7 +29,7 @@ impl<'a> Rootless<'a> {
         let namespaces = Namespaces::from(linux.namespaces().as_ref());
         let user_namespace = namespaces.get(LinuxNamespaceType::User);
 
-        // If conditions requires us to use rootless, we must either create a new
+         // If conditions requires us to use rootless, we must either create a new
         // user namespace or enter an existing.
         if rootless_required() && user_namespace.is_none() {
             bail!("rootless container requires valid user namespace definition");
@@ -123,7 +123,24 @@ pub fn rootless_required() -> bool {
         return true;
     }
 
+    if is_running_in_user_ns() {
+        return true;
+    }
+
     matches!(std::env::var("YOUKI_USE_ROOTLESS").as_deref(), Ok("true"))
+}
+
+fn is_running_in_user_ns() -> bool {
+    let uid_map_path = Path::new("/proc/self/uid_map");
+    if !uid_map_path.exists() {
+        return false; // not more than one namespace supported
+    }
+
+    let uid_read = fs::read_to_string(uid_map_path);
+    match uid_read {
+        Ok(uid_mappings) => !uid_mappings.contains("4294967295"),
+        Err(_) => false,
+    }
 }
 
 pub fn unprivileged_user_ns_enabled() -> Result<bool> {
