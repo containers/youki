@@ -7,7 +7,7 @@ use std::io;
 #[derive(Debug, Parser)]
 /// Generate scripts for shell completion
 pub struct Completion {
-    #[clap(long = "shell", short = 's', arg_enum)]
+    #[clap(long = "shell", short = 's', value_enum)]
     pub shell: Shell,
 }
 

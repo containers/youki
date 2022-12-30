@@ -7,7 +7,7 @@ mod logger;
 use anyhow::bail;
 use anyhow::Context;
 use anyhow::Result;
-use clap::IntoApp;
+use clap::CommandFactory;
 use clap::{crate_version, Parser};
 use nix::libc;
 use std::fs;

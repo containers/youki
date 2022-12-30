@@ -25,9 +25,9 @@ uuid = "1.2"
 which = "4.3.0"
 
 [dependencies.clap]
-version = "3.2.23"
+version = "4.0.32"
 default-features = false
-features = ["std", "suggestions", "derive", "cargo"]
+features = ["std", "suggestions", "derive", "cargo", "help", "usage", "error-context"]
 
 [dependencies.clap_derive]
 version = "4.0.21"

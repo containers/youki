@@ -4,7 +4,7 @@ use std::path::PathBuf;
 /// Update running container resource constraints
 #[derive(Parser, Debug)]
 pub struct Update {
-    #[clap(forbid_empty_values = true, required = true)]
+    #[clap(value_parser = clap::builder::NonEmptyStringValueParser::new(), required = true)]
     pub container_id: String,
 
     /// Read the new resource limits from the given json file. Use - to read from stdin.
