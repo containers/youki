@@ -84,6 +84,11 @@ check_environment() {
         return 1
     fi
   fi
+  if [[ $test_case == "delete_only_create_resources/delete_only_create_resources.t" ]]; then
+    if [[ ! -e "/sys/fs/cgroup/pids/cgrouptest/tasks" ]]; then
+        return 1
+    fi
+  fi
 }
 
 if [[ ! -e $RUNTIME ]]; then
@@ -116,8 +121,12 @@ for case in "${test_cases[@]}"; do
   mkdir -p "$(dirname $logfile)"
   sudo RUST_BACKTRACE=1 RUNTIME=${RUNTIME} ${OCI_TEST_DIR}/validation/$case >$logfile 2>&1 || (cat $logfile && exit 1)
   if [ 0 -ne $(grep "not ok" $logfile | wc -l ) ]; then
-      cat $logfile
-      exit 1
+    if [ 0 -eq $(grep "# cgroupv2 is not supported yet " $logfile | wc -l ) ]; then
+      echo "Skip $case bacause oci-runtime-tools doesn't support cgroup v2"
+      continue;
+    fi
+    cat $logfile
+    exit 1
   fi
   sleep 1
 done
