@@ -1,6 +1,6 @@
 use anyhow::{anyhow, bail, Context, Result};
 use oci_spec::runtime::Spec;
-use wasmtime::{Engine, Linker, Module, Store};
+use wasmtime::*;
 use wasmtime_wasi::WasiCtxBuilder;
 
 use super::{Executor, EMPTY};
