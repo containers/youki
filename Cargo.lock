@@ -81,9 +81,9 @@ checksum = "3ae7d751998c189c1d4468cf0a39bb2eae052a9c58d50ebb3b9591ee3813ad50"
 
 [[package]]
 name = "async-trait"
-version = "0.1.60"
+version = "0.1.61"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "677d1d8ab452a3936018a687b20e6f7cf5363d713b732b8884001317b0e48aa3"
+checksum = "705339e0e4a9690e2908d2b3d049d85682cf19fbd5782494498fbf7003a6a282"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -351,7 +351,7 @@ dependencies = [
  "bitflags",
  "clap_derive",
  "clap_lex",
- "is-terminal 0.4.2",
+ "is-terminal",
  "once_cell",
  "strsim",
  "termcolor",
