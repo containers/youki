@@ -3,14 +3,13 @@ use crate::apparmor;
 use crate::syscall::Syscall;
 use crate::{
     capabilities, hooks, namespaces::Namespaces, process::channel, rootfs::RootFS,
-    rootless::Rootless, seccomp, tty, utils,
+    rootless::Rootless, tty, utils,
 };
 use anyhow::{bail, Context, Ok, Result};
 use nix::mount::MsFlags;
 use nix::sched::CloneFlags;
 use nix::sys::stat::Mode;
 use nix::unistd::setsid;
-
 use nix::unistd::{self, Gid, Uid};
 use oci_spec::runtime::{LinuxNamespaceType, Spec, User};
 use std::collections::HashMap;
@@ -19,6 +18,12 @@ use std::{
     env, fs,
     path::{Path, PathBuf},
 };
+
+#[cfg(feature = "libseccomp")]
+use crate::seccomp;
+
+#[cfg(not(feature = "libseccomp"))]
+use log::warn;
 
 fn sysctl(kernel_params: &HashMap<String, String>) -> Result<()> {
     let sys = PathBuf::from("/proc/sys");
@@ -158,6 +163,7 @@ fn reopen_dev_null() -> Result<()> {
     Ok(())
 }
 
+#[allow(unused_variables)]
 pub fn container_init_process(
     args: &ContainerArgs,
     main_sender: &mut channel::MainSender,
@@ -348,6 +354,7 @@ pub fn container_init_process(
     // Without no new privileges, seccomp is a privileged operation. We have to
     // do this before dropping capabilities. Otherwise, we should do it later,
     // as close to exec as possible.
+    #[cfg(feature = "libseccomp")]
     if let Some(seccomp) = linux.seccomp() {
         if proc.no_new_privileges().is_none() {
             let notify_fd =
@@ -355,6 +362,10 @@ pub fn container_init_process(
             sync_seccomp(notify_fd, main_sender, init_receiver)
                 .context("failed to sync seccomp")?;
         }
+    }
+    #[cfg(not(feature = "libseccomp"))]
+    if proc.no_new_privileges().is_none() {
+        warn!("seccomp not available, unable to enforce no_new_privileges!")
     }
 
     capabilities::reset_effective(syscall).context("Failed to reset effective capabilities")?;
@@ -384,6 +395,7 @@ pub fn container_init_process(
     // Initialize seccomp profile right before we are ready to execute the
     // payload so as few syscalls will happen between here and payload exec. The
     // notify socket will still need network related syscalls.
+    #[cfg(feature = "libseccomp")]
     if let Some(seccomp) = linux.seccomp() {
         if proc.no_new_privileges().is_some() {
             let notify_fd =
@@ -391,6 +403,10 @@ pub fn container_init_process(
             sync_seccomp(notify_fd, main_sender, init_receiver)
                 .context("failed to sync seccomp")?;
         }
+    }
+    #[cfg(not(feature = "libseccomp"))]
+    if proc.no_new_privileges().is_some() {
+        warn!("seccomp not available, unable to set seccomp privileges!")
     }
 
     // this checks if the binary to run actually exists and if we have permissions to run it.
@@ -514,6 +530,7 @@ fn set_supplementary_gids(
     Ok(())
 }
 
+#[cfg(feature = "libseccomp")]
 fn sync_seccomp(
     fd: Option<i32>,
     main_sender: &mut channel::MainSender,
@@ -539,8 +556,10 @@ mod tests {
         syscall::create_syscall,
         test::{ArgName, MountArgs, TestHelperSyscall},
     };
+    #[cfg(feature = "libseccomp")]
     use nix::unistd;
     use oci_spec::runtime::{LinuxNamespaceBuilder, SpecBuilder, UserBuilder};
+    #[cfg(feature = "libseccomp")]
     use serial_test::serial;
     use std::fs;
 
@@ -675,6 +694,7 @@ mod tests {
 
     #[test]
     #[serial]
+    #[cfg(feature = "libseccomp")]
     fn test_sync_seccomp() -> Result<()> {
         use std::os::unix::io::IntoRawFd;
         use std::thread;

@@ -1,13 +1,4 @@
 //! Implements Command trait for Linux systems
-use std::ffi::{CStr, CString, OsStr};
-use std::fs;
-use std::os::unix::ffi::OsStrExt;
-use std::os::unix::fs::symlink;
-use std::os::unix::io::RawFd;
-use std::str::FromStr;
-use std::sync::Arc;
-use std::{any::Any, mem, path::Path, ptr};
-
 use anyhow::{anyhow, bail, Context, Error, Result};
 use caps::{CapSet, CapsHashSet};
 use libc::{c_char, setdomainname, uid_t};
@@ -21,9 +12,16 @@ use nix::{
     unistd,
     unistd::{chown, fchdir, pivot_root, setgroups, sethostname, Gid, Uid},
 };
-use syscalls::{syscall, Sysno, Sysno::close_range};
-
 use oci_spec::runtime::LinuxRlimit;
+use std::ffi::{CStr, CString, OsStr};
+use std::fs;
+use std::os::unix::ffi::OsStrExt;
+use std::os::unix::fs::symlink;
+use std::os::unix::io::RawFd;
+use std::str::FromStr;
+use std::sync::Arc;
+use std::{any::Any, mem, path::Path, ptr};
+use syscalls::{syscall, Sysno, Sysno::close_range};
 
 use super::Syscall;
 use crate::syscall::syscall::CloseRange;
@@ -374,7 +372,13 @@ impl Syscall for LinuxSyscall {
             rlim_cur: rlimit.soft(),
             rlim_max: rlimit.hard(),
         };
+
+        // Change for musl libc based on seccomp needs
+        #[cfg(not(target_env = "musl"))]
         let res = unsafe { libc::setrlimit(rlimit.typ() as u32, rlim) };
+        #[cfg(target_env = "musl")]
+        let res = unsafe { libc::setrlimit(rlimit.typ() as i32, rlim) };
+
         if let Err(e) = Errno::result(res).map(drop) {
             bail!("Failed to set {:?}. {:?}", rlimit.typ(), e)
         }
@@ -472,7 +476,6 @@ impl Syscall for LinuxSyscall {
                 CloseRange::CLOEXEC.bits()
             )
         };
-
         match result {
             Ok(_) => Ok(()),
             Err(e) if e == syscalls::Errno::ENOSYS || e == syscalls::Errno::EINVAL => {
@@ -500,6 +503,9 @@ impl Syscall for LinuxSyscall {
         };
         let result = unsafe {
             // TODO: nix/libc crate hasn't supported mount_setattr system call yet.
+            // TODO: @krisnova migrate all youki to libc::SYS_mount_setattr
+            // https://docs.rs/libc/0.2.139/libc/constant.SYS_mount_setattr.html
+            // https://docs.rs/libc/0.2.139/libc/fn.syscall.html
             syscall!(
                 Sysno::mount_setattr,
                 dirfd,

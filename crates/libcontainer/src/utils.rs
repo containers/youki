@@ -371,6 +371,7 @@ pub(crate) mod test_utils {
         message: String,
     }
 
+    #[allow(dead_code)]
     pub fn test_in_child_process<F: FnOnce() -> Result<()>>(cb: F) -> Result<()> {
         let (mut sender, mut receiver) = channel::channel::<TestResult>()?;
         match unsafe { nix::unistd::fork()? } {
