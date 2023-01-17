@@ -246,4 +246,20 @@ Example spec:
     ]
   }
 }
+
+### Building with musl
+
+In order to build `libcontainer` with musl you must first remove the libseccomp dependency as it will reference shared libraries (`libdbus` and `libseccomp`).
+
+Do this by using the `--no-default-features` flag followed by `-F` and whatever features you intend to build with such as `v2` or `systemd` as defined in Cargo.toml under features section.
+
+```bash
+# Add musl to toolchain
+rustup target add $(uname -m)-unknown-linux-musl
+
+# Build nigthly stdlib with musl
+cargo +nightly build -Zbuild-std --target $(uname -m)-unknown-linux-musl --no-default-features -F v2
+
+# Compile libcontainer without GNU dependencies with musl
+cargo +nightly build --target $(uname -m)-unknown-linux-musl --no-default-features -F v2
 ```
