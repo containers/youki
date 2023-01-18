@@ -44,7 +44,7 @@ clap_complete = "4.0.7"
 caps = "0.5.5"
 
 [dev-dependencies]
-serial_test = "0.10.0"
+serial_test = "1.0.0"
 
 [build-dependencies]
 anyhow = "1.0.65"
