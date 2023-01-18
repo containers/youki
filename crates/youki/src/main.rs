@@ -14,7 +14,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::commands::info;
-use libcontainer::rootless::rootless_required;
+use libcgroups::common::rootless_required;
 use libcontainer::utils::create_dir_all_with_mode;
 use nix::sys::stat::Mode;
 use nix::unistd::getuid;

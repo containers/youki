@@ -217,6 +217,22 @@ fn create_v2_cgroup_manager(_cgroup_path: PathBuf) -> Result<Box<dyn CgroupManag
     bail!("cgroup v2 feature is required, but was not enabled during compile time");
 }
 
+/// Checks if rootless mode should be used
+pub fn rootless_required() -> bool {
+    if !nix::unistd::geteuid().is_root() {
+        return true;
+    }
+
+    let uid_map_path = "/proc/self/uid_map";
+    let content = fs::read_to_string(uid_map_path)
+        .unwrap_or_else(|_| panic!("failed to read {}", uid_map_path));
+    if !content.contains("4294967295") {
+        return true;
+    }
+
+    matches!(std::env::var("YOUKI_USE_ROOTLESS").as_deref(), Ok("true"))
+}
+
 #[cfg(feature = "systemd")]
 fn create_systemd_cgroup_manager(
     cgroup_path: PathBuf,
@@ -228,7 +244,7 @@ fn create_systemd_cgroup_manager(
         );
     }
 
-    let use_system = nix::unistd::geteuid().is_root();
+    let use_system = !rootless_required();
 
     log::info!(
         "systemd cgroup manager with system bus {} will be used",

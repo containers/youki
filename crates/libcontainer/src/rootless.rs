@@ -1,5 +1,6 @@
 use crate::{namespaces::Namespaces, utils};
 use anyhow::{bail, Context, Result};
+use libcgroups::common::rootless_required;
 use nix::unistd::Pid;
 use oci_spec::runtime::{Linux, LinuxIdMapping, LinuxNamespace, LinuxNamespaceType, Mount, Spec};
 use std::fs;
@@ -115,15 +116,6 @@ fn get_gid_path(pid: &Pid) -> PathBuf {
 #[cfg(test)]
 pub fn get_gid_path(pid: &Pid) -> PathBuf {
     utils::get_temp_dir_path(format!("{pid}_mapping_path").as_str()).join("gid_map")
-}
-
-/// Checks if rootless mode should be used
-pub fn rootless_required() -> bool {
-    if !nix::unistd::geteuid().is_root() {
-        return true;
-    }
-
-    matches!(std::env::var("YOUKI_USE_ROOTLESS").as_deref(), Ok("true"))
 }
 
 pub fn unprivileged_user_ns_enabled() -> Result<bool> {
