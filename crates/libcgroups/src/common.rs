@@ -29,6 +29,29 @@ use super::stats::Stats;
 pub const CGROUP_PROCS: &str = "cgroup.procs";
 pub const DEFAULT_CGROUP_ROOT: &str = "/sys/fs/cgroup";
 
+/// Create a cgroup with cgroup manager
+///
+/// # Example
+///
+/// ```no_run
+///    use libcgroups::common::{create_cgroup_manager, DEFAULT_CGROUP_ROOT};
+///    use nix::libc::pid_t;
+///    use nix::unistd::Pid;
+///    use std::path::Path;
+///    use std::process::Command;
+///    
+///    // Create cgroup manager
+///    let manager = create_cgroup_manager(Path::new(DEFAULT_CGROUP_ROOT), false, "example-cgroup")?;
+///
+///    // Run process
+///    let cmd = Command::new("sh")
+///        .args(["-c", "sleep 100"])
+///        .spawn()
+///        .expect("spawning sleep");
+///
+///    // Add the new process to the cgroup
+///    manager.add_task(Pid::from_raw(cmd.id() as pid_t))?;
+/// ```
 pub trait CgroupManager {
     /// Adds a task specified by its pid to the cgroup
     fn add_task(&self, pid: Pid) -> Result<()>;
