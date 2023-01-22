@@ -27,7 +27,7 @@ bitflags = "1.3.2"
 caps = "0.5.5"
 chrono = { version = "0.4", features = ["serde"] }
 crossbeam-channel = "0.5"
-fastrand = "1.8.0"
+fastrand = "^1.7.0"
 futures = { version = "0.3", features = ["thread-pool"] }
 libc = "0.2.139"
 log = "0.4"
