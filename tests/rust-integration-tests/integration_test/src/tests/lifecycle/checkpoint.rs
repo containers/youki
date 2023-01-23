@@ -144,6 +144,13 @@ fn checkpoint(
         ));
     }
 
+    if !Path::new(&checkpoint_dir.join("descriptors.json")).exists() {
+        return TestResult::Failed(anyhow::anyhow!(
+            "resulting checkpoint does not seem to be complete. {:?}/descriptors.json is missing",
+            &checkpoint_dir,
+        ));
+    }
+
     let dump_log = match work_path {
         Some(wp) => Path::new(wp).join("dump.log"),
         _ => checkpoint_dir.join("dump.log"),

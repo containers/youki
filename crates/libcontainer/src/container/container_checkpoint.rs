@@ -6,9 +6,12 @@ use libcgroups::common::CgroupSetup::{Hybrid, Legacy};
 #[cfg(feature = "v1")]
 use libcgroups::common::DEFAULT_CGROUP_ROOT;
 use oci_spec::runtime::Spec;
+use std::fs::{self, File};
+use std::io::Write;
 use std::os::unix::io::AsRawFd;
 
 const CRIU_CHECKPOINT_LOG_FILE: &str = "dump.log";
+const DESCRIPTORS_JSON: &str = "descriptors.json";
 
 impl Container {
     pub fn checkpoint(&mut self, opts: &CheckpointOptions) -> Result<()> {
@@ -88,9 +91,24 @@ impl Container {
             criu.set_work_dir_fd(work_dir.as_raw_fd());
         }
 
+        let pid: i32 = self.pid().unwrap().into();
+
+        // Remember original stdin, stdout, stderr for container restore.
+        let mut descriptors = Vec::new();
+        for n in 0..3 {
+            let link_path = match fs::read_link(format!("/proc/{}/fd/{}", pid, n)) {
+                Ok(lp) => lp.into_os_string().into_string().unwrap(),
+                Err(..) => "/dev/null".to_string(),
+            };
+            descriptors.push(link_path);
+        }
+        let descriptors_json_path = opts.image_path.join(DESCRIPTORS_JSON);
+        let mut descriptors_json = File::create(descriptors_json_path)?;
+        write!(descriptors_json, "{}", serde_json::to_string(&descriptors)?)?;
+
         criu.set_log_file(CRIU_CHECKPOINT_LOG_FILE.to_string());
         criu.set_log_level(4);
-        criu.set_pid(self.pid().unwrap().into());
+        criu.set_pid(pid);
         criu.set_leave_running(opts.leave_running);
         criu.set_ext_unix_sk(opts.ext_unix_sk);
         criu.set_shell_job(opts.shell_job);
