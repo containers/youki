@@ -33,7 +33,7 @@ libcontainer = { version = "0.0.4", path = "../libcontainer", default-features =
 liboci-cli = { version = "0.0.4", path = "../liboci-cli" }
 log = { version = "0.4", features = ["std"] }
 nix = "0.25.0"
-oci-spec = { version = "0.6.0", features = ["runtime"] }
+oci-spec = { version = "^0.5.5", features = ["runtime"] }
 once_cell = "1.17.0"
 pentacle = "1.0.0"
 procfs = "0.14.2"
