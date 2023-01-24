@@ -23,13 +23,13 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     let execute_test = match args.get(1) {
         Some(execute_test) => execute_test.to_string(),
-        None => return eprintln!("error due to execute test flag not found"),
+        None => return eprintln!("error due to execute test name not found"),
     };
     
     match &*execute_test {
         "readonly_paths" => tests::validate_readonly_paths(&spec),
         "set_host_name" => tests::validate_hostname(&spec),
         "mounts_recursive" => tests::validate_mounts_recursive(&spec),
-        _ => eprintln!("error due to unexpected execute test flag: {}", execute_test),
+        _ => eprintln!("error due to unexpected execute test name: {}", execute_test),
     }
 }
