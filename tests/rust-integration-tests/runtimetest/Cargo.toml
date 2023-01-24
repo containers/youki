@@ -8,11 +8,3 @@ oci-spec = { version = "0.5.8", features = ["runtime"] }
 nix = "0.25.0"
 anyhow = "1.0"
 
-[dependencies.clap]
-version = "3.2.23"
-default-features = false
-features = ["std", "suggestions", "derive", "cargo"]
-
-[dependencies.clap_derive]
-version = "4.0.21"
-default-features = true

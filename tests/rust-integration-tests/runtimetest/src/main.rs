@@ -1,28 +1,9 @@
 mod tests;
 mod utils;
 
-use clap::Parser;
 use oci_spec::runtime::Spec;
 use std::path::PathBuf;
-
-#[derive(Parser, Debug)]
-#[clap(version = "0.0.1", author = "youki team")]
-struct Opts {
-    #[clap(subcommand)]
-    command: SubCommand,
-}
-
-#[derive(Parser, Debug)]
-enum SubCommand {
-    #[clap(name = "readonly_paths")]
-    ReadonlyPaths,
-
-    #[clap(name = "set_host_name")]
-    SetHostName,
-
-    #[clap(name = "mounts_recursive")]
-    MountsRecursive,
-}
+use std::env;
 
 const SPEC_PATH: &str = "/config.json";
 
@@ -38,12 +19,17 @@ fn get_spec() -> Spec {
 }
 
 fn main() {
-    let opts: Opts = Opts::parse();
     let spec = get_spec();
-
-    match opts.command {
-        SubCommand::ReadonlyPaths => tests::validate_readonly_paths(&spec),
-        SubCommand::SetHostName => tests::validate_hostname(&spec),
-        SubCommand::MountsRecursive => tests::validate_mounts_recursive(&spec),
+    let args: Vec<String> = env::args().collect();
+    let execute_test = match args.get(1) {
+        Some(execute_test) => execute_test.to_string(),
+        None => return eprintln!("error due to execute test flag not found"),
     };
+    
+    match &*execute_test {
+        "readonly_paths" => tests::validate_readonly_paths(&spec),
+        "set_host_name" => tests::validate_hostname(&spec),
+        "mounts_recursive" => tests::validate_mounts_recursive(&spec),
+        _ => eprintln!("error due to unexpected execute test flag: {}", execute_test),
+    }
 }
