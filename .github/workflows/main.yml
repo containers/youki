@@ -31,7 +31,7 @@ jobs:
     timeout-minutes: 15
     strategy:
       matrix:
-        rust: [1.65.0, 1.66.0]
+        rust: [1.66.0, 1.67.0]
         dirs: ${{ fromJSON(needs.changes.outputs.dirs) }}
     steps:
       - uses: actions/checkout@v3
@@ -55,7 +55,7 @@ jobs:
     timeout-minutes: 15
     strategy:
       matrix:
-        rust: [1.65.0, 1.66.0]
+        rust: [1.66.0, 1.67.0]
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
@@ -79,7 +79,7 @@ jobs:
       - name: Toolchain setup
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: 1.65.0
+          toolchain: 1.67.0
           override: true
           profile: minimal
           components: llvm-tools-preview
@@ -107,7 +107,7 @@ jobs:
     timeout-minutes: 15
     strategy:
       matrix:
-        rust: [1.65.0, 1.66.0]
+        rust: [1.66.0, 1.67.0]
     steps:
       - uses: actions/checkout@v3
         with:

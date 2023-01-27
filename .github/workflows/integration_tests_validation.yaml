@@ -26,7 +26,7 @@ jobs:
     timeout-minutes: 15
     strategy:
       matrix:
-        rust: [1.65.0, 1.66.0]
+        rust: [1.66.0, 1.67.0]
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
