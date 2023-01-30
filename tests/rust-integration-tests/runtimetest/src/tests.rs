@@ -1,6 +1,9 @@
-use crate::utils::{test_read_access, test_write_access};
+use crate::utils::{self, test_read_access, test_write_access};
+use anyhow::{bail, Result};
 use nix::errno::Errno;
 use oci_spec::runtime::Spec;
+use std::fs::read_dir;
+use std::path::Path;
 
 pub fn validate_readonly_paths(spec: &Spec) {
     let linux = spec.linux().as_ref().unwrap();
@@ -73,6 +76,71 @@ pub fn validate_hostname(spec: &Spec) {
                 "Unexpected hostname, expected: {:?} found: {:?}",
                 expected_hostname, actual_hostname
             );
+        }
+    }
+}
+
+// Run argument test recursively for files after base_dir
+fn do_test_mounts_recursive(base_dir: &Path, test_fn: &dyn Fn(&Path) -> Result<()>) -> Result<()> {
+    let dirs = read_dir(base_dir).unwrap();
+    for dir in dirs {
+        let dir = dir.unwrap();
+        let f_type = dir.file_type().unwrap();
+        if f_type.is_dir() {
+            do_test_mounts_recursive(dir.path().as_path(), test_fn)?;
+        }
+
+        if f_type.is_file() {
+            test_fn(dir.path().as_path())?;
+        }
+    }
+
+    Ok(())
+}
+
+pub fn validate_mounts_recursive(spec: &Spec) {
+    if let Some(mounts) = spec.mounts() {
+        for mount in mounts {
+            if let Some(options) = mount.options() {
+                for option in options {
+                    match option.as_str() {
+                        "rro" => {
+                            if let Err(e) =
+                                do_test_mounts_recursive(mount.destination(), &|test_file_path| {
+                                    if utils::test_write_access(test_file_path.to_str().unwrap())
+                                        .is_ok()
+                                    {
+                                        // Return Err if writeable
+                                        bail!(
+                                            "path {:?} expected to be read-only, found writable",
+                                            test_file_path
+                                        );
+                                    }
+                                    Ok(())
+                                })
+                            {
+                                eprintln!("error in testing rro recursive mounting : {}", e);
+                            }
+                        }
+                        "rnoexec" => {
+                            if let Err(e) = do_test_mounts_recursive(
+                                mount.destination(),
+                                &|test_file_path| {
+                                    if utils::test_file_executable(test_file_path.to_str().unwrap())
+                                        .is_ok()
+                                    {
+                                        bail!("path {:?} expected to be not executable, found executable", test_file_path);
+                                    }
+                                    Ok(())
+                                },
+                            ) {
+                                eprintln!("error in testing rnoexec recursive mounting: {}", e);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
         }
     }
 }

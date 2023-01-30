@@ -16,7 +16,10 @@ fn get_spec(readonly_paths: Vec<String>) -> Spec {
         )
         .process(
             ProcessBuilder::default()
-                .args(vec!["runtimetest".to_string()])
+                .args(vec![
+                    "runtimetest".to_string(),
+                    "readonly_paths".to_string(),
+                ])
                 .build()
                 .unwrap(),
         )

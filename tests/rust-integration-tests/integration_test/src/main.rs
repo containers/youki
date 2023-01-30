@@ -5,6 +5,7 @@ use crate::tests::hooks::get_hooks_tests;
 use crate::tests::hostname::get_hostname_test;
 use crate::tests::lifecycle::{ContainerCreate, ContainerLifecycle};
 use crate::tests::linux_ns_itype::get_ns_itype_tests;
+use crate::tests::mounts_recursive::get_mounts_recursive_test;
 use crate::tests::pidfile::get_pidfile_test;
 use crate::tests::readonly_paths::get_ro_paths_test;
 use crate::tests::seccomp_notify::get_seccomp_notify_test;
@@ -90,6 +91,7 @@ fn main() -> Result<()> {
     let seccomp_notify = get_seccomp_notify_test();
     let ro_paths = get_ro_paths_test();
     let hostname = get_hostname_test();
+    let mounts_recursive = get_mounts_recursive_test();
 
     tm.add_test_group(Box::new(cl));
     tm.add_test_group(Box::new(cc));
@@ -106,6 +108,7 @@ fn main() -> Result<()> {
     tm.add_test_group(Box::new(seccomp_notify));
     tm.add_test_group(Box::new(ro_paths));
     tm.add_test_group(Box::new(hostname));
+    tm.add_test_group(Box::new(mounts_recursive));
 
     tm.add_cleanup(Box::new(cgroups::cleanup_v1));
     tm.add_cleanup(Box::new(cgroups::cleanup_v2));

@@ -3,6 +3,7 @@ pub mod hooks;
 pub mod hostname;
 pub mod lifecycle;
 pub mod linux_ns_itype;
+pub mod mounts_recursive;
 pub mod pidfile;
 pub mod readonly_paths;
 pub mod seccomp_notify;
