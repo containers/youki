@@ -77,7 +77,7 @@ pub fn convert_shares_to_cgroup2(shares: u64) -> u64 {
         return 0;
     }
 
-    1 + ((shares - 2) * 9999) / 262142
+    1 + ((shares.saturating_sub(2)) * 9999) / 262142
 }
 
 #[cfg(test)]

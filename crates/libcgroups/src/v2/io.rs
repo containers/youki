@@ -89,7 +89,7 @@ impl Io {
         if v == 0 {
             return 0;
         }
-        1 + (v - 10) * 9999 / 990
+        1 + (v.saturating_sub(10)) * 9999 / 990
     }
 
     fn io_max_path(path: &Path) -> PathBuf {
