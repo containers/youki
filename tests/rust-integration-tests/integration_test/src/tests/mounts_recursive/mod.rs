@@ -7,10 +7,10 @@ use oci_spec::runtime::{
     Spec, SpecBuilder,
 };
 use std::collections::hash_set::HashSet;
+use std::fs;
 use std::os::unix::prelude::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::fs;
 use test_framework::{Test, TestGroup, TestResult};
 
 fn get_spec(added_mounts: Vec<Mount>, process_args: Vec<String>) -> Spec {
@@ -249,7 +249,11 @@ pub fn get_mounts_recursive_test() -> TestGroup {
     let rnoexec_test = Test::new("rnoexec_test", Box::new(check_recursive_noexec));
 
     let mut tg = TestGroup::new("mounts_recursive");
-    tg.add(vec![Box::new(rro_test), Box::new(rnosuid_test), Box::new(rnoexec_test)]);
+    tg.add(vec![
+        Box::new(rro_test),
+        Box::new(rnosuid_test),
+        Box::new(rnoexec_test),
+    ]);
 
     tg
 }
