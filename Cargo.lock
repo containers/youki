@@ -2556,6 +2556,7 @@ name = "runtimetest"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "libc",
  "nix",
  "oci-spec 0.6.0",
 ]

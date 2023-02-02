@@ -1,4 +1,5 @@
 pub mod cgroups;
+pub mod domainname;
 pub mod hooks;
 pub mod hostname;
 pub mod lifecycle;

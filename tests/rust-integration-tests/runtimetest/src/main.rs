@@ -30,6 +30,7 @@ fn main() {
         "readonly_paths" => tests::validate_readonly_paths(&spec),
         "set_host_name" => tests::validate_hostname(&spec),
         "mounts_recursive" => tests::validate_mounts_recursive(&spec),
+        "domainname_test" => tests::validate_domainname(&spec),
         _ => eprintln!(
             "error due to unexpected execute test name: {}",
             execute_test

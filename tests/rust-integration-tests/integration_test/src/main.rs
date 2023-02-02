@@ -1,6 +1,7 @@
 mod tests;
 mod utils;
 
+use crate::tests::domainname::get_domainname_tests;
 use crate::tests::hooks::get_hooks_tests;
 use crate::tests::hostname::get_hostname_test;
 use crate::tests::lifecycle::{ContainerCreate, ContainerLifecycle};
@@ -92,6 +93,7 @@ fn main() -> Result<()> {
     let ro_paths = get_ro_paths_test();
     let hostname = get_hostname_test();
     let mounts_recursive = get_mounts_recursive_test();
+    let domainname = get_domainname_tests();
 
     tm.add_test_group(Box::new(cl));
     tm.add_test_group(Box::new(cc));
@@ -109,6 +111,7 @@ fn main() -> Result<()> {
     tm.add_test_group(Box::new(ro_paths));
     tm.add_test_group(Box::new(hostname));
     tm.add_test_group(Box::new(mounts_recursive));
+    tm.add_test_group(Box::new(domainname));
 
     tm.add_cleanup(Box::new(cgroups::cleanup_v1));
     tm.add_cleanup(Box::new(cgroups::cleanup_v2));
