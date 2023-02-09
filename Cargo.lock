@@ -231,9 +231,9 @@ dependencies = [
 
 [[package]]
 name = "cap-rand"
-version = "1.0.4"
+version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a986c3b8fb6e25bbef961b237756ff7a771aa71c9ffdeb01c29f3f208577bf9"
+checksum = "103e94d97d73504c5fa6ffb47135d5627ce5ff84a4ad37e8219103ddc291de24"
 dependencies = [
  "ambient-authority",
  "rand",
