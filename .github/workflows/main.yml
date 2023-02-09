@@ -31,16 +31,11 @@ jobs:
     timeout-minutes: 15
     strategy:
       matrix:
-        rust: [1.66.0, 1.67.0]
         dirs: ${{ fromJSON(needs.changes.outputs.dirs) }}
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: ${{ matrix.rust }}
-          override: true
-      - name: Cache youki
-        uses: Swatinem/rust-cache@v1
+      - name: Setup Rust toolchain and cache
+        uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
       - run: rustup component add rustfmt clippy
       - run: sudo apt-get -y update
       - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev libseccomp-dev
@@ -53,17 +48,10 @@ jobs:
   tests:
     runs-on: ubuntu-20.04
     timeout-minutes: 15
-    strategy:
-      matrix:
-        rust: [1.66.0, 1.67.0]
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: ${{ matrix.rust }}
-          override: true
-      - name: Cache youki
-        uses: Swatinem/rust-cache@v1
+      - name: Install rus
+        run: rustup show
       - run: sudo apt-get -y update
       - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev libseccomp-dev
       - name: Run tests
@@ -76,15 +64,10 @@ jobs:
     name: Run test coverage
     steps:
       - uses: actions/checkout@v3
-      - name: Toolchain setup
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: 1.67.0
-          override: true
-          profile: minimal
-          components: llvm-tools-preview
-      - name: Cache youki
-        uses: Swatinem/rust-cache@v1
+      - name: Setup Rust toolchain and cache
+        uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
+      - name: Install llvm-tools-preview
+        run: rustup component add llvm-tools-preview
       - name: install cargo-llvm-cov
         uses: taiki-e/install-action@v1
         with:
@@ -105,19 +88,12 @@ jobs:
   integration_tests:
     runs-on: ubuntu-20.04
     timeout-minutes: 15
-    strategy:
-      matrix:
-        rust: [1.66.0, 1.67.0]
     steps:
       - uses: actions/checkout@v3
         with:
           submodules: recursive
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: ${{ matrix.rust }}
-          override: true
-      - name: Cache youki
-        uses: Swatinem/rust-cache@v1
+      - name: Setup Rust toolchain and cache
+        uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
       - run: sudo apt-get -y update
       - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev libseccomp-dev
       - uses: actions/setup-go@v2
