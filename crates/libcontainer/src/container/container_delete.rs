@@ -1,4 +1,4 @@
-use super::{Container, ContainerStatus};
+use super::{Container};
 use crate::config::YoukiConfig;
 use crate::hooks;
 use anyhow::{bail, Context, Result};
@@ -27,9 +27,8 @@ impl Container {
     pub fn delete(&mut self, force: bool) -> Result<()> {
         self.refresh_status()
             .context("failed to refresh container status")?;
-        if self.can_kill() && force {
-            self.do_kill(signal::Signal::SIGKILL, true)?;
-            self.set_status(ContainerStatus::Stopped).save()?;
+        if self.can_kill() || force {
+            self.kill(signal::Signal::SIGKILL, false)?;
         }
         log::debug!("container status: {:?}", self.status());
         if self.can_delete() {
