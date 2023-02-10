@@ -14,10 +14,8 @@ jobs:
       - name: Checkout to PR branch
         uses: actions/checkout@v3
 
-      - name: Setup Linux env
-        run: |
-          sudo apt -y update
-          sudo apt install libsystemd-dev librust-libdbus-sys-dev libseccomp-dev
+      - name: Install requirements
+        run: ./.github/scripts/dependency.sh
 
       - name: Setup Rust toolchain and cache
         uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
@@ -42,10 +40,8 @@ jobs:
         with:
           ref: main
 
-      - name: Setup Linux env
-        run: |
-          sudo apt -y update
-          sudo apt install libsystemd-dev librust-libdbus-sys-dev libseccomp-dev
+      - name: Install requirements
+        run: ./.github/scripts/dependency.sh
 
       - name: Setup Rust toolchain and cache
         uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
