@@ -1,4 +1,4 @@
-use super::{Container};
+use super::Container;
 use crate::config::YoukiConfig;
 use crate::hooks;
 use anyhow::{bail, Context, Result};
