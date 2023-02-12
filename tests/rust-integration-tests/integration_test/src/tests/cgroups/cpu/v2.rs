@@ -266,7 +266,7 @@ fn check_cpu_weight(cgroup_name: &str, expected_weight: u64) -> Result<()> {
 
     let actual_weight = data
         .parse::<u64>()
-        .with_context(|| format!("failed to parse {:?}", data))?;
+        .with_context(|| format!("failed to parse {data:?}"))?;
     assert_result_eq!(actual_weight, expected_weight, "unexpected cpu weight")
 }
 
@@ -274,7 +274,7 @@ fn check_cpu_idle(cgroup_name: &str, expected_value: i64) -> Result<()> {
     let data = read_cgroup_data(cgroup_name, "cpu.idle")?;
     assert_result_eq!(
         data.parse::<i64>()
-            .with_context(|| format!("failed to parse {:?}", data))?,
+            .with_context(|| format!("failed to parse {data:?}"))?,
         expected_value
     )
 }
@@ -300,14 +300,14 @@ fn check_cpu_max(cgroup_name: &str, expected_quota: i64, expected_period: u64) -
     } else {
         let actual_quota = quota
             .parse::<i64>()
-            .with_context(|| format!("failed to parse {:?}", quota))?;
+            .with_context(|| format!("failed to parse {quota:?}"))?;
         assert_result_eq!(expected_quota, actual_quota, "unexpected cpu quota")?;
     }
 
     let period = parts[1].trim();
     let actual_period = period
         .parse::<u64>()
-        .with_context(|| format!("failed to parse {:?}", period))?;
+        .with_context(|| format!("failed to parse {period:?}"))?;
     assert_result_eq!(expected_period, actual_period, "unexpected cpu period")
 }
 
@@ -319,7 +319,7 @@ fn read_cgroup_data(cgroup_name: &str, cgroup_file: &str) -> Result<String> {
 
     log::debug!("reading value from {:?}", cgroup_path);
     let content = fs::read_to_string(&cgroup_path)
-        .with_context(|| format!("failed to read {:?}", cgroup_path))?;
+        .with_context(|| format!("failed to read {cgroup_path:?}"))?;
     let trimmed = content.trim();
     Ok(trimmed.to_owned())
 }
@@ -337,12 +337,12 @@ fn prepare_cpu_max(spec: &Spec, quota: &str, period: &str) -> Result<()> {
 
     let full_cgroup_path = PathBuf::from(common::DEFAULT_CGROUP_ROOT).join_safely(cgroups_path)?;
     fs::create_dir_all(&full_cgroup_path)
-        .with_context(|| format!("could not create cgroup {:?}", full_cgroup_path))?;
+        .with_context(|| format!("could not create cgroup {full_cgroup_path:?}"))?;
     attach_controller(Path::new(DEFAULT_CGROUP_ROOT), cgroups_path, "cpu")?;
 
     let cpu_max_path = full_cgroup_path.join("cpu.max");
-    fs::write(&cpu_max_path, format!("{} {}", quota, period))
-        .with_context(|| format!("failed to write to {:?}", cpu_max_path))?;
+    fs::write(&cpu_max_path, format!("{quota} {period}"))
+        .with_context(|| format!("failed to write to {cpu_max_path:?}"))?;
 
     Ok(())
 }

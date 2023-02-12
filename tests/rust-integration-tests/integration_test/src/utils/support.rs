@@ -34,7 +34,7 @@ pub fn get_project_path() -> PathBuf {
     let current_dir_path_result = env::current_dir();
     match current_dir_path_result {
         Ok(path_buf) => path_buf,
-        Err(e) => panic!("directory is not found, {}", e),
+        Err(e) => panic!("directory is not found, {e}"),
     }
 }
 
@@ -52,7 +52,7 @@ pub fn generate_uuid() -> Uuid {
 
     match Uuid::parse_str(&rand_string) {
         Ok(uuid) => uuid,
-        Err(e) => panic!("can not parse uuid, {}", e),
+        Err(e) => panic!("can not parse uuid, {e}"),
     }
 }
 
@@ -63,7 +63,7 @@ pub fn prepare_bundle(id: &Uuid) -> Result<TempDir> {
     let tar_source = std::env::current_dir()?.join(tar_file_name);
     let tar_target = temp_dir.as_ref().join(tar_file_name);
     std::fs::copy(&tar_source, &tar_target)
-        .with_context(|| format!("could not copy {:?} to {:?}", tar_source, tar_target))?;
+        .with_context(|| format!("could not copy {tar_source:?} to {tar_target:?}"))?;
 
     let tar_gz = File::open(&tar_source)?;
     let tar = GzDecoder::new(tar_gz);

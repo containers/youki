@@ -152,7 +152,7 @@ mod tests {
         // arrange
         let (tmp, shares) = setup("test_set_shares", CGROUP_CPU_SHARES);
         let _ = set_fixture(&tmp, CGROUP_CPU_SHARES, "")
-            .unwrap_or_else(|_| panic!("set test fixture for {}", CGROUP_CPU_SHARES));
+            .unwrap_or_else(|_| panic!("set test fixture for {CGROUP_CPU_SHARES}"));
         let cpu = LinuxCpuBuilder::default().shares(2048u64).build().unwrap();
 
         // act
@@ -160,7 +160,7 @@ mod tests {
 
         // assert
         let content = fs::read_to_string(shares)
-            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_SHARES));
+            .unwrap_or_else(|_| panic!("read {CGROUP_CPU_SHARES} file content"));
         assert_eq!(content, 2048.to_string());
     }
 
@@ -176,7 +176,7 @@ mod tests {
 
         // assert
         let content = fs::read_to_string(max)
-            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_QUOTA));
+            .unwrap_or_else(|_| panic!("read {CGROUP_CPU_QUOTA} file content"));
         assert_eq!(content, QUOTA.to_string());
     }
 
@@ -192,7 +192,7 @@ mod tests {
 
         // assert
         let content = fs::read_to_string(max)
-            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_PERIOD));
+            .unwrap_or_else(|_| panic!("read {CGROUP_CPU_PERIOD} file content"));
         assert_eq!(content, PERIOD.to_string());
     }
 
@@ -211,7 +211,7 @@ mod tests {
 
         // assert
         let content = fs::read_to_string(max)
-            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_RT_RUNTIME));
+            .unwrap_or_else(|_| panic!("read {CGROUP_CPU_RT_RUNTIME} file content"));
         assert_eq!(content, RUNTIME.to_string());
     }
 
@@ -238,7 +238,7 @@ mod tests {
 
         // assert
         let content = fs::read_to_string(max)
-            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_IDLE));
+            .unwrap_or_else(|_| panic!("read {CGROUP_CPU_IDLE} file content"));
         assert_eq!(content, IDLE.to_string());
     }
 
@@ -257,7 +257,7 @@ mod tests {
 
         // assert
         let content = fs::read_to_string(max)
-            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_RT_PERIOD));
+            .unwrap_or_else(|_| panic!("read {CGROUP_CPU_RT_PERIOD} file content"));
         assert_eq!(content, PERIOD.to_string());
     }
 

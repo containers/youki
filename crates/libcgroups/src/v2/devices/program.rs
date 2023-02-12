@@ -287,10 +287,7 @@ mod tests {
                         let ret = prog.execute(*ty, *major, *minor, access.to_string());
                         assert!(ret.is_ok());
 
-                        println!(
-                            "execute {:?} {} {} {} -> {:?}",
-                            ty, major, minor, access, ret
-                        );
+                        println!("execute {ty:?} {major} {minor} {access} -> {ret:?}");
                         if *ty == LinuxDeviceType::C  // only this is allowed
                             && *major == 10
                                 && *minor == 20
@@ -358,10 +355,7 @@ mod tests {
                         let ret = prog.execute(*ty, *major, *minor, access.to_string());
                         assert!(ret.is_ok());
 
-                        println!(
-                            "execute {:?} {} {} {} -> {:?}",
-                            ty, major, minor, access, ret
-                        );
+                        println!("execute {ty:?} {major} {minor} {access} -> {ret:?}");
                         assert_eq!(ret.unwrap(), 1);
                     }
                 }
@@ -396,10 +390,7 @@ mod tests {
                         let ret = prog.execute(*ty, *major, *minor, access.to_string());
                         assert!(ret.is_ok());
 
-                        println!(
-                            "execute {:?} {} {} {} -> {:?}",
-                            ty, major, minor, access, ret
-                        );
+                        println!("execute {ty:?} {major} {minor} {access} -> {ret:?}");
                         if *ty == LinuxDeviceType::C && *minor == 20 && access.eq(&"r") {
                             assert_eq!(ret.unwrap(), 1);
                         } else {
@@ -447,10 +438,7 @@ mod tests {
                         let ret = prog.execute(*ty, *major, *minor, access.to_string());
                         assert!(ret.is_ok());
 
-                        println!(
-                            "execute {:?} {} {} {} -> {:?}",
-                            ty, major, minor, access, ret
-                        );
+                        println!("execute {ty:?} {major} {minor} {access} -> {ret:?}");
                         if *ty == LinuxDeviceType::C && *major == 10 && access.eq(&"r") {
                             assert_eq!(ret.unwrap(), 0);
                         } else if *ty == LinuxDeviceType::C

@@ -40,10 +40,7 @@ pub fn test_read_access(path: &str) -> Result<(), std::io::Error> {
 
     Err(std::io::Error::new(
         std::io::ErrorKind::Other,
-        format!(
-            "cannot test read access for {:?}, has mode {:x}",
-            path, mode
-        ),
+        format!("cannot test read access for {path:?}, has mode {mode:x}"),
     ))
 }
 
@@ -72,10 +69,7 @@ pub fn test_write_access(path: &str) -> Result<(), std::io::Error> {
 
     Err(std::io::Error::new(
         std::io::ErrorKind::Other,
-        format!(
-            "cannot test write access for {:?}, has mode {:x}",
-            path, mode
-        ),
+        format!("cannot test write access for {path:?}, has mode {mode:x}"),
     ))
 }
 
@@ -88,6 +82,6 @@ pub fn test_file_executable(path: &str) -> Result<(), std::io::Error> {
 
     Err(std::io::Error::new(
         std::io::ErrorKind::Other,
-        format!("{:?} is directory, so cannot execute", path),
+        format!("{path:?} is directory, so cannot execute"),
     ))
 }

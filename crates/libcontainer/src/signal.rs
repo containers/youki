@@ -56,7 +56,7 @@ impl TryFrom<i32> for Signal {
 
     fn try_from(value: i32) -> Result<Self, Self::Error> {
         NixSignal::try_from(value)
-            .with_context(|| format!("{} is not a valid signal", value))
+            .with_context(|| format!("{value} is not a valid signal"))
             .map(Signal)
     }
 }

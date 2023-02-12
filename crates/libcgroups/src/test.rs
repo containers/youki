@@ -61,7 +61,7 @@ pub fn create_temp_dir(test_name: &str) -> Result<TempDir> {
 pub fn setup(testname: &str, cgroup_file: &str) -> (TempDir, PathBuf) {
     let tmp = create_temp_dir(testname).expect("create temp directory for test");
     let cgroup_file = set_fixture(&tmp, cgroup_file, "")
-        .unwrap_or_else(|_| panic!("set test fixture for {}", cgroup_file));
+        .unwrap_or_else(|_| panic!("set test fixture for {cgroup_file}"));
 
     (tmp, cgroup_file)
 }
@@ -74,9 +74,9 @@ pub fn set_fixture(temp_dir: &Path, filename: &str, val: &str) -> Result<PathBuf
         .write(true)
         .truncate(true)
         .open(&full_path)
-        .with_context(|| format!("failed to open {:?}", full_path))?
+        .with_context(|| format!("failed to open {full_path:?}"))?
         .write_all(val.as_bytes())
-        .with_context(|| format!("failed to write to {:?}", full_path))?;
+        .with_context(|| format!("failed to write to {full_path:?}"))?;
 
     Ok(full_path)
 }

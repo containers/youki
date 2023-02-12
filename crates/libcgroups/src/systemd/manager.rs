@@ -136,7 +136,7 @@ impl Manager {
         let mut destructured_path = cgroups_path
             .as_path()
             .try_into()
-            .with_context(|| format!("failed to destructure cgroups path {:?}", cgroups_path))?;
+            .with_context(|| format!("failed to destructure cgroups path {cgroups_path:?}"))?;
         ensure_parent_unit(&mut destructured_path, use_system);
 
         let client = match use_system {
@@ -189,9 +189,9 @@ impl Manager {
 
         let cgroups_path = systemd_root
             .join_safely(&parent)
-            .with_context(|| format!("failed to join {:?} with {:?}", systemd_root, parent))?
+            .with_context(|| format!("failed to join {systemd_root:?} with {parent:?}"))?
             .join_safely(&unit_name)
-            .with_context(|| format!("failed to join {:?} with {:?}", parent, unit_name))?;
+            .with_context(|| format!("failed to join {parent:?} with {unit_name:?}"))?;
         Ok((cgroups_path, systemd_root))
     }
 
@@ -218,8 +218,8 @@ impl Manager {
                 bail!("invalid slice name: {}", slice);
             }
             // Append the component to the path and to the prefix.
-            path = format!("{}/{}{}{}", path, prefix, component, suffix);
-            prefix = format!("{}{}-", prefix, component);
+            path = format!("{path}/{prefix}{component}{suffix}");
+            prefix = format!("{prefix}{component}-");
         }
         Ok(Path::new(&path).to_path_buf())
     }

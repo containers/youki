@@ -81,7 +81,7 @@ impl Mount {
                         &mount_option_config,
                         options.label,
                     )
-                    .with_context(|| format!("failed to mount /dev: {:?}", mount))?;
+                    .with_context(|| format!("failed to mount /dev: {mount:?}"))?;
                 } else {
                     self.mount_into_container(
                         mount,
@@ -89,7 +89,7 @@ impl Mount {
                         &mount_option_config,
                         options.label,
                     )
-                    .with_context(|| format!("failed to mount: {:?}", mount))?;
+                    .with_context(|| format!("failed to mount: {mount:?}"))?;
                 }
             }
         }
@@ -197,10 +197,10 @@ impl Mount {
                     .collect::<Vec<String>>(),
             )
             .build()
-            .with_context(|| format!("failed to build {}", subsystem_name))?;
+            .with_context(|| format!("failed to build {subsystem_name}"))?;
 
         let data: Cow<str> = if named {
-            format!("name={}", subsystem_name).into()
+            format!("name={subsystem_name}").into()
         } else {
             subsystem_name.into()
         };
@@ -217,7 +217,7 @@ impl Mount {
             &mount_options_config,
             options.label,
         )
-        .with_context(|| format!("failed to mount {:?}", subsystem_mount))
+        .with_context(|| format!("failed to mount {subsystem_mount:?}"))
     }
 
     #[cfg(feature = "v1")]
@@ -232,7 +232,7 @@ impl Mount {
     ) -> Result<()> {
         log::debug!("Mounting (emulated) {:?} cgroup subsystem", subsystem_name);
         let named_hierarchy: Cow<str> = if named {
-            format!("name={}", subsystem_name).into()
+            format!("name={subsystem_name}").into()
         } else {
             subsystem_name.into()
         };
@@ -243,10 +243,7 @@ impl Mount {
                     host_mount
                         .join_safely(proc_path.as_str())
                         .with_context(|| {
-                            format!(
-                                "failed to join mount source for {} subsystem",
-                                subsystem_name
-                            )
+                            format!("failed to join mount source for {subsystem_name} subsystem")
                         })?,
                 )
                 .destination(
@@ -255,8 +252,7 @@ impl Mount {
                         .join_safely(subsystem_name)
                         .with_context(|| {
                             format!(
-                                "failed to join mount destination for {} subsystem",
-                                subsystem_name
+                                "failed to join mount destination for {subsystem_name} subsystem"
                             )
                         })?,
                 )
@@ -271,7 +267,7 @@ impl Mount {
             log::debug!("Mounting emulated cgroup subsystem: {:?}", emulated);
 
             self.setup_mount(&emulated, options)
-                .with_context(|| format!("failed to mount {} cgroup hierarchy", subsystem_name))?;
+                .with_context(|| format!("failed to mount {subsystem_name} cgroup hierarchy"))?;
         } else {
             log::warn!("Could not mount {:?} cgroup subsystem", subsystem_name);
         }
@@ -378,7 +374,7 @@ impl Mount {
         if let Some(l) = label {
             if typ != Some("proc") && typ != Some("sysfs") {
                 match mount_option_config.data.is_empty() {
-                    true => d = format!("context=\"{}\"", l),
+                    true => d = format!("context=\"{l}\""),
                     false => d = format!("{},context=\"{}\"", mount_option_config.data, l),
                 }
             }
@@ -394,7 +390,7 @@ impl Mount {
             .with_context(|| "no source in mount spec".to_string())?;
         let src = if typ == Some("bind") {
             let src = canonicalize(source)
-                .with_context(|| format!("failed to canonicalize: {:?}", source))?;
+                .with_context(|| format!("failed to canonicalize: {source:?}"))?;
             let dir = if src.is_file() {
                 Path::new(&dest).parent().unwrap()
             } else {
@@ -402,19 +398,19 @@ impl Mount {
             };
 
             create_dir_all(dir)
-                .with_context(|| format!("failed to create dir for bind mount: {:?}", dir))?;
+                .with_context(|| format!("failed to create dir for bind mount: {dir:?}"))?;
 
             if src.is_file() {
                 OpenOptions::new()
                     .create(true)
                     .write(true)
                     .open(dest)
-                    .with_context(|| format!("failed to create file for bind mount: {:?}", src))?;
+                    .with_context(|| format!("failed to create file for bind mount: {src:?}"))?;
             }
 
             src
         } else {
-            create_dir_all(dest).with_context(|| format!("Failed to create device: {:?}", dest))?;
+            create_dir_all(dest).with_context(|| format!("Failed to create device: {dest:?}"))?;
 
             PathBuf::from(source)
         };
@@ -437,7 +433,7 @@ impl Mount {
                     mount_option_config.flags,
                     Some(&mount_option_config.data),
                 )
-                .with_context(|| format!("failed to mount {:?} to {:?}", src, dest))?;
+                .with_context(|| format!("failed to mount {src:?} to {dest:?}"))?;
         }
 
         if typ == Some("bind")
@@ -458,7 +454,7 @@ impl Mount {
                     mount_option_config.flags | MsFlags::MS_REMOUNT,
                     None,
                 )
-                .with_context(|| format!("Failed to remount: {:?}", dest))?;
+                .with_context(|| format!("Failed to remount: {dest:?}"))?;
         }
 
         if let Some(mount_attr) = &mount_option_config.rec_attr {
@@ -780,7 +776,7 @@ mod tests {
                 flags: MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
                 data: Some(
                     if subsystem_name == "systemd" {
-                        format!("name={}", subsystem_name)
+                        format!("name={subsystem_name}")
                     } else {
                         subsystem_name.to_string()
                     }

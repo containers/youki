@@ -140,7 +140,7 @@ pub fn print_cgroup_mounts() {
 
         v1_mounts.sort();
         for cgroup_mount in v1_mounts {
-            println!("{}", cgroup_mount);
+            println!("{cgroup_mount}");
         }
     }
 

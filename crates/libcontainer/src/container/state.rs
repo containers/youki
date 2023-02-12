@@ -68,7 +68,7 @@ impl Display for ContainerStatus {
             Self::Paused => "Paused",
         };
 
-        write!(f, "{}", print)
+        write!(f, "{print}")
     }
 }
 
@@ -138,9 +138,8 @@ impl State {
 
     pub fn load(container_root: &Path) -> Result<Self> {
         let state_file_path = Self::file_path(container_root);
-        let state_file = File::open(&state_file_path).with_context(|| {
-            format!("failed to open container state file {:?}", state_file_path)
-        })?;
+        let state_file = File::open(&state_file_path)
+            .with_context(|| format!("failed to open container state file {state_file_path:?}"))?;
 
         let state: Self = serde_json::from_reader(BufReader::new(state_file))?;
         Ok(state)

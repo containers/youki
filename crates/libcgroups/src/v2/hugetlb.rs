@@ -66,18 +66,18 @@ impl HugeTlb {
     }
 
     fn stats_for_page_size(cgroup_path: &Path, page_size: &str) -> Result<HugeTlbStats> {
-        let events_file = format!("hugetlb.{}.events", page_size);
+        let events_file = format!("hugetlb.{page_size}.events");
         let events = common::read_cgroup_file(cgroup_path.join(&events_file))?;
         let fail_count: u64 = events
             .lines()
             .find(|l| l.starts_with("max"))
             .map(|l| l[3..].trim().parse())
             .transpose()
-            .with_context(|| format!("failed to parse max value for {}", events_file))?
+            .with_context(|| format!("failed to parse max value for {events_file}"))?
             .unwrap_or_default();
 
         Ok(HugeTlbStats {
-            usage: parse_single_value(&cgroup_path.join(format!("hugetlb.{}.current", page_size)))?,
+            usage: parse_single_value(&cgroup_path.join(format!("hugetlb.{page_size}.current")))?,
             fail_count,
             ..Default::default()
         })
