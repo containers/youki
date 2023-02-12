@@ -43,7 +43,7 @@ $ sudo dnf install   \
 
 ### Getting the source
 
-Currently Youki can only be installed from the source code itself, so you will need to clone the Youki GitHub repository to get the source code for using it as a runtime. If you are using any crates of Youki as dependency you need to do this step, as Cargo will automatically clone the repository for you.
+To obtain the source code for Youki you will need to clone the Github repository. If you are using any crates of Youki as dependency you need to do this step, as Cargo will automatically clone the repository for you.
 
 To clone the repository, run
 
@@ -65,6 +65,9 @@ make youki-dev # or youki-release
 ```
 
 This will build the Youki binary, and put it at the root level of the cloned directory, that is in the youki/ .
+
+### Installing through Cargo
+Youki is published on [crates.io](https://crates.io/crates/youki) and can be installed using cargo, rust's package manager. To install this way run `cargo install youki` this will install youki as a subcommand of cargo, usually in the `~/.cargo/bin` directory, after this youki can be run through cargo ex:`cargo youki -h`, or if you add this directory to your path youki can be run directly ex:`PATH=$PATH:$HOME/.cargo/bin youki -h`. To update after a new youki version is released simply run `cargo install youki` again.
 
 ---
 
