@@ -11,6 +11,14 @@ edition = "2021"
 build = "build.rs"
 keywords = ["youki", "container"]
 
+[[bin]]
+name = "youki"
+path = "src/main.rs"
+
+[[bin]]
+name = "cargo-youki"
+path = "src/main.rs"
+
 [features]
 systemd = ["libcgroups/systemd", "libcontainer/systemd", "v2"]
 v2 = ["libcgroups/v2", "libcontainer/v2"]
