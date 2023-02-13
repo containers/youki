@@ -14,17 +14,11 @@ jobs:
       - name: Checkout to PR branch
         uses: actions/checkout@v3
 
-      - name: Setup Linux env
-        run: |
-          sudo apt -y update
-          sudo apt install libsystemd-dev librust-libdbus-sys-dev libseccomp-dev
+      - name: Install requirements
+        run: ./.github/scripts/dependency.sh
 
-      - name: Setting rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-          profile: minimal
+      - name: Setup Rust toolchain and cache
+        uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
 
       - name: Building PR branch
         run: make youki-release
@@ -46,17 +40,11 @@ jobs:
         with:
           ref: main
 
-      - name: Setup Linux env
-        run: |
-          sudo apt -y update
-          sudo apt install libsystemd-dev librust-libdbus-sys-dev libseccomp-dev
+      - name: Install requirements
+        run: ./.github/scripts/dependency.sh
 
-      - name: Setting rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-          profile: minimal
+      - name: Setup Rust toolchain and cache
+        uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
 
       - name: Building main branch
         run: make youki-release

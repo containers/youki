@@ -12,13 +12,11 @@ jobs:
       - uses: actions/checkout@v3
         with:
           submodules: recursive
-      - run: sudo apt-get -y update
-      - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev libseccomp-dev libclang-dev
+      - name: Install requirements
+        run: ./.github/scripts/dependency.sh
       - name: Set up cargo
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
+      - name: Setup Rust toolchain and cache
+        uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
       - name: Build
         run: make youki-release
       - name: test
@@ -30,13 +28,11 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
-      - run: sudo apt-get -y update
-      - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev libseccomp-dev
+      - name: Install requirements
+        run: ./.github/scripts/dependency.sh
       - name: Set up cargo
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
+      - name: Setup Rust toolchain and cache
+        uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
       - name: Release build
         run: make youki-release
       - name: Create output directory
@@ -104,11 +100,8 @@ jobs:
       CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
     steps:
       - uses: actions/checkout@v3
-      - name: Set up cargo
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
+      - name: Setup Rust toolchain and cache
+        uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
       - name: Publish libcgroups
         run: cargo publish -p libcgroups --no-verify
       - name: Publish libcontainer
