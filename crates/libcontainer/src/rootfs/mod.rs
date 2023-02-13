@@ -5,7 +5,10 @@
 pub(crate) mod rootfs;
 pub use rootfs::RootFS;
 
-pub(super) mod device;
+pub mod device;
+pub use device::Device;
+
 pub(super) mod mount;
 pub(super) mod symlink;
-pub(super) mod utils;
+
+pub mod utils;
