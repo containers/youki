@@ -326,9 +326,9 @@ mod tests {
                 None => reservation_content == "0",
             };
 
-            println!("limit_check: {}", limit_check);
-            println!("swap_check: {}", swap_check);
-            println!("reservation_check: {}", reservation_check);
+            println!("limit_check: {limit_check}");
+            println!("swap_check: {swap_check}");
+            println!("reservation_check: {reservation_check}");
             limit_check && swap_check && reservation_check
         }
     }

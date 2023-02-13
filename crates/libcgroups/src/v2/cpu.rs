@@ -79,11 +79,9 @@ impl Cpu {
             (None, Some(period)) => Self::create_period_only_value(&cpu_max_file, period)?,
             (Some(quota), None) if quota > 0 => Some(quota.to_string().into()),
             (Some(quota), None) if quota <= 0 => Some(UNRESTRICTED_QUOTA.into()),
-            (Some(quota), Some(period)) if quota > 0 => {
-                Some(format!("{} {}", quota, period).into())
-            }
+            (Some(quota), Some(period)) if quota > 0 => Some(format!("{quota} {period}").into()),
             (Some(quota), Some(period)) if quota <= 0 => {
-                Some(format!("{} {}", UNRESTRICTED_QUOTA, period).into())
+                Some(format!("{UNRESTRICTED_QUOTA} {period}").into())
             }
             _ => None,
         };
@@ -131,7 +129,7 @@ impl Cpu {
     fn create_period_only_value(cpu_max_file: &Path, period: u64) -> Result<Option<Cow<str>>> {
         let old_cpu_max = common::read_cgroup_file(cpu_max_file)?;
         if let Some(old_quota) = old_cpu_max.split_whitespace().next() {
-            return Ok(Some(format!("{} {}", old_quota, period).into()));
+            return Ok(Some(format!("{old_quota} {period}").into()));
         }
         Ok(None)
     }
@@ -152,7 +150,7 @@ mod tests {
         // arrange
         let (tmp, weight) = setup("test_set_shares", CGROUP_CPU_WEIGHT);
         let _ = set_fixture(&tmp, CGROUP_CPU_MAX, "")
-            .unwrap_or_else(|_| panic!("set test fixture for {}", CGROUP_CPU_MAX));
+            .unwrap_or_else(|_| panic!("set test fixture for {CGROUP_CPU_MAX}"));
         let cpu = LinuxCpuBuilder::default().shares(22000u64).build().unwrap();
 
         // act
@@ -160,7 +158,7 @@ mod tests {
 
         // assert
         let content = fs::read_to_string(weight)
-            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_WEIGHT));
+            .unwrap_or_else(|_| panic!("read {CGROUP_CPU_WEIGHT} file content"));
         assert_eq!(content, 840.to_string());
     }
 
@@ -187,8 +185,8 @@ mod tests {
 
         // assert
         let content = fs::read_to_string(max)
-            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_IDLE));
-        assert_eq!(content, format!("{}", IDLE))
+            .unwrap_or_else(|_| panic!("read {CGROUP_CPU_IDLE} file content"));
+        assert_eq!(content, format!("{IDLE}"))
     }
 
     #[test]
@@ -203,8 +201,8 @@ mod tests {
 
         // assert
         let content = fs::read_to_string(max)
-            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_MAX));
-        assert_eq!(content, format!("{}", QUOTA))
+            .unwrap_or_else(|_| panic!("read {CGROUP_CPU_MAX} file content"));
+        assert_eq!(content, format!("{QUOTA}"))
     }
 
     #[test]
@@ -218,7 +216,7 @@ mod tests {
 
         // assert
         let content = fs::read_to_string(max)
-            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_MAX));
+            .unwrap_or_else(|_| panic!("read {CGROUP_CPU_MAX} file content"));
         assert_eq!(content, UNRESTRICTED_QUOTA)
     }
 
@@ -236,8 +234,8 @@ mod tests {
 
         // assert
         let content = fs::read_to_string(max)
-            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_MAX));
-        assert_eq!(content, format!("{} {}", QUOTA, PERIOD))
+            .unwrap_or_else(|_| panic!("read {CGROUP_CPU_MAX} file content"));
+        assert_eq!(content, format!("{QUOTA} {PERIOD}"))
     }
 
     #[test]
@@ -257,8 +255,8 @@ mod tests {
 
         // assert
         let content = fs::read_to_string(max)
-            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPU_MAX));
-        assert_eq!(content, format!("{} {}", QUOTA, PERIOD));
+            .unwrap_or_else(|_| panic!("read {CGROUP_CPU_MAX} file content"));
+        assert_eq!(content, format!("{QUOTA} {PERIOD}"));
     }
 
     #[test]

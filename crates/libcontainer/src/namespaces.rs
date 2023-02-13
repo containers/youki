@@ -67,7 +67,7 @@ impl Namespaces {
 
         for (ns_type, ns) in to_enter {
             self.unshare_or_setns(ns)
-                .with_context(|| format!("failed to enter {:?} namespace: {:?}", ns_type, ns))?;
+                .with_context(|| format!("failed to enter {ns_type:?} namespace: {ns:?}"))?;
         }
         Ok(())
     }
@@ -79,7 +79,7 @@ impl Namespaces {
         } else {
             let ns_path = namespace.path().as_ref().unwrap();
             let fd = fcntl::open(ns_path, fcntl::OFlag::empty(), stat::Mode::empty())
-                .with_context(|| format!("failed to open namespace fd: {:?}", ns_path))?;
+                .with_context(|| format!("failed to open namespace fd: {ns_path:?}"))?;
             self.command
                 .set_ns(fd, get_clone_flag(namespace.typ()))
                 .with_context(|| "failed to set namespace")?;

@@ -216,7 +216,7 @@ impl LinuxSyscall {
     fn get_open_fds() -> Result<Vec<i32>> {
         const PROCFS_FD_PATH: &str = "/proc/self/fd";
         utils::ensure_procfs(Path::new(PROCFS_FD_PATH))
-            .with_context(|| format!("{} is not the actual procfs", PROCFS_FD_PATH))?;
+            .with_context(|| format!("{PROCFS_FD_PATH} is not the actual procfs"))?;
 
         let fds: Vec<i32> = fs::read_dir(PROCFS_FD_PATH)?
             .filter_map(|entry| match entry {

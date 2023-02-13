@@ -133,7 +133,7 @@ impl<'a> ContainerBuilderImpl<'a> {
 
         // if file to write the pid to is specified, write pid of the child
         if let Some(pid_file) = &self.pid_file {
-            fs::write(pid_file, format!("{}", init_pid)).context("failed to write pid file")?;
+            fs::write(pid_file, format!("{init_pid}")).context("failed to write pid file")?;
         }
 
         if let Some(container) = &mut self.container {

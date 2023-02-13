@@ -18,7 +18,7 @@ impl Display for ControllerType {
             ControllerType::Pids => "pids",
         };
 
-        write!(f, "{}", print)
+        write!(f, "{print}")
     }
 }
 

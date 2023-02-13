@@ -55,7 +55,7 @@ pub fn list(_: List, root_path: PathBuf) -> Result<()> {
 
     let mut tab_writer = TabWriter::new(io::stdout());
     writeln!(&mut tab_writer, "ID\tPID\tSTATUS\tBUNDLE\tCREATED\tCREATOR")?;
-    write!(&mut tab_writer, "{}", content)?;
+    write!(&mut tab_writer, "{content}")?;
     tab_writer.flush()?;
 
     Ok(())

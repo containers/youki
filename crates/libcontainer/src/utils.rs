@@ -29,7 +29,7 @@ impl PathBufExt for Path {
             bail!("relative path cannot be converted to the path in the container.")
         } else {
             self.strip_prefix("/")
-                .with_context(|| format!("failed to strip prefix from {:?}", self))
+                .with_context(|| format!("failed to strip prefix from {self:?}"))
         }
     }
 
@@ -49,7 +49,7 @@ impl PathBufExt for Path {
     fn canonicalize_safely(&self) -> Result<PathBuf> {
         if self.exists() {
             self.canonicalize()
-                .with_context(|| format!("failed to canonicalize path {:?}", self))
+                .with_context(|| format!("failed to canonicalize path {self:?}"))
         } else {
             if self.is_relative() {
                 let p = std::env::current_dir()
@@ -142,25 +142,25 @@ pub fn get_cgroup_path(
         Some(cpath) => cpath.clone(),
         None => match rootless {
             false => PathBuf::from(container_id),
-            true => PathBuf::from(format!(":youki:{}", container_id)),
+            true => PathBuf::from(format!(":youki:{container_id}")),
         },
     }
 }
 
 pub fn write_file<P: AsRef<Path>, C: AsRef<[u8]>>(path: P, contents: C) -> Result<()> {
     let path = path.as_ref();
-    fs::write(path, contents).with_context(|| format!("failed to write to {:?}", path))?;
+    fs::write(path, contents).with_context(|| format!("failed to write to {path:?}"))?;
     Ok(())
 }
 
 pub fn create_dir_all<P: AsRef<Path>>(path: P) -> Result<()> {
     let path = path.as_ref();
-    fs::create_dir_all(path).with_context(|| format!("failed to create directory {:?}", path))
+    fs::create_dir_all(path).with_context(|| format!("failed to create directory {path:?}"))
 }
 
 pub fn open<P: AsRef<Path>>(path: P) -> Result<File> {
     let path = path.as_ref();
-    File::open(path).with_context(|| format!("failed to open {:?}", path))
+    File::open(path).with_context(|| format!("failed to open {path:?}"))
 }
 
 /// Creates the specified directory and all parent directories with the specified mode. Ensures
@@ -210,7 +210,7 @@ pub fn ensure_procfs(path: &Path) -> Result<()> {
     let fstat_info = statfs::fstatfs(&procfs_fd.as_raw_fd())?;
 
     if fstat_info.filesystem_type() != statfs::PROC_SUPER_MAGIC {
-        bail!(format!("{:?} is not on the procfs", path));
+        bail!(format!("{path:?} is not on the procfs"));
     }
 
     Ok(())
@@ -448,7 +448,7 @@ mod tests {
     fn test_parse_env() -> Result<()> {
         let key = "key".to_string();
         let value = "value".to_string();
-        let env_input = vec![format!("{}={}", key, value)];
+        let env_input = vec![format!("{key}={value}")];
         let env_output = parse_env(&env_input);
         assert_eq!(
             env_output.len(),

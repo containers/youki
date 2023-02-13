@@ -30,8 +30,7 @@ pub fn validate_readonly_paths(spec: &Spec) {
                 /* This is expected */
             } else {
                 eprintln!(
-                    "in readonly paths, error in testing read access for path {} : {:?}",
-                    path, e
+                    "in readonly paths, error in testing read access for path {path} : {e:?}"
                 );
                 return;
             }
@@ -48,16 +47,12 @@ pub fn validate_readonly_paths(spec: &Spec) {
                 /* This is expected */
             } else {
                 eprintln!(
-                    "in readonly paths, error in testing write access for path {} : {:?}",
-                    path, e
+                    "in readonly paths, error in testing write access for path {path} : {e:?}"
                 );
                 return;
             }
         } else {
-            eprintln!(
-                "in readonly paths, path {} expected to not be writable, found writable",
-                path
-            );
+            eprintln!("in readonly paths, path {path} expected to not be writable, found writable");
             return;
         }
     }
@@ -73,8 +68,7 @@ pub fn validate_hostname(spec: &Spec) {
         let actual_hostname = actual_hostname.to_str().unwrap();
         if actual_hostname != expected_hostname {
             eprintln!(
-                "Unexpected hostname, expected: {:?} found: {:?}",
-                expected_hostname, actual_hostname
+                "Unexpected hostname, expected: {expected_hostname:?} found: {actual_hostname:?}"
             );
         }
     }
@@ -119,7 +113,7 @@ pub fn validate_mounts_recursive(spec: &Spec) {
                                     Ok(())
                                 })
                             {
-                                eprintln!("error in testing rro recursive mounting : {}", e);
+                                eprintln!("error in testing rro recursive mounting : {e}");
                             }
                         }
                         "rnoexec" => {
@@ -134,7 +128,7 @@ pub fn validate_mounts_recursive(spec: &Spec) {
                                     Ok(())
                                 },
                             ) {
-                                eprintln!("error in testing rnoexec recursive mounting: {}", e);
+                                eprintln!("error in testing rnoexec recursive mounting: {e}");
                             }
                         }
                         _ => {}

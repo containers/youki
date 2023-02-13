@@ -85,7 +85,7 @@ fn check_pid_limit_set(cgroup_name: &str, expected: i64) -> Result<()> {
         .join(cgroup_name)
         .join("pids.max");
     let content = fs::read_to_string(&cgroup_path)
-        .with_context(|| format!("failed to read {:?}", cgroup_path))?;
+        .with_context(|| format!("failed to read {cgroup_path:?}"))?;
     let trimmed = content.trim();
 
     if trimmed.is_empty() {
@@ -106,7 +106,7 @@ fn check_pid_limit_set(cgroup_name: &str, expected: i64) -> Result<()> {
 
     let actual: i64 = trimmed
         .parse()
-        .with_context(|| format!("could not parse {:?}", trimmed))?;
+        .with_context(|| format!("could not parse {trimmed:?}"))?;
     if expected != actual {
         bail!(
             "expected {:?} to contain a pid limit of {}, but the limit was {}",
@@ -125,7 +125,7 @@ fn check_pids_are_unlimited(cgroup_name: &str) -> Result<()> {
         .join(cgroup_name)
         .join("pids.max");
     let content = fs::read_to_string(&cgroup_path)
-        .with_context(|| format!("failed to read {:?}", cgroup_path))?;
+        .with_context(|| format!("failed to read {cgroup_path:?}"))?;
     let trimmed = content.trim();
 
     if trimmed.is_empty() {

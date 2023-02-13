@@ -83,7 +83,7 @@ impl TestableGroup for ContainerCreate {
                 "empty_id" => ret.push(("empty_id", self.create_empty_id())),
                 "valid_id" => ret.push(("valid_id", self.create_valid_id())),
                 "duplicate_id" => ret.push(("duplicate_id", self.create_duplicate_id())),
-                _ => eprintln!("No test named {} in lifecycle", name),
+                _ => eprintln!("No test named {name} in lifecycle"),
             };
         }
         ret

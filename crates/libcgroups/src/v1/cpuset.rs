@@ -110,7 +110,7 @@ mod tests {
 
         // assert
         let content = fs::read_to_string(cpus)
-            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPUSET_CPUS));
+            .unwrap_or_else(|_| panic!("read {CGROUP_CPUSET_CPUS} file content"));
         assert_eq!(content, "1-3");
     }
 
@@ -128,7 +128,7 @@ mod tests {
 
         // assert
         let content = fs::read_to_string(mems)
-            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPUSET_MEMS));
+            .unwrap_or_else(|_| panic!("read {CGROUP_CPUSET_MEMS} file content"));
         assert_eq!(content, "1-3");
     }
 }

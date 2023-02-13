@@ -26,7 +26,7 @@ fn write_log_hook(content: &str) -> Hook {
         .args(vec![
             "sh".to_string(),
             "-c".to_string(),
-            format!("echo '{}' >> {}", content, output,),
+            format!("echo '{content}' >> {output}",),
         ])
         .build()
         .expect("could not build hook")

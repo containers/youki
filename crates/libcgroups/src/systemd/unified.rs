@@ -39,7 +39,7 @@ impl Unified {
                 "cpu.weight" => {
                     let shares = value
                         .parse::<u64>()
-                        .with_context(|| format!("failed to parse cpu weight: {}", value))?;
+                        .with_context(|| format!("failed to parse cpu weight: {value}"))?;
                     properties.insert(cpu::CPU_WEIGHT, Box::new(convert_shares_to_cgroup2(shares)));
                 }
                 "cpu.max" => {
@@ -69,7 +69,7 @@ impl Unified {
                     }
 
                     let bitmask = to_bitmask(value)
-                        .with_context(|| format!("invalid value for cpuset.cpus: {}", value))?;
+                        .with_context(|| format!("invalid value for cpuset.cpus: {value}"))?;
 
                     let systemd_cpuset = match cpuset {
                         "cpuset.cpus" => cpuset::ALLOWED_CPUS,
@@ -82,7 +82,7 @@ impl Unified {
                 memory @ ("memory.min" | "memory.low" | "memory.high" | "memory.max") => {
                     let value = value
                         .parse::<u64>()
-                        .with_context(|| format!("failed to parse {}: {}", memory, value))?;
+                        .with_context(|| format!("failed to parse {memory}: {value}"))?;
                     let systemd_memory = match memory {
                         "memory.min" => memory::MEMORY_MIN,
                         "memory.low" => memory::MEMORY_LOW,
@@ -145,10 +145,10 @@ mod tests {
         // assert
         for (setting, value) in expected {
             assert!(actual.contains_key(setting));
-            assert_eq!(value.arg_type(), actual[setting].arg_type(), "{}", setting);
+            assert_eq!(value.arg_type(), actual[setting].arg_type(), "{setting}");
             match value.arg_type() {
                 ArgType::UInt64 => {
-                    assert_eq!(value.as_u64(), actual[setting].as_u64(), "{}", setting)
+                    assert_eq!(value.as_u64(), actual[setting].as_u64(), "{setting}")
                 }
                 ArgType::Array => assert_eq!(
                     value.as_iter().unwrap().next().unwrap().as_u64(),

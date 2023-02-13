@@ -62,7 +62,7 @@ fn setup_network_namespace(project_path: &Path, id: &str) -> Result<(), TestResu
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .arg("-t")
-        .arg(format!("{}", pid))
+        .arg(format!("{pid}"))
         .arg("-a")
         .args(vec!["/bin/ip", "link", "set", "up", "dev", "lo"])
         .spawn()

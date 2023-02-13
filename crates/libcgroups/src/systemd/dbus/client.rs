@@ -99,7 +99,7 @@ impl SystemdClient for Client {
         let mut properties: Vec<(&str, Variant<Box<dyn RefArg>>)> = Vec::with_capacity(6);
         properties.push((
             "Description",
-            Variant(Box::new(format!("youki container {}", container_name))),
+            Variant(Box::new(format!("youki container {container_name}"))),
         ));
 
         // if we create a slice, the parent is defined via a Wants=
@@ -123,10 +123,7 @@ impl SystemdClient for Client {
         proxy
             .start_transient_unit(unit_name, "replace", properties, vec![])
             .with_context(|| {
-                format!(
-                    "failed to start transient unit {}, parent is {}",
-                    unit_name, parent
-                )
+                format!("failed to start transient unit {unit_name}, parent is {parent}")
             })?;
         Ok(())
     }
@@ -136,7 +133,7 @@ impl SystemdClient for Client {
 
         proxy
             .stop_unit(unit_name, "replace")
-            .with_context(|| format!("failed to stop unit {}", unit_name))?;
+            .with_context(|| format!("failed to stop unit {unit_name}"))?;
         Ok(())
     }
 
@@ -154,7 +151,7 @@ impl SystemdClient for Client {
 
         proxy
             .set_unit_properties(unit_name, true, props)
-            .with_context(|| format!("failed to set properties for unit {:?}", unit_name))?;
+            .with_context(|| format!("failed to set properties for unit {unit_name:?}"))?;
         Ok(())
     }
 
@@ -181,6 +178,6 @@ impl SystemdClient for Client {
             .control_group()
             .context("failed to get systemd control group")?;
         PathBuf::try_from(&cgroup_root)
-            .with_context(|| format!("parse systemd control cgroup {} into path", cgroup_root))
+            .with_context(|| format!("parse systemd control cgroup {cgroup_root} into path"))
     }
 }

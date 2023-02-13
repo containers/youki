@@ -33,7 +33,7 @@ impl Symlink {
             let link = cgroup_root.join(comount);
             self.syscall
                 .symlink(Path::new(subsystem_name), &link)
-                .with_context(|| format!("failed to symlink {:?} to {:?}", link, subsystem_name))?;
+                .with_context(|| format!("failed to symlink {link:?} to {subsystem_name:?}"))?;
         }
 
         Ok(())

@@ -557,7 +557,7 @@ mod tests {
 
         let tests = vec![
             Testcase {
-                name: format!("all LinuxCapabilities fields with caps: {:?}", cps),
+                name: format!("all LinuxCapabilities fields with caps: {cps:?}"),
                 input: LinuxCapabilitiesBuilder::default()
                     .bounding(cps.clone().into_iter().collect::<Capabilities>())
                     .effective(cps.clone().into_iter().collect::<Capabilities>())
@@ -575,7 +575,7 @@ mod tests {
                 ],
             },
             Testcase {
-                name: format!("partial LinuxCapabilities fields with caps: {:?}", cps),
+                name: format!("partial LinuxCapabilities fields with caps: {cps:?}"),
                 input: LinuxCapabilitiesBuilder::default()
                     .bounding(cps.clone().into_iter().collect::<Capabilities>())
                     .effective(cps.clone().into_iter().collect::<Capabilities>())
@@ -591,7 +591,7 @@ mod tests {
                 ],
             },
             Testcase {
-                name: format!("empty LinuxCapabilities fields with caps: {:?}", cps),
+                name: format!("empty LinuxCapabilities fields with caps: {cps:?}"),
                 input: LinuxCapabilitiesBuilder::default()
                     .bounding(HashSet::new())
                     .effective(HashSet::new())

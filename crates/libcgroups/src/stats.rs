@@ -238,7 +238,7 @@ fn extract_page_size(dir_name: &str) -> Result<String> {
 pub fn parse_value(value: &str) -> Result<u64> {
     value
         .parse()
-        .with_context(|| format!("failed to parse {}", value))
+        .with_context(|| format!("failed to parse {value}"))
 }
 
 /// Parses a single valued file to an u64

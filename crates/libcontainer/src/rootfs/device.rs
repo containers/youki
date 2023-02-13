@@ -54,7 +54,7 @@ impl Device {
 
     fn bind_dev(&self, rootfs: &Path, dev: &LinuxDevice) -> Result<()> {
         let full_container_path = create_container_dev_path(rootfs, dev)
-            .with_context(|| format!("could not create container path for device {:?}", dev))?;
+            .with_context(|| format!("could not create container path for device {dev:?}"))?;
 
         let fd = open(
             &full_container_path,
@@ -82,7 +82,7 @@ impl Device {
         }
 
         let full_container_path = create_container_dev_path(rootfs, dev)
-            .with_context(|| format!("could not create container path for device {:?}", dev))?;
+            .with_context(|| format!("could not create container path for device {dev:?}"))?;
 
         self.syscall.mknod(
             &full_container_path,

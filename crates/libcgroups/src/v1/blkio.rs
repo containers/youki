@@ -275,7 +275,7 @@ mod tests {
 
         Blkio::apply(&tmp, &blkio).expect("apply blkio");
         let content = fs::read_to_string(throttle)
-            .unwrap_or_else(|_| panic!("read {} content", BLKIO_THROTTLE_READ_BPS));
+            .unwrap_or_else(|_| panic!("read {BLKIO_THROTTLE_READ_BPS} content"));
 
         assert_eq!("8:0 102400", content);
     }
@@ -296,7 +296,7 @@ mod tests {
 
         Blkio::apply(&tmp, &blkio).expect("apply blkio");
         let content = fs::read_to_string(throttle)
-            .unwrap_or_else(|_| panic!("read {} content", BLKIO_THROTTLE_WRITE_BPS));
+            .unwrap_or_else(|_| panic!("read {BLKIO_THROTTLE_WRITE_BPS} content"));
 
         assert_eq!("8:0 102400", content);
     }
@@ -317,7 +317,7 @@ mod tests {
 
         Blkio::apply(&tmp, &blkio).expect("apply blkio");
         let content = fs::read_to_string(throttle)
-            .unwrap_or_else(|_| panic!("read {} content", BLKIO_THROTTLE_READ_IOPS));
+            .unwrap_or_else(|_| panic!("read {BLKIO_THROTTLE_READ_IOPS} content"));
 
         assert_eq!("8:0 102400", content);
     }
@@ -338,7 +338,7 @@ mod tests {
 
         Blkio::apply(&tmp, &blkio).expect("apply blkio");
         let content = fs::read_to_string(throttle)
-            .unwrap_or_else(|_| panic!("read {} content", BLKIO_THROTTLE_WRITE_IOPS));
+            .unwrap_or_else(|_| panic!("read {BLKIO_THROTTLE_WRITE_IOPS} content"));
 
         assert_eq!("8:0 102400", content);
     }

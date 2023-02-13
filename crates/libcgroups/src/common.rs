@@ -64,7 +64,7 @@ impl Display for CgroupSetup {
             CgroupSetup::Unified => "unified",
         };
 
-        write!(f, "{}", print)
+        write!(f, "{print}")
     }
 }
 
@@ -124,7 +124,7 @@ pub fn write_cgroup_file<P: AsRef<Path>, T: ToString>(path: P, data: T) -> Resul
 #[inline]
 pub fn read_cgroup_file<P: AsRef<Path>>(path: P) -> Result<String> {
     let path = path.as_ref();
-    fs::read_to_string(path).with_context(|| format!("failed to open {:?}", path))
+    fs::read_to_string(path).with_context(|| format!("failed to open {path:?}"))
 }
 
 /// Determines the cgroup setup of the system. Systems typically have one of

@@ -140,9 +140,9 @@ mod tests {
         let tmp = create_temp_dir(test_name).expect("create temp directory for test");
 
         let _ = set_fixture(&tmp, CGROUP_CPUACCT_STAT, stat_content)
-            .unwrap_or_else(|_| panic!("create {} file", CGROUP_CPUACCT_STAT));
+            .unwrap_or_else(|_| panic!("create {CGROUP_CPUACCT_STAT} file"));
         let _ = set_fixture(&tmp, CGROUP_CPUACCT_USAGE, usage_content)
-            .unwrap_or_else(|_| panic!("create {} file", CGROUP_CPUACCT_USAGE));
+            .unwrap_or_else(|_| panic!("create {CGROUP_CPUACCT_USAGE} file"));
 
         tmp
     }
@@ -151,9 +151,9 @@ mod tests {
         let tmp = create_temp_dir(test_name).expect("create temp directory for test");
 
         let _ = set_fixture(&tmp, CGROUP_CPUACCT_PERCPU, percpu_content)
-            .unwrap_or_else(|_| panic!("create {} file", CGROUP_CPUACCT_PERCPU));
+            .unwrap_or_else(|_| panic!("create {CGROUP_CPUACCT_PERCPU} file"));
         let _ = set_fixture(&tmp, CGROUP_CPUACCT_USAGE_ALL, usage_all_content)
-            .unwrap_or_else(|_| panic!("create {} file", CGROUP_CPUACCT_USAGE_ALL));
+            .unwrap_or_else(|_| panic!("create {CGROUP_CPUACCT_USAGE_ALL} file"));
 
         tmp
     }
@@ -166,7 +166,7 @@ mod tests {
         CpuAcct::add_task(pid, &tmp).expect("apply cpuacct");
 
         let content = fs::read_to_string(procs)
-            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_PROCS));
+            .unwrap_or_else(|_| panic!("read {CGROUP_PROCS} file content"));
         assert_eq!(content, "1000");
     }
 

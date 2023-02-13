@@ -96,7 +96,7 @@ impl Container {
         // Remember original stdin, stdout, stderr for container restore.
         let mut descriptors = Vec::new();
         for n in 0..3 {
-            let link_path = match fs::read_link(format!("/proc/{}/fd/{}", pid, n)) {
+            let link_path = match fs::read_link(format!("/proc/{pid}/fd/{n}")) {
                 Ok(lp) => lp.into_os_string().into_string().unwrap(),
                 Err(..) => "/dev/null".to_string(),
             };
