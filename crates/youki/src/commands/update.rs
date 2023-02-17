@@ -16,7 +16,9 @@ pub fn update(args: Update, root_path: PathBuf) -> Result<()> {
         linux_res = if resources_path.to_string_lossy() == "-" {
             serde_json::from_reader(io::stdin())?
         } else {
-            serde_json::from_reader(fs::File::open(resources_path)?)?
+            let file = fs::File::open(resources_path)?;
+            let reader = io::BufReader::new(file);
+            serde_json::from_reader(reader)?
         };
     } else {
         let mut builder = LinuxResourcesBuilder::default();

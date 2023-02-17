@@ -2,7 +2,7 @@
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::fs;
-use std::io::BufReader;
+use std::io::{BufReader, BufWriter, Write};
 use std::path::PathBuf;
 use std::{fs::File, path::Path};
 
@@ -132,7 +132,9 @@ impl State {
             .truncate(true)
             .open(&state_file_path)
             .with_context(|| format!("failed to open {}", state_file_path.display()))?;
-        serde_json::to_writer(&file, self)?;
+        let mut writer = BufWriter::new(file);
+        serde_json::to_writer(&mut writer, self)?;
+        writer.flush()?;
         Ok(())
     }
 

@@ -1,5 +1,6 @@
 use std::{
     fs,
+    io::{BufReader, BufWriter, Write},
     path::{Path, PathBuf},
 };
 
@@ -38,14 +39,17 @@ impl<'a> YoukiConfig {
 
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let file = fs::File::create(path.as_ref().join(YOUKI_CONFIG_NAME))?;
-        serde_json::to_writer(&file, self)?;
+        let mut writer = BufWriter::new(file);
+        serde_json::to_writer(&mut writer, self)?;
+        writer.flush()?;
         Ok(())
     }
 
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path = path.as_ref();
         let file = fs::File::open(path.join(YOUKI_CONFIG_NAME))?;
-        let config = serde_json::from_reader(&file)
+        let reader = BufReader::new(file);
+        let config = serde_json::from_reader(reader)
             .with_context(|| format!("failed to load config from {path:?}"))?;
         Ok(config)
     }
