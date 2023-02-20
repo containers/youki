@@ -134,16 +134,16 @@ impl Memory {
     fn get_memory_data(cgroup_path: &Path, file_prefix: &str) -> Result<MemoryData> {
         let memory_data = MemoryData {
             usage: parse_single_value(
-                &cgroup_path.join(format!("{}{}", file_prefix, MEMORY_USAGE_IN_BYTES)),
+                &cgroup_path.join(format!("{file_prefix}{MEMORY_USAGE_IN_BYTES}")),
             )?,
             max_usage: parse_single_value(
-                &cgroup_path.join(format!("{}{}", file_prefix, MEMORY_MAX_USAGE_IN_BYTES)),
+                &cgroup_path.join(format!("{file_prefix}{MEMORY_MAX_USAGE_IN_BYTES}")),
             )?,
             limit: parse_single_value(
-                &cgroup_path.join(format!("{}{}", file_prefix, MEMORY_LIMIT_IN_BYTES)),
+                &cgroup_path.join(format!("{file_prefix}{MEMORY_LIMIT_IN_BYTES}")),
             )?,
             fail_count: parse_single_value(
-                &cgroup_path.join(format!("{}{}", file_prefix, MEMORY_FAIL_COUNT)),
+                &cgroup_path.join(format!("{file_prefix}{MEMORY_FAIL_COUNT}")),
             )?,
         };
 
@@ -522,11 +522,11 @@ mod tests {
                 };
 
                 // useful for debugging
-                println!("reservation_check: {:?}", reservation_check);
-                println!("kernel_check: {:?}", kernel_check);
-                println!("kernel_tcp_check: {:?}", kernel_tcp_check);
-                println!("swappiness_check: {:?}", swappiness_check);
-                println!("limit_swap_check: {:?}", limit_swap_check);
+                println!("reservation_check: {reservation_check:?}");
+                println!("kernel_check: {kernel_check:?}");
+                println!("kernel_tcp_check: {kernel_tcp_check:?}");
+                println!("swappiness_check: {swappiness_check:?}");
+                println!("limit_swap_check: {limit_swap_check:?}");
 
                 // combine all the checks
                 reservation_check && kernel_check && kernel_tcp_check && swappiness_check && limit_swap_check
@@ -538,28 +538,23 @@ mod tests {
         let tmp = create_temp_dir("test_stat_memory_data").expect("create test directory");
         set_fixture(
             &tmp,
-            &format!("{}{}", MEMORY_PREFIX, MEMORY_USAGE_IN_BYTES),
+            &format!("{MEMORY_PREFIX}{MEMORY_USAGE_IN_BYTES}"),
             "1024\n",
         )
         .unwrap();
         set_fixture(
             &tmp,
-            &format!("{}{}", MEMORY_PREFIX, MEMORY_MAX_USAGE_IN_BYTES),
+            &format!("{MEMORY_PREFIX}{MEMORY_MAX_USAGE_IN_BYTES}"),
             "2048\n",
         )
         .unwrap();
         set_fixture(
             &tmp,
-            &format!("{}{}", MEMORY_PREFIX, MEMORY_LIMIT_IN_BYTES),
+            &format!("{MEMORY_PREFIX}{MEMORY_LIMIT_IN_BYTES}"),
             "4096\n",
         )
         .unwrap();
-        set_fixture(
-            &tmp,
-            &format!("{}{}", MEMORY_PREFIX, MEMORY_FAIL_COUNT),
-            "5\n",
-        )
-        .unwrap();
+        set_fixture(&tmp, &format!("{MEMORY_PREFIX}{MEMORY_FAIL_COUNT}"), "5\n").unwrap();
 
         let actual = Memory::get_memory_data(&tmp, MEMORY_PREFIX).expect("get cgroup stats");
         let expected = MemoryData {

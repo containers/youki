@@ -81,15 +81,15 @@ impl HugeTlb {
     fn stats_for_page_size(cgroup_path: &Path, page_size: &str) -> Result<HugeTlbStats> {
         let mut stats = HugeTlbStats::default();
 
-        let usage_file = format!("hugetlb.{}.usage_in_bytes", page_size);
+        let usage_file = format!("hugetlb.{page_size}.usage_in_bytes");
         let usage_content = common::read_cgroup_file(cgroup_path.join(usage_file))?;
         stats.usage = usage_content.trim().parse()?;
 
-        let max_file = format!("hugetlb.{}.max_usage_in_bytes", page_size);
+        let max_file = format!("hugetlb.{page_size}.max_usage_in_bytes");
         let max_content = common::read_cgroup_file(cgroup_path.join(max_file))?;
         stats.max_usage = max_content.trim().parse()?;
 
-        let failcnt_file = format!("hugetlb.{}.failcnt", page_size);
+        let failcnt_file = format!("hugetlb.{page_size}.failcnt");
         let failcnt_content = common::read_cgroup_file(cgroup_path.join(failcnt_file))?;
         stats.fail_count = failcnt_content.trim().parse()?;
 

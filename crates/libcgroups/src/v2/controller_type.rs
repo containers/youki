@@ -21,7 +21,7 @@ impl Display for ControllerType {
             Self::Pids => "pids",
         };
 
-        write!(f, "{}", print)
+        write!(f, "{print}")
     }
 }
 
@@ -49,7 +49,7 @@ impl Display for PseudoControllerType {
             Self::Unified => "unified",
         };
 
-        write!(f, "{}", print)
+        write!(f, "{print}")
     }
 }
 

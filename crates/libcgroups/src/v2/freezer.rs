@@ -1,7 +1,7 @@
 use anyhow::{bail, Context, Result};
 use std::{
     fs::OpenOptions,
-    io::{BufRead, BufReader, Read, Seek, SeekFrom, Write},
+    io::{BufRead, BufReader, Read, Seek, Write},
     path::Path,
     str, thread,
     time::Duration,
@@ -111,7 +111,7 @@ impl Freezer {
                 }
                 iter += 1;
                 thread::sleep(wait_time);
-                f.seek(SeekFrom::Start(0))?;
+                f.rewind()?;
             }
         }
 

@@ -47,7 +47,7 @@ pub fn container_intermediate_process(
     if let Some(user_namespace) = namespaces.get(LinuxNamespaceType::User) {
         namespaces
             .unshare_or_setns(user_namespace)
-            .with_context(|| format!("failed to enter user namespace: {:?}", user_namespace))?;
+            .with_context(|| format!("failed to enter user namespace: {user_namespace:?}"))?;
         if user_namespace.path().is_none() {
             log::debug!("creating new user namespace");
             // child needs to be dumpable, otherwise the non root parent is not
@@ -81,7 +81,7 @@ pub fn container_intermediate_process(
     if let Some(pid_namespace) = namespaces.get(LinuxNamespaceType::Pid) {
         namespaces
             .unshare_or_setns(pid_namespace)
-            .with_context(|| format!("failed to enter pid namespace: {:?}", pid_namespace))?;
+            .with_context(|| format!("failed to enter pid namespace: {pid_namespace:?}"))?;
     }
 
     // We have to record the pid of the child (container init process), since
@@ -100,7 +100,7 @@ pub fn container_intermediate_process(
             Ok(_) => Ok(0),
             Err(e) => {
                 if let ContainerType::TenantContainer { exec_notify_fd } = args.container_type {
-                    let buf = format!("{}", e);
+                    let buf = format!("{e}");
                     write(exec_notify_fd, buf.as_bytes())?;
                     close(exec_notify_fd)?;
                 }
@@ -139,7 +139,7 @@ fn apply_cgroups<C: CgroupManager + ?Sized>(
     let pid = Pid::from_raw(Process::myself()?.pid());
     cmanager
         .add_task(pid)
-        .with_context(|| format!("failed to add task {} to cgroup manager", pid))?;
+        .with_context(|| format!("failed to add task {pid} to cgroup manager"))?;
 
     if let Some(resources) = resources {
         if init {

@@ -110,7 +110,7 @@ impl TestableGroup for ContainerLifecycle {
                 "kill" => ret.push(("kill", self.kill())),
                 "state" => ret.push(("state", self.state())),
                 "delete" => ret.push(("delete", self.delete())),
-                _ => eprintln!("No test named {} in lifecycle", name),
+                _ => eprintln!("No test named {name} in lifecycle"),
             };
         }
         ret

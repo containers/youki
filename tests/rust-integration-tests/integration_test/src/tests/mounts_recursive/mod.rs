@@ -97,10 +97,10 @@ fn check_recursive_readonly() -> TestResult {
     let mount_options = vec!["rbind".to_string(), "rro".to_string()];
     let mut mount_spec = Mount::default();
     mount_spec
-        .set_destination(mount_dest_path.clone())
+        .set_destination(mount_dest_path)
         .set_typ(None)
         .set_source(Some(rro_dir_path.clone()))
-        .set_options(Some(mount_options.clone()));
+        .set_options(Some(mount_options));
     let spec = get_spec(
         vec![mount_spec],
         vec!["runtimetest".to_string(), "mounts_recursive".to_string()],
@@ -129,7 +129,7 @@ fn check_recursive_nosuid() -> TestResult {
         .set_destination(mount_dest_path.clone())
         .set_typ(None)
         .set_source(Some(rnosuid_dir_path.clone()))
-        .set_options(Some(mount_options.clone()));
+        .set_options(Some(mount_options));
     let spec = get_spec(
         vec![mount_spec],
         vec![
@@ -211,10 +211,10 @@ fn check_recursive_noexec() -> TestResult {
     let mount_options = vec!["rbind".to_string(), "rnoexec".to_string()];
     let mut mount_spec = Mount::default();
     mount_spec
-        .set_destination(mount_dest_path.clone())
+        .set_destination(mount_dest_path)
         .set_typ(None)
         .set_source(Some(rnoexec_dir_path.clone()))
-        .set_options(Some(mount_options.clone()));
+        .set_options(Some(mount_options));
     let spec = get_spec(
         vec![mount_spec],
         vec!["runtimetest".to_string(), "mounts_recursive".to_string()],
@@ -229,10 +229,10 @@ fn check_recursive_noexec() -> TestResult {
         let in_container_executable_subdir_file_path =
             rnoexec_subdir_path.join(executable_file_name);
 
-        fs::copy(&executable_file_path, &in_container_executable_file_path)?;
+        fs::copy(&executable_file_path, in_container_executable_file_path)?;
         fs::copy(
             &executable_file_path,
-            &in_container_executable_subdir_file_path,
+            in_container_executable_subdir_file_path,
         )?;
 
         Ok(())

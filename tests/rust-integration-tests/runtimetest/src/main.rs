@@ -12,7 +12,7 @@ fn get_spec() -> Spec {
     match Spec::load(path) {
         Ok(spec) => spec,
         Err(e) => {
-            eprintln!("Error in loading spec, {:?}", e);
+            eprintln!("Error in loading spec, {e:?}");
             std::process::exit(66);
         }
     }
@@ -30,9 +30,6 @@ fn main() {
         "readonly_paths" => tests::validate_readonly_paths(&spec),
         "set_host_name" => tests::validate_hostname(&spec),
         "mounts_recursive" => tests::validate_mounts_recursive(&spec),
-        _ => eprintln!(
-            "error due to unexpected execute test name: {}",
-            execute_test
-        ),
+        _ => eprintln!("error due to unexpected execute test name: {execute_test}"),
     }
 }

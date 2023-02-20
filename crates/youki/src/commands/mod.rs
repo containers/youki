@@ -45,7 +45,7 @@ fn load_container<P: AsRef<Path>>(root_path: P, container_id: &str) -> Result<Co
     }
 
     Container::load(container_root)
-        .with_context(|| format!("could not load state for container {}", container_id))
+        .with_context(|| format!("could not load state for container {container_id}"))
 }
 
 fn container_exists<P: AsRef<Path>>(root_path: P, container_id: &str) -> Result<bool> {

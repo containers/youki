@@ -39,11 +39,10 @@ impl Unified {
                             .unwrap();
                         let context = if !controllers.iter().any(|c| c.to_string() == subsystem) {
                             format!(
-                                "failed to set {} to {}: subsystem {} is not available",
-                                cgroup_file, value, subsystem
+                                "failed to set {cgroup_file} to {value}: subsystem {subsystem} is not available"
                             )
                         } else {
-                            format!("failed to set {} to {}: {}", cgroup_file, value, e)
+                            format!("failed to set {cgroup_file} to {value}: {e}")
                         };
 
                         e.context(context)

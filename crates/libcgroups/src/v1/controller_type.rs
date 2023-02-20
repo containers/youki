@@ -33,7 +33,7 @@ impl Display for ControllerType {
             Self::Freezer => "freezer",
         };
 
-        write!(f, "{}", print)
+        write!(f, "{print}")
     }
 }
 

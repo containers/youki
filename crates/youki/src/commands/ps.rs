@@ -36,7 +36,7 @@ pub fn ps(args: Ps, root_path: PathBuf) -> Result<()> {
                 let fields: Vec<&str> = line.split_whitespace().collect();
                 let pid: i32 = fields[pid_index].parse()?;
                 if pids.contains(&pid) {
-                    println!("{}", line);
+                    println!("{line}");
                 }
             }
         }

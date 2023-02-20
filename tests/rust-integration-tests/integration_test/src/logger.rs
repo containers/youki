@@ -59,7 +59,7 @@ impl Log for IntegrationLogger {
         if self.enabled(record.metadata()) {
             let log_msg = text_format(record);
             // if log file is set, write to it, else write to stderr
-            let _ = writeln!(stderr(), "{}", log_msg);
+            let _ = writeln!(stderr(), "{log_msg}");
         }
     }
 

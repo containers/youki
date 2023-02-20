@@ -75,7 +75,7 @@ impl RootFS {
             for mount in mounts {
                 mounter
                     .setup_mount(mount, &global_options)
-                    .with_context(|| format!("failed to setup mount {:#?}", mount))?;
+                    .with_context(|| format!("failed to setup mount {mount:#?}"))?;
             }
         }
 

@@ -25,7 +25,7 @@ impl Executor for DefaultExecutor {
 
         let executable = args[0].as_str();
         let p = CString::new(executable.as_bytes())
-            .with_context(|| format!("failed to convert path {:?} to cstring", executable))?;
+            .with_context(|| format!("failed to convert path {executable:?} to cstring"))?;
         let a: Vec<CString> = args
             .iter()
             .map(|s| CString::new(s.as_bytes()).unwrap_or_default())

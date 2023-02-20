@@ -107,9 +107,9 @@ impl Log for YoukiLogger {
             };
             // if log file is set, write to it, else write to stderr
             if let Some(mut log_file) = LOG_FILE.get().unwrap().as_ref() {
-                let _ = writeln!(log_file, "{}", log_msg);
+                let _ = writeln!(log_file, "{log_msg}");
             } else {
-                let _ = writeln!(stderr(), "{}", log_msg);
+                let _ = writeln!(stderr(), "{log_msg}");
             }
         }
     }

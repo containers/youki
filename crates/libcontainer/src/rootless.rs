@@ -291,7 +291,7 @@ fn write_id_mapping(
                 .arg(pid.to_string())
                 .args(args)
                 .output()
-                .with_context(|| format!("failed to execute {:?}", map_binary))?;
+                .with_context(|| format!("failed to execute {map_binary:?}"))?;
         }
     }
 

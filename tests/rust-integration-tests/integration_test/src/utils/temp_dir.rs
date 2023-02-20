@@ -15,8 +15,7 @@ pub struct TempDir {
 impl TempDir {
     pub fn new<P: Into<PathBuf>>(path: P) -> Result<Self> {
         let p = path.into();
-        std::fs::create_dir_all(&p)
-            .with_context(|| format!("failed to create diectory {:?}", p))?;
+        std::fs::create_dir_all(&p).with_context(|| format!("failed to create diectory {p:?}"))?;
         Ok(Self { path: Some(p) })
     }
 

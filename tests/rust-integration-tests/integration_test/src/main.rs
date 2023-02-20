@@ -71,7 +71,7 @@ fn main() -> Result<()> {
     let opts: Opts = Opts::parse();
 
     if let Err(e) = logger::init(opts.debug) {
-        eprintln!("logger could not be initialized: {:?}", e);
+        eprintln!("logger could not be initialized: {e:?}");
     }
 
     let mut tm = TestManager::new();
@@ -129,7 +129,7 @@ fn get_abs_path(rel_path: &Path) -> PathBuf {
         Err(_) => match which::which(rel_path) {
             Ok(path) => path,
             Err(e) => {
-                eprintln!("Error in finding path {:?} : {}\nexiting.", rel_path, e);
+                eprintln!("Error in finding path {rel_path:?} : {e}\nexiting.");
                 std::process::exit(66);
             }
         },
@@ -155,7 +155,7 @@ fn run(opts: Run, test_manager: &TestManager) -> Result<()> {
 
 fn list(test_manager: &TestManager) -> Result<()> {
     for test_group in test_manager.tests_groups() {
-        println!("{}", test_group);
+        println!("{test_group}");
     }
 
     Ok(())
