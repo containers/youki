@@ -110,7 +110,7 @@ impl Cpu {
             return 0;
         }
 
-        let weight = 1 + ((shares - 2) * 9999) / 262142;
+        let weight = 1 + ((shares.saturating_sub(2)) * 9999) / 262142;
         weight.min(MAX_CPU_WEIGHT)
     }
 

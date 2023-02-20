@@ -75,7 +75,7 @@ impl HugeTlb {
     }
 
     fn is_power_of_two(number: u64) -> bool {
-        (number != 0) && (number & (number - 1)) == 0
+        (number != 0) && (number & (number.saturating_sub(1))) == 0
     }
 
     fn stats_for_page_size(cgroup_path: &Path, page_size: &str) -> Result<HugeTlbStats> {
