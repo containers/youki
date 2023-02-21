@@ -14,6 +14,7 @@ use std::{
     convert::TryFrom,
     ffi::{OsStr, OsString},
     fs,
+    io::BufReader,
     os::unix::prelude::RawFd,
     path::{Path, PathBuf},
     str::FromStr,
@@ -246,7 +247,8 @@ impl<'a> TenantContainerBuilder<'a> {
         }
 
         let process = utils::open(process)?;
-        let process_spec = serde_json::from_reader(process)?;
+        let reader = BufReader::new(process);
+        let process_spec = serde_json::from_reader(reader)?;
         Ok(process_spec)
     }
 

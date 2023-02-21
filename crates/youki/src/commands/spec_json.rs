@@ -7,6 +7,7 @@ use oci_spec::runtime::{
 };
 use serde_json::to_writer_pretty;
 use std::fs::File;
+use std::io::{BufWriter, Write};
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -89,7 +90,10 @@ pub fn spec(args: liboci_cli::Spec) -> Result<()> {
     };
 
     // write data to config.json
-    to_writer_pretty(&File::create("config.json")?, &spec)?;
+    let file = File::create("config.json")?;
+    let mut writer = BufWriter::new(file);
+    to_writer_pretty(&mut writer, &spec)?;
+    writer.flush()?;
     Ok(())
 }
 
@@ -106,7 +110,10 @@ mod tests {
         let spec = get_rootless()?;
         let tmpdir = create_temp_dir("test_spec_json").expect("failed to create temp dir");
         let path = tmpdir.path().join("config.json");
-        to_writer_pretty(&File::create(path)?, &spec)?;
+        let file = File::create(path)?;
+        let mut writer = BufWriter::new(file);
+        to_writer_pretty(&mut writer, &spec)?;
+        writer.flush()?;
         Ok(())
     }
 }
