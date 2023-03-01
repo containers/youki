@@ -28,6 +28,10 @@ impl Device {
         }
     }
 
+    pub fn new_with_syscall(syscall: Box<dyn Syscall>) -> Device {
+        Device { syscall }
+    }
+
     pub fn create_devices<'a, I>(&self, rootfs: &Path, devices: I, bind: bool) -> Result<()>
     where
         I: IntoIterator<Item = &'a LinuxDevice>,
@@ -132,7 +136,7 @@ mod tests {
     #[test]
     fn test_bind_dev() {
         let tmp_dir = TempDir::new("/tmp/test_bind_dev").unwrap();
-        let device = Device::new();
+        let device = Device::new_with_syscall(Box::<TestHelperSyscall>::default());
         assert!(device
             .bind_dev(
                 tmp_dir.path(),
@@ -162,7 +166,7 @@ mod tests {
     #[test]
     fn test_mknod_dev() {
         let tmp_dir = TempDir::new("/tmp/test_mknod_dev").unwrap();
-        let device = Device::new();
+        let device = Device::new_with_syscall(Box::<TestHelperSyscall>::default());
         assert!(device
             .mknod_dev(
                 tmp_dir.path(),
@@ -210,7 +214,8 @@ mod tests {
     #[test]
     fn test_create_devices() {
         let tmp_dir = TempDir::new("/tmp/test_create_devices").unwrap();
-        let device = Device::new();
+        let device = Device::new_with_syscall(Box::<TestHelperSyscall>::default());
+
         let devices = vec![LinuxDeviceBuilder::default()
             .path(PathBuf::from("/dev/null"))
             .major(1)
