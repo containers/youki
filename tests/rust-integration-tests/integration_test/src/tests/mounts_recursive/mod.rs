@@ -243,6 +243,47 @@ fn check_recursive_noexec() -> TestResult {
     result
 }
 
+fn check_recursive_rexec() -> TestResult {
+    let rnoexec_test_base_dir = PathBuf::from_str("/tmp").unwrap();
+    let rnoexec_dir_path = rnoexec_test_base_dir.join("rexec_dir");
+    let rnoexec_subdir_path = rnoexec_dir_path.join("rexec_subdir");
+    let mount_dest_path = PathBuf::from_str("/mnt").unwrap();
+
+    let mount_options = vec!["rbind".to_string(), "rexec".to_string()];
+    let mut mount_spec = Mount::default();
+    mount_spec
+        .set_destination(mount_dest_path)
+        .set_typ(None)
+        .set_source(Some(rnoexec_dir_path.clone()))
+        .set_options(Some(mount_options));
+    let spec = get_spec(
+        vec![mount_spec],
+        vec!["runtimetest".to_string(), "mounts_recursive".to_string()],
+    );
+
+    let result = test_inside_container(spec, &|bundle_path| {
+        setup_mount(&rnoexec_dir_path, &rnoexec_subdir_path);
+
+        let executable_file_name = "echo";
+        let executable_file_path = bundle_path.join("bin").join(executable_file_name);
+        let in_container_executable_file_path = rnoexec_dir_path.join(executable_file_name);
+        let in_container_executable_subdir_file_path =
+            rnoexec_subdir_path.join(executable_file_name);
+
+        fs::copy(&executable_file_path, in_container_executable_file_path)?;
+        fs::copy(
+            &executable_file_path,
+            in_container_executable_subdir_file_path,
+        )?;
+
+        Ok(())
+    });
+
+    clean_mount(&rnoexec_dir_path, &rnoexec_subdir_path);
+
+    result
+}
+
 /// rdiratime If set in attr_clr, removes the restriction that prevented updating access time for directories.
 fn check_recursive_rdiratime() -> TestResult {
     let rdiratime_base_dir = PathBuf::from_str("/tmp/rdiratime").unwrap();
@@ -330,6 +371,34 @@ fn check_recursive_rnodev() -> TestResult {
     result
 }
 
+fn check_recursive_readwrite() -> TestResult {
+    let rrw_test_base_dir = PathBuf::from_str("/tmp").unwrap();
+    let rrw_dir_path = rrw_test_base_dir.join("rrw_dir");
+    let rrw_subdir_path = rrw_dir_path.join("rrw_subdir");
+    let mount_dest_path = PathBuf::from_str("/rrw").unwrap();
+
+    let mount_options = vec!["rbind".to_string(), "rrw".to_string()];
+    let mut mount_spec = Mount::default();
+    mount_spec
+        .set_destination(mount_dest_path)
+        .set_typ(None)
+        .set_source(Some(rrw_dir_path.clone()))
+        .set_options(Some(mount_options));
+    let spec = get_spec(
+        vec![mount_spec],
+        vec!["runtimetest".to_string(), "mounts_recursive".to_string()],
+    );
+
+    let result = test_inside_container(spec, &|_| {
+        setup_mount(&rrw_dir_path, &rrw_subdir_path);
+        Ok(())
+    });
+
+    clean_mount(&rrw_dir_path, &rrw_subdir_path);
+
+    result
+}
+
 pub fn get_mounts_recursive_test() -> TestGroup {
     let rro_test = Test::new("rro_test", Box::new(check_recursive_readonly));
     let rnosuid_test = Test::new("rnosuid_test", Box::new(check_recursive_nosuid));
@@ -338,6 +407,8 @@ pub fn get_mounts_recursive_test() -> TestGroup {
     let rdiratime_test = Test::new("rdiratime_test", Box::new(check_recursive_rdiratime));
     let rdev_test = Test::new("rdev_test", Box::new(check_recursive_rdev));
     let rnodev_test = Test::new("rnodev_test", Box::new(check_recursive_rnodev));
+    let rrw_test = Test::new("rrw_test", Box::new(check_recursive_readwrite));
+    let rexec_test = Test::new("rexec_test", Box::new(check_recursive_rexec));
 
     let mut tg = TestGroup::new("mounts_recursive");
     tg.add(vec![
@@ -348,6 +419,8 @@ pub fn get_mounts_recursive_test() -> TestGroup {
         Box::new(rnodiratime_test),
         Box::new(rdev_test),
         Box::new(rnodev_test),
+        Box::new(rrw_test),
+        Box::new(rexec_test),
     ]);
 
     tg

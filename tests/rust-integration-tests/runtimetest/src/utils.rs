@@ -78,6 +78,7 @@ pub fn test_file_executable(path: &str) -> Result<(), std::io::Error> {
     let mode = fstat.st_mode;
     if is_file_like(mode) {
         Command::new(path).output()?;
+        return Ok(());
     }
 
     Err(std::io::Error::new(
