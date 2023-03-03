@@ -11,6 +11,7 @@ pub fn exec(args: Exec, root_path: PathBuf) -> Result<i32> {
         .with_root_path(root_path)?
         .with_console_socket(args.console_socket.as_ref())
         .with_pid_file(args.pid_file.as_ref())?
+        .validate_id()?
         .as_tenant()
         .with_detach(args.detach)
         .with_cwd(args.cwd.as_ref())

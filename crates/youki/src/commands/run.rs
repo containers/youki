@@ -11,6 +11,7 @@ pub fn run(args: Run, root_path: PathBuf, systemd_cgroup: bool) -> Result<()> {
         .with_console_socket(args.console_socket.as_ref())
         .with_root_path(root_path)?
         .with_preserved_fds(args.preserve_fds)
+        .validate_id()?
         .as_init(&args.bundle)
         .with_systemd(systemd_cgroup)
         .build()?;

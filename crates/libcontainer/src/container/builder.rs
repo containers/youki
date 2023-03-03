@@ -1,5 +1,5 @@
 use crate::{syscall::Syscall, utils::PathBufExt};
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use std::path::PathBuf;
 
 use super::{init_builder::InitContainerBuilder, tenant_builder::TenantContainerBuilder};
@@ -50,7 +50,6 @@ impl<'a> ContainerBuilder<'a> {
     /// ```
     pub fn new(container_id: String, syscall: &'a dyn Syscall) -> Self {
         let root_path = PathBuf::from("/run/youki");
-
         Self {
             container_id,
             root_path,
@@ -59,6 +58,40 @@ impl<'a> ContainerBuilder<'a> {
             console_socket: None,
             preserve_fds: 0,
         }
+    }
+
+    /// validate_id checks if the supplied container ID is valid, returning
+    /// the ErrInvalidID in case it is not.
+    ///
+    /// The format of valid ID was never formally defined, instead the code
+    /// was modified to allow or disallow specific characters.
+    ///
+    /// Currently, a valid ID is a non-empty string consisting only of
+    /// the following characters:
+    /// - uppercase (A-Z) and lowercase (a-z) Latin letters;
+    /// - digits (0-9);
+    /// - underscore (_);
+    /// - plus sign (+);
+    /// - minus sign (-);
+    /// - period (.).
+    ///
+    /// In addition, IDs that can't be used to represent a file name
+    /// (such as . or ..) are rejected.
+    pub fn validate_id(self) -> Result<Self> {
+        let container_id = self.container_id.clone();
+        if container_id.is_empty() {
+            return Err(anyhow!("invalid container ID format: {:?}", container_id));
+        }
+        if container_id == "." || container_id == ".." {
+            return Err(anyhow!("invalid container ID format: {:?}", container_id));
+        }
+        for c in container_id.chars() {
+            match c {
+                'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '+' | '-' | '.' => (),
+                _ => return Err(anyhow!("invalid container ID format: {:?}", container_id)),
+            }
+        }
+        Ok(self)
     }
 
     /// Transforms this builder into a tenant builder
@@ -225,6 +258,28 @@ mod tests {
             .context("build container")?;
         assert_eq!(path_builder.pid_file, Some(cwd.join("not/existing/path")));
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_validate_id() -> Result<()> {
+        let syscall = create_syscall();
+        // validate container_id
+        let result = ContainerBuilder::new("$#".to_owned(), syscall.as_ref()).validate_id();
+        assert!(result.is_err());
+
+        let result = ContainerBuilder::new(".".to_owned(), syscall.as_ref()).validate_id();
+        assert!(result.is_err());
+
+        let result = ContainerBuilder::new("..".to_owned(), syscall.as_ref()).validate_id();
+        assert!(result.is_err());
+
+        let result = ContainerBuilder::new("...".to_owned(), syscall.as_ref()).validate_id();
+        assert!(result.is_ok());
+
+        let result =
+            ContainerBuilder::new("74f1a4cb3801".to_owned(), syscall.as_ref()).validate_id();
+        assert!(result.is_ok());
         Ok(())
     }
 }
