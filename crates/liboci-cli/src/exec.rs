@@ -10,38 +10,38 @@ pub struct Exec {
     /// Unix socket (file) path , which will receive file descriptor of the writing end of the pseudoterminal
     #[clap(long)]
     pub console_socket: Option<PathBuf>,
-    #[clap(short, long)]
-    pub tty: bool,
     #[clap(long)]
     /// Current working directory of the container
     pub cwd: Option<PathBuf>,
-    #[clap(long)]
-    /// The file to which the pid of the container process should be written to
-    pub pid_file: Option<PathBuf>,
     /// Environment variables that should be set in the container
     #[clap(short, long, value_parser = parse_key_val::<String, String>, number_of_values = 1)]
     pub env: Vec<(String, String)>,
+    #[clap(short, long)]
+    pub tty: bool,
     /// Run the command as a user
     #[clap(short, long, value_parser = parse_colon_separated_pair::<u32, u32>)]
     pub user: Option<(u32, Option<u32>)>,
     /// Add additional group IDs. Can be specified multiple times
     #[clap(long, short = 'g', number_of_values = 1)]
     pub additional_gids: Vec<u32>,
-    /// Prevent the process from gaining additional privileges
-    #[clap(long)]
-    pub no_new_privs: bool,
     /// Path to process.json
     #[clap(short, long)]
     pub process: Option<PathBuf>,
     /// Detach from the container process
     #[clap(short, long)]
     pub detach: bool,
+    #[clap(long)]
+    /// The file to which the pid of the container process should be written to
+    pub pid_file: Option<PathBuf>,
     /// Set the asm process label for the process commonly used with selinux
     #[clap(long)]
     pub process_label: Option<String>,
     /// Set the apparmor profile for the process
     #[clap(long)]
     pub apparmor: Option<String>,
+    /// Prevent the process from gaining additional privileges
+    #[clap(long)]
+    pub no_new_privs: bool,
     /// Add a capability to the bounding set for the process
     #[clap(long, number_of_values = 1)]
     pub cap: Vec<String>,
@@ -54,9 +54,11 @@ pub struct Exec {
     /// Execute a process in a sub-cgroup
     #[clap(long)]
     pub cgroup: Option<String>,
+
     /// Identifier of the container
     #[clap(value_parser = clap::builder::NonEmptyStringValueParser::new(), required = true)]
     pub container_id: String,
+
     /// Command that should be executed in the container
     #[clap(required = false)]
     pub command: Vec<String>,
