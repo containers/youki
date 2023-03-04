@@ -10,9 +10,6 @@ pub struct Run {
     /// Unix socket (file) path , which will receive file descriptor of the writing end of the pseudoterminal
     #[clap(short, long)]
     pub console_socket: Option<PathBuf>,
-    /// Detach from teh container process
-    #[clap(short, long)]
-    pub detach: bool,
     /// File to write pid of the container created
     // note that in the end, container is just another process
     #[clap(short, long)]
