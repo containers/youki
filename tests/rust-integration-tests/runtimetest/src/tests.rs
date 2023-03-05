@@ -131,6 +131,24 @@ pub fn validate_mounts_recursive(spec: &Spec) {
                                 eprintln!("error in testing rnoexec recursive mounting: {e}");
                             }
                         }
+                        "rdiratime" => {
+                            println!("test_dir_update_access_time: {:?}", mount);
+                            let rest = utils::test_dir_update_access_time(
+                                mount.destination().to_str().unwrap(),
+                            );
+                            if let Err(e) = rest {
+                                eprintln!("error in testing rdiratime recursive mounting: {e}");
+                            }
+                        }
+                        "rnodiratime" => {
+                            println!("test_dir_not_update_access_time: {:?}", mount);
+                            let rest = utils::test_dir_not_update_access_time(
+                                mount.destination().to_str().unwrap(),
+                            );
+                            if let Err(e) = rest {
+                                eprintln!("error in testing rnodiratime recursive mounting: {e}");
+                            }
+                        }
                         _ => {}
                     }
                 }
