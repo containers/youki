@@ -149,6 +149,23 @@ pub fn validate_mounts_recursive(spec: &Spec) {
                                 eprintln!("error in testing rnodiratime recursive mounting: {e}");
                             }
                         }
+                        "rdev" => {
+                            println!("test_device_access: {:?}", mount);
+                            let rest =
+                                utils::test_device_access(mount.destination().to_str().unwrap());
+                            if let Err(e) = rest {
+                                eprintln!("error in testing rdev recursive mounting: {e}");
+                            }
+                        }
+                        "rnodev" => {
+                            println!("test_device_unaccess: {:?}", mount);
+                            let rest =
+                                utils::test_device_unaccess(mount.destination().to_str().unwrap());
+                            if rest.is_ok() {
+                                // beacuse /rnodev/null device not access,so rest is err
+                                eprintln!("error in testing rnodev recursive mounting");
+                            }
+                        }
                         _ => {}
                     }
                 }

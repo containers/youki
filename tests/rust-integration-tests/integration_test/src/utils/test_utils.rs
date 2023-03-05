@@ -199,6 +199,13 @@ pub fn test_inside_container(
         .context("getting output after starting the container failed")
         .unwrap();
 
+    let stdout = String::from_utf8_lossy(&create_output.stdout);
+    if !stdout.is_empty() {
+        println!(
+            "{:?}",
+            anyhow!("container stdout was not empty, found : {}", stdout)
+        )
+    }
     let stderr = String::from_utf8_lossy(&create_output.stderr);
     if !stderr.is_empty() {
         return TestResult::Failed(anyhow!(
