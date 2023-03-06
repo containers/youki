@@ -243,16 +243,67 @@ fn check_recursive_noexec() -> TestResult {
     result
 }
 
+/// rdiratime If set in attr_clr, removes the restriction that prevented updating access time for directories.
+fn check_recursive_rdiratime() -> TestResult {
+    let rdiratime_base_dir = PathBuf::from_str("/tmp/rdiratime").unwrap();
+    let mount_dest_path = PathBuf::from_str("/rdiratime").unwrap();
+    fs::create_dir(rdiratime_base_dir.clone()).unwrap();
+
+    let mount_options = vec!["rbind".to_string(), "rdiratime".to_string()];
+    let mut mount_spec = Mount::default();
+    mount_spec
+        .set_destination(mount_dest_path)
+        .set_typ(None)
+        .set_source(Some(rdiratime_base_dir.clone()))
+        .set_options(Some(mount_options));
+    let spec = get_spec(
+        vec![mount_spec],
+        vec!["runtimetest".to_string(), "mounts_recursive".to_string()],
+    );
+
+    let result = test_inside_container(spec, &|_| Ok(()));
+
+    fs::remove_dir(rdiratime_base_dir).unwrap();
+    result
+}
+
+/// If set in attr_set, prevents updating access time for directories on this mount
+fn check_recursive_rnodiratime() -> TestResult {
+    let rnodiratime_base_dir = PathBuf::from_str("/tmp/rnodiratime").unwrap();
+    let mount_dest_path = PathBuf::from_str("/rnodiratime").unwrap();
+    fs::create_dir(rnodiratime_base_dir.clone()).unwrap();
+
+    let mount_options = vec!["rbind".to_string(), "rnodiratime".to_string()];
+    let mut mount_spec = Mount::default();
+    mount_spec
+        .set_destination(mount_dest_path)
+        .set_typ(None)
+        .set_source(Some(rnodiratime_base_dir.clone()))
+        .set_options(Some(mount_options));
+    let spec = get_spec(
+        vec![mount_spec],
+        vec!["runtimetest".to_string(), "mounts_recursive".to_string()],
+    );
+
+    let result = test_inside_container(spec, &|_| Ok(()));
+    fs::remove_dir(rnodiratime_base_dir).unwrap();
+    result
+}
+
 pub fn get_mounts_recursive_test() -> TestGroup {
     let rro_test = Test::new("rro_test", Box::new(check_recursive_readonly));
     let rnosuid_test = Test::new("rnosuid_test", Box::new(check_recursive_nosuid));
     let rnoexec_test = Test::new("rnoexec_test", Box::new(check_recursive_noexec));
+    let rnodiratime_test = Test::new("rnodiratime_test", Box::new(check_recursive_rnodiratime));
+    let rdiratime_test = Test::new("rdiratime_test", Box::new(check_recursive_rdiratime));
 
     let mut tg = TestGroup::new("mounts_recursive");
     tg.add(vec![
         Box::new(rro_test),
         Box::new(rnosuid_test),
         Box::new(rnoexec_test),
+        Box::new(rdiratime_test),
+        Box::new(rnodiratime_test),
     ]);
 
     tg
