@@ -379,6 +379,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "clone3"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5ee4e061ea30800291ca09663878f3953840a69b08ce244b3e8b26e894d9f60f"
+dependencies = [
+ "bitflags",
+ "uapi",
+]
+
+[[package]]
 name = "cmake"
 version = "0.1.49"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1611,6 +1621,7 @@ dependencies = [
  "bitflags",
  "caps",
  "chrono",
+ "clone3",
  "crossbeam-channel",
  "fastrand",
  "futures",
@@ -3129,6 +3140,32 @@ name = "typenum"
 version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "497961ef93d974e23eb6f433eb5fe1b7930b659f06d12dec6fc44a8f554c0bba"
+
+[[package]]
+name = "uapi"
+version = "0.2.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "019450240401d342e2a5bc47f7fbaeb002a38fe18197b83788750d7ffb143274"
+dependencies = [
+ "cc",
+ "cfg-if 0.1.10",
+ "libc",
+ "uapi-proc",
+]
+
+[[package]]
+name = "uapi-proc"
+version = "0.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "54de46f980cea7b2ae8d8f7f9f1c35cf7062c68343e99345ef73758f8e60975a"
+dependencies = [
+ "lazy_static",
+ "libc",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "syn",
+]
 
 [[package]]
 name = "unicase"
