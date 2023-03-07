@@ -119,6 +119,7 @@ fn main() -> Result<()> {
                     std::process::exit(-1);
                 }
             },
+            CommonCmd::Features(features) => commands::features::features(features),
             CommonCmd::List(list) => commands::list::list(list, root_path),
             CommonCmd::Pause(pause) => commands::pause::pause(pause, root_path),
             CommonCmd::Ps(ps) => commands::ps::ps(ps, root_path),
