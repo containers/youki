@@ -116,6 +116,24 @@ pub fn validate_mounts_recursive(spec: &Spec) {
                                 eprintln!("error in testing rro recursive mounting : {e}");
                             }
                         }
+                        "rrw" => {
+                            if let Err(e) =
+                                do_test_mounts_recursive(mount.destination(), &|test_file_path| {
+                                    if utils::test_write_access(test_file_path.to_str().unwrap())
+                                        .is_err()
+                                    {
+                                        // Return Err if not writeable
+                                        bail!(
+                                            "path {:?} expected to be  writable, found read-only",
+                                            test_file_path
+                                        );
+                                    }
+                                    Ok(())
+                                })
+                            {
+                                eprintln!("error in testing rro recursive mounting : {e}");
+                            }
+                        }
                         "rnoexec" => {
                             if let Err(e) = do_test_mounts_recursive(
                                 mount.destination(),
@@ -129,6 +147,21 @@ pub fn validate_mounts_recursive(spec: &Spec) {
                                 },
                             ) {
                                 eprintln!("error in testing rnoexec recursive mounting: {e}");
+                            }
+                        }
+                        "rexec" => {
+                            if let Err(e) = do_test_mounts_recursive(
+                                mount.destination(),
+                                &|test_file_path| {
+                                    if let Err(ee) = utils::test_file_executable(
+                                        test_file_path.to_str().unwrap(),
+                                    ) {
+                                        bail!("path {:?} expected to be executable, found not executable, error: {ee}", test_file_path);
+                                    }
+                                    Ok(())
+                                },
+                            ) {
+                                eprintln!("error in testing rexec recursive mounting: {e}");
                             }
                         }
                         "rdiratime" => {
