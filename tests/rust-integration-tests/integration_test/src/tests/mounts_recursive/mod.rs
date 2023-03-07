@@ -290,12 +290,54 @@ fn check_recursive_rnodiratime() -> TestResult {
     result
 }
 
+fn check_recursive_rdev() -> TestResult {
+    let rdev_base_dir = PathBuf::from_str("/dev").unwrap();
+    let mount_dest_path = PathBuf::from_str("/rdev").unwrap();
+
+    let mount_options = vec!["rbind".to_string(), "rdev".to_string()];
+    let mut mount_spec = Mount::default();
+    mount_spec
+        .set_destination(mount_dest_path)
+        .set_typ(None)
+        .set_source(Some(rdev_base_dir.clone()))
+        .set_options(Some(mount_options));
+    let spec = get_spec(
+        vec![mount_spec],
+        vec!["runtimetest".to_string(), "mounts_recursive".to_string()],
+    );
+
+    let result = test_inside_container(spec, &|_| Ok(()));
+    result
+}
+
+fn check_recursive_rnodev() -> TestResult {
+    let rnodev_base_dir = PathBuf::from_str("/dev").unwrap();
+    let mount_dest_path = PathBuf::from_str("/rnodev").unwrap();
+
+    let mount_options = vec!["rbind".to_string(), "rnodev".to_string()];
+    let mut mount_spec = Mount::default();
+    mount_spec
+        .set_destination(mount_dest_path)
+        .set_typ(None)
+        .set_source(Some(rnodev_base_dir.clone()))
+        .set_options(Some(mount_options));
+    let spec = get_spec(
+        vec![mount_spec],
+        vec!["runtimetest".to_string(), "mounts_recursive".to_string()],
+    );
+
+    let result = test_inside_container(spec, &|_| Ok(()));
+    result
+}
+
 pub fn get_mounts_recursive_test() -> TestGroup {
     let rro_test = Test::new("rro_test", Box::new(check_recursive_readonly));
     let rnosuid_test = Test::new("rnosuid_test", Box::new(check_recursive_nosuid));
     let rnoexec_test = Test::new("rnoexec_test", Box::new(check_recursive_noexec));
     let rnodiratime_test = Test::new("rnodiratime_test", Box::new(check_recursive_rnodiratime));
     let rdiratime_test = Test::new("rdiratime_test", Box::new(check_recursive_rdiratime));
+    let rdev_test = Test::new("rdev_test", Box::new(check_recursive_rdev));
+    let rnodev_test = Test::new("rnodev_test", Box::new(check_recursive_rnodev));
 
     let mut tg = TestGroup::new("mounts_recursive");
     tg.add(vec![
@@ -304,6 +346,8 @@ pub fn get_mounts_recursive_test() -> TestGroup {
         Box::new(rnoexec_test),
         Box::new(rdiratime_test),
         Box::new(rnodiratime_test),
+        Box::new(rdev_test),
+        Box::new(rnodev_test),
     ]);
 
     tg
