@@ -90,10 +90,15 @@ impl<'a> InitContainerBuilder<'a> {
             notify_path,
             container: Some(container.clone()),
             preserve_fds: self.base.preserve_fds,
-            detached: false, // TODO this should be set properly based on how the command is given
+            // TODO: This should be set properly based on how the command is
+            // given. For now, set the detached to true because this is what
+            // `youki create` defaults to.
+            detached: true,
         };
 
-        builder_impl.create()?;
+        // TODO: Fix waiting on this pid (init process) when detached = false.
+        let _pid = builder_impl.create()?;
+
         container.refresh_state()?;
 
         Ok(container)
