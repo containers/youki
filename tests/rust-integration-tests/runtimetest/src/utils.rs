@@ -88,14 +88,11 @@ pub fn test_file_executable(path: &str) -> Result<(), std::io::Error> {
 }
 
 pub fn test_dir_update_access_time(path: &str) -> Result<(), std::io::Error> {
-    println!("test_dir_update_access_time path: {:?}", path);
+    println!("test_dir_update_access_time path: {path:?}");
     let metadata = fs::metadata(PathBuf::from(path))?;
     let rest = metadata.accessed();
     let first_access_time = rest.unwrap();
-    println!(
-        "{:?} dir first access time is {:?}",
-        path, first_access_time
-    );
+    println!("{path:?} dir first access time is {first_access_time:?}");
     // execute ls command to update access time
     Command::new("ls")
         .arg(path)
@@ -105,28 +102,22 @@ pub fn test_dir_update_access_time(path: &str) -> Result<(), std::io::Error> {
     let metadata = fs::metadata(PathBuf::from(path))?;
     let rest = metadata.accessed();
     let second_access_time = rest.unwrap();
-    println!(
-        "{:?} dir second access time is {:?}",
-        path, second_access_time
-    );
+    println!("{path:?} dir second access time is {second_access_time:?}");
     if first_access_time == second_access_time {
         return Err(std::io::Error::new(
             std::io::ErrorKind::Other,
-            format!("cannot update access time for path {:?}", path),
+            format!("cannot update access time for path {path:?}"),
         ));
     }
     Ok(())
 }
 
 pub fn test_dir_not_update_access_time(path: &str) -> Result<(), std::io::Error> {
-    println!("test_dir_not_update_access_time path: {:?}", path);
+    println!("test_dir_not_update_access_time path: {path:?}");
     let metadata = fs::metadata(PathBuf::from(path))?;
     let rest = metadata.accessed();
     let first_access_time = rest.unwrap();
-    println!(
-        "{:?} dir first access time is {:?}",
-        path, first_access_time
-    );
+    println!("{path:?} dir first access time is {first_access_time:?}");
     // execute ls command to update access time
     Command::new("ls")
         .arg(path)
@@ -136,21 +127,18 @@ pub fn test_dir_not_update_access_time(path: &str) -> Result<(), std::io::Error>
     let metadata = fs::metadata(PathBuf::from(path))?;
     let rest = metadata.accessed();
     let second_access_time = rest.unwrap();
-    println!(
-        "{:?} dir second access time is {:?}",
-        path, second_access_time
-    );
+    println!("{path:?} dir second access time is {second_access_time:?}");
     if first_access_time != second_access_time {
         return Err(std::io::Error::new(
             std::io::ErrorKind::Other,
-            format!("cannot update access time for path {:?}", path),
+            format!("cannot update access time for path {path:?}"),
         ));
     }
     Ok(())
 }
 
 pub fn test_device_access(path: &str) -> Result<(), std::io::Error> {
-    println!("test_device_access path: {:?}", path);
+    println!("test_device_access path: {path:?}");
     let _ = std::fs::OpenOptions::new()
         .create(true)
         .write(true)
@@ -159,7 +147,7 @@ pub fn test_device_access(path: &str) -> Result<(), std::io::Error> {
 }
 
 pub fn test_device_unaccess(path: &str) -> Result<(), std::io::Error> {
-    println!("test_device_unaccess path: {:?}", path);
+    println!("test_device_unaccess path: {path:?}");
     let _ = std::fs::OpenOptions::new()
         .create(true)
         .write(true)
