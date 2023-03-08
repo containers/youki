@@ -199,6 +199,40 @@ pub fn validate_mounts_recursive(spec: &Spec) {
                                 eprintln!("error in testing rnodev recursive mounting");
                             }
                         }
+                        "rrelatime" => {
+                            println!("rrelatime: {mount:?}");
+                            if let Err(e) = utils::test_mount_releatime_option(
+                                mount.destination().to_str().unwrap(),
+                            ) {
+                                eprintln!("path expected to be rrelatime, found not rrelatime, error: {e}");
+                            }
+                        }
+                        "rnorelatime" => {
+                            println!("rnorelatime: {mount:?}");
+                            if let Err(e) = utils::test_mount_noreleatime_option(
+                                mount.destination().to_str().unwrap(),
+                            ) {
+                                eprintln!("path expected to be rnorelatime, found not rnorelatime, error: {e}");
+                            }
+                        }
+                        "rnoatime" => {
+                            println!("rnoatime: {mount:?}");
+                            if let Err(e) = utils::test_mount_rnoatime_option(
+                                mount.destination().to_str().unwrap(),
+                            ) {
+                                eprintln!(
+                                    "path expected to be rnoatime, found not rnoatime, error: {e}"
+                                );
+                            }
+                        }
+                        "rstrictatime" => {
+                            println!("rstrictatime: {mount:?}");
+                            if let Err(e) = utils::test_mount_rstrictatime_option(
+                                mount.destination().to_str().unwrap(),
+                            ) {
+                                eprintln!("path expected to be rstrictatime, found not rstrictatime, error: {e}");
+                            }
+                        }
                         _ => {}
                     }
                 }
