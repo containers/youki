@@ -18,7 +18,8 @@ jobs:
         id: filter
         with:
           filters: |
-            ./integration_test: ./tests/rust-integration-tests/**
+            ./integration_test: 
+              - './tests/rust-integration-tests/**'
   validate:
     needs: [changes]
     if: ${{ !contains(needs.changes.outputs.dirs, '[]') }}
