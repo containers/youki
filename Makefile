@@ -47,7 +47,7 @@ test-all: unittest featuretest oci-tests containerd-test # currently not doing r
 # Misc
 
 lint:
-	cargo clippy --all-targets --all-features
+	cargo clippy --all-targets --all-features -- -D warnings
 
 clean:
 	./scripts/clean.sh $(ROOT)

@@ -165,7 +165,7 @@ pub fn validate_mounts_recursive(spec: &Spec) {
                             }
                         }
                         "rdiratime" => {
-                            println!("test_dir_update_access_time: {:?}", mount);
+                            println!("test_dir_update_access_time: {mount:?}");
                             let rest = utils::test_dir_update_access_time(
                                 mount.destination().to_str().unwrap(),
                             );
@@ -174,7 +174,7 @@ pub fn validate_mounts_recursive(spec: &Spec) {
                             }
                         }
                         "rnodiratime" => {
-                            println!("test_dir_not_update_access_time: {:?}", mount);
+                            println!("test_dir_not_update_access_time: {mount:?}");
                             let rest = utils::test_dir_not_update_access_time(
                                 mount.destination().to_str().unwrap(),
                             );
@@ -183,7 +183,7 @@ pub fn validate_mounts_recursive(spec: &Spec) {
                             }
                         }
                         "rdev" => {
-                            println!("test_device_access: {:?}", mount);
+                            println!("test_device_access: {mount:?}");
                             let rest =
                                 utils::test_device_access(mount.destination().to_str().unwrap());
                             if let Err(e) = rest {
@@ -191,7 +191,7 @@ pub fn validate_mounts_recursive(spec: &Spec) {
                             }
                         }
                         "rnodev" => {
-                            println!("test_device_unaccess: {:?}", mount);
+                            println!("test_device_unaccess: {mount:?}");
                             let rest =
                                 utils::test_device_unaccess(mount.destination().to_str().unwrap());
                             if rest.is_ok() {

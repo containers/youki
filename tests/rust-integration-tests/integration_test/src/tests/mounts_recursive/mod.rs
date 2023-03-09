@@ -340,15 +340,14 @@ fn check_recursive_rdev() -> TestResult {
     mount_spec
         .set_destination(mount_dest_path)
         .set_typ(None)
-        .set_source(Some(rdev_base_dir.clone()))
+        .set_source(Some(rdev_base_dir))
         .set_options(Some(mount_options));
     let spec = get_spec(
         vec![mount_spec],
         vec!["runtimetest".to_string(), "mounts_recursive".to_string()],
     );
 
-    let result = test_inside_container(spec, &|_| Ok(()));
-    result
+    test_inside_container(spec, &|_| Ok(()))
 }
 
 fn check_recursive_rnodev() -> TestResult {
@@ -360,15 +359,14 @@ fn check_recursive_rnodev() -> TestResult {
     mount_spec
         .set_destination(mount_dest_path)
         .set_typ(None)
-        .set_source(Some(rnodev_base_dir.clone()))
+        .set_source(Some(rnodev_base_dir))
         .set_options(Some(mount_options));
     let spec = get_spec(
         vec![mount_spec],
         vec!["runtimetest".to_string(), "mounts_recursive".to_string()],
     );
 
-    let result = test_inside_container(spec, &|_| Ok(()));
-    result
+    test_inside_container(spec, &|_| Ok(()))
 }
 
 fn check_recursive_readwrite() -> TestResult {
