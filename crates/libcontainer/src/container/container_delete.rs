@@ -1,5 +1,5 @@
 use super::Container;
-use crate::config::YoukiConfig;
+use crate::{config::YoukiConfig, container::ContainerStatus};
 use crate::hooks;
 use anyhow::{bail, Context, Result};
 use libcgroups;
@@ -29,6 +29,7 @@ impl Container {
             .context("failed to refresh container status")?;
         if self.can_kill() || force {
             self.kill(signal::Signal::SIGKILL, false)?;
+            self.set_status(ContainerStatus::Stopped).save()?;
         }
         log::debug!("container status: {:?}", self.status());
         if self.can_delete() {
