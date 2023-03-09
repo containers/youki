@@ -112,10 +112,10 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, Pi
 
     // here we send both intermediate and init pid, because :
     // init pid is required for writing it to pid_file (if) given by the high-level runtime
-    // intermediate pid is required in the case when we call exec, as we nned to wait for the
+    // intermediate pid is required in the case when we call exec, as we need to wait for the
     // intermediate process to exit, which itself waits for child process (the exec process) to exit
     // in order to get the proper exit code. We cannot simply wait for the init_pid , that is the actual container
-    // process, as it is not (direect) child of our process
+    // process, as it is not (direct) child of our process
     Ok((intermediate_pid, init_pid))
 }
 
