@@ -18,12 +18,18 @@ jobs:
         id: filter
         with:
           filters: |
-            crates/youki: crates/youki/**
-            crates/libcontainer: crates/libcontainer/**
-            crates/libcgroups: crates/libcgroups/**
-            tests/rust-integration-tests/runtimetest: ./tests/rust-integration-tests/runtimetest
-            tests/rust-integration-tests/integration_test: ./tests/rust-integration-tests/integration_test
-            tests/rust-integration-tests/test_framework: ./tests/rust-integration-tests/test_framework
+            crates/youki: 
+              - 'crates/youki/**'
+            crates/libcontainer: 
+              - 'crates/libcontainer/**'
+            crates/libcgroups: 
+              - 'crates/libcgroups/**'
+            tests/rust-integration-tests/runtimetest: 
+              - './tests/rust-integration-tests/runtimetest/**'
+            tests/rust-integration-tests/integration_test: 
+              - './tests/rust-integration-tests/integration_test/**'
+            tests/rust-integration-tests/test_framework:
+              - './tests/rust-integration-tests/test_framework/**'
 
   check:
     needs: [changes]
