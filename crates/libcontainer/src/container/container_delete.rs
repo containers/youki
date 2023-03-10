@@ -98,7 +98,7 @@ impl Container {
                     // from the OCI spec. In this case, we assume as if we
                     // successfully deleted the config and moving on.
                     log::warn!("skipping loading youki config due to: {err:?}, continue to delete");
-                },
+                }
             }
 
             // remove the directory storing container state
