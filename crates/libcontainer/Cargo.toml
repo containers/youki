@@ -29,7 +29,7 @@ chrono = { version = "0.4", features = ["serde"] }
 crossbeam-channel = "0.5"
 fastrand = "^1.7.0"
 futures = { version = "0.3", features = ["thread-pool"] }
-libc = "0.2.139"
+libc = "0.2.140"
 log = "0.4"
 mio = { version = "0.8.6", features = ["os-ext", "os-poll"] }
 nix = "0.26.2"
