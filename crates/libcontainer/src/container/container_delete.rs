@@ -67,29 +67,38 @@ impl Container {
         debug_assert!(self.status().can_delete());
 
         if self.root.exists() {
-            if let Ok(config) = YoukiConfig::load(&self.root) {
-                log::debug!("config: {:?}", config);
+            match YoukiConfig::load(&self.root) {
+                Ok(config) => {
+                    log::debug!("config: {:?}", config);
 
-                // remove the cgroup created for the container
-                // check https://man7.org/linux/man-pages/man7/cgroups.7.html
-                // creating and removing cgroups section for more information on cgroups
-                let use_systemd = self
-                    .systemd()
-                    .context("container state does not contain cgroup manager")?;
-                let cmanager = libcgroups::common::create_cgroup_manager(
-                    &config.cgroup_path,
-                    use_systemd,
-                    self.id(),
-                )
-                .context("failed to create cgroup manager")?;
-                cmanager.remove().with_context(|| {
-                    format!("failed to remove cgroup {}", config.cgroup_path.display())
-                })?;
+                    // remove the cgroup created for the container
+                    // check https://man7.org/linux/man-pages/man7/cgroups.7.html
+                    // creating and removing cgroups section for more information on cgroups
+                    let use_systemd = self
+                        .systemd()
+                        .context("container state does not contain cgroup manager")?;
+                    let cmanager = libcgroups::common::create_cgroup_manager(
+                        &config.cgroup_path,
+                        use_systemd,
+                        self.id(),
+                    )
+                    .context("failed to create cgroup manager")?;
+                    cmanager.remove().with_context(|| {
+                        format!("failed to remove cgroup {}", config.cgroup_path.display())
+                    })?;
 
-                if let Some(hooks) = config.hooks.as_ref() {
-                    hooks::run_hooks(hooks.poststop().as_ref(), Some(self))
-                        .with_context(|| "failed to run post stop hooks")?;
+                    if let Some(hooks) = config.hooks.as_ref() {
+                        hooks::run_hooks(hooks.poststop().as_ref(), Some(self))
+                            .with_context(|| "failed to run post stop hooks")?;
+                    }
                 }
+                Err(err) => {
+                    // There is a brief window where the container state is
+                    // created, but the container config is not yet generated
+                    // from the OCI spec. In this case, we assume as if we
+                    // successfully deleted the config and moving on.
+                    log::warn!("skipping loading youki config due to: {err:?}, continue to delete");
+                },
             }
 
             // remove the directory storing container state
