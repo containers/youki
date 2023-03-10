@@ -34,37 +34,36 @@ impl Container {
         log::debug!("container status: {:?}", self.status());
         if self.can_delete() {
             if self.root.exists() {
-                let config = YoukiConfig::load(&self.root).with_context(|| {
-                    format!("failed to load runtime spec for container {}", self.id())
-                })?;
-                log::debug!("config: {:?}", config);
+                if let Ok(config) = YoukiConfig::load(&self.root) {
+                    log::debug!("config: {:?}", config);
+
+                    // remove the cgroup created for the container
+                    // check https://man7.org/linux/man-pages/man7/cgroups.7.html
+                    // creating and removing cgroups section for more information on cgroups
+                    let use_systemd = self
+                        .systemd()
+                        .context("container state does not contain cgroup manager")?;
+                    let cmanager = libcgroups::common::create_cgroup_manager(
+                        &config.cgroup_path,
+                        use_systemd,
+                        self.id(),
+                    )
+                    .context("failed to create cgroup manager")?;
+                    cmanager.remove().with_context(|| {
+                        format!("failed to remove cgroup {}", config.cgroup_path.display())
+                    })?;
+
+                    if let Some(hooks) = config.hooks.as_ref() {
+                        hooks::run_hooks(hooks.poststop().as_ref(), Some(self))
+                            .with_context(|| "failed to run post stop hooks")?;
+                    }
+                }
 
                 // remove the directory storing container state
                 log::debug!("remove dir {:?}", self.root);
                 fs::remove_dir_all(&self.root).with_context(|| {
                     format!("failed to remove container dir {}", self.root.display())
                 })?;
-
-                // remove the cgroup created for the container
-                // check https://man7.org/linux/man-pages/man7/cgroups.7.html
-                // creating and removing cgroups section for more information on cgroups
-                let use_systemd = self
-                    .systemd()
-                    .context("container state does not contain cgroup manager")?;
-                let cmanager = libcgroups::common::create_cgroup_manager(
-                    &config.cgroup_path,
-                    use_systemd,
-                    self.id(),
-                )
-                .context("failed to create cgroup manager")?;
-                cmanager.remove().with_context(|| {
-                    format!("failed to remove cgroup {}", config.cgroup_path.display())
-                })?;
-
-                if let Some(hooks) = config.hooks.as_ref() {
-                    hooks::run_hooks(hooks.poststop().as_ref(), Some(self))
-                        .with_context(|| "failed to run post stop hooks")?;
-                }
             }
             Ok(())
         } else {
