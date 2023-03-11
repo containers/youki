@@ -397,6 +397,106 @@ fn check_recursive_readwrite() -> TestResult {
     result
 }
 
+fn check_recursive_rrelatime() -> TestResult {
+    let rrelatime_base_dir = PathBuf::from_str("/tmp").unwrap();
+    let rrelatime_dir_path = rrelatime_base_dir.join("rrelatime_dir");
+    let rrelatime_suddir_path = rrelatime_dir_path.join("rrelatime_subdir");
+    let mount_dest_path = PathBuf::from_str("/rrelatime").unwrap();
+    fs::create_dir_all(rrelatime_suddir_path).unwrap();
+
+    let mount_options = vec!["rbind".to_string(), "rrelatime".to_string()];
+    let mut mount_spec = Mount::default();
+    mount_spec
+        .set_destination(mount_dest_path)
+        .set_typ(None)
+        .set_source(Some(rrelatime_dir_path.clone()))
+        .set_options(Some(mount_options));
+    let spec = get_spec(
+        vec![mount_spec],
+        vec!["runtimetest".to_string(), "mounts_recursive".to_string()],
+    );
+    let result = test_inside_container(spec, &|_| Ok(()));
+
+    fs::remove_dir_all(rrelatime_dir_path).unwrap();
+    result
+}
+
+fn check_recursive_rnorelatime() -> TestResult {
+    let rnorelatime_base_dir = PathBuf::from_str("/tmp").unwrap();
+    let rnorelatime_dir_path = rnorelatime_base_dir.join("rnorelatime_dir");
+    let mount_dest_path = PathBuf::from_str("/rnorelatime").unwrap();
+    fs::create_dir(rnorelatime_dir_path.clone()).unwrap();
+
+    let mount_options = vec!["rbind".to_string(), "rnorelatime".to_string()];
+    let mut mount_spec = Mount::default();
+    mount_spec
+        .set_destination(mount_dest_path)
+        .set_typ(None)
+        .set_source(Some(rnorelatime_dir_path.clone()))
+        .set_options(Some(mount_options));
+    let spec = get_spec(
+        vec![mount_spec],
+        vec!["runtimetest".to_string(), "mounts_recursive".to_string()],
+    );
+
+    let result = test_inside_container(spec, &|_| Ok(()));
+
+    fs::remove_dir_all(rnorelatime_dir_path).unwrap();
+    result
+}
+
+fn check_recursive_rnoatime() -> TestResult {
+    let rnoatime_base_dir = PathBuf::from_str("/tmp").unwrap();
+    let rnoatime_dir_path = rnoatime_base_dir.join("rnoatime_dir");
+    let mount_dest_path = PathBuf::from_str("/rnoatime").unwrap();
+    fs::create_dir(rnoatime_dir_path.clone()).unwrap();
+
+    let mount_options = vec!["rbind".to_string(), "rnoatime".to_string()];
+    let mut mount_spec = Mount::default();
+    mount_spec
+        .set_destination(mount_dest_path)
+        .set_typ(None)
+        .set_source(Some(rnoatime_dir_path.clone()))
+        .set_options(Some(mount_options));
+    let spec = get_spec(
+        vec![mount_spec],
+        vec!["runtimetest".to_string(), "mounts_recursive".to_string()],
+    );
+
+    let result = test_inside_container(spec, &|_| Ok(()));
+
+    fs::remove_dir_all(rnoatime_dir_path).unwrap();
+    result
+}
+
+fn check_recursive_rstrictatime() -> TestResult {
+    let rstrictatime_base_dir = PathBuf::from_str("/tmp").unwrap();
+    let rstrictatime_dir_path = rstrictatime_base_dir.join("rstrictatime_dir");
+    let mount_dest_path = PathBuf::from_str("/rstrictatime").unwrap();
+    fs::create_dir(rstrictatime_dir_path.clone()).unwrap();
+
+    let mount_options = vec!["rbind".to_string(), "rstrictatime".to_string()];
+    let mut mount_spec = Mount::default();
+    mount_spec
+        .set_destination(mount_dest_path)
+        .set_typ(None)
+        .set_source(Some(rstrictatime_dir_path.clone()))
+        .set_options(Some(mount_options));
+    let spec = get_spec(
+        vec![mount_spec],
+        vec!["runtimetest".to_string(), "mounts_recursive".to_string()],
+    );
+    let result = test_inside_container(spec, &|_| Ok(()));
+
+    fs::remove_dir_all(rstrictatime_dir_path).unwrap();
+    result
+}
+
+/// this mount test how to work?
+/// 1. Create mount_options based on the mount properties of the test
+/// 2. Create OCI.Spec content, container one process is runtimetest,(runtimetest is cargo model, file path `tests/rust-integration-tests/runtimetest/`)
+/// 3. inside container to check if the actual mount matches the spec, (spec https://man7.org/linux/man-pages/man2/mount_setattr.2.html),
+///  eg. tests/rust-integration-tests/runtimetest/src/tests.rs
 pub fn get_mounts_recursive_test() -> TestGroup {
     let rro_test = Test::new("rro_test", Box::new(check_recursive_readonly));
     let rnosuid_test = Test::new("rnosuid_test", Box::new(check_recursive_nosuid));
@@ -407,6 +507,10 @@ pub fn get_mounts_recursive_test() -> TestGroup {
     let rnodev_test = Test::new("rnodev_test", Box::new(check_recursive_rnodev));
     let rrw_test = Test::new("rrw_test", Box::new(check_recursive_readwrite));
     let rexec_test = Test::new("rexec_test", Box::new(check_recursive_rexec));
+    let rrelatime_test = Test::new("rrelatime_test", Box::new(check_recursive_rrelatime));
+    let rnorelatime_test = Test::new("rnorelatime_test", Box::new(check_recursive_rnorelatime));
+    let rnoatime_test = Test::new("rnoatime_test", Box::new(check_recursive_rnoatime));
+    let rstrictatime_test = Test::new("rstrictatime_test", Box::new(check_recursive_rstrictatime));
 
     let mut tg = TestGroup::new("mounts_recursive");
     tg.add(vec![
@@ -419,6 +523,10 @@ pub fn get_mounts_recursive_test() -> TestGroup {
         Box::new(rnodev_test),
         Box::new(rrw_test),
         Box::new(rexec_test),
+        Box::new(rrelatime_test),
+        Box::new(rnorelatime_test),
+        Box::new(rnoatime_test),
+        Box::new(rstrictatime_test),
     ]);
 
     tg

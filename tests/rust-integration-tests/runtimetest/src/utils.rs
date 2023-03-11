@@ -1,6 +1,7 @@
 use nix::sys::stat::stat;
 use nix::sys::stat::SFlag;
 use std::fs;
+use std::os::unix::prelude::MetadataExt;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -152,5 +153,251 @@ pub fn test_device_unaccess(path: &str) -> Result<(), std::io::Error> {
         .create(true)
         .write(true)
         .open(PathBuf::from(path).join("null"))?;
+    Ok(())
+}
+
+// https://man7.org/linux/man-pages/man2/mount_setattr.2.html
+// When a file is accessed via this mount, update the
+// file's last access time (atime) only if the current
+// value of atime is less than or equal to the file's
+// last modification time (mtime) or last status
+// change time (ctime).
+// case:
+// 1. create test.txt file, get one atime
+// 2. cat a.txt, get two atime; check atime wheather update, conditions are met atime less than or equal mtime or ctime
+// 3. cat a.txt, get three atime, check now two atime wheather equal three atime
+pub fn test_mount_releatime_option(path: &str) -> Result<(), std::io::Error> {
+    let test_file_path = PathBuf::from(path).join("test.txt");
+    Command::new("touch")
+        .arg(test_file_path.to_str().unwrap())
+        .output()?;
+    let one_metadata = fs::metadata(test_file_path.clone())?;
+    println!(
+        "{:?} file one metadata atime is {:?},mtime is {:?},current time is{:?}",
+        test_file_path,
+        one_metadata.atime(),
+        one_metadata.mtime(),
+        std::time::SystemTime::now()
+    );
+    std::thread::sleep(std::time::Duration::from_millis(1000));
+
+    // execute cat command to update access time
+    Command::new("cat")
+        .arg(test_file_path.to_str().unwrap())
+        .output()
+        .expect("execute cat command error");
+    let two_metadata = fs::metadata(test_file_path.clone())?;
+    println!(
+        "{:?} file two metadata atime is {:?},mtime is {:?},current time is{:?}",
+        test_file_path,
+        two_metadata.atime(),
+        two_metadata.mtime(),
+        std::time::SystemTime::now()
+    );
+
+    if one_metadata.atime() == two_metadata.atime() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!(
+                "not update access time for file {:?}",
+                test_file_path.to_str()
+            ),
+        ));
+    }
+
+    // execute cat command to update access time
+    std::thread::sleep(std::time::Duration::from_millis(1000));
+    Command::new("cat")
+        .arg(test_file_path.to_str().unwrap())
+        .output()
+        .expect("execute cat command error");
+    let three_metadata = fs::metadata(test_file_path.clone())?;
+    println!(
+        "{:?} file three metadata atime is {:?}",
+        test_file_path,
+        two_metadata.atime()
+    );
+    if two_metadata.atime() != three_metadata.atime() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("update access time for file {:?}", test_file_path.to_str()),
+        ));
+    }
+
+    Ok(())
+}
+
+// case: because filesystem having relatime option
+// 1. create test.txt file, get one atime
+// 2. cat a.txt, get two atime; check atime wheather update
+// 3. cat a.txt, get three atime, check now two atime wheather equal three atime
+pub fn test_mount_noreleatime_option(path: &str) -> Result<(), std::io::Error> {
+    let test_file_path = PathBuf::from(path).join("noreleatime.txt");
+    Command::new("touch")
+        .arg(test_file_path.to_str().unwrap())
+        .output()?;
+    let one_metadata = fs::metadata(test_file_path.clone())?;
+    println!(
+        "{:?} file one atime is {:?},mtime is {:?}, current time is {:?}",
+        test_file_path,
+        one_metadata.atime(),
+        one_metadata.mtime(),
+        std::time::SystemTime::now()
+    );
+
+    std::thread::sleep(std::time::Duration::from_millis(1000));
+    // execute cat command to update access time
+    Command::new("cat")
+        .arg(test_file_path.to_str().unwrap())
+        .output()
+        .expect("execute cat command error");
+    let two_metadata = fs::metadata(test_file_path.clone())?;
+    println!(
+        "{:?} file two atime is {:?},mtime is {:?},current time is {:?}",
+        test_file_path,
+        two_metadata.atime(),
+        two_metadata.mtime(),
+        std::time::SystemTime::now()
+    );
+
+    if one_metadata.atime() == two_metadata.atime() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!(
+                "not update access time for file {:?}",
+                test_file_path.to_str()
+            ),
+        ));
+    }
+
+    // execute cat command to update access time
+    std::thread::sleep(std::time::Duration::from_millis(1000));
+    Command::new("cat")
+        .arg(test_file_path.to_str().unwrap())
+        .output()
+        .expect("execute cat command error");
+    let three_metadata = fs::metadata(test_file_path.clone())?;
+    println!(
+        "{:?} file three atime is {:?},mtime is {:?},current time is {:?}",
+        test_file_path,
+        two_metadata.atime(),
+        two_metadata.mtime(),
+        std::time::SystemTime::now()
+    );
+
+    if two_metadata.atime() != three_metadata.atime() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("update access time for file {:?}", test_file_path.to_str()),
+        ));
+    }
+    Ok(())
+}
+
+// Do not update access times for (all types of) files on this mount.
+// case:
+// 1. touch rnoatime.txt file, get atime
+// 2. caat rnoatime.txt, check atime wheather update, if update return error, else return Ok
+pub fn test_mount_rnoatime_option(path: &str) -> Result<(), std::io::Error> {
+    let test_file_path = PathBuf::from(path).join("rnoatime.txt");
+    Command::new("touch")
+        .arg(test_file_path.to_str().unwrap())
+        .output()?;
+    let one_metadata = fs::metadata(test_file_path.clone())?;
+    println!(
+        "{:?} file one atime is {:?},mtime is {:?}, current time is {:?}",
+        test_file_path,
+        one_metadata.atime(),
+        one_metadata.mtime(),
+        std::time::SystemTime::now()
+    );
+    std::thread::sleep(std::time::Duration::from_millis(1000));
+
+    // execute cat command to update access time
+    Command::new("cat")
+        .arg(test_file_path.to_str().unwrap())
+        .output()
+        .expect("execute cat command error");
+    let two_metadata = fs::metadata(test_file_path.clone())?;
+    println!(
+        "{:?} file two atime is {:?},mtime is {:?},current time is {:?}",
+        test_file_path,
+        two_metadata.atime(),
+        two_metadata.mtime(),
+        std::time::SystemTime::now()
+    );
+    if one_metadata.atime() != two_metadata.atime() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!(
+                "update access time for file {:?}, expected not update",
+                test_file_path.to_str()
+            ),
+        ));
+    }
+    Ok(())
+}
+
+// Always update the last access time (atime) when files are accessed on this mount.
+pub fn test_mount_rstrictatime_option(path: &str) -> Result<(), std::io::Error> {
+    let test_file_path = PathBuf::from(path).join("rstrictatime.txt");
+    Command::new("touch")
+        .arg(test_file_path.to_str().unwrap())
+        .output()?;
+    let one_metadata = fs::metadata(test_file_path.clone())?;
+    println!(
+        "{:?} file one atime is {:?},mtime is {:?}, current time is {:?}",
+        test_file_path,
+        one_metadata.atime(),
+        one_metadata.mtime(),
+        std::time::SystemTime::now()
+    );
+
+    std::thread::sleep(std::time::Duration::from_millis(1000));
+    // execute cat command to update access time
+    Command::new("cat")
+        .arg(test_file_path.to_str().unwrap())
+        .output()
+        .expect("execute cat command error");
+    let two_metadata = fs::metadata(test_file_path.clone())?;
+    println!(
+        "{:?} file two atime is {:?},mtime is {:?},current time is {:?}",
+        test_file_path,
+        two_metadata.atime(),
+        two_metadata.mtime(),
+        std::time::SystemTime::now()
+    );
+
+    if one_metadata.atime() == two_metadata.atime() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!(
+                "not update access time for file {:?}",
+                test_file_path.to_str()
+            ),
+        ));
+    }
+
+    // execute cat command to update access time
+    std::thread::sleep(std::time::Duration::from_millis(1000));
+    Command::new("cat")
+        .arg(test_file_path.to_str().unwrap())
+        .output()
+        .expect("execute cat command error");
+    let three_metadata = fs::metadata(test_file_path.clone())?;
+    println!(
+        "{:?} file three atime is {:?},mtime is {:?},current time is {:?}",
+        test_file_path,
+        two_metadata.atime(),
+        two_metadata.mtime(),
+        std::time::SystemTime::now()
+    );
+
+    if two_metadata.atime() == three_metadata.atime() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("update access time for file {:?}", test_file_path.to_str()),
+        ));
+    }
     Ok(())
 }
