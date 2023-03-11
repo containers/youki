@@ -38,18 +38,14 @@ impl Container {
                 // behavior as `runc` and `crun`. The OCI spec does not allow
                 // deletion of status `created` without `force` flag. But both
                 // `runc` and `crun` allows deleting `created`. Therefore we
-                // decided to follow `runc` and `crun`. In the case where
-                // container is in `created` status, we first kill the container
-                // init process which is waiting on start signal. Since only a
-                // single container process (the init process) is created, we do
-                // not need to send signals to all in this case.
-                self.do_kill(signal::Signal::SIGKILL, false)?;
+                // decided to follow `runc` and `crun`.
+                self.do_kill(signal::Signal::SIGKILL, true)?;
                 self.set_status(ContainerStatus::Stopped).save()?;
             }
             ContainerStatus::Creating | ContainerStatus::Running | ContainerStatus::Paused => {
                 // Containers can't be deleted while in these status, unless
                 // force flag is set. In the force case, we need to clean up any
-                // processes launched by containers.
+                // processes associated with containers.
                 if force {
                     self.do_kill(signal::Signal::SIGKILL, true)?;
                     self.set_status(ContainerStatus::Stopped).save()?;
