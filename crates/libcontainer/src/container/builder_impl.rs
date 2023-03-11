@@ -44,7 +44,7 @@ pub(super) struct ContainerBuilderImpl<'a> {
     pub preserve_fds: i32,
     /// If the container is to be run in detached mode
     pub detached: bool,
-    /// TODO: Comment
+    /// Default executes the specified execution of a generic command
     pub executor_manager: ExecutorManager,
 }
 

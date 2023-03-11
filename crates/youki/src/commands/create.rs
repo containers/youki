@@ -14,19 +14,16 @@ use crate::workload::executor::default_executors;
 // associated with it like any other process.
 pub fn create(args: Create, root_path: PathBuf, systemd_cgroup: bool) -> Result<()> {
     let syscall = create_syscall();
-    ContainerBuilder::new(
-        args.container_id.clone(),
-        syscall.as_ref(),
-        default_executors(),
-    )
-    .with_pid_file(args.pid_file.as_ref())?
-    .with_console_socket(args.console_socket.as_ref())
-    .with_root_path(root_path)?
-    .with_preserved_fds(args.preserve_fds)
-    .validate_id()?
-    .as_init(&args.bundle)
-    .with_systemd(systemd_cgroup)
-    .build()?;
+    ContainerBuilder::new(args.container_id.clone(), syscall.as_ref())
+        .with_executor(default_executors())?
+        .with_pid_file(args.pid_file.as_ref())?
+        .with_console_socket(args.console_socket.as_ref())
+        .with_root_path(root_path)?
+        .with_preserved_fds(args.preserve_fds)
+        .validate_id()?
+        .as_init(&args.bundle)
+        .with_systemd(systemd_cgroup)
+        .build()?;
 
     Ok(())
 }

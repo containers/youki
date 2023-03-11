@@ -1,6 +1,7 @@
+use crate::workload::default::DefaultExecutor;
 use crate::workload::{Executor, ExecutorManager};
 use crate::{syscall::Syscall, utils::PathBufExt};
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use std::path::PathBuf;
 
 use super::{init_builder::InitContainerBuilder, tenant_builder::TenantContainerBuilder};
@@ -19,7 +20,8 @@ pub struct ContainerBuilder<'a> {
     pub(super) console_socket: Option<PathBuf>,
     /// File descriptors to be passed into the container process
     pub(super) preserve_fds: i32,
-    /// TODO: Comment
+    /// Manage the functions that actually run on the container
+    /// Default executes the specified execution of a generic command
     pub(super) executor_manager: ExecutorManager,
 }
 
@@ -36,7 +38,6 @@ pub struct ContainerBuilder<'a> {
 /// ContainerBuilder::new(
 ///     "74f1a4cb3801".to_owned(),
 ///     create_syscall().as_ref(),
-///     vec![Box::new(DefaultExecutor::default())],
 /// )
 /// .with_root_path("/run/containers/youki").expect("invalid root path")
 /// .with_pid_file(Some("/var/run/docker.pid")).expect("invalid pid file")
@@ -58,14 +59,9 @@ impl<'a> ContainerBuilder<'a> {
     /// let builder = ContainerBuilder::new(
     ///     "74f1a4cb3801".to_owned(),
     ///     create_syscall().as_ref(),
-    ///     vec![Box::new(DefaultExecutor::default())],
     /// );
     /// ```
-    pub fn new(
-        container_id: String,
-        syscall: &'a dyn Syscall,
-        executors: Vec<Box<dyn Executor>>,
-    ) -> Self {
+    pub fn new(container_id: String, syscall: &'a dyn Syscall) -> Self {
         let root_path = PathBuf::from("/run/youki");
         Self {
             container_id,
@@ -74,7 +70,9 @@ impl<'a> ContainerBuilder<'a> {
             pid_file: None,
             console_socket: None,
             preserve_fds: 0,
-            executor_manager: ExecutorManager { executors },
+            executor_manager: ExecutorManager {
+                executors: vec![Box::<DefaultExecutor>::default()],
+            },
         }
     }
 
@@ -123,7 +121,6 @@ impl<'a> ContainerBuilder<'a> {
     /// ContainerBuilder::new(
     ///     "74f1a4cb3801".to_owned(),
     ///     create_syscall().as_ref(),
-    ///     vec![Box::new(DefaultExecutor::default())],
     /// )
     /// .as_tenant()
     /// .with_container_args(vec!["sleep".to_owned(), "9001".to_owned()])
@@ -145,7 +142,6 @@ impl<'a> ContainerBuilder<'a> {
     /// ContainerBuilder::new(
     ///     "74f1a4cb3801".to_owned(),
     ///     create_syscall().as_ref(),
-    ///     vec![Box::new(DefaultExecutor::default())],
     /// )
     /// .as_init("/var/run/docker/bundle")
     /// .with_systemd(false)
@@ -167,7 +163,6 @@ impl<'a> ContainerBuilder<'a> {
     /// ContainerBuilder::new(
     ///     "74f1a4cb3801".to_owned(),
     ///     create_syscall().as_ref(),
-    ///     vec![Box::new(DefaultExecutor::default())],
     /// )
     /// .with_root_path("/run/containers/youki").expect("invalid root path");
     /// ```
@@ -192,7 +187,6 @@ impl<'a> ContainerBuilder<'a> {
     /// ContainerBuilder::new(
     ///     "74f1a4cb3801".to_owned(),
     ///     create_syscall().as_ref(),
-    ///     vec![Box::new(DefaultExecutor::default())],
     /// )
     /// .with_pid_file(Some("/var/run/docker.pid")).expect("invalid pid file");
     /// ```
@@ -223,7 +217,6 @@ impl<'a> ContainerBuilder<'a> {
     /// ContainerBuilder::new(
     ///     "74f1a4cb3801".to_owned(),
     ///     create_syscall().as_ref(),
-    ///     vec![Box::new(DefaultExecutor::default())],
     /// )
     /// .with_console_socket(Some("/var/run/docker/sock.tty"));
     /// ```
@@ -244,13 +237,34 @@ impl<'a> ContainerBuilder<'a> {
     /// ContainerBuilder::new(
     ///     "74f1a4cb3801".to_owned(),
     ///     create_syscall().as_ref(),
-    ///     vec![Box::new(DefaultExecutor::default())],
     /// )
     /// .with_preserved_fds(5);
     /// ```
     pub fn with_preserved_fds(mut self, preserved_fds: i32) -> Self {
         self.preserve_fds = preserved_fds;
         self
+    }
+    /// Sets the number of additional file descriptors which will be passed into
+    /// the container process.
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use libcontainer::container::builder::ContainerBuilder;
+    /// # use libcontainer::syscall::syscall::create_syscall;
+    /// # use libcontainer::workload::default::DefaultExecutor;
+    ///
+    /// ContainerBuilder::new(
+    ///     "74f1a4cb3801".to_owned(),
+    ///     create_syscall().as_ref(),
+    /// )
+    /// .with_executor(vec![Box::<DefaultExecutor>::default()]);
+    /// ```
+    pub fn with_executor(mut self, executors: Vec<Box<dyn Executor>>) -> Result<Self> {
+        if executors.is_empty() {
+            bail!("executors must not be empty");
+        };
+        self.executor_manager = ExecutorManager { executors };
+        Ok(self)
     }
 }
 
@@ -259,7 +273,6 @@ mod tests {
     use crate::container::builder::ContainerBuilder;
     use crate::syscall::syscall::create_syscall;
     use crate::utils::TempDir;
-    use crate::workload::default::DefaultExecutor;
     use anyhow::{Context, Result};
     use std::path::PathBuf;
 
@@ -269,66 +282,42 @@ mod tests {
         let pid_file_temp_dir = TempDir::new("pid_file").context("failed to create temp dir")?;
         let syscall = create_syscall();
 
-        ContainerBuilder::new(
-            "74f1a4cb3801".to_owned(),
-            syscall.as_ref(),
-            vec![Box::<DefaultExecutor>::default()],
-        )
-        .with_root_path(root_path_temp_dir.path())?
-        .with_pid_file(Some(pid_file_temp_dir.path()))?
-        .with_console_socket(Some("/var/run/docker/sock.tty"))
-        .as_init("/var/run/docker/bundle");
+        ContainerBuilder::new("74f1a4cb3801".to_owned(), syscall.as_ref())
+            .with_root_path(root_path_temp_dir.path())?
+            .with_pid_file(Some(pid_file_temp_dir.path()))?
+            .with_console_socket(Some("/var/run/docker/sock.tty"))
+            .as_init("/var/run/docker/bundle");
 
         // accept None pid file.
-        ContainerBuilder::new(
-            "74f1a4cb3801".to_owned(),
-            syscall.as_ref(),
-            vec![Box::<DefaultExecutor>::default()],
-        )
-        .with_pid_file::<PathBuf>(None)?;
+        ContainerBuilder::new("74f1a4cb3801".to_owned(), syscall.as_ref())
+            .with_pid_file::<PathBuf>(None)?;
 
         // accept absolute root path which does not exist
         let abs_root_path = PathBuf::from("/not/existing/path");
-        let path_builder = ContainerBuilder::new(
-            "74f1a4cb3801".to_owned(),
-            syscall.as_ref(),
-            vec![Box::<DefaultExecutor>::default()],
-        )
-        .with_root_path(&abs_root_path)
-        .context("build container")?;
+        let path_builder = ContainerBuilder::new("74f1a4cb3801".to_owned(), syscall.as_ref())
+            .with_root_path(&abs_root_path)
+            .context("build container")?;
         assert_eq!(path_builder.root_path, abs_root_path);
 
         // accept relative root path which does not exist
         let cwd = std::env::current_dir().context("get current dir")?;
-        let path_builder = ContainerBuilder::new(
-            "74f1a4cb3801".to_owned(),
-            syscall.as_ref(),
-            vec![Box::<DefaultExecutor>::default()],
-        )
-        .with_root_path("./not/existing/path")
-        .context("build container")?;
+        let path_builder = ContainerBuilder::new("74f1a4cb3801".to_owned(), syscall.as_ref())
+            .with_root_path("./not/existing/path")
+            .context("build container")?;
         assert_eq!(path_builder.root_path, cwd.join("not/existing/path"));
 
         // accept absolute pid path which does not exist
         let abs_pid_path = PathBuf::from("/not/existing/path");
-        let path_builder = ContainerBuilder::new(
-            "74f1a4cb3801".to_owned(),
-            syscall.as_ref(),
-            vec![Box::<DefaultExecutor>::default()],
-        )
-        .with_pid_file(Some(&abs_pid_path))
-        .context("build container")?;
+        let path_builder = ContainerBuilder::new("74f1a4cb3801".to_owned(), syscall.as_ref())
+            .with_pid_file(Some(&abs_pid_path))
+            .context("build container")?;
         assert_eq!(path_builder.pid_file, Some(abs_pid_path));
 
         // accept relative pid path which does not exist
         let cwd = std::env::current_dir().context("get current dir")?;
-        let path_builder = ContainerBuilder::new(
-            "74f1a4cb3801".to_owned(),
-            syscall.as_ref(),
-            vec![Box::<DefaultExecutor>::default()],
-        )
-        .with_pid_file(Some("./not/existing/path"))
-        .context("build container")?;
+        let path_builder = ContainerBuilder::new("74f1a4cb3801".to_owned(), syscall.as_ref())
+            .with_pid_file(Some("./not/existing/path"))
+            .context("build container")?;
         assert_eq!(path_builder.pid_file, Some(cwd.join("not/existing/path")));
 
         Ok(())
@@ -338,44 +327,20 @@ mod tests {
     fn test_validate_id() -> Result<()> {
         let syscall = create_syscall();
         // validate container_id
-        let result = ContainerBuilder::new(
-            "$#".to_owned(),
-            syscall.as_ref(),
-            vec![Box::new(DefaultExecutor::default())],
-        )
-        .validate_id();
+        let result = ContainerBuilder::new("$#".to_owned(), syscall.as_ref()).validate_id();
         assert!(result.is_err());
 
-        let result = ContainerBuilder::new(
-            ".".to_owned(),
-            syscall.as_ref(),
-            vec![Box::new(DefaultExecutor::default())],
-        )
-        .validate_id();
+        let result = ContainerBuilder::new(".".to_owned(), syscall.as_ref()).validate_id();
         assert!(result.is_err());
 
-        let result = ContainerBuilder::new(
-            "..".to_owned(),
-            syscall.as_ref(),
-            vec![Box::new(DefaultExecutor::default())],
-        )
-        .validate_id();
+        let result = ContainerBuilder::new("..".to_owned(), syscall.as_ref()).validate_id();
         assert!(result.is_err());
 
-        let result = ContainerBuilder::new(
-            "...".to_owned(),
-            syscall.as_ref(),
-            vec![Box::new(DefaultExecutor::default())],
-        )
-        .validate_id();
+        let result = ContainerBuilder::new("...".to_owned(), syscall.as_ref()).validate_id();
         assert!(result.is_ok());
 
-        let result = ContainerBuilder::new(
-            "74f1a4cb3801".to_owned(),
-            syscall.as_ref(),
-            vec![Box::new(DefaultExecutor::default())],
-        )
-        .validate_id();
+        let result =
+            ContainerBuilder::new("74f1a4cb3801".to_owned(), syscall.as_ref()).validate_id();
         assert!(result.is_ok());
         Ok(())
     }

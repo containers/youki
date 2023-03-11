@@ -442,7 +442,7 @@ pub fn container_init_process(
 
     if proc.args().is_some() {
         args.executor_manager.exec(spec)?;
-        unreachable!("process image should have been replaced after exec");
+        unreachable!("should not be back here");
     } else {
         bail!("on non-Windows, at least one process arg entry is required")
     }

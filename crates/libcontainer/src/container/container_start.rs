@@ -22,7 +22,6 @@ impl Container {
     /// let mut container = ContainerBuilder::new(
     ///     "74f1a4cb3801".to_owned(),
     ///     create_syscall().as_ref(),
-    ///     vec![Box::new(DefaultExecutor::default())],
     /// )
     /// .as_init("/var/run/docker/bundle")
     /// .build()?;

@@ -36,6 +36,6 @@ pub struct ContainerArgs<'a> {
     pub cgroup_manager: Box<dyn CgroupManager>,
     /// If the container is to be run in detached mode
     pub detached: bool,
-    /// TODO: Comment
+    /// Manage the functions that actually run on the container
     pub executor_manager: &'a ExecutorManager,
 }
