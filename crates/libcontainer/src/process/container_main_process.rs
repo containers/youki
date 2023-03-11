@@ -1,9 +1,6 @@
 use crate::{
     container::ContainerProcessState,
-    process::{
-        args::{ContainerArgs, ContainerType},
-        channel, container_intermediate_process, fork,
-    },
+    process::{args::ContainerArgs, channel, container_intermediate_process, fork},
     rootless::Rootless,
     seccomp, utils,
 };
@@ -18,10 +15,10 @@ use nix::{
 use oci_spec::runtime;
 use std::{io::IoSlice, path::Path};
 
-pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, Pid)> {
+pub fn container_main_process(container_args: &ContainerArgs) -> Result<Pid> {
     // We use a set of channels to communicate between parent and child process.
     // Each channel is uni-directional. Because we will pass these channel to
-    // forked process, we have to be deligent about closing any unused channel.
+    // cloned process, we have to be deligent about closing any unused channel.
     // At minimum, we have to close down any unused senders. The corresponding
     // receivers will be cleaned up once the senders are closed down.
     let (main_sender, main_receiver) = &mut channel::main_channel()?;
@@ -29,27 +26,16 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, Pi
     let init_chan = &mut channel::init_channel()?;
 
     let intermediate_pid = fork::container_fork(|| {
-        let container_pid = container_intermediate_process::container_intermediate_process(
+        container_intermediate_process::container_intermediate_process(
             container_args,
             inter_chan,
             init_chan,
             main_sender,
         )?;
 
-        if matches!(
-            container_args.container_type,
-            ContainerType::TenantContainer { exec_notify_fd: _ }
-        ) && !container_args.detached
-        {
-            match waitpid(container_pid, None)? {
-                WaitStatus::Exited(_, s) => Ok(s),
-                WaitStatus::Signaled(_, sig, _) => Ok(sig as i32),
-                _ => Ok(0),
-            }
-        } else {
-            Ok(0)
-        }
+        Ok(0)
     })?;
+
     // Close down unused fds. The corresponding fds are duplicated to the
     // child process during fork.
     main_sender
@@ -110,13 +96,22 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, Pi
 
     log::debug!("init pid is {:?}", init_pid);
 
-    // here we send both intermediate and init pid, because :
-    // init pid is required for writing it to pid_file (if) given by the high-level runtime
-    // intermediate pid is required in the case when we call exec, as we need to wait for the
-    // intermediate process to exit, which itself waits for child process (the exec process) to exit
-    // in order to get the proper exit code. We cannot simply wait for the init_pid , that is the actual container
-    // process, as it is not (direct) child of our process
-    Ok((intermediate_pid, init_pid))
+    // Before the main process returns, we want to make sure the intermediate
+    // process is exit and reaped. By this point, the intermediate process
+    // should already exited successfully. If intermediate process errors out,
+    // the `init_ready` will not be sent.
+    match waitpid(intermediate_pid, None)? {
+        WaitStatus::Exited(_, 0) => (),
+        WaitStatus::Exited(_, s) => {
+            log::warn!("intermediate process failed with exit status: {s}");
+        }
+        WaitStatus::Signaled(_, sig, _) => {
+            log::warn!("intermediate process killed with signal: {sig}")
+        }
+        _ => (),
+    };
+
+    Ok(init_pid)
 }
 
 fn sync_seccomp(

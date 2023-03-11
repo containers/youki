@@ -84,12 +84,18 @@ pub fn container_intermediate_process(
             .with_context(|| format!("failed to enter pid namespace: {pid_namespace:?}"))?;
     }
 
-    // We have to record the pid of the child (container init process), since
-    // the child will be inside the pid namespace. We can't rely on child_ready
-    // to send us the correct pid.
-    let pid = fork::container_fork(|| {
-        // We are inside the forked process here. The first thing we have to do is to close
-        // any unused senders, since fork will make a dup for all the socket.
+    // We have to record the pid of the init process. The init process will be
+    // inside the pid namespace, so we can't rely on the init process to send us
+    // the correct pid. We also want to clone the init process as a sibling
+    // process to the intermediate process. The intermediate process is only
+    // used as a jumping board to set the init process to the correct
+    // configuration. The youki main process can decide what to do with the init
+    // process and the intermediate process can just exit safely after the job
+    // is done.
+    let pid = fork::container_clone_sibling(|| {
+        // We are inside the forked process here. The first thing we have to do
+        // is to close any unused senders, since fork will make a dup for all
+        // the socket.
         init_sender
             .close()
             .context("failed to close receiver in init process")?;
@@ -109,7 +115,7 @@ pub fn container_intermediate_process(
         }
     })?;
 
-    // close the  exec_notify_fd in this process
+    // Close the exec_notify_fd in this process
     if let ContainerType::TenantContainer { exec_notify_fd } = args.container_type {
         close(exec_notify_fd)?;
     }
