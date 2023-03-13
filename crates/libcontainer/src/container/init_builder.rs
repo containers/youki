@@ -94,6 +94,7 @@ impl<'a> InitContainerBuilder<'a> {
             // given. For now, set the detached to true because this is what
             // `youki create` defaults to.
             detached: true,
+            executor_manager: self.base.executor_manager,
         };
 
         // TODO: Fix waiting on this pid (init process) when detached = false.

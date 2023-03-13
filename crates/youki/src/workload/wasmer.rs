@@ -3,14 +3,15 @@ use oci_spec::runtime::Spec;
 use wasmer::{Instance, Module, Store};
 use wasmer_wasi::WasiState;
 
-use super::{Executor, EMPTY};
+use libcontainer::workload::{Executor, EMPTY};
 
 const EXECUTOR_NAME: &str = "wasmer";
 
+#[derive(Default)]
 pub struct WasmerExecutor {}
 
 impl Executor for WasmerExecutor {
-    fn exec(spec: &Spec) -> Result<()> {
+    fn exec(&self, spec: &Spec) -> Result<()> {
         log::debug!("Executing workload with wasmer handler");
         let process = spec.process().as_ref();
 
@@ -62,7 +63,7 @@ impl Executor for WasmerExecutor {
         Ok(())
     }
 
-    fn can_handle(spec: &Spec) -> Result<bool> {
+    fn can_handle(&self, spec: &Spec) -> Result<bool> {
         if let Some(annotations) = spec.annotations() {
             if let Some(handler) = annotations.get("run.oci.handler") {
                 return Ok(handler == "wasm");
@@ -76,7 +77,7 @@ impl Executor for WasmerExecutor {
         Ok(false)
     }
 
-    fn name() -> &'static str {
+    fn name(&self) -> &'static str {
         EXECUTOR_NAME
     }
 }
@@ -96,7 +97,9 @@ mod tests {
             .build()
             .context("build spec")?;
 
-        assert!(WasmerExecutor::can_handle(&spec).context("can handle")?);
+        assert!(WasmerExecutor::default()
+            .can_handle(&spec)
+            .context("can handle")?);
 
         Ok(())
     }
@@ -110,7 +113,9 @@ mod tests {
             .build()
             .context("build spec")?;
 
-        assert!(WasmerExecutor::can_handle(&spec).context("can handle")?);
+        assert!(WasmerExecutor::default()
+            .can_handle(&spec)
+            .context("can handle")?);
 
         Ok(())
     }
@@ -119,7 +124,9 @@ mod tests {
     fn test_can_handle_no_execute() -> Result<()> {
         let spec = SpecBuilder::default().build().context("build spec")?;
 
-        assert!(!WasmerExecutor::can_handle(&spec).context("can handle")?);
+        assert!(!WasmerExecutor::default()
+            .can_handle(&spec)
+            .context("can handle")?);
 
         Ok(())
     }

@@ -1,7 +1,6 @@
 use super::args::{ContainerArgs, ContainerType};
 use crate::apparmor;
 use crate::syscall::Syscall;
-use crate::workload::ExecutorManager;
 use crate::{
     capabilities, hooks, namespaces::Namespaces, process::channel, rootfs::RootFS,
     rootless::Rootless, seccomp, tty, utils,
@@ -442,7 +441,8 @@ pub fn container_init_process(
     }
 
     if proc.args().is_some() {
-        ExecutorManager::exec(spec)
+        args.executor_manager.exec(spec)?;
+        unreachable!("should not be back here");
     } else {
         bail!("on non-Windows, at least one process arg entry is required")
     }

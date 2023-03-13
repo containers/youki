@@ -5,13 +5,15 @@ use wasmedge_sdk::{
     params, Vm,
 };
 
-use super::Executor;
+use libcontainer::workload::Executor;
 
 const EXECUTOR_NAME: &str = "wasmedge";
 
+#[derive(Default)]
 pub struct WasmEdgeExecutor {}
+
 impl Executor for WasmEdgeExecutor {
-    fn exec(spec: &Spec) -> Result<()> {
+    fn exec(&self, spec: &Spec) -> Result<()> {
         // parse wasi parameters
         let args = get_args(spec);
         let mut cmd = args[0].clone();
@@ -46,7 +48,7 @@ impl Executor for WasmEdgeExecutor {
         Ok(())
     }
 
-    fn can_handle(spec: &Spec) -> Result<bool> {
+    fn can_handle(&self, spec: &Spec) -> Result<bool> {
         if let Some(annotations) = spec.annotations() {
             if let Some(handler) = annotations.get("run.oci.handler") {
                 return Ok(handler == "wasm");
@@ -60,7 +62,7 @@ impl Executor for WasmEdgeExecutor {
         Ok(false)
     }
 
-    fn name() -> &'static str {
+    fn name(&self) -> &'static str {
         EXECUTOR_NAME
     }
 }
