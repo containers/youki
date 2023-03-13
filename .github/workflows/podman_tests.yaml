@@ -1,3 +1,5 @@
+name: Test for podman
+
 on:
   schedule:
   - cron: "0 0 * * *"
@@ -11,6 +13,8 @@ jobs:
         run: ./.github/scripts/dependency.sh
       - run: make youki-dev
       - run: sudo cp youki /usr/local/bin
+      - name: Install requirements for Podman
+        run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev libseccomp-dev libgpgme-dev bats
       - name: Clone podman repository
         uses: actions/checkout@v3
         with:
