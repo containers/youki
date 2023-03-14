@@ -67,7 +67,7 @@ pub fn create_syscall() -> Box<dyn Syscall> {
 }
 
 bitflags! {
-pub struct CloseRange : usize {
+pub struct CloseRange : u32 {
     const NONE = 0b00000000;
     const UNSHARE = 0b00000010;
     const CLOEXEC = 0b00000100;
