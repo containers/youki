@@ -20,4 +20,7 @@ pub struct Run {
     /// name of the container instance to be started
     #[clap(value_parser = clap::builder::NonEmptyStringValueParser::new(), required = true)]
     pub container_id: String,
+    /// Detach from the container process
+    #[clap(short, long)]
+    pub detach: bool,
 }

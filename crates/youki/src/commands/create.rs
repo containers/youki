@@ -23,6 +23,7 @@ pub fn create(args: Create, root_path: PathBuf, systemd_cgroup: bool) -> Result<
         .validate_id()?
         .as_init(&args.bundle)
         .with_systemd(systemd_cgroup)
+        .with_detach(true)
         .build()?;
 
     Ok(())

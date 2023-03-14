@@ -22,15 +22,15 @@ impl NotifyListener {
         // and chdir back after the socket is created.
         let workdir = socket_path.parent().unwrap();
         let socket_name = socket_path.file_name().unwrap();
-        let cwd = unistd::getcwd().context("Failed to get cwd")?;
+        let cwd = unistd::getcwd().context("failed to get cwd")?;
         unistd::chdir(workdir).context(format!(
-            "Failed to chdir into {}",
+            "failed to chdir into {}",
             workdir.to_str().unwrap()
         ))?;
         let stream = UnixListener::bind(socket_name)
-            .context(format!("Failed to bind {}", socket_name.to_str().unwrap()))?;
+            .context(format!("failed to bind {}", socket_name.to_str().unwrap()))?;
         unistd::chdir(&cwd)
-            .context(format!("Failed to chdir back to {}", cwd.to_str().unwrap()))?;
+            .context(format!("failed to chdir back to {}", cwd.to_str().unwrap()))?;
 
         Ok(Self { socket: stream })
     }
