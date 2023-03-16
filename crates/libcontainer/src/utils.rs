@@ -556,10 +556,12 @@ mod tests {
     #[test]
     fn test_is_executable() {
         let executable_path = PathBuf::from("/bin/sh");
-        let directory_path = PathBuf::from("/tmp");
-        // a file guaranteed to be on linux and not executable
-        let non_executable_path = PathBuf::from("/boot/initrd.img");
+        let directory_path =
+            create_temp_dir("test_is_executable").expect("create temp directory for test");
+        let non_executable_path = directory_path.join("non_executable_file");
         let non_existent_path = PathBuf::from("/some/non/existent/path");
+
+        File::create(non_executable_path.as_path()).unwrap();
 
         assert!(is_executable(&non_existent_path).is_err());
         assert!(is_executable(&executable_path).unwrap());
