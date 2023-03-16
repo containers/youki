@@ -109,7 +109,10 @@ fn handle_foreground(init_pid: Pid) -> Result<i32> {
 mod tests {
     use std::time::Duration;
 
-    use nix::{sys::{wait, signal::Signal::SIGKILL}, unistd};
+    use nix::{
+        sys::{signal::Signal::SIGKILL, wait},
+        unistd,
+    };
 
     use super::*;
 
@@ -169,7 +172,7 @@ mod tests {
         // The setup is similar to `handle_foreground`, but instead of
         // forwarding signal, the container init process will exit. Again, we
         // use `sleep` to simulate the conditions to aovid fine grained
-        // synchronization for now. 
+        // synchronization for now.
         match unsafe { unistd::fork()? } {
             unistd::ForkResult::Parent { child } => {
                 // Inside P0
