@@ -104,3 +104,94 @@ fn handle_foreground(init_pid: Pid) -> Result<i32> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use nix::{sys::{wait, signal::Signal::SIGKILL}, unistd};
+
+    use super::*;
+
+    #[test]
+    fn test_foreground_forward_sigkill() -> Result<()> {
+        // To set up the test correctly, we need to run the test in dedicated
+        // process, so the rust unit test runtime and other unit tests will not
+        // mess with the signal handling. We use `sigkill` as a simple way to
+        // make sure the signal is properly forwarded. In this test, P0 is the
+        // rust process that runs this unit test (in a thread). P1 mocks youki
+        // main and P2 mocks the container init process
+        match unsafe { unistd::fork()? } {
+            unistd::ForkResult::Parent { child } => {
+                // Inside P0
+                //
+                // We need to make sure that the child process has entered into
+                // the signal forwarding loops. There is no way to 100% sync
+                // that the child has executed the for loop waiting to forward
+                // the signal. There are sync mechanisms with condvar or
+                // channels to make it as close to calling the handle_foreground
+                // function as possible, but still have a tiny (highly unlikely
+                // but probable) window that a race can still happen. So instead
+                // we just wait for 1 second for everything to settle. In
+                // general, I don't like sleep in tests to avoid race condition,
+                // but I'd rather not over-engineer this now. We can revisit
+                // this later if the test becomes flaky.
+                std::thread::sleep(Duration::from_secs(1));
+                // Send the `sigkill` signal to P1 who will forward the signal
+                // to P2. P2 will then exit and send a sigchld to P1. P1 will
+                // then reap P2 and exits. In P0, we can then reap P1.
+                kill(child, SIGKILL)?;
+                wait::waitpid(child, None)?;
+            }
+            unistd::ForkResult::Child => {
+                // Inside P1. Fork P2 as mock container init process and run
+                // signal handler process inside.
+                match unsafe { unistd::fork()? } {
+                    unistd::ForkResult::Parent { child } => {
+                        // Inside P1.
+                        handle_foreground(child)?;
+                    }
+                    unistd::ForkResult::Child => {
+                        // Inside P2. This process block and waits the `sigkill`
+                        // from the parent. Use thread::sleep here with a long
+                        // duration to minimic blocking forever.
+                        std::thread::sleep(Duration::from_secs(3600));
+                    }
+                };
+            }
+        };
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_foreground_exit() -> Result<()> {
+        // The setup is similar to `handle_foreground`, but instead of
+        // forwarding signal, the container init process will exit. Again, we
+        // use `sleep` to simulate the conditions to aovid fine grained
+        // synchronization for now. 
+        match unsafe { unistd::fork()? } {
+            unistd::ForkResult::Parent { child } => {
+                // Inside P0
+                std::thread::sleep(Duration::from_secs(1));
+                wait::waitpid(child, None)?;
+            }
+            unistd::ForkResult::Child => {
+                // Inside P1. Fork P2 as mock container init process and run
+                // signal handler process inside.
+                match unsafe { unistd::fork()? } {
+                    unistd::ForkResult::Parent { child } => {
+                        // Inside P1.
+                        handle_foreground(child)?;
+                    }
+                    unistd::ForkResult::Child => {
+                        // Inside P2. The process exits after 1 second.
+                        std::thread::sleep(Duration::from_secs(1));
+                    }
+                };
+            }
+        };
+
+        Ok(())
+    }
+}
