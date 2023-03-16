@@ -1,5 +1,5 @@
 use anyhow::{bail, Context, Result};
-use nix::unistd::{self};
+use nix::unistd;
 use oci_spec::runtime::Spec;
 use rootless::Rootless;
 use std::{

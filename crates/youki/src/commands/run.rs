@@ -46,6 +46,10 @@ pub fn run(args: Run, root_path: PathBuf, systemd_cgroup: bool) -> Result<i32> {
     handle_foreground(container.pid().unwrap())
 }
 
+// handle_foreground will match the `runc` behavior running the foreground mode.
+// The youki main process will wait and reap the container init process. The
+// youki main process also forwards most of the signals to the container init
+// process.
 fn handle_foreground(init_pid: Pid) -> Result<i32> {
     // We mask all signals here and forward most of the signals to the container
     // init process.
