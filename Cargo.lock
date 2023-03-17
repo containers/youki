@@ -221,9 +221,9 @@ dependencies = [
 
 [[package]]
 name = "cap-primitives"
-version = "1.0.5"
+version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9554a7698c8db4b7777f01b2237de111c5ecea169efb1190004d9069ceb289aa"
+checksum = "140f0d0d968143f4d23cd2958ccae53e3b336d7362920af268205b8593718933"
 dependencies = [
  "ambient-authority",
  "fs-set-times",
