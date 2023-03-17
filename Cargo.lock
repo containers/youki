@@ -160,9 +160,9 @@ checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
 name = "bitflags"
-version = "2.0.0"
+version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4f6e5df9abedba5099a01a6567c6086a6fbcff57af07c360d356737f9e0c644"
+checksum = "d5dd14596c0e5b954530d0e6f1fd99b89c03e313aa2086e8da4303701a09e1cf"
 
 [[package]]
 name = "block-buffer"
@@ -1624,7 +1624,7 @@ name = "libcontainer"
 version = "0.0.4"
 dependencies = [
  "anyhow",
- "bitflags 2.0.0",
+ "bitflags 2.0.1",
  "caps",
  "chrono",
  "clone3",
