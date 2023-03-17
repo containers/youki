@@ -21,6 +21,7 @@ pub struct InitContainerBuilder<'a> {
     base: ContainerBuilder<'a>,
     bundle: PathBuf,
     use_systemd: bool,
+    detached: bool,
 }
 
 impl<'a> InitContainerBuilder<'a> {
@@ -31,12 +32,18 @@ impl<'a> InitContainerBuilder<'a> {
             base: builder,
             bundle,
             use_systemd: true,
+            detached: true,
         }
     }
 
     /// Sets if systemd should be used for managing cgroups
     pub fn with_systemd(mut self, should_use: bool) -> Self {
         self.use_systemd = should_use;
+        self
+    }
+
+    pub fn with_detach(mut self, detached: bool) -> Self {
+        self.detached = detached;
         self
     }
 
@@ -90,15 +97,11 @@ impl<'a> InitContainerBuilder<'a> {
             notify_path,
             container: Some(container.clone()),
             preserve_fds: self.base.preserve_fds,
-            // TODO: This should be set properly based on how the command is
-            // given. For now, set the detached to true because this is what
-            // `youki create` defaults to.
-            detached: true,
+            detached: self.detached,
             executor_manager: self.base.executor_manager,
         };
 
-        // TODO: Fix waiting on this pid (init process) when detached = false.
-        let _pid = builder_impl.create()?;
+        builder_impl.create()?;
 
         container.refresh_state()?;
 
