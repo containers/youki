@@ -20,7 +20,7 @@ cgroupsv2_devices = ["libcgroups/cgroupsv2_devices"]
 
 [dependencies]
 anyhow = "1.0"
-bitflags = "2.0.0"
+bitflags = "2.0.1"
 caps = "0.5.5"
 chrono = { version = "0.4", features = ["serde"] }
 crossbeam-channel = "0.5"
