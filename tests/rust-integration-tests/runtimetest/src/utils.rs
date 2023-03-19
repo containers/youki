@@ -1,6 +1,8 @@
 use nix::sys::stat::stat;
 use nix::sys::stat::SFlag;
 use std::fs;
+use std::fs::metadata;
+use std::fs::symlink_metadata;
 use std::os::unix::prelude::MetadataExt;
 use std::path::PathBuf;
 use std::process::Command;
@@ -400,4 +402,48 @@ pub fn test_mount_rstrictatime_option(path: &str) -> Result<(), std::io::Error> 
         ));
     }
     Ok(())
+}
+
+pub fn test_mount_rnosymfollow_option(path: &str) -> Result<(), std::io::Error> {
+    let path = format!("{}/{}", path, "link");
+    let metadata = match symlink_metadata(path.clone()) {
+        Ok(metadata) => metadata,
+        Err(e) => {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("get file symlink_metadata err {path:?}, {e}"),
+            ));
+        }
+    };
+    // check symbolic is followed
+    if metadata.file_type().is_symlink() && metadata.mode() & 0o777 == 0o777 {
+        Ok(())
+    } else {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("get file symlink_metadata err {path:?}"),
+        ))
+    }
+}
+
+pub fn test_mount_rsuid_option(path: &str) -> Result<(), std::io::Error> {
+    let path = PathBuf::from(path).join("file");
+
+    let metadata = match metadata(path.clone()) {
+        Ok(metadata) => metadata,
+        Err(e) => {
+            return Err(std::io::Error::new(std::io::ErrorKind::Other, e));
+        }
+    };
+    // check suid and sgid
+    let suid = metadata.mode() & 0o4000 == 0o4000;
+    let sgid = metadata.mode() & 0o2000 == 0o2000;
+    println!("suid: {suid:?},sgid: {sgid:?}");
+    if suid && sgid {
+        return Ok(());
+    }
+    return Err(std::io::Error::new(
+        std::io::ErrorKind::Other,
+        format!("rsuid error {path:?}"),
+    ));
 }
