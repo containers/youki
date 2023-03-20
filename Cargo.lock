@@ -248,9 +248,9 @@ dependencies = [
 
 [[package]]
 name = "cap-std"
-version = "1.0.5"
+version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7b68a8ac703cc7bed0a46666a04b386cca214844897a69f599dcd82ea59422c"
+checksum = "2139a25a1568af991f921198c13d30e5ddfacd06967707841905366aee257e0a"
 dependencies = [
  "cap-primitives",
  "io-extras",
