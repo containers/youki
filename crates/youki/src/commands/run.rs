@@ -1,9 +1,14 @@
-use std::path::PathBuf;
+use std::{
+    fs::OpenOptions,
+    os::{fd::AsRawFd, unix::prelude::OpenOptionsExt},
+    path::PathBuf,
+};
 
 use anyhow::{Context, Result};
 use libcontainer::{container::builder::ContainerBuilder, syscall::syscall::create_syscall};
 use liboci_cli::Run;
 use nix::{
+    libc,
     sys::{
         signal::{self, kill},
         signalfd::SigSet,
@@ -43,16 +48,18 @@ pub fn run(args: Run, root_path: PathBuf, systemd_cgroup: bool) -> Result<i32> {
         container.pid().is_some(),
         "expects a container init pid in the container state"
     );
-    handle_foreground(container.pid().unwrap())
+    let console_socket: Option<PathBuf> = args.console_socket.as_ref().map(|p| p.into());
+    handle_foreground(container.pid().unwrap(), console_socket)
 }
 
 // handle_foreground will match the `runc` behavior running the foreground mode.
 // The youki main process will wait and reap the container init process. The
 // youki main process also forwards most of the signals to the container init
 // process.
-fn handle_foreground(init_pid: Pid) -> Result<i32> {
+fn handle_foreground(init_pid: Pid, socket_path: Option<PathBuf>) -> Result<i32> {
     // We mask all signals here and forward most of the signals to the container
     // init process.
+    resize(socket_path.as_ref())?;
     let signal_set = SigSet::all();
     signal_set
         .thread_set_mask()
@@ -94,9 +101,7 @@ fn handle_foreground(init_pid: Pid) -> Result<i32> {
                 // In `runc`, SIGURG is used by go runtime and should not be forwarded to
                 // the container process. Here, we just ignore the signal.
             }
-            signal::SIGWINCH => {
-                // TODO: resize the terminal
-            }
+            signal::SIGWINCH => resize(socket_path.as_ref())?,
             signal => {
                 // There is nothing we can do if we fail to forward the signal.
                 let _ = kill(init_pid, Some(signal));
@@ -105,12 +110,50 @@ fn handle_foreground(init_pid: Pid) -> Result<i32> {
     }
 }
 
+fn resize(socket_path: Option<&PathBuf>) -> Result<()> {
+    // from /dev/tty file get current termios winsize
+    let tty_file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .custom_flags(libc::O_RDWR | libc::O_NOCTTY | libc::O_CLOEXEC)
+        .open(PathBuf::from("/dev/tty"))?;
+
+    let mut ws = nix::pty::Winsize {
+        ws_row: 0,
+        ws_col: 0,
+        ws_xpixel: 0,
+        ws_ypixel: 0,
+    };
+    let ret = unsafe { libc::ioctl(tty_file.as_raw_fd(), libc::TIOCGWINSZ, &mut ws) };
+    if ret != 0 {
+        return Err(anyhow::format_err!(std::io::Error::last_os_error()));
+    }
+    log::debug!("winsize is {:?},socket_path is {:?}", ws, socket_path);
+
+    // get socket_file file fd to set socket_file termios winsize
+    // let path = socket_path.unwrap();
+    if let Some(path) = socket_path {
+        let socket_file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .custom_flags(libc::O_RDWR | libc::O_NOCTTY | libc::O_CLOEXEC)
+            .open(path)?;
+        let ret = unsafe { libc::ioctl(socket_file.as_raw_fd(), libc::TIOCSWINSZ, &ws) };
+        if ret != 0 {
+            return Err(anyhow::format_err!(std::io::Error::last_os_error()));
+        }
+    } else {
+        log::warn!("socket_path is none");
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
 
     use nix::{
-        sys::{signal::Signal::SIGKILL, wait},
+        sys::{signal::Signal::SIGKILL, signal::Signal::SIGWINCH, wait},
         unistd,
     };
 
@@ -152,7 +195,7 @@ mod tests {
                 match unsafe { unistd::fork()? } {
                     unistd::ForkResult::Parent { child } => {
                         // Inside P1.
-                        handle_foreground(child)?;
+                        handle_foreground(child, None)?;
                     }
                     unistd::ForkResult::Child => {
                         // Inside P2. This process block and waits the `sigkill`
@@ -185,7 +228,39 @@ mod tests {
                 match unsafe { unistd::fork()? } {
                     unistd::ForkResult::Parent { child } => {
                         // Inside P1.
-                        handle_foreground(child)?;
+                        handle_foreground(child, None)?;
+                    }
+                    unistd::ForkResult::Child => {
+                        // Inside P2. The process exits after 1 second.
+                        std::thread::sleep(Duration::from_secs(1));
+                    }
+                };
+            }
+        };
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_foreground_sigwatch() -> Result<()> {
+        // The setup is similar to `handle_foreground`, but instead of
+        // forwarding signal, the container init process will exit. Again, we
+        // use `sleep` to simulate the conditions to aovid fine grained
+        // synchronization for now.
+        match unsafe { unistd::fork()? } {
+            unistd::ForkResult::Parent { child } => {
+                // Inside P0
+                std::thread::sleep(Duration::from_secs(1));
+                kill(child, SIGWINCH)?;
+                wait::waitpid(child, None)?;
+            }
+            unistd::ForkResult::Child => {
+                // Inside P1. Fork P2 as mock container init process and run
+                // signal handler process inside.
+                match unsafe { unistd::fork()? } {
+                    unistd::ForkResult::Parent { child } => {
+                        // Inside P1.
+                        handle_foreground(child, None)?;
                     }
                     unistd::ForkResult::Child => {
                         // Inside P2. The process exits after 1 second.
