@@ -31,14 +31,44 @@ impl Container {
     pub fn delete(&mut self, force: bool) -> Result<()> {
         self.refresh_status()
             .context("failed to refresh container status")?;
-        if self.can_kill() && force {
-            self.do_kill(signal::Signal::SIGKILL, true)?;
-            self.set_status(ContainerStatus::Stopped).save()?;
-        }
+
         log::debug!("container status: {:?}", self.status());
-        if self.can_delete() {
-            if self.root.exists() {
-                if let Ok(config) = YoukiConfig::load(&self.root) {
+
+        // Check if container is allowed to be deleted based on container status.
+        match self.status() {
+            ContainerStatus::Stopped => {}
+            ContainerStatus::Created => {
+                // Here, we differ from the OCI spec, but matches the same
+                // behavior as `runc` and `crun`. The OCI spec does not allow
+                // deletion of status `created` without `force` flag. But both
+                // `runc` and `crun` allows deleting `created`. Therefore we
+                // decided to follow `runc` and `crun`.
+                self.do_kill(signal::Signal::SIGKILL, true)?;
+                self.set_status(ContainerStatus::Stopped).save()?;
+            }
+            ContainerStatus::Creating | ContainerStatus::Running | ContainerStatus::Paused => {
+                // Containers can't be deleted while in these status, unless
+                // force flag is set. In the force case, we need to clean up any
+                // processes associated with containers.
+                if force {
+                    self.do_kill(signal::Signal::SIGKILL, true)?;
+                    self.set_status(ContainerStatus::Stopped).save()?;
+                } else {
+                    bail!(
+                        "{} could not be deleted because it was {:?}",
+                        self.id(),
+                        self.status()
+                    )
+                }
+            }
+        }
+
+        // Once reached here, the container is verified that it can be deleted.
+        debug_assert!(self.status().can_delete());
+
+        if self.root.exists() {
+            match YoukiConfig::load(&self.root) {
+                Ok(config) => {
                     log::debug!("config: {:?}", config);
 
                     // remove the cgroup created for the container
@@ -62,20 +92,22 @@ impl Container {
                             .with_context(|| "failed to run post stop hooks")?;
                     }
                 }
-
-                // remove the directory storing container state
-                log::debug!("remove dir {:?}", self.root);
-                fs::remove_dir_all(&self.root).with_context(|| {
-                    format!("failed to remove container dir {}", self.root.display())
-                })?;
+                Err(err) => {
+                    // There is a brief window where the container state is
+                    // created, but the container config is not yet generated
+                    // from the OCI spec. In this case, we assume as if we
+                    // successfully deleted the config and moving on.
+                    log::warn!("skipping loading youki config due to: {err:?}, continue to delete");
+                }
             }
-            Ok(())
-        } else {
-            bail!(
-                "{} could not be deleted because it was {:?}",
-                self.id(),
-                self.status()
-            )
+
+            // remove the directory storing container state
+            log::debug!("remove dir {:?}", self.root);
+            fs::remove_dir_all(&self.root).with_context(|| {
+                format!("failed to remove container dir {}", self.root.display())
+            })?;
         }
+
+        Ok(())
     }
 }

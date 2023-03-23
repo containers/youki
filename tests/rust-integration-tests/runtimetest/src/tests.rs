@@ -233,6 +233,20 @@ pub fn validate_mounts_recursive(spec: &Spec) {
                                 eprintln!("path expected to be rstrictatime, found not rstrictatime, error: {e}");
                             }
                         }
+                        "rnosymfollow" => {
+                            if let Err(e) = utils::test_mount_rnosymfollow_option(
+                                mount.destination().to_str().unwrap(),
+                            ) {
+                                eprintln!("path expected to be rnosymfollow, found not rnosymfollow, error: {e}");
+                            }
+                        }
+                        "rsuid" => {
+                            if let Err(e) = utils::test_mount_rsuid_option(
+                                mount.destination().to_str().unwrap(),
+                            ) {
+                                eprintln!("path expected to be rsuid, found not rsuid, error: {e}");
+                            }
+                        }
                         _ => {}
                     }
                 }

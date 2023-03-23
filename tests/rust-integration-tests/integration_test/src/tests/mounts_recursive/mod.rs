@@ -1,4 +1,6 @@
 use crate::utils::test_inside_container;
+use anyhow::anyhow;
+use nix::libc;
 use nix::mount::{mount, umount, MsFlags};
 use nix::sys::stat::Mode;
 use nix::unistd::{chown, Uid};
@@ -8,6 +10,8 @@ use oci_spec::runtime::{
 };
 use std::collections::hash_set::HashSet;
 use std::fs;
+use std::fs::File;
+use std::os::unix::fs::symlink;
 use std::os::unix::prelude::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -199,6 +203,37 @@ fn check_recursive_nosuid() -> TestResult {
 
     clean_mount(&rnosuid_dir_path, &rnosuid_subdir_path);
 
+    result
+}
+
+fn check_recursive_rsuid() -> TestResult {
+    let rsuid_dir_path = PathBuf::from_str("/tmp/rsuid_dir").unwrap();
+    let mount_dest_path = PathBuf::from_str("/mnt/rsuid_dir").unwrap();
+    fs::create_dir_all(rsuid_dir_path.clone()).unwrap();
+
+    let mount_options = vec!["rbind".to_string(), "rsuid".to_string()];
+    let mut mount_spec = Mount::default();
+    mount_spec
+        .set_destination(mount_dest_path)
+        .set_typ(None)
+        .set_source(Some(rsuid_dir_path.clone()))
+        .set_options(Some(mount_options));
+    let spec = get_spec(
+        vec![mount_spec],
+        vec!["runtimetest".to_string(), "mounts_recursive".to_string()],
+    );
+    let result = test_inside_container(spec, &|_| {
+        let original_file_path = format!("{}/{}", rsuid_dir_path.to_str().unwrap(), "file");
+        File::create(original_file_path.clone())?;
+        // chmod +s /tmp/rsuid_dir/file && chmod +g /tmp/rsuid_dir/file
+        let mode = libc::S_ISUID | libc::S_ISGID;
+        let result = unsafe { libc::chmod(original_file_path.as_ptr() as *const i8, mode) };
+        if result == -1 {
+            return Err(anyhow!(std::io::Error::last_os_error()));
+        }
+        Ok(())
+    });
+    fs::remove_dir_all(rsuid_dir_path).unwrap();
     result
 }
 
@@ -492,6 +527,45 @@ fn check_recursive_rstrictatime() -> TestResult {
     result
 }
 
+fn check_recursive_rnosymfollow() -> TestResult {
+    let rnosymfollow_dir_path = PathBuf::from_str("/tmp/rnosymfollow").unwrap();
+    let mount_dest_path = PathBuf::from_str("/mnt/rnosymfollow").unwrap();
+    fs::create_dir_all(rnosymfollow_dir_path.clone()).unwrap();
+
+    let mount_options = vec![
+        "rbind".to_string(),
+        "rnosymfollow".to_string(),
+        "rsuid".to_string(),
+    ];
+    let mut mount_spec = Mount::default();
+    mount_spec
+        .set_destination(mount_dest_path)
+        .set_typ(None)
+        .set_source(Some(rnosymfollow_dir_path.clone()))
+        .set_options(Some(mount_options));
+    let spec = get_spec(
+        vec![mount_spec],
+        vec!["runtimetest".to_string(), "mounts_recursive".to_string()],
+    );
+    let result = test_inside_container(spec, &|_| {
+        let original_file_path = format!("{}/{}", rnosymfollow_dir_path.to_str().unwrap(), "file");
+        File::create(original_file_path.clone())?;
+        let link_file_path = format!("{}/{}", rnosymfollow_dir_path.to_str().unwrap(), "link");
+        println!("original file: {original_file_path:?},link file: {link_file_path:?}");
+        let mode = libc::S_ISUID | libc::S_ISGID;
+        let result = unsafe { libc::chmod(original_file_path.as_ptr() as *const i8, mode) };
+        if result == -1 {
+            return Err(anyhow!(std::io::Error::last_os_error()));
+        };
+        symlink(original_file_path, link_file_path)?;
+        println!("symlink success");
+        Ok(())
+    });
+
+    fs::remove_dir_all(rnosymfollow_dir_path).unwrap();
+    result
+}
+
 /// this mount test how to work?
 /// 1. Create mount_options based on the mount properties of the test
 /// 2. Create OCI.Spec content, container one process is runtimetest,(runtimetest is cargo model, file path `tests/rust-integration-tests/runtimetest/`)
@@ -500,6 +574,7 @@ fn check_recursive_rstrictatime() -> TestResult {
 pub fn get_mounts_recursive_test() -> TestGroup {
     let rro_test = Test::new("rro_test", Box::new(check_recursive_readonly));
     let rnosuid_test = Test::new("rnosuid_test", Box::new(check_recursive_nosuid));
+    let rsuid_test = Test::new("rsuid_test", Box::new(check_recursive_rsuid));
     let rnoexec_test = Test::new("rnoexec_test", Box::new(check_recursive_noexec));
     let rnodiratime_test = Test::new("rnodiratime_test", Box::new(check_recursive_rnodiratime));
     let rdiratime_test = Test::new("rdiratime_test", Box::new(check_recursive_rdiratime));
@@ -511,11 +586,13 @@ pub fn get_mounts_recursive_test() -> TestGroup {
     let rnorelatime_test = Test::new("rnorelatime_test", Box::new(check_recursive_rnorelatime));
     let rnoatime_test = Test::new("rnoatime_test", Box::new(check_recursive_rnoatime));
     let rstrictatime_test = Test::new("rstrictatime_test", Box::new(check_recursive_rstrictatime));
+    let rnosymfollow_test = Test::new("rnosymfollow_test", Box::new(check_recursive_rnosymfollow));
 
     let mut tg = TestGroup::new("mounts_recursive");
     tg.add(vec![
         Box::new(rro_test),
         Box::new(rnosuid_test),
+        Box::new(rsuid_test),
         Box::new(rnoexec_test),
         Box::new(rdiratime_test),
         Box::new(rnodiratime_test),
@@ -527,6 +604,7 @@ pub fn get_mounts_recursive_test() -> TestGroup {
         Box::new(rnorelatime_test),
         Box::new(rnoatime_test),
         Box::new(rstrictatime_test),
+        Box::new(rnosymfollow_test),
     ]);
 
     tg
