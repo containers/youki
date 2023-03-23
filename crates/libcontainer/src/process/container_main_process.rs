@@ -2,17 +2,22 @@ use crate::{
     container::ContainerProcessState,
     process::{args::ContainerArgs, channel, container_intermediate_process, fork},
     rootless::Rootless,
-    seccomp, utils,
+    utils,
 };
 use anyhow::{Context, Result};
+use nix::sys::wait::{waitpid, WaitStatus};
+use nix::unistd::Pid;
+
+#[cfg(feature = "libseccomp")]
+use crate::seccomp;
+#[cfg(feature = "libseccomp")]
 use nix::{
-    sys::{
-        socket::{self, UnixAddr},
-        wait::{waitpid, WaitStatus},
-    },
-    unistd::{self, Pid},
+    sys::socket::{self, UnixAddr},
+    unistd::{self},
 };
+#[cfg(feature = "libseccomp")]
 use oci_spec::runtime;
+#[cfg(feature = "libseccomp")]
 use std::{io::IoSlice, path::Path};
 
 pub fn container_main_process(container_args: &ContainerArgs) -> Result<Pid> {
@@ -66,6 +71,7 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<Pid> {
 
     if let Some(linux) = container_args.spec.linux() {
         if let Some(seccomp) = linux.seccomp() {
+            #[allow(unused_variables)]
             let state = ContainerProcessState {
                 oci_version: container_args.spec.version().to_string(),
                 // runc hardcode the `seccompFd` name for fds.
@@ -79,6 +85,7 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<Pid> {
                     .state
                     .clone(),
             };
+            #[cfg(feature = "libseccomp")]
             sync_seccomp(seccomp, &state, init_sender, main_receiver)
                 .context("failed to sync seccomp with init")?;
         }
@@ -114,6 +121,7 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<Pid> {
     Ok(init_pid)
 }
 
+#[cfg(feature = "libseccomp")]
 fn sync_seccomp(
     seccomp: &runtime::LinuxSeccomp,
     state: &ContainerProcessState,
@@ -141,6 +149,7 @@ fn sync_seccomp(
     Ok(())
 }
 
+#[cfg(feature = "libseccomp")]
 fn sync_seccomp_send_msg(listener_path: &Path, msg: &[u8], fd: i32) -> Result<()> {
     // The seccomp listener has specific instructions on how to transmit the
     // information through seccomp listener.  Therefore, we have to use
@@ -197,9 +206,9 @@ mod tests {
         sched::{unshare, CloneFlags},
         unistd::{self, getgid, getuid},
     };
-    use oci_spec::runtime::{
-        LinuxIdMappingBuilder, LinuxSeccompAction, LinuxSeccompBuilder, LinuxSyscallBuilder,
-    };
+    use oci_spec::runtime::LinuxIdMappingBuilder;
+    #[cfg(feature = "libseccomp")]
+    use oci_spec::runtime::{LinuxSeccompAction, LinuxSeccompBuilder, LinuxSyscallBuilder};
     use serial_test::serial;
     use std::fs;
 
@@ -320,6 +329,7 @@ mod tests {
 
     #[test]
     #[serial]
+    #[cfg(feature = "libseccomp")]
     fn test_sync_seccomp() -> Result<()> {
         use std::io::Read;
         use std::os::unix::io::IntoRawFd;
