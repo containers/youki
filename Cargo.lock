@@ -2894,9 +2894,9 @@ dependencies = [
 
 [[package]]
 name = "syscalls"
-version = "0.6.8"
+version = "0.6.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d0d44de5aedd16a1c586d9582c2509b8b07d23723efa269416037205527cabee"
+checksum = "5370cb0d74115b12ddd7feb517742dbaaf4aae9e3c10ff0edc7c19404935075b"
 dependencies = [
  "cc",
  "serde",
