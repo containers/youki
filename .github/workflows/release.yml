@@ -19,7 +19,9 @@ jobs:
       - name: Build
         run: make youki-release
       - name: test
-        run: make unittest featuretest oci-tests
+        # TODO(utam0k): The feature test needs nightly
+        # run: make unittest featuretest oci-tests
+        run: make unittest oci-tests
 
   upload:
     name: Upload
