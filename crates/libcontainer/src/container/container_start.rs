@@ -6,7 +6,7 @@ use crate::{
 
 use super::{Container, ContainerStatus};
 use anyhow::{bail, Context, Result};
-use nix::unistd;
+use nix::{sys::signal, unistd};
 
 impl Container {
     /// Starts a previously created container
@@ -50,8 +50,14 @@ impl Container {
             // While prestart is marked as deprecated in the OCI spec, the docker and integration test still
             // uses it.
             #[allow(deprecated)]
-            hooks::run_hooks(hooks.prestart().as_ref(), Some(self))
-                .with_context(|| "failed to run pre start hooks")?;
+            let ret = hooks::run_hooks(hooks.prestart().as_ref(), Some(self))
+                .with_context(|| "failed to run pre start hooks");
+            if ret.is_err() {
+                // In the case where prestart hook fails, the runtime must
+                // stop the container before generate an error on exits.
+                self.kill(signal::Signal::SIGKILL, true)?;
+                return ret;
+            }
         }
 
         unistd::chdir(self.root.as_os_str())?;
