@@ -54,7 +54,7 @@ impl Container {
                 .with_context(|| "failed to run pre start hooks");
             if ret.is_err() {
                 // In the case where prestart hook fails, the runtime must
-                // stop the container before generate an error on exits.
+                // stop the container before generating an error and exiting.
                 self.kill(signal::Signal::SIGKILL, true)?;
                 return ret;
             }
