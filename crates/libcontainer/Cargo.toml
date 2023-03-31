@@ -46,5 +46,5 @@ clone3 = "0.2.3"
 [dev-dependencies]
 oci-spec = { version = "^0.6.0", features = ["proptests", "runtime"] }
 quickcheck = "1"
-serial_test = "1.0.0"
+serial_test = "2.0.0"
 rand = "0.8.5"
