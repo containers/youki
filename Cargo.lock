@@ -256,13 +256,13 @@ dependencies = [
 
 [[package]]
 name = "cap-time-ext"
-version = "1.0.8"
+version = "1.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d95b67660838129586d32c3996e65208a832bd0d6dc1eff4a589c008f852520"
+checksum = "1c36aba6f39b14951cc10cc331441ffbdb471960d27e2f0813eb05f33d786e56"
 dependencies = [
  "cap-primitives",
  "once_cell",
- "rustix 0.36.11",
+ "rustix 0.37.5",
  "winx",
 ]
 
