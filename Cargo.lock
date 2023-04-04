@@ -999,17 +999,6 @@ dependencies = [
 
 [[package]]
 name = "errno"
-version = "0.2.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f639046355ee4f37944e44f60642c6f3a7efa3cf6b78c78a0d989a8ce6c396a1"
-dependencies = [
- "errno-dragonfly",
- "libc",
- "winapi",
-]
-
-[[package]]
-name = "errno"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "50d6a0976c999d473fe89ad888d5a284e55366d9dc9038b1ba2aa15128c4afa0"
@@ -1130,7 +1119,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "857cf27edcb26c2a36d84b2954019573d335bb289876113aceacacdca47a4fd4"
 dependencies = [
  "io-lifetimes",
- "rustix 0.36.11",
+ "rustix 0.36.12",
  "windows-sys 0.45.0",
 ]
 
@@ -1623,7 +1612,7 @@ dependencies = [
  "clap",
  "dbus",
  "env_logger 0.10.0",
- "errno 0.3.0",
+ "errno",
  "fixedbitset",
  "libbpf-sys",
  "libc",
@@ -2264,7 +2253,7 @@ dependencies = [
  "flate2",
  "hex",
  "lazy_static",
- "rustix 0.36.11",
+ "rustix 0.36.12",
 ]
 
 [[package]]
@@ -2610,12 +2599,12 @@ dependencies = [
 
 [[package]]
 name = "rustix"
-version = "0.36.11"
+version = "0.36.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db4165c9963ab29e422d6c26fbc1d37f15bace6b2810221f9d925023480fcf0e"
+checksum = "e0af200a3324fa5bcd922e84e9b55a298ea9f431a489f01961acdebc6e908f25"
 dependencies = [
  "bitflags 1.3.2",
- "errno 0.2.8",
+ "errno",
  "io-lifetimes",
  "libc",
  "linux-raw-sys 0.1.4",
@@ -2629,7 +2618,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e78cc525325c06b4a7ff02db283472f3c042b7ff0c391f96c6d5ac6f4f91b75"
 dependencies = [
  "bitflags 1.3.2",
- "errno 0.3.0",
+ "errno",
  "io-lifetimes",
  "itoa",
  "libc",
@@ -3337,7 +3326,7 @@ dependencies = [
  "io-lifetimes",
  "is-terminal",
  "once_cell",
- "rustix 0.36.11",
+ "rustix 0.36.12",
  "system-interface",
  "tracing",
  "wasi-common",
@@ -3356,7 +3345,7 @@ dependencies = [
  "cap-std",
  "io-extras",
  "log",
- "rustix 0.36.11",
+ "rustix 0.36.12",
  "thiserror",
  "tracing",
  "wasmtime",
@@ -3828,7 +3817,7 @@ dependencies = [
  "directories-next",
  "file-per-thread-logger",
  "log",
- "rustix 0.36.11",
+ "rustix 0.36.12",
  "serde",
  "sha2",
  "toml",
@@ -3905,7 +3894,7 @@ checksum = "01b1192624694399f601de28db78975ed20fa859da8e048bf8250bd3b38d302b"
 dependencies = [
  "cc",
  "cfg-if 1.0.0",
- "rustix 0.36.11",
+ "rustix 0.36.12",
  "wasmtime-asm-macros",
  "windows-sys 0.45.0",
 ]
@@ -3943,7 +3932,7 @@ checksum = "17e35d335dd2461c631ba24d2326d993bd3a4bdb4b0217e5bda4f518ba0e29f3"
 dependencies = [
  "object 0.30.3",
  "once_cell",
- "rustix 0.36.11",
+ "rustix 0.36.12",
 ]
 
 [[package]]
@@ -3974,7 +3963,7 @@ dependencies = [
  "memoffset 0.8.0",
  "paste",
  "rand",
- "rustix 0.36.11",
+ "rustix 0.36.12",
  "wasmtime-asm-macros",
  "wasmtime-environ",
  "wasmtime-fiber",
