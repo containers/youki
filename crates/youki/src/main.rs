@@ -62,7 +62,7 @@ macro_rules! youki_version {
             "\ncommit: ",
             crate_version!(),
             "-0-",
-            env!("VERGEN_GIT_SHA_SHORT")
+            env!("VERGEN_GIT_SHA")
         )
     };
 }
