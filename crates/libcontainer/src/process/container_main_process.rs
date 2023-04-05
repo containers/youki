@@ -118,6 +118,8 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<Pid> {
         }
         Ok(_) => (),
         Err(err) => {
+            // This is safe because intermediate_process and main_process check if the process is
+            // finished by piping instead of exit code.
             if err == Errno::ECHILD {
                 log::warn!("intermediate process already reaped");
             } else {
