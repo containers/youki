@@ -1,10 +1,17 @@
 use anyhow::Result;
-use vergen::{vergen, Config, ShaKind};
+use vergen::EmitBuilder;
 
 fn main() -> Result<()> {
-    let mut config = Config::default();
-    *config.git_mut().sha_kind_mut() = ShaKind::Short;
-    *config.git_mut().skip_if_error_mut() = true;
-    println!("cargo:rustc-env=VERGEN_GIT_SHA_SHORT=unknown");
-    vergen(config)
+    if EmitBuilder::builder()
+        .fail_on_error()
+        .git_sha(true)
+        .emit()
+        .is_err()
+    {
+        // currently we only inject git sha, so just this
+        // else we will need to think of more elegant way to check
+        // what failed, and what needs to be added
+        println!("cargo:rustc-env=VERGEN_GIT_SHA=unknown");
+    }
+    Ok(())
 }
