@@ -1,7 +1,7 @@
 # Youki
 
 <p align="center">
-  <img src="./assets/youki_flat_full.png" width="450">
+  <img src="./assets/youki.png" width="450">
 </p>
 
 youki is an implementation of the [OCI runtime-spec](https://github.com/opencontainers/runtime-spec) in Rust, similar to [runc](https://github.com/opencontainers/runc).
