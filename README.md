@@ -246,7 +246,7 @@ $ ../youki run rootless-container   # will create and run a container with rootl
 Start the docker daemon.
 
 ```console
-$ dockerd --experimental --add-runtime="youki=$(pwd)/target/x86_64-unknown-linux-gnu/debug/youki"
+$ dockerd --experimental --add-runtime="youki=$(pwd)/youki"
 ```
 
 If you get an error like the below, that means your normal Docker daemon is running, and it needs to be stopped. Do that with your init system (i.e., with systemd, run `systemctl stop docker`, as root if necessary).
