@@ -70,10 +70,12 @@
         <!-- Hide / unhide sidebar before it is displayed -->
         <script>
             var html = document.querySelector('html');
-            var sidebar = 'hidden';
+            var sidebar = null;
             if (document.body.clientWidth >= 1080) {
                 try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
                 sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
             }
             html.classList.remove('sidebar-visible');
             html.classList.add("sidebar-" + sidebar);
@@ -144,7 +146,7 @@
                     <main>
                         <h1 id="youki"><a class="header" href="#youki">Youki</a></h1>
 <p align="center">
-  <img src="./assets/youki_flat_full.png" width="450">
+  <img src="./assets/youki.png" width="450">
 </p>
 <p>youki is an implementation of the <a href="https://github.com/opencontainers/runtime-spec">OCI runtime-spec</a> in Rust, similar to <a href="https://github.com/opencontainers/runc">runc</a>.</p>
 <h2 id="about-the-name"><a class="header" href="#about-the-name">About the name</a></h2>
