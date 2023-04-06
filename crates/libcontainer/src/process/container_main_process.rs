@@ -4,7 +4,7 @@ use crate::{
     rootless::Rootless,
     utils,
 };
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use nix::sys::wait::{waitpid, WaitStatus};
 use nix::unistd::Pid;
 
@@ -12,8 +12,9 @@ use nix::unistd::Pid;
 use crate::seccomp;
 #[cfg(feature = "libseccomp")]
 use nix::{
+    errno::Errno,
     sys::socket::{self, UnixAddr},
-    unistd::{self},
+    unistd,
 };
 #[cfg(feature = "libseccomp")]
 use oci_spec::runtime;
@@ -107,15 +108,24 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<Pid> {
     // process is exit and reaped. By this point, the intermediate process
     // should already exited successfully. If intermediate process errors out,
     // the `init_ready` will not be sent.
-    match waitpid(intermediate_pid, None)? {
-        WaitStatus::Exited(_, 0) => (),
-        WaitStatus::Exited(_, s) => {
+    match waitpid(intermediate_pid, None) {
+        Ok(WaitStatus::Exited(_, 0)) => (),
+        Ok(WaitStatus::Exited(_, s)) => {
             log::warn!("intermediate process failed with exit status: {s}");
         }
-        WaitStatus::Signaled(_, sig, _) => {
+        Ok(WaitStatus::Signaled(_, sig, _)) => {
             log::warn!("intermediate process killed with signal: {sig}")
         }
-        _ => (),
+        Ok(_) => (),
+        Err(err) => {
+            // This is safe because intermediate_process and main_process check if the process is
+            // finished by piping instead of exit code.
+            if err == Errno::ECHILD {
+                log::warn!("intermediate process already reaped");
+            } else {
+                bail!("failed to wait for intermediate process: {err}");
+            }
+        }
     };
 
     Ok(init_pid)
