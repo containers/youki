@@ -2852,9 +2852,9 @@ dependencies = [
 
 [[package]]
 name = "system-interface"
-version = "0.25.5"
+version = "0.25.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12a638b21790634294d82697a110052af16bf88d88bec7c8f8e57989e2f922b7"
+checksum = "7e1ab6a74e204b606bf397944fa991f3b01046113cc0a4ac269be3ef067cc24b"
 dependencies = [
  "bitflags 1.3.2",
  "cap-fs-ext",
@@ -2862,7 +2862,7 @@ dependencies = [
  "fd-lock",
  "io-lifetimes",
  "rustix 0.37.5",
- "windows-sys 0.45.0",
+ "windows-sys 0.48.0",
  "winx",
 ]
 
