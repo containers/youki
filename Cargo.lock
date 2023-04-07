@@ -217,9 +217,9 @@ dependencies = [
 
 [[package]]
 name = "cap-primitives"
-version = "1.0.9"
+version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68c5812f1b3818f5132a8ea1ddcc09c32bc4374874616c6093f2d352e93f1d30"
+checksum = "613f377e5b016d3d2b9d150b8e8f711d88d42046b89294572d504596f19e59ca"
 dependencies = [
  "ambient-authority",
  "fs-set-times 0.19.0",
@@ -228,7 +228,7 @@ dependencies = [
  "ipnet",
  "maybe-owned",
  "rustix 0.37.5",
- "windows-sys 0.45.0",
+ "windows-sys 0.48.0",
  "winx",
 ]
 
