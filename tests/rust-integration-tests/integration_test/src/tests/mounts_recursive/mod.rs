@@ -227,7 +227,12 @@ fn check_recursive_rsuid() -> TestResult {
         File::create(original_file_path.clone())?;
         // chmod +s /tmp/rsuid_dir/file && chmod +g /tmp/rsuid_dir/file
         let mode = libc::S_ISUID | libc::S_ISGID;
-        let result = unsafe { libc::chmod(original_file_path.as_ptr() as *const i8, mode) };
+        let result = unsafe {
+            libc::chmod(
+                original_file_path.as_ptr() as *const ::std::os::raw::c_char,
+                mode,
+            )
+        };
         if result == -1 {
             return Err(anyhow!(std::io::Error::last_os_error()));
         }
@@ -553,7 +558,12 @@ fn check_recursive_rnosymfollow() -> TestResult {
         let link_file_path = format!("{}/{}", rnosymfollow_dir_path.to_str().unwrap(), "link");
         println!("original file: {original_file_path:?},link file: {link_file_path:?}");
         let mode = libc::S_ISUID | libc::S_ISGID;
-        let result = unsafe { libc::chmod(original_file_path.as_ptr() as *const i8, mode) };
+        let result = unsafe {
+            libc::chmod(
+                original_file_path.as_ptr() as *const ::std::os::raw::c_char,
+                mode,
+            )
+        };
         if result == -1 {
             return Err(anyhow!(std::io::Error::last_os_error()));
         };
