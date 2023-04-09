@@ -132,9 +132,10 @@ impl<'a> InitContainerBuilder<'a> {
     }
 
     fn validate_spec(spec: &Spec) -> Result<()> {
-        if !spec.version().starts_with("1.0") {
+        let version = spec.version();
+        if !version.starts_with("1.") {
             bail!(
-                "runtime spec has incompatible version '{}'. Only 1.0.X is supported",
+                "runtime spec has incompatible version '{}'. Only 1.X.Y is supported",
                 spec.version()
             );
         }
