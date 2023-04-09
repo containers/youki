@@ -442,8 +442,8 @@ pub fn test_mount_rsuid_option(path: &str) -> Result<(), std::io::Error> {
     if suid && sgid {
         return Ok(());
     }
-    return Err(std::io::Error::new(
+    Err(std::io::Error::new(
         std::io::ErrorKind::Other,
         format!("rsuid error {path:?}"),
-    ));
+    ))
 }

@@ -60,7 +60,6 @@ pub fn attach_controller(cgroup_root: &Path, cgroup_path: &Path, controller: &st
 
     let mut components = cgroup_path
         .components()
-        .into_iter()
         .filter(|c| c.ne(&RootDir))
         .peekable();
 
