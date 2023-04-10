@@ -55,6 +55,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec8ad6edb4840b78c5c3d88de606b22252d552b55f3a4699fbb10fc070ec3049"
 
 [[package]]
+name = "ambient-authority"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e9d4ee0d472d1cd2e28c97dfa124b3d8d992e10eb0a035f33f5d12e3a177ba3b"
+
+[[package]]
 name = "android_system_properties"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -221,7 +227,7 @@ version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "613f377e5b016d3d2b9d150b8e8f711d88d42046b89294572d504596f19e59ca"
 dependencies = [
- "ambient-authority",
+ "ambient-authority 0.0.1",
  "fs-set-times 0.19.0",
  "io-extras",
  "io-lifetimes",
@@ -234,11 +240,11 @@ dependencies = [
 
 [[package]]
 name = "cap-rand"
-version = "1.0.10"
+version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d999e6475ef1227e8ec5e0eecb37974aeed0d8d2bc0937e3939166e57c1e7ff8"
+checksum = "24ce2f47106bd45fefff9aaeed5cd12500c1760068f6cfce7eee1a6081801962"
 dependencies = [
- "ambient-authority",
+ "ambient-authority 0.0.2",
  "rand",
 ]
 
