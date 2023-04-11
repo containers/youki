@@ -36,7 +36,7 @@ pub mod prog {
         let insns = insns as *const _ as *const bpf_insn;
         let opts = libbpf_sys::bpf_prog_load_opts {
             kern_version: 0,
-            log_buf: ptr::null_mut::<i8>(),
+            log_buf: ptr::null_mut::<::std::os::raw::c_char>(),
             log_size: 0,
             ..Default::default()
         };
@@ -44,8 +44,8 @@ pub mod prog {
         let prog_fd = unsafe {
             bpf_prog_load(
                 BPF_PROG_TYPE_CGROUP_DEVICE,
-                ptr::null::<i8>(),
-                license as *const _ as *const i8,
+                ptr::null::<::std::os::raw::c_char>(),
+                license as *const _ as *const ::std::os::raw::c_char,
                 insns,
                 insns_cnt as u64,
                 &opts,
