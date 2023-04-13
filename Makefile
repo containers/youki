@@ -67,6 +67,10 @@ lint:
 	cargo fmt --all -- --check
 	cargo clippy --all-targets --all-features -- -D warnings
 
+.PHONY: hack/bpftrace
+hack/bpftrace:
+	BPFTRACE_STRLEN=120 ./hack/debug.bt
+
 .PHONY: clean
 clean:
 	./scripts/clean.sh $(ROOT)
