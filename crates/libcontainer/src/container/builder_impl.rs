@@ -53,9 +53,14 @@ impl<'a> ContainerBuilderImpl<'a> {
         match self.run_container().context("failed to create container") {
             Ok(pid) => Ok(pid),
             Err(outer) => {
-                if let Err(inner) = self.cleanup_container() {
-                    return Err(outer.context(inner));
+                // Only the init container should be cleaned up in the case of
+                // an error.
+                if matches!(self.container_type, ContainerType::InitContainer) {
+                    if let Err(inner) = self.cleanup_container() {
+                        return Err(outer.context(inner));
+                    }
                 }
+
                 Err(outer)
             }
         }
