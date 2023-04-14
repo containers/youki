@@ -52,17 +52,15 @@ impl<'a> ContainerBuilderImpl<'a> {
     pub(super) fn create(&mut self) -> Result<Pid> {
         match self.run_container().context("failed to create container") {
             Ok(pid) => Ok(pid),
-            Err(outer) if matches!(self.container_type, ContainerType::InitContainer) => {
+            Err(outer) => {
                 // Only the init container should be cleaned up in the case of
                 // an error.
-                if let Err(inner) = self.cleanup_container() {
-                    return Err(outer.context(inner));
+                if matches!(self.container_type, ContainerType::InitContainer) {
+                    if let Err(inner) = self.cleanup_container() {
+                        return Err(outer.context(inner));
+                    }
                 }
-                Err(outer)
-            }
-            Err(outer) => {
-                // In the cases of tenant containers, we should not clean up.
-                // Simply returns the error here.
+
                 Err(outer)
             }
         }
