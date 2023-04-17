@@ -1,6 +1,7 @@
 use super::{Container, ContainerStatus};
 use crate::config::YoukiConfig;
 use crate::hooks;
+use crate::process::intel_rdt::delete_resctrl_subdirectory;
 use anyhow::{bail, Context, Result};
 use libcgroups;
 use nix::sys::signal;
@@ -65,6 +66,14 @@ impl Container {
 
         // Once reached here, the container is verified that it can be deleted.
         debug_assert!(self.status().can_delete());
+
+        if let Some(true) = &self.clean_up_intel_rdt_subdirectory() {
+            if let Err(err) = delete_resctrl_subdirectory(self.id()) {
+                log::warn!(
+                    "failed to delete resctrl subdirectory due to: {err:?}, continue to delete"
+                );
+            }
+        }
 
         if self.root.exists() {
             match YoukiConfig::load(&self.root) {

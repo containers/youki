@@ -26,7 +26,7 @@ pub struct ContainerArgs<'a> {
     pub console_socket: Option<RawFd>,
     /// The Unix Domain Socket to communicate container start
     pub notify_socket: NotifyListener,
-    /// File descriptos preserved/passed to the container init process.
+    /// File descriptors preserved/passed to the container init process.
     pub preserve_fds: i32,
     /// Container state
     pub container: &'a Option<Container>,

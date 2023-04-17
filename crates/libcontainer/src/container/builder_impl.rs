@@ -5,6 +5,7 @@ use crate::{
     process::{
         self,
         args::{ContainerArgs, ContainerType},
+        intel_rdt::delete_resctrl_subdirectory,
     },
     rootless::Rootless,
     syscall::Syscall,
@@ -137,7 +138,8 @@ impl<'a> ContainerBuilderImpl<'a> {
             executor_manager: &self.executor_manager,
         };
 
-        let init_pid = process::container_main_process::container_main_process(&container_args)?;
+        let (init_pid, need_to_clean_up_intel_rdt_dir) =
+            process::container_main_process::container_main_process(&container_args)?;
 
         // if file to write the pid to is specified, write pid of the child
         if let Some(pid_file) = &self.pid_file {
@@ -150,6 +152,7 @@ impl<'a> ContainerBuilderImpl<'a> {
                 .set_status(ContainerStatus::Created)
                 .set_creator(nix::unistd::geteuid().as_raw())
                 .set_pid(init_pid.as_raw())
+                .set_clean_up_intel_rdt_directory(need_to_clean_up_intel_rdt_dir)
                 .save()
                 .context("Failed to save container state")?;
         }
@@ -171,11 +174,23 @@ impl<'a> ContainerBuilderImpl<'a> {
         )?;
 
         let mut errors = Vec::new();
+
         if let Err(e) = cmanager.remove().context("failed to remove cgroup") {
             errors.push(e.to_string());
         }
 
         if let Some(container) = &self.container {
+            if let Some(true) = container.clean_up_intel_rdt_subdirectory() {
+                if let Err(e) = delete_resctrl_subdirectory(container.id()).with_context(|| {
+                    format!(
+                        "failed to delete resctrl subdirectory: {:?}",
+                        container.id()
+                    )
+                }) {
+                    errors.push(e.to_string());
+                }
+            }
+
             if container.root.exists() {
                 if let Err(e) = fs::remove_dir_all(&container.root)
                     .with_context(|| format!("could not delete {:?}", container.root))

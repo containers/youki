@@ -1,6 +1,9 @@
 use crate::{
     container::ContainerProcessState,
-    process::{args::ContainerArgs, channel, container_intermediate_process, fork},
+    process::{
+        args::ContainerArgs, channel, container_intermediate_process, fork,
+        intel_rdt::setup_intel_rdt,
+    },
     rootless::Rootless,
     utils,
 };
@@ -20,7 +23,7 @@ use oci_spec::runtime;
 #[cfg(feature = "libseccomp")]
 use std::{io::IoSlice, path::Path};
 
-pub fn container_main_process(container_args: &ContainerArgs) -> Result<Pid> {
+pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, bool)> {
     // We use a set of channels to communicate between parent and child process.
     // Each channel is uni-directional. Because we will pass these channel to
     // cloned process, we have to be deligent about closing any unused channel.
@@ -68,6 +71,7 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<Pid> {
     // The intermediate process will send the init pid once it forks the init
     // process.  The intermediate process should exit after this point.
     let init_pid = main_receiver.wait_for_intermediate_ready()?;
+    let mut need_to_clean_up_intel_rdt_subdirectory = false;
 
     if let Some(linux) = container_args.spec.linux() {
         if let Some(seccomp) = linux.seccomp() {
@@ -88,6 +92,14 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<Pid> {
             #[cfg(feature = "libseccomp")]
             sync_seccomp(seccomp, &state, init_sender, main_receiver)
                 .context("failed to sync seccomp with init")?;
+        }
+        if let Some(intel_rdt) = linux.intel_rdt() {
+            let container_id = container_args
+                .container
+                .as_ref()
+                .map(|container| container.id());
+            need_to_clean_up_intel_rdt_subdirectory =
+                setup_intel_rdt(container_id, &init_pid, intel_rdt)?;
         }
     }
 
@@ -124,7 +136,7 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<Pid> {
         Err(err) => bail!("failed to wait for intermediate process: {err}"),
     };
 
-    Ok(init_pid)
+    Ok((init_pid, need_to_clean_up_intel_rdt_subdirectory))
 }
 
 #[cfg(feature = "libseccomp")]
