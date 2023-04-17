@@ -1,6 +1,7 @@
 pub mod cgroups;
 pub mod hooks;
 pub mod hostname;
+pub mod intel_rdt;
 pub mod lifecycle;
 pub mod linux_ns_itype;
 pub mod mounts_recursive;
