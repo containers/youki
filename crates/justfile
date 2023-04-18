@@ -1,0 +1,15 @@
+
+# build debug version of youki
+debug: 
+    cargo build
+    cp ./target/debug/youki ./youki_bin
+
+# build release version of youki
+release:
+    cargo build --release
+    cp ./target/release/youki ./youki_bin
+
+# clean the generated artifacts
+clean:
+    rm ./youki_bin || true # rm fails if youki bin is not present,  so we || with true
+    cargo clean
