@@ -1,5 +1,5 @@
 ///! Contains structure for a test group
-use crate::testable::{TestResult, Testable, TestableGroup, TestError};
+use crate::testable::{TestError, TestResult, Testable, TestableGroup};
 use crossbeam::thread;
 use std::collections::BTreeMap;
 

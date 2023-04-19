@@ -7,7 +7,7 @@ use std::{
     fs::File,
     process::{Command, Stdio},
 };
-use test_framework::{Test, TestGroup, TestResult, testable::TestError};
+use test_framework::{testable::TestError, Test, TestGroup, TestResult};
 use uuid::Uuid;
 
 #[inline]

@@ -4,8 +4,8 @@ use anyhow::anyhow;
 use oci_spec::runtime::LinuxBuilder;
 use oci_spec::runtime::{LinuxHugepageLimitBuilder, LinuxResourcesBuilder};
 use oci_spec::runtime::{Spec, SpecBuilder};
-use test_framework::testable::TestError;
 use std::path::PathBuf;
+use test_framework::testable::TestError;
 use test_framework::{test_result, ConditionalTest, TestGroup, TestResult};
 
 fn check_hugetlb() -> bool {
@@ -49,11 +49,16 @@ fn test_wrong_tlb() -> TestResult<()> {
                     )));
                 }
                 if data.state_err.is_empty() {
-                    return Err(TestError::Failed(anyhow!("stderr of state command was empty")));
+                    return Err(TestError::Failed(anyhow!(
+                        "stderr of state command was empty"
+                    )));
                 }
                 if res.success() {
                     // The operation should not have succeeded as pagesize was not power of 2
-                    Err(TestError::Failed(anyhow!("invalid page size of {} was allowed", page)))
+                    Err(TestError::Failed(anyhow!(
+                        "invalid page size of {} was allowed",
+                        page
+                    )))
                 } else {
                     Ok(())
                 }

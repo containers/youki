@@ -1,5 +1,5 @@
 use std::{io, process};
-use test_framework::{TestResult, testable::TestError};
+use test_framework::{testable::TestError, TestResult};
 
 pub fn get_result_from_output(res: io::Result<process::Output>) -> TestResult<()> {
     match res {

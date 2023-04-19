@@ -2,7 +2,7 @@ use super::{create, delete, kill};
 use crate::utils::TempDir;
 use crate::utils::{generate_uuid, prepare_bundle};
 use test_framework::testable::TestError;
-use test_framework::{TestResult, TestableGroup, TestGroup, Test};
+use test_framework::{TestResult, TestableGroup};
 
 pub struct ContainerCreate {
     project_path: TempDir,

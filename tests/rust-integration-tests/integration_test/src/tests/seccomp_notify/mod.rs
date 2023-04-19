@@ -8,7 +8,7 @@ use std::{
     sync::mpsc::{self, Receiver, Sender},
     thread,
 };
-use test_framework::{Test, TestGroup, testable::TestError};
+use test_framework::{testable::TestError, Test, TestGroup};
 
 mod seccomp_agent;
 
@@ -85,11 +85,15 @@ fn test_seccomp_notify() -> Result<()> {
         }
 
         if state.pid.unwrap() != container_process_state.pid {
-            return Err(TestError::Failed(anyhow!("container process id doesn't match")));
+            return Err(TestError::Failed(anyhow!(
+                "container process id doesn't match"
+            )));
         }
 
         if SECCOMP_METADATA != container_process_state.metadata {
-            return Err(TestError::Failed(anyhow!("seccomp listener metadata doesn't match")));
+            return Err(TestError::Failed(anyhow!(
+                "seccomp listener metadata doesn't match"
+            )));
         }
 
         Ok(())

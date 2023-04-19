@@ -1,5 +1,5 @@
 ///! This exposes the main control wrapper to control the tests
-use crate::testable::{TestResult, TestableGroup, TestError};
+use crate::testable::{TestError, TestResult, TestableGroup};
 use anyhow::Result;
 use crossbeam::thread;
 use std::collections::BTreeMap;

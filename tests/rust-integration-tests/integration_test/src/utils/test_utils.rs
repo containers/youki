@@ -5,12 +5,12 @@ use super::{get_runtime_path, get_runtimetest_path};
 use anyhow::{anyhow, bail, Context, Result};
 use oci_spec::runtime::Spec;
 use serde::{Deserialize, Serialize};
-use test_framework::testable::TestError;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, ExitStatus, Stdio};
 use std::thread::sleep;
 use std::time::Duration;
+use test_framework::testable::TestError;
 use test_framework::{test_result, TestResult};
 
 const SLEEP_TIME: Duration = Duration::from_millis(150);
@@ -192,7 +192,12 @@ pub fn test_inside_container(
         .wait_with_output()
     {
         Ok(c) => c,
-        Err(e) => return Err(TestError::Failed(anyhow!("container start failed : {:?}", e))),
+        Err(e) => {
+            return Err(TestError::Failed(anyhow!(
+                "container start failed : {:?}",
+                e
+            )))
+        }
     };
 
     let create_output = create_process

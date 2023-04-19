@@ -2,8 +2,8 @@ use crate::utils::get_runtime_path;
 use std::io;
 use std::path::Path;
 use std::process::{Command, Stdio};
-use test_framework::TestResult;
 use test_framework::testable::TestError;
+use test_framework::TestResult;
 
 // There are still some issues here
 // in case we put stdout and stderr as piped
