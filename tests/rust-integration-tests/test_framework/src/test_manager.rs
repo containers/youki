@@ -1,5 +1,5 @@
 ///! This exposes the main control wrapper to control the tests
-use crate::testable::{TestResult, TestableGroup};
+use crate::testable::{TestResult, TestableGroup, TestError};
 use anyhow::Result;
 use crossbeam::thread;
 use std::collections::BTreeMap;
@@ -38,19 +38,19 @@ impl TestManager {
 
     /// Prints the given test results, usually used to print
     /// results of a test group
-    fn print_test_result(&self, name: &str, res: &[(&'static str, TestResult)]) {
+    fn print_test_result(&self, name: &str, res: &[(&'static str, TestResult<()>)]) {
         println!("# Start group {name}");
         let len = res.len();
         for (idx, (name, res)) in res.iter().enumerate() {
             print!("{} / {} : {} : ", idx + 1, len, name);
             match res {
-                TestResult::Passed => {
+                Ok(()) => {
                     println!("ok");
                 }
-                TestResult::Skipped => {
+                Err(TestError::Skipped) => {
                     println!("skipped");
                 }
-                TestResult::Failed(e) => {
+                Err(TestError::Failed(e)) => {
                     println!("not ok\n\t{e}");
                 }
             }

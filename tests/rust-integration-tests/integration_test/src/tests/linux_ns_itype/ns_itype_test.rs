@@ -3,7 +3,8 @@ use anyhow::anyhow;
 use oci_spec::runtime::LinuxBuilder;
 use oci_spec::runtime::{Spec, SpecBuilder};
 use procfs::process::Process;
-use test_framework::{Test, TestGroup, TestResult};
+use test_framework::testable::TestError;
+use test_framework::{Test, TestGroup};
 
 // get spec for the test
 fn get_spec() -> Spec {
@@ -37,17 +38,17 @@ fn get_test(test_name: &'static str) -> Test {
             let host_namespaces = match host_proc.namespaces() {
                 Ok(n) => n,
                 Err(e) => {
-                    return TestResult::Failed(anyhow!(
+                    return Err(TestError::Failed(anyhow!(
                         "error in resolving host namespaces : {}",
                         e
-                    ))
+                    )))
                 }
             };
             let spec = get_spec();
             test_outside_container(spec, &move |data| {
                 let pid = match data.state {
                     Some(s) => s.pid.unwrap(),
-                    None => return TestResult::Failed(anyhow!("state command returned error")),
+                    None => return Err(TestError::Failed(anyhow!("state command returned error"))),
                 };
                 let container_process =
                     Process::new(pid).expect("error in getting /proc for container process");
@@ -55,11 +56,11 @@ fn get_test(test_name: &'static str) -> Test {
                     .namespaces()
                     .expect("error in getting namespaces of container process");
                 if container_namespaces != host_namespaces {
-                    return TestResult::Failed(anyhow!(
+                    return Err(TestError::Failed(anyhow!(
                         "error : namespaces are not correctly inherited"
-                    ));
+                    )));
                 }
-                TestResult::Passed
+                Ok(())
             })
         }),
     )

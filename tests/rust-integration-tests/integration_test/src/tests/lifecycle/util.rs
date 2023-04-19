@@ -1,21 +1,21 @@
 use std::{io, process};
-use test_framework::TestResult;
+use test_framework::{TestResult, testable::TestError};
 
-pub fn get_result_from_output(res: io::Result<process::Output>) -> TestResult {
+pub fn get_result_from_output(res: io::Result<process::Output>) -> TestResult<()> {
     match res {
-        io::Result::Ok(output) => {
+        Ok(output) => {
             let stderr = String::from_utf8(output.stderr).unwrap();
             if stderr.contains("Error") || stderr.contains("error") {
                 let stdout = String::from_utf8(output.stdout).unwrap();
-                TestResult::Failed(anyhow::anyhow!(
+                Err(TestError::Failed(anyhow::anyhow!(
                     "Error :\nstdout : {}\nstderr : {}",
                     stdout,
                     stderr
-                ))
+                )))
             } else {
-                TestResult::Passed
+                Ok(())
             }
         }
-        io::Result::Err(e) => TestResult::Failed(anyhow::Error::new(e)),
+        Err(e) => Err(TestError::Failed(anyhow::Error::new(e))),
     }
 }

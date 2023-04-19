@@ -2,7 +2,7 @@
 use crate::testable::{TestResult, Testable};
 
 // type alias for the test function
-type TestFn = dyn Sync + Send + Fn() -> TestResult;
+type TestFn = dyn Sync + Send + Fn() -> TestResult<()>;
 
 /// Basic Template structure for a test
 pub struct Test {
@@ -24,7 +24,7 @@ impl Testable for Test {
         self.name
     }
 
-    fn run(&self) -> TestResult {
+    fn run(&self) -> TestResult<()> {
         (self.test_fn)()
     }
 }

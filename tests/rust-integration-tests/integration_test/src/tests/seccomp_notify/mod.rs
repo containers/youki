@@ -8,7 +8,7 @@ use std::{
     sync::mpsc::{self, Receiver, Sender},
     thread,
 };
-use test_framework::{Test, TestGroup, TestResult};
+use test_framework::{Test, TestGroup, testable::TestError};
 
 mod seccomp_agent;
 
@@ -69,7 +69,7 @@ fn test_seccomp_notify() -> Result<()> {
             .send(res)
             .expect("failed to send seccomp agent result back to main thread");
     });
-    if let TestResult::Failed(err) = test_outside_container(spec, &move |data| {
+    if let Err(err) = test_outside_container(spec, &move |data| {
         let (container_process_state, _) = receiver
             .recv()
             .expect("failed to receive from channel")
@@ -77,22 +77,22 @@ fn test_seccomp_notify() -> Result<()> {
 
         let state = match data.state {
             Some(s) => s,
-            None => return TestResult::Failed(anyhow!("state command returned error")),
+            None => return Err(TestError::Failed(anyhow!("state command returned error"))),
         };
 
         if state.id != container_process_state.state.id {
-            return TestResult::Failed(anyhow!("container id doesn't match"));
+            return Err(TestError::Failed(anyhow!("container id doesn't match")));
         }
 
         if state.pid.unwrap() != container_process_state.pid {
-            return TestResult::Failed(anyhow!("container process id doesn't match"));
+            return Err(TestError::Failed(anyhow!("container process id doesn't match")));
         }
 
         if SECCOMP_METADATA != container_process_state.metadata {
-            return TestResult::Failed(anyhow!("seccomp listener metadata doesn't match"));
+            return Err(TestError::Failed(anyhow!("seccomp listener metadata doesn't match")));
         }
 
-        TestResult::Passed
+        Ok(())
     }) {
         bail!("failed to run test outside container: {:?}", err);
     }
@@ -111,13 +111,12 @@ pub fn get_seccomp_notify_test() -> TestGroup {
             let runtime = get_runtime_path();
             // runc doesn't support seccomp notify yet
             if runtime.ends_with("runc") {
-                return TestResult::Skipped;
+                return Err(TestError::Skipped);
             }
 
-            match test_seccomp_notify() {
-                Ok(_) => TestResult::Passed,
-                Err(err) => TestResult::Failed(err),
-            }
+            test_seccomp_notify()?;
+
+            Ok(())
         }),
     );
     let mut tg = TestGroup::new("seccomp_notify");

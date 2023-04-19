@@ -70,7 +70,7 @@ fn get_network_interfaces() -> Option<(String, String)> {
     Some((lo_if_name.to_string(), eth_if_name.to_string()))
 }
 
-fn test_network_cgroups() -> TestResult {
+fn test_network_cgroups() -> TestResult<()> {
     let cgroup_name = "test_network_cgroups";
 
     let interfaces = test_result!(get_network_interfaces()
@@ -115,17 +115,14 @@ fn test_network_cgroups() -> TestResult {
     ];
 
     for spec in cases.into_iter() {
-        let test_result = test_outside_container(spec, &|data| {
+        test_outside_container(spec, &|data| {
             test_result!(check_container_created(&data));
 
-            TestResult::Passed
-        });
-        if let TestResult::Failed(_) = test_result {
-            return test_result;
-        }
+            Ok(())
+        })?;
     }
 
-    TestResult::Passed
+    Ok(())
 }
 
 fn can_run() -> bool {

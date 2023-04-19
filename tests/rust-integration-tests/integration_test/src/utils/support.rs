@@ -18,7 +18,7 @@ pub fn set_runtime_path(path: &Path) {
 }
 
 pub fn get_runtime_path() -> &'static PathBuf {
-    RUNTIME_PATH.get().expect("Runtime path is not set")
+    RUNTIME_PATH.get().expect("runtime path is not set")
 }
 
 pub fn set_runtimetest_path(path: &Path) {
@@ -26,7 +26,7 @@ pub fn set_runtimetest_path(path: &Path) {
 }
 
 pub fn get_runtimetest_path() -> &'static PathBuf {
-    RUNTIMETEST_PATH.get().expect("Runtimetest path is not set")
+    RUNTIMETEST_PATH.get().expect("runtimetest path is not set")
 }
 
 #[allow(dead_code)]

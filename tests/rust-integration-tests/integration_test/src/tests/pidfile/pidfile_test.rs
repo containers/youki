@@ -7,7 +7,7 @@ use std::{
     fs::File,
     process::{Command, Stdio},
 };
-use test_framework::{Test, TestGroup, TestResult};
+use test_framework::{Test, TestGroup, TestResult, testable::TestError};
 use uuid::Uuid;
 
 #[inline]
@@ -19,7 +19,7 @@ fn cleanup(id: &Uuid, bundle: &TempDir) {
 
 // here we have to manually create and manage the container
 // as the test_inside container does not provide a way to set the pid file argument
-fn test_pidfile() -> TestResult {
+fn test_pidfile() -> TestResult<()> {
     // create id for the container and pidfile
     let container_id = generate_uuid();
     let pidfile_uuid = generate_uuid();
@@ -52,26 +52,26 @@ fn test_pidfile() -> TestResult {
 
     if !err.is_empty() {
         cleanup(&container_id, &bundle);
-        return TestResult::Failed(anyhow!("error in state : {}", err));
+        return Err(TestError::Failed(anyhow!("error in state : {}", err)));
     }
 
     let state: State = serde_json::from_str(&out).unwrap();
 
     if state.id != container_id.to_string() {
         cleanup(&container_id, &bundle);
-        return TestResult::Failed(anyhow!(
+        return Err(TestError::Failed(anyhow!(
             "error in state : id not matched ,expected {} got {}",
             container_id,
             state.id
-        ));
+        )));
     }
 
     if state.status != "created" {
         cleanup(&container_id, &bundle);
-        return TestResult::Failed(anyhow!(
+        return Err(TestError::Failed(anyhow!(
             "error in state : status not matched ,expected 'created' got {}",
             state.status
-        ));
+        )));
     }
 
     // get pid from the pidfile
@@ -83,15 +83,15 @@ fn test_pidfile() -> TestResult {
     // get pid from the state
     if state.pid.unwrap() != pidfile {
         cleanup(&container_id, &bundle);
-        return TestResult::Failed(anyhow!(
+        return Err(TestError::Failed(anyhow!(
             "error : pid not matched ,expected {} as per state, but got {} from pidfile instead",
             state.pid.unwrap(),
             pidfile
-        ));
+        )));
     }
 
     cleanup(&container_id, &bundle);
-    TestResult::Passed
+    Ok(())
 }
 
 pub fn get_pidfile_test() -> TestGroup {

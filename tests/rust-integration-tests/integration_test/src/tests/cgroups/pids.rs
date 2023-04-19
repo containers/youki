@@ -41,7 +41,7 @@ fn create_spec(cgroup_name: &str, limit: i64) -> Result<Spec> {
 }
 
 // Tests if a specified limit was successfully set
-fn test_positive_limit() -> TestResult {
+fn test_positive_limit() -> TestResult<()>{
     let cgroup_name = "test_positive_limit";
     let limit = 50;
     let spec = test_result!(create_spec(cgroup_name, limit));
@@ -49,12 +49,12 @@ fn test_positive_limit() -> TestResult {
     test_outside_container(spec, &|data| {
         test_result!(check_container_created(&data));
         test_result!(check_pid_limit_set(cgroup_name, limit));
-        TestResult::Passed
+        Ok(())
     })
 }
 
 // Tests if a specified limit of zero sets the pid limit to unlimited
-fn test_zero_limit() -> TestResult {
+fn test_zero_limit() -> TestResult<()>{
     let cgroup_name = "test_zero_limit";
     let limit = 0;
     let spec = test_result!(create_spec(cgroup_name, limit));
@@ -62,12 +62,12 @@ fn test_zero_limit() -> TestResult {
     test_outside_container(spec, &|data| {
         test_result!(check_container_created(&data));
         test_result!(check_pids_are_unlimited(cgroup_name));
-        TestResult::Passed
+        Ok(())
     })
 }
 
 // Tests if a specified negative limit sets the pid limit to unlimited
-fn test_negative_limit() -> TestResult {
+fn test_negative_limit() -> TestResult<()>{
     let cgroup_name = "test_negative_limit";
     let limit = -1;
     let spec = test_result!(create_spec(cgroup_name, limit));
@@ -75,7 +75,7 @@ fn test_negative_limit() -> TestResult {
     test_outside_container(spec, &|data| {
         test_result!(check_container_created(&data));
         test_result!(check_pids_are_unlimited(cgroup_name));
-        TestResult::Passed
+        Ok(())
     })
 }
 

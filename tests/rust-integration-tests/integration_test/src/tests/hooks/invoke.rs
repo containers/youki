@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use oci_spec::runtime::{Hook, HookBuilder, HooksBuilder, ProcessBuilder, Spec, SpecBuilder};
 use std::{fs::File, io::Read};
-use test_framework::{Test, TestGroup, TestResult};
+use test_framework::{Test, TestGroup, testable::TestError};
 
 use crate::utils::{
     create_container, delete_container, generate_uuid, prepare_bundle, set_config,
@@ -84,11 +84,11 @@ fn get_test(test_name: &'static str) -> Test {
             };
             delete_hook_output_file();
             if log != "pre-start1 called\npre-start2 called\npost-start1 called\npost-start2 called\npost-stop1 called\npost-stop2 called\n" {
-                return TestResult::Failed(anyhow!(
+                return Err(TestError::Failed(anyhow!(
                         "error : hooks must be called in the listed order, {log:?}"
-                        ));
+                        )));
             }
-            TestResult::Passed
+            Ok(())
         }),
     )
 }

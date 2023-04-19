@@ -4,6 +4,7 @@ use nix::sys::stat::SFlag;
 use oci_spec::runtime::LinuxBuilder;
 use oci_spec::runtime::{ProcessBuilder, Spec, SpecBuilder};
 use std::path::PathBuf;
+use test_framework::testable::TestError;
 use test_framework::{Test, TestGroup, TestResult};
 
 fn get_spec(readonly_paths: Vec<String>) -> Spec {
@@ -27,7 +28,7 @@ fn get_spec(readonly_paths: Vec<String>) -> Spec {
         .unwrap()
 }
 
-fn check_readonly_paths() -> TestResult {
+fn check_readonly_paths() -> TestResult<()> {
     // here we abbreviate 'readonly' as ro for variable names,
     // purely for ease of writing
 
@@ -105,7 +106,7 @@ fn check_readonly_paths() -> TestResult {
     })
 }
 
-fn check_readonly_rel_path() -> TestResult {
+fn check_readonly_rel_path() -> TestResult<()> {
     let ro_rel_path = "readonly_relpath";
     let ro_paths = vec![ro_rel_path.to_string()];
     let spec = get_spec(ro_paths);
@@ -134,7 +135,7 @@ fn check_readonly_rel_path() -> TestResult {
     })
 }
 
-fn check_readonly_symlinks() -> TestResult {
+fn check_readonly_symlinks() -> TestResult<()> {
     let root = PathBuf::from("/");
     let ro_symlink = "readonly_symlink";
     let ro_paths = vec![root.join(ro_symlink).to_string_lossy().to_string()];
@@ -176,16 +177,16 @@ fn check_readonly_symlinks() -> TestResult {
             }
         }
     });
-    if let TestResult::Passed = res {
-        TestResult::Failed(anyhow!(
+    match res {
+        Ok(()) => Err(TestError::Failed(anyhow!(
             "expected error in container creation with invalid symlink, found no error"
-        ))
-    } else {
-        TestResult::Passed
+        ))),
+        Err(TestError::Failed(_)) => Ok(()),
+        Err(TestError::Skipped) => Err(TestError::Skipped),
     }
 }
 
-fn test_node(mode: u32) -> TestResult {
+fn test_node(mode: u32) -> TestResult<()> {
     let root = PathBuf::from("/");
     let ro_device = "readonly_device";
     let ro_paths = vec![root.join(ro_device).to_string_lossy().to_string()];
@@ -223,20 +224,17 @@ fn test_node(mode: u32) -> TestResult {
     })
 }
 
-fn check_readonly_device_nodes() -> TestResult {
+fn check_readonly_device_nodes() -> TestResult<()> {
     let modes = [
         SFlag::S_IFBLK.bits() | 0o666,
         SFlag::S_IFCHR.bits() | 0o666,
         SFlag::S_IFIFO.bits() | 0o666,
     ];
     for mode in modes {
-        let res = test_node(mode);
-        if let TestResult::Failed(_) = res {
-            return res;
-        }
+        test_node(mode)?;
         std::thread::sleep(std::time::Duration::from_millis(1000));
     }
-    TestResult::Passed
+    Ok(())
 }
 
 pub fn get_ro_paths_test() -> TestGroup {

@@ -3,12 +3,13 @@ use crate::utils::get_runtime_path;
 use crate::utils::test_utils::State;
 use crate::utils::{create_temp_dir, generate_uuid};
 use anyhow::anyhow;
+use test_framework::testable::TestError;
 use std::path::Path;
 use std::process::{Command, Stdio};
 use test_framework::TestResult;
 
 // Simple function to figure out the PID of the first container process
-fn get_container_pid(project_path: &Path, id: &str) -> Result<i32, TestResult> {
+fn get_container_pid(project_path: &Path, id: &str) -> TestResult<i32> {
     let res_state = match Command::new(get_runtime_path())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -22,7 +23,7 @@ fn get_container_pid(project_path: &Path, id: &str) -> Result<i32, TestResult> {
     {
         Ok(o) => o,
         Err(e) => {
-            return Err(TestResult::Failed(anyhow!(
+            return Err(TestError::Failed(anyhow!(
                 "error getting container state {}",
                 e
             )))
@@ -31,7 +32,7 @@ fn get_container_pid(project_path: &Path, id: &str) -> Result<i32, TestResult> {
     let stdout = match String::from_utf8(res_state.stdout) {
         Ok(s) => s,
         Err(e) => {
-            return Err(TestResult::Failed(anyhow!(
+            return Err(TestError::Failed(anyhow!(
                 "failed to parse container stdout {}",
                 e
             )))
@@ -40,7 +41,7 @@ fn get_container_pid(project_path: &Path, id: &str) -> Result<i32, TestResult> {
     let state: State = match serde_json::from_str(&stdout) {
         Ok(v) => v,
         Err(e) => {
-            return Err(TestResult::Failed(anyhow!(
+            return Err(TestError::Failed(anyhow!(
                 "error in parsing state of container: stdout : {}, parse error : {}",
                 stdout,
                 e
@@ -55,7 +56,7 @@ fn get_container_pid(project_path: &Path, id: &str) -> Result<i32, TestResult> {
 }
 
 // CRIU requires a minimal network setup in the network namespace
-fn setup_network_namespace(project_path: &Path, id: &str) -> Result<(), TestResult> {
+fn setup_network_namespace(project_path: &Path, id: &str) -> TestResult<()> {
     let pid = get_container_pid(project_path, id)?;
 
     if let Err(e) = Command::new("nsenter")
@@ -69,7 +70,7 @@ fn setup_network_namespace(project_path: &Path, id: &str) -> Result<(), TestResu
         .expect("failed to exec ip")
         .wait_with_output()
     {
-        return Err(TestResult::Failed(anyhow!(
+        return Err(TestError::Failed(anyhow!(
             "error setting up network namespace {}",
             e
         )));
@@ -83,27 +84,25 @@ fn checkpoint(
     id: &str,
     args: Vec<&str>,
     work_path: Option<&str>,
-) -> TestResult {
-    if let Err(e) = setup_network_namespace(project_path, id) {
-        return e;
-    }
+) -> TestResult<()> {
+    setup_network_namespace(project_path, id)?;
 
     let temp_dir = match create_temp_dir(&generate_uuid()) {
         Ok(td) => td,
         Err(e) => {
-            return TestResult::Failed(anyhow::anyhow!(
+            return Err(TestError::Failed(anyhow::anyhow!(
                 "failed creating temporary directory {:?}",
                 e
-            ))
+            )))
         }
     };
     let checkpoint_dir = temp_dir.as_ref().join("checkpoint");
     if let Err(e) = std::fs::create_dir(&checkpoint_dir) {
-        return TestResult::Failed(anyhow::anyhow!(
+        return Err(TestError::Failed(anyhow::anyhow!(
             "failed creating checkpoint directory ({:?}): {}",
             &checkpoint_dir,
             e
-        ));
+        )));
     }
 
     let additional_args = match work_path {
@@ -131,24 +130,21 @@ fn checkpoint(
         .expect("failed to execute checkpoint command")
         .wait_with_output();
 
-    let result = get_result_from_output(checkpoint);
-    if let TestResult::Failed(_) = result {
-        return result;
-    }
+    get_result_from_output(checkpoint)?;
 
     // Check for complete checkpoint
     if !Path::new(&checkpoint_dir.join("inventory.img")).exists() {
-        return TestResult::Failed(anyhow::anyhow!(
+        return Err(TestError::Failed(anyhow::anyhow!(
             "resulting checkpoint does not seem to be complete. {:?}/inventory.img is missing",
             &checkpoint_dir,
-        ));
+        )));
     }
 
     if !Path::new(&checkpoint_dir.join("descriptors.json")).exists() {
-        return TestResult::Failed(anyhow::anyhow!(
+        return Err(TestError::Failed(anyhow::anyhow!(
             "resulting checkpoint does not seem to be complete. {:?}/descriptors.json is missing",
             &checkpoint_dir,
-        ));
+        )));
     }
 
     let dump_log = match work_path {
@@ -157,19 +153,19 @@ fn checkpoint(
     };
 
     if !dump_log.exists() {
-        return TestResult::Failed(anyhow::anyhow!(
+        return Err(TestError::Failed(anyhow::anyhow!(
             "resulting checkpoint log file {:?} not found.",
             &dump_log,
-        ));
+        )));
     }
 
-    TestResult::Passed
+    Ok(())
 }
 
-pub fn checkpoint_leave_running_work_path_tmp(project_path: &Path, id: &str) -> TestResult {
+pub fn checkpoint_leave_running_work_path_tmp(project_path: &Path, id: &str) -> TestResult<()> {
     checkpoint(project_path, id, vec!["--leave-running"], Some("/tmp/"))
 }
 
-pub fn checkpoint_leave_running(project_path: &Path, id: &str) -> TestResult {
+pub fn checkpoint_leave_running(project_path: &Path, id: &str) -> TestResult<()> {
     checkpoint(project_path, id, vec!["--leave-running"], None)
 }

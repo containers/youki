@@ -23,7 +23,7 @@ fn create_spec(hostname: &str) -> Spec {
         .unwrap()
 }
 
-fn hostname_test() -> TestResult {
+fn hostname_test() -> TestResult<()>{
     let spec = create_spec("hostname-specific");
     test_inside_container(spec, &|_| {
         // As long as the container is created, we expect the hostname to be determined
@@ -32,7 +32,7 @@ fn hostname_test() -> TestResult {
     })
 }
 
-fn empty_hostname() -> TestResult {
+fn empty_hostname() -> TestResult<()>{
     let spec = create_spec("");
     test_inside_container(spec, &|_| {
         // As long as the container is created, we expect the hostname to be determined

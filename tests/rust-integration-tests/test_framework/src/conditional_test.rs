@@ -2,7 +2,7 @@
 use crate::testable::{TestResult, Testable};
 
 // type aliases for test function signature
-type TestFn = dyn Fn() -> TestResult + Sync + Send;
+type TestFn = dyn Fn() -> TestResult<()> + Sync + Send;
 // type alias for function signature for function which checks if a test can be run or not
 type CheckFn = dyn Fn() -> bool + Sync + Send;
 
@@ -36,7 +36,7 @@ impl Testable for ConditionalTest {
         (self.check_fn)()
     }
 
-    fn run(&self) -> TestResult {
+    fn run(&self) -> TestResult<()> {
         (self.test_fn)()
     }
 }

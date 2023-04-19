@@ -1,5 +1,5 @@
 ///! Contains structure for a test group
-use crate::testable::{TestResult, Testable, TestableGroup};
+use crate::testable::{TestResult, Testable, TestableGroup, TestError};
 use crossbeam::thread;
 use std::collections::BTreeMap;
 
@@ -26,6 +26,12 @@ impl TestGroup {
             self.tests.insert(t.get_name(), t);
         });
     }
+
+    pub fn with(mut self, test: Box<impl Testable + Sync + Send + 'static>) -> Self {
+        self.tests.insert(test.get_name(), test);
+
+        self
+    }
 }
 
 impl TestableGroup for TestGroup {
@@ -35,7 +41,7 @@ impl TestableGroup for TestGroup {
     }
 
     /// run all the test from the test group
-    fn run_all(&self) -> Vec<(&'static str, TestResult)> {
+    fn run_all(&self) -> Vec<(&'static str, TestResult<()>)> {
         let mut ret = Vec::with_capacity(self.tests.len());
         thread::scope(|s| {
             let mut collector = Vec::with_capacity(self.tests.len());
@@ -44,7 +50,7 @@ impl TestableGroup for TestGroup {
                     if t.can_run() {
                         (t.get_name(), t.run())
                     } else {
-                        (t.get_name(), TestResult::Skipped)
+                        (t.get_name(), Err(TestError::Skipped))
                     }
                 });
                 collector.push(_t);
@@ -58,7 +64,7 @@ impl TestableGroup for TestGroup {
     }
 
     /// run selected test from the group
-    fn run_selected(&self, selected: &[&str]) -> Vec<(&'static str, TestResult)> {
+    fn run_selected(&self, selected: &[&str]) -> Vec<(&'static str, TestResult<()>)> {
         let selected_tests = self
             .tests
             .iter()
@@ -71,7 +77,7 @@ impl TestableGroup for TestGroup {
                     if t.can_run() {
                         (t.get_name(), t.run())
                     } else {
-                        (t.get_name(), TestResult::Skipped)
+                        (t.get_name(), Err(TestError::Skipped))
                     }
                 });
                 collector.push(_t);

@@ -4,6 +4,7 @@ use anyhow::anyhow;
 use oci_spec::runtime::LinuxBuilder;
 use oci_spec::runtime::{LinuxHugepageLimitBuilder, LinuxResourcesBuilder};
 use oci_spec::runtime::{Spec, SpecBuilder};
+use test_framework::testable::TestError;
 use std::path::PathBuf;
 use test_framework::{test_result, ConditionalTest, TestGroup, TestResult};
 
@@ -32,29 +33,29 @@ fn make_hugetlb_spec(page_size: &str, limit: i64) -> Spec {
         .unwrap()
 }
 
-fn test_wrong_tlb() -> TestResult {
+fn test_wrong_tlb() -> TestResult<()> {
     // 3 MB pagesize is wrong, as valid values must be a power of 2
     let page = "3MB";
     let limit = 100 * 3 * 1024 * 1024;
     let spec = make_hugetlb_spec(page, limit);
     test_outside_container(spec, &|data| {
         match data.create_result {
-            Err(e) => TestResult::Failed(anyhow!(e)),
+            Err(e) => Err(TestError::Failed(anyhow!(e))),
             Ok(res) => {
                 if data.state.is_some() {
-                    return TestResult::Failed(anyhow!(
+                    return Err(TestError::Failed(anyhow!(
                         "stdout of state command was non-empty : {:?}",
                         data.state
-                    ));
+                    )));
                 }
                 if data.state_err.is_empty() {
-                    return TestResult::Failed(anyhow!("stderr of state command was empty"));
+                    return Err(TestError::Failed(anyhow!("stderr of state command was empty")));
                 }
                 if res.success() {
                     // The operation should not have succeeded as pagesize was not power of 2
-                    TestResult::Failed(anyhow!("invalid page size of {} was allowed", page))
+                    Err(TestError::Failed(anyhow!("invalid page size of {} was allowed", page)))
                 } else {
-                    TestResult::Passed
+                    Ok(())
                 }
             }
         }
@@ -93,24 +94,24 @@ fn get_tlb_sizes() -> Vec<String> {
     sizes
 }
 
-fn validate_tlb(id: &str, size: &str, limit: i64) -> TestResult {
+fn validate_tlb(id: &str, size: &str, limit: i64) -> TestResult<()> {
     let root = "/sys/fs/cgroup/hugetlb";
     let path = format!("{root}/{id}/hugetlb.{size}.limit_in_bytes");
     let val_str = std::fs::read_to_string(path).unwrap();
     let val: i64 = val_str.trim().parse().unwrap();
     if val == limit {
-        TestResult::Passed
+        Ok(())
     } else {
-        TestResult::Failed(anyhow!(
+        Err(TestError::Failed(anyhow!(
             "page limit not set correctly : for size {}, expected {}, got {}",
             size,
             limit,
             val
-        ))
+        )))
     }
 }
 
-fn test_valid_tlb() -> TestResult {
+fn test_valid_tlb() -> TestResult<()> {
     // When setting the limit just for checking if writing works, the amount of memory
     // requested does not matter, as all insigned integers will be accepted.
     // Use 1GiB as an example
@@ -118,20 +119,14 @@ fn test_valid_tlb() -> TestResult {
     let tlb_sizes = get_tlb_sizes();
     for size in tlb_sizes.iter() {
         let spec = make_hugetlb_spec(size, limit);
-        let res = test_outside_container(spec, &|data| {
+        test_outside_container(spec, &|data| {
             test_result!(check_container_created(&data));
+            validate_tlb(&data.id, size, limit)?;
 
-            let r = validate_tlb(&data.id, size, limit);
-            if matches!(r, TestResult::Failed(_)) {
-                return r;
-            }
-            TestResult::Passed
-        });
-        if matches!(res, TestResult::Failed(_)) {
-            return res;
-        }
+            Ok(())
+        })?;
     }
-    TestResult::Passed
+    Ok(())
 }
 
 pub fn get_tlb_test() -> TestGroup {

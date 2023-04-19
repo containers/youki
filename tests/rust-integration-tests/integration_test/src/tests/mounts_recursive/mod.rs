@@ -92,7 +92,7 @@ fn clean_mount(mount_dir: &Path, sub_mount_dir: &Path) {
     fs::remove_dir_all(mount_dir).unwrap();
 }
 
-fn check_recursive_readonly() -> TestResult {
+fn check_recursive_readonly() -> TestResult<()> {
     let rro_test_base_dir = PathBuf::from_str("/tmp").unwrap();
     let rro_dir_path = rro_test_base_dir.join("rro_dir");
     let rro_subdir_path = rro_dir_path.join("rro_subdir");
@@ -120,7 +120,7 @@ fn check_recursive_readonly() -> TestResult {
     result
 }
 
-fn check_recursive_nosuid() -> TestResult {
+fn check_recursive_nosuid() -> TestResult<()> {
     let rnosuid_test_base_dir = PathBuf::from_str("/tmp").unwrap();
     let rnosuid_dir_path = rnosuid_test_base_dir.join("rnosuid_dir");
     let rnosuid_subdir_path = rnosuid_dir_path.join("rnosuid_subdir");
@@ -206,7 +206,7 @@ fn check_recursive_nosuid() -> TestResult {
     result
 }
 
-fn check_recursive_rsuid() -> TestResult {
+fn check_recursive_rsuid() -> TestResult<()> {
     let rsuid_dir_path = PathBuf::from_str("/tmp/rsuid_dir").unwrap();
     let mount_dest_path = PathBuf::from_str("/mnt/rsuid_dir").unwrap();
     fs::create_dir_all(rsuid_dir_path.clone()).unwrap();
@@ -242,7 +242,7 @@ fn check_recursive_rsuid() -> TestResult {
     result
 }
 
-fn check_recursive_noexec() -> TestResult {
+fn check_recursive_noexec() -> TestResult<()> {
     let rnoexec_test_base_dir = PathBuf::from_str("/tmp").unwrap();
     let rnoexec_dir_path = rnoexec_test_base_dir.join("rnoexec_dir");
     let rnoexec_subdir_path = rnoexec_dir_path.join("rnoexec_subdir");
@@ -283,7 +283,7 @@ fn check_recursive_noexec() -> TestResult {
     result
 }
 
-fn check_recursive_rexec() -> TestResult {
+fn check_recursive_rexec() -> TestResult<()> {
     let rnoexec_test_base_dir = PathBuf::from_str("/tmp").unwrap();
     let rnoexec_dir_path = rnoexec_test_base_dir.join("rexec_dir");
     let rnoexec_subdir_path = rnoexec_dir_path.join("rexec_subdir");
@@ -325,7 +325,7 @@ fn check_recursive_rexec() -> TestResult {
 }
 
 /// rdiratime If set in attr_clr, removes the restriction that prevented updating access time for directories.
-fn check_recursive_rdiratime() -> TestResult {
+fn check_recursive_rdiratime() -> TestResult<()> {
     let rdiratime_base_dir = PathBuf::from_str("/tmp/rdiratime").unwrap();
     let mount_dest_path = PathBuf::from_str("/rdiratime").unwrap();
     fs::create_dir(rdiratime_base_dir.clone()).unwrap();
@@ -349,7 +349,7 @@ fn check_recursive_rdiratime() -> TestResult {
 }
 
 /// If set in attr_set, prevents updating access time for directories on this mount
-fn check_recursive_rnodiratime() -> TestResult {
+fn check_recursive_rnodiratime() -> TestResult<()> {
     let rnodiratime_base_dir = PathBuf::from_str("/tmp/rnodiratime").unwrap();
     let mount_dest_path = PathBuf::from_str("/rnodiratime").unwrap();
     fs::create_dir(rnodiratime_base_dir.clone()).unwrap();
@@ -371,7 +371,7 @@ fn check_recursive_rnodiratime() -> TestResult {
     result
 }
 
-fn check_recursive_rdev() -> TestResult {
+fn check_recursive_rdev() -> TestResult<()> {
     let rdev_base_dir = PathBuf::from_str("/dev").unwrap();
     let mount_dest_path = PathBuf::from_str("/rdev").unwrap();
 
@@ -390,7 +390,7 @@ fn check_recursive_rdev() -> TestResult {
     test_inside_container(spec, &|_| Ok(()))
 }
 
-fn check_recursive_rnodev() -> TestResult {
+fn check_recursive_rnodev() -> TestResult<()> {
     let rnodev_base_dir = PathBuf::from_str("/dev").unwrap();
     let mount_dest_path = PathBuf::from_str("/rnodev").unwrap();
 
@@ -409,7 +409,7 @@ fn check_recursive_rnodev() -> TestResult {
     test_inside_container(spec, &|_| Ok(()))
 }
 
-fn check_recursive_readwrite() -> TestResult {
+fn check_recursive_readwrite() -> TestResult<()> {
     let rrw_test_base_dir = PathBuf::from_str("/tmp").unwrap();
     let rrw_dir_path = rrw_test_base_dir.join("rrw_dir");
     let rrw_subdir_path = rrw_dir_path.join("rrw_subdir");
@@ -437,7 +437,7 @@ fn check_recursive_readwrite() -> TestResult {
     result
 }
 
-fn check_recursive_rrelatime() -> TestResult {
+fn check_recursive_rrelatime() -> TestResult<()> {
     let rrelatime_base_dir = PathBuf::from_str("/tmp").unwrap();
     let rrelatime_dir_path = rrelatime_base_dir.join("rrelatime_dir");
     let rrelatime_suddir_path = rrelatime_dir_path.join("rrelatime_subdir");
@@ -461,7 +461,7 @@ fn check_recursive_rrelatime() -> TestResult {
     result
 }
 
-fn check_recursive_rnorelatime() -> TestResult {
+fn check_recursive_rnorelatime() -> TestResult<()> {
     let rnorelatime_base_dir = PathBuf::from_str("/tmp").unwrap();
     let rnorelatime_dir_path = rnorelatime_base_dir.join("rnorelatime_dir");
     let mount_dest_path = PathBuf::from_str("/rnorelatime").unwrap();
@@ -485,7 +485,7 @@ fn check_recursive_rnorelatime() -> TestResult {
     result
 }
 
-fn check_recursive_rnoatime() -> TestResult {
+fn check_recursive_rnoatime() -> TestResult<()> {
     let rnoatime_base_dir = PathBuf::from_str("/tmp").unwrap();
     let rnoatime_dir_path = rnoatime_base_dir.join("rnoatime_dir");
     let mount_dest_path = PathBuf::from_str("/rnoatime").unwrap();
@@ -509,7 +509,7 @@ fn check_recursive_rnoatime() -> TestResult {
     result
 }
 
-fn check_recursive_rstrictatime() -> TestResult {
+fn check_recursive_rstrictatime() -> TestResult<()> {
     let rstrictatime_base_dir = PathBuf::from_str("/tmp").unwrap();
     let rstrictatime_dir_path = rstrictatime_base_dir.join("rstrictatime_dir");
     let mount_dest_path = PathBuf::from_str("/rstrictatime").unwrap();
@@ -532,7 +532,7 @@ fn check_recursive_rstrictatime() -> TestResult {
     result
 }
 
-fn check_recursive_rnosymfollow() -> TestResult {
+fn check_recursive_rnosymfollow() -> TestResult<()> {
     let rnosymfollow_dir_path = PathBuf::from_str("/tmp/rnosymfollow").unwrap();
     let mount_dest_path = PathBuf::from_str("/mnt/rnosymfollow").unwrap();
     fs::create_dir_all(rnosymfollow_dir_path.clone()).unwrap();

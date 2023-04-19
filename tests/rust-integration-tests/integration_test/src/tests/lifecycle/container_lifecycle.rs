@@ -31,24 +31,23 @@ impl ContainerLifecycle {
         }
     }
 
-    pub fn create(&self) -> TestResult {
+    pub fn create(&self) -> TestResult<()> {
         create::create(&self.project_path, &self.container_id)
     }
 
-    #[allow(dead_code)]
-    pub fn exec(&self, cmd: Vec<&str>, expected_output: Option<&str>) -> TestResult {
+    pub fn exec(&self, cmd: Vec<&str>, expected_output: Option<&str>) -> TestResult<()> {
         exec::exec(&self.project_path, &self.container_id, cmd, expected_output)
     }
 
-    pub fn start(&self) -> TestResult {
+    pub fn start(&self) -> TestResult<()> {
         start::start(&self.project_path, &self.container_id)
     }
 
-    pub fn state(&self) -> TestResult {
+    pub fn state(&self) -> TestResult<()> {
         state::state(&self.project_path, &self.container_id)
     }
 
-    pub fn kill(&self) -> TestResult {
+    pub fn kill(&self) -> TestResult<()> {
         let ret = kill::kill(&self.project_path, &self.container_id);
         // sleep a little, so the youki process actually gets the signal and shuts down
         // otherwise, the tester moves on to next tests before the youki has gotten signal, and delete test can fail
@@ -56,15 +55,15 @@ impl ContainerLifecycle {
         ret
     }
 
-    pub fn delete(&self) -> TestResult {
+    pub fn delete(&self) -> TestResult<()> {
         delete::delete(&self.project_path, &self.container_id)
     }
 
-    pub fn checkpoint_leave_running(&self) -> TestResult {
+    pub fn checkpoint_leave_running(&self) -> TestResult<()> {
         checkpoint::checkpoint_leave_running(&self.project_path, &self.container_id)
     }
 
-    pub fn checkpoint_leave_running_work_path_tmp(&self) -> TestResult {
+    pub fn checkpoint_leave_running_work_path_tmp(&self) -> TestResult<()> {
         checkpoint::checkpoint_leave_running_work_path_tmp(&self.project_path, &self.container_id)
     }
 }
@@ -74,7 +73,7 @@ impl TestableGroup for ContainerLifecycle {
         "lifecycle"
     }
 
-    fn run_all(&self) -> Vec<(&'static str, TestResult)> {
+    fn run_all(&self) -> Vec<(&'static str, TestResult<()>)> {
         vec![
             ("create", self.create()),
             ("start", self.start()),
@@ -96,7 +95,7 @@ impl TestableGroup for ContainerLifecycle {
         ]
     }
 
-    fn run_selected(&self, selected: &[&str]) -> Vec<(&'static str, TestResult)> {
+    fn run_selected(&self, selected: &[&str]) -> Vec<(&'static str, TestResult<()>)> {
         let mut ret = Vec::new();
         for name in selected {
             match *name {

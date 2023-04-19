@@ -480,7 +480,7 @@ fn validate_block_io(cgroup_name: &str, spec: &Spec) -> Result<()> {
     Ok(())
 }
 
-fn test_blkio(test_name: &str, rate: u64, empty: bool) -> TestResult {
+fn test_blkio(test_name: &str, rate: u64, empty: bool) -> TestResult<()> {
     // these "magic" numbers are taken from the original tests
     // https://github.com/opencontainers/runtime-tools/blob/1684d131456a6bc99b8e96aa4a99783f21e58d79/validation/linux_cgroups_blkio/linux_cgroups_blkio.go#L13-L20
     let weight: u16 = 500;
@@ -551,7 +551,7 @@ fn test_blkio(test_name: &str, rate: u64, empty: bool) -> TestResult {
     test_outside_container(spec.clone(), &|data| {
         test_result!(check_container_created(&data));
         test_result!(validate_block_io(test_name, &spec));
-        TestResult::Passed
+        Ok(())
     })
 }
 

@@ -35,7 +35,7 @@ const CGROUP_CPU_IDLE: &str = "cpu.idle";
 // that it should be unchanged.
 
 /// Tests if a cpu idle value is successfully set
-fn test_cpu_idle_set() -> TestResult {
+fn test_cpu_idle_set() -> TestResult<()> {
     let idle: i64 = 1;
     let cpu = test_result!(LinuxCpuBuilder::default()
         .idle(idle)
@@ -46,12 +46,12 @@ fn test_cpu_idle_set() -> TestResult {
     test_outside_container(spec, &|data| {
         test_result!(check_container_created(&data));
         test_result!(check_cpu_idle("test_cpu_idle_set", idle));
-        TestResult::Passed
+        Ok(())
     })
 }
 
 /// Tests default idle value is correct
-fn test_cpu_idle_default() -> TestResult {
+fn test_cpu_idle_default() -> TestResult<()> {
     let default_idle = 0;
     let cpu = test_result!(LinuxCpuBuilder::default().build().context("build cpu spec"));
 
@@ -59,12 +59,12 @@ fn test_cpu_idle_default() -> TestResult {
     test_outside_container(spec, &|data| {
         test_result!(check_container_created(&data));
         test_result!(check_cpu_idle("test_cpu_idle_default", default_idle));
-        TestResult::Passed
+        Ok(())
     })
 }
 
 /// Tests if a cpu weight that is in the valid range [1, 10000] is successfully set
-fn test_cpu_weight_valid_set() -> TestResult {
+fn test_cpu_weight_valid_set() -> TestResult<()> {
     let cpu_weight = 22_000u64;
     let converted_cpu_weight = 840u64;
     let cpu = test_result!(LinuxCpuBuilder::default()
@@ -79,12 +79,12 @@ fn test_cpu_weight_valid_set() -> TestResult {
             "test_cpu_weight_valid_set",
             converted_cpu_weight
         ));
-        TestResult::Passed
+        Ok(())
     })
 }
 
 /// Tests if a cpu weight of zero is ignored
-fn test_cpu_weight_zero_ignored() -> TestResult {
+fn test_cpu_weight_zero_ignored() -> TestResult<()> {
     let cpu_weight = 0u64;
     let default_cpu_weight = 100;
     let cpu = test_result!(LinuxCpuBuilder::default()
@@ -99,12 +99,13 @@ fn test_cpu_weight_zero_ignored() -> TestResult {
             "test_cpu_weight_zero_ignored",
             default_cpu_weight
         ));
-        TestResult::Passed
+
+        Ok(())
     })
 }
 
 /// Tests if a cpu weight that is too high (over 10000 after conversion) is set to the maximum value
-fn test_cpu_weight_too_high_maximum_set() -> TestResult {
+fn test_cpu_weight_too_high_maximum_set() -> TestResult<()> {
     let cpu_weight = 500_000u64;
     let converted_cpu_weight = 10_000;
     let cpu = test_result!(LinuxCpuBuilder::default()
@@ -119,12 +120,12 @@ fn test_cpu_weight_too_high_maximum_set() -> TestResult {
             "test_cpu_weight_too_high_maximum_set",
             converted_cpu_weight
         ));
-        TestResult::Passed
+        Ok(())
     })
 }
 
 /// Tests if a valid cpu quota (x > 0) is set successfully
-fn test_cpu_quota_valid_set() -> TestResult {
+fn test_cpu_quota_valid_set() -> TestResult<()> {
     let cpu_quota = 250_000;
     let cpu = test_result!(LinuxCpuBuilder::default()
         .quota(cpu_quota)
@@ -139,12 +140,12 @@ fn test_cpu_quota_valid_set() -> TestResult {
             cpu_quota,
             DEFAULT_PERIOD
         ));
-        TestResult::Passed
+        Ok(())
     })
 }
 
 /// Tests if the cpu quota is the defalt value (max) if a cpu quota of zero has been specified
-fn test_cpu_quota_zero_default_set() -> TestResult {
+fn test_cpu_quota_zero_default_set() -> TestResult<()> {
     let cpu_quota = 0;
     let cpu = test_result!(LinuxCpuBuilder::default()
         .quota(cpu_quota)
@@ -159,12 +160,12 @@ fn test_cpu_quota_zero_default_set() -> TestResult {
             i64::MAX,
             DEFAULT_PERIOD
         ));
-        TestResult::Passed
+        Ok(())
     })
 }
 
 /// Tests if the cpu quota is the default value (max) if a negative cpu quota has been specified
-fn test_cpu_quota_negative_default_set() -> TestResult {
+fn test_cpu_quota_negative_default_set() -> TestResult<()> {
     let cpu_quota = -9999;
     let cpu = test_result!(LinuxCpuBuilder::default()
         .quota(cpu_quota)
@@ -182,13 +183,13 @@ fn test_cpu_quota_negative_default_set() -> TestResult {
             i64::MAX,
             DEFAULT_PERIOD
         ));
-        TestResult::Passed
+        Ok(())
     })
 }
 
 /// Tests if a valid cpu period (x > 0) is set successfully. Cpu quota needs to
 /// remain unchanged
-fn test_cpu_period_valid_set() -> TestResult {
+fn test_cpu_period_valid_set() -> TestResult<()> {
     let quota = 250_000;
     let expected_period = 250_000;
     let cpu = test_result!(LinuxCpuBuilder::default()
@@ -210,13 +211,13 @@ fn test_cpu_period_valid_set() -> TestResult {
             quota,
             expected_period
         ));
-        TestResult::Passed
+        Ok(())
     })
 }
 
 /// Tests if the cpu period is unchanged if the cpu period is unspecified. Cpu quota needs
 /// to be unchanged as well
-fn test_cpu_quota_period_unspecified_unchanged() -> TestResult {
+fn test_cpu_quota_period_unspecified_unchanged() -> TestResult<()> {
     let quota = 250_000;
     let expected_period = 250_000;
     let cpu = test_result!(LinuxCpuBuilder::default().build().context("build cpu spec"));
@@ -235,11 +236,11 @@ fn test_cpu_quota_period_unspecified_unchanged() -> TestResult {
             quota,
             expected_period
         ));
-        TestResult::Passed
+        Ok(())
     })
 }
 
-fn test_cpu_period_and_quota_valid_set() -> TestResult {
+fn test_cpu_period_and_quota_valid_set() -> TestResult<()> {
     let expected_quota = 250_000;
     let expected_period = 250_000;
     let cpu = test_result!(LinuxCpuBuilder::default()
@@ -257,7 +258,7 @@ fn test_cpu_period_and_quota_valid_set() -> TestResult {
             expected_quota,
             expected_period
         ));
-        TestResult::Passed
+        Ok(())
     })
 }
 

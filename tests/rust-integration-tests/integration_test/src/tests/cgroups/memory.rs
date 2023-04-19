@@ -37,7 +37,7 @@ fn create_spec(cgroup_name: &str, limit: i64, swappiness: u64) -> Result<Spec> {
     Ok(spec)
 }
 
-fn test_memory_cgroups() -> TestResult {
+fn test_memory_cgroups() -> TestResult<()> {
     let cgroup_name = "test_memory_cgroups";
 
     let cases = vec![
@@ -50,17 +50,14 @@ fn test_memory_cgroups() -> TestResult {
     ];
 
     for spec in cases.into_iter() {
-        let test_result = test_outside_container(spec, &|data| {
+        test_outside_container(spec, &|data| {
             test_result!(check_container_created(&data));
 
-            TestResult::Passed
-        });
-        if let TestResult::Failed(_) = test_result {
-            return test_result;
-        }
+            Ok(())
+        })?;
     }
 
-    TestResult::Passed
+    Ok(())
 }
 
 fn can_run() -> bool {

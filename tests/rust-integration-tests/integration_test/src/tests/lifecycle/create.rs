@@ -3,12 +3,13 @@ use std::io;
 use std::path::Path;
 use std::process::{Command, Stdio};
 use test_framework::TestResult;
+use test_framework::testable::TestError;
 
 // There are still some issues here
 // in case we put stdout and stderr as piped
 // the youki process created halts indefinitely
 // which is why we pass null, and use wait instead of wait_with_output
-pub fn create(project_path: &Path, id: &str) -> TestResult {
+pub fn create(project_path: &Path, id: &str) -> TestResult<()> {
     let res = Command::new(get_runtime_path())
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -25,14 +26,14 @@ pub fn create(project_path: &Path, id: &str) -> TestResult {
     match res {
         io::Result::Ok(status) => {
             if status.success() {
-                TestResult::Passed
+                Ok(())
             } else {
-                TestResult::Failed(anyhow::anyhow!(
+                Err(TestError::Failed(anyhow::anyhow!(
                     "Error : create exited with nonzero status : {}",
                     status
-                ))
+                )))
             }
         }
-        io::Result::Err(e) => TestResult::Failed(anyhow::Error::new(e)),
+        io::Result::Err(e) => Err(TestError::Failed(anyhow::Error::new(e))),
     }
 }

@@ -32,7 +32,7 @@ fn get_realtime_runtime() -> Option<i64> {
     None
 }
 
-fn test_cpu_cgroups() -> TestResult {
+fn test_cpu_cgroups() -> TestResult<()> {
     let cgroup_name = "test_cpu_cgroups";
     // Kernel counts 0 as a CPU, so on a system with 8 logical cores you will need `0-7` range set.
     let cpu_range = format!("0-{}", num_cpus::get().saturating_sub(1));
@@ -205,32 +205,30 @@ fn test_cpu_cgroups() -> TestResult {
 
     for case in cases.into_iter() {
         let spec = test_result!(create_spec(cgroup_name, case));
-        let test_result = test_outside_container(spec, &|data| {
+        test_outside_container(spec, &|data| {
             test_result!(check_container_created(&data));
 
-            TestResult::Passed
-        });
-
-        if let TestResult::Failed(_) = test_result {
-            return test_result;
-        }
+            Ok(())
+        })?;
     }
 
-    TestResult::Passed
+    Ok(())
 }
 
-fn test_empty_cpu() -> TestResult {
+fn test_empty_cpu() -> TestResult<()> {
     let cgroup_name = "test_empty_cpu";
     let spec = test_result!(create_empty_spec(cgroup_name));
 
     test_outside_container(spec, &|data| {
-        test_result!(check_container_created(&data));
-        TestResult::Passed
+        // test_result!(check_container_created(&data))?;
+        check_container_created(&data)?;
+
+        Ok(())
     })
 }
 
 // Tests if a cpu idle value can be set
-fn test_cpu_idle_set() -> TestResult {
+fn test_cpu_idle_set() -> TestResult<()> {
     let idle: i64 = 1;
     let realtime_period = get_realtime_period();
     let realtime_runtime = get_realtime_runtime();
@@ -251,12 +249,13 @@ fn test_cpu_idle_set() -> TestResult {
     let spec = test_result!(create_spec(cgroup_name, cpu));
     test_outside_container(spec, &|data| {
         test_result!(check_container_created(&data));
-        TestResult::Passed
+
+        Ok(())
     })
 }
 
 /// Tests default idle value
-fn test_cpu_idle_default() -> TestResult {
+fn test_cpu_idle_default() -> TestResult<()> {
     let realtime_period = get_realtime_period();
     let realtime_runtime = get_realtime_runtime();
 
@@ -275,7 +274,8 @@ fn test_cpu_idle_default() -> TestResult {
     let spec = test_result!(create_spec(cgroup_name, cpu));
     test_outside_container(spec, &|data| {
         test_result!(check_container_created(&data));
-        TestResult::Passed
+
+        Ok(())
     })
 }
 

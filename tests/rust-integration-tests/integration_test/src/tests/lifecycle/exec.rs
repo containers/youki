@@ -9,7 +9,7 @@ pub fn exec(
     id: &str,
     exec_cmd: Vec<&str>,
     expected_output: Option<&str>,
-) -> TestResult {
+) -> TestResult<()> {
     let res = Command::new(get_runtime_path())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
