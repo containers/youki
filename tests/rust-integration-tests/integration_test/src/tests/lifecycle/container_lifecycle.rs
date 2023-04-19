@@ -78,7 +78,10 @@ impl TestableGroup for ContainerLifecycle {
         vec![
             ("create", self.create()),
             ("start", self.start()),
-            // ("exec", self.exec(vec!["echo", "Hello"], Some("Hello\n"))),
+            (
+                "exec",
+                self.exec(vec!["/bin/echo", "Hello"], Some("Hello\n")),
+            ),
             (
                 "checkpoint and leave running with --work-path /tmp",
                 self.checkpoint_leave_running_work_path_tmp(),
