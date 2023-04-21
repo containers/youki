@@ -37,7 +37,6 @@ impl Executor for WasmerExecutor {
             )
         }
 
-
         let mut store = Store::default();
         let module = Module::from_file(&store, &args[0])
             .with_context(|| format!("could not load wasm module from {}", &args[0]))?;
@@ -50,9 +49,9 @@ impl Executor for WasmerExecutor {
         let imports = wasi_env
             .import_object(&mut store, &module)
             .context("could not retrieve wasm imports")?;
-        let instance =
-            Instance::new(&mut store, &module, &imports).context("wasm module could not be instantiated")?;
-        
+        let instance = Instance::new(&mut store, &module, &imports)
+            .context("wasm module could not be instantiated")?;
+
         wasi_env.initialize(&mut store, instance.clone())?;
 
         let start = instance
