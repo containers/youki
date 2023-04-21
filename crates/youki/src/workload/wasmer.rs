@@ -1,7 +1,7 @@
 use anyhow::{bail, Context, Result};
 use oci_spec::runtime::Spec;
 use wasmer::{Instance, Module, Store};
-use wasmer_wasi::WasiState;
+use wasmer_wasix::WasiEnv;
 
 use libcontainer::workload::{Executor, EMPTY};
 
@@ -37,28 +37,33 @@ impl Executor for WasmerExecutor {
             )
         }
 
-        let mut wasm_env = WasiState::new("youki_wasm_app")
-            .args(args.iter().skip(1))
-            .envs(env)
-            .finalize()?;
 
-        let store = Store::default();
+        let mut store = Store::default();
         let module = Module::from_file(&store, &args[0])
             .with_context(|| format!("could not load wasm module from {}", &args[0]))?;
 
-        let imports = wasm_env
-            .import_object(&module)
+        let mut wasi_env = WasiEnv::builder("youki_wasm_app")
+            .args(args.iter().skip(1))
+            .envs(env)
+            .finalize(&mut store)?;
+
+        let imports = wasi_env
+            .import_object(&mut store, &module)
             .context("could not retrieve wasm imports")?;
         let instance =
-            Instance::new(&module, &imports).context("wasm module could not be instantiated")?;
+            Instance::new(&mut store, &module, &imports).context("wasm module could not be instantiated")?;
+        
+        wasi_env.initialize(&mut store, instance.clone())?;
 
         let start = instance
             .exports
             .get_function("_start")
             .context("could not retrieve wasm module main function")?;
         start
-            .call(&[])
+            .call(&mut store, &[])
             .context("wasm module was not executed successfully")?;
+
+        wasi_env.cleanup(&mut store, None);
 
         Ok(())
     }
