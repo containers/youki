@@ -12,7 +12,6 @@ use nix::unistd::Pid;
 use crate::seccomp;
 #[cfg(feature = "libseccomp")]
 use nix::{
-    errno::Errno,
     sys::socket::{self, UnixAddr},
     unistd,
 };
@@ -117,15 +116,12 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<Pid> {
             log::warn!("intermediate process killed with signal: {sig}")
         }
         Ok(_) => (),
-        Err(err) => {
+        Err(nix::errno::Errno::ECHILD) => {
             // This is safe because intermediate_process and main_process check if the process is
             // finished by piping instead of exit code.
-            if err == Errno::ECHILD {
-                log::warn!("intermediate process already reaped");
-            } else {
-                bail!("failed to wait for intermediate process: {err}");
-            }
+            log::warn!("intermediate process already reaped");
         }
+        Err(err) => bail!("failed to wait for intermediate process: {err}"),
     };
 
     Ok(init_pid)
