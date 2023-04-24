@@ -70,7 +70,7 @@ pub struct GlobalOpts {
     // Example in future : '--debug     change log level to debug. (default: "warn")'
     #[clap(long)]
     pub debug: bool,
-    #[clap(short, long)]
+    #[clap(short, long, overrides_with("log"))]
     pub log: Option<PathBuf>,
     #[clap(long)]
     pub log_format: Option<String>,
