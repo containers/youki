@@ -30,7 +30,7 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<Pid> {
     let inter_chan = &mut channel::intermediate_channel()?;
     let init_chan = &mut channel::init_channel()?;
 
-    let intermediate_pid = fork::container_fork(|| {
+    let intermediate_pid = fork::container_fork("youki:[1:INTER]", || {
         container_intermediate_process::container_intermediate_process(
             container_args,
             inter_chan,

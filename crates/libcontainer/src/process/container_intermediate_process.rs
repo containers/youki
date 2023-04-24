@@ -92,7 +92,7 @@ pub fn container_intermediate_process(
     // configuration. The youki main process can decide what to do with the init
     // process and the intermediate process can just exit safely after the job
     // is done.
-    let pid = fork::container_clone_sibling(|| {
+    let pid = fork::container_clone_sibling("youki:[2:INIT]", || {
         // We are inside the forked process here. The first thing we have to do
         // is to close any unused senders, since fork will make a dup for all
         // the socket.

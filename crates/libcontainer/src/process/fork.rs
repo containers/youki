@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use libc::SIGCHLD;
 use nix::unistd::Pid;
+use prctl;
 
 // Fork/Clone a sibling process that shares the same parent as the calling
 // process. This is used to launch the container init process so the parent
@@ -9,7 +10,7 @@ use nix::unistd::Pid;
 // youki main process) will exit and the init process will be re-parented to the
 // process 1 (system init process), which is not the right behavior of what we
 // look for.
-pub fn container_clone_sibling<F: FnOnce() -> Result<i32>>(cb: F) -> Result<Pid> {
+pub fn container_clone_sibling<F: FnOnce() -> Result<i32>>(child_name: &str, cb: F) -> Result<Pid> {
     let mut clone = clone3::Clone3::default();
     // Note: normally, an exit signal is required, but when using
     // `CLONE_PARENT`, the `clone3` will return EINVAL if an exit signal is set.
@@ -17,7 +18,7 @@ pub fn container_clone_sibling<F: FnOnce() -> Result<i32>>(cb: F) -> Result<Pid>
     // the exit signal bits in the glibc wrapper.
     clone.flag_parent();
 
-    container_clone(cb, clone).with_context(|| "failed to clone sibling process")
+    container_clone(child_name, cb, clone).with_context(|| "failed to clone sibling process")
 }
 
 // A simple clone wrapper to clone3 so we can share this logic in different
@@ -25,6 +26,7 @@ pub fn container_clone_sibling<F: FnOnce() -> Result<i32>>(cb: F) -> Result<Pid>
 // and `clone3` requires only kernel version >= 5.3. Therefore, we don't need to
 // fall back to `clone` or `fork`.
 fn container_clone<F: FnOnce() -> Result<i32>>(
+    child_name: &str,
     cb: F,
     mut clone_cmd: clone3::Clone3,
 ) -> Result<Pid> {
@@ -34,6 +36,7 @@ fn container_clone<F: FnOnce() -> Result<i32>>(
     // callback, exit with -1
     match unsafe { clone_cmd.call().with_context(|| "failed to run clone3")? } {
         0 => {
+            prctl::set_name(child_name).expect("failed to set name");
             // Inside the cloned process
             let ret = match cb() {
                 Err(error) => {
@@ -54,12 +57,12 @@ fn container_clone<F: FnOnce() -> Result<i32>>(
 // using clone, we would have to manually make sure all the variables are
 // correctly send to the new process, especially Rust borrow checker will be a
 // lot of hassel to deal with every details.
-pub fn container_fork<F: FnOnce() -> Result<i32>>(cb: F) -> Result<Pid> {
+pub fn container_fork<F: FnOnce() -> Result<i32>>(child_name: &str, cb: F) -> Result<Pid> {
     // Using `clone3` to mimic the effect of `fork`.
     let mut clone = clone3::Clone3::default();
     clone.exit_signal(SIGCHLD as u64);
 
-    container_clone(cb, clone).with_context(|| "failed to fork process")
+    container_clone(child_name, cb, clone).with_context(|| "failed to fork process")
 }
 
 #[cfg(test)]
@@ -73,7 +76,7 @@ mod test {
 
     #[test]
     fn test_container_fork() -> Result<()> {
-        let pid = container_fork(|| Ok(0))?;
+        let pid = container_fork("test:child", || Ok(0))?;
         match waitpid(pid, None).expect("wait pid failed.") {
             WaitStatus::Exited(p, status) => {
                 assert_eq!(pid, p);
@@ -86,7 +89,7 @@ mod test {
 
     #[test]
     fn test_container_err_fork() -> Result<()> {
-        let pid = container_fork(|| bail!(""))?;
+        let pid = container_fork("test:child", || bail!(""))?;
         match waitpid(pid, None).expect("wait pid failed.") {
             WaitStatus::Exited(p, status) => {
                 assert_eq!(pid, p);
@@ -138,7 +141,7 @@ mod test {
             unistd::ForkResult::Child => {
                 // Inside the forked process. We call `container_clone` and pass
                 // the pid to the parent process.
-                let pid = container_clone_sibling(|| Ok(0))?;
+                let pid = container_clone_sibling("test:child", || Ok(0))?;
                 sender.send(pid.as_raw())?;
                 sender.close()?;
                 std::process::exit(0);
