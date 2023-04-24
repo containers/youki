@@ -47,7 +47,7 @@ wasmer-wasix = { version = "0.3.1", optional = true }
 
 wasmedge-sdk = { version = "0.7.1", optional = true }
 wasmtime = {version = "8.0.0", optional = true }
-wasmtime-wasi = {version = "7.0.0", optional = true }
+wasmtime-wasi = {version = "8.0.0", optional = true }
 
 [dev-dependencies]
 serial_test = "2.0.0"
