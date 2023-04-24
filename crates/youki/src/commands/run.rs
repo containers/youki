@@ -43,7 +43,11 @@ pub fn run(args: Run, root_path: PathBuf, systemd_cgroup: bool) -> Result<i32> {
         container.pid().is_some(),
         "expects a container init pid in the container state"
     );
-    handle_foreground(container.pid().unwrap())
+    let foreground_result = handle_foreground(container.pid().unwrap());
+    // execute the destruction action after the container finishes running
+    container.delete(true)?;
+    // return result
+    foreground_result
 }
 
 // handle_foreground will match the `runc` behavior running the foreground mode.
