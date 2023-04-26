@@ -54,4 +54,4 @@ serial_test = "2.0.0"
 
 [build-dependencies]
 anyhow = "1.0.70"
-vergen = {version ="8.1.1", features =["git","gitcl"]}
+vergen = {version ="8.1.2", features =["git","gitcl"]}
