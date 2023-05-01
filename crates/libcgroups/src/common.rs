@@ -92,39 +92,77 @@ pub struct ControllerOpt<'a> {
     pub freezer_state: Option<FreezerState>,
 }
 
-#[inline]
-pub fn write_cgroup_file_str<P: AsRef<Path>>(path: P, data: &str) -> Result<()> {
-    fs::OpenOptions::new()
-        .create(false)
-        .write(true)
-        .truncate(false)
-        .open(path.as_ref())
-        .with_context(|| format!("failed to open {:?}", path.as_ref()))?
-        .write_all(data.as_bytes())
-        .with_context(|| format!("failed to write {} to {:?}", data, path.as_ref()))?;
-
-    Ok(())
+#[derive(thiserror::Error, Debug)]
+pub enum WrappedIoError {
+    #[error("failed to open {path}: {err}")]
+    Open { err: std::io::Error, path: PathBuf },
+    #[error("failed to write {data} to {path}: {err}")]
+    Write {
+        err: std::io::Error,
+        path: PathBuf,
+        data: String,
+    },
+    #[error("failed to read {path}: {err}")]
+    Read { err: std::io::Error, path: PathBuf },
 }
 
 #[inline]
-pub fn write_cgroup_file<P: AsRef<Path>, T: ToString>(path: P, data: T) -> Result<()> {
-    let data = data.to_string();
-    fs::OpenOptions::new()
-        .create(false)
-        .write(true)
-        .truncate(false)
-        .open(path.as_ref())
-        .with_context(|| format!("failed to open {:?}", path.as_ref()))?
-        .write_all(data.as_bytes())
-        .with_context(|| format!("failed to write {} to {:?}", data, path.as_ref()))?;
-
-    Ok(())
-}
-
-#[inline]
-pub fn read_cgroup_file<P: AsRef<Path>>(path: P) -> Result<String> {
+pub fn write_cgroup_file_str<P: AsRef<Path>>(path: P, data: &str) -> Result<(), WrappedIoError> {
     let path = path.as_ref();
-    fs::read_to_string(path).with_context(|| format!("failed to open {path:?}"))
+
+    fs::OpenOptions::new()
+        .create(false)
+        .write(true)
+        .truncate(false)
+        .open(path)
+        .map_err(|err| WrappedIoError::Open {
+            err,
+            path: path.to_path_buf(),
+        })?
+        .write_all(data.as_bytes())
+        .map_err(|err| WrappedIoError::Write {
+            err,
+            path: path.to_path_buf(),
+            data: data.into(),
+        })?;
+
+    Ok(())
+}
+
+#[inline]
+pub fn write_cgroup_file<P: AsRef<Path>, T: ToString>(
+    path: P,
+    data: T,
+) -> Result<(), WrappedIoError> {
+    let path = path.as_ref();
+    let data = data.to_string();
+
+    fs::OpenOptions::new()
+        .create(false)
+        .write(true)
+        .truncate(false)
+        .open(path)
+        .map_err(|err| WrappedIoError::Open {
+            err,
+            path: path.to_path_buf(),
+        })?
+        .write_all(data.as_bytes())
+        .map_err(|err| WrappedIoError::Write {
+            err,
+            path: path.to_path_buf(),
+            data,
+        })?;
+
+    Ok(())
+}
+
+#[inline]
+pub fn read_cgroup_file<P: AsRef<Path>>(path: P) -> Result<String, WrappedIoError> {
+    let path = path.as_ref();
+    fs::read_to_string(path).map_err(|err| WrappedIoError::Read {
+        err,
+        path: path.to_path_buf(),
+    })
 }
 
 /// Determines the cgroup setup of the system. Systems typically have one of

@@ -45,7 +45,7 @@ impl Unified {
                             format!("failed to set {cgroup_file} to {value}: {e}")
                         };
 
-                        e.context(context)
+                        anyhow::anyhow!(e).context(context)
                     },
                 )?;
             }

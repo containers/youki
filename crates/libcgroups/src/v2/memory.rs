@@ -79,9 +79,9 @@ impl Memory {
         if val == 0 {
             Ok(())
         } else if val == -1 {
-            common::write_cgroup_file_str(path, "max")
+            Ok(common::write_cgroup_file_str(path, "max")?)
         } else {
-            common::write_cgroup_file(path, val)
+            Ok(common::write_cgroup_file(path, val)?)
         }
     }
 

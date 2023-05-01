@@ -335,25 +335,28 @@ impl CgroupManager for Manager {
 
         for controller in CONTROLLER_TYPES {
             match controller {
-                ControllerType::Cpu => {
-                    Cpu::apply(controller_opt, systemd_version, &mut properties)?
-                }
+                ControllerType::Cpu => Cpu::apply(controller_opt, systemd_version, &mut properties)
+                    .map_err(|err| anyhow!(err))?,
 
                 ControllerType::CpuSet => {
-                    CpuSet::apply(controller_opt, systemd_version, &mut properties)?
+                    CpuSet::apply(controller_opt, systemd_version, &mut properties)
+                        .map_err(|err| anyhow!(err))?
                 }
 
                 ControllerType::Pids => {
-                    Pids::apply(controller_opt, systemd_version, &mut properties)?
+                    Pids::apply(controller_opt, systemd_version, &mut properties)
+                        .map_err(|err| anyhow!(err))?
                 }
                 ControllerType::Memory => {
-                    Memory::apply(controller_opt, systemd_version, &mut properties)?
+                    Memory::apply(controller_opt, systemd_version, &mut properties)
+                        .map_err(|err| anyhow!(err))?
                 }
                 _ => {}
             };
         }
 
-        Unified::apply(controller_opt, systemd_version, &mut properties)?;
+        Unified::apply(controller_opt, systemd_version, &mut properties)
+            .map_err(|err| anyhow!(err))?;
         log::debug!("{:?}", properties);
 
         if !properties.is_empty() {
