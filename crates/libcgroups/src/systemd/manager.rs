@@ -15,12 +15,12 @@ use super::{
     controller_type::{ControllerType, CONTROLLER_TYPES},
     cpu::Cpu,
     cpuset::CpuSet,
-    dbus::client::{Client, SystemdClient},
+    dbus::client::{Client, SystemdClient, SystemdClientError},
     memory::Memory,
     pids::Pids,
 };
 use crate::{
-    common::{self, CgroupManager, ControllerOpt, FreezerState, PathBufExt},
+    common::{self, CgroupManager, ControllerOpt, FreezerState, JoinSafelyError, PathBufExt},
     systemd::unified::Unified,
 };
 use crate::{stats::Stats, v2::manager::Manager as FsManager};
@@ -61,19 +61,29 @@ struct CgroupsPath {
     name: String,
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum CgroupsPathError {
+    #[error("no cgroups path has been provided")]
+    NoPath,
+    #[error("cgroups path does not contain valid utf8")]
+    InvalidUtf8(PathBuf),
+    #[error("cgroups path is malformed: {0}")]
+    MalformedPath(PathBuf),
+}
+
 impl TryFrom<&Path> for CgroupsPath {
-    type Error = anyhow::Error;
+    type Error = CgroupsPathError;
 
     fn try_from(cgroups_path: &Path) -> Result<Self, Self::Error> {
         // if cgroups_path was provided it should be of the form [slice]:[prefix]:[name],
         // for example: "system.slice:docker:1234".
         if cgroups_path.len() == 0 {
-            bail!("no cgroups path has been provided");
+            return Err(CgroupsPathError::NoPath);
         }
 
         let parts = cgroups_path
             .to_str()
-            .ok_or_else(|| anyhow!("failed to parse cgroups path {:?}", cgroups_path))?
+            .ok_or_else(|| CgroupsPathError::InvalidUtf8(cgroups_path.to_path_buf()))?
             .split(':')
             .collect::<Vec<&str>>();
 
@@ -88,7 +98,7 @@ impl TryFrom<&Path> for CgroupsPath {
                 prefix: parts[1].to_owned(),
                 name: parts[2].to_owned(),
             },
-            _ => bail!("cgroup path {:?} is invalid", cgroups_path),
+            _ => return Err(CgroupsPathError::MalformedPath(cgroups_path.to_path_buf())),
         };
 
         Ok(destructured_path)
@@ -126,27 +136,37 @@ impl Debug for Manager {
     }
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum SystemdManagerError {
+    #[error("failed to destructure cgroups path: {0}")]
+    CgroupsPath(#[from] CgroupsPathError),
+    #[error("dbus error: {0}")]
+    DBus(#[from] dbus::Error),
+    #[error("invalid slice name: {0}")]
+    InvalidSliceName(String),
+    #[error(transparent)]
+    SystemdClient(#[from] SystemdClientError),
+    #[error("failed to join safely: {0}")]
+    JoinSafely(#[from] JoinSafelyError),
+}
+
 impl Manager {
     pub fn new(
         root_path: PathBuf,
         cgroups_path: PathBuf,
         container_name: String,
         use_system: bool,
-    ) -> Result<Self> {
-        let mut destructured_path = cgroups_path
-            .as_path()
-            .try_into()
-            .with_context(|| format!("failed to destructure cgroups path {cgroups_path:?}"))?;
+    ) -> Result<Self, SystemdManagerError> {
+        let mut destructured_path = cgroups_path.as_path().try_into()?;
         ensure_parent_unit(&mut destructured_path, use_system);
 
         let client = match use_system {
-            true => Client::new_system().context("failed to create system dbus client")?,
-            false => Client::new_session().context("failed to create session dbus client")?,
+            true => Client::new_system()?,
+            false => Client::new_session()?,
         };
 
         let (cgroups_path, delegation_boundary) =
-            Self::construct_cgroups_path(&destructured_path, &client)
-                .context("failed to construct cgroups path")?;
+            Self::construct_cgroups_path(&destructured_path, &client)?;
         let full_path = root_path.join_safely(&cgroups_path)?;
         let fs_manager = FsManager::new(root_path.clone(), cgroups_path.clone())?;
 
@@ -179,7 +199,7 @@ impl Manager {
     fn construct_cgroups_path(
         cgroups_path: &CgroupsPath,
         client: &dyn SystemdClient,
-    ) -> Result<(PathBuf, PathBuf)> {
+    ) -> Result<(PathBuf, PathBuf), SystemdManagerError> {
         // if the user provided a '.slice' (as in a branch of a tree)
         // we need to convert it to a filesystem path.
 
@@ -187,24 +207,20 @@ impl Manager {
         let systemd_root = client.control_cgroup_root()?;
         let unit_name = Self::get_unit_name(cgroups_path);
 
-        let cgroups_path = systemd_root
-            .join_safely(&parent)
-            .with_context(|| format!("failed to join {systemd_root:?} with {parent:?}"))?
-            .join_safely(&unit_name)
-            .with_context(|| format!("failed to join {parent:?} with {unit_name:?}"))?;
+        let cgroups_path = systemd_root.join_safely(&parent)?.join_safely(&unit_name)?;
         Ok((cgroups_path, systemd_root))
     }
 
     // systemd represents slice hierarchy using `-`, so we need to follow suit when
     // generating the path of slice. For example, 'test-a-b.slice' becomes
     // '/test.slice/test-a.slice/test-a-b.slice'.
-    fn expand_slice(slice: &str) -> Result<PathBuf> {
+    fn expand_slice(slice: &str) -> Result<PathBuf, SystemdManagerError> {
         let suffix = ".slice";
         if slice.len() <= suffix.len() || !slice.ends_with(suffix) {
-            bail!("invalid slice name: {}", slice);
+            return Err(SystemdManagerError::InvalidSliceName(slice.into()));
         }
         if slice.contains('/') {
-            bail!("invalid slice name: {}", slice);
+            return Err(SystemdManagerError::InvalidSliceName(slice.into()));
         }
         let mut path = "".to_owned();
         let mut prefix = "".to_owned();
@@ -215,7 +231,7 @@ impl Manager {
         }
         for component in slice_name.split('-') {
             if component.is_empty() {
-                bail!("invalid slice name: {}", slice);
+                return Err(SystemdManagerError::InvalidSliceName(slice.into()));
             }
             // Append the component to the path and to the prefix.
             path = format!("{path}/{prefix}{component}{suffix}");
@@ -399,6 +415,8 @@ impl CgroupManager for Manager {
 
 #[cfg(test)]
 mod tests {
+    use anyhow::Result;
+
     use crate::systemd::dbus::client::SystemdClient;
 
     use super::*;
@@ -420,11 +438,11 @@ mod tests {
             _pid: u32,
             _parent: &str,
             _unit_name: &str,
-        ) -> Result<()> {
+        ) -> Result<(), SystemdClientError> {
             Ok(())
         }
 
-        fn stop_transient_unit(&self, _unit_name: &str) -> Result<()> {
+        fn stop_transient_unit(&self, _unit_name: &str) -> Result<(), SystemdClientError> {
             Ok(())
         }
 
@@ -432,15 +450,15 @@ mod tests {
             &self,
             _unit_name: &str,
             _properties: &HashMap<&str, Box<dyn RefArg>>,
-        ) -> Result<()> {
+        ) -> Result<(), SystemdClientError> {
             Ok(())
         }
 
-        fn systemd_version(&self) -> Result<u32> {
+        fn systemd_version(&self) -> Result<u32, SystemdClientError> {
             Ok(245)
         }
 
-        fn control_cgroup_root(&self) -> Result<PathBuf> {
+        fn control_cgroup_root(&self) -> Result<PathBuf, SystemdClientError> {
             Ok(PathBuf::from("/"))
         }
     }

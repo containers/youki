@@ -2,7 +2,7 @@ use std::{
     fmt::{Debug, Display},
     fs::{self, File},
     io::{BufRead, BufReader, Write},
-    path::{Path, PathBuf},
+    path::{Path, PathBuf, StripPrefixError},
     time::Duration,
 };
 
@@ -321,11 +321,20 @@ where
 }
 
 pub(crate) trait PathBufExt {
-    fn join_safely<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf>;
+    fn join_safely<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf, JoinSafelyError>;
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum JoinSafelyError {
+    #[error("failed to strip prefix from {path}: {err}")]
+    StripPrefix {
+        err: StripPrefixError,
+        path: PathBuf,
+    },
 }
 
 impl PathBufExt for PathBuf {
-    fn join_safely<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf> {
+    fn join_safely<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf, JoinSafelyError> {
         let path = path.as_ref();
         if path.is_relative() {
             return Ok(self.join(path));
@@ -333,7 +342,10 @@ impl PathBufExt for PathBuf {
 
         let stripped = path
             .strip_prefix("/")
-            .with_context(|| format!("failed to strip prefix from {}", path.display()))?;
+            .map_err(|err| JoinSafelyError::StripPrefix {
+                err,
+                path: path.to_path_buf(),
+            })?;
         Ok(self.join(stripped))
     }
 }

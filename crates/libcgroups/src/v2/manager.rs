@@ -27,7 +27,9 @@ use super::{
     util::{self, CGROUP_SUBTREE_CONTROL},
 };
 use crate::{
-    common::{self, CgroupManager, ControllerOpt, FreezerState, PathBufExt, CGROUP_PROCS},
+    common::{
+        self, CgroupManager, ControllerOpt, FreezerState, JoinSafelyError, PathBufExt, CGROUP_PROCS,
+    },
     stats::{Stats, StatsProvider},
 };
 
@@ -42,7 +44,7 @@ pub struct Manager {
 impl Manager {
     /// Constructs a new cgroup manager with root path being the mount point
     /// of a cgroup v2 fs and cgroup path being a relative path from the root
-    pub fn new(root_path: PathBuf, cgroup_path: PathBuf) -> Result<Self> {
+    pub fn new(root_path: PathBuf, cgroup_path: PathBuf) -> Result<Self, JoinSafelyError> {
         let full_path = root_path.join_safely(&cgroup_path)?;
 
         Ok(Self {
