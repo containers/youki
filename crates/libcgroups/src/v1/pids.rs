@@ -2,12 +2,13 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 
-use super::Controller;
 use crate::{
     common::{self, ControllerOpt},
     stats::{self, PidStats, StatsProvider},
 };
 use oci_spec::runtime::LinuxPids;
+
+use super::controller::Controller;
 
 // Contains the maximum allowed number of active pids
 const CGROUP_PIDS_MAX: &str = "pids.max";

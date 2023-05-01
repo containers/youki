@@ -3,11 +3,12 @@ use std::path::Path;
 use crate::{
     common::{self, ControllerOpt},
     stats::{self, BlkioDeviceStat, BlkioStats, StatsProvider},
-    v1::Controller,
 };
 
 use anyhow::{Context, Result};
 use oci_spec::runtime::LinuxBlockIo;
+
+use super::controller::Controller;
 
 // Throttling/upper limit policy
 // ---------------------------------------

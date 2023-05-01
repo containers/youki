@@ -8,7 +8,7 @@ use crate::{
     stats::{CpuThrottling, StatsProvider},
 };
 
-use super::Controller;
+use super::controller::Controller;
 
 const CGROUP_CPU_SHARES: &str = "cpu.shares";
 const CGROUP_CPU_QUOTA: &str = "cpu.cfs_quota_us";

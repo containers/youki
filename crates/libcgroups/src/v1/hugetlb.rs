@@ -7,8 +7,9 @@ use crate::{
     stats::{supported_page_sizes, HugeTlbStats, StatsProvider},
 };
 
-use super::Controller;
 use oci_spec::runtime::LinuxHugepageLimit;
+
+use super::controller::Controller;
 
 pub struct HugeTlb {}
 

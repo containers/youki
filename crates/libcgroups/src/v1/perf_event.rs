@@ -1,7 +1,8 @@
-use super::Controller;
 use crate::common::ControllerOpt;
 use anyhow::Result;
 use std::path::Path;
+
+use super::controller::Controller;
 
 pub struct PerfEvent {}
 

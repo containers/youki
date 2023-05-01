@@ -14,6 +14,5 @@ mod network_priority;
 pub mod perf_event;
 mod pids;
 pub mod util;
-pub use controller::Controller;
 pub use controller_type::ControllerType;
 pub use manager::Manager;

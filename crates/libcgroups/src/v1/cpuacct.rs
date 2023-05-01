@@ -7,7 +7,7 @@ use crate::{
     stats::{CpuUsage, StatsProvider},
 };
 
-use super::Controller;
+use super::controller::Controller;
 
 // Contains user mode and kernel mode cpu consumption
 const CGROUP_CPUACCT_STAT: &str = "cpuacct.stat";

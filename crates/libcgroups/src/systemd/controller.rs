@@ -4,7 +4,7 @@ use dbus::arg::RefArg;
 
 use crate::common::ControllerOpt;
 
-pub(crate) trait Controller {
+pub(super) trait Controller {
     type Error;
 
     fn apply(

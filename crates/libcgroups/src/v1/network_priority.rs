@@ -2,9 +2,10 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 
-use super::Controller;
 use crate::common::{self, ControllerOpt};
 use oci_spec::runtime::LinuxNetwork;
+
+use super::controller::Controller;
 
 pub struct NetworkPriority {}
 

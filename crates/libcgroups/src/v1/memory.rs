@@ -5,11 +5,12 @@ use std::{fs::OpenOptions, path::Path};
 use anyhow::{anyhow, bail, Result};
 use nix::errno::Errno;
 
-use super::Controller;
 use crate::common::{self, ControllerOpt};
 use crate::stats::{self, parse_single_value, MemoryData, MemoryStats, StatsProvider};
 
 use oci_spec::runtime::LinuxMemory;
+
+use super::controller::Controller;
 
 const CGROUP_MEMORY_SWAP_LIMIT: &str = "memory.memsw.limit_in_bytes";
 const CGROUP_MEMORY_LIMIT: &str = "memory.limit_in_bytes";

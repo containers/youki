@@ -5,7 +5,7 @@ use nix::unistd::Pid;
 
 use crate::common::{self, ControllerOpt, CGROUP_PROCS};
 
-pub trait Controller {
+pub(super) trait Controller {
     type Resource;
 
     /// Adds a new task specified by its pid to the cgroup

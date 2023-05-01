@@ -9,12 +9,11 @@ use nix::unistd::Pid;
 
 use procfs::process::Process;
 
-use super::ControllerType as CtrlType;
 use super::{
-    blkio::Blkio, controller_type::CONTROLLERS, cpu::Cpu, cpuacct::CpuAcct, cpuset::CpuSet,
-    devices::Devices, freezer::Freezer, hugetlb::HugeTlb, memory::Memory,
+    blkio::Blkio, controller::Controller, controller_type::CONTROLLERS, cpu::Cpu, cpuacct::CpuAcct,
+    cpuset::CpuSet, devices::Devices, freezer::Freezer, hugetlb::HugeTlb, memory::Memory,
     network_classifier::NetworkClassifier, network_priority::NetworkPriority,
-    perf_event::PerfEvent, pids::Pids, util, Controller,
+    perf_event::PerfEvent, pids::Pids, util, ControllerType as CtrlType,
 };
 
 use crate::common::{self, CgroupManager, ControllerOpt, FreezerState, PathBufExt, CGROUP_PROCS};

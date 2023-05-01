@@ -7,7 +7,7 @@ use unistd::Pid;
 
 use crate::common::{self, ControllerOpt, CGROUP_PROCS};
 
-use super::{util, Controller, ControllerType};
+use super::{controller::Controller, util, ControllerType};
 
 const CGROUP_CPUSET_CPUS: &str = "cpuset.cpus";
 const CGROUP_CPUSET_MEMS: &str = "cpuset.mems";

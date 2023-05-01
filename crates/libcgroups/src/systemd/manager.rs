@@ -207,7 +207,7 @@ impl Manager {
         let systemd_root = client.control_cgroup_root()?;
         let unit_name = Self::get_unit_name(cgroups_path);
 
-        let cgroups_path = systemd_root.join_safely(&parent)?.join_safely(&unit_name)?;
+        let cgroups_path = systemd_root.join_safely(parent)?.join_safely(unit_name)?;
         Ok((cgroups_path, systemd_root))
     }
 

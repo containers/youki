@@ -7,9 +7,10 @@ use std::{
 
 use anyhow::{Result, *};
 
-use super::Controller;
 use crate::common;
 use crate::common::{ControllerOpt, FreezerState};
+
+use super::controller::Controller;
 
 const CGROUP_FREEZER_STATE: &str = "freezer.state";
 const FREEZER_STATE_THAWED: &str = "THAWED";
