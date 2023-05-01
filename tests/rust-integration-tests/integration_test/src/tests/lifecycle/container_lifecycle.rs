@@ -32,7 +32,10 @@ impl ContainerLifecycle {
     }
 
     pub fn create(&self) -> TestResult {
-        create::create(&self.project_path, &self.container_id)
+        match create::create(&self.project_path, &self.container_id) {
+            Ok(_) => TestResult::Passed,
+            Err(err) => TestResult::Failed(err),
+        }
     }
 
     #[allow(dead_code)]

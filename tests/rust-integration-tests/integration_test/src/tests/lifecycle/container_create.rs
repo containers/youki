@@ -26,39 +26,45 @@ impl ContainerCreate {
 
     // runtime should not create container with empty id
     fn create_empty_id(&self) -> TestResult {
-        let temp = create::create(&self.project_path, "");
-        match temp {
-            TestResult::Passed => TestResult::Failed(anyhow::anyhow!(
+        match create::create(&self.project_path, "") {
+            Ok(()) => TestResult::Failed(anyhow::anyhow!(
                 "Container should not have been created with empty id, but was created."
             )),
-            TestResult::Failed(_) => TestResult::Passed,
-            TestResult::Skipped => TestResult::Skipped,
+            Err(_) => TestResult::Passed,
         }
     }
 
     // runtime should create container with valid id
     fn create_valid_id(&self) -> TestResult {
-        let temp = create::create(&self.project_path, &self.container_id);
-        if let TestResult::Passed = temp {
-            kill::kill(&self.project_path, &self.container_id);
-            delete::delete(&self.project_path, &self.container_id);
+        match create::create(&self.project_path, &self.container_id) {
+            Ok(_) => {
+                kill::kill(&self.project_path, &self.container_id);
+                delete::delete(&self.project_path, &self.container_id);
+                TestResult::Passed
+            }
+            Err(_) => TestResult::Failed(anyhow::anyhow!(
+                "Container should have been created with valid id, but was not created."
+            )),
         }
-        temp
     }
 
     // runtime should not create container with is that already exists
     fn create_duplicate_id(&self) -> TestResult {
         let id = generate_uuid().to_string();
         let _ = create::create(&self.project_path, &id);
-        let temp = create::create(&self.project_path, &id);
-        kill::kill(&self.project_path, &id);
-        delete::delete(&self.project_path, &id);
-        match temp {
-            TestResult::Passed => TestResult::Failed(anyhow::anyhow!(
-                "Container should not have been created with same id, but was created."
-            )),
-            TestResult::Failed(_) => TestResult::Passed,
-            TestResult::Skipped => TestResult::Skipped,
+        match create::create(&self.project_path, &id) {
+            Ok(()) => {
+                kill::kill(&self.project_path, &id);
+                delete::delete(&self.project_path, &id);
+                TestResult::Failed(anyhow::anyhow!(
+                    "Container should not have been created with same id, but was created."
+                ))
+            }
+            Err(_) => {
+                kill::kill(&self.project_path, &id);
+                delete::delete(&self.project_path, &id);
+                TestResult::Passed
+            }
         }
     }
 }
