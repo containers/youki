@@ -1,5 +1,5 @@
 use crate::utils::get_state;
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 use std::path::Path;
 
 pub fn state(project_path: &Path, id: &str) -> Result<()> {
