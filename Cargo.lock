@@ -5187,9 +5187,9 @@ checksum = "1a515f5799fe4961cb532f983ce2b23082366b898e52ffbce459c86f67c8378a"
 
 [[package]]
 name = "winnow"
-version = "0.4.1"
+version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae8970b36c66498d8ff1d66685dc86b91b29db0c7739899012f63a63814b4b28"
+checksum = "5617da7e1f97bf363947d767b91aaf3c2bbc19db7fda9c65af1278713d58e0a2"
 dependencies = [
  "memchr",
 ]
