@@ -45,7 +45,7 @@ impl ContainerLifecycle {
     }
 
     pub fn state(&self) -> TestResult {
-        state::state(&self.project_path, &self.container_id)
+        state::state(&self.project_path, &self.container_id).into()
     }
 
     pub fn kill(&self) -> TestResult {

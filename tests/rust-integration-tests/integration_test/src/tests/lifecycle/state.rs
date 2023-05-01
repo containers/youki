@@ -1,24 +1,24 @@
 use crate::utils::get_state;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, bail};
 use std::path::Path;
 use test_framework::TestResult;
 
-pub fn state(project_path: &Path, id: &str) -> TestResult {
+pub fn state(project_path: &Path, id: &str) -> Result<()> {
     match get_state(id, project_path) {
-        Result::Ok((stdout, stderr)) => {
+        Ok((stdout, stderr)) => {
             if stderr.contains("Error") || stderr.contains("error") {
-                TestResult::Failed(anyhow!("Error :\nstdout : {}\nstderr : {}", stdout, stderr))
+                bail!("Error :\nstdout : {}\nstderr : {}", stdout, stderr)
             } else {
                 // confirm that the status is stopped, as this is executed after the kill command
                 if !(stdout.contains(&format!(r#""id": "{id}""#))
                     && stdout.contains(r#""status": "stopped""#))
                 {
-                    TestResult::Failed(anyhow!("Expected state stopped, got : {}", stdout))
+                    bail!("Expected state stopped, got : {}", stdout)
                 } else {
-                    TestResult::Passed
+                    Ok(())
                 }
             }
         }
-        Result::Err(e) => TestResult::Failed(e.context("failed to get container state")),
+        Err(e) => Err(e.context("failed to get container state")),
     }
 }
