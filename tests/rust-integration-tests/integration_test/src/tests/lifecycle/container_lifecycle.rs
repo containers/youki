@@ -32,19 +32,16 @@ impl ContainerLifecycle {
     }
 
     pub fn create(&self) -> TestResult {
-        match create::create(&self.project_path, &self.container_id) {
-            Ok(_) => TestResult::Passed,
-            Err(err) => TestResult::Failed(err),
-        }
+        create::create(&self.project_path, &self.container_id).into()
     }
 
     #[allow(dead_code)]
     pub fn exec(&self, cmd: Vec<&str>, expected_output: Option<&str>) -> TestResult {
-        exec::exec(&self.project_path, &self.container_id, cmd, expected_output)
+        exec::exec(&self.project_path, &self.container_id, cmd, expected_output).into()
     }
 
     pub fn start(&self) -> TestResult {
-        start::start(&self.project_path, &self.container_id)
+        start::start(&self.project_path, &self.container_id).into()
     }
 
     pub fn state(&self) -> TestResult {
@@ -56,11 +53,11 @@ impl ContainerLifecycle {
         // sleep a little, so the youki process actually gets the signal and shuts down
         // otherwise, the tester moves on to next tests before the youki has gotten signal, and delete test can fail
         sleep(SLEEP_TIME);
-        ret
+        ret.into()
     }
 
     pub fn delete(&self) -> TestResult {
-        delete::delete(&self.project_path, &self.container_id)
+        delete::delete(&self.project_path, &self.container_id).into()
     }
 
     pub fn checkpoint_leave_running(&self) -> TestResult {

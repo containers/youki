@@ -131,9 +131,10 @@ fn checkpoint(
         .expect("failed to execute checkpoint command")
         .wait_with_output();
 
-    let result = get_result_from_output(checkpoint);
-    if let TestResult::Failed(_) = result {
-        return result;
+    if let Err(e) = get_result_from_output(checkpoint)  {
+        return TestResult::Failed(anyhow::anyhow!(
+            "failed to execute checkpoint command: {e}"
+        ));
     }
 
     // Check for complete checkpoint
