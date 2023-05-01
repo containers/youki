@@ -1,7 +1,6 @@
 use crate::utils::get_state;
 use anyhow::{Result, bail};
 use std::path::Path;
-use test_framework::TestResult;
 
 pub fn state(project_path: &Path, id: &str) -> Result<()> {
     match get_state(id, project_path) {

@@ -38,8 +38,8 @@ impl ContainerCreate {
     fn create_valid_id(&self) -> TestResult {
         match create::create(&self.project_path, &self.container_id) {
             Ok(_) => {
-                kill::kill(&self.project_path, &self.container_id);
-                delete::delete(&self.project_path, &self.container_id);
+                let _ = kill::kill(&self.project_path, &self.container_id);
+                let _ = delete::delete(&self.project_path, &self.container_id);
                 TestResult::Passed
             }
             Err(_) => TestResult::Failed(anyhow::anyhow!(
@@ -54,15 +54,15 @@ impl ContainerCreate {
         let _ = create::create(&self.project_path, &id);
         match create::create(&self.project_path, &id) {
             Ok(()) => {
-                kill::kill(&self.project_path, &id);
-                delete::delete(&self.project_path, &id);
+                let _ = kill::kill(&self.project_path, &id);
+                let _ = delete::delete(&self.project_path, &id);
                 TestResult::Failed(anyhow::anyhow!(
                     "Container should not have been created with same id, but was created."
                 ))
             }
             Err(_) => {
-                kill::kill(&self.project_path, &id);
-                delete::delete(&self.project_path, &id);
+                let _ = kill::kill(&self.project_path, &id);
+                let _ = delete::delete(&self.project_path, &id);
                 TestResult::Passed
             }
         }
