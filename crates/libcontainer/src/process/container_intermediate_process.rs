@@ -1,5 +1,6 @@
+use crate::{LibcontainerError, Result};
 use crate::{namespaces::Namespaces, process::channel, process::fork};
-use anyhow::{Context, Error, Result};
+use anyhow::{Context};
 use libcgroups::common::CgroupManager;
 use nix::unistd::{close, write};
 use nix::unistd::{Gid, Pid, Uid};
@@ -110,7 +111,7 @@ pub fn container_intermediate_process(
                     write(exec_notify_fd, buf.as_bytes())?;
                     close(exec_notify_fd)?;
                 }
-                Err(e)
+                Err(LibcontainerError::UnknownLegacy(e))
             }
         }
     })?;
@@ -144,11 +145,11 @@ fn apply_cgroups<
     cmanager: &C,
     resources: Option<&LinuxResources>,
     init: bool,
-) -> Result<(), Error> {
+) -> Result<()> {
     let pid = Pid::from_raw(Process::myself()?.pid());
     cmanager
         .add_task(pid)
-        .with_context(|| format!("failed to add task {pid} to cgroup manager"))?;
+        .map_err(|err| LibcontainerError::CgroupAdd { pid, err })?;
 
     if let Some(resources) = resources {
         if init {
@@ -161,7 +162,7 @@ fn apply_cgroups<
 
             cmanager
                 .apply(&controller_opt)
-                .context("failed to apply resource limits to cgroup")?;
+                .map_err(|err| LibcontainerError::CgroupApply(err))?;
         }
     }
 
