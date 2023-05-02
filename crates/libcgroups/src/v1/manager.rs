@@ -29,7 +29,7 @@ impl Manager {
         let mut subsystems = HashMap::<CtrlType, PathBuf>::new();
         for subsystem in CONTROLLERS {
             if let Ok(subsystem_path) = Self::get_subsystem_path(&cgroup_path, subsystem) {
-                subsystems.insert(subsystem.clone(), subsystem_path);
+                subsystems.insert(*subsystem, subsystem_path);
             } else {
                 log::warn!("cgroup {} not supported on this system", subsystem);
             }

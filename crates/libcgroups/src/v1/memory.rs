@@ -50,17 +50,17 @@ const MEMORY_FAIL_COUNT: &str = ".failcnt";
 
 #[derive(Debug)]
 pub enum MalformedThing {
-    MemoryLimit,
-    MemoryUsage,
-    MemoryMaxUsage,
+    Limit,
+    Usage,
+    MaxUsage,
 }
 
 impl Display for MalformedThing {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            MalformedThing::MemoryLimit => f.write_str("memory limit"),
-            MalformedThing::MemoryUsage => f.write_str("memory usage"),
-            MalformedThing::MemoryMaxUsage => f.write_str("memory max usage"),
+            MalformedThing::Limit => f.write_str("memory limit"),
+            MalformedThing::Usage => f.write_str("memory usage"),
+            MalformedThing::MaxUsage => f.write_str("memory max usage"),
         }
     }
 }
@@ -218,9 +218,7 @@ impl Memory {
     }
 
     fn get_stat_data(cgroup_path: &Path) -> Result<HashMap<String, u64>, ParseFlatKeyedDataError> {
-        Ok(stats::parse_flat_keyed_data(
-            &cgroup_path.join(MEMORY_STAT),
-        )?)
+        stats::parse_flat_keyed_data(&cgroup_path.join(MEMORY_STAT))
     }
 
     fn get_memory_usage(cgroup_root: &Path) -> Result<u64, V1MemoryControllerError> {
@@ -244,7 +242,7 @@ impl Memory {
             contents
                 .parse::<u64>()
                 .map_err(|err| V1MemoryControllerError::MalformedValue {
-                    thing: MalformedThing::MemoryUsage,
+                    thing: MalformedThing::Usage,
                     limit: contents,
                     path,
                     err,
@@ -273,7 +271,7 @@ impl Memory {
             contents
                 .parse::<u64>()
                 .map_err(|err| V1MemoryControllerError::MalformedValue {
-                    thing: MalformedThing::MemoryMaxUsage,
+                    thing: MalformedThing::MaxUsage,
                     limit: contents,
                     path,
                     err,
@@ -302,7 +300,7 @@ impl Memory {
             contents
                 .parse::<i64>()
                 .map_err(|err| V1MemoryControllerError::MalformedValue {
-                    thing: MalformedThing::MemoryLimit,
+                    thing: MalformedThing::Limit,
                     limit: contents,
                     path,
                     err,
@@ -338,11 +336,11 @@ impl Memory {
                         Errno::EBUSY => {
                             let usage = Self::get_memory_usage(cgroup_root)?;
                             let max_usage = Self::get_memory_max_usage(cgroup_root)?;
-                            return Err(V1MemoryControllerError::UnableToSet {
+                            Err(V1MemoryControllerError::UnableToSet {
                                 target: val,
                                 current: usage,
                                 peak: max_usage,
-                            });
+                            })
                         }
                         _ => Err(e)?,
                     },

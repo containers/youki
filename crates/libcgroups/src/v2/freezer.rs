@@ -99,7 +99,7 @@ impl Freezer {
             "0" => Ok(FreezerState::Thawed),
             "1" => Self::wait_frozen(path),
             _ => {
-                return Err(V2FreezerError::UnknownState {
+                Err(V2FreezerError::UnknownState {
                     state: state.into(),
                 })
             }

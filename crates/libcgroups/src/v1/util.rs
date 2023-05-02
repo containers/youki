@@ -75,7 +75,7 @@ pub fn get_subsystem_mount_point(subsystem: &ControllerType) -> Result<PathBuf, 
             m.mount_point.ends_with(&subsystem_name)
         })
         .map(|m| m.mount_point)
-        .ok_or_else(|| V1MountPointError::NotFound {
+        .ok_or(V1MountPointError::NotFound {
             subsystem: *subsystem,
         })
 }

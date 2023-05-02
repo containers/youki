@@ -116,7 +116,7 @@ impl HugeTlb {
         page_size: &str,
     ) -> Result<HugeTlbStats, V2HugeTlbStatsError> {
         let events_file = format!("hugetlb.{page_size}.events");
-        let path = cgroup_path.join(&events_file);
+        let path = cgroup_path.join(events_file);
         let events = common::read_cgroup_file(&path)?;
         let fail_count: u64 = events
             .lines()
