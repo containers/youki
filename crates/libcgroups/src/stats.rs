@@ -371,14 +371,6 @@ pub enum ParseDeviceNumberError {
     MalformedNumber { device: String, err: ParseIntError },
 }
 
-/// Parses a file that is structed according to the nested keyed format
-/// # Example
-/// ```
-/// use libcgroups::stats::parse_device_number;
-///
-/// let (major, minor) = parse_device_number("8:0").unwrap();
-/// assert_eq!((major, minor), (8, 0));
-/// ```
 pub(crate) fn parse_device_number(device: &str) -> Result<(u64, u64), ParseDeviceNumberError> {
     let numbers: Vec<&str> = device.split_terminator(':').collect();
     if numbers.len() != 2 {
