@@ -278,7 +278,7 @@ pub fn get_cgroup_setup() -> Result<CgroupSetup, GetCgroupSetupError> {
             // folder we are in hybrid mode, otherwise we are in legacy mode.
             let stat = statfs(default_root)
                 .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err))
-                .wrap_other(&default_root)?;
+                .wrap_other(default_root)?;
             if stat.filesystem_type() == CGROUP2_SUPER_MAGIC {
                 return Ok(CgroupSetup::Unified);
             }
@@ -288,7 +288,7 @@ pub fn get_cgroup_setup() -> Result<CgroupSetup, GetCgroupSetupError> {
                 if Path::new(unified).exists() {
                     let stat = statfs(unified)
                         .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err))
-                        .wrap_other(&unified)?;
+                        .wrap_other(unified)?;
                     if stat.filesystem_type() == CGROUP2_SUPER_MAGIC {
                         return Ok(CgroupSetup::Hybrid);
                     }
@@ -350,7 +350,7 @@ fn create_v1_cgroup_manager(
     cgroup_path: PathBuf,
 ) -> Result<v1::manager::Manager, v1::manager::V1ManagerError> {
     log::info!("cgroup manager V1 will be used");
-    Ok(v1::manager::Manager::new(cgroup_path)?)
+    v1::manager::Manager::new(cgroup_path)
 }
 
 #[cfg(not(feature = "v1"))]
@@ -363,10 +363,10 @@ fn create_v2_cgroup_manager(
     cgroup_path: PathBuf,
 ) -> Result<v2::manager::Manager, v2::manager::V2ManagerError> {
     log::info!("cgroup manager V2 will be used");
-    Ok(v2::manager::Manager::new(
+    v2::manager::Manager::new(
         DEFAULT_CGROUP_ROOT.into(),
         cgroup_path,
-    )?)
+    )
 }
 
 #[cfg(not(feature = "v2"))]
@@ -391,12 +391,12 @@ fn create_systemd_cgroup_manager(
         "systemd cgroup manager with system bus {} will be used",
         use_system
     );
-    Ok(systemd::manager::Manager::new(
+    systemd::manager::Manager::new(
         DEFAULT_CGROUP_ROOT.into(),
         cgroup_path,
         container_name.into(),
         use_system,
-    )?)
+    )
 }
 
 #[cfg(not(feature = "systemd"))]
@@ -433,8 +433,8 @@ where
     E: From<WrappedIoError>,
 {
     c(path)?;
-    for entry in fs::read_dir(path).wrap_read(&path)? {
-        let entry = entry.wrap_open(&path)?;
+    for entry in fs::read_dir(path).wrap_read(path)? {
+        let entry = entry.wrap_open(path)?;
         let path = entry.path();
 
         if path.is_dir() {
@@ -606,9 +606,9 @@ pub(crate) fn delete_with_retry<P: AsRef<Path>, L: Into<Option<Duration>>>(
 
     Err(std::io::Error::new(
         std::io::ErrorKind::TimedOut,
-        format!("could not delete"),
+        "could not delete".to_string(),
     ))
-    .wrap_other(&path)?
+    .wrap_other(path)?
 }
 
 pub(crate) trait WrapIoResult {

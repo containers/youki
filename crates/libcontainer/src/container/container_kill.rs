@@ -80,7 +80,7 @@ impl Container {
                     let use_systemd = self
                         .systemd()
                         .context("container state does not contain cgroup manager")?;
-                    let cmanger = create_cgroup_manager(&cgroups_path, use_systemd, self.id())?;
+                    let cmanger = create_cgroup_manager(cgroups_path, use_systemd, self.id())?;
                     cmanger.freeze(libcgroups::common::FreezerState::Thawed)?;
                 }
                 libcgroups::common::CgroupSetup::Unified => {}
@@ -95,7 +95,7 @@ impl Container {
         let use_systemd = self
             .systemd()
             .context("container state does not contain cgroup manager")?;
-        let cmanger = create_cgroup_manager(&cgroups_path, use_systemd, self.id())?;
+        let cmanger = create_cgroup_manager(cgroups_path, use_systemd, self.id())?;
         let ret = cmanger.freeze(libcgroups::common::FreezerState::Frozen);
         if ret.is_err() {
             log::warn!(

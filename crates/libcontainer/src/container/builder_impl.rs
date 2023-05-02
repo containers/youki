@@ -76,7 +76,7 @@ impl<'a> ContainerBuilderImpl<'a> {
             self.rootless.is_some(),
         );
         let cmanager = libcgroups::common::create_cgroup_manager(
-            &cgroups_path,
+            cgroups_path,
             self.use_systemd || self.rootless.is_some(),
             &self.container_id,
         )?;
@@ -169,7 +169,7 @@ impl<'a> ContainerBuilderImpl<'a> {
             self.rootless.is_some(),
         );
         let cmanager = libcgroups::common::create_cgroup_manager(
-            &cgroups_path,
+            cgroups_path,
             self.use_systemd || self.rootless.is_some(),
             &self.container_id,
         )?;
