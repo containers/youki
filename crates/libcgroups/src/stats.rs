@@ -4,7 +4,7 @@ use std::{collections::HashMap, fmt::Display, fs, path::Path};
 
 use super::common;
 
-pub trait StatsProvider {
+pub(crate) trait StatsProvider {
     type Stats;
 
     fn stats(cgroup_path: &Path) -> Result<Self::Stats>;
