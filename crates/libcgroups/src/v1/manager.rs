@@ -3,12 +3,19 @@ use std::path::Path;
 use std::time::Duration;
 use std::{collections::HashMap, path::PathBuf};
 
-use anyhow::bail;
-use anyhow::Result;
 use nix::unistd::Pid;
 
 use procfs::process::Process;
+use procfs::ProcError;
 
+use super::blkio::V1BlkioStatsError;
+use super::cpu::V1CpuStatsError;
+use super::cpuacct::V1CpuAcctStatsError;
+use super::cpuset::V1CpuSetControllerError;
+use super::freezer::V1FreezerControllerError;
+use super::hugetlb::{V1HugeTlbControllerError, V1HugeTlbStatsError};
+use super::memory::{V1MemoryControllerError, V1MemoryStatsError};
+use super::util::V1MountPointError;
 use super::{
     blkio::Blkio, controller::Controller, controller_type::CONTROLLERS, cpu::Cpu, cpuacct::CpuAcct,
     cpuset::CpuSet, devices::Devices, freezer::Freezer, hugetlb::HugeTlb, memory::Memory,
@@ -16,16 +23,65 @@ use super::{
     perf_event::PerfEvent, pids::Pids, util, ControllerType as CtrlType,
 };
 
-use crate::common::{self, CgroupManager, ControllerOpt, FreezerState, PathBufExt, CGROUP_PROCS};
-use crate::stats::{Stats, StatsProvider};
+use crate::common::{
+    self, AnyManager, CgroupManager, ControllerOpt, FreezerState, JoinSafelyError, PathBufExt,
+    WrapIoResult, WrappedIoError, CGROUP_PROCS,
+};
+use crate::stats::{PidStatsError, Stats, StatsProvider};
+use crate::v1::ControllerType;
 
 pub struct Manager {
     subsystems: HashMap<CtrlType, PathBuf>,
 }
+#[derive(thiserror::Error, Debug)]
+pub enum V1ManagerError {
+    #[error("io error: {0}")]
+    WrappedIo(#[from] WrappedIoError),
+    #[error("mount point error: {0}")]
+    MountPoint(#[from] V1MountPointError),
+    #[error("proc error: {0}")]
+    Proc(#[from] ProcError),
+    #[error("while joining paths: {0}")]
+    JoinSafely(#[from] JoinSafelyError),
+    #[error("cgroup {0} is required to fulfill the request, but is not supported by this system")]
+    CGroupRequired(ControllerType),
+    #[error("subsystem does not exist")]
+    SubsystemDoesNotExist,
+
+    #[error(transparent)]
+    BlkioController(WrappedIoError),
+    #[error(transparent)]
+    CpuController(WrappedIoError),
+    #[error(transparent)]
+    CpuAcctController(WrappedIoError),
+    #[error(transparent)]
+    CpuSetController(#[from] V1CpuSetControllerError),
+    #[error(transparent)]
+    FreezerController(#[from] V1FreezerControllerError),
+    #[error(transparent)]
+    HugeTlbController(#[from] V1HugeTlbControllerError),
+    #[error(transparent)]
+    MemoryController(#[from] V1MemoryControllerError),
+    #[error(transparent)]
+    PidsController(WrappedIoError),
+
+    #[error(transparent)]
+    BlkioStats(#[from] V1BlkioStatsError),
+    #[error(transparent)]
+    CpuStats(#[from] V1CpuStatsError),
+    #[error(transparent)]
+    CpuAcctStats(#[from] V1CpuAcctStatsError),
+    #[error(transparent)]
+    PidsStats(PidStatsError),
+    #[error(transparent)]
+    HugeTlbStats(#[from] V1HugeTlbStatsError),
+    #[error(transparent)]
+    MemoryStats(#[from] V1MemoryStatsError),
+}
 
 impl Manager {
     /// Constructs a new cgroup manager with cgroups_path being relative to the root of the subsystem
-    pub fn new(cgroup_path: PathBuf) -> Result<Self> {
+    pub fn new(cgroup_path: PathBuf) -> Result<Self, V1ManagerError> {
         let mut subsystems = HashMap::<CtrlType, PathBuf>::new();
         for subsystem in CONTROLLERS {
             if let Ok(subsystem_path) = Self::get_subsystem_path(&cgroup_path, subsystem) {
@@ -38,7 +94,10 @@ impl Manager {
         Ok(Manager { subsystems })
     }
 
-    fn get_subsystem_path(cgroup_path: &Path, subsystem: &CtrlType) -> Result<PathBuf> {
+    fn get_subsystem_path(
+        cgroup_path: &Path,
+        subsystem: &CtrlType,
+    ) -> Result<PathBuf, V1ManagerError> {
         log::debug!("Get path for subsystem: {}", subsystem);
         let mount_point = util::get_subsystem_mount_point(subsystem)?;
 
@@ -60,7 +119,7 @@ impl Manager {
     fn get_required_controllers(
         &self,
         controller_opt: &ControllerOpt,
-    ) -> Result<HashMap<&CtrlType, &PathBuf>> {
+    ) -> Result<HashMap<&CtrlType, &PathBuf>, V1ManagerError> {
         let mut required_controllers = HashMap::new();
 
         for controller in CONTROLLERS {
@@ -87,25 +146,31 @@ impl Manager {
                 if let Some(subsystem_path) = self.subsystems.get(controller) {
                     required_controllers.insert(controller, subsystem_path);
                 } else {
-                    bail!("cgroup {} is required to fulfill the request, but is not supported by this system", controller);
+                    return Err(V1ManagerError::CGroupRequired(*controller));
                 }
             }
         }
 
         Ok(required_controllers)
     }
+
+    pub fn any(self) -> AnyManager {
+        AnyManager::V1(self)
+    }
 }
 
 impl CgroupManager for Manager {
-    fn get_all_pids(&self) -> Result<Vec<Pid>> {
+    type Error = V1ManagerError;
+
+    fn get_all_pids(&self) -> Result<Vec<Pid>, Self::Error> {
         let devices = self.subsystems.get(&CtrlType::Devices);
         if let Some(p) = devices {
-            common::get_all_pids(p)
+            Ok(common::get_all_pids(p)?)
         } else {
-            bail!("subsystem does not exist")
+            Err(V1ManagerError::SubsystemDoesNotExist)
         }
     }
-    fn add_task(&self, pid: Pid) -> Result<()> {
+    fn add_task(&self, pid: Pid) -> Result<(), Self::Error> {
         for subsys in &self.subsystems {
             match subsys.0 {
                 CtrlType::Cpu => Cpu::add_task(pid, subsys.1)?,
@@ -116,7 +181,9 @@ impl CgroupManager for Manager {
                 CtrlType::Memory => Memory::add_task(pid, subsys.1)?,
                 CtrlType::Pids => Pids::add_task(pid, subsys.1)?,
                 CtrlType::PerfEvent => PerfEvent::add_task(pid, subsys.1)?,
-                CtrlType::Blkio => Blkio::add_task(pid, subsys.1)?,
+                CtrlType::Blkio => {
+                    Blkio::add_task(pid, subsys.1).map_err(V1ManagerError::BlkioController)?
+                }
                 CtrlType::NetworkPriority => NetworkPriority::add_task(pid, subsys.1)?,
                 CtrlType::NetworkClassifier => NetworkClassifier::add_task(pid, subsys.1)?,
                 CtrlType::Freezer => Freezer::add_task(pid, subsys.1)?,
@@ -126,7 +193,7 @@ impl CgroupManager for Manager {
         Ok(())
     }
 
-    fn apply(&self, controller_opt: &ControllerOpt) -> Result<()> {
+    fn apply(&self, controller_opt: &ControllerOpt) -> Result<(), Self::Error> {
         for subsys in self.get_required_controllers(controller_opt)? {
             match subsys.0 {
                 CtrlType::Cpu => Cpu::apply(controller_opt, subsys.1)?,
@@ -137,7 +204,8 @@ impl CgroupManager for Manager {
                 CtrlType::Memory => Memory::apply(controller_opt, subsys.1)?,
                 CtrlType::Pids => Pids::apply(controller_opt, subsys.1)?,
                 CtrlType::PerfEvent => PerfEvent::apply(controller_opt, subsys.1)?,
-                CtrlType::Blkio => Blkio::apply(controller_opt, subsys.1)?,
+                CtrlType::Blkio => Blkio::apply(controller_opt, subsys.1)
+                    .map_err(V1ManagerError::BlkioController)?,
                 CtrlType::NetworkPriority => NetworkPriority::apply(controller_opt, subsys.1)?,
                 CtrlType::NetworkClassifier => NetworkClassifier::apply(controller_opt, subsys.1)?,
                 CtrlType::Freezer => Freezer::apply(controller_opt, subsys.1)?,
@@ -147,15 +215,18 @@ impl CgroupManager for Manager {
         Ok(())
     }
 
-    fn remove(&self) -> Result<()> {
+    fn remove(&self) -> Result<(), Self::Error> {
         for cgroup_path in &self.subsystems {
             if cgroup_path.1.exists() {
                 log::debug!("remove cgroup {:?}", cgroup_path.1);
                 let procs_path = cgroup_path.1.join(CGROUP_PROCS);
-                let procs = fs::read_to_string(procs_path)?;
+                let procs = fs::read_to_string(&procs_path).wrap_read(&procs_path)?;
 
                 for line in procs.lines() {
-                    let pid: i32 = line.parse()?;
+                    let pid: i32 = line
+                        .parse()
+                        .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err))
+                        .wrap_other(&procs_path)?;
                     let _ = nix::sys::signal::kill(Pid::from_raw(pid), nix::sys::signal::SIGKILL);
                 }
 
@@ -166,7 +237,7 @@ impl CgroupManager for Manager {
         Ok(())
     }
 
-    fn freeze(&self, state: FreezerState) -> Result<()> {
+    fn freeze(&self, state: FreezerState) -> Result<(), Self::Error> {
         let controller_opt = ControllerOpt {
             resources: &Default::default(),
             freezer_state: Some(state),
@@ -179,14 +250,16 @@ impl CgroupManager for Manager {
         )?)
     }
 
-    fn stats(&self) -> Result<Stats> {
+    fn stats(&self) -> Result<Stats, Self::Error> {
         let mut stats = Stats::default();
 
         for subsystem in &self.subsystems {
             match subsystem.0 {
                 CtrlType::Cpu => stats.cpu.throttling = Cpu::stats(subsystem.1)?,
                 CtrlType::CpuAcct => stats.cpu.usage = CpuAcct::stats(subsystem.1)?,
-                CtrlType::Pids => stats.pids = Pids::stats(subsystem.1)?,
+                CtrlType::Pids => {
+                    stats.pids = Pids::stats(subsystem.1).map_err(V1ManagerError::PidsStats)?
+                }
                 CtrlType::HugeTlb => stats.hugetlb = HugeTlb::stats(subsystem.1)?,
                 CtrlType::Blkio => stats.blkio = Blkio::stats(subsystem.1)?,
                 CtrlType::Memory => stats.memory = Memory::stats(subsystem.1)?,

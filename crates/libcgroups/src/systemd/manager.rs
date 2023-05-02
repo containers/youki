@@ -1,11 +1,11 @@
 use std::{
     collections::HashMap,
+    convert::Infallible,
     fmt::{Debug, Display},
     fs::{self},
     path::Component::RootDir,
 };
 
-use anyhow::{anyhow, bail, Context, Result};
 use dbus::arg::RefArg;
 use nix::{unistd::Pid, NixPath};
 use std::path::{Path, PathBuf};
@@ -20,8 +20,12 @@ use super::{
     pids::Pids,
 };
 use crate::{
-    common::{self, CgroupManager, ControllerOpt, FreezerState, JoinSafelyError, PathBufExt},
+    common::{
+        self, AnyManager, CgroupManager, ControllerOpt, FreezerState, JoinSafelyError, PathBufExt,
+        WrapIoResult, WrappedIoError,
+    },
     systemd::unified::Unified,
+    v2::manager::V2ManagerError,
 };
 use crate::{stats::Stats, v2::manager::Manager as FsManager};
 
@@ -138,6 +142,8 @@ impl Debug for Manager {
 
 #[derive(thiserror::Error, Debug)]
 pub enum SystemdManagerError {
+    #[error("io error: {0}")]
+    WrappedIo(#[from] WrappedIoError),
     #[error("failed to destructure cgroups path: {0}")]
     CgroupsPath(#[from] CgroupsPathError),
     #[error("dbus error: {0}")]
@@ -148,6 +154,23 @@ pub enum SystemdManagerError {
     SystemdClient(#[from] SystemdClientError),
     #[error("failed to join safely: {0}")]
     JoinSafely(#[from] JoinSafelyError),
+    #[error("file not found: {0}")]
+    FileNotFound(PathBuf),
+    #[error("bad delegation boundary {boundary} for cgroups path {cgroup}")]
+    BadDelegationBoundary { boundary: PathBuf, cgroup: PathBuf },
+    #[error("in v2 manager: {0}")]
+    V2Manager(#[from] V2ManagerError),
+
+    #[error("in cpu controller: {0}")]
+    Cpu(#[from] super::cpu::SystemdCpuError),
+    #[error("in cpuset controller: {0}")]
+    CpuSet(#[from] super::cpuset::SystemdCpuSetError),
+    #[error("in memory controller: {0}")]
+    Memory(#[from] super::memory::SystemdMemoryError),
+    #[error("in pids controller: {0}")]
+    Pids(Infallible),
+    #[error("in pids unified controller: {0}")]
+    Unified(#[from] super::unified::SystemdUnifiedError),
 }
 
 impl Manager {
@@ -242,7 +265,7 @@ impl Manager {
 
     /// ensures that each level in the downward path from the delegation boundary down to
     /// the scope or slice of the transient unit has all available controllers enabled
-    fn ensure_controllers_attached(&self) -> Result<()> {
+    fn ensure_controllers_attached(&self) -> Result<(), SystemdManagerError> {
         let full_boundary_path = self.root_path.join_safely(&self.delegation_boundary)?;
 
         let controllers: Vec<String> = self
@@ -256,7 +279,11 @@ impl Manager {
         let mut current_path = full_boundary_path;
         let mut components = self
             .cgroups_path
-            .strip_prefix(&self.delegation_boundary)?
+            .strip_prefix(&self.delegation_boundary)
+            .map_err(|_| SystemdManagerError::BadDelegationBoundary {
+                boundary: self.delegation_boundary.clone(),
+                cgroup: self.cgroups_path.clone(),
+            })?
             .components()
             .filter(|c| c.ne(&RootDir))
             .peekable();
@@ -286,17 +313,17 @@ impl Manager {
     fn get_available_controllers<P: AsRef<Path>>(
         &self,
         cgroups_path: P,
-    ) -> Result<Vec<ControllerType>> {
+    ) -> Result<Vec<ControllerType>, SystemdManagerError> {
         let controllers_path = self.root_path.join(cgroups_path).join(CGROUP_CONTROLLERS);
         if !controllers_path.exists() {
-            bail!(
-                "cannot get available controllers. {:?} does not exist",
-                controllers_path
-            )
+            return Err(SystemdManagerError::FileNotFound(controllers_path));
         }
 
         let mut controllers = Vec::new();
-        for controller in fs::read_to_string(controllers_path)?.split_whitespace() {
+        for controller in fs::read_to_string(&controllers_path)
+            .wrap_read(controllers_path)?
+            .split_whitespace()
+        {
             match controller {
                 "cpu" => controllers.push(ControllerType::Cpu),
                 "memory" => controllers.push(ControllerType::Memory),
@@ -308,114 +335,102 @@ impl Manager {
         Ok(controllers)
     }
 
-    fn write_controllers(path: &Path, controllers: &[String]) -> Result<()> {
+    fn write_controllers(path: &Path, controllers: &[String]) -> Result<(), SystemdManagerError> {
         for controller in controllers {
             common::write_cgroup_file_str(path.join(CGROUP_SUBTREE_CONTROL), controller)?;
         }
 
         Ok(())
     }
+
+    pub fn any(self) -> AnyManager {
+        AnyManager::Systemd(self)
+    }
 }
 
 impl CgroupManager for Manager {
-    fn add_task(&self, pid: Pid) -> Result<()> {
+    type Error = SystemdManagerError;
+
+    fn add_task(&self, pid: Pid) -> Result<(), Self::Error> {
         // Dont attach any pid to the cgroup if -1 is specified as a pid
         if pid.as_raw() == -1 {
             return Ok(());
         }
 
         log::debug!("Starting {:?}", self.unit_name);
-        self.client
-            .start_transient_unit(
-                &self.container_name,
-                pid.as_raw() as u32,
-                &self.destructured_path.parent,
-                &self.unit_name,
-            )
-            .with_context(|| {
-                format!(
-                    "failed to create unit {} for container {}",
-                    self.unit_name, self.container_name
-                )
-            })?;
+        self.client.start_transient_unit(
+            &self.container_name,
+            pid.as_raw() as u32,
+            &self.destructured_path.parent,
+            &self.unit_name,
+        )?;
 
         Ok(())
     }
 
-    fn apply(&self, controller_opt: &ControllerOpt) -> Result<()> {
+    fn apply(&self, controller_opt: &ControllerOpt) -> Result<(), Self::Error> {
         let mut properties: HashMap<&str, Box<dyn RefArg>> = HashMap::new();
-        let systemd_version = self
-            .client
-            .systemd_version()
-            .context("could not retrieve systemd version")?;
+        let systemd_version = self.client.systemd_version()?;
 
         for controller in CONTROLLER_TYPES {
             match controller {
-                ControllerType::Cpu => Cpu::apply(controller_opt, systemd_version, &mut properties)
-                    .map_err(|err| anyhow!(err))?,
+                ControllerType::Cpu => {
+                    Cpu::apply(controller_opt, systemd_version, &mut properties)?;
+                }
 
                 ControllerType::CpuSet => {
-                    CpuSet::apply(controller_opt, systemd_version, &mut properties)
-                        .map_err(|err| anyhow!(err))?
+                    CpuSet::apply(controller_opt, systemd_version, &mut properties)?;
                 }
 
                 ControllerType::Pids => {
                     Pids::apply(controller_opt, systemd_version, &mut properties)
-                        .map_err(|err| anyhow!(err))?
+                        .map_err(SystemdManagerError::Pids)?;
                 }
                 ControllerType::Memory => {
-                    Memory::apply(controller_opt, systemd_version, &mut properties)
-                        .map_err(|err| anyhow!(err))?
+                    Memory::apply(controller_opt, systemd_version, &mut properties)?;
                 }
                 _ => {}
             };
         }
 
-        Unified::apply(controller_opt, systemd_version, &mut properties)
-            .map_err(|err| anyhow!(err))?;
+        Unified::apply(controller_opt, systemd_version, &mut properties)?;
         log::debug!("{:?}", properties);
 
         if !properties.is_empty() {
-            self.ensure_controllers_attached()
-                .context("failed to attach controllers")?;
+            self.ensure_controllers_attached()?;
 
             self.client
-                .set_unit_properties(&self.unit_name, &properties)
-                .context("could not apply resource restrictions")?;
+                .set_unit_properties(&self.unit_name, &properties)?;
         }
 
         Ok(())
     }
 
-    fn remove(&self) -> Result<()> {
+    fn remove(&self) -> Result<(), Self::Error> {
         log::debug!("remove {}", self.unit_name);
         if self.client.transient_unit_exists(&self.unit_name) {
-            self.client
-                .stop_transient_unit(&self.unit_name)
-                .with_context(|| {
-                    format!("could not remove control group {}", self.destructured_path)
-                })?;
+            self.client.stop_transient_unit(&self.unit_name)?;
         }
 
         Ok(())
     }
 
-    fn freeze(&self, state: FreezerState) -> Result<()> {
-        self.fs_manager.freeze(state)
+    fn freeze(&self, state: FreezerState) -> Result<(), Self::Error> {
+        Ok(self.fs_manager.freeze(state)?)
     }
 
-    fn stats(&self) -> Result<Stats> {
-        self.fs_manager.stats()
+    fn stats(&self) -> Result<Stats, Self::Error> {
+        Ok(self.fs_manager.stats()?)
     }
 
-    fn get_all_pids(&self) -> Result<Vec<Pid>> {
-        common::get_all_pids(&self.full_path)
+    fn get_all_pids(&self) -> Result<Vec<Pid>, Self::Error> {
+        Ok(common::get_all_pids(&self.full_path)?)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use anyhow::Result;
+    use anyhow::{Context, Result};
 
     use crate::systemd::dbus::client::SystemdClient;
 

@@ -5,8 +5,6 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{Context, Result};
-
 use nix::unistd::Pid;
 
 #[cfg(feature = "cgroupsv2_devices")]
@@ -16,24 +14,63 @@ use super::{
     controller_type::{
         ControllerType, PseudoControllerType, CONTROLLER_TYPES, PSEUDO_CONTROLLER_TYPES,
     },
-    cpu::Cpu,
+    cpu::{Cpu, V2CpuControllerError, V2CpuStatsError},
     cpuset::CpuSet,
-    freezer::Freezer,
-    hugetlb::HugeTlb,
-    io::Io,
-    memory::Memory,
+    freezer::{Freezer, V2FreezerError},
+    hugetlb::{HugeTlb, V2HugeTlbControllerError, V2HugeTlbStatsError},
+    io::{Io, V2IoControllerError, V2IoStatsError},
+    memory::{Memory, V2MemoryControllerError, V2MemoryStatsError},
     pids::Pids,
-    unified::Unified,
-    util::{self, CGROUP_SUBTREE_CONTROL},
+    unified::{Unified, V2UnifiedError},
+    util::{self, V2UtilError, CGROUP_SUBTREE_CONTROL},
 };
 use crate::{
     common::{
-        self, CgroupManager, ControllerOpt, FreezerState, JoinSafelyError, PathBufExt, CGROUP_PROCS,
+        self, AnyManager, CgroupManager, ControllerOpt, FreezerState, JoinSafelyError, PathBufExt,
+        WrapIoResult, WrappedIoError, CGROUP_PROCS,
     },
-    stats::{Stats, StatsProvider},
+    stats::{PidStatsError, Stats, StatsProvider},
 };
 
 pub const CGROUP_KILL: &str = "cgroup.kill";
+
+#[derive(thiserror::Error, Debug)]
+pub enum V2ManagerError {
+    #[error("io error: {0}")]
+    WrappedIo(#[from] WrappedIoError),
+    #[error("while joining paths: {0}")]
+    JoinSafely(#[from] JoinSafelyError),
+    #[error(transparent)]
+    Util(#[from] V2UtilError),
+
+    #[error(transparent)]
+    CpuController(#[from] V2CpuControllerError),
+    #[error(transparent)]
+    CpuSetController(WrappedIoError),
+    #[error(transparent)]
+    HugeTlbController(#[from] V2HugeTlbControllerError),
+    #[error(transparent)]
+    IoController(#[from] V2IoControllerError),
+    #[error(transparent)]
+    MemoryController(#[from] V2MemoryControllerError),
+    #[error(transparent)]
+    PidsController(WrappedIoError),
+    #[error(transparent)]
+    UnifiedController(#[from] V2UnifiedError),
+    #[error(transparent)]
+    FreezerController(#[from] V2FreezerError),
+
+    #[error(transparent)]
+    CpuStats(#[from] V2CpuStatsError),
+    #[error(transparent)]
+    HugeTlbStats(#[from] V2HugeTlbStatsError),
+    #[error(transparent)]
+    PidsStats(PidStatsError),
+    #[error(transparent)]
+    MemoryStats(#[from] V2MemoryStatsError),
+    #[error(transparent)]
+    IoStats(#[from] V2IoStatsError),
+}
 
 pub struct Manager {
     root_path: PathBuf,
@@ -44,7 +81,7 @@ pub struct Manager {
 impl Manager {
     /// Constructs a new cgroup manager with root path being the mount point
     /// of a cgroup v2 fs and cgroup path being a relative path from the root
-    pub fn new(root_path: PathBuf, cgroup_path: PathBuf) -> Result<Self, JoinSafelyError> {
+    pub fn new(root_path: PathBuf, cgroup_path: PathBuf) -> Result<Self, V2ManagerError> {
         let full_path = root_path.join_safely(&cgroup_path)?;
 
         Ok(Self {
@@ -54,7 +91,7 @@ impl Manager {
         })
     }
 
-    fn create_unified_cgroup(&self, pid: Pid) -> Result<()> {
+    fn create_unified_cgroup(&self, pid: Pid) -> Result<(), V2ManagerError> {
         let controllers: Vec<String> = util::get_available_controllers(&self.root_path)?
             .iter()
             .map(|c| format!("{}{}", "+", c))
@@ -71,8 +108,11 @@ impl Manager {
         while let Some(component) = components.next() {
             current_path = current_path.join(component);
             if !current_path.exists() {
-                fs::create_dir(&current_path)?;
-                fs::metadata(&current_path)?.permissions().set_mode(0o755);
+                fs::create_dir(&current_path).wrap_create_dir(&current_path)?;
+                fs::metadata(&current_path)
+                    .wrap_other(&current_path)?
+                    .permissions()
+                    .set_mode(0o755);
             }
 
             // last component cannot have subtree_control enabled due to internal process constraint
@@ -86,22 +126,28 @@ impl Manager {
         Ok(())
     }
 
-    fn write_controllers(path: &Path, controllers: &[String]) -> Result<()> {
+    fn write_controllers(path: &Path, controllers: &[String]) -> Result<(), WrappedIoError> {
         for controller in controllers {
             common::write_cgroup_file_str(path.join(CGROUP_SUBTREE_CONTROL), controller)?;
         }
 
         Ok(())
     }
+
+    pub fn any(self) -> AnyManager {
+        AnyManager::V2(self)
+    }
 }
 
 impl CgroupManager for Manager {
-    fn add_task(&self, pid: Pid) -> Result<()> {
+    type Error = V2ManagerError;
+
+    fn add_task(&self, pid: Pid) -> Result<(), Self::Error> {
         self.create_unified_cgroup(pid)?;
         Ok(())
     }
 
-    fn apply(&self, controller_opt: &ControllerOpt) -> Result<()> {
+    fn apply(&self, controller_opt: &ControllerOpt) -> Result<(), Self::Error> {
         for controller in CONTROLLER_TYPES {
             match controller {
                 ControllerType::Cpu => Cpu::apply(controller_opt, &self.full_path)?,
@@ -129,18 +175,21 @@ impl CgroupManager for Manager {
         Ok(())
     }
 
-    fn remove(&self) -> Result<()> {
+    fn remove(&self) -> Result<(), Self::Error> {
         if self.full_path.exists() {
             log::debug!("remove cgroup {:?}", self.full_path);
             let kill_file = self.full_path.join(CGROUP_KILL);
             if kill_file.exists() {
-                fs::write(kill_file, "1").context("failed to kill cgroup")?;
+                fs::write(&kill_file, "1").wrap_write(&kill_file, "1")?;
             } else {
                 let procs_path = self.full_path.join(CGROUP_PROCS);
-                let procs = fs::read_to_string(procs_path)?;
+                let procs = fs::read_to_string(&procs_path).wrap_read(&procs_path)?;
 
                 for line in procs.lines() {
-                    let pid: i32 = line.parse()?;
+                    let pid: i32 = line
+                        .parse()
+                        .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err))
+                        .wrap_other(&procs_path)?;
                     let _ = nix::sys::signal::kill(Pid::from_raw(pid), nix::sys::signal::SIGKILL);
                 }
             }
@@ -151,7 +200,7 @@ impl CgroupManager for Manager {
         Ok(())
     }
 
-    fn freeze(&self, state: FreezerState) -> Result<()> {
+    fn freeze(&self, state: FreezerState) -> Result<(), Self::Error> {
         let controller_opt = ControllerOpt {
             resources: &Default::default(),
             freezer_state: Some(state),
@@ -161,14 +210,16 @@ impl CgroupManager for Manager {
         Ok(Freezer::apply(&controller_opt, &self.full_path)?)
     }
 
-    fn stats(&self) -> Result<Stats> {
+    fn stats(&self) -> Result<Stats, Self::Error> {
         let mut stats = Stats::default();
 
         for subsystem in CONTROLLER_TYPES {
             match subsystem {
                 ControllerType::Cpu => stats.cpu = Cpu::stats(&self.full_path)?,
                 ControllerType::HugeTlb => stats.hugetlb = HugeTlb::stats(&self.full_path)?,
-                ControllerType::Pids => stats.pids = Pids::stats(&self.full_path)?,
+                ControllerType::Pids => {
+                    stats.pids = Pids::stats(&self.full_path).map_err(V2ManagerError::PidsStats)?
+                }
                 ControllerType::Memory => stats.memory = Memory::stats(&self.full_path)?,
                 ControllerType::Io => stats.blkio = Io::stats(&self.full_path)?,
                 _ => continue,
@@ -178,7 +229,7 @@ impl CgroupManager for Manager {
         Ok(stats)
     }
 
-    fn get_all_pids(&self) -> Result<Vec<Pid>> {
-        common::get_all_pids(&self.full_path)
+    fn get_all_pids(&self) -> Result<Vec<Pid>, Self::Error> {
+        Ok(common::get_all_pids(&self.full_path)?)
     }
 }

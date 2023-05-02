@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::{cell::RefCell, convert::Infallible};
 
 use anyhow::Result;
 use nix::unistd::Pid;
@@ -24,30 +24,32 @@ impl Default for TestManager {
 }
 
 impl CgroupManager for TestManager {
-    fn add_task(&self, pid: Pid) -> Result<()> {
+    type Error = Infallible;
+
+    fn add_task(&self, pid: Pid) -> Result<(), Infallible> {
         self.add_task_args.borrow_mut().push(pid);
         Ok(())
     }
 
     // NOTE: The argument cannot be stored due to lifetime.
-    fn apply(&self, _controller_opt: &ControllerOpt) -> Result<()> {
+    fn apply(&self, _controller_opt: &ControllerOpt) -> Result<(), Infallible> {
         *self.apply_called.borrow_mut() = true;
         Ok(())
     }
 
-    fn remove(&self) -> Result<()> {
+    fn remove(&self) -> Result<(), Infallible> {
         unimplemented!()
     }
 
-    fn freeze(&self, _state: FreezerState) -> Result<()> {
+    fn freeze(&self, _state: FreezerState) -> Result<(), Infallible> {
         unimplemented!()
     }
 
-    fn stats(&self) -> anyhow::Result<Stats> {
+    fn stats(&self) -> anyhow::Result<Stats, Infallible> {
         unimplemented!()
     }
 
-    fn get_all_pids(&self) -> Result<Vec<Pid>> {
+    fn get_all_pids(&self) -> Result<Vec<Pid>, Infallible> {
         unimplemented!()
     }
 }

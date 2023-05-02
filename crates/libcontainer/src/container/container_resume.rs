@@ -1,7 +1,7 @@
 use super::{Container, ContainerStatus};
 
 use anyhow::{bail, Context, Result};
-use libcgroups::common::FreezerState;
+use libcgroups::common::{CgroupManager, FreezerState};
 
 impl Container {
     /// Resumes all processes within the container

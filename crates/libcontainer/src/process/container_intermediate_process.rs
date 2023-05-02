@@ -34,7 +34,7 @@ pub fn container_intermediate_process(
     // the cgroup of the process will form the root of the cgroup hierarchy in
     // the cgroup namespace.
     apply_cgroups(
-        args.cgroup_manager.as_ref(),
+        &args.cgroup_manager,
         linux.resources().as_ref(),
         matches!(args.container_type, ContainerType::InitContainer),
     )
@@ -137,7 +137,10 @@ pub fn container_intermediate_process(
     Ok(pid)
 }
 
-fn apply_cgroups<C: CgroupManager + ?Sized>(
+fn apply_cgroups<
+    C: CgroupManager<Error = E> + ?Sized,
+    E: std::error::Error + Send + Sync + 'static,
+>(
     cmanager: &C,
     resources: Option<&LinuxResources>,
     init: bool,

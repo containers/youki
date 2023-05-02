@@ -13,6 +13,7 @@ use crate::{
     workload::ExecutorManager,
 };
 use anyhow::{bail, Context, Result};
+use libcgroups::common::CgroupManager;
 use nix::unistd::Pid;
 use oci_spec::runtime::Spec;
 use std::{fs, io::Write, os::unix::prelude::RawFd, path::PathBuf};

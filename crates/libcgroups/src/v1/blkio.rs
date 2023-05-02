@@ -79,7 +79,7 @@ const BLKIO_MERGED: &str = "blkio.io_merged_recursive";
 pub struct Blkio {}
 
 impl Controller for Blkio {
-    type Error = V1BlkioStatsError;
+    type Error = WrappedIoError;
     type Resource = LinuxBlockIo;
 
     fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<(), Self::Error> {

@@ -2,6 +2,7 @@ use std::{thread, time::Duration};
 
 use super::{Container, ContainerStatus};
 use anyhow::{bail, Context, Result};
+use libcgroups::common::CgroupManager;
 
 impl Container {
     /// Displays container events

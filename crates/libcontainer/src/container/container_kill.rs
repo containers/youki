@@ -1,7 +1,7 @@
 use super::{Container, ContainerStatus};
 use crate::signal::Signal;
 use anyhow::{bail, Context, Result};
-use libcgroups::common::{create_cgroup_manager, get_cgroup_setup};
+use libcgroups::common::{create_cgroup_manager, get_cgroup_setup, CgroupManager};
 use nix::sys::signal::{self};
 
 impl Container {

@@ -1,5 +1,4 @@
 use crate::systemd::dbus::systemd_api::OrgFreedesktopSystemd1Manager;
-use anyhow::Result;
 use dbus::arg::{RefArg, Variant};
 use dbus::blocking::{Connection, Proxy};
 use std::collections::HashMap;

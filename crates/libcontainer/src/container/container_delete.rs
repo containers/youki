@@ -3,7 +3,7 @@ use crate::config::YoukiConfig;
 use crate::hooks;
 use crate::process::intel_rdt::delete_resctrl_subdirectory;
 use anyhow::{bail, Context, Result};
-use libcgroups;
+use libcgroups::{self, common::CgroupManager};
 use nix::sys::signal;
 use std::fs;
 
