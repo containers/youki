@@ -106,6 +106,8 @@ pub enum WrappedIoError {
     Read { err: std::io::Error, path: PathBuf },
     #[error("failed to create dir {path}: {err}")]
     CreateDir { err: std::io::Error, path: PathBuf },
+    #[error("at {path}: {err}")]
+    Other { err: std::io::Error, path: PathBuf },
 }
 
 impl WrappedIoError {
@@ -115,6 +117,7 @@ impl WrappedIoError {
             WrappedIoError::Write { err, .. } => err,
             WrappedIoError::Read { err, .. } => err,
             WrappedIoError::CreateDir { err, .. } => err,
+            WrappedIoError::Other { err, .. } => err,
         }
     }
 }
@@ -507,6 +510,7 @@ pub(crate) trait WrapIoResult {
         path: P,
         data: D,
     ) -> Result<Self::Target, WrappedIoError>;
+    fn wrap_other<P: Into<PathBuf>>(self, path: P) -> Result<Self::Target, WrappedIoError>;
 }
 
 impl<T> WrapIoResult for Result<T, std::io::Error> {
@@ -544,6 +548,13 @@ impl<T> WrapIoResult for Result<T, std::io::Error> {
             data: data.into(),
         })
     }
+
+    fn wrap_other<P: Into<PathBuf>>(self, path: P) -> Result<Self::Target, WrappedIoError> {
+        self.map_err(|err| WrappedIoError::Other {
+            err,
+            path: path.into(),
+        })
+    }
 }
 
 #[derive(Debug)]
@@ -562,3 +573,12 @@ impl<L: Display, R: Display> Display for EitherError<L, R> {
 }
 
 impl<L: Debug + Display, R: Debug + Display> std::error::Error for EitherError<L, R> {}
+
+#[derive(Debug)]
+pub struct MustBePowerOfTwo;
+
+impl Display for MustBePowerOfTwo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("page size must be in the format of 2^(integer)")
+    }
+}

@@ -22,6 +22,8 @@ const LICENSE: &str = "Apache";
 pub struct Devices {}
 
 impl Controller for Devices {
+    type Error = anyhow::Error;
+
     fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()> {
         #[cfg(not(feature = "cgroupsv2_devices"))]
         return Ok(());

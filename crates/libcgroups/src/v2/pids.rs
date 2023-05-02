@@ -1,9 +1,9 @@
 use std::path::Path;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 
 use crate::{
-    common::{self, ControllerOpt},
+    common::{self, ControllerOpt, WrappedIoError},
     stats::{self, PidStats, StatsProvider},
 };
 
@@ -13,10 +13,15 @@ use oci_spec::runtime::LinuxPids;
 pub struct Pids {}
 
 impl Controller for Pids {
-    fn apply(controller_opt: &ControllerOpt, cgroup_root: &std::path::Path) -> Result<()> {
+    type Error = WrappedIoError;
+
+    fn apply(
+        controller_opt: &ControllerOpt,
+        cgroup_root: &std::path::Path,
+    ) -> Result<(), Self::Error> {
         log::debug!("Apply pids cgroup v2 config");
         if let Some(pids) = &controller_opt.resources.pids() {
-            Self::apply(cgroup_root, pids).context("failed to apply pids resource restrictions")?;
+            Self::apply(cgroup_root, pids)?;
         }
         Ok(())
     }
@@ -31,7 +36,7 @@ impl StatsProvider for Pids {
 }
 
 impl Pids {
-    fn apply(root_path: &Path, pids: &LinuxPids) -> Result<()> {
+    fn apply(root_path: &Path, pids: &LinuxPids) -> Result<(), WrappedIoError> {
         let limit = if pids.limit() > 0 {
             pids.limit().to_string()
         } else {

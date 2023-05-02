@@ -1,25 +1,47 @@
-use anyhow::{bail, Context, Result};
+use anyhow::Result;
 use std::{
     fs::OpenOptions,
     io::{BufRead, BufReader, Read, Seek, Write},
     path::Path,
-    str, thread,
+    str::{self, Utf8Error},
+    thread,
     time::Duration,
 };
 
-use crate::common::{ControllerOpt, FreezerState};
+use crate::common::{ControllerOpt, FreezerState, WrapIoResult, WrappedIoError};
 
 use super::controller::Controller;
 
 const CGROUP_FREEZE: &str = "cgroup.freeze";
 const CGROUP_EVENTS: &str = "cgroup.events";
 
+#[derive(thiserror::Error, Debug)]
+pub enum V2FreezerError {
+    #[error("io error: {0}")]
+    WrappedIo(#[from] WrappedIoError),
+    #[error("freezer not supported: {0}")]
+    NotSupported(WrappedIoError),
+    #[error("expected \"cgroup.freeze\" to be in state {expected:?} but was in {actual:?}")]
+    ExepectedToBe {
+        expected: FreezerState,
+        actual: FreezerState,
+    },
+    #[error("unexpected \"cgroup.freeze\" state: {state}")]
+    UnknownState { state: String },
+    #[error("timeout of {0} ms reached waiting for the cgroup to freeze")]
+    Timeout(u128),
+    #[error("invalid utf8: {0}")]
+    InvalidUtf8(#[from] Utf8Error),
+}
+
 pub struct Freezer {}
 
 impl Controller for Freezer {
-    fn apply(controller_opt: &ControllerOpt, cgroup_path: &Path) -> Result<()> {
+    type Error = V2FreezerError;
+
+    fn apply(controller_opt: &ControllerOpt, cgroup_path: &Path) -> Result<(), Self::Error> {
         if let Some(freezer_state) = controller_opt.freezer_state {
-            Self::apply(freezer_state, cgroup_path).context("failed to apply freezer")?;
+            Self::apply(freezer_state, cgroup_path)?;
         }
 
         Ok(())
@@ -27,62 +49,72 @@ impl Controller for Freezer {
 }
 
 impl Freezer {
-    fn apply(freezer_state: FreezerState, path: &Path) -> Result<()> {
+    fn apply(freezer_state: FreezerState, path: &Path) -> Result<(), V2FreezerError> {
         let state_str = match freezer_state {
             FreezerState::Undefined => return Ok(()),
             FreezerState::Frozen => "1",
             FreezerState::Thawed => "0",
         };
 
-        match OpenOptions::new()
-            .create(false)
-            .write(true)
-            .open(path.join(CGROUP_FREEZE))
-        {
-            Err(e) => {
-                if let FreezerState::Frozen = freezer_state {
-                    bail!("freezer not supported {}", e);
+        let target = path.join(CGROUP_FREEZE);
+        match OpenOptions::new().create(false).write(true).open(&target) {
+            Err(err) => {
+                if freezer_state == FreezerState::Frozen {
+                    return Err(V2FreezerError::NotSupported(WrappedIoError::Open {
+                        err,
+                        path: target,
+                    }));
                 }
                 return Ok(());
             }
-            Ok(mut file) => file.write_all(state_str.as_bytes())?,
+            Ok(mut file) => file
+                .write_all(state_str.as_bytes())
+                .wrap_write(target, state_str)?,
         };
 
         // confirm that the cgroup did actually change states.
         let actual_state = Self::read_freezer_state(path)?;
         if !actual_state.eq(&freezer_state) {
-            bail!(
-                "expected \"cgroup.freeze\" to be in state {:?} but was in {:?}",
-                freezer_state,
-                actual_state
-            );
+            return Err(V2FreezerError::ExepectedToBe {
+                expected: freezer_state,
+                actual: actual_state,
+            });
         }
 
         Ok(())
     }
 
-    fn read_freezer_state(path: &Path) -> Result<FreezerState> {
+    fn read_freezer_state(path: &Path) -> Result<FreezerState, V2FreezerError> {
+        let target = path.join(CGROUP_FREEZE);
         let mut buf = [0; 1];
         OpenOptions::new()
             .create(false)
             .read(true)
-            .open(path.join(CGROUP_FREEZE))?
-            .read_exact(&mut buf)?;
+            .open(&target)
+            .wrap_open(&target)?
+            .read_exact(&mut buf)
+            .wrap_read(&target)?;
 
         let state = str::from_utf8(&buf)?;
         match state {
             "0" => Ok(FreezerState::Thawed),
             "1" => Self::wait_frozen(path),
-            _ => bail!("unknown \"cgroup.freeze\" state: {}", state),
+            _ => {
+                return Err(V2FreezerError::UnknownState {
+                    state: state.into(),
+                })
+            }
         }
     }
 
     // wait_frozen polls cgroup.events until it sees "frozen 1" in it.
-    fn wait_frozen(path: &Path) -> Result<FreezerState> {
+    fn wait_frozen(path: &Path) -> Result<FreezerState, V2FreezerError> {
+        let path = path.join(CGROUP_EVENTS);
         let f = OpenOptions::new()
             .create(false)
             .read(true)
-            .open(path.join(CGROUP_EVENTS))?;
+            .open(&path)
+            .wrap_open(&path)?;
         let mut f = BufReader::new(f);
 
         let wait_time = Duration::from_millis(10);
@@ -92,13 +124,10 @@ impl Freezer {
 
         loop {
             if iter == max_iter {
-                bail!(
-                    "timeout of {} ms reached waiting for the cgroup to freeze",
-                    wait_time.as_millis() * max_iter
-                );
+                return Err(V2FreezerError::Timeout(wait_time.as_millis() * max_iter));
             }
             line.clear();
-            let num_bytes = f.read_line(&mut line)?;
+            let num_bytes = f.read_line(&mut line).wrap_read(&path)?;
             if num_bytes == 0 {
                 break;
             }
@@ -111,7 +140,7 @@ impl Freezer {
                 }
                 iter += 1;
                 thread::sleep(wait_time);
-                f.rewind()?;
+                f.rewind().wrap_other(&path)?;
             }
         }
 

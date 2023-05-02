@@ -1,10 +1,10 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use std::path::Path;
 
 use oci_spec::runtime::LinuxMemory;
 
 use crate::{
-    common::{self, ControllerOpt},
+    common::{self, ControllerOpt, WrappedIoError},
     stats::{self, MemoryData, MemoryStats, StatsProvider},
 };
 
@@ -16,13 +16,30 @@ const CGROUP_MEMORY_LOW: &str = "memory.low";
 const MEMORY_STAT: &str = "memory.stat";
 const MEMORY_PSI: &str = "memory.pressure";
 
+#[derive(thiserror::Error, Debug)]
+pub enum V2MemoryError {
+    #[error("io error: {0}")]
+    WrappedIo(#[from] WrappedIoError),
+    #[error("invalid memory value {0}")]
+    MemoryValue(i64),
+    #[error("invalid swap value {0}")]
+    SwapValue(i64),
+    #[error("swap memory ({swap}) should be bigger than memory limit ({limit})")]
+    SwapTooSmall { swap: i64, limit: i64 },
+    #[error("unable to set swap limit without memory limit")]
+    SwapWithoutLimit,
+    #[error("invalid memory reservation value: {0}")]
+    MemoryReservation(i64),
+}
+
 pub struct Memory {}
 
 impl Controller for Memory {
-    fn apply(controller_opt: &ControllerOpt, cgroup_path: &Path) -> Result<()> {
+    type Error = V2MemoryError;
+
+    fn apply(controller_opt: &ControllerOpt, cgroup_path: &Path) -> Result<(), Self::Error> {
         if let Some(memory) = &controller_opt.resources.memory() {
-            Self::apply(cgroup_path, memory)
-                .context("failed to apply memory resource restrictions")?;
+            Self::apply(cgroup_path, memory)?;
         }
 
         Ok(())
@@ -75,7 +92,7 @@ impl Memory {
         })
     }
 
-    fn set<P: AsRef<Path>>(path: P, val: i64) -> Result<()> {
+    fn set<P: AsRef<Path>>(path: P, val: i64) -> Result<(), WrappedIoError> {
         if val == 0 {
             Ok(())
         } else if val == -1 {
@@ -85,7 +102,7 @@ impl Memory {
         }
     }
 
-    fn apply(path: &Path, memory: &LinuxMemory) -> Result<()> {
+    fn apply(path: &Path, memory: &LinuxMemory) -> Result<(), V2MemoryError> {
         // if nothing is set just exit right away
         if memory.reservation().is_none() && memory.limit().is_none() && memory.swap().is_none() {
             return Ok(());
@@ -93,11 +110,11 @@ impl Memory {
 
         match memory.limit() {
             Some(limit) if limit < -1 => {
-                bail!("invalid memory value: {}", limit);
+                return Err(V2MemoryError::MemoryValue(limit));
             }
             Some(limit) => match memory.swap() {
                 Some(swap) if swap < -1 => {
-                    bail!("invalid swap value: {}", swap);
+                    return Err(V2MemoryError::SwapValue(swap));
                 }
                 Some(swap) => {
                     // -1 means max
@@ -105,11 +122,7 @@ impl Memory {
                         Memory::set(path.join(CGROUP_MEMORY_SWAP), swap)?;
                     } else {
                         if swap < limit {
-                            bail!(
-                                "swap memory ({}) should be bigger than memory limit ({})",
-                                swap,
-                                limit
-                            );
+                            return Err(V2MemoryError::SwapTooSmall { swap, limit });
                         }
 
                         // In cgroup v1 swap is memory+swap, but in cgroup v2 swap is
@@ -129,14 +142,14 @@ impl Memory {
             },
             None => {
                 if memory.swap().is_some() {
-                    bail!("unable to set swap limit without memory limit");
+                    return Err(V2MemoryError::SwapWithoutLimit);
                 }
             }
         };
 
         if let Some(reservation) = memory.reservation() {
             if reservation < -1 {
-                bail!("invalid memory reservation value: {}", reservation);
+                return Err(V2MemoryError::MemoryReservation(reservation));
             }
             Memory::set(path.join(CGROUP_MEMORY_LOW), reservation)?;
         }

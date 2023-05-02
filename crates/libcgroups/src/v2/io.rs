@@ -1,9 +1,9 @@
 use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 
 use crate::{
-    common::{self, ControllerOpt},
+    common::{self, ControllerOpt, WrappedIoError},
     stats::{self, psi_stats, BlkioDeviceStat, BlkioStats, StatsProvider},
 };
 
@@ -15,13 +15,23 @@ const CGROUP_IO_WEIGHT: &str = "io.weight";
 const CGROUP_IO_STAT: &str = "io.stat";
 const CGROUP_IO_PSI: &str = "io.pressure";
 
+#[derive(thiserror::Error, Debug)]
+pub enum V2IoError {
+    #[error("io error: {0}")]
+    WrappedIo(#[from] WrappedIoError),
+    #[error("cannot set leaf_weight with cgroupv2")]
+    LeafWeight,
+}
+
 pub struct Io {}
 
 impl Controller for Io {
-    fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()> {
+    type Error = V2IoError;
+
+    fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<(), Self::Error> {
         log::debug!("Apply io cgroup v2 config");
         if let Some(io) = &controller_opt.resources.block_io() {
-            Self::apply(cgroup_root, io).context("failed to apply io resource restrictions")?;
+            Self::apply(cgroup_root, io)?;
         }
         Ok(())
     }
@@ -97,7 +107,7 @@ impl Io {
     }
 
     // linux kernel doc: https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html#io
-    fn apply(root_path: &Path, blkio: &LinuxBlockIo) -> Result<()> {
+    fn apply(root_path: &Path, blkio: &LinuxBlockIo) -> Result<(), V2IoError> {
         if let Some(weight_device) = blkio.weight_device() {
             for wd in weight_device {
                 common::write_cgroup_file(
@@ -108,7 +118,7 @@ impl Io {
         }
         if let Some(leaf_weight) = blkio.leaf_weight() {
             if leaf_weight > 0 {
-                bail!("cannot set leaf_weight with cgroupv2");
+                return Err(V2IoError::LeafWeight);
             }
         }
         if let Some(io_weight) = blkio.weight() {

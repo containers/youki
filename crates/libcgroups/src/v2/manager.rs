@@ -158,7 +158,7 @@ impl CgroupManager for Manager {
             oom_score_adj: None,
             disable_oom_killer: false,
         };
-        Freezer::apply(&controller_opt, &self.full_path)
+        Ok(Freezer::apply(&controller_opt, &self.full_path)?)
     }
 
     fn stats(&self) -> Result<Stats> {

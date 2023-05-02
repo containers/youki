@@ -1,8 +1,8 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use std::{borrow::Cow, path::Path};
 
 use crate::{
-    common::{self, ControllerOpt},
+    common::{self, ControllerOpt, WrappedIoError},
     stats::{self, CpuStats, StatsProvider},
 };
 
@@ -20,12 +20,22 @@ const MAX_CPU_WEIGHT: u64 = 10000;
 const CPU_STAT: &str = "cpu.stat";
 const CPU_PSI: &str = "cpu.pressure";
 
+#[derive(thiserror::Error, Debug)]
+pub enum V2CpuError {
+    #[error("io error: {0}")]
+    WrappedIo(#[from] WrappedIoError),
+    #[error("realtime is not supported on v2 yet")]
+    RealtimeV2,
+}
+
 pub struct Cpu {}
 
 impl Controller for Cpu {
-    fn apply(controller_opt: &ControllerOpt, path: &Path) -> Result<()> {
+    type Error = V2CpuError;
+
+    fn apply(controller_opt: &ControllerOpt, path: &Path) -> Result<(), Self::Error> {
         if let Some(cpu) = &controller_opt.resources.cpu() {
-            Self::apply(path, cpu).context("failed to apply cpu resource restrictions")?;
+            Self::apply(path, cpu)?;
         }
 
         Ok(())
@@ -61,9 +71,9 @@ impl StatsProvider for Cpu {
 }
 
 impl Cpu {
-    fn apply(path: &Path, cpu: &LinuxCpu) -> Result<()> {
+    fn apply(path: &Path, cpu: &LinuxCpu) -> Result<(), V2CpuError> {
         if Self::is_realtime_requested(cpu) {
-            bail!("realtime is not supported on cgroup v2 yet");
+            return Err(V2CpuError::RealtimeV2);
         }
 
         if let Some(mut shares) = cpu.shares() {
@@ -126,7 +136,10 @@ impl Cpu {
         false
     }
 
-    fn create_period_only_value(cpu_max_file: &Path, period: u64) -> Result<Option<Cow<str>>> {
+    fn create_period_only_value(
+        cpu_max_file: &Path,
+        period: u64,
+    ) -> Result<Option<Cow<str>>, V2CpuError> {
         let old_cpu_max = common::read_cgroup_file(cpu_max_file)?;
         if let Some(old_quota) = old_cpu_max.split_whitespace().next() {
             return Ok(Some(format!("{old_quota} {period}").into()));

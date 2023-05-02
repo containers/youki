@@ -1,9 +1,9 @@
-use std::{collections::HashMap, fmt::Display, num::ParseIntError, path::Path};
+use std::{collections::HashMap, num::ParseIntError, path::Path};
 
 use anyhow::Result;
 
 use crate::{
-    common::{self, ControllerOpt, EitherError, WrappedIoError},
+    common::{self, ControllerOpt, EitherError, MustBePowerOfTwo, WrappedIoError},
     stats::{supported_page_sizes, HugeTlbStats, StatsProvider},
 };
 
@@ -67,15 +67,6 @@ impl StatsProvider for HugeTlb {
         }
 
         Ok(hugetlb_stats)
-    }
-}
-
-#[derive(Debug)]
-pub struct MustBePowerOfTwo;
-
-impl Display for MustBePowerOfTwo {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("page size must be in the format of 2^(integer)")
     }
 }
 
