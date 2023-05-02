@@ -1,11 +1,10 @@
-use anyhow::{Context, Result};
 use std::path::Path;
 
 use oci_spec::runtime::LinuxMemory;
 
 use crate::{
     common::{self, ControllerOpt, WrappedIoError},
-    stats::{self, MemoryData, MemoryStats, StatsProvider},
+    stats::{self, MemoryData, MemoryStats, ParseFlatKeyedDataError, StatsProvider},
 };
 
 use super::controller::Controller;
@@ -17,7 +16,7 @@ const MEMORY_STAT: &str = "memory.stat";
 const MEMORY_PSI: &str = "memory.pressure";
 
 #[derive(thiserror::Error, Debug)]
-pub enum V2MemoryError {
+pub enum V2MemoryControllerError {
     #[error("io error: {0}")]
     WrappedIo(#[from] WrappedIoError),
     #[error("invalid memory value {0}")]
@@ -35,7 +34,7 @@ pub enum V2MemoryError {
 pub struct Memory {}
 
 impl Controller for Memory {
-    type Error = V2MemoryError;
+    type Error = V2MemoryControllerError;
 
     fn apply(controller_opt: &ControllerOpt, cgroup_path: &Path) -> Result<(), Self::Error> {
         if let Some(memory) = &controller_opt.resources.memory() {
@@ -45,19 +44,25 @@ impl Controller for Memory {
         Ok(())
     }
 }
+#[derive(thiserror::Error, Debug)]
+pub enum V2MemoryStatsError {
+    #[error("io error: {0}")]
+    WrappedIo(#[from] WrappedIoError),
+    #[error("while parsing stat table: {0}")]
+    ParseNestedKeyedData(#[from] ParseFlatKeyedDataError),
+}
 
 impl StatsProvider for Memory {
-    type Error = anyhow::Error;
+    type Error = V2MemoryStatsError;
     type Stats = MemoryStats;
 
-    fn stats(cgroup_path: &Path) -> Result<Self::Stats> {
+    fn stats(cgroup_path: &Path) -> Result<Self::Stats, Self::Error> {
         let stats = MemoryStats {
             memory: Self::get_memory_data(cgroup_path, "memory", "oom")?,
             memswap: Self::get_memory_data(cgroup_path, "memory.swap", "fail")?,
             hierarchy: true,
             stats: stats::parse_flat_keyed_data(&cgroup_path.join(MEMORY_STAT))?,
-            psi: stats::psi_stats(&cgroup_path.join(MEMORY_PSI))
-                .context("could not read memory psi")?,
+            psi: stats::psi_stats(&cgroup_path.join(MEMORY_PSI))?,
             ..Default::default()
         };
 
@@ -70,7 +75,7 @@ impl Memory {
         cgroup_path: &Path,
         file_prefix: &str,
         fail_event: &str,
-    ) -> Result<MemoryData> {
+    ) -> Result<MemoryData, V2MemoryStatsError> {
         let usage =
             stats::parse_single_value(&cgroup_path.join(format!("{}.{}", file_prefix, "current")))?;
         let limit =
@@ -103,7 +108,7 @@ impl Memory {
         }
     }
 
-    fn apply(path: &Path, memory: &LinuxMemory) -> Result<(), V2MemoryError> {
+    fn apply(path: &Path, memory: &LinuxMemory) -> Result<(), V2MemoryControllerError> {
         // if nothing is set just exit right away
         if memory.reservation().is_none() && memory.limit().is_none() && memory.swap().is_none() {
             return Ok(());
@@ -111,11 +116,11 @@ impl Memory {
 
         match memory.limit() {
             Some(limit) if limit < -1 => {
-                return Err(V2MemoryError::MemoryValue(limit));
+                return Err(V2MemoryControllerError::MemoryValue(limit));
             }
             Some(limit) => match memory.swap() {
                 Some(swap) if swap < -1 => {
-                    return Err(V2MemoryError::SwapValue(swap));
+                    return Err(V2MemoryControllerError::SwapValue(swap));
                 }
                 Some(swap) => {
                     // -1 means max
@@ -123,7 +128,7 @@ impl Memory {
                         Memory::set(path.join(CGROUP_MEMORY_SWAP), swap)?;
                     } else {
                         if swap < limit {
-                            return Err(V2MemoryError::SwapTooSmall { swap, limit });
+                            return Err(V2MemoryControllerError::SwapTooSmall { swap, limit });
                         }
 
                         // In cgroup v1 swap is memory+swap, but in cgroup v2 swap is
@@ -143,14 +148,14 @@ impl Memory {
             },
             None => {
                 if memory.swap().is_some() {
-                    return Err(V2MemoryError::SwapWithoutLimit);
+                    return Err(V2MemoryControllerError::SwapWithoutLimit);
                 }
             }
         };
 
         if let Some(reservation) = memory.reservation() {
             if reservation < -1 {
-                return Err(V2MemoryError::MemoryReservation(reservation));
+                return Err(V2MemoryControllerError::MemoryReservation(reservation));
             }
             Memory::set(path.join(CGROUP_MEMORY_LOW), reservation)?;
         }

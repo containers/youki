@@ -1,4 +1,3 @@
-use anyhow::Result;
 use std::{
     fs::OpenOptions,
     io::{BufRead, BufReader, Read, Seek, Write},

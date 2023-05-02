@@ -1,16 +1,22 @@
-use anyhow::{Context, Result};
-use std::{collections::HashMap, num::ParseIntError, path::Path};
+use std::{
+    collections::HashMap,
+    num::ParseIntError,
+    path::{Path, PathBuf},
+};
 
 use super::controller::Controller;
 use crate::{
     common::{self, ControllerOpt, EitherError, MustBePowerOfTwo, WrappedIoError},
-    stats::{parse_single_value, supported_page_sizes, HugeTlbStats, StatsProvider},
+    stats::{
+        parse_single_value, supported_page_sizes, HugeTlbStats, StatsProvider,
+        SupportedPageSizesError,
+    },
 };
 
 use oci_spec::runtime::LinuxHugepageLimit;
 
 #[derive(thiserror::Error, Debug)]
-pub enum V2HugeTlbError {
+pub enum V2HugeTlbControllerError {
     #[error("io error: {0}")]
     WrappedIo(#[from] WrappedIoError),
     #[error("malformed page size {page_size}: {err}")]
@@ -23,7 +29,7 @@ pub enum V2HugeTlbError {
 pub struct HugeTlb {}
 
 impl Controller for HugeTlb {
-    type Error = V2HugeTlbError;
+    type Error = V2HugeTlbControllerError;
 
     fn apply(
         controller_opt: &ControllerOpt,
@@ -39,11 +45,21 @@ impl Controller for HugeTlb {
     }
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum V2HugeTlbStatsError {
+    #[error("io error: {0}")]
+    WrappedIo(#[from] WrappedIoError),
+    #[error("getting supported huge page sizes: {0}")]
+    SupportedPageSizes(#[from] SupportedPageSizesError),
+    #[error("failed to parse max value for {path}: {err}")]
+    ParseMax { path: PathBuf, err: ParseIntError },
+}
+
 impl StatsProvider for HugeTlb {
-    type Error = anyhow::Error;
+    type Error = V2HugeTlbStatsError;
     type Stats = HashMap<String, HugeTlbStats>;
 
-    fn stats(cgroup_path: &Path) -> Result<Self::Stats> {
+    fn stats(cgroup_path: &Path) -> Result<Self::Stats, Self::Error> {
         let page_sizes = supported_page_sizes()?;
         let mut hugetlb_stats = HashMap::with_capacity(page_sizes.len());
 
@@ -59,7 +75,10 @@ impl StatsProvider for HugeTlb {
 }
 
 impl HugeTlb {
-    fn apply(root_path: &Path, hugetlb: &LinuxHugepageLimit) -> Result<(), V2HugeTlbError> {
+    fn apply(
+        root_path: &Path,
+        hugetlb: &LinuxHugepageLimit,
+    ) -> Result<(), V2HugeTlbControllerError> {
         let page_size_raw: String = hugetlb
             .page_size()
             .chars()
@@ -68,14 +87,14 @@ impl HugeTlb {
         let page_size: u64 = match page_size_raw.parse() {
             Ok(page_size) => page_size,
             Err(err) => {
-                return Err(V2HugeTlbError::MalformedPageSize {
+                return Err(V2HugeTlbControllerError::MalformedPageSize {
                     page_size: page_size_raw,
                     err: EitherError::Left(err),
                 })
             }
         };
         if !Self::is_power_of_two(page_size) {
-            return Err(V2HugeTlbError::MalformedPageSize {
+            return Err(V2HugeTlbControllerError::MalformedPageSize {
                 page_size: page_size_raw,
                 err: EitherError::Right(MustBePowerOfTwo),
             });
@@ -92,15 +111,22 @@ impl HugeTlb {
         (number != 0) && (number & (number.saturating_sub(1))) == 0
     }
 
-    fn stats_for_page_size(cgroup_path: &Path, page_size: &str) -> Result<HugeTlbStats> {
+    fn stats_for_page_size(
+        cgroup_path: &Path,
+        page_size: &str,
+    ) -> Result<HugeTlbStats, V2HugeTlbStatsError> {
         let events_file = format!("hugetlb.{page_size}.events");
-        let events = common::read_cgroup_file(cgroup_path.join(&events_file))?;
+        let path = cgroup_path.join(&events_file);
+        let events = common::read_cgroup_file(&path)?;
         let fail_count: u64 = events
             .lines()
             .find(|l| l.starts_with("max"))
             .map(|l| l[3..].trim().parse())
             .transpose()
-            .with_context(|| format!("failed to parse max value for {events_file}"))?
+            .map_err(|err| V2HugeTlbStatsError::ParseMax {
+                path: path.clone(),
+                err,
+            })?
             .unwrap_or_default();
 
         Ok(HugeTlbStats {

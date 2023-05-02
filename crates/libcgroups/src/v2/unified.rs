@@ -1,7 +1,5 @@
 use std::{collections::HashMap, path::Path};
 
-use anyhow::Result;
-
 use super::controller_type::ControllerType;
 use crate::common::{self, ControllerOpt, WrappedIoError};
 

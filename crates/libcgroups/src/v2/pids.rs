@@ -1,10 +1,8 @@
 use std::path::Path;
 
-use anyhow::Result;
-
 use crate::{
     common::{self, ControllerOpt, WrappedIoError},
-    stats::{self, PidStats, StatsProvider},
+    stats::{self, PidStats, PidStatsError, StatsProvider},
 };
 
 use super::controller::Controller;
@@ -28,11 +26,11 @@ impl Controller for Pids {
 }
 
 impl StatsProvider for Pids {
-    type Error = anyhow::Error;
+    type Error = PidStatsError;
     type Stats = PidStats;
 
-    fn stats(cgroup_path: &Path) -> Result<Self::Stats> {
-        Ok(stats::pid_stats(cgroup_path)?)
+    fn stats(cgroup_path: &Path) -> Result<Self::Stats, Self::Error> {
+        stats::pid_stats(cgroup_path)
     }
 }
 

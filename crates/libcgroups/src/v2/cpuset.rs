@@ -1,4 +1,3 @@
-use anyhow::Result;
 use std::path::Path;
 
 use crate::common::{self, ControllerOpt, WrappedIoError};

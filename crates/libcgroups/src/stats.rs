@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::Result;
 use serde::Serialize;
 use std::{
     collections::HashMap,
@@ -328,14 +328,26 @@ pub(crate) fn parse_flat_keyed_data(
     Ok(stats)
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum ParseNestedKeyedDataError {
+    #[error("io error: {0}")]
+    WrappedIo(#[from] WrappedIoError),
+    #[error("nested keyed data at {path} contains entries that do not conform to key format")]
+    DoesNotConform { path: PathBuf },
+}
+
 /// Parses a file that is structed according to the nested keyed format
-pub fn parse_nested_keyed_data(file_path: &Path) -> Result<HashMap<String, Vec<String>>> {
+pub fn parse_nested_keyed_data(
+    file_path: &Path,
+) -> Result<HashMap<String, Vec<String>>, ParseNestedKeyedDataError> {
     let mut stats: HashMap<String, Vec<String>> = HashMap::new();
     let keyed_data = common::read_cgroup_file(file_path)?;
     for entry in keyed_data.lines() {
         let entry_fields: Vec<&str> = entry.split_ascii_whitespace().collect();
         if entry_fields.len() < 2 || !entry_fields[1..].iter().all(|p| p.contains('=')) {
-            bail!("nested key data at {} contains entries that do not conform to the nested key format", file_path.display());
+            return Err(ParseNestedKeyedDataError::DoesNotConform {
+                path: file_path.to_path_buf(),
+            });
         }
 
         stats.insert(
@@ -421,14 +433,14 @@ pub fn pid_stats(cgroup_path: &Path) -> Result<PidStats, PidStatsError> {
     Ok(stats)
 }
 
-pub fn psi_stats(psi_file: &Path) -> Result<PSIStats> {
+pub fn psi_stats(psi_file: &Path) -> Result<PSIStats, WrappedIoError> {
     let mut stats = PSIStats::default();
 
     let psi = common::read_cgroup_file(psi_file)?;
     for line in psi.lines() {
         match &line[0..4] {
-            "some" => stats.some = parse_psi(&line[4..])?,
-            "full" => stats.full = parse_psi(&line[4..])?,
+            "some" => stats.some = parse_psi(&line[4..], psi_file)?,
+            "full" => stats.full = parse_psi(&line[4..], psi_file)?,
             _ => continue,
         }
     }
@@ -436,7 +448,9 @@ pub fn psi_stats(psi_file: &Path) -> Result<PSIStats> {
     Ok(stats)
 }
 
-fn parse_psi(stat_line: &str) -> Result<PSIData> {
+fn parse_psi(stat_line: &str, path: &Path) -> Result<PSIData, WrappedIoError> {
+    use std::io::{Error, ErrorKind};
+
     let mut psi_data = PSIData::default();
 
     for kv in stat_line.split_ascii_whitespace() {
@@ -444,17 +458,20 @@ fn parse_psi(stat_line: &str) -> Result<PSIData> {
             Some(("avg10", v)) => {
                 psi_data.avg10 = v
                     .parse()
-                    .with_context(|| format!("invalid psi value {v}"))?
+                    .map_err(|err| Error::new(ErrorKind::InvalidData, err))
+                    .wrap_other(path)?
             }
             Some(("avg60", v)) => {
                 psi_data.avg60 = v
                     .parse()
-                    .with_context(|| format!("invalid psi value {v}"))?
+                    .map_err(|err| Error::new(ErrorKind::InvalidData, err))
+                    .wrap_other(path)?
             }
             Some(("avg300", v)) => {
                 psi_data.avg300 = v
                     .parse()
-                    .with_context(|| format!("invalid psi value {v}"))?
+                    .map_err(|err| Error::new(ErrorKind::InvalidData, err))
+                    .wrap_other(path)?
             }
             _ => continue,
         }

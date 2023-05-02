@@ -1,10 +1,14 @@
-use std::path::{Path, PathBuf};
-
-use anyhow::{Context, Result};
+use std::{
+    num::ParseIntError,
+    path::{Path, PathBuf},
+};
 
 use crate::{
     common::{self, ControllerOpt, WrappedIoError},
-    stats::{self, psi_stats, BlkioDeviceStat, BlkioStats, StatsProvider},
+    stats::{
+        self, psi_stats, BlkioDeviceStat, BlkioStats, ParseDeviceNumberError,
+        ParseNestedKeyedDataError, StatsProvider,
+    },
 };
 
 use super::controller::Controller;
@@ -16,7 +20,7 @@ const CGROUP_IO_STAT: &str = "io.stat";
 const CGROUP_IO_PSI: &str = "io.pressure";
 
 #[derive(thiserror::Error, Debug)]
-pub enum V2IoError {
+pub enum V2IoControllerError {
     #[error("io error: {0}")]
     WrappedIo(#[from] WrappedIoError),
     #[error("cannot set leaf_weight with cgroupv2")]
@@ -26,7 +30,7 @@ pub enum V2IoError {
 pub struct Io {}
 
 impl Controller for Io {
-    type Error = V2IoError;
+    type Error = V2IoControllerError;
 
     fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<(), Self::Error> {
         log::debug!("Apply io cgroup v2 config");
@@ -37,17 +41,29 @@ impl Controller for Io {
     }
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum V2IoStatsError {
+    #[error("io error: {0}")]
+    WrappedIo(#[from] WrappedIoError),
+    #[error("while parsing stat table: {0}")]
+    ParseNestedKeyedData(#[from] ParseNestedKeyedDataError),
+    #[error("while parsing device number: {0}")]
+    ParseDeviceNumber(#[from] ParseDeviceNumberError),
+    #[error("while parsing table value: {0}")]
+    ParseInt(#[from] ParseIntError),
+}
+
 impl StatsProvider for Io {
-    type Error = anyhow::Error;
+    type Error = V2IoStatsError;
     type Stats = BlkioStats;
 
-    fn stats(cgroup_path: &Path) -> Result<Self::Stats> {
+    fn stats(cgroup_path: &Path) -> Result<Self::Stats, Self::Error> {
         let keyed_data = stats::parse_nested_keyed_data(&cgroup_path.join(CGROUP_IO_STAT))?;
         let mut service_bytes = Vec::with_capacity(keyed_data.len());
         let mut serviced = Vec::with_capacity(keyed_data.len());
         for entry in keyed_data {
             let (major, minor) = stats::parse_device_number(&entry.0)?;
-            for value in &entry.1 {
+            for value in entry.1 {
                 if value.starts_with("rbytes") {
                     service_bytes.push(BlkioDeviceStat {
                         major,
@@ -83,7 +99,7 @@ impl StatsProvider for Io {
         let stats = BlkioStats {
             service_bytes,
             serviced,
-            psi: psi_stats(&cgroup_path.join(CGROUP_IO_PSI)).context("could not read io psi")?,
+            psi: psi_stats(&cgroup_path.join(CGROUP_IO_PSI))?,
             ..Default::default()
         };
 
@@ -108,7 +124,7 @@ impl Io {
     }
 
     // linux kernel doc: https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html#io
-    fn apply(root_path: &Path, blkio: &LinuxBlockIo) -> Result<(), V2IoError> {
+    fn apply(root_path: &Path, blkio: &LinuxBlockIo) -> Result<(), V2IoControllerError> {
         if let Some(weight_device) = blkio.weight_device() {
             for wd in weight_device {
                 common::write_cgroup_file(
@@ -119,7 +135,7 @@ impl Io {
         }
         if let Some(leaf_weight) = blkio.leaf_weight() {
             if leaf_weight > 0 {
-                return Err(V2IoError::LeafWeight);
+                return Err(V2IoControllerError::LeafWeight);
             }
         }
         if let Some(io_weight) = blkio.weight() {
