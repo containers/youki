@@ -47,6 +47,7 @@ impl Controller for Memory {
 }
 
 impl StatsProvider for Memory {
+    type Error = anyhow::Error;
     type Stats = MemoryStats;
 
     fn stats(cgroup_path: &Path) -> Result<Self::Stats> {

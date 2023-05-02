@@ -1,10 +1,8 @@
 use std::{collections::HashMap, num::ParseIntError, path::Path};
 
-use anyhow::Result;
-
 use crate::{
     common::{self, ControllerOpt, EitherError, MustBePowerOfTwo, WrappedIoError},
-    stats::{supported_page_sizes, HugeTlbStats, StatsProvider},
+    stats::{supported_page_sizes, HugeTlbStats, StatsProvider, SupportedPageSizesError},
 };
 
 use oci_spec::runtime::LinuxHugepageLimit;
@@ -12,7 +10,7 @@ use oci_spec::runtime::LinuxHugepageLimit;
 use super::controller::Controller;
 
 #[derive(thiserror::Error, Debug)]
-pub enum V1HugeTlbError {
+pub enum V1HugeTlbControllerError {
     #[error("io error: {0}")]
     WrappedIo(#[from] WrappedIoError),
     #[error("malformed page size {page_size}: {err}")]
@@ -25,7 +23,7 @@ pub enum V1HugeTlbError {
 pub struct HugeTlb {}
 
 impl Controller for HugeTlb {
-    type Error = V1HugeTlbError;
+    type Error = V1HugeTlbControllerError;
     type Resource = Vec<LinuxHugepageLimit>;
 
     fn apply(
@@ -54,10 +52,21 @@ impl Controller for HugeTlb {
     }
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum V1HugeTlbStatsError {
+    #[error("io error: {0}")]
+    WrappedIo(#[from] WrappedIoError),
+    #[error("error getting supported page sizes: {0}")]
+    SupportedPageSizes(#[from] SupportedPageSizesError),
+    #[error("error parsing value: {0}")]
+    Parse(#[from] ParseIntError),
+}
+
 impl StatsProvider for HugeTlb {
+    type Error = V1HugeTlbStatsError;
     type Stats = HashMap<String, HugeTlbStats>;
 
-    fn stats(cgroup_path: &Path) -> Result<Self::Stats> {
+    fn stats(cgroup_path: &Path) -> Result<Self::Stats, Self::Error> {
         let page_sizes = supported_page_sizes()?;
         let mut hugetlb_stats = HashMap::with_capacity(page_sizes.len());
 
@@ -71,7 +80,10 @@ impl StatsProvider for HugeTlb {
 }
 
 impl HugeTlb {
-    fn apply(root_path: &Path, hugetlb: &LinuxHugepageLimit) -> Result<(), V1HugeTlbError> {
+    fn apply(
+        root_path: &Path,
+        hugetlb: &LinuxHugepageLimit,
+    ) -> Result<(), V1HugeTlbControllerError> {
         let raw_page_size: String = hugetlb
             .page_size()
             .chars()
@@ -80,14 +92,14 @@ impl HugeTlb {
         let page_size: u64 = match raw_page_size.parse() {
             Ok(page_size) => page_size,
             Err(err) => {
-                return Err(V1HugeTlbError::MalformedPageSize {
+                return Err(V1HugeTlbControllerError::MalformedPageSize {
                     page_size: raw_page_size,
                     err: EitherError::Left(err),
                 })
             }
         };
         if !Self::is_power_of_two(page_size) {
-            return Err(V1HugeTlbError::MalformedPageSize {
+            return Err(V1HugeTlbControllerError::MalformedPageSize {
                 page_size: raw_page_size,
                 err: EitherError::Right(MustBePowerOfTwo),
             });
@@ -104,7 +116,10 @@ impl HugeTlb {
         (number != 0) && (number & (number.saturating_sub(1))) == 0
     }
 
-    fn stats_for_page_size(cgroup_path: &Path, page_size: &str) -> Result<HugeTlbStats> {
+    fn stats_for_page_size(
+        cgroup_path: &Path,
+        page_size: &str,
+    ) -> Result<HugeTlbStats, V1HugeTlbStatsError> {
         let mut stats = HugeTlbStats::default();
 
         let usage_file = format!("hugetlb.{page_size}.usage_in_bytes");

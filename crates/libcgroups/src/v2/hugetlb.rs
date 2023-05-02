@@ -40,6 +40,7 @@ impl Controller for HugeTlb {
 }
 
 impl StatsProvider for HugeTlb {
+    type Error = anyhow::Error;
     type Stats = HashMap<String, HugeTlbStats>;
 
     fn stats(cgroup_path: &Path) -> Result<Self::Stats> {

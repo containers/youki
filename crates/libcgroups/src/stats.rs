@@ -1,13 +1,22 @@
 use anyhow::{bail, Context, Result};
 use serde::Serialize;
-use std::{collections::HashMap, fmt::Display, fs, path::Path};
+use std::{
+    collections::HashMap,
+    fmt::Display,
+    fs,
+    num::ParseIntError,
+    path::{Path, PathBuf},
+};
+
+use crate::common::{WrapIoResult, WrappedIoError};
 
 use super::common;
 
 pub(crate) trait StatsProvider {
+    type Error;
     type Stats;
 
-    fn stats(cgroup_path: &Path) -> Result<Self::Stats>;
+    fn stats(cgroup_path: &Path) -> Result<Self::Stats, Self::Error>;
 }
 
 /// Reports the statistics for a cgroup
@@ -188,8 +197,18 @@ pub struct PSIData {
     pub avg300: f64,
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum SupportedPageSizesError {
+    #[error("io error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("failed to parse value {value}: {err}")]
+    Parse { value: String, err: ParseIntError },
+    #[error("failed to determine page size from {dir_name}")]
+    Failed { dir_name: String },
+}
+
 /// Reports which hugepage sizes are supported by the system
-pub fn supported_page_sizes() -> Result<Vec<String>> {
+pub fn supported_page_sizes() -> Result<Vec<String>, SupportedPageSizesError> {
     let mut sizes = Vec::new();
     for hugetlb_entry in fs::read_dir("/sys/kernel/mm/hugepages")? {
         let hugetlb_entry = hugetlb_entry?;
@@ -206,12 +225,15 @@ pub fn supported_page_sizes() -> Result<Vec<String>> {
     Ok(sizes)
 }
 
-fn extract_page_size(dir_name: &str) -> Result<String> {
+fn extract_page_size(dir_name: &str) -> Result<String, SupportedPageSizesError> {
     if let Some(size) = dir_name
         .strip_prefix("hugepages-")
         .and_then(|name_stripped| name_stripped.strip_suffix("kB"))
     {
-        let size: u64 = parse_value(size)?;
+        let size: u64 = size.parse().map_err(|err| SupportedPageSizesError::Parse {
+            value: size.into(),
+            err,
+        })?;
 
         let size_moniker = if size >= (1 << 20) {
             (size >> 20).to_string() + "GB"
@@ -224,7 +246,9 @@ fn extract_page_size(dir_name: &str) -> Result<String> {
         return Ok(size_moniker);
     }
 
-    bail!("failed to determine page size from {}", dir_name);
+    Err(SupportedPageSizesError::Failed {
+        dir_name: dir_name.into(),
+    })
 }
 
 /// Parses this string slice into an u64
@@ -235,10 +259,8 @@ fn extract_page_size(dir_name: &str) -> Result<String> {
 /// let value = parse_value("32").unwrap();
 /// assert_eq!(value, 32);
 /// ```
-pub fn parse_value(value: &str) -> Result<u64> {
-    value
-        .parse()
-        .with_context(|| format!("failed to parse {value}"))
+pub fn parse_value(value: &str) -> Result<u64, ParseIntError> {
+    value.parse()
 }
 
 /// Parses a single valued file to an u64
@@ -250,44 +272,56 @@ pub fn parse_value(value: &str) -> Result<u64> {
 /// let value = parse_single_value(&Path::new("memory.current")).unwrap();
 /// assert_eq!(value, 32);
 /// ```
-pub fn parse_single_value(file_path: &Path) -> Result<u64> {
+pub fn parse_single_value(file_path: &Path) -> Result<u64, WrappedIoError> {
     let value = common::read_cgroup_file(file_path)?;
     let value = value.trim();
     if value == "max" {
         return Ok(u64::MAX);
     }
 
-    value.parse().with_context(|| {
-        format!(
-            "failed to parse value {} from {}",
-            value,
-            file_path.display()
-        )
-    })
+    value
+        .parse()
+        .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err))
+        .wrap_other(file_path)
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum ParseFlatKeyedDataError {
+    #[error("io error: {0}")]
+    WrappedIo(#[from] WrappedIoError),
+    #[error("flat keyed data at {path} contains entries that do not conform to 'key value'")]
+    DoesNotConform { path: PathBuf },
+    #[error("failed to parse value {value} from {path}")]
+    FailedToParse {
+        value: String,
+        path: PathBuf,
+        err: ParseIntError,
+    },
 }
 
 /// Parses a file that is structured according to the flat keyed format
-pub fn parse_flat_keyed_data(file_path: &Path) -> Result<HashMap<String, u64>> {
+pub(crate) fn parse_flat_keyed_data(
+    file_path: &Path,
+) -> Result<HashMap<String, u64>, ParseFlatKeyedDataError> {
     let mut stats = HashMap::new();
     let keyed_data = common::read_cgroup_file(file_path)?;
     for entry in keyed_data.lines() {
         let entry_fields: Vec<&str> = entry.split_ascii_whitespace().collect();
         if entry_fields.len() != 2 {
-            bail!(
-                "flat keyed data at {} contains entries that do not conform to 'key value'",
-                &file_path.display()
-            );
+            return Err(ParseFlatKeyedDataError::DoesNotConform {
+                path: file_path.to_path_buf(),
+            });
         }
 
         stats.insert(
             entry_fields[0].to_owned(),
-            entry_fields[1].parse().with_context(|| {
-                format!(
-                    "failed to parse value {} from {}",
-                    entry_fields[0],
-                    file_path.display()
-                )
-            })?,
+            entry_fields[1]
+                .parse()
+                .map_err(|err| ParseFlatKeyedDataError::FailedToParse {
+                    value: entry_fields[0].into(),
+                    path: file_path.to_path_buf(),
+                    err,
+                })?,
         );
     }
 
@@ -317,6 +351,14 @@ pub fn parse_nested_keyed_data(file_path: &Path) -> Result<HashMap<String, Vec<S
     Ok(stats)
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum ParseDeviceNumberError {
+    #[error("failed to parse device number from {device}: expected 2 parts, found {numbers}")]
+    TooManyNumbers { device: String, numbers: usize },
+    #[error("failed to parse device number from {device}: {err}")]
+    MalformedNumber { device: String, err: ParseIntError },
+}
+
 /// Parses a file that is structed according to the nested keyed format
 /// # Example
 /// ```
@@ -325,29 +367,55 @@ pub fn parse_nested_keyed_data(file_path: &Path) -> Result<HashMap<String, Vec<S
 /// let (major, minor) = parse_device_number("8:0").unwrap();
 /// assert_eq!((major, minor), (8, 0));
 /// ```
-pub fn parse_device_number(device: &str) -> Result<(u64, u64)> {
+pub(crate) fn parse_device_number(device: &str) -> Result<(u64, u64), ParseDeviceNumberError> {
     let numbers: Vec<&str> = device.split_terminator(':').collect();
     if numbers.len() != 2 {
-        bail!("failed to parse device number {}", device);
+        return Err(ParseDeviceNumberError::TooManyNumbers {
+            device: device.into(),
+            numbers: numbers.len(),
+        });
     }
 
-    Ok((numbers[0].parse()?, numbers[1].parse()?))
+    Ok((
+        numbers[0]
+            .parse()
+            .map_err(|err| ParseDeviceNumberError::MalformedNumber {
+                device: device.into(),
+                err,
+            })?,
+        numbers[1]
+            .parse()
+            .map_err(|err| ParseDeviceNumberError::MalformedNumber {
+                device: device.into(),
+                err,
+            })?,
+    ))
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum PidStatsError {
+    #[error("io error: {0}")]
+    WrappedIo(#[from] WrappedIoError),
+    #[error("failed to parse current pids: {0}")]
+    ParseCurrent(ParseIntError),
+    #[error("failed to parse pids limit: {0}")]
+    ParseLimit(ParseIntError),
 }
 
 /// Returns cgroup pid statistics
-pub fn pid_stats(cgroup_path: &Path) -> Result<PidStats> {
+pub fn pid_stats(cgroup_path: &Path) -> Result<PidStats, PidStatsError> {
     let mut stats = PidStats::default();
 
     let current = common::read_cgroup_file(cgroup_path.join("pids.current"))?;
     stats.current = current
         .trim()
         .parse()
-        .context("failed to parse current pids")?;
+        .map_err(PidStatsError::ParseCurrent)?;
 
     let limit =
         common::read_cgroup_file(cgroup_path.join("pids.max")).map(|l| l.trim().to_owned())?;
     if limit != "max" {
-        stats.limit = limit.parse().context("failed to parse pids limit")?;
+        stats.limit = limit.parse().map_err(PidStatsError::ParseLimit)?;
     }
 
     Ok(stats)

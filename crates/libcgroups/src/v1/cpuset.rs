@@ -3,7 +3,6 @@ use std::{
     path::{Path, PathBuf, StripPrefixError},
 };
 
-use anyhow::Result;
 use nix::unistd;
 use oci_spec::runtime::LinuxCpu;
 use unistd::Pid;
@@ -20,7 +19,7 @@ const CGROUP_CPUSET_CPUS: &str = "cpuset.cpus";
 const CGROUP_CPUSET_MEMS: &str = "cpuset.mems";
 
 #[derive(thiserror::Error, Debug)]
-pub enum V1CpuSetError {
+pub enum V1CpuSetControllerError {
     #[error("io error: {0}")]
     WrappedIo(#[from] WrappedIoError),
     #[error("bad cgroup path {path}: {err}")]
@@ -37,7 +36,7 @@ pub enum V1CpuSetError {
 pub struct CpuSet {}
 
 impl Controller for CpuSet {
-    type Error = V1CpuSetError;
+    type Error = V1CpuSetControllerError;
     type Resource = LinuxCpu;
 
     fn add_task(pid: Pid, cgroup_path: &Path) -> Result<(), Self::Error> {
@@ -72,7 +71,7 @@ impl Controller for CpuSet {
 }
 
 impl CpuSet {
-    fn apply(cgroup_path: &Path, cpuset: &LinuxCpu) -> Result<(), V1CpuSetError> {
+    fn apply(cgroup_path: &Path, cpuset: &LinuxCpu) -> Result<(), V1CpuSetControllerError> {
         if let Some(cpus) = &cpuset.cpus() {
             common::write_cgroup_file_str(cgroup_path.join(CGROUP_CPUSET_CPUS), cpus)?;
         }
@@ -86,21 +85,23 @@ impl CpuSet {
 
     // if a task is moved into the cgroup and a value has not been set for cpus and mems
     // Errno 28 (no space left on device) will be returned. Therefore we set the value from the parent if required.
-    fn ensure_not_empty(cgroup_path: &Path, interface_file: &str) -> Result<(), V1CpuSetError> {
+    fn ensure_not_empty(
+        cgroup_path: &Path,
+        interface_file: &str,
+    ) -> Result<(), V1CpuSetControllerError> {
         let mut current = util::get_subsystem_mount_point(&ControllerType::CpuSet)?;
-        let relative_cgroup_path =
-            cgroup_path
-                .strip_prefix(&current)
-                .map_err(|err| V1CpuSetError::BadCgroupPath {
-                    err,
-                    path: cgroup_path.to_path_buf(),
-                })?;
+        let relative_cgroup_path = cgroup_path.strip_prefix(&current).map_err(|err| {
+            V1CpuSetControllerError::BadCgroupPath {
+                err,
+                path: cgroup_path.to_path_buf(),
+            }
+        })?;
 
         for component in relative_cgroup_path.components() {
             let parent_value =
                 fs::read_to_string(current.join(interface_file)).wrap_read(cgroup_path)?;
             if parent_value.trim().is_empty() {
-                return Err(V1CpuSetError::EmptyParent);
+                return Err(V1CpuSetControllerError::EmptyParent);
             }
 
             current.push(component);

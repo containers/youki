@@ -43,6 +43,7 @@ impl Controller for Cpu {
 }
 
 impl StatsProvider for Cpu {
+    type Error = anyhow::Error;
     type Stats = CpuStats;
 
     fn stats(cgroup_path: &Path) -> Result<Self::Stats> {

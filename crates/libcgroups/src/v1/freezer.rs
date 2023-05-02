@@ -12,7 +12,7 @@ const FREEZER_STATE_FROZEN: &str = "FROZEN";
 const FREEZER_STATE_FREEZING: &str = "FREEZING";
 
 #[derive(thiserror::Error, Debug)]
-pub enum V1FreezerError {
+pub enum V1FreezerControllerError {
     #[error("io error: {0}")]
     WrappedIo(#[from] WrappedIoError),
     #[error("unexpected state {state} while freezing")]
@@ -24,7 +24,7 @@ pub enum V1FreezerError {
 pub struct Freezer {}
 
 impl Controller for Freezer {
-    type Error = V1FreezerError;
+    type Error = V1FreezerControllerError;
     type Resource = FreezerState;
 
     fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<(), Self::Error> {
@@ -44,7 +44,10 @@ impl Controller for Freezer {
 }
 
 impl Freezer {
-    fn apply(freezer_state: &FreezerState, cgroup_root: &Path) -> Result<(), V1FreezerError> {
+    fn apply(
+        freezer_state: &FreezerState,
+        cgroup_root: &Path,
+    ) -> Result<(), V1FreezerControllerError> {
         match freezer_state {
             FreezerState::Undefined => {}
             FreezerState::Thawed => {
@@ -54,7 +57,7 @@ impl Freezer {
                 )?;
             }
             FreezerState::Frozen => {
-                let r = || -> Result<(), V1FreezerError> {
+                let r = || -> Result<(), V1FreezerControllerError> {
                     // We should do our best to retry if FREEZING is seen until it becomes FROZEN.
                     // Add sleep between retries occasionally helped when system is extremely slow.
                     // see:
@@ -90,11 +93,11 @@ impl Freezer {
                             }
                             _ => {
                                 // should not reach here.
-                                return Err(V1FreezerError::UnexpectedState { state: r });
+                                return Err(V1FreezerControllerError::UnexpectedState { state: r });
                             }
                         }
                     }
-                    Err(V1FreezerError::UnableToFreeze)
+                    Err(V1FreezerControllerError::UnableToFreeze)
                 }();
 
                 if r.is_err() {

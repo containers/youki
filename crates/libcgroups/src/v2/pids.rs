@@ -28,10 +28,11 @@ impl Controller for Pids {
 }
 
 impl StatsProvider for Pids {
+    type Error = anyhow::Error;
     type Stats = PidStats;
 
     fn stats(cgroup_path: &Path) -> Result<Self::Stats> {
-        stats::pid_stats(cgroup_path)
+        Ok(stats::pid_stats(cgroup_path)?)
     }
 }
 

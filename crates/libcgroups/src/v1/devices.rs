@@ -1,7 +1,5 @@
 use std::path::Path;
 
-use anyhow::Result;
-
 use super::controller::Controller;
 use crate::common::{self, default_allow_devices, default_devices, ControllerOpt, WrappedIoError};
 use oci_spec::runtime::LinuxDeviceCgroup;

@@ -1,10 +1,8 @@
 use std::path::Path;
 
-use anyhow::Result;
-
 use crate::{
     common::{self, ControllerOpt, WrappedIoError},
-    stats::{self, PidStats, StatsProvider},
+    stats::{self, PidStats, PidStatsError, StatsProvider},
 };
 use oci_spec::runtime::LinuxPids;
 
@@ -35,9 +33,10 @@ impl Controller for Pids {
 }
 
 impl StatsProvider for Pids {
+    type Error = PidStatsError;
     type Stats = PidStats;
 
-    fn stats(cgroup_path: &Path) -> Result<Self::Stats> {
+    fn stats(cgroup_path: &Path) -> Result<Self::Stats, Self::Error> {
         stats::pid_stats(cgroup_path)
     }
 }

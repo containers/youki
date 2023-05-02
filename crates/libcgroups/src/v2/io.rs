@@ -38,6 +38,7 @@ impl Controller for Io {
 }
 
 impl StatsProvider for Io {
+    type Error = anyhow::Error;
     type Stats = BlkioStats;
 
     fn stats(cgroup_path: &Path) -> Result<Self::Stats> {
