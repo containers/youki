@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use crate::{
-    common::{self, ControllerOpt},
+    common::{self, ControllerOpt, WrappedIoError},
     stats::{self, BlkioDeviceStat, BlkioStats, StatsProvider},
 };
 
@@ -77,9 +77,10 @@ const BLKIO_MERGED: &str = "blkio.io_merged_recursive";
 pub struct Blkio {}
 
 impl Controller for Blkio {
+    type Error = WrappedIoError;
     type Resource = LinuxBlockIo;
 
-    fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()> {
+    fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<(), Self::Error> {
         log::debug!("Apply blkio cgroup config");
 
         if let Some(blkio) = Self::needs_to_handle(controller_opt) {
@@ -107,7 +108,7 @@ impl StatsProvider for Blkio {
 }
 
 impl Blkio {
-    fn apply(root_path: &Path, blkio: &LinuxBlockIo) -> Result<()> {
+    fn apply(root_path: &Path, blkio: &LinuxBlockIo) -> Result<(), WrappedIoError> {
         if let Some(blkio_weight) = blkio.weight() {
             // be aligned with what runc does
             // See also: https://github.com/opencontainers/runc/blob/81044ad7c902f3fc153cb8ffadaf4da62855193f/libcontainer/cgroups/fs/blkio.go#L28-L33

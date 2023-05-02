@@ -1,11 +1,14 @@
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::io::{prelude::*, Write};
+use std::num::ParseIntError;
+use std::path::PathBuf;
 use std::{fs::OpenOptions, path::Path};
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::Result;
 use nix::errno::Errno;
 
-use crate::common::{self, ControllerOpt};
+use crate::common::{self, ControllerOpt, WrapIoResult, WrappedIoError};
 use crate::stats::{self, parse_single_value, MemoryData, MemoryStats, StatsProvider};
 
 use oci_spec::runtime::LinuxMemory;
@@ -44,12 +47,53 @@ const MEMORY_LIMIT_IN_BYTES: &str = ".limit_in_bytes";
 // Number of times memory usage hit limits
 const MEMORY_FAIL_COUNT: &str = ".failcnt";
 
+#[derive(Debug)]
+pub enum MalformedThing {
+    MemoryLimit,
+    MemoryUsage,
+    MemoryMaxUsage,
+}
+
+impl Display for MalformedThing {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MalformedThing::MemoryLimit => f.write_str("memory limit"),
+            MalformedThing::MemoryUsage => f.write_str("memory usage"),
+            MalformedThing::MemoryMaxUsage => f.write_str("memory max usage"),
+        }
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum V1MemoryError {
+    #[error("io error: {0}")]
+    WrappedIo(#[from] WrappedIoError),
+    #[error("invalid swappiness value: {supplied}. valid range is 0-100")]
+    SwappinessOutOfRange { supplied: u64 },
+    #[error("read malformed {thing} {limit} from {path}: {err}")]
+    MalformedValue {
+        thing: MalformedThing,
+        limit: String,
+        path: PathBuf,
+        err: ParseIntError,
+    },
+    #[error(
+        "unable to set memory limit to {target} (current usage: {current}, peak usage: {peak})"
+    )]
+    UnableToSet {
+        target: i64,
+        current: u64,
+        peak: u64,
+    },
+}
+
 pub struct Memory {}
 
 impl Controller for Memory {
+    type Error = V1MemoryError;
     type Resource = LinuxMemory;
 
-    fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()> {
+    fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<(), V1MemoryError> {
         log::debug!("Apply Memory cgroup config");
 
         if let Some(memory) = &controller_opt.resources.memory() {
@@ -78,10 +122,9 @@ impl Controller for Memory {
                     )?;
                 } else {
                     // invalid swappiness value
-                    return Err(anyhow!(
-                        "Invalid swappiness value: {}. Valid range is 0-100",
-                        swappiness
-                    ));
+                    return Err(V1MemoryError::SwappinessOutOfRange {
+                        supplied: swappiness,
+                    });
                 }
             }
 
@@ -163,14 +206,16 @@ impl Memory {
         stats::parse_flat_keyed_data(&cgroup_path.join(MEMORY_STAT))
     }
 
-    fn get_memory_usage(cgroup_root: &Path) -> Result<u64> {
+    fn get_memory_usage(cgroup_root: &Path) -> Result<u64, V1MemoryError> {
         let path = cgroup_root.join(CGROUP_MEMORY_USAGE);
         let mut contents = String::new();
         OpenOptions::new()
             .create(false)
             .read(true)
-            .open(path)?
-            .read_to_string(&mut contents)?;
+            .open(&path)
+            .wrap_open(&path)?
+            .read_to_string(&mut contents)
+            .wrap_read(&path)?;
 
         contents = contents.trim().to_string();
 
@@ -178,18 +223,27 @@ impl Memory {
             return Ok(u64::MAX);
         }
 
-        let val = contents.parse::<u64>()?;
+        let val = contents
+            .parse::<u64>()
+            .map_err(|err| V1MemoryError::MalformedValue {
+                thing: MalformedThing::MemoryUsage,
+                limit: contents,
+                path,
+                err,
+            })?;
         Ok(val)
     }
 
-    fn get_memory_max_usage(cgroup_root: &Path) -> Result<u64> {
+    fn get_memory_max_usage(cgroup_root: &Path) -> Result<u64, V1MemoryError> {
         let path = cgroup_root.join(CGROUP_MEMORY_MAX_USAGE);
         let mut contents = String::new();
         OpenOptions::new()
             .create(false)
             .read(true)
-            .open(path)?
-            .read_to_string(&mut contents)?;
+            .open(&path)
+            .wrap_open(&path)?
+            .read_to_string(&mut contents)
+            .wrap_read(&path)?;
 
         contents = contents.trim().to_string();
 
@@ -197,18 +251,27 @@ impl Memory {
             return Ok(u64::MAX);
         }
 
-        let val = contents.parse::<u64>()?;
+        let val = contents
+            .parse::<u64>()
+            .map_err(|err| V1MemoryError::MalformedValue {
+                thing: MalformedThing::MemoryMaxUsage,
+                limit: contents,
+                path,
+                err,
+            })?;
         Ok(val)
     }
 
-    fn get_memory_limit(cgroup_root: &Path) -> Result<i64> {
+    fn get_memory_limit(cgroup_root: &Path) -> Result<i64, V1MemoryError> {
         let path = cgroup_root.join(CGROUP_MEMORY_LIMIT);
         let mut contents = String::new();
         OpenOptions::new()
             .create(false)
             .read(true)
-            .open(path)?
-            .read_to_string(&mut contents)?;
+            .open(&path)
+            .wrap_open(&path)?
+            .read_to_string(&mut contents)
+            .wrap_read(&path)?;
 
         contents = contents.trim().to_string();
 
@@ -216,21 +279,31 @@ impl Memory {
             return Ok(i64::MAX);
         }
 
-        let val = contents.parse::<i64>()?;
+        let val = contents
+            .parse::<i64>()
+            .map_err(|err| V1MemoryError::MalformedValue {
+                thing: MalformedThing::MemoryLimit,
+                limit: contents,
+                path,
+                err,
+            })?;
         Ok(val)
     }
 
-    fn set<T: ToString>(val: T, path: &Path) -> std::io::Result<()> {
+    fn set<T: ToString>(val: T, path: &Path) -> Result<(), WrappedIoError> {
+        let data = val.to_string();
         OpenOptions::new()
             .create(false)
             .write(true)
             .truncate(true)
-            .open(path)?
-            .write_all(val.to_string().as_bytes())?;
+            .open(path)
+            .wrap_open(path)?
+            .write_all(data.as_bytes())
+            .wrap_write(path, data)?;
         Ok(())
     }
 
-    fn set_memory(val: i64, cgroup_root: &Path) -> Result<()> {
+    fn set_memory(val: i64, cgroup_root: &Path) -> Result<(), V1MemoryError> {
         if val == 0 {
             return Ok(());
         }
@@ -240,27 +313,26 @@ impl Memory {
             Ok(_) => Ok(()),
             Err(e) => {
                 // we need to look into the raw OS error for an EBUSY status
-                match e.raw_os_error() {
+                match e.inner().raw_os_error() {
                     Some(code) => match Errno::from_i32(code) {
                         Errno::EBUSY => {
                             let usage = Self::get_memory_usage(cgroup_root)?;
                             let max_usage = Self::get_memory_max_usage(cgroup_root)?;
-                            bail!(
-                                    "unable to set memory limit to {} (current usage: {}, peak usage: {})",
-                                    val,
-                                    usage,
-                                    max_usage,
-                            )
+                            return Err(V1MemoryError::UnableToSet {
+                                target: val,
+                                current: usage,
+                                peak: max_usage,
+                            });
                         }
-                        _ => bail!(e),
+                        _ => Err(e)?,
                     },
-                    None => bail!(e),
+                    None => Err(e)?,
                 }
             }
         }
     }
 
-    fn set_swap(swap: i64, cgroup_root: &Path) -> Result<()> {
+    fn set_swap(swap: i64, cgroup_root: &Path) -> Result<(), V1MemoryError> {
         if swap == 0 {
             return Ok(());
         }
@@ -274,7 +346,7 @@ impl Memory {
         swap: i64,
         is_updated: bool,
         cgroup_root: &Path,
-    ) -> Result<()> {
+    ) -> Result<(), V1MemoryError> {
         // According to runc we need to change the write sequence of
         // limit and swap so it won't fail, because the new and old
         // values don't fit the kernel's validation
@@ -289,7 +361,7 @@ impl Memory {
         Ok(())
     }
 
-    fn apply(resource: &LinuxMemory, cgroup_root: &Path) -> Result<()> {
+    fn apply(resource: &LinuxMemory, cgroup_root: &Path) -> Result<(), V1MemoryError> {
         match resource.limit() {
             Some(limit) => {
                 let current_limit = Self::get_memory_limit(cgroup_root)?;

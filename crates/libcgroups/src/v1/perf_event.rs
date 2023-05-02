@@ -1,5 +1,4 @@
-use crate::common::ControllerOpt;
-use anyhow::Result;
+use crate::common::{ControllerOpt, WrappedIoError};
 use std::path::Path;
 
 use super::controller::Controller;
@@ -7,9 +6,10 @@ use super::controller::Controller;
 pub struct PerfEvent {}
 
 impl Controller for PerfEvent {
+    type Error = WrappedIoError;
     type Resource = ();
 
-    fn apply(_controller_opt: &ControllerOpt, _cgroup_root: &Path) -> Result<()> {
+    fn apply(_controller_opt: &ControllerOpt, _cgroup_root: &Path) -> Result<(), Self::Error> {
         Ok(())
     }
     //no need to handle any case

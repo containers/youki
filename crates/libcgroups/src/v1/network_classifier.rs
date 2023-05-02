@@ -1,8 +1,6 @@
 use std::path::Path;
 
-use anyhow::{Context, Result};
-
-use crate::common::{self, ControllerOpt};
+use crate::common::{self, ControllerOpt, WrappedIoError};
 use oci_spec::runtime::LinuxNetwork;
 
 use super::controller::Controller;
@@ -10,14 +8,14 @@ use super::controller::Controller;
 pub struct NetworkClassifier {}
 
 impl Controller for NetworkClassifier {
+    type Error = WrappedIoError;
     type Resource = LinuxNetwork;
 
-    fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()> {
+    fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<(), Self::Error> {
         log::debug!("Apply NetworkClassifier cgroup config");
 
         if let Some(network) = Self::needs_to_handle(controller_opt) {
-            Self::apply(cgroup_root, network)
-                .context("failed to apply network classifier resource restrictions")?;
+            Self::apply(cgroup_root, network)?;
         }
 
         Ok(())
@@ -29,7 +27,7 @@ impl Controller for NetworkClassifier {
 }
 
 impl NetworkClassifier {
-    fn apply(root_path: &Path, network: &LinuxNetwork) -> Result<()> {
+    fn apply(root_path: &Path, network: &LinuxNetwork) -> Result<(), WrappedIoError> {
         if let Some(class_id) = network.class_id() {
             common::write_cgroup_file(root_path.join("net_cls.classid"), class_id)?;
         }

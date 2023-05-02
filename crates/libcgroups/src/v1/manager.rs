@@ -173,10 +173,10 @@ impl CgroupManager for Manager {
             oom_score_adj: None,
             disable_oom_killer: false,
         };
-        Freezer::apply(
+        Ok(Freezer::apply(
             &controller_opt,
             self.subsystems.get(&CtrlType::Freezer).unwrap(),
-        )
+        )?)
     }
 
     fn stats(&self) -> Result<Stats> {

@@ -3,15 +3,16 @@ use std::path::Path;
 use anyhow::Result;
 
 use super::controller::Controller;
-use crate::common::{self, default_allow_devices, default_devices, ControllerOpt};
+use crate::common::{self, default_allow_devices, default_devices, ControllerOpt, WrappedIoError};
 use oci_spec::runtime::LinuxDeviceCgroup;
 
 pub struct Devices {}
 
 impl Controller for Devices {
+    type Error = WrappedIoError;
     type Resource = ();
 
-    fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()> {
+    fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<(), Self::Error> {
         log::debug!("Apply Devices cgroup config");
 
         if let Some(devices) = controller_opt.resources.devices().as_ref() {
@@ -39,7 +40,7 @@ impl Controller for Devices {
 }
 
 impl Devices {
-    fn apply_device(device: &LinuxDeviceCgroup, cgroup_root: &Path) -> Result<()> {
+    fn apply_device(device: &LinuxDeviceCgroup, cgroup_root: &Path) -> Result<(), WrappedIoError> {
         let path = if device.allow() {
             cgroup_root.join("devices.allow")
         } else {

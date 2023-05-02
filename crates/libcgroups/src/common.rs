@@ -104,6 +104,19 @@ pub enum WrappedIoError {
     },
     #[error("failed to read {path}: {err}")]
     Read { err: std::io::Error, path: PathBuf },
+    #[error("failed to create dir {path}: {err}")]
+    CreateDir { err: std::io::Error, path: PathBuf },
+}
+
+impl WrappedIoError {
+    pub fn inner(&self) -> &std::io::Error {
+        match self {
+            WrappedIoError::Open { err, .. } => err,
+            WrappedIoError::Write { err, .. } => err,
+            WrappedIoError::Read { err, .. } => err,
+            WrappedIoError::CreateDir { err, .. } => err,
+        }
+    }
 }
 
 #[inline]
@@ -482,3 +495,70 @@ pub(crate) fn delete_with_retry<P: AsRef<Path>, L: Into<Option<Duration>>>(
 
     bail!("could not delete {:?}", path)
 }
+
+pub(crate) trait WrapIoResult {
+    type Target;
+
+    fn wrap_create_dir<P: Into<PathBuf>>(self, path: P) -> Result<Self::Target, WrappedIoError>;
+    fn wrap_read<P: Into<PathBuf>>(self, path: P) -> Result<Self::Target, WrappedIoError>;
+    fn wrap_open<P: Into<PathBuf>>(self, path: P) -> Result<Self::Target, WrappedIoError>;
+    fn wrap_write<P: Into<PathBuf>, D: Into<String>>(
+        self,
+        path: P,
+        data: D,
+    ) -> Result<Self::Target, WrappedIoError>;
+}
+
+impl<T> WrapIoResult for Result<T, std::io::Error> {
+    type Target = T;
+
+    fn wrap_create_dir<P: Into<PathBuf>>(self, path: P) -> Result<Self::Target, WrappedIoError> {
+        self.map_err(|err| WrappedIoError::CreateDir {
+            err,
+            path: path.into(),
+        })
+    }
+
+    fn wrap_read<P: Into<PathBuf>>(self, path: P) -> Result<Self::Target, WrappedIoError> {
+        self.map_err(|err| WrappedIoError::Read {
+            err,
+            path: path.into(),
+        })
+    }
+
+    fn wrap_open<P: Into<PathBuf>>(self, path: P) -> Result<Self::Target, WrappedIoError> {
+        self.map_err(|err| WrappedIoError::Open {
+            err,
+            path: path.into(),
+        })
+    }
+
+    fn wrap_write<P: Into<PathBuf>, D: Into<String>>(
+        self,
+        path: P,
+        data: D,
+    ) -> Result<Self::Target, WrappedIoError> {
+        self.map_err(|err| WrappedIoError::Write {
+            err,
+            path: path.into(),
+            data: data.into(),
+        })
+    }
+}
+
+#[derive(Debug)]
+pub enum EitherError<L, R> {
+    Left(L),
+    Right(R),
+}
+
+impl<L: Display, R: Display> Display for EitherError<L, R> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EitherError::Left(left) => <L as Display>::fmt(left, f),
+            EitherError::Right(right) => <R as Display>::fmt(right, f),
+        }
+    }
+}
+
+impl<L: Debug + Display, R: Debug + Display> std::error::Error for EitherError<L, R> {}

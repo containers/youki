@@ -4,7 +4,7 @@ use anyhow::{bail, Context, Result};
 use oci_spec::runtime::LinuxCpu;
 
 use crate::{
-    common::{self, ControllerOpt},
+    common::{self, ControllerOpt, WrappedIoError},
     stats::{CpuThrottling, StatsProvider},
 };
 
@@ -22,13 +22,14 @@ const CGROUP_CPU_IDLE: &str = "cpu.idle";
 pub struct Cpu {}
 
 impl Controller for Cpu {
+    type Error = WrappedIoError;
     type Resource = LinuxCpu;
 
-    fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()> {
+    fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<(), Self::Error> {
         log::debug!("Apply Cpu cgroup config");
 
         if let Some(cpu) = Self::needs_to_handle(controller_opt) {
-            Self::apply(cgroup_root, cpu).context("failed to apply cpu resource restrictions")?;
+            Self::apply(cgroup_root, cpu)?;
         }
 
         Ok(())
@@ -97,7 +98,7 @@ impl StatsProvider for Cpu {
 }
 
 impl Cpu {
-    fn apply(root_path: &Path, cpu: &LinuxCpu) -> Result<()> {
+    fn apply(root_path: &Path, cpu: &LinuxCpu) -> Result<(), WrappedIoError> {
         if let Some(cpu_shares) = cpu.shares() {
             if cpu_shares != 0 {
                 common::write_cgroup_file(root_path.join(CGROUP_CPU_SHARES), cpu_shares)?;

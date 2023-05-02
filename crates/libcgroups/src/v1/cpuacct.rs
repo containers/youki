@@ -3,7 +3,7 @@ use std::path::Path;
 use anyhow::{bail, Context, Result};
 
 use crate::{
-    common::{self, ControllerOpt},
+    common::{self, ControllerOpt, WrappedIoError},
     stats::{CpuUsage, StatsProvider},
 };
 
@@ -21,9 +21,10 @@ const CGROUP_CPUACCT_PERCPU: &str = "cpuacct.usage_percpu";
 pub struct CpuAcct {}
 
 impl Controller for CpuAcct {
+    type Error = WrappedIoError;
     type Resource = ();
 
-    fn apply(_controller_opt: &ControllerOpt, _cgroup_path: &Path) -> Result<()> {
+    fn apply(_controller_opt: &ControllerOpt, _cgroup_path: &Path) -> Result<(), Self::Error> {
         Ok(())
     }
 
