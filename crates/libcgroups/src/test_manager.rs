@@ -1,6 +1,5 @@
 use std::{cell::RefCell, convert::Infallible};
 
-use anyhow::Result;
 use nix::unistd::Pid;
 
 use crate::{
@@ -45,7 +44,7 @@ impl CgroupManager for TestManager {
         unimplemented!()
     }
 
-    fn stats(&self) -> anyhow::Result<Stats, Infallible> {
+    fn stats(&self) -> Result<Stats, Infallible> {
         unimplemented!()
     }
 

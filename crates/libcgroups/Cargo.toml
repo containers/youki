@@ -23,7 +23,6 @@ cgroupsv2_devices = ["rbpf", "libbpf-sys", "errno", "libc"]
 nix = "0.26.2"
 procfs = "0.15.1"
 log = "0.4"
-anyhow = "1.0"
 oci-spec = { version = "^0.6.0", features = ["runtime"] }
 dbus = { version = "0.9.7", optional = true }
 fixedbitset = "0.4.2"
@@ -35,6 +34,7 @@ libc = { version = "0.2.142", optional = true }
 thiserror = "1.0.40"
 
 [dev-dependencies]
+anyhow = "1.0"
 oci-spec = { version = "^0.6.0", features = ["proptests", "runtime"] }
 quickcheck = "1"
 mockall = { version = "0.11.4", features = [] }

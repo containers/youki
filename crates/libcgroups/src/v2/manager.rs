@@ -59,6 +59,9 @@ pub enum V2ManagerError {
     UnifiedController(#[from] V2UnifiedError),
     #[error(transparent)]
     FreezerController(#[from] V2FreezerError),
+    #[cfg(feature = "cgroupsv2_devices")]
+    #[error(transparent)]
+    DevicesController(#[from] super::devices::controller::DevicesControllerError),
 
     #[error(transparent)]
     CpuStats(#[from] V2CpuStatsError),
