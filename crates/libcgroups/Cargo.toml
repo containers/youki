@@ -9,7 +9,7 @@ readme = "README.md"
 authors = ["youki team"]
 edition = "2021"
 rust-version = "1.58.1"
-autoexamples = false
+autoexamples = true
 keywords = ["youki", "container", "cgroups"]
 
 [features]
