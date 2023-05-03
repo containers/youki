@@ -17,7 +17,7 @@ use nix::{
 
 use oci_spec::runtime::LinuxRlimit;
 
-use super::{linux, Syscall};
+use super::{linux, Syscall, Result};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct MountArgs {
@@ -46,7 +46,7 @@ pub struct ChownArgs {
 #[derive(Default)]
 struct Mock {
     values: Vec<Box<dyn Any>>,
-    ret_err: Option<fn() -> anyhow::Result<()>>,
+    ret_err: Option<fn() -> Result<()>>,
     ret_err_times: usize,
 }
 
@@ -102,7 +102,7 @@ impl Default for MockCalls {
 }
 
 impl MockCalls {
-    fn act(&self, name: ArgName, value: Box<dyn Any>) -> anyhow::Result<()> {
+    fn act(&self, name: ArgName, value: Box<dyn Any>) -> Result<()> {
         if self.args.get(&name).unwrap().borrow().ret_err_times > 0 {
             self.args.get(&name).unwrap().borrow_mut().ret_err_times -= 1;
             if let Some(e) = &self.args.get(&name).unwrap().borrow().ret_err {
@@ -138,39 +138,39 @@ impl Syscall for TestHelperSyscall {
         self
     }
 
-    fn pivot_rootfs(&self, _path: &Path) -> anyhow::Result<()> {
+    fn pivot_rootfs(&self, _path: &Path) -> Result<()> {
         unimplemented!()
     }
 
-    fn set_ns(&self, rawfd: i32, nstype: CloneFlags) -> anyhow::Result<()> {
+    fn set_ns(&self, rawfd: i32, nstype: CloneFlags) -> Result<()> {
         self.mocks
             .act(ArgName::Namespace, Box::new((rawfd, nstype)))
     }
 
-    fn set_id(&self, _uid: Uid, _gid: Gid) -> anyhow::Result<()> {
+    fn set_id(&self, _uid: Uid, _gid: Gid) -> Result<()> {
         unimplemented!()
     }
 
-    fn unshare(&self, flags: CloneFlags) -> anyhow::Result<()> {
+    fn unshare(&self, flags: CloneFlags) -> Result<()> {
         self.mocks.act(ArgName::Unshare, Box::new(flags))
     }
 
-    fn set_capability(&self, cset: CapSet, value: &CapsHashSet) -> anyhow::Result<()> {
+    fn set_capability(&self, cset: CapSet, value: &CapsHashSet) -> Result<()> {
         self.mocks
             .act(ArgName::Capability, Box::new((cset, value.clone())))
     }
 
-    fn set_hostname(&self, hostname: &str) -> anyhow::Result<()> {
+    fn set_hostname(&self, hostname: &str) -> Result<()> {
         self.mocks
             .act(ArgName::Hostname, Box::new(hostname.to_owned()))
     }
 
-    fn set_domainname(&self, domainname: &str) -> anyhow::Result<()> {
+    fn set_domainname(&self, domainname: &str) -> Result<()> {
         self.mocks
             .act(ArgName::Domainname, Box::new(domainname.to_owned()))
     }
 
-    fn set_rlimit(&self, _rlimit: &LinuxRlimit) -> anyhow::Result<()> {
+    fn set_rlimit(&self, _rlimit: &LinuxRlimit) -> Result<()> {
         todo!()
     }
 
@@ -178,7 +178,7 @@ impl Syscall for TestHelperSyscall {
         Some(OsString::from("youki").into())
     }
 
-    fn chroot(&self, _: &Path) -> anyhow::Result<()> {
+    fn chroot(&self, _: &Path) -> Result<()> {
         todo!()
     }
 
@@ -189,7 +189,7 @@ impl Syscall for TestHelperSyscall {
         fstype: Option<&str>,
         flags: MsFlags,
         data: Option<&str>,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         self.mocks.act(
             ArgName::Mount,
             Box::new(MountArgs {
@@ -202,14 +202,14 @@ impl Syscall for TestHelperSyscall {
         )
     }
 
-    fn symlink(&self, original: &Path, link: &Path) -> anyhow::Result<()> {
+    fn symlink(&self, original: &Path, link: &Path) -> Result<()> {
         self.mocks.act(
             ArgName::Symlink,
             Box::new((original.to_path_buf(), link.to_path_buf())),
         )
     }
 
-    fn mknod(&self, path: &Path, kind: SFlag, perm: Mode, dev: u64) -> anyhow::Result<()> {
+    fn mknod(&self, path: &Path, kind: SFlag, perm: Mode, dev: u64) -> Result<()> {
         self.mocks.act(
             ArgName::Mknod,
             Box::new(MknodArgs {
@@ -220,7 +220,7 @@ impl Syscall for TestHelperSyscall {
             }),
         )
     }
-    fn chown(&self, path: &Path, owner: Option<Uid>, group: Option<Gid>) -> anyhow::Result<()> {
+    fn chown(&self, path: &Path, owner: Option<Uid>, group: Option<Gid>) -> Result<()> {
         self.mocks.act(
             ArgName::Chown,
             Box::new(ChownArgs {
@@ -231,11 +231,11 @@ impl Syscall for TestHelperSyscall {
         )
     }
 
-    fn set_groups(&self, groups: &[Gid]) -> anyhow::Result<()> {
+    fn set_groups(&self, groups: &[Gid]) -> Result<()> {
         self.mocks.act(ArgName::Groups, Box::new(groups.to_vec()))
     }
 
-    fn close_range(&self, _: i32) -> anyhow::Result<()> {
+    fn close_range(&self, _: i32) -> Result<()> {
         todo!()
     }
 
@@ -246,13 +246,13 @@ impl Syscall for TestHelperSyscall {
         _: u32,
         _: &linux::MountAttr,
         _: libc::size_t,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         todo!()
     }
 }
 
 impl TestHelperSyscall {
-    pub fn set_ret_err(&self, name: ArgName, err: fn() -> anyhow::Result<()>) {
+    pub fn set_ret_err(&self, name: ArgName, err: fn() -> Result<()>) {
         self.mocks.fetch_mut(name).ret_err = Some(err);
         self.set_ret_err_times(name, 1);
     }
