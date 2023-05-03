@@ -4,10 +4,17 @@ pub struct ProgramInfo {
     pub fd: i32,
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum BpfError {
+    #[error(transparent)]
+    Errno(#[from] errno::Errno),
+    #[error("Failed to increase rlimit")]
+    FailedToIncreaseRLimit,
+}
+
 #[cfg_attr(test, automock)]
 pub mod prog {
     use super::ProgramInfo;
-    use anyhow::{bail, Result};
     use std::os::unix::io::RawFd;
     use std::ptr;
 
@@ -31,7 +38,7 @@ pub mod prog {
         bpf_prog_attach, bpf_prog_detach2, bpf_prog_get_fd_by_id, bpf_prog_load, bpf_prog_query,
     };
 
-    pub fn load(license: &str, insns: &[u8]) -> Result<RawFd> {
+    pub fn load(license: &str, insns: &[u8]) -> Result<RawFd, super::BpfError> {
         let insns_cnt = insns.len() / std::mem::size_of::<bpf_insn>();
         let insns = insns as *const _ as *const bpf_insn;
         let opts = libbpf_sys::bpf_prog_load_opts {
@@ -59,7 +66,7 @@ pub mod prog {
     }
 
     /// Given a fd for a cgroup, collect the programs associated with it
-    pub fn query(cgroup_fd: RawFd) -> Result<Vec<ProgramInfo>> {
+    pub fn query(cgroup_fd: RawFd) -> Result<Vec<ProgramInfo>, super::BpfError> {
         let mut prog_ids: Vec<u32> = vec![0_u32; 64];
         let mut attach_flags = 0_u32;
         for _ in 0..10 {
@@ -110,7 +117,7 @@ pub mod prog {
         Ok(prog_fds)
     }
 
-    pub fn detach2(prog_fd: RawFd, cgroup_fd: RawFd) -> Result<()> {
+    pub fn detach2(prog_fd: RawFd, cgroup_fd: RawFd) -> Result<(), super::BpfError> {
         #[allow(unused_unsafe)]
         let ret = unsafe { bpf_prog_detach2(prog_fd, cgroup_fd, BPF_CGROUP_DEVICE) };
         if ret != 0 {
@@ -119,7 +126,7 @@ pub mod prog {
         Ok(())
     }
 
-    pub fn attach(prog_fd: RawFd, cgroup_fd: RawFd) -> Result<()> {
+    pub fn attach(prog_fd: RawFd, cgroup_fd: RawFd) -> Result<(), super::BpfError> {
         #[allow(unused_unsafe)]
         let ret =
             unsafe { bpf_prog_attach(prog_fd, cgroup_fd, BPF_CGROUP_DEVICE, BPF_F_ALLOW_MULTI) };
@@ -130,7 +137,7 @@ pub mod prog {
         Ok(())
     }
 
-    pub fn bump_memlock_rlimit() -> Result<()> {
+    pub fn bump_memlock_rlimit() -> Result<(), super::BpfError> {
         let rlimit = rlimit {
             rlim_cur: 128 << 20,
             rlim_max: 128 << 20,
@@ -138,7 +145,7 @@ pub mod prog {
 
         #[allow(unused_unsafe)]
         if unsafe { setrlimit(RLIMIT_MEMLOCK, &rlimit) } != 0 {
-            bail!("Failed to increase rlimit");
+            return Err(super::BpfError::FailedToIncreaseRLimit);
         }
 
         Ok(())

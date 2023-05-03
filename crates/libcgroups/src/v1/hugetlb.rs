@@ -1,27 +1,40 @@
-use std::{collections::HashMap, path::Path};
-
-use anyhow::{bail, Context, Result};
+use std::{collections::HashMap, num::ParseIntError, path::Path};
 
 use crate::{
-    common::{self, ControllerOpt},
-    stats::{supported_page_sizes, HugeTlbStats, StatsProvider},
+    common::{self, ControllerOpt, EitherError, MustBePowerOfTwo, WrappedIoError},
+    stats::{supported_page_sizes, HugeTlbStats, StatsProvider, SupportedPageSizesError},
 };
 
-use super::Controller;
 use oci_spec::runtime::LinuxHugepageLimit;
+
+use super::controller::Controller;
+
+#[derive(thiserror::Error, Debug)]
+pub enum V1HugeTlbControllerError {
+    #[error("io error: {0}")]
+    WrappedIo(#[from] WrappedIoError),
+    #[error("malformed page size {page_size}: {err}")]
+    MalformedPageSize {
+        page_size: String,
+        err: EitherError<ParseIntError, MustBePowerOfTwo>,
+    },
+}
 
 pub struct HugeTlb {}
 
 impl Controller for HugeTlb {
+    type Error = V1HugeTlbControllerError;
     type Resource = Vec<LinuxHugepageLimit>;
 
-    fn apply(controller_opt: &ControllerOpt, cgroup_root: &std::path::Path) -> Result<()> {
+    fn apply(
+        controller_opt: &ControllerOpt,
+        cgroup_root: &std::path::Path,
+    ) -> Result<(), Self::Error> {
         log::debug!("Apply Hugetlb cgroup config");
 
         if let Some(hugepage_limits) = Self::needs_to_handle(controller_opt) {
             for hugetlb in hugepage_limits {
-                Self::apply(cgroup_root, hugetlb)
-                    .context("failed to apply hugetlb resource restrictions")?
+                Self::apply(cgroup_root, hugetlb)?
             }
         }
 
@@ -39,10 +52,21 @@ impl Controller for HugeTlb {
     }
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum V1HugeTlbStatsError {
+    #[error("io error: {0}")]
+    WrappedIo(#[from] WrappedIoError),
+    #[error("error getting supported page sizes: {0}")]
+    SupportedPageSizes(#[from] SupportedPageSizesError),
+    #[error("error parsing value: {0}")]
+    Parse(#[from] ParseIntError),
+}
+
 impl StatsProvider for HugeTlb {
+    type Error = V1HugeTlbStatsError;
     type Stats = HashMap<String, HugeTlbStats>;
 
-    fn stats(cgroup_path: &Path) -> Result<Self::Stats> {
+    fn stats(cgroup_path: &Path) -> Result<Self::Stats, Self::Error> {
         let page_sizes = supported_page_sizes()?;
         let mut hugetlb_stats = HashMap::with_capacity(page_sizes.len());
 
@@ -56,15 +80,29 @@ impl StatsProvider for HugeTlb {
 }
 
 impl HugeTlb {
-    fn apply(root_path: &Path, hugetlb: &LinuxHugepageLimit) -> Result<()> {
-        let page_size: String = hugetlb
+    fn apply(
+        root_path: &Path,
+        hugetlb: &LinuxHugepageLimit,
+    ) -> Result<(), V1HugeTlbControllerError> {
+        let raw_page_size: String = hugetlb
             .page_size()
             .chars()
             .take_while(|c| c.is_ascii_digit())
             .collect();
-        let page_size: u64 = page_size.parse()?;
+        let page_size: u64 = match raw_page_size.parse() {
+            Ok(page_size) => page_size,
+            Err(err) => {
+                return Err(V1HugeTlbControllerError::MalformedPageSize {
+                    page_size: raw_page_size,
+                    err: EitherError::Left(err),
+                })
+            }
+        };
         if !Self::is_power_of_two(page_size) {
-            bail!("page size must be in the format of 2^(integer)");
+            return Err(V1HugeTlbControllerError::MalformedPageSize {
+                page_size: raw_page_size,
+                err: EitherError::Right(MustBePowerOfTwo),
+            });
         }
 
         common::write_cgroup_file(
@@ -78,7 +116,10 @@ impl HugeTlb {
         (number != 0) && (number & (number.saturating_sub(1))) == 0
     }
 
-    fn stats_for_page_size(cgroup_path: &Path, page_size: &str) -> Result<HugeTlbStats> {
+    fn stats_for_page_size(
+        cgroup_path: &Path,
+        page_size: &str,
+    ) -> Result<HugeTlbStats, V1HugeTlbStatsError> {
         let mut stats = HugeTlbStats::default();
 
         let usage_file = format!("hugetlb.{page_size}.usage_in_bytes");

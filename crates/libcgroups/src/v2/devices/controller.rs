@@ -1,8 +1,8 @@
 use std::os::unix::io::AsRawFd;
 use std::path::Path;
 
-use anyhow::Result;
-
+use super::bpf::BpfError;
+use super::program::ProgramError;
 use super::*;
 use nix::fcntl::OFlag;
 use nix::sys::stat::Mode;
@@ -21,8 +21,23 @@ const LICENSE: &str = "Apache";
 
 pub struct Devices {}
 
+#[derive(thiserror::Error, Debug)]
+pub enum DevicesControllerError {
+    #[error("bpf error: {0}")]
+    Bpf(#[from] BpfError),
+    #[error("nix error: {0}")]
+    Nix(#[from] nix::Error),
+    #[error("program error: {0}")]
+    Program(#[from] ProgramError),
+}
+
 impl Controller for Devices {
-    fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()> {
+    type Error = DevicesControllerError;
+
+    fn apply(
+        controller_opt: &ControllerOpt,
+        cgroup_root: &Path,
+    ) -> Result<(), DevicesControllerError> {
         #[cfg(not(feature = "cgroupsv2_devices"))]
         return Ok(());
 
@@ -35,7 +50,7 @@ impl Devices {
     pub fn apply_devices(
         cgroup_root: &Path,
         linux_devices: &Option<Vec<LinuxDeviceCgroup>>,
-    ) -> Result<()> {
+    ) -> Result<(), DevicesControllerError> {
         log::debug!("Apply Devices cgroup config");
 
         // FIXME: should we start as "deny all"?
@@ -45,7 +60,7 @@ impl Devices {
         if let Some(devices) = linux_devices {
             for d in devices {
                 log::debug!("apply user defined rule: {:?}", d);
-                emulator.add_rule(d)?;
+                emulator.add_rule(d);
             }
         }
 
@@ -56,7 +71,7 @@ impl Devices {
         .concat()
         {
             log::debug!("apply default rule: {:?}", d);
-            emulator.add_rule(&d)?;
+            emulator.add_rule(&d);
         }
 
         let prog = program::Program::from_rules(&emulator.rules, emulator.default_allow)?;

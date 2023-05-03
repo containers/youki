@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use libcgroups::common::CgroupManager;
+use libcgroups::common::AnyCgroupManager;
 use libcontainer::container::Container;
 
 pub mod checkpoint;
@@ -56,12 +56,16 @@ fn container_exists<P: AsRef<Path>>(root_path: P, container_id: &str) -> Result<
 fn create_cgroup_manager<P: AsRef<Path>>(
     root_path: P,
     container_id: &str,
-) -> Result<Box<dyn CgroupManager>> {
+) -> Result<AnyCgroupManager> {
     let container = load_container(root_path, container_id)?;
     let cgroups_path = container.spec()?.cgroup_path;
     let systemd_cgroup = container
         .systemd()
         .context("could not determine cgroup manager")?;
 
-    libcgroups::common::create_cgroup_manager(cgroups_path, systemd_cgroup, container.id())
+    Ok(libcgroups::common::create_cgroup_manager(
+        cgroups_path,
+        systemd_cgroup,
+        container.id(),
+    )?)
 }

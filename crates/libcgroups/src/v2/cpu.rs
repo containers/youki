@@ -1,8 +1,11 @@
-use anyhow::{bail, Context, Result};
-use std::{borrow::Cow, path::Path};
+use std::{
+    borrow::Cow,
+    num::ParseIntError,
+    path::{Path, PathBuf},
+};
 
 use crate::{
-    common::{self, ControllerOpt},
+    common::{self, ControllerOpt, WrappedIoError},
     stats::{self, CpuStats, StatsProvider},
 };
 
@@ -20,32 +23,64 @@ const MAX_CPU_WEIGHT: u64 = 10000;
 const CPU_STAT: &str = "cpu.stat";
 const CPU_PSI: &str = "cpu.pressure";
 
+#[derive(thiserror::Error, Debug)]
+pub enum V2CpuControllerError {
+    #[error("io error: {0}")]
+    WrappedIo(#[from] WrappedIoError),
+    #[error("realtime is not supported on v2 yet")]
+    RealtimeV2,
+}
+
 pub struct Cpu {}
 
 impl Controller for Cpu {
-    fn apply(controller_opt: &ControllerOpt, path: &Path) -> Result<()> {
+    type Error = V2CpuControllerError;
+
+    fn apply(controller_opt: &ControllerOpt, path: &Path) -> Result<(), Self::Error> {
         if let Some(cpu) = &controller_opt.resources.cpu() {
-            Self::apply(path, cpu).context("failed to apply cpu resource restrictions")?;
+            Self::apply(path, cpu)?;
         }
 
         Ok(())
     }
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum V2CpuStatsError {
+    #[error("io error: {0}")]
+    WrappedIo(#[from] WrappedIoError),
+    #[error("failed parsing value {value} for field {field} in {path}: {err}")]
+    ParseField {
+        value: String,
+        field: String,
+        path: PathBuf,
+        err: ParseIntError,
+    },
+}
+
 impl StatsProvider for Cpu {
+    type Error = V2CpuStatsError;
     type Stats = CpuStats;
 
-    fn stats(cgroup_path: &Path) -> Result<Self::Stats> {
+    fn stats(cgroup_path: &Path) -> Result<Self::Stats, Self::Error> {
         let mut stats = CpuStats::default();
+        let stats_path = cgroup_path.join(CPU_STAT);
 
-        let stat_content = common::read_cgroup_file(cgroup_path.join(CPU_STAT))?;
+        let stat_content = common::read_cgroup_file(&stats_path)?;
         for entry in stat_content.lines() {
             let parts: Vec<&str> = entry.split_ascii_whitespace().collect();
             if parts.len() != 2 {
                 continue;
             }
 
-            let value = parts[1].parse()?;
+            let value = parts[1]
+                .parse()
+                .map_err(|err| V2CpuStatsError::ParseField {
+                    value: parts[1].into(),
+                    field: parts[0].into(),
+                    path: stats_path.clone(),
+                    err,
+                })?;
             match parts[0] {
                 "usage_usec" => stats.usage.usage_total = value,
                 "user_usec" => stats.usage.usage_user = value,
@@ -54,16 +89,15 @@ impl StatsProvider for Cpu {
             }
         }
 
-        stats.psi =
-            stats::psi_stats(&cgroup_path.join(CPU_PSI)).context("could not read cpu psi")?;
+        stats.psi = stats::psi_stats(&cgroup_path.join(CPU_PSI))?;
         Ok(stats)
     }
 }
 
 impl Cpu {
-    fn apply(path: &Path, cpu: &LinuxCpu) -> Result<()> {
+    fn apply(path: &Path, cpu: &LinuxCpu) -> Result<(), V2CpuControllerError> {
         if Self::is_realtime_requested(cpu) {
-            bail!("realtime is not supported on cgroup v2 yet");
+            return Err(V2CpuControllerError::RealtimeV2);
         }
 
         if let Some(mut shares) = cpu.shares() {
@@ -126,7 +160,10 @@ impl Cpu {
         false
     }
 
-    fn create_period_only_value(cpu_max_file: &Path, period: u64) -> Result<Option<Cow<str>>> {
+    fn create_period_only_value(
+        cpu_max_file: &Path,
+        period: u64,
+    ) -> Result<Option<Cow<str>>, V2CpuControllerError> {
         let old_cpu_max = common::read_cgroup_file(cpu_max_file)?;
         if let Some(old_quota) = old_cpu_max.split_whitespace().next() {
             return Ok(Some(format!("{old_quota} {period}").into()));

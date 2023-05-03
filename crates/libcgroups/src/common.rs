@@ -2,11 +2,10 @@ use std::{
     fmt::{Debug, Display},
     fs::{self, File},
     io::{BufRead, BufReader, Write},
-    path::{Path, PathBuf},
+    path::{Path, PathBuf, StripPrefixError},
     time::Duration,
 };
 
-use anyhow::{bail, Context, Result};
 use nix::{
     sys::statfs::{statfs, CGROUP2_SUPER_MAGIC, TMPFS_MAGIC},
     unistd::Pid,
@@ -30,23 +29,93 @@ pub const CGROUP_PROCS: &str = "cgroup.procs";
 pub const DEFAULT_CGROUP_ROOT: &str = "/sys/fs/cgroup";
 
 pub trait CgroupManager {
+    type Error;
+
     /// Adds a task specified by its pid to the cgroup
-    fn add_task(&self, pid: Pid) -> Result<()>;
+    fn add_task(&self, pid: Pid) -> Result<(), Self::Error>;
 
     /// Applies resource restrictions to the cgroup
-    fn apply(&self, controller_opt: &ControllerOpt) -> Result<()>;
+    fn apply(&self, controller_opt: &ControllerOpt) -> Result<(), Self::Error>;
 
     /// Removes the cgroup
-    fn remove(&self) -> Result<()>;
+    fn remove(&self) -> Result<(), Self::Error>;
 
     /// Sets the freezer cgroup to the specified state
-    fn freeze(&self, state: FreezerState) -> Result<()>;
+    fn freeze(&self, state: FreezerState) -> Result<(), Self::Error>;
 
     /// Retrieve statistics for the cgroup
-    fn stats(&self) -> Result<Stats>;
+    fn stats(&self) -> Result<Stats, Self::Error>;
 
     /// Gets the PIDs inside the cgroup
-    fn get_all_pids(&self) -> Result<Vec<Pid>>;
+    fn get_all_pids(&self) -> Result<Vec<Pid>, Self::Error>;
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum AnyManagerError {
+    #[error(transparent)]
+    Systemd(#[from] systemd::manager::SystemdManagerError),
+    #[error(transparent)]
+    V1(#[from] v1::manager::V1ManagerError),
+    #[error(transparent)]
+    V2(#[from] v2::manager::V2ManagerError),
+}
+
+pub enum AnyCgroupManager {
+    Systemd(systemd::manager::Manager),
+    V1(v1::manager::Manager),
+    V2(v2::manager::Manager),
+}
+
+impl CgroupManager for AnyCgroupManager {
+    type Error = AnyManagerError;
+
+    fn add_task(&self, pid: Pid) -> Result<(), Self::Error> {
+        match self {
+            AnyCgroupManager::Systemd(m) => Ok(m.add_task(pid)?),
+            AnyCgroupManager::V1(m) => Ok(m.add_task(pid)?),
+            AnyCgroupManager::V2(m) => Ok(m.add_task(pid)?),
+        }
+    }
+
+    fn apply(&self, controller_opt: &ControllerOpt) -> Result<(), Self::Error> {
+        match self {
+            AnyCgroupManager::Systemd(m) => Ok(m.apply(controller_opt)?),
+            AnyCgroupManager::V1(m) => Ok(m.apply(controller_opt)?),
+            AnyCgroupManager::V2(m) => Ok(m.apply(controller_opt)?),
+        }
+    }
+
+    fn remove(&self) -> Result<(), Self::Error> {
+        match self {
+            AnyCgroupManager::Systemd(m) => Ok(m.remove()?),
+            AnyCgroupManager::V1(m) => Ok(m.remove()?),
+            AnyCgroupManager::V2(m) => Ok(m.remove()?),
+        }
+    }
+
+    fn freeze(&self, state: FreezerState) -> Result<(), Self::Error> {
+        match self {
+            AnyCgroupManager::Systemd(m) => Ok(m.freeze(state)?),
+            AnyCgroupManager::V1(m) => Ok(m.freeze(state)?),
+            AnyCgroupManager::V2(m) => Ok(m.freeze(state)?),
+        }
+    }
+
+    fn stats(&self) -> Result<Stats, Self::Error> {
+        match self {
+            AnyCgroupManager::Systemd(m) => Ok(m.stats()?),
+            AnyCgroupManager::V1(m) => Ok(m.stats()?),
+            AnyCgroupManager::V2(m) => Ok(m.stats()?),
+        }
+    }
+
+    fn get_all_pids(&self) -> Result<Vec<Pid>, Self::Error> {
+        match self {
+            AnyCgroupManager::Systemd(m) => Ok(m.get_all_pids()?),
+            AnyCgroupManager::V1(m) => Ok(m.get_all_pids()?),
+            AnyCgroupManager::V2(m) => Ok(m.get_all_pids()?),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -92,39 +161,103 @@ pub struct ControllerOpt<'a> {
     pub freezer_state: Option<FreezerState>,
 }
 
-#[inline]
-pub fn write_cgroup_file_str<P: AsRef<Path>>(path: P, data: &str) -> Result<()> {
-    fs::OpenOptions::new()
-        .create(false)
-        .write(true)
-        .truncate(false)
-        .open(path.as_ref())
-        .with_context(|| format!("failed to open {:?}", path.as_ref()))?
-        .write_all(data.as_bytes())
-        .with_context(|| format!("failed to write {} to {:?}", data, path.as_ref()))?;
+#[derive(thiserror::Error, Debug)]
+pub enum WrappedIoError {
+    #[error("failed to open {path}: {err}")]
+    Open { err: std::io::Error, path: PathBuf },
+    #[error("failed to write {data} to {path}: {err}")]
+    Write {
+        err: std::io::Error,
+        path: PathBuf,
+        data: String,
+    },
+    #[error("failed to read {path}: {err}")]
+    Read { err: std::io::Error, path: PathBuf },
+    #[error("failed to create dir {path}: {err}")]
+    CreateDir { err: std::io::Error, path: PathBuf },
+    #[error("at {path}: {err}")]
+    Other { err: std::io::Error, path: PathBuf },
+}
 
-    Ok(())
+impl WrappedIoError {
+    pub fn inner(&self) -> &std::io::Error {
+        match self {
+            WrappedIoError::Open { err, .. } => err,
+            WrappedIoError::Write { err, .. } => err,
+            WrappedIoError::Read { err, .. } => err,
+            WrappedIoError::CreateDir { err, .. } => err,
+            WrappedIoError::Other { err, .. } => err,
+        }
+    }
 }
 
 #[inline]
-pub fn write_cgroup_file<P: AsRef<Path>, T: ToString>(path: P, data: T) -> Result<()> {
-    let data = data.to_string();
-    fs::OpenOptions::new()
-        .create(false)
-        .write(true)
-        .truncate(false)
-        .open(path.as_ref())
-        .with_context(|| format!("failed to open {:?}", path.as_ref()))?
-        .write_all(data.as_bytes())
-        .with_context(|| format!("failed to write {} to {:?}", data, path.as_ref()))?;
-
-    Ok(())
-}
-
-#[inline]
-pub fn read_cgroup_file<P: AsRef<Path>>(path: P) -> Result<String> {
+pub fn write_cgroup_file_str<P: AsRef<Path>>(path: P, data: &str) -> Result<(), WrappedIoError> {
     let path = path.as_ref();
-    fs::read_to_string(path).with_context(|| format!("failed to open {path:?}"))
+
+    fs::OpenOptions::new()
+        .create(false)
+        .write(true)
+        .truncate(false)
+        .open(path)
+        .map_err(|err| WrappedIoError::Open {
+            err,
+            path: path.to_path_buf(),
+        })?
+        .write_all(data.as_bytes())
+        .map_err(|err| WrappedIoError::Write {
+            err,
+            path: path.to_path_buf(),
+            data: data.into(),
+        })?;
+
+    Ok(())
+}
+
+#[inline]
+pub fn write_cgroup_file<P: AsRef<Path>, T: ToString>(
+    path: P,
+    data: T,
+) -> Result<(), WrappedIoError> {
+    let path = path.as_ref();
+    let data = data.to_string();
+
+    fs::OpenOptions::new()
+        .create(false)
+        .write(true)
+        .truncate(false)
+        .open(path)
+        .map_err(|err| WrappedIoError::Open {
+            err,
+            path: path.to_path_buf(),
+        })?
+        .write_all(data.as_bytes())
+        .map_err(|err| WrappedIoError::Write {
+            err,
+            path: path.to_path_buf(),
+            data,
+        })?;
+
+    Ok(())
+}
+
+#[inline]
+pub fn read_cgroup_file<P: AsRef<Path>>(path: P) -> Result<String, WrappedIoError> {
+    let path = path.as_ref();
+    fs::read_to_string(path).map_err(|err| WrappedIoError::Read {
+        err,
+        path: path.to_path_buf(),
+    })
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum GetCgroupSetupError {
+    #[error("io error: {0}")]
+    WrappedIo(#[from] WrappedIoError),
+    #[error("non default cgroup root not supported")]
+    NonDefault,
+    #[error("failed to detect cgroup setup")]
+    FailedToDetect,
 }
 
 /// Determines the cgroup setup of the system. Systems typically have one of
@@ -135,7 +268,7 @@ pub fn read_cgroup_file<P: AsRef<Path>>(path: P) -> Result<String> {
 ///   an additional unified hierarchy which doesn't have any
 ///   controllers attached. Resource control can purely be achieved
 ///   through the cgroup v1 hierarchy, not through the cgroup v2 hierarchy.
-pub fn get_cgroup_setup() -> Result<CgroupSetup> {
+pub fn get_cgroup_setup() -> Result<CgroupSetup, GetCgroupSetupError> {
     let default_root = Path::new(DEFAULT_CGROUP_ROOT);
     match default_root.exists() {
         true => {
@@ -143,12 +276,9 @@ pub fn get_cgroup_setup() -> Result<CgroupSetup> {
             // If the filesystem is tmpfs instead the system is either in legacy or
             // hybrid mode. If a cgroup2 filesystem has been mounted under the "unified"
             // folder we are in hybrid mode, otherwise we are in legacy mode.
-            let stat = statfs(default_root).with_context(|| {
-                format!(
-                    "failed to stat default cgroup root {}",
-                    &default_root.display()
-                )
-            })?;
+            let stat = statfs(default_root)
+                .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err))
+                .wrap_other(default_root)?;
             if stat.filesystem_type() == CGROUP2_SUPER_MAGIC {
                 return Ok(CgroupSetup::Unified);
             }
@@ -157,7 +287,8 @@ pub fn get_cgroup_setup() -> Result<CgroupSetup> {
                 let unified = Path::new("/sys/fs/cgroup/unified");
                 if Path::new(unified).exists() {
                     let stat = statfs(unified)
-                        .with_context(|| format!("failed to stat {}", unified.display()))?;
+                        .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err))
+                        .wrap_other(unified)?;
                     if stat.filesystem_type() == CGROUP2_SUPER_MAGIC {
                         return Ok(CgroupSetup::Hybrid);
                     }
@@ -166,36 +297,60 @@ pub fn get_cgroup_setup() -> Result<CgroupSetup> {
                 return Ok(CgroupSetup::Legacy);
             }
         }
-        false => bail!("non default cgroup root not supported"),
+        false => return Err(GetCgroupSetupError::NonDefault),
     }
 
-    bail!("failed to detect cgroup setup");
+    Err(GetCgroupSetupError::FailedToDetect)
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum CreateCgroupSetupError {
+    #[error("io error: {0}")]
+    WrappedIo(#[from] WrappedIoError),
+    #[error("non default cgroup root not supported")]
+    NonDefault,
+    #[error("failed to detect cgroup setup")]
+    FailedToDetect,
+    #[error("v1 error: {0}")]
+    V1(#[from] v1::manager::V1ManagerError),
+    #[error("v2 error: {0}")]
+    V2(#[from] v2::manager::V2ManagerError),
+    #[error("systemd error: {0}")]
+    Systemd(#[from] systemd::manager::SystemdManagerError),
 }
 
 pub fn create_cgroup_manager<P: Into<PathBuf>>(
     cgroup_path: P,
     systemd_cgroup: bool,
     container_name: &str,
-) -> Result<Box<dyn CgroupManager>> {
-    let cgroup_setup = get_cgroup_setup()?;
+) -> Result<AnyCgroupManager, CreateCgroupSetupError> {
+    let cgroup_setup = get_cgroup_setup().map_err(|err| match err {
+        GetCgroupSetupError::WrappedIo(err) => CreateCgroupSetupError::WrappedIo(err),
+        GetCgroupSetupError::NonDefault => CreateCgroupSetupError::NonDefault,
+        GetCgroupSetupError::FailedToDetect => CreateCgroupSetupError::FailedToDetect,
+    })?;
     let cgroup_path = cgroup_path.into();
 
     match cgroup_setup {
-        CgroupSetup::Legacy | CgroupSetup::Hybrid => create_v1_cgroup_manager(cgroup_path),
+        CgroupSetup::Legacy | CgroupSetup::Hybrid => {
+            Ok(create_v1_cgroup_manager(cgroup_path)?.any())
+        }
         CgroupSetup::Unified => {
             // ref https://github.com/opencontainers/runtime-spec/blob/main/config-linux.md#cgroups-path
             if cgroup_path.is_absolute() || !systemd_cgroup {
-                return create_v2_cgroup_manager(cgroup_path);
+                return Ok(create_v2_cgroup_manager(cgroup_path)?.any());
             }
-            create_systemd_cgroup_manager(cgroup_path, container_name)
+            Ok(create_systemd_cgroup_manager(cgroup_path, container_name)?.any())
         }
     }
 }
 
 #[cfg(feature = "v1")]
-fn create_v1_cgroup_manager(cgroup_path: PathBuf) -> Result<Box<dyn CgroupManager>> {
+fn create_v1_cgroup_manager(
+    cgroup_path: PathBuf,
+) -> Result<v1::manager::Manager, v1::manager::V1ManagerError> {
     log::info!("cgroup manager V1 will be used");
-    Ok(Box::new(v1::manager::Manager::new(cgroup_path)?))
+    v1::manager::Manager::new(cgroup_path)
 }
 
 #[cfg(not(feature = "v1"))]
@@ -204,12 +359,11 @@ fn create_v1_cgroup_manager(_cgroup_path: PathBuf) -> Result<Box<dyn CgroupManag
 }
 
 #[cfg(feature = "v2")]
-fn create_v2_cgroup_manager(cgroup_path: PathBuf) -> Result<Box<dyn CgroupManager>> {
+fn create_v2_cgroup_manager(
+    cgroup_path: PathBuf,
+) -> Result<v2::manager::Manager, v2::manager::V2ManagerError> {
     log::info!("cgroup manager V2 will be used");
-    Ok(Box::new(v2::manager::Manager::new(
-        DEFAULT_CGROUP_ROOT.into(),
-        cgroup_path,
-    )?))
+    v2::manager::Manager::new(DEFAULT_CGROUP_ROOT.into(), cgroup_path)
 }
 
 #[cfg(not(feature = "v2"))]
@@ -221,9 +375,9 @@ fn create_v2_cgroup_manager(_cgroup_path: PathBuf) -> Result<Box<dyn CgroupManag
 fn create_systemd_cgroup_manager(
     cgroup_path: PathBuf,
     container_name: &str,
-) -> Result<Box<dyn CgroupManager>> {
+) -> Result<systemd::manager::Manager, systemd::manager::SystemdManagerError> {
     if !systemd::booted() {
-        bail!(
+        panic!(
             "systemd cgroup flag passed, but systemd support for managing cgroups is not available"
         );
     }
@@ -234,12 +388,12 @@ fn create_systemd_cgroup_manager(
         "systemd cgroup manager with system bus {} will be used",
         use_system
     );
-    Ok(Box::new(systemd::manager::Manager::new(
+    systemd::manager::Manager::new(
         DEFAULT_CGROUP_ROOT.into(),
         cgroup_path,
         container_name.into(),
         use_system,
-    )?))
+    )
 }
 
 #[cfg(not(feature = "systemd"))]
@@ -250,29 +404,34 @@ fn create_systemd_cgroup_manager(
     bail!("systemd cgroup feature is required, but was not enabled during compile time");
 }
 
-pub fn get_all_pids(path: &Path) -> Result<Vec<Pid>> {
+pub fn get_all_pids(path: &Path) -> Result<Vec<Pid>, WrappedIoError> {
     log::debug!("scan pids in folder: {:?}", path);
     let mut result = vec![];
     walk_dir(path, &mut |p| {
         let file_path = p.join(CGROUP_PROCS);
         if file_path.exists() {
-            let file = File::open(file_path)?;
+            let file = File::open(&file_path).wrap_open(&file_path)?;
             for line in BufReader::new(file).lines().flatten() {
-                result.push(Pid::from_raw(line.parse::<i32>()?))
+                result.push(Pid::from_raw(
+                    line.parse::<i32>()
+                        .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err))
+                        .wrap_other(&file_path)?,
+                ))
             }
         }
-        Ok(())
+        Ok::<(), WrappedIoError>(())
     })?;
     Ok(result)
 }
 
-fn walk_dir<F>(path: &Path, c: &mut F) -> Result<()>
+fn walk_dir<F, E>(path: &Path, c: &mut F) -> Result<(), E>
 where
-    F: FnMut(&Path) -> Result<()>,
+    F: FnMut(&Path) -> Result<(), E>,
+    E: From<WrappedIoError>,
 {
     c(path)?;
-    for entry in fs::read_dir(path)? {
-        let entry = entry?;
+    for entry in fs::read_dir(path).wrap_read(path)? {
+        let entry = entry.wrap_open(path)?;
         let path = entry.path();
 
         if path.is_dir() {
@@ -283,11 +442,20 @@ where
 }
 
 pub(crate) trait PathBufExt {
-    fn join_safely<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf>;
+    fn join_safely<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf, JoinSafelyError>;
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum JoinSafelyError {
+    #[error("failed to strip prefix from {path}: {err}")]
+    StripPrefix {
+        err: StripPrefixError,
+        path: PathBuf,
+    },
 }
 
 impl PathBufExt for PathBuf {
-    fn join_safely<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf> {
+    fn join_safely<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf, JoinSafelyError> {
         let path = path.as_ref();
         if path.is_relative() {
             return Ok(self.join(path));
@@ -295,7 +463,10 @@ impl PathBufExt for PathBuf {
 
         let stripped = path
             .strip_prefix("/")
-            .with_context(|| format!("failed to strip prefix from {}", path.display()))?;
+            .map_err(|err| JoinSafelyError::StripPrefix {
+                err,
+                path: path.to_path_buf(),
+            })?;
         Ok(self.join(stripped))
     }
 }
@@ -411,7 +582,7 @@ pub(crate) fn delete_with_retry<P: AsRef<Path>, L: Into<Option<Duration>>>(
     path: P,
     retries: u32,
     limit_backoff: L,
-) -> Result<()> {
+) -> Result<(), WrappedIoError> {
     let mut attempts = 0;
     let mut delay = Duration::from_millis(10);
     let path = path.as_ref();
@@ -430,5 +601,93 @@ pub(crate) fn delete_with_retry<P: AsRef<Path>, L: Into<Option<Duration>>>(
         }
     }
 
-    bail!("could not delete {:?}", path)
+    Err(std::io::Error::new(
+        std::io::ErrorKind::TimedOut,
+        "could not delete".to_string(),
+    ))
+    .wrap_other(path)?
+}
+
+pub(crate) trait WrapIoResult {
+    type Target;
+
+    fn wrap_create_dir<P: Into<PathBuf>>(self, path: P) -> Result<Self::Target, WrappedIoError>;
+    fn wrap_read<P: Into<PathBuf>>(self, path: P) -> Result<Self::Target, WrappedIoError>;
+    fn wrap_open<P: Into<PathBuf>>(self, path: P) -> Result<Self::Target, WrappedIoError>;
+    fn wrap_write<P: Into<PathBuf>, D: Into<String>>(
+        self,
+        path: P,
+        data: D,
+    ) -> Result<Self::Target, WrappedIoError>;
+    fn wrap_other<P: Into<PathBuf>>(self, path: P) -> Result<Self::Target, WrappedIoError>;
+}
+
+impl<T> WrapIoResult for Result<T, std::io::Error> {
+    type Target = T;
+
+    fn wrap_create_dir<P: Into<PathBuf>>(self, path: P) -> Result<Self::Target, WrappedIoError> {
+        self.map_err(|err| WrappedIoError::CreateDir {
+            err,
+            path: path.into(),
+        })
+    }
+
+    fn wrap_read<P: Into<PathBuf>>(self, path: P) -> Result<Self::Target, WrappedIoError> {
+        self.map_err(|err| WrappedIoError::Read {
+            err,
+            path: path.into(),
+        })
+    }
+
+    fn wrap_open<P: Into<PathBuf>>(self, path: P) -> Result<Self::Target, WrappedIoError> {
+        self.map_err(|err| WrappedIoError::Open {
+            err,
+            path: path.into(),
+        })
+    }
+
+    fn wrap_write<P: Into<PathBuf>, D: Into<String>>(
+        self,
+        path: P,
+        data: D,
+    ) -> Result<Self::Target, WrappedIoError> {
+        self.map_err(|err| WrappedIoError::Write {
+            err,
+            path: path.into(),
+            data: data.into(),
+        })
+    }
+
+    fn wrap_other<P: Into<PathBuf>>(self, path: P) -> Result<Self::Target, WrappedIoError> {
+        self.map_err(|err| WrappedIoError::Other {
+            err,
+            path: path.into(),
+        })
+    }
+}
+
+#[derive(Debug)]
+pub enum EitherError<L, R> {
+    Left(L),
+    Right(R),
+}
+
+impl<L: Display, R: Display> Display for EitherError<L, R> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EitherError::Left(left) => <L as Display>::fmt(left, f),
+            EitherError::Right(right) => <R as Display>::fmt(right, f),
+        }
+    }
+}
+
+impl<L: Debug + Display, R: Debug + Display> std::error::Error for EitherError<L, R> {}
+
+#[derive(Debug)]
+pub struct MustBePowerOfTwo;
+
+impl Display for MustBePowerOfTwo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("page size must be in the format of 2^(integer)")
+    }
 }

@@ -1,14 +1,13 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Context, Result};
 use oci_spec::runtime::LinuxCpu;
 
 use crate::{
-    common::{self, ControllerOpt},
-    stats::{CpuThrottling, StatsProvider},
+    common::{self, ControllerOpt, WrappedIoError},
+    stats::{parse_flat_keyed_data, CpuThrottling, ParseFlatKeyedDataError, StatsProvider},
 };
 
-use super::Controller;
+use super::controller::Controller;
 
 const CGROUP_CPU_SHARES: &str = "cpu.shares";
 const CGROUP_CPU_QUOTA: &str = "cpu.cfs_quota_us";
@@ -22,13 +21,14 @@ const CGROUP_CPU_IDLE: &str = "cpu.idle";
 pub struct Cpu {}
 
 impl Controller for Cpu {
+    type Error = WrappedIoError;
     type Resource = LinuxCpu;
 
-    fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()> {
+    fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<(), Self::Error> {
         log::debug!("Apply Cpu cgroup config");
 
         if let Some(cpu) = Self::needs_to_handle(controller_opt) {
-            Self::apply(cgroup_root, cpu).context("failed to apply cpu resource restrictions")?;
+            Self::apply(cgroup_root, cpu)?;
         }
 
         Ok(())
@@ -51,53 +51,46 @@ impl Controller for Cpu {
     }
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum V1CpuStatsError {
+    #[error("error parsing data: {0}")]
+    ParseData(#[from] ParseFlatKeyedDataError),
+    #[error("missing field {field} from {path}")]
+    MissingField { field: &'static str, path: PathBuf },
+}
+
 impl StatsProvider for Cpu {
+    type Error = V1CpuStatsError;
     type Stats = CpuThrottling;
 
-    fn stats(cgroup_path: &Path) -> Result<Self::Stats> {
+    fn stats(cgroup_path: &Path) -> Result<Self::Stats, Self::Error> {
         let mut stats = CpuThrottling::default();
         let stat_path = cgroup_path.join(CGROUP_CPU_STAT);
-        let stat_content = common::read_cgroup_file(&stat_path)?;
 
-        let parts: Vec<&str> = stat_content.split_ascii_whitespace().collect();
-        if parts.len() < 6 {
-            bail!(
-                "{} contains less than the expected number of entries",
-                stat_path.display()
-            );
+        let stat_table = parse_flat_keyed_data(&stat_path)?;
+
+        macro_rules! get {
+            ($name: expr => $field: ident) => {
+                stats.$field =
+                    *stat_table
+                        .get($name)
+                        .ok_or_else(|| V1CpuStatsError::MissingField {
+                            field: $name,
+                            path: stat_path.clone(),
+                        })?;
+            };
         }
 
-        if parts[0] != "nr_periods" {
-            bail!(
-                "{} does not contain the number of elapsed periods",
-                stat_path.display()
-            );
-        }
-
-        if parts[2] != "nr_throttled" {
-            bail!(
-                "{} does not contain the number of throttled periods",
-                stat_path.display()
-            );
-        }
-
-        if parts[4] != "throttled_time" {
-            bail!(
-                "{} does not contain the total time tasks have spent throttled",
-                stat_path.display()
-            );
-        }
-
-        stats.periods = parts[1].parse().context("failed to parse nr_periods")?;
-        stats.throttled_periods = parts[3].parse().context("failed to parse nr_throttled")?;
-        stats.throttled_time = parts[5].parse().context("failed to parse throttled time")?;
+        get!("nr_periods" => periods);
+        get!("nr_throttled" => throttled_periods);
+        get!("throttled_time" => throttled_time);
 
         Ok(stats)
     }
 }
 
 impl Cpu {
-    fn apply(root_path: &Path, cpu: &LinuxCpu) -> Result<()> {
+    fn apply(root_path: &Path, cpu: &LinuxCpu) -> Result<(), WrappedIoError> {
         if let Some(cpu_shares) = cpu.shares() {
             if cpu_shares != 0 {
                 common::write_cgroup_file(root_path.join(CGROUP_CPU_SHARES), cpu_shares)?;

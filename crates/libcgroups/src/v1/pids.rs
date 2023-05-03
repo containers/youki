@@ -1,13 +1,12 @@
 use std::path::Path;
 
-use anyhow::{Context, Result};
-
-use super::Controller;
 use crate::{
-    common::{self, ControllerOpt},
-    stats::{self, PidStats, StatsProvider},
+    common::{self, ControllerOpt, WrappedIoError},
+    stats::{self, PidStats, PidStatsError, StatsProvider},
 };
 use oci_spec::runtime::LinuxPids;
+
+use super::controller::Controller;
 
 // Contains the maximum allowed number of active pids
 const CGROUP_PIDS_MAX: &str = "pids.max";
@@ -15,13 +14,14 @@ const CGROUP_PIDS_MAX: &str = "pids.max";
 pub struct Pids {}
 
 impl Controller for Pids {
+    type Error = WrappedIoError;
     type Resource = LinuxPids;
 
-    fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()> {
+    fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<(), Self::Error> {
         log::debug!("Apply pids cgroup config");
 
         if let Some(pids) = &controller_opt.resources.pids() {
-            Self::apply(cgroup_root, pids).context("failed to apply pids resource restrictions")?;
+            Self::apply(cgroup_root, pids)?;
         }
 
         Ok(())
@@ -33,15 +33,16 @@ impl Controller for Pids {
 }
 
 impl StatsProvider for Pids {
+    type Error = PidStatsError;
     type Stats = PidStats;
 
-    fn stats(cgroup_path: &Path) -> Result<Self::Stats> {
+    fn stats(cgroup_path: &Path) -> Result<Self::Stats, Self::Error> {
         stats::pid_stats(cgroup_path)
     }
 }
 
 impl Pids {
-    fn apply(root_path: &Path, pids: &LinuxPids) -> Result<()> {
+    fn apply(root_path: &Path, pids: &LinuxPids) -> Result<(), WrappedIoError> {
         let limit = if pids.limit() > 0 {
             pids.limit().to_string()
         } else {

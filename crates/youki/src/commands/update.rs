@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use crate::commands::create_cgroup_manager;
 use anyhow::Result;
+use libcgroups::common::CgroupManager;
 use libcgroups::{self, common::ControllerOpt};
 use liboci_cli::Update;
 use oci_spec::runtime::{LinuxPidsBuilder, LinuxResources, LinuxResourcesBuilder};

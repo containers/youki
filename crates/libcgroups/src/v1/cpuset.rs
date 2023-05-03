@@ -1,24 +1,46 @@
-use std::{fs, path::Path};
+use std::{
+    fs,
+    path::{Path, PathBuf, StripPrefixError},
+};
 
-use anyhow::{bail, Context, Result};
 use nix::unistd;
 use oci_spec::runtime::LinuxCpu;
 use unistd::Pid;
 
-use crate::common::{self, ControllerOpt, CGROUP_PROCS};
+use crate::common::{self, ControllerOpt, WrapIoResult, WrappedIoError, CGROUP_PROCS};
 
-use super::{util, Controller, ControllerType};
+use super::{
+    controller::Controller,
+    util::{self, V1MountPointError},
+    ControllerType,
+};
 
 const CGROUP_CPUSET_CPUS: &str = "cpuset.cpus";
 const CGROUP_CPUSET_MEMS: &str = "cpuset.mems";
 
+#[derive(thiserror::Error, Debug)]
+pub enum V1CpuSetControllerError {
+    #[error("io error: {0}")]
+    WrappedIo(#[from] WrappedIoError),
+    #[error("bad cgroup path {path}: {err}")]
+    BadCgroupPath {
+        err: StripPrefixError,
+        path: PathBuf,
+    },
+    #[error("cpuset parent value is empty")]
+    EmptyParent,
+    #[error("mount point error: {0}")]
+    MountPoint(#[from] V1MountPointError),
+}
+
 pub struct CpuSet {}
 
 impl Controller for CpuSet {
+    type Error = V1CpuSetControllerError;
     type Resource = LinuxCpu;
 
-    fn add_task(pid: Pid, cgroup_path: &Path) -> Result<()> {
-        fs::create_dir_all(cgroup_path)?;
+    fn add_task(pid: Pid, cgroup_path: &Path) -> Result<(), Self::Error> {
+        fs::create_dir_all(cgroup_path).wrap_create_dir(cgroup_path)?;
 
         Self::ensure_not_empty(cgroup_path, CGROUP_CPUSET_CPUS)?;
         Self::ensure_not_empty(cgroup_path, CGROUP_CPUSET_MEMS)?;
@@ -27,12 +49,11 @@ impl Controller for CpuSet {
         Ok(())
     }
 
-    fn apply(controller_opt: &ControllerOpt, cgroup_path: &Path) -> Result<()> {
+    fn apply(controller_opt: &ControllerOpt, cgroup_path: &Path) -> Result<(), Self::Error> {
         log::debug!("Apply CpuSet cgroup config");
 
         if let Some(cpuset) = Self::needs_to_handle(controller_opt) {
-            Self::apply(cgroup_path, cpuset)
-                .context("failed to apply cpuset resource restrictions")?;
+            Self::apply(cgroup_path, cpuset)?;
         }
 
         Ok(())
@@ -50,7 +71,7 @@ impl Controller for CpuSet {
 }
 
 impl CpuSet {
-    fn apply(cgroup_path: &Path, cpuset: &LinuxCpu) -> Result<()> {
+    fn apply(cgroup_path: &Path, cpuset: &LinuxCpu) -> Result<(), V1CpuSetControllerError> {
         if let Some(cpus) = &cpuset.cpus() {
             common::write_cgroup_file_str(cgroup_path.join(CGROUP_CPUSET_CPUS), cpus)?;
         }
@@ -64,19 +85,28 @@ impl CpuSet {
 
     // if a task is moved into the cgroup and a value has not been set for cpus and mems
     // Errno 28 (no space left on device) will be returned. Therefore we set the value from the parent if required.
-    fn ensure_not_empty(cgroup_path: &Path, interface_file: &str) -> Result<()> {
+    fn ensure_not_empty(
+        cgroup_path: &Path,
+        interface_file: &str,
+    ) -> Result<(), V1CpuSetControllerError> {
         let mut current = util::get_subsystem_mount_point(&ControllerType::CpuSet)?;
-        let relative_cgroup_path = cgroup_path.strip_prefix(&current)?;
+        let relative_cgroup_path = cgroup_path.strip_prefix(&current).map_err(|err| {
+            V1CpuSetControllerError::BadCgroupPath {
+                err,
+                path: cgroup_path.to_path_buf(),
+            }
+        })?;
 
         for component in relative_cgroup_path.components() {
-            let parent_value = fs::read_to_string(current.join(interface_file))?;
+            let parent_value =
+                fs::read_to_string(current.join(interface_file)).wrap_read(cgroup_path)?;
             if parent_value.trim().is_empty() {
-                bail!("cpuset parent value is empty")
+                return Err(V1CpuSetControllerError::EmptyParent);
             }
 
             current.push(component);
             let child_path = current.join(interface_file);
-            let child_value = fs::read_to_string(&child_path)?;
+            let child_value = fs::read_to_string(&child_path).wrap_read(&child_path)?;
             // the file can contain a newline character. Need to trim it away,
             // otherwise it is not considered empty and value will not be written
             if child_value.trim().is_empty() {

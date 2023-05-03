@@ -13,6 +13,7 @@ use crate::{
     workload::ExecutorManager,
 };
 use anyhow::{bail, Context, Result};
+use libcgroups::common::CgroupManager;
 use nix::unistd::Pid;
 use oci_spec::runtime::Spec;
 use std::{fs, io::Write, os::unix::prelude::RawFd, path::PathBuf};
@@ -75,7 +76,7 @@ impl<'a> ContainerBuilderImpl<'a> {
             self.rootless.is_some(),
         );
         let cmanager = libcgroups::common::create_cgroup_manager(
-            &cgroups_path,
+            cgroups_path,
             self.use_systemd || self.rootless.is_some(),
             &self.container_id,
         )?;
@@ -168,7 +169,7 @@ impl<'a> ContainerBuilderImpl<'a> {
             self.rootless.is_some(),
         );
         let cmanager = libcgroups::common::create_cgroup_manager(
-            &cgroups_path,
+            cgroups_path,
             self.use_systemd || self.rootless.is_some(),
             &self.container_id,
         )?;

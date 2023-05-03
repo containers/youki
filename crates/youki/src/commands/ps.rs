@@ -1,5 +1,6 @@
 use crate::commands::create_cgroup_manager;
 use anyhow::{bail, Result};
+use libcgroups::common::CgroupManager;
 use liboci_cli::Ps;
 use std::{path::PathBuf, process::Command};
 

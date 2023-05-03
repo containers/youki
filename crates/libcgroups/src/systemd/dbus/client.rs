@@ -1,10 +1,28 @@
 use crate::systemd::dbus::systemd_api::OrgFreedesktopSystemd1Manager;
-use anyhow::{Context, Result};
 use dbus::arg::{RefArg, Variant};
 use dbus::blocking::{Connection, Proxy};
 use std::collections::HashMap;
+use std::num::ParseIntError;
 use std::path::PathBuf;
 use std::time::Duration;
+
+#[derive(thiserror::Error, Debug)]
+pub enum SystemdClientError {
+    #[error("dbus error: {0}")]
+    DBus(#[from] dbus::Error),
+    #[error("failed to start transient unit {unit_name}, parent is {parent}: {err}")]
+    FailedTransient {
+        err: dbus::Error,
+        unit_name: String,
+        parent: String,
+    },
+    #[error("failed to stop unit {unit_name}: {err}")]
+    FailedStop { err: dbus::Error, unit_name: String },
+    #[error("failed to set properties for unit {unit_name}: {err}")]
+    FailedProperties { err: dbus::Error, unit_name: String },
+    #[error("could not parse systemd version: {0}")]
+    SystemdVersion(ParseIntError),
+}
 
 pub trait SystemdClient {
     fn is_system(&self) -> bool;
@@ -17,19 +35,19 @@ pub trait SystemdClient {
         pid: u32,
         parent: &str,
         unit_name: &str,
-    ) -> Result<()>;
+    ) -> Result<(), SystemdClientError>;
 
-    fn stop_transient_unit(&self, unit_name: &str) -> Result<()>;
+    fn stop_transient_unit(&self, unit_name: &str) -> Result<(), SystemdClientError>;
 
     fn set_unit_properties(
         &self,
         unit_name: &str,
         properties: &HashMap<&str, Box<dyn RefArg>>,
-    ) -> Result<()>;
+    ) -> Result<(), SystemdClientError>;
 
-    fn systemd_version(&self) -> Result<u32>;
+    fn systemd_version(&self) -> Result<u32, SystemdClientError>;
 
-    fn control_cgroup_root(&self) -> Result<PathBuf>;
+    fn control_cgroup_root(&self) -> Result<PathBuf, SystemdClientError>;
 }
 
 /// Client is a wrapper providing higher level API and abatraction around dbus.
@@ -41,13 +59,13 @@ pub struct Client {
 
 impl Client {
     /// Uses the system bus to communicate with systemd
-    pub fn new_system() -> Result<Self> {
+    pub fn new_system() -> Result<Self, dbus::Error> {
         let conn = Connection::new_system()?;
         Ok(Client { conn, system: true })
     }
 
     /// Uses the session bus to communicate with systemd
-    pub fn new_session() -> Result<Self> {
+    pub fn new_session() -> Result<Self, dbus::Error> {
         let conn = Connection::new_session()?;
         Ok(Client {
             conn,
@@ -83,7 +101,7 @@ impl SystemdClient for Client {
         pid: u32,
         parent: &str,
         unit_name: &str,
-    ) -> Result<()> {
+    ) -> Result<(), SystemdClientError> {
         // To view and introspect the methods under the 'org.freedesktop.systemd1' destination
         // and object path under it use the following command:
         // `gdbus introspect --system --dest org.freedesktop.systemd1 --object-path /org/freedesktop/systemd1`
@@ -122,18 +140,23 @@ impl SystemdClient for Client {
         log::debug!("Starting transient unit: {:?}", properties);
         proxy
             .start_transient_unit(unit_name, "replace", properties, vec![])
-            .with_context(|| {
-                format!("failed to start transient unit {unit_name}, parent is {parent}")
+            .map_err(|err| SystemdClientError::FailedTransient {
+                err,
+                unit_name: unit_name.into(),
+                parent: parent.into(),
             })?;
         Ok(())
     }
 
-    fn stop_transient_unit(&self, unit_name: &str) -> Result<()> {
+    fn stop_transient_unit(&self, unit_name: &str) -> Result<(), SystemdClientError> {
         let proxy = self.create_proxy();
 
         proxy
             .stop_unit(unit_name, "replace")
-            .with_context(|| format!("failed to stop unit {unit_name}"))?;
+            .map_err(|err| SystemdClientError::FailedStop {
+                err,
+                unit_name: unit_name.into(),
+            })?;
         Ok(())
     }
 
@@ -141,7 +164,7 @@ impl SystemdClient for Client {
         &self,
         unit_name: &str,
         properties: &HashMap<&str, Box<dyn RefArg>>,
-    ) -> Result<()> {
+    ) -> Result<(), SystemdClientError> {
         let proxy = self.create_proxy();
 
         let props = properties
@@ -151,33 +174,32 @@ impl SystemdClient for Client {
 
         proxy
             .set_unit_properties(unit_name, true, props)
-            .with_context(|| format!("failed to set properties for unit {unit_name:?}"))?;
+            .map_err(|err| SystemdClientError::FailedProperties {
+                err,
+                unit_name: unit_name.into(),
+            })?;
         Ok(())
     }
 
-    fn systemd_version(&self) -> Result<u32> {
+    fn systemd_version(&self) -> Result<u32, SystemdClientError> {
         let proxy = self.create_proxy();
 
         let version = proxy
-            .version()
-            .context("dbus request failed")?
+            .version()?
             .chars()
             .skip_while(|c| c.is_alphabetic())
             .take_while(|c| c.is_numeric())
             .collect::<String>()
             .parse::<u32>()
-            .context("could not parse systemd version")?;
+            .map_err(SystemdClientError::SystemdVersion)?;
 
         Ok(version)
     }
 
-    fn control_cgroup_root(&self) -> Result<PathBuf> {
+    fn control_cgroup_root(&self) -> Result<PathBuf, SystemdClientError> {
         let proxy = self.create_proxy();
 
-        let cgroup_root = proxy
-            .control_group()
-            .context("failed to get systemd control group")?;
-        PathBuf::try_from(&cgroup_root)
-            .with_context(|| format!("parse systemd control cgroup {cgroup_root} into path"))
+        let cgroup_root = proxy.control_group()?;
+        Ok(PathBuf::from(&cgroup_root))
     }
 }
