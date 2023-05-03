@@ -33,7 +33,7 @@ impl Emulator {
         }
     }
 
-    pub fn add_rule(&mut self, rule: &LinuxDeviceCgroup) -> () {
+    pub fn add_rule(&mut self, rule: &LinuxDeviceCgroup) {
         // special case, switch to blacklist or whitelist and clear all existing rules
         // NOTE: we ignore other fields when type='a', this is same as cgroup v1 and runc
         if rule.typ().unwrap_or_default() == LinuxDeviceType::A {
