@@ -14,14 +14,6 @@ use std::collections;
 
 type Result<T> = std::result::Result<T, NamespaceError>;
 
-// #[derive(Debug, thiserror::Error)]
-// enum UnshareError {
-//     #[error("syscall failed")]
-//     SyscallFailed(#[from] SyscallError),
-//     #[error("nix syscall failed")]
-//     NixSyscallFailed(#[from] nix::Error),
-// }
-
 #[derive(Debug, thiserror::Error)]
 pub enum NamespaceError {
     #[error("failed to set namespace")]
