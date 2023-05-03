@@ -30,12 +30,9 @@ pub enum ProcessError {
     #[error("io error: {0}")]
     UnixIo(#[from] nix::errno::Errno),
     #[error("failed to add task {pid} to cgroup manager")]
-    CgroupAdd {
-        pid: nix::unistd::Pid,
-        err: anyhow::Error,
-    },
+    CgroupAdd { pid: nix::unistd::Pid, msg: String },
     #[error("failed to apply resource limits to cgroup")]
-    CgroupApply(anyhow::Error),
+    CgroupApply { msg: String },
     #[error("failed to get proc state")]
     Procfs(#[from] procfs::ProcError),
     #[error("missing linux in spec")]

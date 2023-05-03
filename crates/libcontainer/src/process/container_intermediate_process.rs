@@ -169,7 +169,10 @@ fn apply_cgroups<
     let pid = Pid::from_raw(Process::myself()?.pid());
     cmanager
         .add_task(pid)
-        .map_err(|err| ProcessError::CgroupAdd { pid, err })?;
+        .map_err(|err| ProcessError::CgroupAdd {
+            pid,
+            msg: err.to_string(),
+        })?;
 
     if let Some(resources) = resources {
         if init {
@@ -182,7 +185,9 @@ fn apply_cgroups<
 
             cmanager
                 .apply(&controller_opt)
-                .map_err(ProcessError::CgroupApply)?;
+                .map_err(|err| ProcessError::CgroupApply {
+                    msg: err.to_string(),
+                })?;
         }
     }
 
