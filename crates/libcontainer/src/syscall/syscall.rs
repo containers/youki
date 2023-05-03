@@ -1,7 +1,6 @@
 //! An interface trait so that rest of Youki can call
 //! necessary functions without having to worry about their
 //! implementation details
-use std::{any::Any, ffi::OsStr, path::Path, sync::Arc};
 use bitflags::bitflags;
 use caps::{CapSet, CapsHashSet};
 use libc;
@@ -11,13 +10,14 @@ use nix::{
     sys::stat::{Mode, SFlag},
     unistd::{Gid, Uid},
 };
+use std::{any::Any, ffi::OsStr, path::Path, sync::Arc};
 
 use oci_spec::runtime::LinuxRlimit;
 
 use crate::syscall::{
     linux::{LinuxSyscall, MountAttr},
-    Result,
     test::TestHelperSyscall,
+    Result,
 };
 
 /// This specifies various kernel/other functionalities required for

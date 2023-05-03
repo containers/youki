@@ -1,4 +1,4 @@
-use crate::{LibcontainerError, Result};
+use crate::process::{ProcessError, Result};
 use libc::SIGCHLD;
 use nix::unistd::Pid;
 use prctl;
@@ -35,12 +35,10 @@ fn container_clone<F: FnOnce() -> Result<i32>>(
     // code returned by the callback. If there was any error when trying to run
     // callback, exit with -1
     match unsafe {
-        clone_cmd
-            .call()
-            .map_err(|err| LibcontainerError::CloneFailed {
-                errno: nix::errno::from_i32(err.0),
-                child_name: child_name.to_string(),
-            })?
+        clone_cmd.call().map_err(|err| ProcessError::CloneFailed {
+            errno: nix::errno::from_i32(err.0),
+            child_name: child_name.to_string(),
+        })?
     } {
         0 => {
             prctl::set_name(child_name).expect("failed to set name");
@@ -96,7 +94,7 @@ mod test {
 
     #[test]
     fn test_container_err_fork() -> Result<()> {
-        let pid = container_fork("test:child", || Err(LibcontainerError::Unknown))?;
+        let pid = container_fork("test:child", || Err(ProcessError::Unknown))?;
         match waitpid(pid, None).expect("wait pid failed.") {
             WaitStatus::Exited(p, status) => {
                 assert_eq!(pid, p);

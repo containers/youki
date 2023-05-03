@@ -17,7 +17,7 @@ use nix::{
 
 use oci_spec::runtime::LinuxRlimit;
 
-use super::{linux, Syscall, Result};
+use super::{linux, Result, Syscall};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct MountArgs {

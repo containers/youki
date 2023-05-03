@@ -18,12 +18,12 @@ pub enum SyscallError {
         value: bool,
     },
     #[error("set hostname to {hostname} returned {errno}")]
-    SetHostnameFailed{
+    SetHostnameFailed {
         errno: nix::errno::Errno,
         hostname: String,
     },
     #[error("set domainname to {domainname} returned {errno}")]
-    SetDomainnameFailed{
+    SetDomainnameFailed {
         errno: nix::errno::Errno,
         domainname: String,
     },
@@ -32,7 +32,7 @@ pub enum SyscallError {
     #[error("failed to get open fds: {0}")]
     GetOpenFdsFailed(std::io::Error),
     #[error("failed to pivot root")]
-    PivotRootFailed{
+    PivotRootFailed {
         path: String,
         msg: String,
         errno: nix::errno::Errno,
@@ -40,7 +40,7 @@ pub enum SyscallError {
     #[error("failed to setns: {0}")]
     SetNamespaceFailed(nix::errno::Errno),
     #[error("failed to set real gid to {gid}: {errno}")]
-    SetRealGidFailed{
+    SetRealGidFailed {
         errno: nix::errno::Errno,
         gid: nix::unistd::Gid,
     },

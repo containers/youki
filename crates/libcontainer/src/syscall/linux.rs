@@ -282,7 +282,7 @@ impl Syscall for LinuxSyscall {
         )
         .map_err(|errno| SyscallError::PivotRootFailed {
             errno,
-            msg: format!("failed to make root directory rslave"),
+            msg: "failed to make root directory rslave".to_string(),
             path: format!("{:?}", path),
         })?;
 
@@ -292,13 +292,13 @@ impl Syscall for LinuxSyscall {
         // see https://man7.org/linux/man-pages/man2/umount2.2.html for more information
         umount2("/", MntFlags::MNT_DETACH).map_err(|errno| SyscallError::PivotRootFailed {
             errno,
-            msg: format!("failed to unmount old root directory"),
+            msg: "failed to unmount old root directory".to_string(),
             path: format!("{:?}", path),
         })?;
         // Change directory to the new root
         fchdir(newroot).map_err(|errno| SyscallError::PivotRootFailed {
             errno,
-            msg: format!("failed to change directory to new root"),
+            msg: "failed to change directory to new root".to_string(),
             path: format!("{:?}", path),
         })?;
 

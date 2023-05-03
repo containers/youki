@@ -14,21 +14,27 @@ use std::collections;
 
 type Result<T> = std::result::Result<T, NamespaceError>;
 
-#[derive(Debug, thiserror::Error)]
-enum UnshareError {
-    #[error("syscall failed")]
-    SyscallFailed(#[from] SyscallError),
-    #[error("nix syscall failed")]
-    NixSyscallFailed(#[from] nix::Error),
-}
+// #[derive(Debug, thiserror::Error)]
+// enum UnshareError {
+//     #[error("syscall failed")]
+//     SyscallFailed(#[from] SyscallError),
+//     #[error("nix syscall failed")]
+//     NixSyscallFailed(#[from] nix::Error),
+// }
 
 #[derive(Debug, thiserror::Error)]
 pub enum NamespaceError {
     #[error("failed to set namespace")]
-    ApplyNamespace {
-        namespace: LinuxNamespaceType,
-        namespace_type: CloneFlags,
-        err: UnshareError,
+    ApplyNamespaceSyscallFailed {
+        namespace: Box<LinuxNamespace>,
+        #[source]
+        err: SyscallError,
+    },
+    #[error("failed to set namespace")]
+    ApplyNamespaceUnixSyscallFailed {
+        namespace: Box<LinuxNamespace>,
+        #[source]
+        err: nix::Error,
     },
 }
 
@@ -84,29 +90,43 @@ impl Namespaces {
             .filter_map(|c| self.namespace_map.get_key_value(c))
             .collect();
 
-        for (ns_type, ns) in to_enter {
-            self.unshare_or_setns(ns)
-                .map_err(|err| NamespaceError::ApplyNamespace {
-                    namespace: ns.typ(),
-                    namespace_type: *ns_type,
-                    err,
-                })?;
+        for (_, ns) in to_enter {
+            self.unshare_or_setns(ns)?;
         }
         Ok(())
     }
 
-    pub fn unshare_or_setns(
-        &self,
-        namespace: &LinuxNamespace,
-    ) -> std::result::Result<(), UnshareError> {
+    pub fn unshare_or_setns(&self, namespace: &LinuxNamespace) -> Result<()> {
         log::debug!("unshare or setns: {:?}", namespace);
-        if namespace.path().is_none() {
-            self.command.unshare(get_clone_flag(namespace.typ()))?;
-        } else {
-            let ns_path = namespace.path().as_ref().unwrap();
-            let fd = fcntl::open(ns_path, fcntl::OFlag::empty(), stat::Mode::empty())?;
-            self.command.set_ns(fd, get_clone_flag(namespace.typ()))?;
-            unistd::close(fd)?;
+        match namespace.path() {
+            Some(path) => {
+                let fd = fcntl::open(path, fcntl::OFlag::empty(), stat::Mode::empty()).map_err(
+                    |err| NamespaceError::ApplyNamespaceUnixSyscallFailed {
+                        namespace: Box::new(namespace.to_owned()),
+                        err,
+                    },
+                )?;
+                self.command
+                    .set_ns(fd, get_clone_flag(namespace.typ()))
+                    .map_err(|err| NamespaceError::ApplyNamespaceSyscallFailed {
+                        namespace: Box::new(namespace.to_owned()),
+                        err,
+                    })?;
+                unistd::close(fd).map_err(|err| {
+                    NamespaceError::ApplyNamespaceUnixSyscallFailed {
+                        namespace: Box::new(namespace.to_owned()),
+                        err,
+                    }
+                })?;
+            }
+            None => {
+                self.command
+                    .unshare(get_clone_flag(namespace.typ()))
+                    .map_err(|err| NamespaceError::ApplyNamespaceSyscallFailed {
+                        namespace: Box::new(namespace.to_owned()),
+                        err,
+                    })?;
+            }
         }
 
         Ok(())

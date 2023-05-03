@@ -1,6 +1,6 @@
 use super::args::{ContainerArgs, ContainerType};
 use crate::apparmor;
-use crate::syscall::Syscall;
+use crate::syscall::{Syscall, SyscallError};
 use crate::{
     capabilities, hooks, namespaces::Namespaces, process::channel, rootfs::RootFS,
     rootless::Rootless, tty, utils,
@@ -53,13 +53,15 @@ fn readonly_path(path: &Path, syscall: &dyn Syscall) -> Result<()> {
         MsFlags::MS_BIND | MsFlags::MS_REC,
         None,
     ) {
-        if let Some(errno) = err.downcast_ref() {
-            // ignore error if path is not exist.
-            if matches!(errno, nix::errno::Errno::ENOENT) {
-                return Ok(());
+        match err {
+            SyscallError::MountFailed { errno, .. } => {
+                // ignore error if path is not exist.
+                if matches!(errno, nix::errno::Errno::ENOENT) {
+                    return Ok(());
+                }
             }
+            _ => bail!(err),
         }
-        bail!(err)
     }
 
     syscall.mount(
@@ -82,33 +84,39 @@ fn readonly_path(path: &Path, syscall: &dyn Syscall) -> Result<()> {
 // For files, bind mounts /dev/null over the top of the specified path.
 // For directories, mounts read-only tmpfs over the top of the specified path.
 fn masked_path(path: &Path, mount_label: &Option<String>, syscall: &dyn Syscall) -> Result<()> {
-    if let Err(e) = syscall.mount(
+    if let Err(err) = syscall.mount(
         Some(Path::new("/dev/null")),
         path,
         None,
         MsFlags::MS_BIND,
         None,
     ) {
-        if let Some(errno) = e.downcast_ref() {
-            if matches!(errno, nix::errno::Errno::ENOENT) {
-                log::warn!("masked path {:?} not exist", path);
-            } else if matches!(errno, nix::errno::Errno::ENOTDIR) {
-                let label = match mount_label {
-                    Some(l) => format!("context=\"{l}\""),
-                    None => "".to_string(),
-                };
-                syscall.mount(
-                    Some(Path::new("tmpfs")),
-                    path,
-                    Some("tmpfs"),
-                    MsFlags::MS_RDONLY,
-                    Some(label.as_str()),
-                )?;
-            }
-        } else {
-            bail!(e)
+        match err {
+            SyscallError::MountFailed { errno, .. } => match errno {
+                nix::errno::Errno::ENOENT => {
+                    log::warn!("masked path {:?} not exist", path);
+                }
+                nix::errno::Errno::ENOTDIR => {
+                    let label = match mount_label {
+                        Some(l) => format!("context=\"{l}\""),
+                        None => "".to_string(),
+                    };
+                    syscall.mount(
+                        Some(Path::new("tmpfs")),
+                        path,
+                        Some("tmpfs"),
+                        MsFlags::MS_RDONLY,
+                        Some(label.as_str()),
+                    )?;
+                }
+                _ => {
+                    bail!(err)
+                }
+            },
+            _ => bail!(err),
         }
-    };
+    }
+
     Ok(())
 }
 
@@ -731,7 +739,16 @@ mod tests {
             .as_any()
             .downcast_ref::<TestHelperSyscall>()
             .unwrap();
-        mocks.set_ret_err(ArgName::Mount, || bail!(nix::errno::Errno::ENOENT));
+        mocks.set_ret_err(ArgName::Mount, || {
+            Err(SyscallError::MountFailed {
+                mount_source: None,
+                mount_target: PathBuf::new(),
+                fstype: None,
+                flags: MsFlags::empty(),
+                data: None,
+                errno: nix::errno::Errno::ENOENT,
+            })
+        });
 
         assert!(masked_path(Path::new("/proc/self"), &None, syscall.as_ref()).is_ok());
         let got = mocks.get_mount_args();
@@ -745,7 +762,16 @@ mod tests {
             .as_any()
             .downcast_ref::<TestHelperSyscall>()
             .unwrap();
-        mocks.set_ret_err(ArgName::Mount, || bail!(nix::errno::Errno::ENOTDIR));
+        mocks.set_ret_err(ArgName::Mount, || {
+            Err(SyscallError::MountFailed {
+                mount_source: None,
+                mount_target: PathBuf::new(),
+                fstype: None,
+                flags: MsFlags::empty(),
+                data: None,
+                errno: nix::errno::Errno::ENOTDIR,
+            })
+        });
 
         assert!(masked_path(Path::new("/proc/self"), &None, syscall.as_ref()).is_ok());
 
@@ -768,7 +794,16 @@ mod tests {
             .as_any()
             .downcast_ref::<TestHelperSyscall>()
             .unwrap();
-        mocks.set_ret_err(ArgName::Mount, || bail!(nix::errno::Errno::ENOTDIR));
+        mocks.set_ret_err(ArgName::Mount, || {
+            Err(SyscallError::MountFailed {
+                mount_source: None,
+                mount_target: PathBuf::new(),
+                fstype: None,
+                flags: MsFlags::empty(),
+                data: None,
+                errno: nix::errno::Errno::ENOTDIR,
+            })
+        });
 
         assert!(masked_path(
             Path::new("/proc/self"),
@@ -796,7 +831,16 @@ mod tests {
             .as_any()
             .downcast_ref::<TestHelperSyscall>()
             .unwrap();
-        mocks.set_ret_err(ArgName::Mount, || bail!("unknown error"));
+        mocks.set_ret_err(ArgName::Mount, || {
+            Err(SyscallError::MountFailed {
+                mount_source: None,
+                mount_target: PathBuf::new(),
+                fstype: None,
+                flags: MsFlags::empty(),
+                data: None,
+                errno: nix::errno::Errno::UnknownErrno,
+            })
+        });
 
         assert!(masked_path(Path::new("/proc/self"), &None, syscall.as_ref()).is_err());
         let got = mocks.get_mount_args();
