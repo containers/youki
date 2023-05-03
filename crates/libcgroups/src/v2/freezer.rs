@@ -98,11 +98,9 @@ impl Freezer {
         match state {
             "0" => Ok(FreezerState::Thawed),
             "1" => Self::wait_frozen(path),
-            _ => {
-                Err(V2FreezerError::UnknownState {
-                    state: state.into(),
-                })
-            }
+            _ => Err(V2FreezerError::UnknownState {
+                state: state.into(),
+            }),
         }
     }
 
