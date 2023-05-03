@@ -24,8 +24,8 @@ use super::{
 };
 
 use crate::common::{
-    self, AnyManager, CgroupManager, ControllerOpt, FreezerState, JoinSafelyError, PathBufExt,
-    WrapIoResult, WrappedIoError, CGROUP_PROCS,
+    self, AnyCgroupManager, CgroupManager, ControllerOpt, FreezerState, JoinSafelyError,
+    PathBufExt, WrapIoResult, WrappedIoError, CGROUP_PROCS,
 };
 use crate::stats::{PidStatsError, Stats, StatsProvider};
 use crate::v1::ControllerType;
@@ -154,8 +154,8 @@ impl Manager {
         Ok(required_controllers)
     }
 
-    pub fn any(self) -> AnyManager {
-        AnyManager::V1(self)
+    pub fn any(self) -> AnyCgroupManager {
+        AnyCgroupManager::V1(self)
     }
 }
 

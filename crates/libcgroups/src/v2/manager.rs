@@ -26,8 +26,8 @@ use super::{
 };
 use crate::{
     common::{
-        self, AnyManager, CgroupManager, ControllerOpt, FreezerState, JoinSafelyError, PathBufExt,
-        WrapIoResult, WrappedIoError, CGROUP_PROCS,
+        self, AnyCgroupManager, CgroupManager, ControllerOpt, FreezerState, JoinSafelyError,
+        PathBufExt, WrapIoResult, WrappedIoError, CGROUP_PROCS,
     },
     stats::{PidStatsError, Stats, StatsProvider},
 };
@@ -137,8 +137,8 @@ impl Manager {
         Ok(())
     }
 
-    pub fn any(self) -> AnyManager {
-        AnyManager::V2(self)
+    pub fn any(self) -> AnyCgroupManager {
+        AnyCgroupManager::V2(self)
     }
 }
 

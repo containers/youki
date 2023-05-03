@@ -21,8 +21,8 @@ use super::{
 };
 use crate::{
     common::{
-        self, AnyManager, CgroupManager, ControllerOpt, FreezerState, JoinSafelyError, PathBufExt,
-        WrapIoResult, WrappedIoError,
+        self, AnyCgroupManager, CgroupManager, ControllerOpt, FreezerState, JoinSafelyError,
+        PathBufExt, WrapIoResult, WrappedIoError,
     },
     systemd::unified::Unified,
     v2::manager::V2ManagerError,
@@ -343,8 +343,8 @@ impl Manager {
         Ok(())
     }
 
-    pub fn any(self) -> AnyManager {
-        AnyManager::Systemd(self)
+    pub fn any(self) -> AnyCgroupManager {
+        AnyCgroupManager::Systemd(self)
     }
 }
 

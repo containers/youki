@@ -60,60 +60,60 @@ pub enum AnyManagerError {
     V2(#[from] v2::manager::V2ManagerError),
 }
 
-pub enum AnyManager {
+pub enum AnyCgroupManager {
     Systemd(systemd::manager::Manager),
     V1(v1::manager::Manager),
     V2(v2::manager::Manager),
 }
 
-impl CgroupManager for AnyManager {
+impl CgroupManager for AnyCgroupManager {
     type Error = AnyManagerError;
 
     fn add_task(&self, pid: Pid) -> Result<(), Self::Error> {
         match self {
-            AnyManager::Systemd(m) => Ok(m.add_task(pid)?),
-            AnyManager::V1(m) => Ok(m.add_task(pid)?),
-            AnyManager::V2(m) => Ok(m.add_task(pid)?),
+            AnyCgroupManager::Systemd(m) => Ok(m.add_task(pid)?),
+            AnyCgroupManager::V1(m) => Ok(m.add_task(pid)?),
+            AnyCgroupManager::V2(m) => Ok(m.add_task(pid)?),
         }
     }
 
     fn apply(&self, controller_opt: &ControllerOpt) -> Result<(), Self::Error> {
         match self {
-            AnyManager::Systemd(m) => Ok(m.apply(controller_opt)?),
-            AnyManager::V1(m) => Ok(m.apply(controller_opt)?),
-            AnyManager::V2(m) => Ok(m.apply(controller_opt)?),
+            AnyCgroupManager::Systemd(m) => Ok(m.apply(controller_opt)?),
+            AnyCgroupManager::V1(m) => Ok(m.apply(controller_opt)?),
+            AnyCgroupManager::V2(m) => Ok(m.apply(controller_opt)?),
         }
     }
 
     fn remove(&self) -> Result<(), Self::Error> {
         match self {
-            AnyManager::Systemd(m) => Ok(m.remove()?),
-            AnyManager::V1(m) => Ok(m.remove()?),
-            AnyManager::V2(m) => Ok(m.remove()?),
+            AnyCgroupManager::Systemd(m) => Ok(m.remove()?),
+            AnyCgroupManager::V1(m) => Ok(m.remove()?),
+            AnyCgroupManager::V2(m) => Ok(m.remove()?),
         }
     }
 
     fn freeze(&self, state: FreezerState) -> Result<(), Self::Error> {
         match self {
-            AnyManager::Systemd(m) => Ok(m.freeze(state)?),
-            AnyManager::V1(m) => Ok(m.freeze(state)?),
-            AnyManager::V2(m) => Ok(m.freeze(state)?),
+            AnyCgroupManager::Systemd(m) => Ok(m.freeze(state)?),
+            AnyCgroupManager::V1(m) => Ok(m.freeze(state)?),
+            AnyCgroupManager::V2(m) => Ok(m.freeze(state)?),
         }
     }
 
     fn stats(&self) -> Result<Stats, Self::Error> {
         match self {
-            AnyManager::Systemd(m) => Ok(m.stats()?),
-            AnyManager::V1(m) => Ok(m.stats()?),
-            AnyManager::V2(m) => Ok(m.stats()?),
+            AnyCgroupManager::Systemd(m) => Ok(m.stats()?),
+            AnyCgroupManager::V1(m) => Ok(m.stats()?),
+            AnyCgroupManager::V2(m) => Ok(m.stats()?),
         }
     }
 
     fn get_all_pids(&self) -> Result<Vec<Pid>, Self::Error> {
         match self {
-            AnyManager::Systemd(m) => Ok(m.get_all_pids()?),
-            AnyManager::V1(m) => Ok(m.get_all_pids()?),
-            AnyManager::V2(m) => Ok(m.get_all_pids()?),
+            AnyCgroupManager::Systemd(m) => Ok(m.get_all_pids()?),
+            AnyCgroupManager::V1(m) => Ok(m.get_all_pids()?),
+            AnyCgroupManager::V2(m) => Ok(m.get_all_pids()?),
         }
     }
 }
@@ -323,7 +323,7 @@ pub fn create_cgroup_manager<P: Into<PathBuf>>(
     cgroup_path: P,
     systemd_cgroup: bool,
     container_name: &str,
-) -> Result<AnyManager, CreateCgroupSetupError> {
+) -> Result<AnyCgroupManager, CreateCgroupSetupError> {
     let cgroup_setup = get_cgroup_setup().map_err(|err| match err {
         GetCgroupSetupError::WrappedIo(err) => CreateCgroupSetupError::WrappedIo(err),
         GetCgroupSetupError::NonDefault => CreateCgroupSetupError::NonDefault,
@@ -363,10 +363,7 @@ fn create_v2_cgroup_manager(
     cgroup_path: PathBuf,
 ) -> Result<v2::manager::Manager, v2::manager::V2ManagerError> {
     log::info!("cgroup manager V2 will be used");
-    v2::manager::Manager::new(
-        DEFAULT_CGROUP_ROOT.into(),
-        cgroup_path,
-    )
+    v2::manager::Manager::new(DEFAULT_CGROUP_ROOT.into(), cgroup_path)
 }
 
 #[cfg(not(feature = "v2"))]
