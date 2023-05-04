@@ -15,3 +15,4 @@ pub mod syscall;
 pub mod tty;
 pub mod utils;
 pub mod workload;
+mod error;
