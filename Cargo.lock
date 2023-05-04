@@ -1972,6 +1972,7 @@ dependencies = [
  "serde_json",
  "serial_test",
  "syscalls",
+ "thiserror",
 ]
 
 [[package]]

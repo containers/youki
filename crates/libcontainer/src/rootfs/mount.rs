@@ -2,7 +2,7 @@
 use super::symlink::Symlink;
 use super::utils::{find_parent_mount, parse_mount, MountOptionConfig};
 use crate::{
-    syscall::{linux, syscall::create_syscall, Syscall},
+    syscall::{linux, syscall::create_syscall, Syscall, SyscallError},
     utils,
     utils::PathBufExt,
 };
@@ -419,7 +419,7 @@ impl Mount {
             self.syscall
                 .mount(Some(&*src), dest, typ, mount_option_config.flags, Some(&*d))
         {
-            if let Some(errno) = err.downcast_ref() {
+            if let SyscallError::MountFailed { errno, .. } = err {
                 if !matches!(errno, Errno::EINVAL) {
                     bail!("mount of {:?} failed. {}", m.destination(), errno);
                 }

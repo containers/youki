@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::process::{ProcessError, Result};
 use libc::SIGCHLD;
 use nix::unistd::Pid;
 use prctl;
@@ -18,7 +18,7 @@ pub fn container_clone_sibling<F: FnOnce() -> Result<i32>>(child_name: &str, cb:
     // the exit signal bits in the glibc wrapper.
     clone.flag_parent();
 
-    container_clone(child_name, cb, clone).with_context(|| "failed to clone sibling process")
+    container_clone(child_name, cb, clone)
 }
 
 // A simple clone wrapper to clone3 so we can share this logic in different
@@ -34,7 +34,12 @@ fn container_clone<F: FnOnce() -> Result<i32>>(
     // cloned process, run the callback function, and exit with the same exit
     // code returned by the callback. If there was any error when trying to run
     // callback, exit with -1
-    match unsafe { clone_cmd.call().with_context(|| "failed to run clone3")? } {
+    match unsafe {
+        clone_cmd.call().map_err(|err| ProcessError::CloneFailed {
+            errno: nix::errno::from_i32(err.0),
+            child_name: child_name.to_string(),
+        })?
+    } {
         0 => {
             prctl::set_name(child_name).expect("failed to set name");
             // Inside the cloned process
@@ -62,7 +67,7 @@ pub fn container_fork<F: FnOnce() -> Result<i32>>(child_name: &str, cb: F) -> Re
     let mut clone = clone3::Clone3::default();
     clone.exit_signal(SIGCHLD as u64);
 
-    container_clone(child_name, cb, clone).with_context(|| "failed to fork process")
+    container_clone(child_name, cb, clone)
 }
 
 #[cfg(test)]
@@ -70,7 +75,7 @@ mod test {
     use crate::process::channel::channel;
 
     use super::*;
-    use anyhow::{bail, Result};
+    use anyhow::{bail, Context, Result};
     use nix::sys::wait::{waitpid, WaitStatus};
     use nix::unistd;
 
@@ -89,7 +94,7 @@ mod test {
 
     #[test]
     fn test_container_err_fork() -> Result<()> {
-        let pid = container_fork("test:child", || bail!(""))?;
+        let pid = container_fork("test:child", || Err(ProcessError::Unknown))?;
         match waitpid(pid, None).expect("wait pid failed.") {
             WaitStatus::Exited(p, status) => {
                 assert_eq!(pid, p);

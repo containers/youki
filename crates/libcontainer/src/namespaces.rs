@@ -7,11 +7,28 @@
 //! UTS (hostname and domain information, processes will think they're running on servers with different names),
 //! Cgroup (Resource limits, execution priority etc.)
 
-use crate::syscall::{syscall::create_syscall, Syscall};
-use anyhow::{Context, Result};
+use crate::syscall::{syscall::create_syscall, Syscall, SyscallError};
 use nix::{fcntl, sched::CloneFlags, sys::stat, unistd};
 use oci_spec::runtime::{LinuxNamespace, LinuxNamespaceType};
 use std::collections;
+
+type Result<T> = std::result::Result<T, NamespaceError>;
+
+#[derive(Debug, thiserror::Error)]
+pub enum NamespaceError {
+    #[error("failed to set namespace")]
+    ApplyNamespaceSyscallFailed {
+        namespace: Box<LinuxNamespace>,
+        #[source]
+        err: SyscallError,
+    },
+    #[error("failed to set namespace")]
+    ApplyNamespaceUnixSyscallFailed {
+        namespace: Box<LinuxNamespace>,
+        #[source]
+        err: nix::Error,
+    },
+}
 
 static ORDERED_NAMESPACES: &[CloneFlags] = &[
     CloneFlags::CLONE_NEWUSER,
@@ -65,25 +82,43 @@ impl Namespaces {
             .filter_map(|c| self.namespace_map.get_key_value(c))
             .collect();
 
-        for (ns_type, ns) in to_enter {
-            self.unshare_or_setns(ns)
-                .with_context(|| format!("failed to enter {ns_type:?} namespace: {ns:?}"))?;
+        for (_, ns) in to_enter {
+            self.unshare_or_setns(ns)?;
         }
         Ok(())
     }
 
     pub fn unshare_or_setns(&self, namespace: &LinuxNamespace) -> Result<()> {
         log::debug!("unshare or setns: {:?}", namespace);
-        if namespace.path().is_none() {
-            self.command.unshare(get_clone_flag(namespace.typ()))?;
-        } else {
-            let ns_path = namespace.path().as_ref().unwrap();
-            let fd = fcntl::open(ns_path, fcntl::OFlag::empty(), stat::Mode::empty())
-                .with_context(|| format!("failed to open namespace fd: {ns_path:?}"))?;
-            self.command
-                .set_ns(fd, get_clone_flag(namespace.typ()))
-                .with_context(|| "failed to set namespace")?;
-            unistd::close(fd).with_context(|| "failed to close namespace fd")?;
+        match namespace.path() {
+            Some(path) => {
+                let fd = fcntl::open(path, fcntl::OFlag::empty(), stat::Mode::empty()).map_err(
+                    |err| NamespaceError::ApplyNamespaceUnixSyscallFailed {
+                        namespace: Box::new(namespace.to_owned()),
+                        err,
+                    },
+                )?;
+                self.command
+                    .set_ns(fd, get_clone_flag(namespace.typ()))
+                    .map_err(|err| NamespaceError::ApplyNamespaceSyscallFailed {
+                        namespace: Box::new(namespace.to_owned()),
+                        err,
+                    })?;
+                unistd::close(fd).map_err(|err| {
+                    NamespaceError::ApplyNamespaceUnixSyscallFailed {
+                        namespace: Box::new(namespace.to_owned()),
+                        err,
+                    }
+                })?;
+            }
+            None => {
+                self.command
+                    .unshare(get_clone_flag(namespace.typ()))
+                    .map_err(|err| NamespaceError::ApplyNamespaceSyscallFailed {
+                        namespace: Box::new(namespace.to_owned()),
+                        err,
+                    })?;
+            }
         }
 
         Ok(())
