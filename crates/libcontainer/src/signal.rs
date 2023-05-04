@@ -14,7 +14,7 @@ pub enum SignalError<T> {
 }
 
 impl TryFrom<&str> for Signal {
-    type Error = SignalError::<String>;
+    type Error = SignalError<String>;
 
     fn try_from(s: &str) -> Result<Self, Self::Error> {
         use NixSignal::*;
@@ -58,7 +58,7 @@ impl TryFrom<&str> for Signal {
 }
 
 impl TryFrom<i32> for Signal {
-    type Error = SignalError::<i32>;
+    type Error = SignalError<i32>;
 
     fn try_from(value: i32) -> Result<Self, Self::Error> {
         NixSignal::try_from(value)
