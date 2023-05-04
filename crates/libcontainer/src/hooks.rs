@@ -13,20 +13,20 @@ use crate::{container::Container, utils};
 
 #[derive(Debug, thiserror::Error)]
 pub enum HookError {
-    #[error("failed to execute hook command: {0}")]
-    HookCommandError(std::io::Error),
-    #[error("failed to encode container state: {0}")]
-    EncodeContainerStateError(serde_json::Error),
+    #[error("failed to execute hook command")]
+    CommandExecute(#[source] std::io::Error),
+    #[error("failed to encode container state")]
+    EncodeContainerState(#[source] serde_json::Error),
     #[error("hook command exited with non-zero exit code: {0}")]
-    HookCommandExitError(i32),
+    NonZeroExitCode(i32),
     #[error("hook command was killed by a signal")]
-    HookCommandKilled,
+    Killed,
     #[error("failed to execute hook command due to a timeout")]
-    HookTimeoutError,
+    Timeout,
     #[error("container state is required to run hook")]
     MissingContainerState,
-    #[error("failed to write container state to stdin: {0}")]
-    WriteContainerStateError(std::io::Error),
+    #[error("failed to write container state to stdin")]
+    WriteContainerState(#[source] std::io::Error),
 }
 
 type Result<T> = std::result::Result<T, HookError>;
@@ -62,7 +62,7 @@ pub fn run_hooks(hooks: Option<&Vec<Hook>>, container: Option<&Container>) -> Re
                 .envs(envs)
                 .stdin(process::Stdio::piped())
                 .spawn()
-                .map_err(HookError::HookCommandError)?;
+                .map_err(HookError::CommandExecute)?;
             let hook_process_pid = Pid::from_raw(hook_process.id() as i32);
             // Based on the OCI spec, we need to pipe the container state into
             // the hook command through stdin.
@@ -76,13 +76,13 @@ pub fn run_hooks(hooks: Option<&Vec<Hook>>, container: Option<&Container>) -> Re
                 // error, in the case that the hook command is waiting for us to
                 // write to stdin.
                 let encoded_state =
-                    serde_json::to_string(state).map_err(HookError::EncodeContainerStateError)?;
+                    serde_json::to_string(state).map_err(HookError::EncodeContainerState)?;
                 if let Err(e) = stdin.write_all(encoded_state.as_bytes()) {
                     if e.kind() != ErrorKind::BrokenPipe {
                         // Not a broken pipe. The hook command may be waiting
                         // for us.
                         let _ = signal::kill(hook_process_pid, signal::Signal::SIGKILL);
-                        return Err(HookError::WriteContainerStateError(e));
+                        return Err(HookError::WriteContainerState(e));
                     }
                 }
             }
@@ -109,7 +109,7 @@ pub fn run_hooks(hooks: Option<&Vec<Hook>>, container: Option<&Container>) -> Re
                         // Kill the process. There is no need to further clean
                         // up because we will be error out.
                         let _ = signal::kill(hook_process_pid, signal::Signal::SIGKILL);
-                        return Err(HookError::HookTimeoutError);
+                        return Err(HookError::Timeout);
                     }
                     Err(_) => {
                         unreachable!();
@@ -122,10 +122,10 @@ pub fn run_hooks(hooks: Option<&Vec<Hook>>, container: Option<&Container>) -> Re
             match res {
                 Ok(exit_status) => match exit_status.code() {
                     Some(0) => Ok(()),
-                    Some(exit_code) => Err(HookError::HookCommandExitError(exit_code)),
-                    None => Err(HookError::HookCommandKilled),
+                    Some(exit_code) => Err(HookError::NonZeroExitCode(exit_code)),
+                    None => Err(HookError::Killed),
                 },
-                Err(e) => Err(HookError::HookCommandError(e)),
+                Err(e) => Err(HookError::CommandExecute(e)),
             }?;
         }
     }
@@ -221,7 +221,7 @@ mod test {
             Ok(_) => {
                 bail!("The test expects the hook to error out with timeout. Should not execute cleanly");
             }
-            Err(HookError::HookTimeoutError) => {}
+            Err(HookError::Timeout) => {}
             Err(err) => {
                 bail!(
                     "The test expects the hook to error out with timeout. Got error: {}",

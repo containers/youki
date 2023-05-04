@@ -1,23 +1,12 @@
-
-/// SyscallWrapperError aims to simplify error handling of syscalls in
-/// libcontainer. In many occasions, we mix nix::Error and std::io::Error, which
-/// makes error handling complicated.
+/// UnifiedSyscallError aims to simplify error handling of syscalls in
+/// libcontainer. In many occasions, we mix nix::Error, std::io::Error and our
+/// own syscall wrappers, which makes error handling complicated.
 #[derive(Debug, thiserror::Error)]
-pub enum SyscallWrapperError {
+pub enum UnifiedSyscallError {
     #[error(transparent)]
-    Io(std::io::Error),
+    Io(#[from] std::io::Error),
     #[error(transparent)]
-    Nix(nix::Error),
-}
-
-impl From<std::io::Error> for SyscallWrapperError {
-    fn from(err: std::io::Error) -> Self {
-        SyscallWrapperError::Io(err)
-    }
-}
-
-impl From<nix::Error> for SyscallWrapperError {
-    fn from(err: nix::Error) -> Self {
-        SyscallWrapperError::Nix(err)
-    }
+    Nix(#[from] nix::Error),
+    #[error(transparent)]
+    Syscall(#[from] crate::syscall::SyscallError),
 }

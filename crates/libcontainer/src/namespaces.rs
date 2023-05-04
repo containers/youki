@@ -7,7 +7,8 @@
 //! UTS (hostname and domain information, processes will think they're running on servers with different names),
 //! Cgroup (Resource limits, execution priority etc.)
 
-use crate::syscall::{syscall::create_syscall, Syscall, SyscallError};
+use crate::error::UnifiedSyscallError;
+use crate::syscall::{syscall::create_syscall, Syscall};
 use nix::{fcntl, sched::CloneFlags, sys::stat, unistd};
 use oci_spec::runtime::{LinuxNamespace, LinuxNamespaceType};
 use std::collections;
@@ -20,13 +21,7 @@ pub enum NamespaceError {
     ApplyNamespaceSyscallFailed {
         namespace: Box<LinuxNamespace>,
         #[source]
-        err: SyscallError,
-    },
-    #[error("failed to set namespace")]
-    ApplyNamespaceUnixSyscallFailed {
-        namespace: Box<LinuxNamespace>,
-        #[source]
-        err: nix::Error,
+        err: UnifiedSyscallError,
     },
 }
 
@@ -93,22 +88,20 @@ impl Namespaces {
         match namespace.path() {
             Some(path) => {
                 let fd = fcntl::open(path, fcntl::OFlag::empty(), stat::Mode::empty()).map_err(
-                    |err| NamespaceError::ApplyNamespaceUnixSyscallFailed {
+                    |err| NamespaceError::ApplyNamespaceSyscallFailed {
                         namespace: Box::new(namespace.to_owned()),
-                        err,
+                        err: err.into(),
                     },
                 )?;
                 self.command
                     .set_ns(fd, get_clone_flag(namespace.typ()))
                     .map_err(|err| NamespaceError::ApplyNamespaceSyscallFailed {
                         namespace: Box::new(namespace.to_owned()),
-                        err,
+                        err: err.into(),
                     })?;
-                unistd::close(fd).map_err(|err| {
-                    NamespaceError::ApplyNamespaceUnixSyscallFailed {
-                        namespace: Box::new(namespace.to_owned()),
-                        err,
-                    }
+                unistd::close(fd).map_err(|err| NamespaceError::ApplyNamespaceSyscallFailed {
+                    namespace: Box::new(namespace.to_owned()),
+                    err: err.into(),
                 })?;
             }
             None => {
@@ -116,7 +109,7 @@ impl Namespaces {
                     .unshare(get_clone_flag(namespace.typ()))
                     .map_err(|err| NamespaceError::ApplyNamespaceSyscallFailed {
                         namespace: Box::new(namespace.to_owned()),
-                        err,
+                        err: err.into(),
                     })?;
             }
         }

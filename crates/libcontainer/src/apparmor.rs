@@ -6,14 +6,15 @@ use std::{
 
 #[derive(Debug, thiserror::Error)]
 pub enum AppArmorError {
-    #[error("failed to apply AppArmor profile: {msg}")]
-    ApplyProfileFailed {
+    #[error("failed to apply AppArmor profile")]
+    ApplyProfile {
         path: std::path::PathBuf,
         profile: String,
-        msg: String,
+        // TODO: fix this after `utils` crate is migrated to `thiserror`
+        source: anyhow::Error,
     },
     #[error("failed to read AppArmor profile: {source} {path}")]
-    ReadProfileFailed {
+    ReadProfile {
         path: String,
         source: std::io::Error,
     },
@@ -25,12 +26,11 @@ const ENABLED_PARAMETER_PATH: &str = "/sys/module/apparmor/parameters/enabled";
 
 /// Checks if AppArmor has been enabled on the system.
 pub fn is_enabled() -> Result<bool> {
-    let aa_enabled = fs::read_to_string(ENABLED_PARAMETER_PATH).map_err(|e| {
-        AppArmorError::ReadProfileFailed {
+    let aa_enabled =
+        fs::read_to_string(ENABLED_PARAMETER_PATH).map_err(|e| AppArmorError::ReadProfile {
             path: ENABLED_PARAMETER_PATH.to_string(),
             source: e,
-        }
-    })?;
+        })?;
     Ok(aa_enabled.starts_with('Y'))
 }
 
@@ -51,16 +51,14 @@ pub fn apply_profile(profile: &str) -> Result<()> {
 }
 
 fn activate_profile(path: &Path, profile: &str) -> Result<()> {
-    utils::ensure_procfs(path).map_err(|err| AppArmorError::ApplyProfileFailed {
+    utils::ensure_procfs(path).map_err(|err| AppArmorError::ApplyProfile {
         path: path.to_owned(),
         profile: profile.to_owned(),
-        msg: err.to_string(),
+        source: err,
     })?;
-    utils::write_file(path, format!("exec {profile}")).map_err(|err| {
-        AppArmorError::ApplyProfileFailed {
-            path: path.to_owned(),
-            profile: profile.to_owned(),
-            msg: err.to_string(),
-        }
+    utils::write_file(path, format!("exec {profile}")).map_err(|err| AppArmorError::ApplyProfile {
+        path: path.to_owned(),
+        profile: profile.to_owned(),
+        source: err,
     })
 }
