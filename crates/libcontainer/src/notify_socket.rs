@@ -1,4 +1,3 @@
-use anyhow::{bail, Context, Result};
 use nix::unistd::{self, close};
 use std::env;
 use std::io::prelude::*;
@@ -8,29 +7,68 @@ use std::path::{Path, PathBuf};
 
 pub const NOTIFY_FILE: &str = "notify.sock";
 
+#[derive(Debug, thiserror::Error)]
+pub enum NotifyListenerError {
+    #[error("failed to chdir when create notify socket")]
+    ChdirFailed { source: nix::Error, path: PathBuf },
+    #[error("invalid path: {0}")]
+    InvalidPath(PathBuf),
+    #[error("failed to bind notify socket: {name}")]
+    BindFailed {
+        source: std::io::Error,
+        name: String,
+    },
+    #[error("failed to connect to notify socket: {name}")]
+    ConnectFailed {
+        source: std::io::Error,
+        name: String,
+    },
+    #[error("failed to get cwd")]
+    GetCwdFailed(#[source] std::io::Error),
+    #[error("failed to accept notify listener: {0}")]
+    AcceptFailed(#[source] std::io::Error),
+    #[error("failed to close notify listener: {0}")]
+    CloseFailed(#[source] nix::errno::Errno),
+    #[error("failed to read notify listener: {0}")]
+    ReadFailed(#[source] std::io::Error),
+    #[error("failed to send start container")]
+    SendStartContainerFailed(#[source] std::io::Error),
+}
+
+type Result<T> = std::result::Result<T, NotifyListenerError>;
+
 pub struct NotifyListener {
     socket: UnixListener,
 }
 
 impl NotifyListener {
     pub fn new(socket_path: &Path) -> Result<Self> {
-        // unix domain socket has a maximum length of 108, different from
-        // normal path length of 255. due to how docker create the path name
+        // Unix domain socket has a maximum length of 108, different from
+        // normal path length of 255. Due to how docker create the path name
         // to the container working directory, there is a high chance that
-        // the full absolute path is over the limit. to work around this
+        // the full absolute path is over the limit. To work around this
         // limitation, we chdir first into the workdir where the socket is,
         // and chdir back after the socket is created.
-        let workdir = socket_path.parent().unwrap();
-        let socket_name = socket_path.file_name().unwrap();
-        let cwd = unistd::getcwd().context("failed to get cwd")?;
-        unistd::chdir(workdir).context(format!(
-            "failed to chdir into {}",
-            workdir.to_str().unwrap()
-        ))?;
-        let stream = UnixListener::bind(socket_name)
-            .context(format!("failed to bind {}", socket_name.to_str().unwrap()))?;
-        unistd::chdir(&cwd)
-            .context(format!("failed to chdir back to {}", cwd.to_str().unwrap()))?;
+        let workdir = socket_path
+            .parent()
+            .ok_or_else(|| NotifyListenerError::InvalidPath(socket_path.to_owned()))?;
+        let socket_name = socket_path
+            .file_name()
+            .ok_or_else(|| NotifyListenerError::InvalidPath(socket_path.to_owned()))?;
+        let cwd = env::current_dir().map_err(NotifyListenerError::GetCwdFailed)?;
+        unistd::chdir(workdir).map_err(|e| NotifyListenerError::ChdirFailed {
+            source: e,
+            path: workdir.to_owned(),
+        })?;
+        let stream =
+            UnixListener::bind(socket_name).map_err(|e| NotifyListenerError::BindFailed {
+                source: e,
+                name: socket_name.to_str().unwrap().to_owned(),
+            })?;
+        unistd::chdir(&cwd).map_err(|e| NotifyListenerError::ChdirFailed {
+            source: e,
+            path: cwd,
+        })?;
 
         Ok(Self { socket: stream })
     }
@@ -39,17 +77,19 @@ impl NotifyListener {
         match self.socket.accept() {
             Ok((mut socket, _)) => {
                 let mut response = String::new();
-                socket.read_to_string(&mut response)?;
+                socket
+                    .read_to_string(&mut response)
+                    .map_err(NotifyListenerError::ReadFailed)?;
                 log::debug!("received: {}", response);
             }
-            Err(e) => bail!("accept function failed: {:?}", e),
+            Err(e) => Err(NotifyListenerError::AcceptFailed(e))?,
         }
 
         Ok(())
     }
 
     pub fn close(&self) -> Result<()> {
-        close(self.socket.as_raw_fd())?;
+        close(self.socket.as_raw_fd()).map_err(NotifyListenerError::CloseFailed)?;
         Ok(())
     }
 }
@@ -67,12 +107,32 @@ impl NotifySocket {
 
     pub fn notify_container_start(&mut self) -> Result<()> {
         log::debug!("notify container start");
-        let cwd = env::current_dir()?;
-        unistd::chdir(self.path.parent().unwrap())?;
-        let mut stream = UnixStream::connect(self.path.file_name().unwrap())?;
-        stream.write_all(b"start container")?;
+        let cwd = env::current_dir().map_err(NotifyListenerError::GetCwdFailed)?;
+        let workdir = self
+            .path
+            .parent()
+            .ok_or_else(|| NotifyListenerError::InvalidPath(self.path.to_owned()))?;
+        unistd::chdir(workdir).map_err(|e| NotifyListenerError::ChdirFailed {
+            source: e,
+            path: workdir.to_owned(),
+        })?;
+        let socket_name = self
+            .path
+            .file_name()
+            .ok_or_else(|| NotifyListenerError::InvalidPath(self.path.to_owned()))?;
+        let mut stream =
+            UnixStream::connect(socket_name).map_err(|e| NotifyListenerError::ConnectFailed {
+                source: e,
+                name: socket_name.to_str().unwrap().to_owned(),
+            })?;
+        stream
+            .write_all(b"start container")
+            .map_err(NotifyListenerError::SendStartContainerFailed)?;
         log::debug!("notify finished");
-        unistd::chdir(&cwd)?;
+        unistd::chdir(&cwd).map_err(|e| NotifyListenerError::ChdirFailed {
+            source: e,
+            path: cwd,
+        })?;
         Ok(())
     }
 }
