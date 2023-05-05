@@ -42,29 +42,36 @@ impl ContainerCreate {
                 let _ = delete::delete(&self.project_path, &self.container_id);
                 TestResult::Passed
             }
-            Err(_) => TestResult::Failed(anyhow::anyhow!(
-                "Container should have been created with valid id, but was not created."
-            )),
+            Err(err) => {
+                TestResult::Failed(err.context(
+                    "container should have been created with valid id, but was not created.",
+                ))
+            }
         }
     }
 
     // runtime should not create container with is that already exists
     fn create_duplicate_id(&self) -> TestResult {
         let id = generate_uuid().to_string();
-        let _ = create::create(&self.project_path, &id);
-        match create::create(&self.project_path, &id) {
-            Ok(()) => {
-                let _ = kill::kill(&self.project_path, &id);
-                let _ = delete::delete(&self.project_path, &id);
-                TestResult::Failed(anyhow::anyhow!(
-                    "Container should not have been created with same id, but was created."
-                ))
-            }
-            Err(_) => {
-                let _ = kill::kill(&self.project_path, &id);
-                let _ = delete::delete(&self.project_path, &id);
-                TestResult::Passed
-            }
+        // First create which should be successful
+        if let Err(err) = create::create(&self.project_path, &id) {
+            return TestResult::Failed(
+                err.context(
+                    "Container should have been created with valid id, but was not created",
+                ),
+            );
+        }
+        // Second create which should fail
+        let ret = create::create(&self.project_path, &id);
+        // Clean up the container from the first create. No error handling since
+        // there is nothing we can do.
+        let _ = kill::kill(&self.project_path, &id);
+        let _ = delete::delete(&self.project_path, &id);
+        match ret {
+            Ok(()) => TestResult::Failed(anyhow::anyhow!(
+                "Container should not have been created with same id, but was created."
+            )),
+            Err(_) => TestResult::Passed,
         }
     }
 }
