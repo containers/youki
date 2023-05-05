@@ -28,7 +28,7 @@ impl ContainerCreate {
     fn create_empty_id(&self) -> TestResult {
         match create::create(&self.project_path, "") {
             Ok(()) => TestResult::Failed(anyhow::anyhow!(
-                "Container should not have been created with empty id, but was created."
+                "container should not have been created with empty id, but was created."
             )),
             Err(_) => TestResult::Passed,
         }
@@ -57,7 +57,7 @@ impl ContainerCreate {
         if let Err(err) = create::create(&self.project_path, &id) {
             return TestResult::Failed(
                 err.context(
-                    "Container should have been created with valid id, but was not created",
+                    "container should have been created with valid id, but was not created",
                 ),
             );
         }
@@ -69,7 +69,7 @@ impl ContainerCreate {
         let _ = delete::delete(&self.project_path, &id);
         match ret {
             Ok(()) => TestResult::Failed(anyhow::anyhow!(
-                "Container should not have been created with same id, but was created."
+                "container should not have been created with same id, but was created."
             )),
             Err(_) => TestResult::Passed,
         }
