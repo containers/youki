@@ -1,7 +1,5 @@
 //! Utility functionality
 
-use anyhow::Context;
-use anyhow::{bail, Result};
 use nix::sys::stat::Mode;
 use nix::sys::statfs;
 use nix::unistd;
@@ -15,24 +13,45 @@ use std::os::unix::fs::DirBuilderExt;
 use std::os::unix::prelude::{AsRawFd, OsStrExt};
 use std::path::{Component, Path, PathBuf};
 
+#[derive(Debug, thiserror::Error)]
+pub enum PathBufExtError {
+    #[error("relative path cannot be converted to the path in the container")]
+    RelativePath,
+    #[error("failed to strip prefix from {path:?}")]
+    StripPrefix {
+        path: PathBuf,
+        source: std::path::StripPrefixError,
+    },
+    #[error("failed to canonicalize path {path:?}")]
+    Canonicalize {
+        path: PathBuf,
+        source: std::io::Error,
+    },
+    #[error("failed to get current directory")]
+    CurrentDir { source: std::io::Error },
+}
+
 pub trait PathBufExt {
-    fn as_relative(&self) -> Result<&Path>;
-    fn join_safely<P: AsRef<Path>>(&self, p: P) -> Result<PathBuf>;
-    fn canonicalize_safely(&self) -> Result<PathBuf>;
+    fn as_relative(&self) -> Result<&Path, PathBufExtError>;
+    fn join_safely<P: AsRef<Path>>(&self, p: P) -> Result<PathBuf, PathBufExtError>;
+    fn canonicalize_safely(&self) -> Result<PathBuf, PathBufExtError>;
     fn normalize(&self) -> PathBuf;
 }
 
 impl PathBufExt for Path {
-    fn as_relative(&self) -> Result<&Path> {
-        if self.is_relative() {
-            bail!("relative path cannot be converted to the path in the container.")
-        } else {
-            self.strip_prefix("/")
-                .with_context(|| format!("failed to strip prefix from {self:?}"))
+    fn as_relative(&self) -> Result<&Path, PathBufExtError> {
+        match self.is_relative() {
+            true => Err(PathBufExtError::RelativePath),
+            false => Ok(self
+                .strip_prefix("/")
+                .map_err(|e| PathBufExtError::StripPrefix {
+                    path: self.to_path_buf(),
+                    source: e,
+                })?),
         }
     }
 
-    fn join_safely<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf> {
+    fn join_safely<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf, PathBufExtError> {
         let path = path.as_ref();
         if path.is_relative() {
             return Ok(self.join(path));
@@ -40,19 +59,25 @@ impl PathBufExt for Path {
 
         let stripped = path
             .strip_prefix("/")
-            .with_context(|| format!("failed to strip prefix from {}", path.display()))?;
+            .map_err(|e| PathBufExtError::StripPrefix {
+                path: self.to_path_buf(),
+                source: e,
+            })?;
         Ok(self.join(stripped))
     }
 
     /// Canonicalizes existing and not existing paths
-    fn canonicalize_safely(&self) -> Result<PathBuf> {
+    fn canonicalize_safely(&self) -> Result<PathBuf, PathBufExtError> {
         if self.exists() {
             self.canonicalize()
-                .with_context(|| format!("failed to canonicalize path {self:?}"))
+                .map_err(|e| PathBufExtError::Canonicalize {
+                    path: self.to_path_buf(),
+                    source: e,
+                })
         } else {
             if self.is_relative() {
                 let p = std::env::current_dir()
-                    .context("could not get current directory")?
+                    .map_err(|e| PathBufExtError::CurrentDir { source: e })?
                     .join(self);
                 return Ok(p.normalize());
             }
@@ -120,14 +145,30 @@ pub fn get_user_home(uid: u32) -> Option<PathBuf> {
     }
 }
 
-pub fn do_exec(path: impl AsRef<Path>, args: &[String]) -> Result<()> {
-    let p = CString::new(path.as_ref().as_os_str().as_bytes())
-        .with_context(|| format!("failed to convert path {:?} to cstring", path.as_ref()))?;
-    let a: Vec<CString> = args
+#[derive(Debug, thiserror::Error)]
+pub enum DoExecError {
+    #[error("failed to convert path to cstring")]
+    PathToCString {
+        source: std::ffi::NulError,
+        path: PathBuf,
+    },
+    #[error("failed to execvp")]
+    Execvp { source: nix::Error },
+}
+
+pub fn do_exec(path: impl AsRef<Path>, args: &[String]) -> Result<(), DoExecError> {
+    let p = CString::new(path.as_ref().as_os_str().as_bytes()).map_err(|e| {
+        DoExecError::PathToCString {
+            source: e,
+            path: path.as_ref().to_path_buf(),
+        }
+    })?;
+    let cArgs: Vec<CString> = args
         .iter()
         .map(|s| CString::new(s.as_bytes()).unwrap_or_default())
         .collect();
-    unistd::execvp(&p, &a)?;
+    unistd::execvp(&p, &cArgs).map_err(|err| DoExecError::Execvp { source: err })?;
+
     Ok(())
 }
 
@@ -146,20 +187,56 @@ pub fn get_cgroup_path(
     }
 }
 
-pub fn write_file<P: AsRef<Path>, C: AsRef<[u8]>>(path: P, contents: C) -> Result<()> {
-    let path = path.as_ref();
-    fs::write(path, contents).with_context(|| format!("failed to write to {path:?}"))?;
-    Ok(())
+#[derive(Debug, thiserror::Error)]
+pub enum WrappedIOError {
+    #[error("failed to read from {path:?}")]
+    ReadFile {
+        source: std::io::Error,
+        path: PathBuf,
+    },
+    #[error("failed to write to {path:?}")]
+    WriteFile {
+        source: std::io::Error,
+        path: PathBuf,
+    },
+    #[error("failed to open {path:?}")]
+    Open {
+        source: std::io::Error,
+        path: PathBuf,
+    },
+    #[error("failed to create directory {path:?}")]
+    CreateDirAll {
+        source: std::io::Error,
+        path: PathBuf,
+    },
+    #[error("failed to get metadata")]
+    GetMetadata { source: std::io::Error },
+    #[error("metada doesn't match the expected attributes")]
+    MetadataMismatch,
 }
 
-pub fn create_dir_all<P: AsRef<Path>>(path: P) -> Result<()> {
-    let path = path.as_ref();
-    fs::create_dir_all(path).with_context(|| format!("failed to create directory {path:?}"))
+pub fn write_file<P: AsRef<Path>, C: AsRef<[u8]>>(
+    path: P,
+    contents: C,
+) -> Result<(), WrappedIOError> {
+    fs::write(path.as_ref(), contents).map_err(|err| WrappedIOError::WriteFile {
+        source: err,
+        path: path.as_ref().to_path_buf(),
+    })
 }
 
-pub fn open<P: AsRef<Path>>(path: P) -> Result<File> {
-    let path = path.as_ref();
-    File::open(path).with_context(|| format!("failed to open {path:?}"))
+pub fn create_dir_all<P: AsRef<Path>>(path: P) -> Result<(), WrappedIOError> {
+    fs::create_dir_all(path.as_ref()).map_err(|err| WrappedIOError::CreateDirAll {
+        source: err,
+        path: path.as_ref().to_path_buf(),
+    })
+}
+
+pub fn open<P: AsRef<Path>>(path: P) -> Result<File, WrappedIOError> {
+    File::open(path.as_ref()).map_err(|err| WrappedIOError::Open {
+        source: err,
+        path: path.as_ref().to_path_buf(),
+    })
 }
 
 /// Creates the specified directory and all parent directories with the specified mode. Ensures
@@ -175,19 +252,26 @@ pub fn open<P: AsRef<Path>>(path: P) -> Result<File> {
 /// create_dir_all_with_mode(&path, 1000, Mode::S_IRWXU).unwrap();
 /// assert!(path.exists())
 /// ```
-pub fn create_dir_all_with_mode<P: AsRef<Path>>(path: P, owner: u32, mode: Mode) -> Result<()> {
+pub fn create_dir_all_with_mode<P: AsRef<Path>>(
+    path: P,
+    owner: u32,
+    mode: Mode,
+) -> Result<(), WrappedIOError> {
     let path = path.as_ref();
     if !path.exists() {
         DirBuilder::new()
             .recursive(true)
             .mode(mode.bits())
             .create(path)
-            .with_context(|| format!("failed to create directory {}", path.display()))?;
+            .map_err(|err| WrappedIOError::CreateDirAll {
+                source: err,
+                path: path.to_path_buf(),
+            })?;
     }
 
     let metadata = path
         .metadata()
-        .with_context(|| format!("failed to get metadata for {}", path.display()))?;
+        .map_err(|err| WrappedIOError::GetMetadata { source: err })?;
 
     if metadata.is_dir()
         && metadata.st_uid() == owner
@@ -195,27 +279,65 @@ pub fn create_dir_all_with_mode<P: AsRef<Path>>(path: P, owner: u32, mode: Mode)
     {
         Ok(())
     } else {
-        bail!(
-            "metadata for {} does not possess the expected attributes",
-            path.display()
-        );
+        Err(WrappedIOError::MetadataMismatch)
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum EnsureProcfsError {
+    #[error("failed to open {path:?}")]
+    OpenProcfs {
+        source: std::io::Error,
+        path: PathBuf,
+    },
+    #[error("failed to get statfs for {path:?}")]
+    StatfsProcfs { source: nix::Error, path: PathBuf },
+    #[error("{path:?} is not on the procfs")]
+    NotProcfs { path: PathBuf },
 }
 
 // Make sure a given path is on procfs. This is to avoid the security risk that
 // /proc path is mounted over. Ref: CVE-2019-16884
-pub fn ensure_procfs(path: &Path) -> Result<()> {
-    let procfs_fd = fs::File::open(path)?;
-    let fstat_info = statfs::fstatfs(&procfs_fd.as_raw_fd())?;
+pub fn ensure_procfs(path: &Path) -> Result<(), EnsureProcfsError> {
+    let procfs_fd = fs::File::open(path).map_err(|err| EnsureProcfsError::OpenProcfs {
+        source: err,
+        path: path.to_path_buf(),
+    })?;
+    let fstat_info =
+        statfs::fstatfs(&procfs_fd.as_raw_fd()).map_err(|err| EnsureProcfsError::StatfsProcfs {
+            source: err,
+            path: path.to_path_buf(),
+        })?;
 
     if fstat_info.filesystem_type() != statfs::PROC_SUPER_MAGIC {
-        bail!(format!("{path:?} is not on the procfs"));
+        return Err(EnsureProcfsError::NotProcfs {
+            path: path.to_path_buf(),
+        });
     }
 
     Ok(())
 }
 
-pub fn secure_join<P: Into<PathBuf>>(rootfs: P, unsafe_path: P) -> Result<PathBuf> {
+#[derive(Debug, thiserror::Error)]
+pub enum SecureJoinError {
+    #[error("dereference too many symlinks, may be infinite loop")]
+    TooManySymlinks,
+    #[error("unable to obtain symlink metadata")]
+    SymlinkMetadata {
+        source: std::io::Error,
+        path: PathBuf,
+    },
+    #[error("failed to read link")]
+    ReadLink {
+        source: std::io::Error,
+        path: PathBuf,
+    },
+}
+
+pub fn secure_join<P: Into<PathBuf>>(
+    rootfs: P,
+    unsafe_path: P,
+) -> Result<PathBuf, SecureJoinError> {
     let mut rootfs = rootfs.into();
     let mut path = unsafe_path.into();
     let mut clean_path = PathBuf::new();
@@ -225,7 +347,7 @@ pub fn secure_join<P: Into<PathBuf>>(rootfs: P, unsafe_path: P) -> Result<PathBu
 
     loop {
         if i > 255 {
-            bail!("dereference too many symlinks, may be infinite loop");
+            return Err(SecureJoinError::TooManySymlinks);
         }
 
         let part_path = match part.next() {
@@ -241,22 +363,22 @@ pub fn secure_join<P: Into<PathBuf>>(rootfs: P, unsafe_path: P) -> Result<PathBu
                 let curr_path = PathBuf::from(&rootfs).join(&clean_path).join(&part_path);
                 let metadata = match curr_path.symlink_metadata() {
                     Ok(metadata) => Some(metadata),
-                    Err(error) => match error.kind() {
-                        // if file does not exists, treat it as normal path
-                        ErrorKind::NotFound => None,
-                        other_error => {
-                            bail!(
-                                "unable to obtain symlink metadata for file {:?}: {:?}",
-                                curr_path,
-                                other_error
-                            );
-                        }
-                    },
+                    Err(err) if err.kind() == ErrorKind::NotFound => None,
+                    Err(err) => {
+                        return Err(SecureJoinError::SymlinkMetadata {
+                            source: err,
+                            path: curr_path,
+                        })
+                    }
                 };
 
                 if let Some(metadata) = metadata {
                     if metadata.file_type().is_symlink() {
-                        let link_path = fs::read_link(curr_path)?;
+                        let link_path =
+                            fs::read_link(curr_path).map_err(|err| SecureJoinError::ReadLink {
+                                source: err,
+                                path: curr_path,
+                            })?;
                         path = link_path.join(part.as_path());
                         part = path.iter();
 
@@ -290,7 +412,7 @@ pub fn get_executable_path(name: &str, path_var: &str) -> Option<PathBuf> {
     None
 }
 
-pub fn is_executable(path: &Path) -> Result<bool> {
+pub fn is_executable(path: &Path) -> Result<bool, std::io::Error> {
     use std::os::unix::fs::PermissionsExt;
     let metadata = path.metadata()?;
     let permissions = metadata.permissions();
@@ -356,6 +478,7 @@ pub(crate) mod test_utils {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::Result;
 
     #[test]
     pub fn test_get_unix_user() {
