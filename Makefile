@@ -1,5 +1,9 @@
 ROOT = $(shell git rev-parse --show-toplevel)
 
+DOCKER_BUILD ?= docker buildx build
+
+KIND_CLUSTER_NAME ?= youki
+
 # builds
 
 .PHONY:build
@@ -80,12 +84,36 @@ test/k3s: bin/k3s
 test/k3s/clean:
 	sudo bin/k3s-youki-uninstall.sh
 
-# Misc
-#
+.PHONY: test/k8s/cluster
+test/k8s/cluster: bin/kind tests/k8s/_out/img bin/kind
+	bin/kind create cluster --name $(KIND_CLUSTER_NAME) --image="$(shell cat tests/k8s/_out/img)"
+
+.PHONY: test/k8s/deploy
+test/k8s/deploy: test/k8s/cluster
+	kubectl --context=kind-$(KIND_CLUSTER_NAME) apply -f tests/k8s/deploy.yaml
+	kubectl --context=kind-$(KIND_CLUSTER_NAME) wait deployment nginx-deployment --for condition=Available=True --timeout=90s
+	kubectl --context=kind-$(KIND_CLUSTER_NAME) get pods -o wide
+
+# Bin
+
 .PHONY: bin/k3s
 bin/k3s:
 	mkdir -p bin && \
 	curl -sfL https://get.k3s.io | INSTALL_K3S_BIN_DIR=$(PWD)/bin INSTALL_K3S_SYMLINK=skip INSTALL_K3S_NAME=youki sh -
+
+.PHONY: bin/kind
+bin/kind: tests/k8s/Dockerfile
+	$(DOCKER_BUILD) --output=bin/ -f tests/k8s/Dockerfile --target kind-bin .
+
+.PHONY: test/k8s/clean
+test/k8s/clean:
+	kind delete cluster --name $(KIND_CLUSTER_NAME)
+	rm -r tests/k8s/_out
+
+tests/k8s/_out/img: tests/k8s/Dockerfile Cargo.toml Cargo.lock $(shell find . -type f -name '*.rs')
+	mkdir -p $(@D) && $(DOCKER_BUILD) -f tests/k8s/Dockerfile --iidfile=$(@) --load .
+
+# Misc
 
 .PHONY: lint
 lint:

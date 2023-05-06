@@ -46,7 +46,7 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
       - run: rustup component add rustfmt clippy
       - name: Install requirements
-        run: ./.github/scripts/dependency.sh
+        run: sudo ./.github/scripts/dependency.sh
       - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev libseccomp-dev
       - name: Check formatting
         run: cargo fmt --all -- --check
@@ -84,7 +84,7 @@ jobs:
         with:
           tool: cargo-llvm-cov@0.4.0
       - name: Install requirements
-        run: ./.github/scripts/dependency.sh
+        run: sudo ./.github/scripts/dependency.sh
       - name: Run Test Coverage for youki
         run: |
           cargo llvm-cov clean --workspace
@@ -105,7 +105,7 @@ jobs:
       - name: Setup Rust toolchain and cache
         uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
       - name: Install requirements
-        run: ./.github/scripts/dependency.sh
+        run: sudo ./.github/scripts/dependency.sh
       - uses: actions/setup-go@v3
         with:
           go-version: "1.17.6"

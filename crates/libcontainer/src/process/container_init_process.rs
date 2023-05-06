@@ -376,9 +376,9 @@ pub fn container_init_process(
         warn!("seccomp not available, unable to enforce no_new_privileges!")
     }
 
-    capabilities::reset_effective(syscall).context("Failed to reset effective capabilities")?;
+    capabilities::reset_effective(syscall).context("failed to reset effective capabilities")?;
     if let Some(caps) = proc.capabilities() {
-        capabilities::drop_privileges(caps, syscall).context("Failed to drop capabilities")?;
+        capabilities::drop_privileges(caps, syscall).context("failed to drop capabilities")?;
     }
 
     // Change directory to process.cwd if process.cwd is not empty

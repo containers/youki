@@ -20,3 +20,5 @@ tags.temp
 
 /bundle.tar.gz
 /test.log
+
+/tests/k8s/_out/
