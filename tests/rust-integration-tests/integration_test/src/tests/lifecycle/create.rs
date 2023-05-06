@@ -1,14 +1,13 @@
 use crate::utils::get_runtime_path;
+use anyhow::{bail, Result};
 use std::io;
 use std::path::Path;
 use std::process::{Command, Stdio};
-use test_framework::TestResult;
 
-// There are still some issues here
-// in case we put stdout and stderr as piped
-// the youki process created halts indefinitely
-// which is why we pass null, and use wait instead of wait_with_output
-pub fn create(project_path: &Path, id: &str) -> TestResult {
+// There are still some issues here in case we put stdout and stderr as piped
+// the youki process created halts indefinitely which is why we pass null, and
+// use wait instead of wait_with_output
+pub fn create(project_path: &Path, id: &str) -> Result<()> {
     let res = Command::new(get_runtime_path())
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -25,14 +24,11 @@ pub fn create(project_path: &Path, id: &str) -> TestResult {
     match res {
         io::Result::Ok(status) => {
             if status.success() {
-                TestResult::Passed
+                Ok(())
             } else {
-                TestResult::Failed(anyhow::anyhow!(
-                    "Error : create exited with nonzero status : {}",
-                    status
-                ))
+                bail!("create exited with nonzero status : {}", status)
             }
         }
-        io::Result::Err(e) => TestResult::Failed(anyhow::Error::new(e)),
+        io::Result::Err(e) => bail!("create failed : {}", e),
     }
 }

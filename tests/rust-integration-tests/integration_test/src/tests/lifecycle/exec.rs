@@ -1,15 +1,16 @@
 use super::get_result_from_output;
 use crate::utils::get_runtime_path;
+use anyhow::Result;
 use std::path::Path;
 use std::process::{Command, Stdio};
-use test_framework::{assert_result_eq, TestResult};
+use test_framework::assert_result_eq;
 
 pub fn exec(
     project_path: &Path,
     id: &str,
     exec_cmd: Vec<&str>,
     expected_output: Option<&str>,
-) -> TestResult {
+) -> Result<()> {
     let res = Command::new(get_runtime_path())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
