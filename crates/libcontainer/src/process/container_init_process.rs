@@ -204,7 +204,7 @@ pub fn container_init_process(
         // before pivot_root is called. This runs in the container namespaces.
         if let Some(hooks) = hooks {
             hooks::run_hooks(hooks.create_container().as_ref(), container)
-                .context("Failed to run create container hooks")?;
+                .context("failed to run create container hooks")?;
         }
 
         let bind_service = namespaces.get(LinuxNamespaceType::User).is_some();
@@ -216,7 +216,7 @@ pub fn container_init_process(
                 bind_service,
                 namespaces.get(LinuxNamespaceType::Cgroup).is_some(),
             )
-            .with_context(|| "Failed to prepare rootfs")?;
+            .with_context(|| "failed to prepare rootfs")?;
 
         // Entering into the rootfs jail. If mount namespace is specified, then
         // we use pivot_root, but if we are on the host mount namespace, we will

@@ -119,7 +119,8 @@ pub fn container_intermediate_process(
                     write(exec_notify_fd, buf.as_bytes())?;
                     close(exec_notify_fd)?;
                 }
-                Err(ProcessError::InitProcessFailed)
+                log::error!("failed to initialize container process: {e}");
+                Err(ProcessError::InitProcessFailed { msg: e.to_string() })
             }
         }
     })?;

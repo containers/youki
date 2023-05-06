@@ -136,7 +136,7 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
                 // When the action is the same as the default action, the rule is redundant. We can
                 // skip this here to avoid failing when we add the rules.
                 log::warn!(
-                    "Detect a seccomp action that is the same as the default action: {:?}",
+                    "detect a seccomp action that is the same as the default action: {:?}",
                     syscall
                 );
                 continue;

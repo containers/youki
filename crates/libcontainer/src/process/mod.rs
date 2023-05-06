@@ -24,7 +24,7 @@ pub enum ProcessError {
         child_name: String,
     },
     #[error("failed init process")]
-    InitProcessFailed,
+    InitProcessFailed { msg: String },
     #[error("failed intermediate process")]
     IntermediateProcessFailed,
     #[error("io error: {0}")]

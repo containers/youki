@@ -41,8 +41,44 @@ tracepoint:syscalls:sys_exit_openat
 tracepoint:syscalls:sys_enter_clone3
 /comm == "4"|| comm == "youki" || comm == "youki:[1:INTER]" || comm == "youki:[2:INIT]"/
 {
-    printf("%-12ld %15s %-8d %-9s ", elapsed , comm, pid, "clone3");
+    printf("%-12ld %15s %-8d %-9s\n", elapsed , comm, pid, "clone3");
 }
+
+tracepoint:syscalls:sys_enter_setns
+/comm == "4"|| comm == "youki" || comm == "youki:[1:INTER]" || comm == "youki:[2:INIT]"/
+{
+    printf("%-12ld %15s %-8d %-9s ", elapsed , comm, pid, "setns");
+	printf("fd=%d, flag=%d\n", args->fd, args->flags);
+}
+
+tracepoint:syscalls:sys_enter_capset
+/comm == "4"|| comm == "youki" || comm == "youki:[1:INTER]" || comm == "youki:[2:INIT]"/
+{
+    printf("%-12ld %15s %-8d %-9s\n", elapsed , comm, pid, "capset");
+}
+
+tracepoint:syscalls:sys_enter_pivot_root
+/comm == "4"|| comm == "youki" || comm == "youki:[1:INTER]" || comm == "youki:[2:INIT]"/
+{
+    printf("%-12ld %15s %-8d %-9s ", elapsed , comm, pid, "pivt_root");
+	printf("new_root=%s, put_old=%s\n", str(args->new_root), str(args->put_old));
+}
+
+tracepoint:syscalls:sys_enter_mount
+/comm == "4"|| comm == "youki" || comm == "youki:[1:INTER]" || comm == "youki:[2:INIT]"/
+{
+    printf("%-12ld %15s %-8d %-9s ", elapsed , comm, pid, "mount");
+    printf("dev_name=%s, dir_name=%s\n", str(args->dev_name), str(args->dir_name));
+}
+
+tracepoint:syscalls:sys_enter_setresuid
+/comm == "4"|| comm == "youki" || comm == "youki:[1:INTER]" || comm == "youki:[2:INIT]"/
+{
+    printf("%-12ld %15s %-8d %-9s ", elapsed , comm, pid, "setresuid");
+    printf("ruid=%d, euid=%d, suid=%d\n", args->ruid, args->euid, args->suid);
+}
+
+
 
 END
 {
