@@ -31,7 +31,7 @@ jobs:
       - name: Setup Rust toolchain and cache
         uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
       - name: Install requirements
-        run: ./.github/scripts/dependency.sh
+        run: sudo ./.github/scripts/dependency.sh
       - name: Install runc 1.1.0
         run: |
           wget -q https://github.com/opencontainers/runc/releases/download/v1.1.0/runc.amd64

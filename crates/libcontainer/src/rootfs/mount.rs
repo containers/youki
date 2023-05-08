@@ -48,7 +48,7 @@ impl Mount {
     }
 
     pub fn setup_mount(&self, mount: &SpecMount, options: &MountOptions) -> Result<()> {
-        log::debug!("Mounting {:?}", mount);
+        log::debug!("mounting {:?}", mount);
         let mut mount_option_config = parse_mount(mount);
 
         match mount.typ().as_deref() {

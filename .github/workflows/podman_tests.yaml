@@ -10,7 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Install requirements
-        run: ./.github/scripts/dependency.sh
+        run: sudo ./.github/scripts/dependency.sh
       - run: make youki-dev
       - run: sudo cp youki /usr/local/bin
       - name: Install requirements for Podman
