@@ -1,5 +1,5 @@
 use crate::utils::test_inside_container;
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use nix::libc;
 use nix::mount::{mount, umount, MsFlags};
 use nix::sys::stat::Mode;
@@ -210,6 +210,7 @@ fn check_recursive_rsuid() -> TestResult {
     let rsuid_dir_path = PathBuf::from_str("/tmp/rsuid_dir").unwrap();
     let mount_dest_path = PathBuf::from_str("/mnt/rsuid_dir").unwrap();
     fs::create_dir_all(rsuid_dir_path.clone()).unwrap();
+    scopeguard::defer!(fs::remove_dir_all(rsuid_dir_path.clone()).unwrap());
 
     let mount_options = vec!["rbind".to_string(), "rsuid".to_string()];
     let mut mount_spec = Mount::default();
@@ -222,24 +223,17 @@ fn check_recursive_rsuid() -> TestResult {
         vec![mount_spec],
         vec!["runtimetest".to_string(), "mounts_recursive".to_string()],
     );
-    let result = test_inside_container(spec, &|_| {
-        let original_file_path = format!("{}/{}", rsuid_dir_path.to_str().unwrap(), "file");
-        File::create(original_file_path.clone())?;
+    test_inside_container(spec, &|_| {
+        let original_file_path = rsuid_dir_path.join("file");
+        let file = File::create(original_file_path)?;
+        let mut permission = file.metadata()?.permissions();
         // chmod +s /tmp/rsuid_dir/file && chmod +g /tmp/rsuid_dir/file
-        let mode = libc::S_ISUID | libc::S_ISGID;
-        let result = unsafe {
-            libc::chmod(
-                original_file_path.as_ptr() as *const ::std::os::raw::c_char,
-                mode,
-            )
-        };
-        if result == -1 {
-            return Err(anyhow!(std::io::Error::last_os_error()));
-        }
+        permission.set_mode(permission.mode() | libc::S_ISUID | libc::S_ISGID);
+        file.set_permissions(permission)
+            .with_context(|| "failed to set permission")?;
+
         Ok(())
-    });
-    fs::remove_dir_all(rsuid_dir_path).unwrap();
-    result
+    })
 }
 
 fn check_recursive_noexec() -> TestResult {
