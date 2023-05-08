@@ -136,20 +136,20 @@ impl Cpu {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test::{create_temp_dir, set_fixture, setup};
+    use crate::test::{set_fixture, setup};
     use oci_spec::runtime::LinuxCpuBuilder;
     use std::fs;
 
     #[test]
     fn test_set_shares() {
         // arrange
-        let (tmp, shares) = setup("test_set_shares", CGROUP_CPU_SHARES);
-        let _ = set_fixture(&tmp, CGROUP_CPU_SHARES, "")
+        let (tmp, shares) = setup(CGROUP_CPU_SHARES);
+        let _ = set_fixture(tmp.path(), CGROUP_CPU_SHARES, "")
             .unwrap_or_else(|_| panic!("set test fixture for {CGROUP_CPU_SHARES}"));
         let cpu = LinuxCpuBuilder::default().shares(2048u64).build().unwrap();
 
         // act
-        Cpu::apply(&tmp, &cpu).expect("apply cpu");
+        Cpu::apply(tmp.path(), &cpu).expect("apply cpu");
 
         // assert
         let content = fs::read_to_string(shares)
@@ -161,11 +161,11 @@ mod tests {
     fn test_set_quota() {
         // arrange
         const QUOTA: i64 = 200000;
-        let (tmp, max) = setup("test_set_quota", CGROUP_CPU_QUOTA);
+        let (tmp, max) = setup(CGROUP_CPU_QUOTA);
         let cpu = LinuxCpuBuilder::default().quota(QUOTA).build().unwrap();
 
         // act
-        Cpu::apply(&tmp, &cpu).expect("apply cpu");
+        Cpu::apply(tmp.path(), &cpu).expect("apply cpu");
 
         // assert
         let content = fs::read_to_string(max)
@@ -177,11 +177,11 @@ mod tests {
     fn test_set_period() {
         // arrange
         const PERIOD: u64 = 100000;
-        let (tmp, max) = setup("test_set_period", CGROUP_CPU_PERIOD);
+        let (tmp, max) = setup(CGROUP_CPU_PERIOD);
         let cpu = LinuxCpuBuilder::default().period(PERIOD).build().unwrap();
 
         // act
-        Cpu::apply(&tmp, &cpu).expect("apply cpu");
+        Cpu::apply(tmp.path(), &cpu).expect("apply cpu");
 
         // assert
         let content = fs::read_to_string(max)
@@ -193,14 +193,14 @@ mod tests {
     fn test_set_rt_runtime() {
         // arrange
         const RUNTIME: i64 = 100000;
-        let (tmp, max) = setup("test_set_rt_runtime", CGROUP_CPU_RT_RUNTIME);
+        let (tmp, max) = setup(CGROUP_CPU_RT_RUNTIME);
         let cpu = LinuxCpuBuilder::default()
             .realtime_runtime(RUNTIME)
             .build()
             .unwrap();
 
         // act
-        Cpu::apply(&tmp, &cpu).expect("apply cpu");
+        Cpu::apply(tmp.path(), &cpu).expect("apply cpu");
 
         // assert
         let content = fs::read_to_string(max)
@@ -223,11 +223,11 @@ mod tests {
             return;
         }
 
-        let (tmp, max) = setup("test_set_cpu_idle", CGROUP_CPU_IDLE);
+        let (tmp, max) = setup(CGROUP_CPU_IDLE);
         let cpu = LinuxCpuBuilder::default().idle(IDLE).build().unwrap();
 
         // act
-        Cpu::apply(&tmp, &cpu).expect("apply cpu");
+        Cpu::apply(tmp.path(), &cpu).expect("apply cpu");
 
         // assert
         let content = fs::read_to_string(max)
@@ -239,14 +239,14 @@ mod tests {
     fn test_set_rt_period() {
         // arrange
         const PERIOD: u64 = 100000;
-        let (tmp, max) = setup("test_set_rt_period", CGROUP_CPU_RT_PERIOD);
+        let (tmp, max) = setup(CGROUP_CPU_RT_PERIOD);
         let cpu = LinuxCpuBuilder::default()
             .realtime_period(PERIOD)
             .build()
             .unwrap();
 
         // act
-        Cpu::apply(&tmp, &cpu).expect("apply cpu");
+        Cpu::apply(tmp.path(), &cpu).expect("apply cpu");
 
         // assert
         let content = fs::read_to_string(max)
@@ -256,16 +256,16 @@ mod tests {
 
     #[test]
     fn test_stat_cpu_throttling() {
-        let tmp = create_temp_dir("test_stat_cpu_throttling").expect("create test directory");
+        let tmp = tempfile::tempdir().unwrap();
         let stat_content = &[
             "nr_periods 165000",
             "nr_throttled 27",
             "throttled_time 1080",
         ]
         .join("\n");
-        set_fixture(&tmp, CGROUP_CPU_STAT, stat_content).expect("create stat file");
+        set_fixture(tmp.path(), CGROUP_CPU_STAT, stat_content).expect("create stat file");
 
-        let actual = Cpu::stats(&tmp).expect("get cgroup stats");
+        let actual = Cpu::stats(tmp.path()).expect("get cgroup stats");
         let expected = CpuThrottling {
             periods: 165000,
             throttled_periods: 27,
@@ -278,14 +278,14 @@ mod tests {
     fn test_set_burst() {
         // arrange
         let expected_burst: u64 = 100_000;
-        let (tmp, max) = setup("test_set_burst", CGROUP_CPU_BURST);
+        let (tmp, max) = setup(CGROUP_CPU_BURST);
         let cpu = LinuxCpuBuilder::default()
             .burst(expected_burst)
             .build()
             .unwrap();
 
         // act
-        Cpu::apply(&tmp, &cpu).expect("apply cpu");
+        Cpu::apply(tmp.path(), &cpu).expect("apply cpu");
 
         // assert
         let actual_burst = fs::read_to_string(max).expect("read burst");

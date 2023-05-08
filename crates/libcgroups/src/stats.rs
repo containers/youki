@@ -473,7 +473,7 @@ fn parse_psi(stat_line: &str, path: &Path) -> Result<PSIData, WrappedIoError> {
 
 #[cfg(test)]
 mod tests {
-    use crate::test::{create_temp_dir, set_fixture};
+    use crate::test::set_fixture;
 
     use super::*;
 
@@ -497,8 +497,8 @@ mod tests {
 
     #[test]
     fn test_parse_single_value_valid() {
-        let tmp = create_temp_dir("test_parse_single_value_valid").unwrap();
-        let file_path = set_fixture(&tmp, "single_valued_file", "1200\n").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        let file_path = set_fixture(tmp.path(), "single_valued_file", "1200\n").unwrap();
 
         let value = parse_single_value(&file_path).unwrap();
         assert_eq!(value, 1200);
@@ -506,8 +506,8 @@ mod tests {
 
     #[test]
     fn test_parse_single_value_invalid_number() {
-        let tmp = create_temp_dir("test_parse_single_value_invalid_number").unwrap();
-        let file_path = set_fixture(&tmp, "single_invalid_file", "noop\n").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        let file_path = set_fixture(tmp.path(), "single_invalid_file", "noop\n").unwrap();
 
         let value = parse_single_value(&file_path);
         assert!(value.is_err());
@@ -515,8 +515,8 @@ mod tests {
 
     #[test]
     fn test_parse_single_value_multiple_entries() {
-        let tmp = create_temp_dir("test_parse_single_value_multiple_entries").unwrap();
-        let file_path = set_fixture(&tmp, "multi_valued_file", "1200\n1400\n1600").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        let file_path = set_fixture(tmp.path(), "multi_valued_file", "1200\n1400\n1600").unwrap();
 
         let value = parse_single_value(&file_path);
         assert!(value.is_err());
@@ -524,9 +524,9 @@ mod tests {
 
     #[test]
     fn test_parse_flat_keyed_data() {
-        let tmp = create_temp_dir("test_parse_flat_keyed_data").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
         let file_content = ["key1 1", "key2 2", "key3 3"].join("\n");
-        let file_path = set_fixture(&tmp, "flat_keyed_data", &file_content).unwrap();
+        let file_path = set_fixture(tmp.path(), "flat_keyed_data", &file_content).unwrap();
 
         let actual = parse_flat_keyed_data(&file_path).unwrap();
         let mut expected = HashMap::with_capacity(3);
@@ -539,9 +539,9 @@ mod tests {
 
     #[test]
     fn test_parse_flat_keyed_data_with_characters() {
-        let tmp = create_temp_dir("test_parse_flat_keyed_data_with_characters").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
         let file_content = ["key1 1", "key2 a", "key3 b"].join("\n");
-        let file_path = set_fixture(&tmp, "flat_keyed_data", &file_content).unwrap();
+        let file_path = set_fixture(tmp.path(), "flat_keyed_data", &file_content).unwrap();
 
         let result = parse_flat_keyed_data(&file_path);
         assert!(result.is_err());
@@ -549,9 +549,9 @@ mod tests {
 
     #[test]
     fn test_parse_space_separated_as_flat_keyed_data() {
-        let tmp = create_temp_dir("test_parse_space_separated_as_flat_keyed_data").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
         let file_content = ["key1", "key2", "key3", "key4"].join(" ");
-        let file_path = set_fixture(&tmp, "space_separated", &file_content).unwrap();
+        let file_path = set_fixture(tmp.path(), "space_separated", &file_content).unwrap();
 
         let result = parse_flat_keyed_data(&file_path);
         assert!(result.is_err());
@@ -559,9 +559,9 @@ mod tests {
 
     #[test]
     fn test_parse_newline_separated_as_flat_keyed_data() {
-        let tmp = create_temp_dir("test_parse_newline_separated_as_flat_keyed_data").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
         let file_content = ["key1", "key2", "key3", "key4"].join("\n");
-        let file_path = set_fixture(&tmp, "newline_separated", &file_content).unwrap();
+        let file_path = set_fixture(tmp.path(), "newline_separated", &file_content).unwrap();
 
         let result = parse_flat_keyed_data(&file_path);
         assert!(result.is_err());
@@ -569,14 +569,14 @@ mod tests {
 
     #[test]
     fn test_parse_nested_keyed_data_as_flat_keyed_data() {
-        let tmp = create_temp_dir("test_parse_nested_keyed_data_as_flat_keyed_data").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
         let file_content = [
             "key1 subkey1=value1 subkey2=value2 subkey3=value3",
             "key2 subkey1=value1 subkey2=value2 subkey3=value3",
             "key3 subkey1=value1 subkey2=value2 subkey3=value3",
         ]
         .join("\n");
-        let file_path = set_fixture(&tmp, "nested_keyed_data", &file_content).unwrap();
+        let file_path = set_fixture(tmp.path(), "nested_keyed_data", &file_content).unwrap();
 
         let result = parse_flat_keyed_data(&file_path);
         assert!(result.is_err());
@@ -584,14 +584,14 @@ mod tests {
 
     #[test]
     fn test_parse_nested_keyed_data() {
-        let tmp = create_temp_dir("test_parse_nested_keyed_data").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
         let file_content = [
             "key1 subkey1=value1 subkey2=value2 subkey3=value3",
             "key2 subkey1=value1 subkey2=value2 subkey3=value3",
             "key3 subkey1=value1 subkey2=value2 subkey3=value3",
         ]
         .join("\n");
-        let file_path = set_fixture(&tmp, "nested_keyed_data", &file_content).unwrap();
+        let file_path = set_fixture(tmp.path(), "nested_keyed_data", &file_content).unwrap();
 
         let actual = parse_nested_keyed_data(&file_path).unwrap();
         let mut expected = HashMap::with_capacity(3);
@@ -625,9 +625,9 @@ mod tests {
 
     #[test]
     fn test_parse_space_separated_as_nested_keyed_data() {
-        let tmp = create_temp_dir("test_parse_space_separated_as_nested_keyed_data").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
         let file_content = ["key1", "key2", "key3", "key4"].join(" ");
-        let file_path = set_fixture(&tmp, "space_separated", &file_content).unwrap();
+        let file_path = set_fixture(tmp.path(), "space_separated", &file_content).unwrap();
 
         let result = parse_nested_keyed_data(&file_path);
         assert!(result.is_err());
@@ -635,9 +635,9 @@ mod tests {
 
     #[test]
     fn test_parse_newline_separated_as_nested_keyed_data() {
-        let tmp = create_temp_dir("test_parse_newline_separated_as_nested_keyed_data").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
         let file_content = ["key1", "key2", "key3", "key4"].join("\n");
-        let file_path = set_fixture(&tmp, "newline_separated", &file_content).unwrap();
+        let file_path = set_fixture(tmp.path(), "newline_separated", &file_content).unwrap();
 
         let result = parse_nested_keyed_data(&file_path);
         assert!(result.is_err());
@@ -645,9 +645,9 @@ mod tests {
 
     #[test]
     fn test_parse_flat_keyed_as_nested_keyed_data() {
-        let tmp = create_temp_dir("test_parse_flat_keyed_as_nested_keyed_data").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
         let file_content = ["key1 1", "key2 2", "key3 3"].join("\n");
-        let file_path = set_fixture(&tmp, "newline_separated", &file_content).unwrap();
+        let file_path = set_fixture(tmp.path(), "newline_separated", &file_content).unwrap();
 
         let result = parse_nested_keyed_data(&file_path);
         assert!(result.is_err());
@@ -667,13 +667,13 @@ mod tests {
 
     #[test]
     fn test_parse_psi_full_stats() {
-        let tmp = create_temp_dir("test_parse_psi_full_stats").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
         let file_content = [
             "some avg10=80.00 avg60=50.00 avg300=90.00 total=0",
             "full avg10=10.00 avg60=30.00 avg300=50.00 total=0",
         ]
         .join("\n");
-        let psi_file = set_fixture(&tmp, "psi.pressure", &file_content).unwrap();
+        let psi_file = set_fixture(tmp.path(), "psi.pressure", &file_content).unwrap();
 
         let result = psi_stats(&psi_file).unwrap();
         assert_eq!(
@@ -695,9 +695,9 @@ mod tests {
 
     #[test]
     fn test_parse_psi_only_some() {
-        let tmp = create_temp_dir("test_parse_psi_only_some").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
         let file_content = ["some avg10=80.00 avg60=50.00 avg300=90.00 total=0"].join("\n");
-        let psi_file = set_fixture(&tmp, "psi.pressure", &file_content).unwrap();
+        let psi_file = set_fixture(tmp.path(), "psi.pressure", &file_content).unwrap();
 
         let result = psi_stats(&psi_file).unwrap();
         assert_eq!(

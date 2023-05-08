@@ -149,16 +149,14 @@ impl Freezer {
 mod tests {
     use super::*;
     use crate::common::FreezerState;
-    use crate::test::{create_temp_dir, set_fixture};
+    use crate::test::set_fixture;
     use std::sync::Arc;
 
     #[test]
     fn test_set_freezer_state() {
-        let tmp = Arc::new(
-            create_temp_dir("test_set_freezer_state").expect("create temp directory for test"),
-        );
-        set_fixture(&tmp, CGROUP_FREEZE, "").expect("Set fixure for freezer state");
-        set_fixture(&tmp, CGROUP_EVENTS, "populated 0\nfrozen 0")
+        let tmp = Arc::new(tempfile::tempdir().unwrap());
+        set_fixture(tmp.path(), CGROUP_FREEZE, "").expect("Set fixure for freezer state");
+        set_fixture(tmp.path(), CGROUP_EVENTS, "populated 0\nfrozen 0")
             .expect("Set fixure for freezer state");
 
         // set Frozen state.
@@ -167,51 +165,50 @@ mod tests {
             let p = Arc::clone(&tmp);
             thread::spawn(move || {
                 thread::sleep(Duration::from_millis(100));
-                set_fixture(&p, CGROUP_EVENTS, "populated 0\nfrozen 1")
+                set_fixture(p.path(), CGROUP_EVENTS, "populated 0\nfrozen 1")
                     .expect("Set fixure for freezer state");
             });
             let freezer_state = FreezerState::Frozen;
-            Freezer::apply(freezer_state, &tmp).expect("Set freezer state");
+            Freezer::apply(freezer_state, tmp.path()).expect("Set freezer state");
 
             let state_content =
-                std::fs::read_to_string(tmp.join(CGROUP_FREEZE)).expect("Read to string");
+                std::fs::read_to_string(tmp.path().join(CGROUP_FREEZE)).expect("Read to string");
             assert_eq!("1", state_content);
         }
 
         // set Thawed state.
         {
             let freezer_state = FreezerState::Thawed;
-            Freezer::apply(freezer_state, &tmp).expect("Set freezer state");
+            Freezer::apply(freezer_state, tmp.path()).expect("Set freezer state");
 
             let state_content =
-                std::fs::read_to_string(tmp.join(CGROUP_FREEZE)).expect("Read to string");
+                std::fs::read_to_string(tmp.path().join(CGROUP_FREEZE)).expect("Read to string");
             assert_eq!("0", state_content);
         }
 
         // set Undefined state.
         {
             let old_state_content =
-                std::fs::read_to_string(tmp.join(CGROUP_FREEZE)).expect("Read to string");
+                std::fs::read_to_string(tmp.path().join(CGROUP_FREEZE)).expect("Read to string");
             let freezer_state = FreezerState::Undefined;
-            Freezer::apply(freezer_state, &tmp).expect("Set freezer state");
+            Freezer::apply(freezer_state, tmp.path()).expect("Set freezer state");
 
             let state_content =
-                std::fs::read_to_string(tmp.join(CGROUP_FREEZE)).expect("Read to string");
+                std::fs::read_to_string(tmp.path().join(CGROUP_FREEZE)).expect("Read to string");
             assert_eq!(old_state_content, state_content);
         }
     }
 
     #[test]
     fn test_set_freezer_state_error() {
-        let tmp = create_temp_dir("test_set_freezer_state_error")
-            .expect("create temp directory for test");
-        set_fixture(&tmp, CGROUP_FREEZE, "").expect("Set fixure for freezer state");
-        set_fixture(&tmp, CGROUP_EVENTS, "").expect("Set fixure for freezer state");
+        let tmp = tempfile::tempdir().unwrap();
+        set_fixture(tmp.path(), CGROUP_FREEZE, "").expect("Set fixure for freezer state");
+        set_fixture(tmp.path(), CGROUP_EVENTS, "").expect("Set fixure for freezer state");
 
         // events file does not contain "frozen 1"
         {
             let freezer_state = FreezerState::Frozen;
-            let r = Freezer::apply(freezer_state, &tmp);
+            let r = Freezer::apply(freezer_state, tmp.path());
             assert!(r.is_err());
         }
     }

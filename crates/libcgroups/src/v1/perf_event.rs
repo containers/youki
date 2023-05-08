@@ -29,10 +29,10 @@ mod tests {
 
     #[test]
     fn test_add_task() {
-        let (tmp, procs) = setup("test_perf_event_add_task", CGROUP_PROCS);
+        let (tmp, procs) = setup(CGROUP_PROCS);
         let pid = Pid::from_raw(1000);
 
-        PerfEvent::add_task(pid, &tmp).expect("apply perf_event");
+        PerfEvent::add_task(pid, tmp.path()).expect("apply perf_event");
 
         let content = fs::read_to_string(procs)
             .unwrap_or_else(|_| panic!("read {CGROUP_PROCS} file content"));

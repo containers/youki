@@ -132,54 +132,53 @@ impl Freezer {
 mod tests {
     use super::*;
     use crate::common::{FreezerState, CGROUP_PROCS};
-    use crate::test::{create_temp_dir, set_fixture};
+    use crate::test::set_fixture;
     use nix::unistd::Pid;
     use oci_spec::runtime::LinuxResourcesBuilder;
 
     #[test]
     fn test_set_freezer_state() {
-        let tmp =
-            create_temp_dir("test_set_freezer_state").expect("create temp directory for test");
-        set_fixture(&tmp, CGROUP_FREEZER_STATE, "").expect("Set fixure for freezer state");
+        let tmp = tempfile::tempdir().unwrap();
+        set_fixture(tmp.path(), CGROUP_FREEZER_STATE, "").expect("Set fixure for freezer state");
 
         // set Frozen state.
         {
             let freezer_state = FreezerState::Frozen;
-            Freezer::apply(&freezer_state, &tmp).expect("Set freezer state");
+            Freezer::apply(&freezer_state, tmp.path()).expect("Set freezer state");
 
-            let state_content =
-                std::fs::read_to_string(tmp.join(CGROUP_FREEZER_STATE)).expect("Read to string");
+            let state_content = std::fs::read_to_string(tmp.path().join(CGROUP_FREEZER_STATE))
+                .expect("Read to string");
             assert_eq!(FREEZER_STATE_FROZEN, state_content);
         }
 
         // set Thawed state.
         {
             let freezer_state = FreezerState::Thawed;
-            Freezer::apply(&freezer_state, &tmp).expect("Set freezer state");
+            Freezer::apply(&freezer_state, tmp.path()).expect("Set freezer state");
 
-            let state_content =
-                std::fs::read_to_string(tmp.join(CGROUP_FREEZER_STATE)).expect("Read to string");
+            let state_content = std::fs::read_to_string(tmp.path().join(CGROUP_FREEZER_STATE))
+                .expect("Read to string");
             assert_eq!(FREEZER_STATE_THAWED, state_content);
         }
 
         // set Undefined state.
         {
-            let old_state_content =
-                std::fs::read_to_string(tmp.join(CGROUP_FREEZER_STATE)).expect("Read to string");
+            let old_state_content = std::fs::read_to_string(tmp.path().join(CGROUP_FREEZER_STATE))
+                .expect("Read to string");
             let freezer_state = FreezerState::Undefined;
-            Freezer::apply(&freezer_state, &tmp).expect("Set freezer state");
+            Freezer::apply(&freezer_state, tmp.path()).expect("Set freezer state");
 
-            let state_content =
-                std::fs::read_to_string(tmp.join(CGROUP_FREEZER_STATE)).expect("Read to string");
+            let state_content = std::fs::read_to_string(tmp.path().join(CGROUP_FREEZER_STATE))
+                .expect("Read to string");
             assert_eq!(old_state_content, state_content);
         }
     }
 
     #[test]
     fn test_add_and_apply() {
-        let tmp = create_temp_dir("test_add_task").expect("create temp directory for test");
-        set_fixture(&tmp, CGROUP_FREEZER_STATE, "").expect("set fixure for freezer state");
-        set_fixture(&tmp, CGROUP_PROCS, "").expect("set fixture for proc file");
+        let tmp = tempfile::tempdir().unwrap();
+        set_fixture(tmp.path(), CGROUP_FREEZER_STATE, "").expect("set fixure for freezer state");
+        set_fixture(tmp.path(), CGROUP_PROCS, "").expect("set fixture for proc file");
 
         // set Thawed state.
         {
@@ -198,13 +197,13 @@ mod tests {
             };
 
             let pid = Pid::from_raw(1000);
-            Freezer::add_task(pid, &tmp).expect("freezer add task");
-            <Freezer as Controller>::apply(&controller_opt, &tmp).expect("freezer apply");
-            let state_content =
-                std::fs::read_to_string(tmp.join(CGROUP_FREEZER_STATE)).expect("read to string");
+            Freezer::add_task(pid, tmp.path()).expect("freezer add task");
+            <Freezer as Controller>::apply(&controller_opt, tmp.path()).expect("freezer apply");
+            let state_content = std::fs::read_to_string(tmp.path().join(CGROUP_FREEZER_STATE))
+                .expect("read to string");
             assert_eq!(FREEZER_STATE_THAWED, state_content);
             let pid_content =
-                std::fs::read_to_string(tmp.join(CGROUP_PROCS)).expect("read to string");
+                std::fs::read_to_string(tmp.path().join(CGROUP_PROCS)).expect("read to string");
             assert_eq!(pid_content, "1000");
         }
 
@@ -225,13 +224,13 @@ mod tests {
             };
 
             let pid = Pid::from_raw(1001);
-            Freezer::add_task(pid, &tmp).expect("freezer add task");
-            <Freezer as Controller>::apply(&controller_opt, &tmp).expect("freezer apply");
-            let state_content =
-                std::fs::read_to_string(tmp.join(CGROUP_FREEZER_STATE)).expect("read to string");
+            Freezer::add_task(pid, tmp.path()).expect("freezer add task");
+            <Freezer as Controller>::apply(&controller_opt, tmp.path()).expect("freezer apply");
+            let state_content = std::fs::read_to_string(tmp.path().join(CGROUP_FREEZER_STATE))
+                .expect("read to string");
             assert_eq!(FREEZER_STATE_FROZEN, state_content);
             let pid_content =
-                std::fs::read_to_string(tmp.join(CGROUP_PROCS)).expect("read to string");
+                std::fs::read_to_string(tmp.path().join(CGROUP_PROCS)).expect("read to string");
             assert_eq!(pid_content, "1001");
         }
 
@@ -253,15 +252,15 @@ mod tests {
             };
 
             let pid = Pid::from_raw(1002);
-            let old_state_content =
-                std::fs::read_to_string(tmp.join(CGROUP_FREEZER_STATE)).expect("read to string");
-            Freezer::add_task(pid, &tmp).expect("freezer add task");
-            <Freezer as Controller>::apply(&controller_opt, &tmp).expect("freezer apply");
-            let state_content =
-                std::fs::read_to_string(tmp.join(CGROUP_FREEZER_STATE)).expect("read to string");
+            let old_state_content = std::fs::read_to_string(tmp.path().join(CGROUP_FREEZER_STATE))
+                .expect("read to string");
+            Freezer::add_task(pid, tmp.path()).expect("freezer add task");
+            <Freezer as Controller>::apply(&controller_opt, tmp.path()).expect("freezer apply");
+            let state_content = std::fs::read_to_string(tmp.path().join(CGROUP_FREEZER_STATE))
+                .expect("read to string");
             assert_eq!(old_state_content, state_content);
             let pid_content =
-                std::fs::read_to_string(tmp.join(CGROUP_PROCS)).expect("read to string");
+                std::fs::read_to_string(tmp.path().join(CGROUP_PROCS)).expect("read to string");
             assert_eq!(pid_content, "1002");
         }
     }

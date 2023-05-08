@@ -61,7 +61,7 @@ mod tests {
 
     use oci_spec::runtime::LinuxResourcesBuilder;
 
-    use crate::test::{create_temp_dir, set_fixture};
+    use crate::test::set_fixture;
     use crate::v2::controller_type::ControllerType;
 
     use super::*;
@@ -69,9 +69,9 @@ mod tests {
     #[test]
     fn test_set_unified() {
         // arrange
-        let tmp = create_temp_dir("test_set_unified").unwrap();
-        let hugetlb_limit_path = set_fixture(&tmp, "hugetlb.1GB.limit_in_bytes", "").unwrap();
-        let cpu_weight_path = set_fixture(&tmp, "cpu.weight", "").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        let hugetlb_limit_path = set_fixture(tmp.path(), "hugetlb.1GB.limit_in_bytes", "").unwrap();
+        let cpu_weight_path = set_fixture(tmp.path(), "cpu.weight", "").unwrap();
 
         let unified = {
             let mut u = HashMap::new();
@@ -96,7 +96,7 @@ mod tests {
         };
 
         // act
-        Unified::apply(&controller_opt, &tmp, vec![]).expect("apply unified");
+        Unified::apply(&controller_opt, tmp.path(), vec![]).expect("apply unified");
 
         // assert
         let hugetlb_limit = fs::read_to_string(hugetlb_limit_path).expect("read hugetlb limit");
@@ -108,8 +108,7 @@ mod tests {
     #[test]
     fn test_set_unified_failed_to_write_subsystem_not_enabled() {
         // arrange
-        let tmp =
-            create_temp_dir("test_set_unified_failed_to_write_subsystem_not_enabled").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
 
         let unified = {
             let mut u = HashMap::new();
@@ -134,7 +133,7 @@ mod tests {
         };
 
         // act
-        let result = Unified::apply(&controller_opt, &tmp, vec![]);
+        let result = Unified::apply(&controller_opt, tmp.path(), vec![]);
 
         // assert
         assert!(result.is_err());
@@ -143,7 +142,7 @@ mod tests {
     #[test]
     fn test_set_unified_failed_to_write_subsystem_enabled() {
         // arrange
-        let tmp = create_temp_dir("test_set_unified_failed_to_write_subsystem_enabled").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
 
         let unified = {
             let mut u = HashMap::new();
@@ -170,7 +169,7 @@ mod tests {
         // act
         let result = Unified::apply(
             &controller_opt,
-            &tmp,
+            tmp.path(),
             vec![ControllerType::HugeTlb, ControllerType::Cpu],
         );
 

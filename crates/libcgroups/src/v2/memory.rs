@@ -167,16 +167,17 @@ impl Memory {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test::{create_temp_dir, set_fixture};
+    use crate::test::set_fixture;
     use oci_spec::runtime::LinuxMemoryBuilder;
     use std::fs::read_to_string;
 
     #[test]
     fn test_set_memory() {
-        let tmp = create_temp_dir("test_set_memory_v2").expect("create temp directory for test");
-        set_fixture(&tmp, CGROUP_MEMORY_MAX, "0").expect("set fixture for memory limit");
-        set_fixture(&tmp, CGROUP_MEMORY_LOW, "0").expect("set fixture for memory reservation");
-        set_fixture(&tmp, CGROUP_MEMORY_SWAP, "0").expect("set fixture for swap limit");
+        let tmp = tempfile::tempdir().unwrap();
+        set_fixture(tmp.path(), CGROUP_MEMORY_MAX, "0").expect("set fixture for memory limit");
+        set_fixture(tmp.path(), CGROUP_MEMORY_LOW, "0")
+            .expect("set fixture for memory reservation");
+        set_fixture(tmp.path(), CGROUP_MEMORY_SWAP, "0").expect("set fixture for swap limit");
 
         let limit = 1024;
         let reservation = 512;
@@ -189,73 +190,79 @@ mod tests {
             .build()
             .unwrap();
 
-        Memory::apply(&tmp, &memory_limits).expect("apply memory limits");
+        Memory::apply(tmp.path(), &memory_limits).expect("apply memory limits");
 
-        let limit_content = read_to_string(tmp.join(CGROUP_MEMORY_MAX)).expect("read memory limit");
+        let limit_content =
+            read_to_string(tmp.path().join(CGROUP_MEMORY_MAX)).expect("read memory limit");
         assert_eq!(limit_content, limit.to_string());
 
-        let swap_content = read_to_string(tmp.join(CGROUP_MEMORY_SWAP)).expect("read swap limit");
+        let swap_content =
+            read_to_string(tmp.path().join(CGROUP_MEMORY_SWAP)).expect("read swap limit");
         assert_eq!(swap_content, (swap - limit).to_string());
 
         let reservation_content =
-            read_to_string(tmp.join(CGROUP_MEMORY_LOW)).expect("read memory reservation");
+            read_to_string(tmp.path().join(CGROUP_MEMORY_LOW)).expect("read memory reservation");
         assert_eq!(reservation_content, reservation.to_string());
     }
 
     #[test]
     fn test_set_memory_unlimited() {
-        let tmp = create_temp_dir("test_set_memory_unlimited_v2")
-            .expect("create temp directory for test");
-        set_fixture(&tmp, CGROUP_MEMORY_MAX, "0").expect("set fixture for memory limit");
-        set_fixture(&tmp, CGROUP_MEMORY_LOW, "0").expect("set fixture for memory reservation");
-        set_fixture(&tmp, CGROUP_MEMORY_SWAP, "0").expect("set fixture for swap limit");
+        let tmp = tempfile::tempdir().unwrap();
+        set_fixture(tmp.path(), CGROUP_MEMORY_MAX, "0").expect("set fixture for memory limit");
+        set_fixture(tmp.path(), CGROUP_MEMORY_LOW, "0")
+            .expect("set fixture for memory reservation");
+        set_fixture(tmp.path(), CGROUP_MEMORY_SWAP, "0").expect("set fixture for swap limit");
 
         let memory_limits = LinuxMemoryBuilder::default().limit(-1).build().unwrap();
 
-        Memory::apply(&tmp, &memory_limits).expect("apply memory limits");
+        Memory::apply(tmp.path(), &memory_limits).expect("apply memory limits");
 
-        let limit_content = read_to_string(tmp.join(CGROUP_MEMORY_MAX)).expect("read memory limit");
+        let limit_content =
+            read_to_string(tmp.path().join(CGROUP_MEMORY_MAX)).expect("read memory limit");
         assert_eq!(limit_content, "max");
 
-        let swap_content = read_to_string(tmp.join(CGROUP_MEMORY_SWAP)).expect("read swap limit");
+        let swap_content =
+            read_to_string(tmp.path().join(CGROUP_MEMORY_SWAP)).expect("read swap limit");
         assert_eq!(swap_content, "max");
     }
 
     #[test]
     fn test_err_swap_no_memory() {
-        let tmp =
-            create_temp_dir("test_err_swap_no_memory_v2").expect("create temp directory for test");
-        set_fixture(&tmp, CGROUP_MEMORY_MAX, "0").expect("set fixture for memory limit");
-        set_fixture(&tmp, CGROUP_MEMORY_LOW, "0").expect("set fixture for memory reservation");
-        set_fixture(&tmp, CGROUP_MEMORY_SWAP, "0").expect("set fixture for swap limit");
+        let tmp = tempfile::tempdir().unwrap();
+        set_fixture(tmp.path(), CGROUP_MEMORY_MAX, "0").expect("set fixture for memory limit");
+        set_fixture(tmp.path(), CGROUP_MEMORY_LOW, "0")
+            .expect("set fixture for memory reservation");
+        set_fixture(tmp.path(), CGROUP_MEMORY_SWAP, "0").expect("set fixture for swap limit");
 
         let memory_limits = LinuxMemoryBuilder::default().swap(512).build().unwrap();
 
-        let result = Memory::apply(&tmp, &memory_limits);
+        let result = Memory::apply(tmp.path(), &memory_limits);
 
         assert!(result.is_err());
     }
 
     #[test]
     fn test_err_bad_limit() {
-        let tmp = create_temp_dir("test_err_bad_limit_v2").expect("create temp directory for test");
-        set_fixture(&tmp, CGROUP_MEMORY_MAX, "0").expect("set fixture for memory limit");
-        set_fixture(&tmp, CGROUP_MEMORY_LOW, "0").expect("set fixture for memory reservation");
-        set_fixture(&tmp, CGROUP_MEMORY_SWAP, "0").expect("set fixture for swap limit");
+        let tmp = tempfile::tempdir().unwrap();
+        set_fixture(tmp.path(), CGROUP_MEMORY_MAX, "0").expect("set fixture for memory limit");
+        set_fixture(tmp.path(), CGROUP_MEMORY_LOW, "0")
+            .expect("set fixture for memory reservation");
+        set_fixture(tmp.path(), CGROUP_MEMORY_SWAP, "0").expect("set fixture for swap limit");
 
         let memory_limits = LinuxMemoryBuilder::default().limit(-2).build().unwrap();
 
-        let result = Memory::apply(&tmp, &memory_limits);
+        let result = Memory::apply(tmp.path(), &memory_limits);
 
         assert!(result.is_err());
     }
 
     #[test]
     fn test_err_bad_swap() {
-        let tmp = create_temp_dir("test_err_bad_swap_v2").expect("create temp directory for test");
-        set_fixture(&tmp, CGROUP_MEMORY_MAX, "0").expect("set fixture for memory limit");
-        set_fixture(&tmp, CGROUP_MEMORY_LOW, "0").expect("set fixture for memory reservation");
-        set_fixture(&tmp, CGROUP_MEMORY_SWAP, "0").expect("set fixture for swap limit");
+        let tmp = tempfile::tempdir().unwrap();
+        set_fixture(tmp.path(), CGROUP_MEMORY_MAX, "0").expect("set fixture for memory limit");
+        set_fixture(tmp.path(), CGROUP_MEMORY_LOW, "0")
+            .expect("set fixture for memory reservation");
+        set_fixture(tmp.path(), CGROUP_MEMORY_SWAP, "0").expect("set fixture for swap limit");
 
         let memory_limits = LinuxMemoryBuilder::default()
             .limit(512)
@@ -263,19 +270,19 @@ mod tests {
             .build()
             .unwrap();
 
-        let result = Memory::apply(&tmp, &memory_limits);
+        let result = Memory::apply(tmp.path(), &memory_limits);
 
         assert!(result.is_err());
     }
 
     quickcheck! {
         fn property_test_set_memory(linux_memory: LinuxMemory) -> bool {
-            let tmp = create_temp_dir("property_test_set_memory_v2").expect("create temp directory for test");
-            set_fixture(&tmp, CGROUP_MEMORY_MAX, "0").expect("set fixture for memory limit");
-            set_fixture(&tmp, CGROUP_MEMORY_LOW, "0").expect("set fixture for memory reservation");
-            set_fixture(&tmp, CGROUP_MEMORY_SWAP, "0").expect("set fixture for swap limit");
+            let tmp = tempfile::tempdir().unwrap();
+            set_fixture(tmp.path(), CGROUP_MEMORY_MAX, "0").expect("set fixture for memory limit");
+            set_fixture(tmp.path(), CGROUP_MEMORY_LOW, "0").expect("set fixture for memory reservation");
+            set_fixture(tmp.path(), CGROUP_MEMORY_SWAP, "0").expect("set fixture for swap limit");
 
-            let result = Memory::apply(&tmp, &linux_memory);
+            let result = Memory::apply(tmp.path(), &linux_memory);
 
             // we need to check for expected errors first and foremost or we'll get false negatives
             // later
@@ -306,7 +313,7 @@ mod tests {
             }
 
             // check the limit file is set as expected
-            let limit_content = read_to_string(tmp.join(CGROUP_MEMORY_MAX)).expect("read memory limit to string");
+            let limit_content = read_to_string(tmp.path().join(CGROUP_MEMORY_MAX)).expect("read memory limit to string");
             let limit_check = match linux_memory.limit() {
                 Some(limit) if limit == -1 => limit_content == "max",
                 Some(limit) => limit_content == limit.to_string(),
@@ -314,7 +321,7 @@ mod tests {
             };
 
             // check the swap file is set as expected
-            let swap_content = read_to_string(tmp.join(CGROUP_MEMORY_SWAP)).expect("read swap limit to string");
+            let swap_content = read_to_string(tmp.path().join(CGROUP_MEMORY_SWAP)).expect("read swap limit to string");
             let swap_check = match linux_memory.swap() {
                 Some(swap) if swap == -1 => swap_content == "max",
                 Some(swap) => {
@@ -338,7 +345,7 @@ mod tests {
 
 
             // check the resevation file is set as expected
-            let reservation_content = read_to_string(tmp.join(CGROUP_MEMORY_LOW)).expect("read memory reservation to string");
+            let reservation_content = read_to_string(tmp.path().join(CGROUP_MEMORY_LOW)).expect("read memory reservation to string");
             let reservation_check = match linux_memory.reservation() {
                 Some(reservation) if reservation == -1 => reservation_content == "max",
                 Some(reservation) => reservation_content == reservation.to_string(),
@@ -354,13 +361,14 @@ mod tests {
 
     #[test]
     fn test_get_memory_data() {
-        let tmp = create_temp_dir("test_stat_memory").expect("create test directory");
-        set_fixture(&tmp, "memory.current", "12500\n").unwrap();
-        set_fixture(&tmp, "memory.max", "25000\n").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        set_fixture(tmp.path(), "memory.current", "12500\n").unwrap();
+        set_fixture(tmp.path(), "memory.max", "25000\n").unwrap();
         let events = ["slab 5", "anon 13", "oom 3"].join("\n");
-        set_fixture(&tmp, "memory.events", &events).unwrap();
+        set_fixture(tmp.path(), "memory.events", &events).unwrap();
 
-        let actual = Memory::get_memory_data(&tmp, "memory", "oom").expect("get cgroup stats");
+        let actual =
+            Memory::get_memory_data(tmp.path(), "memory", "oom").expect("get cgroup stats");
         let expected = MemoryData {
             usage: 12500,
             limit: 25000,

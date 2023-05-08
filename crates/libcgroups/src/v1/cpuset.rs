@@ -129,14 +129,14 @@ mod tests {
     #[test]
     fn test_set_cpus() {
         // arrange
-        let (tmp, cpus) = setup("test_set_cpus", CGROUP_CPUSET_CPUS);
+        let (tmp, cpus) = setup(CGROUP_CPUSET_CPUS);
         let cpuset = LinuxCpuBuilder::default()
             .cpus("1-3".to_owned())
             .build()
             .unwrap();
 
         // act
-        CpuSet::apply(&tmp, &cpuset).expect("apply cpuset");
+        CpuSet::apply(tmp.path(), &cpuset).expect("apply cpuset");
 
         // assert
         let content = fs::read_to_string(cpus)
@@ -147,14 +147,14 @@ mod tests {
     #[test]
     fn test_set_mems() {
         // arrange
-        let (tmp, mems) = setup("test_set_mems", CGROUP_CPUSET_MEMS);
+        let (tmp, mems) = setup(CGROUP_CPUSET_MEMS);
         let cpuset = LinuxCpuBuilder::default()
             .mems("1-3".to_owned())
             .build()
             .unwrap();
 
         // act
-        CpuSet::apply(&tmp, &cpuset).expect("apply cpuset");
+        CpuSet::apply(tmp.path(), &cpuset).expect("apply cpuset");
 
         // assert
         let content = fs::read_to_string(mems)

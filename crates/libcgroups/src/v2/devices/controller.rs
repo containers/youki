@@ -129,7 +129,7 @@ mod tests {
     #[serial(bpf)] // mock contexts are shared
     fn test_apply_devices() {
         // arrange
-        let (tmp, _) = setup("test_apply_devices", "some.value");
+        let (tmp, _) = setup("some.value");
         let a_type = LinuxDeviceCgroupBuilder::default()
             .typ(LinuxDeviceType::A)
             .build()
@@ -151,14 +151,14 @@ mod tests {
         detach2.expect().never();
 
         // act
-        Devices::apply_devices(&tmp, &Some(vec![a_type])).expect("Could not apply devices");
+        Devices::apply_devices(tmp.path(), &Some(vec![a_type])).expect("Could not apply devices");
     }
 
     #[test]
     #[serial(bpf)] // mock contexts are shared
     fn test_existing_programs() {
         // arrange
-        let (tmp, _) = setup("test_existing_programs", "some.value");
+        let (tmp, _) = setup("some.value");
         let a_type = LinuxDeviceCgroupBuilder::default()
             .typ(LinuxDeviceType::A)
             .build()
@@ -187,6 +187,6 @@ mod tests {
         detach2.expect().once().returning(|_, _| Ok(()));
 
         // act
-        Devices::apply_devices(&tmp, &Some(vec![a_type])).expect("Could not apply devices");
+        Devices::apply_devices(tmp.path(), &Some(vec![a_type])).expect("Could not apply devices");
     }
 }
