@@ -9,7 +9,7 @@ pub const NOTIFY_FILE: &str = "notify.sock";
 
 #[derive(Debug, thiserror::Error)]
 pub enum NotifyListenerError {
-    #[error("failed to chdir when create notify socket")]
+    #[error("failed to chdir while creating notify socket")]
     Chdir { source: nix::Error, path: PathBuf },
     #[error("invalid path: {0}")]
     InvalidPath(PathBuf),
