@@ -91,13 +91,13 @@ mod tests {
 
     use serial_test::serial;
 
-    use crate::utils::{create_temp_dir, TempDir};
+    use crate::utils::test_utils::create_temp_dir;
 
     const CONSOLE_SOCKET: &str = "console-socket";
 
-    fn setup(testname: &str) -> Result<(TempDir, PathBuf, PathBuf)> {
+    fn setup(testname: &str) -> Result<(tempfile::TempDir, PathBuf, PathBuf)> {
         let testdir = create_temp_dir(testname)?;
-        let rundir_path = Path::join(&testdir, "run");
+        let rundir_path = Path::join(testdir.path(), "run");
         fs::create_dir(&rundir_path)?;
         let socket_path = Path::new(&rundir_path).join("socket");
         let _ = File::create(&socket_path);
@@ -111,7 +111,7 @@ mod tests {
         let init = setup("test_setup_console_socket");
         assert!(init.is_ok());
         let (testdir, rundir_path, socket_path) = init.unwrap();
-        let lis = UnixListener::bind(Path::join(&testdir, "console-socket"));
+        let lis = UnixListener::bind(Path::join(testdir.path(), "console-socket"));
         assert!(lis.is_ok());
         let fd = setup_console_socket(&rundir_path, &socket_path, CONSOLE_SOCKET);
         assert!(fd.is_ok());
@@ -135,7 +135,7 @@ mod tests {
         let init = setup("test_setup_console_socket_invalid");
         assert!(init.is_ok());
         let (testdir, rundir_path, socket_path) = init.unwrap();
-        let _socket = File::create(Path::join(&testdir, "console-socket"));
+        let _socket = File::create(Path::join(testdir.path(), "console-socket"));
         assert!(_socket.is_ok());
         let fd = setup_console_socket(&rundir_path, &socket_path, CONSOLE_SOCKET);
         assert!(fd.is_err());
@@ -147,7 +147,7 @@ mod tests {
         let init = setup("test_setup_console");
         assert!(init.is_ok());
         let (testdir, rundir_path, socket_path) = init.unwrap();
-        let lis = UnixListener::bind(Path::join(&testdir, "console-socket"));
+        let lis = UnixListener::bind(Path::join(testdir.path(), "console-socket"));
         assert!(lis.is_ok());
         let fd = setup_console_socket(&rundir_path, &socket_path, CONSOLE_SOCKET);
         let status = setup_console(&fd.unwrap());

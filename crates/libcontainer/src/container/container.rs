@@ -222,7 +222,6 @@ pub struct CheckpointOptions {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::create_temp_dir;
     use anyhow::Context;
     use serial_test::serial;
 
@@ -297,7 +296,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_refresh_load_save_state() -> Result<()> {
-        let tmp_dir = create_temp_dir("test_refresh_load_save_state")?;
+        let tmp_dir = tempfile::tempdir().unwrap();
         let mut container_1 = Container::new(
             "container_id_1",
             ContainerStatus::Created,
@@ -322,7 +321,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_get_spec() -> Result<()> {
-        let tmp_dir = create_temp_dir("test_get_spec")?;
+        let tmp_dir = tempfile::tempdir().unwrap();
         use oci_spec::runtime::Spec;
         let spec = Spec::default();
         let config =

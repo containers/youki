@@ -125,7 +125,7 @@ fn create_container_dev_path(rootfs: &Path, dev: &LinuxDevice) -> Result<PathBuf
 mod tests {
     use super::*;
     use crate::syscall::test::{ChownArgs, MknodArgs, MountArgs, TestHelperSyscall};
-    use crate::utils::TempDir;
+    use anyhow::Result;
     use nix::{
         sys::stat::SFlag,
         unistd::{Gid, Uid},
@@ -134,8 +134,8 @@ mod tests {
     use std::path::PathBuf;
 
     #[test]
-    fn test_bind_dev() {
-        let tmp_dir = TempDir::new("/tmp/test_bind_dev").unwrap();
+    fn test_bind_dev() -> Result<()> {
+        let tmp_dir = tempfile::tempdir()?;
         let device = Device::new_with_syscall(Box::<TestHelperSyscall>::default());
         assert!(device
             .bind_dev(
@@ -161,11 +161,12 @@ mod tests {
             .unwrap()
             .get_mount_args()[0];
         assert_eq!(want, *got);
+        Ok(())
     }
 
     #[test]
-    fn test_mknod_dev() {
-        let tmp_dir = TempDir::new("/tmp/test_mknod_dev").unwrap();
+    fn test_mknod_dev() -> Result<()> {
+        let tmp_dir = tempfile::tempdir()?;
         let device = Device::new_with_syscall(Box::<TestHelperSyscall>::default());
         assert!(device
             .mknod_dev(
@@ -209,11 +210,13 @@ mod tests {
             .unwrap()
             .get_chown_args()[0];
         assert_eq!(want_chown, *got_chown);
+
+        Ok(())
     }
 
     #[test]
-    fn test_create_devices() {
-        let tmp_dir = TempDir::new("/tmp/test_create_devices").unwrap();
+    fn test_create_devices() -> Result<()> {
+        let tmp_dir = tempfile::tempdir()?;
         let device = Device::new_with_syscall(Box::<TestHelperSyscall>::default());
 
         let devices = vec![LinuxDeviceBuilder::default()
@@ -263,5 +266,7 @@ mod tests {
             .unwrap()
             .get_mknod_args()[0];
         assert_eq!(want, *got);
+
+        Ok(())
     }
 }

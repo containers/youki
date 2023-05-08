@@ -88,8 +88,6 @@ mod tests {
     use crate::syscall::linux::LinuxSyscall;
     use crate::syscall::test::TestHelperSyscall;
     #[cfg(feature = "v1")]
-    use crate::utils::create_temp_dir;
-    use crate::utils::TempDir;
     use nix::{
         fcntl::{open, OFlag},
         sys::stat::Mode,
@@ -101,7 +99,7 @@ mod tests {
     #[test]
     fn test_setup_ptmx() {
         {
-            let tmp_dir = TempDir::new("/tmp/test_setup_ptmx").unwrap();
+            let tmp_dir = tempfile::tempdir().unwrap();
             let symlink = Symlink::new();
             assert!(symlink.setup_ptmx(tmp_dir.path()).is_ok());
             let want = (PathBuf::from("pts/ptmx"), tmp_dir.path().join("dev/ptmx"));
@@ -115,7 +113,7 @@ mod tests {
         }
         // make remove_file goes into the bail! path
         {
-            let tmp_dir = TempDir::new("/tmp/test_setup_ptmx").unwrap();
+            let tmp_dir = tempfile::tempdir().unwrap();
             open(
                 &tmp_dir.path().join("dev"),
                 OFlag::O_RDWR | OFlag::O_CREAT,
@@ -140,7 +138,7 @@ mod tests {
 
     #[test]
     fn test_setup_default_symlinks() {
-        let tmp_dir = TempDir::new("/tmp/test_setup_default_symlinks").unwrap();
+        let tmp_dir = tempfile::tempdir().unwrap();
         let symlink = Symlink::new();
         assert!(symlink.setup_default_symlinks(tmp_dir.path()).is_ok());
         let want = vec![
@@ -174,16 +172,16 @@ mod tests {
     #[cfg(feature = "v1")]
     fn setup_comounted_symlinks_success() -> Result<()> {
         // arrange
-        let tmp = create_temp_dir("setup_comounted_symlinks_success")?;
-        let cpu = tmp.join("cpu");
-        let cpuacct = tmp.join("cpuacct");
-        let cpu_cpuacct = tmp.join("cpu,cpuacct");
+        let tmp = tempfile::tempdir().unwrap();
+        let cpu = tmp.path().join("cpu");
+        let cpuacct = tmp.path().join("cpuacct");
+        let cpu_cpuacct = tmp.path().join("cpu,cpuacct");
         fs::create_dir_all(cpu_cpuacct)?;
         let symlink = Symlink::with_syscall(Box::new(LinuxSyscall));
 
         // act
         symlink
-            .setup_comount_symlinks(&tmp, "cpu,cpuacct")
+            .setup_comount_symlinks(tmp.path(), "cpu,cpuacct")
             .context("failed to setup symlinks")?;
 
         // assert
@@ -217,12 +215,12 @@ mod tests {
     #[cfg(feature = "v1")]
     fn setup_comounted_symlinks_no_comounts() -> Result<()> {
         // arrange
-        let tmp = create_temp_dir("setup_comounted_symlinks_no_comounts")?;
+        let tmp = tempfile::tempdir().unwrap();
         let symlink = Symlink::with_syscall(Box::new(LinuxSyscall));
 
         // act
         let result = symlink
-            .setup_comount_symlinks(&tmp, "memory,task")
+            .setup_comount_symlinks(tmp.path(), "memory,task")
             .context("failed to setup symlinks");
 
         // assert

@@ -1972,6 +1972,7 @@ dependencies = [
  "serde_json",
  "serial_test",
  "syscalls",
+ "tempfile",
  "thiserror",
 ]
 
@@ -5322,10 +5323,12 @@ dependencies = [
  "once_cell",
  "pentacle",
  "procfs",
+ "scopeguard",
  "serde",
  "serde_json",
  "serial_test",
  "tabwriter",
+ "tempfile",
  "vergen",
  "wasmedge-sdk",
  "wasmer",

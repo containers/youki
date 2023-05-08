@@ -99,7 +99,7 @@ impl<'a> YoukiConfig {
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::create_temp_dir;
+    use crate::utils::test_utils::create_temp_dir;
 
     use super::*;
     use anyhow::Result;

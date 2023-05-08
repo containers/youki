@@ -10,7 +10,6 @@ use std::collections::HashMap;
 use std::ffi::CString;
 use std::fs::{self, DirBuilder, File};
 use std::io::ErrorKind;
-use std::ops::Deref;
 use std::os::linux::fs::MetadataExt;
 use std::os::unix::fs::DirBuilderExt;
 use std::os::unix::prelude::{AsRawFd, OsStrExt};
@@ -276,61 +275,6 @@ pub fn secure_join<P: Into<PathBuf>>(rootfs: P, unsafe_path: P) -> Result<PathBu
     Ok(rootfs)
 }
 
-pub struct TempDir {
-    path: Option<PathBuf>,
-}
-
-impl TempDir {
-    pub fn new<P: Into<PathBuf>>(path: P) -> Result<Self> {
-        let p = path.into();
-        std::fs::create_dir_all(&p)
-            .with_context(|| format!("failed to create directory {}", p.display()))?;
-        Ok(Self { path: Some(p) })
-    }
-
-    pub fn path(&self) -> &Path {
-        self.path
-            .as_ref()
-            .expect("temp dir has already been removed")
-    }
-
-    pub fn remove(&mut self) {
-        if let Some(p) = &self.path {
-            let _ = fs::remove_dir_all(p);
-            self.path = None;
-        }
-    }
-}
-
-impl Drop for TempDir {
-    fn drop(&mut self) {
-        self.remove();
-    }
-}
-
-impl AsRef<Path> for TempDir {
-    fn as_ref(&self) -> &Path {
-        self.path()
-    }
-}
-
-impl Deref for TempDir {
-    type Target = Path;
-
-    fn deref(&self) -> &Self::Target {
-        self.path()
-    }
-}
-
-pub fn create_temp_dir(test_name: &str) -> Result<TempDir> {
-    let dir = TempDir::new(get_temp_dir_path(test_name))?;
-    Ok(dir)
-}
-
-pub fn get_temp_dir_path(test_name: &str) -> PathBuf {
-    std::env::temp_dir().join(test_name)
-}
-
 pub fn get_executable_path(name: &str, path_var: &str) -> Option<PathBuf> {
     let paths = path_var.trim_start_matches("PATH=");
     // if path has / in it, we have to assume absolute path, as per runc impl
@@ -364,6 +308,13 @@ pub(crate) mod test_utils {
     use nix::sys::wait;
     use rand::Rng;
     use serde::{Deserialize, Serialize};
+
+    pub fn create_temp_dir(test_name: &str) -> Result<tempfile::TempDir> {
+        tempfile::Builder::new()
+            .prefix(test_name)
+            .tempdir()
+            .with_context(|| format!("failed to create temp dir for {}", test_name))
+    }
 
     #[derive(Debug, Serialize, Deserialize)]
     struct TestResult {
@@ -412,6 +363,7 @@ pub(crate) mod test_utils {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::utils::test_utils::create_temp_dir;
 
     #[test]
     pub fn test_get_unix_user() {
@@ -556,9 +508,9 @@ mod tests {
 
     #[test]
     fn test_is_executable() {
+        let tmp = create_temp_dir("test_is_executable").expect("create temp directory for test");
         let executable_path = PathBuf::from("/bin/sh");
-        let directory_path =
-            create_temp_dir("test_is_executable").expect("create temp directory for test");
+        let directory_path = tmp.path();
         let non_executable_path = directory_path.join("non_executable_file");
         let non_existent_path = PathBuf::from("/some/non/existent/path");
 
@@ -567,6 +519,6 @@ mod tests {
         assert!(is_executable(&non_existent_path).is_err());
         assert!(is_executable(&executable_path).unwrap());
         assert!(!is_executable(&non_executable_path).unwrap());
-        assert!(!is_executable(&directory_path).unwrap());
+        assert!(!is_executable(directory_path).unwrap());
     }
 }

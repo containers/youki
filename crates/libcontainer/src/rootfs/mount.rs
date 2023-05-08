@@ -480,7 +480,7 @@ mod tests {
 
     use super::*;
     use crate::syscall::test::{MountArgs, TestHelperSyscall};
-    use crate::utils::create_temp_dir;
+    use crate::utils::test_utils::create_temp_dir;
     use anyhow::Result;
 
     #[test]
@@ -637,7 +637,10 @@ mod tests {
 
         let expected = MountArgs {
             source: Some(PathBuf::from("cgroup")),
-            target: tmp.join_safely(container_cgroup)?.join(subsystem_name),
+            target: tmp
+                .path()
+                .join_safely(container_cgroup)?
+                .join(subsystem_name),
             fstype: Some("cgroup".to_owned()),
             flags: MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
             data: Some("cpu".to_owned()),
@@ -661,7 +664,7 @@ mod tests {
     fn test_emulated_subsystem_success() -> Result<()> {
         // arrange
         let tmp = create_temp_dir("test_emulated_subsystem")?;
-        let host_cgroup_mount = tmp.join("host_cgroup");
+        let host_cgroup_mount = tmp.path().join("host_cgroup");
         let host_cgroup = host_cgroup_mount.join("cpu/container1");
         fs::create_dir_all(&host_cgroup)?;
 
@@ -700,7 +703,10 @@ mod tests {
         // assert
         let expected = MountArgs {
             source: Some(host_cgroup),
-            target: tmp.join_safely(container_cgroup)?.join(subsystem_name),
+            target: tmp
+                .path()
+                .join_safely(container_cgroup)?
+                .join(subsystem_name),
             fstype: Some("bind".to_owned()),
             flags: MsFlags::MS_BIND | MsFlags::MS_REC,
             data: Some("".to_owned()),
@@ -760,7 +766,7 @@ mod tests {
 
         let expected = MountArgs {
             source: Some(PathBuf::from("tmpfs".to_owned())),
-            target: tmp.join_safely(&container_cgroup)?,
+            target: tmp.path().join_safely(&container_cgroup)?,
             fstype: Some("tmpfs".to_owned()),
             flags: MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
             data: Some("mode=755".to_owned()),
@@ -771,7 +777,10 @@ mod tests {
             let subsystem_name = host_mount.file_name().and_then(|f| f.to_str()).unwrap();
             let expected = MountArgs {
                 source: Some(PathBuf::from("cgroup".to_owned())),
-                target: tmp.join_safely(&container_cgroup)?.join(subsystem_name),
+                target: tmp
+                    .path()
+                    .join_safely(&container_cgroup)?
+                    .join(subsystem_name),
                 fstype: Some("cgroup".to_owned()),
                 flags: MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
                 data: Some(
@@ -825,7 +834,7 @@ mod tests {
         // assert
         let expected = MountArgs {
             source: Some(PathBuf::from("cgroup".to_owned())),
-            target: tmp.join_safely(container_cgroup)?,
+            target: tmp.path().join_safely(container_cgroup)?,
             fstype: Some("cgroup2".to_owned()),
             flags: MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
             data: Some("".to_owned()),

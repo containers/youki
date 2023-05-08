@@ -51,6 +51,8 @@ wasmtime-wasi = {version = "8.0.1", optional = true }
 
 [dev-dependencies]
 serial_test = "2.0.0"
+tempfile = "3"
+scopeguard = "1.1.0"
 
 [build-dependencies]
 anyhow = "1.0.71"
