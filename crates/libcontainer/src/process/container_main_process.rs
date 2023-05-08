@@ -240,15 +240,13 @@ mod tests {
             .build()?;
         let uid_mappings = vec![uid_mapping];
         let tmp = tempfile::tempdir()?;
-        let id_mapper = RootlessIDMapper {
-            path: Some(tmp.path().to_path_buf()),
-        };
-        let mut rootless = Rootless {
+        let id_mapper = RootlessIDMapper::new_test(tmp.path().to_path_buf());
+        let rootless = Rootless {
             uid_mappings: Some(&uid_mappings),
             privileged: true,
+            rootless_id_mapper: id_mapper.clone(),
             ..Default::default()
         };
-        rootless.with_id_mapper(id_mapper.clone());
         let (mut parent_sender, mut parent_receiver) = main_channel()?;
         let (mut child_sender, mut child_receiver) = intermediate_channel()?;
         match unsafe { unistd::fork()? } {
@@ -297,14 +295,12 @@ mod tests {
             .build()?;
         let gid_mappings = vec![gid_mapping];
         let tmp = tempfile::tempdir()?;
-        let id_mapper = RootlessIDMapper {
-            path: Some(tmp.path().to_path_buf()),
-        };
-        let mut rootless = Rootless {
+        let id_mapper = RootlessIDMapper::new_test(tmp.path().to_path_buf());
+        let rootless = Rootless {
             gid_mappings: Some(&gid_mappings),
+            rootless_id_mapper: id_mapper.clone(),
             ..Default::default()
         };
-        rootless.with_id_mapper(id_mapper.clone());
         let (mut parent_sender, mut parent_receiver) = main_channel()?;
         let (mut child_sender, mut child_receiver) = intermediate_channel()?;
         match unsafe { unistd::fork()? } {

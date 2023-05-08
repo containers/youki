@@ -8,24 +8,36 @@ use std::process::Command;
 use std::{env, path::PathBuf};
 
 // Wrap the uid/gid path function into a struct for dependency injection. This
-// allows us to mock the id mapping logic in unit tests.
-#[derive(Debug, Clone, Default)]
+// allows us to mock the id mapping logic in unit tests by using a different
+// base path other than `/proc`.
+#[derive(Debug, Clone)]
 pub struct RootlessIDMapper {
-    pub path: Option<PathBuf>,
+    base_path: PathBuf,
+}
+
+impl Default for RootlessIDMapper {
+    fn default() -> Self {
+        Self {
+            // By default, the `uid_map` and `gid_map` files are located in the
+            // `/proc` directory. In the production code, we can use the
+            // default.
+            base_path: PathBuf::from("/proc"),
+        }
+    }
 }
 
 impl RootlessIDMapper {
+    // In production code, we can direclt use the `new` function without the
+    // need to worry about the default.
+    pub fn new() -> Self {
+        Default::default()
+    }
+
     pub fn get_uid_path(&self, pid: &Pid) -> PathBuf {
-        self.path
-            .as_ref()
-            .unwrap_or(&PathBuf::from("/proc"))
-            .join(format!("{pid}/uid_map").as_str())
+        self.base_path.join(pid.to_string()).join("uid_map")
     }
     pub fn get_gid_path(&self, pid: &Pid) -> PathBuf {
-        self.path
-            .as_ref()
-            .unwrap_or(&PathBuf::from("/proc"))
-            .join(format!("{pid}/gid_map").as_str())
+        self.base_path.join(pid.to_string()).join("gid_map")
     }
 
     #[cfg(test)]
@@ -40,6 +52,12 @@ impl RootlessIDMapper {
         std::fs::create_dir_all(self.get_gid_path(pid).parent().unwrap())?;
 
         Ok(())
+    }
+
+    #[cfg(test)]
+    // In test, we need to fake the base path to a temporary directory.
+    pub fn new_test(path: PathBuf) -> Self {
+        Self { base_path: path }
     }
 }
 
@@ -135,7 +153,7 @@ impl<'a> From<&'a Linux> for Rootless<'a> {
             gid_mappings: linux.gid_mappings().as_ref(),
             user_namespace: user_namespace.cloned(),
             privileged: nix::unistd::geteuid().is_root(),
-            rootless_id_mapper: RootlessIDMapper { path: None },
+            rootless_id_mapper: RootlessIDMapper::new(),
         }
     }
 }
@@ -472,7 +490,7 @@ mod tests {
         let pid = getpid();
         let tmp = tempfile::tempdir()?;
         let id_mapper = RootlessIDMapper {
-            path: Some(tmp.path().to_path_buf()),
+            base_path: tmp.path().to_path_buf(),
         };
         id_mapper.ensure_uid_path(&pid)?;
 
@@ -517,7 +535,7 @@ mod tests {
         let pid = getpid();
         let tmp = tempfile::tempdir()?;
         let id_mapper = RootlessIDMapper {
-            path: Some(tmp.path().to_path_buf()),
+            base_path: tmp.path().to_path_buf(),
         };
         id_mapper.ensure_gid_path(&pid)?;
 
