@@ -54,7 +54,7 @@ fn readonly_path(path: &Path, syscall: &dyn Syscall) -> Result<()> {
         None,
     ) {
         match err {
-            SyscallError::MountFailed { errno, .. } => {
+            SyscallError::Mount { source: errno } => {
                 // ignore error if path is not exist.
                 if matches!(errno, nix::errno::Errno::ENOENT) {
                     return Ok(());
@@ -92,7 +92,7 @@ fn masked_path(path: &Path, mount_label: &Option<String>, syscall: &dyn Syscall)
         None,
     ) {
         match err {
-            SyscallError::MountFailed { errno, .. } => match errno {
+            SyscallError::Mount { source: errno } => match errno {
                 nix::errno::Errno::ENOENT => {
                     log::warn!("masked path {:?} not exist", path);
                 }
@@ -740,13 +740,8 @@ mod tests {
             .downcast_ref::<TestHelperSyscall>()
             .unwrap();
         mocks.set_ret_err(ArgName::Mount, || {
-            Err(SyscallError::MountFailed {
-                mount_source: None,
-                mount_target: PathBuf::new(),
-                fstype: None,
-                flags: MsFlags::empty(),
-                data: None,
-                errno: nix::errno::Errno::ENOENT,
+            Err(SyscallError::Mount {
+                source: nix::errno::Errno::ENOENT,
             })
         });
 
@@ -763,13 +758,8 @@ mod tests {
             .downcast_ref::<TestHelperSyscall>()
             .unwrap();
         mocks.set_ret_err(ArgName::Mount, || {
-            Err(SyscallError::MountFailed {
-                mount_source: None,
-                mount_target: PathBuf::new(),
-                fstype: None,
-                flags: MsFlags::empty(),
-                data: None,
-                errno: nix::errno::Errno::ENOTDIR,
+            Err(SyscallError::Mount {
+                source: nix::errno::Errno::ENOTDIR,
             })
         });
 
@@ -795,13 +785,8 @@ mod tests {
             .downcast_ref::<TestHelperSyscall>()
             .unwrap();
         mocks.set_ret_err(ArgName::Mount, || {
-            Err(SyscallError::MountFailed {
-                mount_source: None,
-                mount_target: PathBuf::new(),
-                fstype: None,
-                flags: MsFlags::empty(),
-                data: None,
-                errno: nix::errno::Errno::ENOTDIR,
+            Err(SyscallError::Mount {
+                source: nix::errno::Errno::ENOTDIR,
             })
         });
 
@@ -832,13 +817,8 @@ mod tests {
             .downcast_ref::<TestHelperSyscall>()
             .unwrap();
         mocks.set_ret_err(ArgName::Mount, || {
-            Err(SyscallError::MountFailed {
-                mount_source: None,
-                mount_target: PathBuf::new(),
-                fstype: None,
-                flags: MsFlags::empty(),
-                data: None,
-                errno: nix::errno::Errno::UnknownErrno,
+            Err(SyscallError::Mount {
+                source: nix::errno::Errno::UnknownErrno,
             })
         });
 

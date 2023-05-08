@@ -419,7 +419,7 @@ impl Mount {
             self.syscall
                 .mount(Some(&*src), dest, typ, mount_option_config.flags, Some(&*d))
         {
-            if let SyscallError::MountFailed { errno, .. } = err {
+            if let SyscallError::Mount { source: errno, .. } = err {
                 if !matches!(errno, Errno::EINVAL) {
                     bail!("mount of {:?} failed. {}", m.destination(), errno);
                 }

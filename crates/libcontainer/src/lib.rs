@@ -2,6 +2,7 @@ pub mod apparmor;
 pub mod capabilities;
 pub mod config;
 pub mod container;
+pub mod error;
 pub mod hooks;
 pub mod namespaces;
 pub mod notify_socket;
