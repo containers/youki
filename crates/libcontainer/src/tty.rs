@@ -91,12 +91,10 @@ mod tests {
 
     use serial_test::serial;
 
-    use crate::utils::test_utils::create_temp_dir;
-
     const CONSOLE_SOCKET: &str = "console-socket";
 
-    fn setup(testname: &str) -> Result<(tempfile::TempDir, PathBuf, PathBuf)> {
-        let testdir = create_temp_dir(testname)?;
+    fn setup() -> Result<(tempfile::TempDir, PathBuf, PathBuf)> {
+        let testdir = tempfile::tempdir()?;
         let rundir_path = Path::join(testdir.path(), "run");
         fs::create_dir(&rundir_path)?;
         let socket_path = Path::new(&rundir_path).join("socket");
@@ -108,7 +106,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_setup_console_socket() {
-        let init = setup("test_setup_console_socket");
+        let init = setup();
         assert!(init.is_ok());
         let (testdir, rundir_path, socket_path) = init.unwrap();
         let lis = UnixListener::bind(Path::join(testdir.path(), "console-socket"));
@@ -121,7 +119,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_setup_console_socket_empty() {
-        let init = setup("test_setup_console_socket_empty");
+        let init = setup();
         assert!(init.is_ok());
         let (_testdir, rundir_path, socket_path) = init.unwrap();
         let fd = setup_console_socket(&rundir_path, &socket_path, CONSOLE_SOCKET);
@@ -132,7 +130,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_setup_console_socket_invalid() {
-        let init = setup("test_setup_console_socket_invalid");
+        let init = setup();
         assert!(init.is_ok());
         let (testdir, rundir_path, socket_path) = init.unwrap();
         let _socket = File::create(Path::join(testdir.path(), "console-socket"));
@@ -144,7 +142,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_setup_console() {
-        let init = setup("test_setup_console");
+        let init = setup();
         assert!(init.is_ok());
         let (testdir, rundir_path, socket_path) = init.unwrap();
         let lis = UnixListener::bind(Path::join(testdir.path(), "console-socket"));

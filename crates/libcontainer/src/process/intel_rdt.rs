@@ -322,8 +322,6 @@ pub fn setup_intel_rdt(
 
 #[cfg(test)]
 mod test {
-    use crate::utils::test_utils::create_temp_dir;
-
     use super::*;
     use anyhow::Result;
 
@@ -437,7 +435,7 @@ mod test {
 
     #[test]
     fn test_write_pid_to_resctrl_tasks() -> Result<()> {
-        let tmp = create_temp_dir("test_write_pid_to_resctrl_tasks").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
 
         // Create the directory for id "foo".
         let res =
@@ -466,7 +464,7 @@ mod test {
 
     #[test]
     fn test_write_resctrl_schemata() -> Result<()> {
-        let tmp = create_temp_dir("test_write_resctrl_schemata").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
 
         let res =
             write_container_pid_to_resctrl_tasks(tmp.path(), "foobar", Pid::from_raw(1000), false);

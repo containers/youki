@@ -309,13 +309,6 @@ pub(crate) mod test_utils {
     use rand::Rng;
     use serde::{Deserialize, Serialize};
 
-    pub fn create_temp_dir(test_name: &str) -> Result<tempfile::TempDir> {
-        tempfile::Builder::new()
-            .prefix(test_name)
-            .tempdir()
-            .with_context(|| format!("failed to create temp dir for {}", test_name))
-    }
-
     #[derive(Debug, Serialize, Deserialize)]
     struct TestResult {
         success: bool,
@@ -363,7 +356,6 @@ pub(crate) mod test_utils {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::test_utils::create_temp_dir;
 
     #[test]
     pub fn test_get_unix_user() {
@@ -455,7 +447,7 @@ mod tests {
     fn test_secure_join_symlink() {
         use std::os::unix::fs::symlink;
 
-        let tmp = create_temp_dir("root").unwrap();
+        let tmp = tempfile::tempdir().expect("create temp directory for test");
         let test_root_dir = tmp.path();
 
         symlink("somepath", PathBuf::from(&test_root_dir).join("etc")).unwrap();
@@ -508,7 +500,7 @@ mod tests {
 
     #[test]
     fn test_is_executable() {
-        let tmp = create_temp_dir("test_is_executable").expect("create temp directory for test");
+        let tmp = tempfile::tempdir().expect("create temp directory for test");
         let executable_path = PathBuf::from("/bin/sh");
         let directory_path = tmp.path();
         let non_executable_path = directory_path.join("non_executable_file");
