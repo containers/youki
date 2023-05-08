@@ -7,17 +7,18 @@ use std::{
 #[derive(Debug, thiserror::Error)]
 pub enum AppArmorError {
     #[error("failed to apply AppArmor profile")]
-    ApplyProfile {
+    ActivateProfile {
         path: std::path::PathBuf,
         profile: String,
-        // TODO: fix this after `utils` crate is migrated to `thiserror`
-        source: anyhow::Error,
+        source: std::io::Error,
     },
     #[error("failed to read AppArmor profile: {source} {path}")]
     ReadProfile {
         path: String,
         source: std::io::Error,
     },
+    #[error(transparent)]
+    EnsureProcfs(#[from] utils::EnsureProcfsError),
 }
 
 type Result<T> = std::result::Result<T, AppArmorError>;
@@ -51,12 +52,8 @@ pub fn apply_profile(profile: &str) -> Result<()> {
 }
 
 fn activate_profile(path: &Path, profile: &str) -> Result<()> {
-    utils::ensure_procfs(path).map_err(|err| AppArmorError::ApplyProfile {
-        path: path.to_owned(),
-        profile: profile.to_owned(),
-        source: err,
-    })?;
-    utils::write_file(path, format!("exec {profile}")).map_err(|err| AppArmorError::ApplyProfile {
+    utils::ensure_procfs(path).map_err(AppArmorError::EnsureProcfs)?;
+    fs::write(path, format!("exec {profile}")).map_err(|err| AppArmorError::ActivateProfile {
         path: path.to_owned(),
         profile: profile.to_owned(),
         source: err,

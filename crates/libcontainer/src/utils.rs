@@ -163,11 +163,11 @@ pub fn do_exec(path: impl AsRef<Path>, args: &[String]) -> Result<(), DoExecErro
             path: path.as_ref().to_path_buf(),
         }
     })?;
-    let cArgs: Vec<CString> = args
+    let c_args: Vec<CString> = args
         .iter()
         .map(|s| CString::new(s.as_bytes()).unwrap_or_default())
         .collect();
-    unistd::execvp(&p, &cArgs).map_err(|err| DoExecError::Execvp { source: err })?;
+    unistd::execvp(&p, &c_args).map_err(|err| DoExecError::Execvp { source: err })?;
 
     Ok(())
 }
@@ -375,9 +375,9 @@ pub fn secure_join<P: Into<PathBuf>>(
                 if let Some(metadata) = metadata {
                     if metadata.file_type().is_symlink() {
                         let link_path =
-                            fs::read_link(curr_path).map_err(|err| SecureJoinError::ReadLink {
+                            fs::read_link(&curr_path).map_err(|err| SecureJoinError::ReadLink {
                                 source: err,
-                                path: curr_path,
+                                path: curr_path.to_owned(),
                             })?;
                         path = link_path.join(part.as_path());
                         part = path.iter();
