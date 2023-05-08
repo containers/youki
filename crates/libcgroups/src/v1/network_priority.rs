@@ -40,14 +40,13 @@ impl NetworkPriority {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test::{create_temp_dir, set_fixture};
+    use crate::test::set_fixture;
     use oci_spec::runtime::{LinuxInterfacePriorityBuilder, LinuxNetworkBuilder};
 
     #[test]
     fn test_apply_network_priorites() {
-        let tmp = create_temp_dir("test_apply_network_priorites")
-            .expect("create temp directory for test");
-        set_fixture(&tmp, "net_prio.ifpriomap", "").expect("set fixture for priority map");
+        let tmp = tempfile::tempdir().unwrap();
+        set_fixture(tmp.path(), "net_prio.ifpriomap", "").expect("set fixture for priority map");
         let priorities = vec![
             LinuxInterfacePriorityBuilder::default()
                 .name("a")
@@ -66,10 +65,10 @@ mod tests {
             .build()
             .unwrap();
 
-        NetworkPriority::apply(&tmp, &network).expect("apply network priorities");
+        NetworkPriority::apply(tmp.path(), &network).expect("apply network priorities");
 
-        let content =
-            std::fs::read_to_string(tmp.join("net_prio.ifpriomap")).expect("Read classID contents");
+        let content = std::fs::read_to_string(tmp.path().join("net_prio.ifpriomap"))
+            .expect("Read classID contents");
         assert_eq!(priorities_string.trim(), content);
     }
 }

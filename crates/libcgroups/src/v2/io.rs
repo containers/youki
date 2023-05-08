@@ -196,7 +196,7 @@ impl Io {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::test::{create_temp_dir, set_fixture, setup};
+    use crate::test::{set_fixture, setup};
 
     use oci_spec::runtime::{
         LinuxBlockIoBuilder, LinuxThrottleDeviceBuilder, LinuxWeightDeviceBuilder,
@@ -205,7 +205,7 @@ mod test {
 
     #[test]
     fn test_set_io_read_bps() {
-        let (tmp, throttle) = setup("test_set_io_read_bps", "io.max");
+        let (tmp, throttle) = setup("io.max");
 
         let blkio = LinuxBlockIoBuilder::default()
             .throttle_read_bps_device(vec![LinuxThrottleDeviceBuilder::default()
@@ -217,7 +217,7 @@ mod test {
             .build()
             .unwrap();
 
-        Io::apply(&tmp, &blkio).expect("apply blkio");
+        Io::apply(tmp.path(), &blkio).expect("apply blkio");
         let content = fs::read_to_string(throttle).unwrap_or_else(|_| panic!("read rbps content"));
 
         assert_eq!("8:0 rbps=102400", content);
@@ -225,7 +225,7 @@ mod test {
 
     #[test]
     fn test_set_io_write_bps() {
-        let (tmp, throttle) = setup("test_set_io_write_bps", "io.max");
+        let (tmp, throttle) = setup("io.max");
 
         let blkio = LinuxBlockIoBuilder::default()
             .throttle_write_bps_device(vec![LinuxThrottleDeviceBuilder::default()
@@ -237,7 +237,7 @@ mod test {
             .build()
             .unwrap();
 
-        Io::apply(&tmp, &blkio).expect("apply blkio");
+        Io::apply(tmp.path(), &blkio).expect("apply blkio");
         let content = fs::read_to_string(throttle).unwrap_or_else(|_| panic!("read rbps content"));
 
         assert_eq!("8:0 wbps=102400", content);
@@ -245,7 +245,7 @@ mod test {
 
     #[test]
     fn test_set_io_read_iops() {
-        let (tmp, throttle) = setup("test_set_io_read_iops", "io.max");
+        let (tmp, throttle) = setup("io.max");
 
         let blkio = LinuxBlockIoBuilder::default()
             .throttle_read_iops_device(vec![LinuxThrottleDeviceBuilder::default()
@@ -257,7 +257,7 @@ mod test {
             .build()
             .unwrap();
 
-        Io::apply(&tmp, &blkio).expect("apply blkio");
+        Io::apply(tmp.path(), &blkio).expect("apply blkio");
         let content = fs::read_to_string(throttle).unwrap_or_else(|_| panic!("read riops content"));
 
         assert_eq!("8:0 riops=102400", content);
@@ -265,7 +265,7 @@ mod test {
 
     #[test]
     fn test_set_io_write_iops() {
-        let (tmp, throttle) = setup("test_set_io_write_iops", "io.max");
+        let (tmp, throttle) = setup("io.max");
 
         let blkio = LinuxBlockIoBuilder::default()
             .throttle_write_iops_device(vec![LinuxThrottleDeviceBuilder::default()
@@ -277,7 +277,7 @@ mod test {
             .build()
             .unwrap();
 
-        Io::apply(&tmp, &blkio).expect("apply blkio");
+        Io::apply(tmp.path(), &blkio).expect("apply blkio");
         let content = fs::read_to_string(throttle).unwrap_or_else(|_| panic!("read wiops content"));
 
         assert_eq!("8:0 wiops=102400", content);
@@ -285,7 +285,7 @@ mod test {
 
     #[test]
     fn test_set_ioweight_device() {
-        let (tmp, throttle) = setup("test_set_io_weight_device", CGROUP_BFQ_IO_WEIGHT);
+        let (tmp, throttle) = setup(CGROUP_BFQ_IO_WEIGHT);
         let blkio = LinuxBlockIoBuilder::default()
             .weight_device(vec![LinuxWeightDeviceBuilder::default()
                 .major(8)
@@ -297,7 +297,7 @@ mod test {
             .build()
             .unwrap();
 
-        Io::apply(&tmp, &blkio).expect("apply blkio");
+        Io::apply(tmp.path(), &blkio).expect("apply blkio");
         let content =
             fs::read_to_string(throttle).unwrap_or_else(|_| panic!("read bfq_io_weight content"));
 
@@ -323,13 +323,13 @@ mod test {
                 expected_weight: String::from("1"),
             },
         ] {
-            let (tmp, weight_file) = setup("test_set_io_weight", case.cgroup_file);
+            let (tmp, weight_file) = setup(case.cgroup_file);
             let blkio = LinuxBlockIoBuilder::default()
                 .weight(case.weight)
                 .build()
                 .unwrap();
 
-            Io::apply(&tmp, &blkio).expect("apply blkio");
+            Io::apply(tmp.path(), &blkio).expect("apply blkio");
             let content = fs::read_to_string(weight_file).expect("read blkio weight");
             assert_eq!(case.expected_weight, content);
         }
@@ -337,16 +337,16 @@ mod test {
 
     #[test]
     fn test_stat_io() {
-        let tmp = create_temp_dir("test_stat_io").expect("create test directory");
+        let tmp = tempfile::tempdir().unwrap();
         let stat_content = [
             "7:10 rbytes=18432 wbytes=16842 rios=12 wios=0 dbytes=0 dios=0",
             "7:9 rbytes=34629632 wbytes=274965 rios=1066 wios=319 dbytes=0 dios=0",
         ]
         .join("\n");
-        set_fixture(&tmp, "io.stat", &stat_content).unwrap();
-        set_fixture(&tmp, CGROUP_IO_PSI, "").expect("create psi file");
+        set_fixture(tmp.path(), "io.stat", &stat_content).unwrap();
+        set_fixture(tmp.path(), CGROUP_IO_PSI, "").expect("create psi file");
 
-        let mut actual = Io::stats(&tmp).expect("get cgroup stats");
+        let mut actual = Io::stats(tmp.path()).expect("get cgroup stats");
         let expected = BlkioStats {
             service_bytes: vec![
                 BlkioDeviceStat {

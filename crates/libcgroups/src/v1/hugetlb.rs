@@ -141,15 +141,15 @@ impl HugeTlb {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test::{create_temp_dir, set_fixture};
+    use crate::test::set_fixture;
     use oci_spec::runtime::LinuxHugepageLimitBuilder;
     use std::fs::read_to_string;
 
     #[test]
     fn test_set_hugetlb() {
         let page_file_name = "hugetlb.2MB.limit_in_bytes";
-        let tmp = create_temp_dir("test_set_hugetlb").expect("create temp directory for test");
-        set_fixture(&tmp, page_file_name, "0").expect("Set fixture for 2 MB page size");
+        let tmp = tempfile::tempdir().unwrap();
+        set_fixture(tmp.path(), page_file_name, "0").expect("Set fixture for 2 MB page size");
 
         let hugetlb = LinuxHugepageLimitBuilder::default()
             .page_size("2MB")
@@ -157,15 +157,15 @@ mod tests {
             .build()
             .unwrap();
 
-        HugeTlb::apply(&tmp, &hugetlb).expect("apply hugetlb");
-        let content = read_to_string(tmp.join(page_file_name)).expect("Read hugetlb file content");
+        HugeTlb::apply(tmp.path(), &hugetlb).expect("apply hugetlb");
+        let content =
+            read_to_string(tmp.path().join(page_file_name)).expect("Read hugetlb file content");
         assert_eq!(hugetlb.limit().to_string(), content);
     }
 
     #[test]
     fn test_set_hugetlb_with_invalid_page_size() {
-        let tmp = create_temp_dir("test_set_hugetlb_with_invalid_page_size")
-            .expect("create temp directory for test");
+        let tmp = tempfile::tempdir().unwrap();
 
         let hugetlb = LinuxHugepageLimitBuilder::default()
             .page_size("3MB")
@@ -173,7 +173,7 @@ mod tests {
             .build()
             .unwrap();
 
-        let result = HugeTlb::apply(&tmp, &hugetlb);
+        let result = HugeTlb::apply(tmp.path(), &hugetlb);
         assert!(
             result.is_err(),
             "page size that is not a power of two should be an error"
@@ -183,10 +183,10 @@ mod tests {
     quickcheck! {
         fn property_test_set_hugetlb(hugetlb: LinuxHugepageLimit) -> bool {
             let page_file_name = format!("hugetlb.{:?}.limit_in_bytes", hugetlb.page_size());
-            let tmp = create_temp_dir("property_test_set_hugetlb").expect("create temp directory for test");
-            set_fixture(&tmp, &page_file_name, "0").expect("Set fixture for page size");
+            let tmp = tempfile::tempdir().unwrap();
+            set_fixture(tmp.path(), &page_file_name, "0").expect("Set fixture for page size");
 
-            let result = HugeTlb::apply(&tmp, &hugetlb);
+            let result = HugeTlb::apply(tmp.path(), &hugetlb);
 
             let page_size: String = hugetlb
             .page_size()
@@ -197,7 +197,7 @@ mod tests {
 
             if HugeTlb::is_power_of_two(page_size) && page_size != 1 {
                 let content =
-                    read_to_string(tmp.join(page_file_name)).expect("Read hugetlb file content");
+                    read_to_string(tmp.path().join(page_file_name)).expect("Read hugetlb file content");
                 hugetlb.limit().to_string() == content
             } else {
                 result.is_err()
@@ -207,13 +207,13 @@ mod tests {
 
     #[test]
     fn test_stat_hugetlb() {
-        let tmp = create_temp_dir("test_stat_hugetlb").expect("create temp directory for test");
-        set_fixture(&tmp, "hugetlb.2MB.usage_in_bytes", "1024\n").expect("set hugetlb usage");
-        set_fixture(&tmp, "hugetlb.2MB.max_usage_in_bytes", "4096\n")
+        let tmp = tempfile::tempdir().unwrap();
+        set_fixture(tmp.path(), "hugetlb.2MB.usage_in_bytes", "1024\n").expect("set hugetlb usage");
+        set_fixture(tmp.path(), "hugetlb.2MB.max_usage_in_bytes", "4096\n")
             .expect("set hugetlb max usage");
-        set_fixture(&tmp, "hugetlb.2MB.failcnt", "5").expect("set hugetlb fail count");
+        set_fixture(tmp.path(), "hugetlb.2MB.failcnt", "5").expect("set hugetlb fail count");
 
-        let actual = HugeTlb::stats_for_page_size(&tmp, "2MB").expect("get cgroup stats");
+        let actual = HugeTlb::stats_for_page_size(tmp.path(), "2MB").expect("get cgroup stats");
 
         let expected = HugeTlbStats {
             usage: 1024,

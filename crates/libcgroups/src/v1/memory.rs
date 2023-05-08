@@ -411,19 +411,20 @@ impl Memory {
 mod tests {
     use super::*;
     use crate::common::CGROUP_PROCS;
-    use crate::test::{create_temp_dir, set_fixture};
+    use crate::test::set_fixture;
     use oci_spec::runtime::{LinuxMemoryBuilder, LinuxResourcesBuilder};
 
     #[test]
     fn test_set_memory() {
         let limit = 1024;
-        let tmp = create_temp_dir("test_set_memory").expect("create temp directory for test");
-        set_fixture(&tmp, CGROUP_MEMORY_USAGE, "0").expect("Set fixure for memory usage");
-        set_fixture(&tmp, CGROUP_MEMORY_MAX_USAGE, "0").expect("Set fixure for max memory usage");
-        set_fixture(&tmp, CGROUP_MEMORY_LIMIT, "0").expect("Set fixure for memory limit");
-        Memory::set_memory(limit, &tmp).expect("Set memory limit");
+        let tmp = tempfile::tempdir().unwrap();
+        set_fixture(tmp.path(), CGROUP_MEMORY_USAGE, "0").expect("Set fixure for memory usage");
+        set_fixture(tmp.path(), CGROUP_MEMORY_MAX_USAGE, "0")
+            .expect("Set fixure for max memory usage");
+        set_fixture(tmp.path(), CGROUP_MEMORY_LIMIT, "0").expect("Set fixure for memory limit");
+        Memory::set_memory(limit, tmp.path()).expect("Set memory limit");
         let content =
-            std::fs::read_to_string(tmp.join(CGROUP_MEMORY_LIMIT)).expect("Read to string");
+            std::fs::read_to_string(tmp.path().join(CGROUP_MEMORY_LIMIT)).expect("Read to string");
         assert_eq!(limit.to_string(), content)
     }
 
@@ -431,46 +432,46 @@ mod tests {
     fn pass_set_memory_if_limit_is_zero() {
         let sample_val = "1024";
         let limit = 0;
-        let tmp = create_temp_dir("pass_set_memory_if_limit_is_zero")
-            .expect("create temp directory for test");
-        set_fixture(&tmp, CGROUP_MEMORY_LIMIT, sample_val).expect("Set fixure for memory limit");
-        Memory::set_memory(limit, &tmp).expect("Set memory limit");
+        let tmp = tempfile::tempdir().unwrap();
+        set_fixture(tmp.path(), CGROUP_MEMORY_LIMIT, sample_val)
+            .expect("Set fixure for memory limit");
+        Memory::set_memory(limit, tmp.path()).expect("Set memory limit");
         let content =
-            std::fs::read_to_string(tmp.join(CGROUP_MEMORY_LIMIT)).expect("Read to string");
+            std::fs::read_to_string(tmp.path().join(CGROUP_MEMORY_LIMIT)).expect("Read to string");
         assert_eq!(content, sample_val)
     }
 
     #[test]
     fn test_set_swap() {
         let limit = 512;
-        let tmp = create_temp_dir("test_set_swap").expect("create temp directory for test");
-        set_fixture(&tmp, CGROUP_MEMORY_SWAP_LIMIT, "0").expect("Set fixure for swap limit");
-        Memory::set_swap(limit, &tmp).expect("Set swap limit");
-        let content =
-            std::fs::read_to_string(tmp.join(CGROUP_MEMORY_SWAP_LIMIT)).expect("Read to string");
+        let tmp = tempfile::tempdir().unwrap();
+        set_fixture(tmp.path(), CGROUP_MEMORY_SWAP_LIMIT, "0").expect("Set fixure for swap limit");
+        Memory::set_swap(limit, tmp.path()).expect("Set swap limit");
+        let content = std::fs::read_to_string(tmp.path().join(CGROUP_MEMORY_SWAP_LIMIT))
+            .expect("Read to string");
         assert_eq!(limit.to_string(), content)
     }
 
     #[test]
     fn test_set_memory_and_swap() {
-        let tmp =
-            create_temp_dir("test_set_memory_and_swap").expect("create temp directory for test");
-        set_fixture(&tmp, CGROUP_MEMORY_USAGE, "0").expect("Set fixure for memory usage");
-        set_fixture(&tmp, CGROUP_MEMORY_MAX_USAGE, "0").expect("Set fixure for max memory usage");
-        set_fixture(&tmp, CGROUP_MEMORY_LIMIT, "0").expect("Set fixure for memory limit");
-        set_fixture(&tmp, CGROUP_MEMORY_SWAP_LIMIT, "0").expect("Set fixure for swap limit");
+        let tmp = tempfile::tempdir().unwrap();
+        set_fixture(tmp.path(), CGROUP_MEMORY_USAGE, "0").expect("Set fixure for memory usage");
+        set_fixture(tmp.path(), CGROUP_MEMORY_MAX_USAGE, "0")
+            .expect("Set fixure for max memory usage");
+        set_fixture(tmp.path(), CGROUP_MEMORY_LIMIT, "0").expect("Set fixure for memory limit");
+        set_fixture(tmp.path(), CGROUP_MEMORY_SWAP_LIMIT, "0").expect("Set fixure for swap limit");
 
         // test unlimited memory with no set swap
         {
             let limit = -1;
             let linux_memory = LinuxMemoryBuilder::default().limit(limit).build().unwrap();
-            Memory::apply(&linux_memory, &tmp).expect("Set memory and swap");
+            Memory::apply(&linux_memory, tmp.path()).expect("Set memory and swap");
 
-            let limit_content =
-                std::fs::read_to_string(tmp.join(CGROUP_MEMORY_LIMIT)).expect("Read to string");
+            let limit_content = std::fs::read_to_string(tmp.path().join(CGROUP_MEMORY_LIMIT))
+                .expect("Read to string");
             assert_eq!(limit.to_string(), limit_content);
 
-            let swap_content = std::fs::read_to_string(tmp.join(CGROUP_MEMORY_SWAP_LIMIT))
+            let swap_content = std::fs::read_to_string(tmp.path().join(CGROUP_MEMORY_SWAP_LIMIT))
                 .expect("Read to string");
             // swap should be set to -1 also
             assert_eq!(limit.to_string(), swap_content);
@@ -485,13 +486,13 @@ mod tests {
                 .swap(swap)
                 .build()
                 .unwrap();
-            Memory::apply(&linux_memory, &tmp).expect("Set memory and swap");
+            Memory::apply(&linux_memory, tmp.path()).expect("Set memory and swap");
 
-            let limit_content =
-                std::fs::read_to_string(tmp.join(CGROUP_MEMORY_LIMIT)).expect("Read to string");
+            let limit_content = std::fs::read_to_string(tmp.path().join(CGROUP_MEMORY_LIMIT))
+                .expect("Read to string");
             assert_eq!(limit.to_string(), limit_content);
 
-            let swap_content = std::fs::read_to_string(tmp.join(CGROUP_MEMORY_SWAP_LIMIT))
+            let swap_content = std::fs::read_to_string(tmp.path().join(CGROUP_MEMORY_SWAP_LIMIT))
                 .expect("Read to string");
             assert_eq!(swap.to_string(), swap_content);
         }
@@ -499,18 +500,17 @@ mod tests {
 
     quickcheck! {
             fn property_test_set_memory(linux_memory: LinuxMemory, disable_oom_killer: bool) -> bool {
-                let tmp =
-                    create_temp_dir("property_test_set_memory").expect("create temp directory for test");
-                set_fixture(&tmp, CGROUP_MEMORY_USAGE, "0").expect("Set fixure for memory usage");
-                set_fixture(&tmp, CGROUP_MEMORY_MAX_USAGE, "0").expect("Set fixure for max memory usage");
-                set_fixture(&tmp, CGROUP_MEMORY_LIMIT, "0").expect("Set fixure for memory limit");
-                set_fixture(&tmp, CGROUP_MEMORY_SWAP_LIMIT, "0").expect("Set fixure for swap limit");
-                set_fixture(&tmp, CGROUP_MEMORY_SWAPPINESS, "0").expect("Set fixure for swappiness");
-                set_fixture(&tmp, CGROUP_MEMORY_RESERVATION, "0").expect("Set fixture for memory reservation");
-                set_fixture(&tmp, CGROUP_MEMORY_OOM_CONTROL, "0").expect("Set fixture for oom control");
-                set_fixture(&tmp, CGROUP_KERNEL_MEMORY_LIMIT, "0").expect("Set fixture for kernel memory limit");
-                set_fixture(&tmp, CGROUP_KERNEL_TCP_MEMORY_LIMIT, "0").expect("Set fixture for kernel tcp memory limit");
-                set_fixture(&tmp, CGROUP_PROCS, "").expect("set fixture for proc file");
+                let tmp = tempfile::tempdir().unwrap();
+                set_fixture(tmp.path(), CGROUP_MEMORY_USAGE, "0").expect("Set fixure for memory usage");
+                set_fixture(tmp.path(), CGROUP_MEMORY_MAX_USAGE, "0").expect("Set fixure for max memory usage");
+                set_fixture(tmp.path(), CGROUP_MEMORY_LIMIT, "0").expect("Set fixure for memory limit");
+                set_fixture(tmp.path(), CGROUP_MEMORY_SWAP_LIMIT, "0").expect("Set fixure for swap limit");
+                set_fixture(tmp.path(), CGROUP_MEMORY_SWAPPINESS, "0").expect("Set fixure for swappiness");
+                set_fixture(tmp.path(), CGROUP_MEMORY_RESERVATION, "0").expect("Set fixture for memory reservation");
+                set_fixture(tmp.path(), CGROUP_MEMORY_OOM_CONTROL, "0").expect("Set fixture for oom control");
+                set_fixture(tmp.path(), CGROUP_KERNEL_MEMORY_LIMIT, "0").expect("Set fixture for kernel memory limit");
+                set_fixture(tmp.path(), CGROUP_KERNEL_TCP_MEMORY_LIMIT, "0").expect("Set fixture for kernel tcp memory limit");
+                set_fixture(tmp.path(), CGROUP_PROCS, "").expect("set fixture for proc file");
 
 
                 // clone to avoid use of moved value later on
@@ -525,7 +525,7 @@ mod tests {
                     freezer_state: None,
                 };
 
-                let result = <Memory as Controller>::apply(&controller_opt, &tmp);
+                let result = <Memory as Controller>::apply(&controller_opt, tmp.path());
 
 
                 if result.is_err() {
@@ -543,7 +543,7 @@ mod tests {
                 }
 
                 // check memory reservation
-                let reservation_content = std::fs::read_to_string(tmp.join(CGROUP_MEMORY_RESERVATION)).expect("read memory reservation");
+                let reservation_content = std::fs::read_to_string(tmp.path().join(CGROUP_MEMORY_RESERVATION)).expect("read memory reservation");
                 let reservation_check = match memory_limits.reservation() {
                     Some(reservation) => {
                         reservation_content == reservation.to_string()
@@ -552,7 +552,7 @@ mod tests {
                 };
 
                 // check kernel memory limit
-                let kernel_content = std::fs::read_to_string(tmp.join(CGROUP_KERNEL_MEMORY_LIMIT)).expect("read kernel memory limit");
+                let kernel_content = std::fs::read_to_string(tmp.path().join(CGROUP_KERNEL_MEMORY_LIMIT)).expect("read kernel memory limit");
                 let kernel_check = match memory_limits.kernel() {
                     Some(kernel) => {
                         kernel_content == kernel.to_string()
@@ -561,7 +561,7 @@ mod tests {
                 };
 
                 // check kernel tcp memory limit
-                let kernel_tcp_content = std::fs::read_to_string(tmp.join(CGROUP_KERNEL_TCP_MEMORY_LIMIT)).expect("read kernel tcp memory limit");
+                let kernel_tcp_content = std::fs::read_to_string(tmp.path().join(CGROUP_KERNEL_TCP_MEMORY_LIMIT)).expect("read kernel tcp memory limit");
                 let kernel_tcp_check = match memory_limits.kernel_tcp() {
                     Some(kernel_tcp) => {
                         kernel_tcp_content == kernel_tcp.to_string()
@@ -570,7 +570,7 @@ mod tests {
                 };
 
                 // check swappiness
-                let swappiness_content = std::fs::read_to_string(tmp.join(CGROUP_MEMORY_SWAPPINESS)).expect("read swappiness");
+                let swappiness_content = std::fs::read_to_string(tmp.path().join(CGROUP_MEMORY_SWAPPINESS)).expect("read swappiness");
                 let swappiness_check = match memory_limits.swappiness() {
                     Some(swappiness) if swappiness <= 100 => {
                         swappiness_content == swappiness.to_string()
@@ -581,8 +581,8 @@ mod tests {
                 };
 
                 // check limit and swap
-                let limit_content = std::fs::read_to_string(tmp.join(CGROUP_MEMORY_LIMIT)).expect("read memory limit");
-                let swap_content = std::fs::read_to_string(tmp.join(CGROUP_MEMORY_SWAP_LIMIT)).expect("read swap memory limit");
+                let limit_content = std::fs::read_to_string(tmp.path().join(CGROUP_MEMORY_LIMIT)).expect("read memory limit");
+                let swap_content = std::fs::read_to_string(tmp.path().join(CGROUP_MEMORY_SWAP_LIMIT)).expect("read swap memory limit");
                 let limit_swap_check = match memory_limits.limit() {
                     Some(limit) => {
                         match memory_limits.swap() {
@@ -626,28 +626,33 @@ mod tests {
 
     #[test]
     fn test_stat_memory_data() {
-        let tmp = create_temp_dir("test_stat_memory_data").expect("create test directory");
+        let tmp = tempfile::tempdir().unwrap();
         set_fixture(
-            &tmp,
+            tmp.path(),
             &format!("{MEMORY_PREFIX}{MEMORY_USAGE_IN_BYTES}"),
             "1024\n",
         )
         .unwrap();
         set_fixture(
-            &tmp,
+            tmp.path(),
             &format!("{MEMORY_PREFIX}{MEMORY_MAX_USAGE_IN_BYTES}"),
             "2048\n",
         )
         .unwrap();
         set_fixture(
-            &tmp,
+            tmp.path(),
             &format!("{MEMORY_PREFIX}{MEMORY_LIMIT_IN_BYTES}"),
             "4096\n",
         )
         .unwrap();
-        set_fixture(&tmp, &format!("{MEMORY_PREFIX}{MEMORY_FAIL_COUNT}"), "5\n").unwrap();
+        set_fixture(
+            tmp.path(),
+            &format!("{MEMORY_PREFIX}{MEMORY_FAIL_COUNT}"),
+            "5\n",
+        )
+        .unwrap();
 
-        let actual = Memory::get_memory_data(&tmp, MEMORY_PREFIX).expect("get cgroup stats");
+        let actual = Memory::get_memory_data(tmp.path(), MEMORY_PREFIX).expect("get cgroup stats");
         let expected = MemoryData {
             usage: 1024,
             max_usage: 2048,
@@ -660,25 +665,25 @@ mod tests {
 
     #[test]
     fn test_stat_hierarchy_enabled() {
-        let tmp = create_temp_dir("test_stat_hierarchy_enabled").expect("create test directory");
-        set_fixture(&tmp, MEMORY_USE_HIERARCHY, "1").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        set_fixture(tmp.path(), MEMORY_USE_HIERARCHY, "1").unwrap();
 
-        let enabled = Memory::hierarchy_enabled(&tmp).expect("get cgroup stats");
+        let enabled = Memory::hierarchy_enabled(tmp.path()).expect("get cgroup stats");
         assert!(enabled)
     }
 
     #[test]
     fn test_stat_hierarchy_disabled() {
-        let tmp = create_temp_dir("test_stat_hierarchy_disabled").expect("create test directory");
-        set_fixture(&tmp, MEMORY_USE_HIERARCHY, "0").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        set_fixture(tmp.path(), MEMORY_USE_HIERARCHY, "0").unwrap();
 
-        let enabled = Memory::hierarchy_enabled(&tmp).expect("get cgroup stats");
+        let enabled = Memory::hierarchy_enabled(tmp.path()).expect("get cgroup stats");
         assert!(!enabled)
     }
 
     #[test]
     fn test_stat_memory_stats() {
-        let tmp = create_temp_dir("test_stat_memory_stats").expect("create test directory");
+        let tmp = tempfile::tempdir().unwrap();
         let content = [
             "cache 0",
             "rss 0",
@@ -690,9 +695,9 @@ mod tests {
             "hierarchical_memsw_limit 9223372036854771712",
         ]
         .join("\n");
-        set_fixture(&tmp, MEMORY_STAT, &content).unwrap();
+        set_fixture(tmp.path(), MEMORY_STAT, &content).unwrap();
 
-        let actual = Memory::get_stat_data(&tmp).expect("get cgroup data");
+        let actual = Memory::get_stat_data(tmp.path()).expect("get cgroup data");
         let expected: HashMap<String, u64> = [
             ("cache".to_owned(), 0),
             ("rss".to_owned(), 0),

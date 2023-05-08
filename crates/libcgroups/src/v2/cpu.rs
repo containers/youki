@@ -177,7 +177,7 @@ mod tests {
     use super::*;
     use crate::{
         stats::CpuUsage,
-        test::{create_temp_dir, set_fixture, setup},
+        test::{set_fixture, setup},
     };
     use oci_spec::runtime::LinuxCpuBuilder;
     use std::fs;
@@ -185,13 +185,13 @@ mod tests {
     #[test]
     fn test_set_valid_shares() {
         // arrange
-        let (tmp, weight) = setup("test_set_shares", CGROUP_CPU_WEIGHT);
-        let _ = set_fixture(&tmp, CGROUP_CPU_MAX, "")
+        let (tmp, weight) = setup(CGROUP_CPU_WEIGHT);
+        let _ = set_fixture(tmp.path(), CGROUP_CPU_MAX, "")
             .unwrap_or_else(|_| panic!("set test fixture for {CGROUP_CPU_MAX}"));
         let cpu = LinuxCpuBuilder::default().shares(22000u64).build().unwrap();
 
         // act
-        Cpu::apply(&tmp, &cpu).expect("apply cpu");
+        Cpu::apply(tmp.path(), &cpu).expect("apply cpu");
 
         // assert
         let content = fs::read_to_string(weight)
@@ -214,11 +214,11 @@ mod tests {
             return;
         }
 
-        let (tmp, max) = setup("test_set_cpu_idle", CGROUP_CPU_IDLE);
+        let (tmp, max) = setup(CGROUP_CPU_IDLE);
         let cpu = LinuxCpuBuilder::default().idle(IDLE).build().unwrap();
 
         // act
-        Cpu::apply(&tmp, &cpu).expect("apply cpu");
+        Cpu::apply(tmp.path(), &cpu).expect("apply cpu");
 
         // assert
         let content = fs::read_to_string(max)
@@ -230,11 +230,11 @@ mod tests {
     fn test_set_positive_quota() {
         // arrange
         const QUOTA: i64 = 200000;
-        let (tmp, max) = setup("test_set_positive_quota", CGROUP_CPU_MAX);
+        let (tmp, max) = setup(CGROUP_CPU_MAX);
         let cpu = LinuxCpuBuilder::default().quota(QUOTA).build().unwrap();
 
         // act
-        Cpu::apply(&tmp, &cpu).expect("apply cpu");
+        Cpu::apply(tmp.path(), &cpu).expect("apply cpu");
 
         // assert
         let content = fs::read_to_string(max)
@@ -245,11 +245,11 @@ mod tests {
     #[test]
     fn test_set_negative_quota() {
         // arrange
-        let (tmp, max) = setup("test_set_negative_quota", CGROUP_CPU_MAX);
+        let (tmp, max) = setup(CGROUP_CPU_MAX);
         let cpu = LinuxCpuBuilder::default().quota(-500).build().unwrap();
 
         // act
-        Cpu::apply(&tmp, &cpu).expect("apply cpu");
+        Cpu::apply(tmp.path(), &cpu).expect("apply cpu");
 
         // assert
         let content = fs::read_to_string(max)
@@ -262,12 +262,12 @@ mod tests {
         // arrange
         const QUOTA: u64 = 50000;
         const PERIOD: u64 = 100000;
-        let (tmp, max) = setup("test_set_positive_period", CGROUP_CPU_MAX);
+        let (tmp, max) = setup(CGROUP_CPU_MAX);
         common::write_cgroup_file(&max, QUOTA).unwrap();
         let cpu = LinuxCpuBuilder::default().period(PERIOD).build().unwrap();
 
         // act
-        Cpu::apply(&tmp, &cpu).expect("apply cpu");
+        Cpu::apply(tmp.path(), &cpu).expect("apply cpu");
 
         // assert
         let content = fs::read_to_string(max)
@@ -280,7 +280,7 @@ mod tests {
         // arrange
         const QUOTA: i64 = 200000;
         const PERIOD: u64 = 100000;
-        let (tmp, max) = setup("test_set_quota_and_period", CGROUP_CPU_MAX);
+        let (tmp, max) = setup(CGROUP_CPU_MAX);
         let cpu = LinuxCpuBuilder::default()
             .quota(QUOTA)
             .period(PERIOD)
@@ -288,7 +288,7 @@ mod tests {
             .unwrap();
 
         // act
-        Cpu::apply(&tmp, &cpu).expect("apply cpu");
+        Cpu::apply(tmp.path(), &cpu).expect("apply cpu");
 
         // assert
         let content = fs::read_to_string(max)
@@ -299,15 +299,14 @@ mod tests {
     #[test]
     fn test_realtime_runtime_not_supported() {
         // arrange
-        let tmp = create_temp_dir("test_realtime_runtime_not_supported")
-            .expect("create temp directory for test");
+        let tmp = tempfile::tempdir().unwrap();
         let cpu = LinuxCpuBuilder::default()
             .realtime_runtime(5)
             .build()
             .unwrap();
 
         // act
-        let result = Cpu::apply(&tmp, &cpu);
+        let result = Cpu::apply(tmp.path(), &cpu);
 
         // assert
         assert!(
@@ -319,15 +318,14 @@ mod tests {
     #[test]
     fn test_realtime_period_not_supported() {
         // arrange
-        let tmp = create_temp_dir("test_realtime_period_not_supported")
-            .expect("create temp directory for test");
+        let tmp = tempfile::tempdir().unwrap();
         let cpu = LinuxCpuBuilder::default()
             .realtime_period(5u64)
             .build()
             .unwrap();
 
         // act
-        let result = Cpu::apply(&tmp, &cpu);
+        let result = Cpu::apply(tmp.path(), &cpu);
 
         // assert
         assert!(
@@ -338,12 +336,12 @@ mod tests {
 
     #[test]
     fn test_stat_usage() {
-        let tmp = create_temp_dir("test_stat_usage").expect("create temp directory for test");
+        let tmp = tempfile::tempdir().unwrap();
         let content = ["usage_usec 7730", "user_usec 4387", "system_usec 3498"].join("\n");
-        set_fixture(&tmp, CPU_STAT, &content).expect("create stat file");
-        set_fixture(&tmp, CPU_PSI, "").expect("create psi file");
+        set_fixture(tmp.path(), CPU_STAT, &content).expect("create stat file");
+        set_fixture(tmp.path(), CPU_PSI, "").expect("create psi file");
 
-        let actual = Cpu::stats(&tmp).expect("get cgroup stats");
+        let actual = Cpu::stats(tmp.path()).expect("get cgroup stats");
         let expected = CpuUsage {
             usage_total: 7730,
             usage_user: 4387,
@@ -357,10 +355,10 @@ mod tests {
     #[test]
     fn test_burst() {
         let expected = 100000u64;
-        let (tmp, burst_file) = setup("test_burst", CGROUP_CPU_BURST);
+        let (tmp, burst_file) = setup(CGROUP_CPU_BURST);
         let cpu = LinuxCpuBuilder::default().burst(expected).build().unwrap();
 
-        Cpu::apply(&tmp, &cpu).expect("apply cpu");
+        Cpu::apply(tmp.path(), &cpu).expect("apply cpu");
 
         let actual = fs::read_to_string(burst_file).expect("read burst file");
         assert_eq!(actual, expected.to_string());

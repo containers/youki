@@ -148,31 +148,31 @@ mod tests {
     use std::fs;
 
     use nix::unistd::Pid;
+    use tempfile::TempDir;
 
     use super::*;
     use crate::{
         common::CGROUP_PROCS,
-        test::{create_temp_dir, TempDir},
         test::{set_fixture, setup},
     };
 
-    fn setup_total_cpu(test_name: &str, stat_content: &str, usage_content: &str) -> TempDir {
-        let tmp = create_temp_dir(test_name).expect("create temp directory for test");
+    fn setup_total_cpu(stat_content: &str, usage_content: &str) -> TempDir {
+        let tmp = tempfile::tempdir().unwrap();
 
-        let _ = set_fixture(&tmp, CGROUP_CPUACCT_STAT, stat_content)
+        let _ = set_fixture(tmp.path(), CGROUP_CPUACCT_STAT, stat_content)
             .unwrap_or_else(|_| panic!("create {CGROUP_CPUACCT_STAT} file"));
-        let _ = set_fixture(&tmp, CGROUP_CPUACCT_USAGE, usage_content)
+        let _ = set_fixture(tmp.path(), CGROUP_CPUACCT_USAGE, usage_content)
             .unwrap_or_else(|_| panic!("create {CGROUP_CPUACCT_USAGE} file"));
 
         tmp
     }
 
-    fn setup_per_core(test_name: &str, percpu_content: &str, usage_all_content: &str) -> TempDir {
-        let tmp = create_temp_dir(test_name).expect("create temp directory for test");
+    fn setup_per_core(percpu_content: &str, usage_all_content: &str) -> TempDir {
+        let tmp = tempfile::tempdir().unwrap();
 
-        let _ = set_fixture(&tmp, CGROUP_CPUACCT_PERCPU, percpu_content)
+        let _ = set_fixture(tmp.path(), CGROUP_CPUACCT_PERCPU, percpu_content)
             .unwrap_or_else(|_| panic!("create {CGROUP_CPUACCT_PERCPU} file"));
-        let _ = set_fixture(&tmp, CGROUP_CPUACCT_USAGE_ALL, usage_all_content)
+        let _ = set_fixture(tmp.path(), CGROUP_CPUACCT_USAGE_ALL, usage_all_content)
             .unwrap_or_else(|_| panic!("create {CGROUP_CPUACCT_USAGE_ALL} file"));
 
         tmp
@@ -180,10 +180,10 @@ mod tests {
 
     #[test]
     fn test_add_task() {
-        let (tmp, procs) = setup("test_cpuacct_apply", CGROUP_PROCS);
+        let (tmp, procs) = setup(CGROUP_PROCS);
         let pid = Pid::from_raw(1000);
 
-        CpuAcct::add_task(pid, &tmp).expect("apply cpuacct");
+        CpuAcct::add_task(pid, tmp.path()).expect("apply cpuacct");
 
         let content = fs::read_to_string(procs)
             .unwrap_or_else(|_| panic!("read {CGROUP_PROCS} file content"));
@@ -194,7 +194,7 @@ mod tests {
     fn test_stat_total_cpu_usage() {
         let stat_content = &["user 1300888", "system 364592"].join("\n");
         let usage_content = "18198092369681";
-        let tmp = setup_total_cpu("test_get_total_cpu", stat_content, usage_content);
+        let tmp = setup_total_cpu(stat_content, usage_content);
 
         let mut stats = CpuUsage::default();
         CpuAcct::get_total_cpu_usage(tmp.path(), &mut stats).expect("get cgroup stats");
@@ -215,11 +215,7 @@ mod tests {
             "3 4021385867300 304269989810",
         ]
         .join("\n");
-        let tmp = setup_per_core(
-            "test_get_per_core_cpu_usage",
-            percpu_content,
-            usage_all_content,
-        );
+        let tmp = setup_per_core(percpu_content, usage_all_content);
 
         let mut stats = CpuUsage::default();
         CpuAcct::get_per_core_usage(tmp.path(), &mut stats).expect("get cgroup stats");
