@@ -272,19 +272,18 @@ impl<'a> ContainerBuilder<'a> {
 mod tests {
     use crate::container::builder::ContainerBuilder;
     use crate::syscall::syscall::create_syscall;
-    use crate::utils::TempDir;
     use anyhow::{Context, Result};
     use std::path::PathBuf;
 
     #[test]
     fn test_failable_functions() -> Result<()> {
-        let root_path_temp_dir = TempDir::new("root_path").context("failed to create temp dir")?;
-        let pid_file_temp_dir = TempDir::new("pid_file").context("failed to create temp dir")?;
+        let root_path_temp_dir = tempfile::tempdir().context("failed to create temp dir")?;
+        let pid_file_temp_dir = tempfile::tempdir().context("failed to create temp dir")?;
         let syscall = create_syscall();
 
         ContainerBuilder::new("74f1a4cb3801".to_owned(), syscall.as_ref())
             .with_root_path(root_path_temp_dir.path())?
-            .with_pid_file(Some(pid_file_temp_dir.path()))?
+            .with_pid_file(Some(pid_file_temp_dir.path().join("fake.pid")))?
             .with_console_socket(Some("/var/run/docker/sock.tty"))
             .as_init("/var/run/docker/bundle");
 

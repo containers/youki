@@ -91,13 +91,11 @@ mod tests {
 
     use serial_test::serial;
 
-    use crate::utils::{create_temp_dir, TempDir};
-
     const CONSOLE_SOCKET: &str = "console-socket";
 
-    fn setup(testname: &str) -> Result<(TempDir, PathBuf, PathBuf)> {
-        let testdir = create_temp_dir(testname)?;
-        let rundir_path = Path::join(&testdir, "run");
+    fn setup() -> Result<(tempfile::TempDir, PathBuf, PathBuf)> {
+        let testdir = tempfile::tempdir()?;
+        let rundir_path = Path::join(testdir.path(), "run");
         fs::create_dir(&rundir_path)?;
         let socket_path = Path::new(&rundir_path).join("socket");
         let _ = File::create(&socket_path);
@@ -108,10 +106,10 @@ mod tests {
     #[test]
     #[serial]
     fn test_setup_console_socket() {
-        let init = setup("test_setup_console_socket");
+        let init = setup();
         assert!(init.is_ok());
         let (testdir, rundir_path, socket_path) = init.unwrap();
-        let lis = UnixListener::bind(Path::join(&testdir, "console-socket"));
+        let lis = UnixListener::bind(Path::join(testdir.path(), "console-socket"));
         assert!(lis.is_ok());
         let fd = setup_console_socket(&rundir_path, &socket_path, CONSOLE_SOCKET);
         assert!(fd.is_ok());
@@ -121,7 +119,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_setup_console_socket_empty() {
-        let init = setup("test_setup_console_socket_empty");
+        let init = setup();
         assert!(init.is_ok());
         let (_testdir, rundir_path, socket_path) = init.unwrap();
         let fd = setup_console_socket(&rundir_path, &socket_path, CONSOLE_SOCKET);
@@ -132,10 +130,10 @@ mod tests {
     #[test]
     #[serial]
     fn test_setup_console_socket_invalid() {
-        let init = setup("test_setup_console_socket_invalid");
+        let init = setup();
         assert!(init.is_ok());
         let (testdir, rundir_path, socket_path) = init.unwrap();
-        let _socket = File::create(Path::join(&testdir, "console-socket"));
+        let _socket = File::create(Path::join(testdir.path(), "console-socket"));
         assert!(_socket.is_ok());
         let fd = setup_console_socket(&rundir_path, &socket_path, CONSOLE_SOCKET);
         assert!(fd.is_err());
@@ -144,10 +142,10 @@ mod tests {
     #[test]
     #[serial]
     fn test_setup_console() {
-        let init = setup("test_setup_console");
+        let init = setup();
         assert!(init.is_ok());
         let (testdir, rundir_path, socket_path) = init.unwrap();
-        let lis = UnixListener::bind(Path::join(&testdir, "console-socket"));
+        let lis = UnixListener::bind(Path::join(testdir.path(), "console-socket"));
         assert!(lis.is_ok());
         let fd = setup_console_socket(&rundir_path, &socket_path, CONSOLE_SOCKET);
         let status = setup_console(&fd.unwrap());

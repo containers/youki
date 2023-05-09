@@ -99,8 +99,6 @@ impl<'a> YoukiConfig {
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::create_temp_dir;
-
     use super::*;
     use anyhow::Result;
 
@@ -118,7 +116,7 @@ mod tests {
     #[test]
     fn test_config_save_and_load() -> Result<()> {
         let container_id = "sample";
-        let tmp = create_temp_dir("test_config_save_and_load").expect("create test directory");
+        let tmp = tempfile::tempdir().expect("create temp dir");
         let spec = Spec::default();
         let config = YoukiConfig::from_spec(&spec, container_id, false)?;
         config.save(&tmp)?;

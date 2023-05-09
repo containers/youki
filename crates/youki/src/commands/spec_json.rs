@@ -101,14 +101,13 @@ pub fn spec(args: liboci_cli::Spec) -> Result<()> {
 // Tests become unstable if not serial. The cause is not known.
 mod tests {
     use super::*;
-    use libcontainer::utils::create_temp_dir;
     use serial_test::serial;
 
     #[test]
     #[serial]
     fn test_spec_json() -> Result<()> {
         let spec = get_rootless()?;
-        let tmpdir = create_temp_dir("test_spec_json").expect("failed to create temp dir");
+        let tmpdir = tempfile::tempdir().expect("failed to create temp dir");
         let path = tmpdir.path().join("config.json");
         let file = File::create(path)?;
         let mut writer = BufWriter::new(file);

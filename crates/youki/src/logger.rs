@@ -159,7 +159,6 @@ mod tests {
     use serial_test::serial;
 
     use super::*;
-    use libcontainer::utils::create_temp_dir;
     use std::{env, path::Path};
 
     struct LogLevelGuard {
@@ -211,7 +210,7 @@ mod tests {
 
     #[test]
     fn test_logfile() {
-        let temp_dir = create_temp_dir("logfile").expect("failed to create tempdir for logfile");
+        let temp_dir = tempfile::tempdir().expect("failed to create tempdir for logfile");
         let log_file = Path::join(temp_dir.path(), "test.log");
 
         init(true, Some(log_file.to_owned()), None).expect("failed to initialize logger");

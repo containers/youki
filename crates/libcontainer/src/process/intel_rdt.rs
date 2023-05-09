@@ -322,8 +322,6 @@ pub fn setup_intel_rdt(
 
 #[cfg(test)]
 mod test {
-    use crate::utils::create_temp_dir;
-
     use super::*;
     use anyhow::Result;
 
@@ -437,24 +435,28 @@ mod test {
 
     #[test]
     fn test_write_pid_to_resctrl_tasks() -> Result<()> {
-        let path = create_temp_dir("test_write_pid_to_resctrl_tasks").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
 
         // Create the directory for id "foo".
-        let res = write_container_pid_to_resctrl_tasks(&path, "foo", Pid::from_raw(1000), false);
+        let res =
+            write_container_pid_to_resctrl_tasks(tmp.path(), "foo", Pid::from_raw(1000), false);
         assert!(res.unwrap()); // new directory created
-        let res = fs::read_to_string(path.join("foo").join("tasks"));
+        let res = fs::read_to_string(tmp.path().join("foo").join("tasks"));
         assert!(res.unwrap() == "1000");
 
         // Create the same directory the second time.
-        let res = write_container_pid_to_resctrl_tasks(&path, "foo", Pid::from_raw(1500), false);
+        let res =
+            write_container_pid_to_resctrl_tasks(tmp.path(), "foo", Pid::from_raw(1500), false);
         assert!(!res.unwrap()); // no new directory created
 
         // If just clos_id then throw an error.
-        let res = write_container_pid_to_resctrl_tasks(&path, "foobar", Pid::from_raw(2000), true);
+        let res =
+            write_container_pid_to_resctrl_tasks(tmp.path(), "foobar", Pid::from_raw(2000), true);
         assert!(res.is_err());
 
         // If the directory already exists then it's fine to have just clos_id.
-        let res = write_container_pid_to_resctrl_tasks(&path, "foo", Pid::from_raw(2500), true);
+        let res =
+            write_container_pid_to_resctrl_tasks(tmp.path(), "foo", Pid::from_raw(2500), true);
         assert!(!res.unwrap()); // no new directory created
 
         Ok(())
@@ -462,21 +464,22 @@ mod test {
 
     #[test]
     fn test_write_resctrl_schemata() -> Result<()> {
-        let path = create_temp_dir("test_write_resctrl_schemata").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
 
-        let res = write_container_pid_to_resctrl_tasks(&path, "foobar", Pid::from_raw(1000), false);
+        let res =
+            write_container_pid_to_resctrl_tasks(tmp.path(), "foobar", Pid::from_raw(1000), false);
         assert!(res.unwrap()); // new directory created
 
         // No schemes, clos_id was not set, directory created (with container id).
-        let res = write_resctrl_schemata(&path, "foobar", &None, &None, false, true);
+        let res = write_resctrl_schemata(tmp.path(), "foobar", &None, &None, false, true);
         assert!(res.is_ok());
-        let res = fs::read_to_string(path.join("foobar").join("schemata"));
+        let res = fs::read_to_string(tmp.path().join("foobar").join("schemata"));
         assert!(res.is_err()); // File not found because no schemes.
 
         let l3_1 = "L3:0=f;1=f0\nL3:2=f\nMB:0=20;1=70";
         let bw_1 = "MB:0=70;1=20";
         let res = write_resctrl_schemata(
-            &path,
+            tmp.path(),
             "foobar",
             &Some(l3_1.to_owned()),
             &Some(bw_1.to_owned()),
@@ -485,7 +488,7 @@ mod test {
         );
         assert!(res.is_ok());
 
-        let res = fs::read_to_string(path.join("foobar").join("schemata"));
+        let res = fs::read_to_string(tmp.path().join("foobar").join("schemata"));
         assert!(res.is_ok());
         assert!(is_same_schema(
             "L3:0=f;1=f0\nL3:2=f\nMB:0=70;1=20\n",
@@ -496,7 +499,7 @@ mod test {
         // by us) and the clos_id was set, it needs to contain the same data as
         // we are trying to set. This is the same data:
         let res = write_resctrl_schemata(
-            &path,
+            tmp.path(),
             "foobar",
             &Some(l3_1.to_owned()),
             &Some(bw_1.to_owned()),
@@ -509,7 +512,7 @@ mod test {
         let l3_2 = "L3:0=f;1=f0\nMB:0=20;1=70";
         let bw_2 = "MB:0=70;1=20";
         let res = write_resctrl_schemata(
-            &path,
+            tmp.path(),
             "foobar",
             &Some(l3_2.to_owned()),
             &Some(bw_2.to_owned()),

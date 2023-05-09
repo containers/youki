@@ -7,6 +7,60 @@ use std::path::Path;
 use std::process::Command;
 use std::{env, path::PathBuf};
 
+// Wrap the uid/gid path function into a struct for dependency injection. This
+// allows us to mock the id mapping logic in unit tests by using a different
+// base path other than `/proc`.
+#[derive(Debug, Clone)]
+pub struct RootlessIDMapper {
+    base_path: PathBuf,
+}
+
+impl Default for RootlessIDMapper {
+    fn default() -> Self {
+        Self {
+            // By default, the `uid_map` and `gid_map` files are located in the
+            // `/proc` directory. In the production code, we can use the
+            // default.
+            base_path: PathBuf::from("/proc"),
+        }
+    }
+}
+
+impl RootlessIDMapper {
+    // In production code, we can direclt use the `new` function without the
+    // need to worry about the default.
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn get_uid_path(&self, pid: &Pid) -> PathBuf {
+        self.base_path.join(pid.to_string()).join("uid_map")
+    }
+    pub fn get_gid_path(&self, pid: &Pid) -> PathBuf {
+        self.base_path.join(pid.to_string()).join("gid_map")
+    }
+
+    #[cfg(test)]
+    pub fn ensure_uid_path(&self, pid: &Pid) -> Result<()> {
+        std::fs::create_dir_all(self.get_uid_path(pid).parent().unwrap())?;
+
+        Ok(())
+    }
+
+    #[cfg(test)]
+    pub fn ensure_gid_path(&self, pid: &Pid) -> Result<()> {
+        std::fs::create_dir_all(self.get_gid_path(pid).parent().unwrap())?;
+
+        Ok(())
+    }
+
+    #[cfg(test)]
+    // In test, we need to fake the base path to a temporary directory.
+    pub fn new_test(path: PathBuf) -> Self {
+        Self { base_path: path }
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct Rootless<'a> {
     /// Location of the newuidmap binary
@@ -21,6 +75,8 @@ pub struct Rootless<'a> {
     pub user_namespace: Option<LinuxNamespace>,
     /// Is rootless container requested by a privileged user
     pub privileged: bool,
+    /// Path to the id mappings
+    pub rootless_id_mapper: RootlessIDMapper,
 }
 
 impl<'a> Rootless<'a> {
@@ -58,7 +114,7 @@ impl<'a> Rootless<'a> {
         if let Some(uid_mappings) = self.uid_mappings {
             write_id_mapping(
                 target_pid,
-                get_uid_path(&target_pid).as_path(),
+                self.rootless_id_mapper.get_uid_path(&target_pid).as_path(),
                 uid_mappings,
                 self.newuidmap.as_deref(),
             )
@@ -72,13 +128,17 @@ impl<'a> Rootless<'a> {
         if let Some(gid_mappings) = self.gid_mappings {
             return write_id_mapping(
                 target_pid,
-                get_gid_path(&target_pid).as_path(),
+                self.rootless_id_mapper.get_gid_path(&target_pid).as_path(),
                 gid_mappings,
                 self.newgidmap.as_deref(),
             );
         } else {
             Ok(())
         }
+    }
+
+    pub fn with_id_mapper(&mut self, mapper: RootlessIDMapper) {
+        self.rootless_id_mapper = mapper
     }
 }
 
@@ -93,28 +153,9 @@ impl<'a> From<&'a Linux> for Rootless<'a> {
             gid_mappings: linux.gid_mappings().as_ref(),
             user_namespace: user_namespace.cloned(),
             privileged: nix::unistd::geteuid().is_root(),
+            rootless_id_mapper: RootlessIDMapper::new(),
         }
     }
-}
-
-#[cfg(not(test))]
-fn get_uid_path(pid: &Pid) -> PathBuf {
-    PathBuf::from(format!("/proc/{pid}/uid_map"))
-}
-
-#[cfg(test)]
-pub fn get_uid_path(pid: &Pid) -> PathBuf {
-    utils::get_temp_dir_path(format!("{pid}_mapping_path").as_str()).join("uid_map")
-}
-
-#[cfg(not(test))]
-fn get_gid_path(pid: &Pid) -> PathBuf {
-    PathBuf::from(format!("/proc/{pid}/gid_map"))
-}
-
-#[cfg(test)]
-pub fn get_gid_path(pid: &Pid) -> PathBuf {
-    utils::get_temp_dir_path(format!("{pid}_mapping_path").as_str()).join("gid_map")
 }
 
 /// Checks if rootless mode should be used
@@ -308,7 +349,7 @@ mod tests {
     };
     use serial_test::serial;
 
-    use crate::utils::{test_utils::gen_u32, TempDir};
+    use crate::utils::test_utils::gen_u32;
 
     use super::*;
 
@@ -445,15 +486,20 @@ mod tests {
             .gid_mappings(gid_mappings)
             .build()?;
         let spec = SpecBuilder::default().linux(linux).build()?;
-        let rootless = Rootless::new(&spec)?.unwrap();
+
         let pid = getpid();
-        let tempdir = TempDir::new(get_uid_path(&pid).parent().unwrap())?;
-        let uid_map_path = tempdir.join("uid_map");
-        let _ = fs::File::create(&uid_map_path)?;
+        let tmp = tempfile::tempdir()?;
+        let id_mapper = RootlessIDMapper {
+            base_path: tmp.path().to_path_buf(),
+        };
+        id_mapper.ensure_uid_path(&pid)?;
+
+        let mut rootless = Rootless::new(&spec)?.unwrap();
+        rootless.with_id_mapper(id_mapper.clone());
         rootless.write_uid_mapping(pid)?;
         assert_eq!(
             format!("{container_id} {host_uid} {size}"),
-            fs::read_to_string(uid_map_path)?
+            fs::read_to_string(id_mapper.get_uid_path(&pid))?
         );
         rootless.write_gid_mapping(pid)?;
         Ok(())
@@ -485,15 +531,20 @@ mod tests {
             .gid_mappings(gid_mappings)
             .build()?;
         let spec = SpecBuilder::default().linux(linux).build()?;
-        let rootless = Rootless::new(&spec)?.unwrap();
+
         let pid = getpid();
-        let tempdir = TempDir::new(get_gid_path(&pid).parent().unwrap())?;
-        let gid_map_path = tempdir.join("gid_map");
-        let _ = fs::File::create(&gid_map_path)?;
+        let tmp = tempfile::tempdir()?;
+        let id_mapper = RootlessIDMapper {
+            base_path: tmp.path().to_path_buf(),
+        };
+        id_mapper.ensure_gid_path(&pid)?;
+
+        let mut rootless = Rootless::new(&spec)?.unwrap();
+        rootless.with_id_mapper(id_mapper.clone());
         rootless.write_gid_mapping(pid)?;
         assert_eq!(
             format!("{container_id} {host_gid} {size}"),
-            fs::read_to_string(gid_map_path)?
+            fs::read_to_string(id_mapper.get_gid_path(&pid))?
         );
         Ok(())
     }

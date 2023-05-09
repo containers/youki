@@ -219,7 +219,7 @@ fn setup_mapping(rootless: &Rootless, pid: Pid) -> Result<()> {
 mod tests {
     use super::*;
     use crate::process::channel::{intermediate_channel, main_channel};
-    use crate::rootless::{get_gid_path, get_uid_path};
+    use crate::rootless::RootlessIDMapper;
     use nix::{
         sched::{unshare, CloneFlags},
         unistd::{self, getgid, getuid},
@@ -230,8 +230,6 @@ mod tests {
     use serial_test::serial;
     use std::fs;
 
-    use crate::utils::TempDir;
-
     #[test]
     #[serial]
     fn setup_uid_mapping_should_succeed() -> Result<()> {
@@ -241,9 +239,12 @@ mod tests {
             .size(1u32)
             .build()?;
         let uid_mappings = vec![uid_mapping];
+        let tmp = tempfile::tempdir()?;
+        let id_mapper = RootlessIDMapper::new_test(tmp.path().to_path_buf());
         let rootless = Rootless {
             uid_mappings: Some(&uid_mappings),
             privileged: true,
+            rootless_id_mapper: id_mapper.clone(),
             ..Default::default()
         };
         let (mut parent_sender, mut parent_receiver) = main_channel()?;
@@ -253,16 +254,13 @@ mod tests {
                 parent_receiver.wait_for_mapping_request()?;
                 parent_receiver.close()?;
 
-                let tempdir = TempDir::new(get_uid_path(&child).parent().unwrap())?;
-                let uid_map_path = tempdir.join("uid_map");
-                let _ = fs::File::create(&uid_map_path)?;
-
-                let tempdir = TempDir::new(get_gid_path(&child).parent().unwrap())?;
-                let gid_map_path = tempdir.join("gid_map");
-                let _ = fs::File::create(gid_map_path)?;
-
+                // In test, we fake the uid path in /proc/{pid}/uid_map, so we
+                // need to ensure the path exists before we write the mapping.
+                // The path requires the pid we use, so we can only do do after
+                // obtaining the child pid here.
+                id_mapper.ensure_uid_path(&child)?;
                 setup_mapping(&rootless, child)?;
-                let line = fs::read_to_string(uid_map_path)?;
+                let line = fs::read_to_string(id_mapper.get_uid_path(&child))?;
                 let line_splited = line.split_whitespace();
                 for (act, expect) in line_splited.zip([
                     uid_mapping.container_id().to_string(),
@@ -296,8 +294,11 @@ mod tests {
             .size(1u32)
             .build()?;
         let gid_mappings = vec![gid_mapping];
+        let tmp = tempfile::tempdir()?;
+        let id_mapper = RootlessIDMapper::new_test(tmp.path().to_path_buf());
         let rootless = Rootless {
             gid_mappings: Some(&gid_mappings),
+            rootless_id_mapper: id_mapper.clone(),
             ..Default::default()
         };
         let (mut parent_sender, mut parent_receiver) = main_channel()?;
@@ -307,16 +308,13 @@ mod tests {
                 parent_receiver.wait_for_mapping_request()?;
                 parent_receiver.close()?;
 
-                let tempdir = TempDir::new(get_uid_path(&child).parent().unwrap())?;
-                let uid_map_path = tempdir.join("uid_map");
-                let _ = fs::File::create(uid_map_path)?;
-
-                let tempdir = TempDir::new(get_gid_path(&child).parent().unwrap())?;
-                let gid_map_path = tempdir.join("gid_map");
-                let _ = fs::File::create(&gid_map_path)?;
-
+                // In test, we fake the gid path in /proc/{pid}/gid_map, so we
+                // need to ensure the path exists before we write the mapping.
+                // The path requires the pid we use, so we can only do do after
+                // obtaining the child pid here.
+                id_mapper.ensure_gid_path(&child)?;
                 setup_mapping(&rootless, child)?;
-                let line = fs::read_to_string(gid_map_path)?;
+                let line = fs::read_to_string(id_mapper.get_gid_path(&child))?;
                 let line_splited = line.split_whitespace();
                 for (act, expect) in line_splited.zip([
                     gid_mapping.container_id().to_string(),
@@ -353,9 +351,8 @@ mod tests {
         use std::os::unix::io::IntoRawFd;
         use std::os::unix::net::UnixListener;
         use std::thread;
-        use utils::create_temp_dir;
 
-        let tmp_dir = create_temp_dir("test_sync_seccomp")?;
+        let tmp_dir = tempfile::tempdir()?;
         let scmp_file = std::fs::OpenOptions::new()
             .write(true)
             .create(true)

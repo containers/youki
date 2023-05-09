@@ -674,6 +674,7 @@ mod tests {
                     newuidmap: None,
                     uid_mappings: None,
                     user_namespace: None,
+                    ..Default::default()
                 }),
                 vec![vec![Gid::from_raw(37), Gid::from_raw(38)]],
             ),
@@ -706,14 +707,8 @@ mod tests {
     fn test_sync_seccomp() -> Result<()> {
         use std::os::unix::io::IntoRawFd;
         use std::thread;
-        use utils::create_temp_dir;
 
-        let tmp_dir = create_temp_dir("test_sync_seccomp")?;
-        let tmp_file = std::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .open(tmp_dir.path().join("temp_file"))
-            .expect("create temp file failed");
+        let tmp_file = tempfile::tempfile()?;
 
         let (mut main_sender, mut main_receiver) = channel::main_channel()?;
         let (mut init_sender, mut init_receiver) = channel::init_channel()?;

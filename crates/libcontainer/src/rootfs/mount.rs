@@ -480,12 +480,11 @@ mod tests {
 
     use super::*;
     use crate::syscall::test::{MountArgs, TestHelperSyscall};
-    use crate::utils::create_temp_dir;
     use anyhow::Result;
 
     #[test]
     fn test_mount_to_container() {
-        let tmp_dir = create_temp_dir("test_mount_to_container").unwrap();
+        let tmp_dir = tempfile::tempdir().unwrap();
         {
             let m = Mount::new();
             let mount = &SpecMountBuilder::default()
@@ -581,7 +580,7 @@ mod tests {
 
     #[test]
     fn test_make_parent_mount_private() {
-        let tmp_dir = create_temp_dir("test_make_parent_mount_private").unwrap();
+        let tmp_dir = tempfile::tempdir().unwrap();
         let m = Mount::new();
         let result = m.make_parent_mount_private(tmp_dir.path());
         assert!(result.is_ok());
@@ -611,7 +610,7 @@ mod tests {
     #[test]
     #[cfg(feature = "v1")]
     fn test_namespaced_subsystem_success() -> Result<()> {
-        let tmp = create_temp_dir("test_namespaced_subsystem_success")?;
+        let tmp = tempfile::tempdir().unwrap();
         let container_cgroup = Path::new("/container_cgroup");
 
         let mounter = Mount::new();
@@ -637,7 +636,10 @@ mod tests {
 
         let expected = MountArgs {
             source: Some(PathBuf::from("cgroup")),
-            target: tmp.join_safely(container_cgroup)?.join(subsystem_name),
+            target: tmp
+                .path()
+                .join_safely(container_cgroup)?
+                .join(subsystem_name),
             fstype: Some("cgroup".to_owned()),
             flags: MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
             data: Some("cpu".to_owned()),
@@ -660,8 +662,8 @@ mod tests {
     #[cfg(feature = "v1")]
     fn test_emulated_subsystem_success() -> Result<()> {
         // arrange
-        let tmp = create_temp_dir("test_emulated_subsystem")?;
-        let host_cgroup_mount = tmp.join("host_cgroup");
+        let tmp = tempfile::tempdir().unwrap();
+        let host_cgroup_mount = tmp.path().join("host_cgroup");
         let host_cgroup = host_cgroup_mount.join("cpu/container1");
         fs::create_dir_all(&host_cgroup)?;
 
@@ -700,7 +702,10 @@ mod tests {
         // assert
         let expected = MountArgs {
             source: Some(host_cgroup),
-            target: tmp.join_safely(container_cgroup)?.join(subsystem_name),
+            target: tmp
+                .path()
+                .join_safely(container_cgroup)?
+                .join(subsystem_name),
             fstype: Some("bind".to_owned()),
             flags: MsFlags::MS_BIND | MsFlags::MS_REC,
             data: Some("".to_owned()),
@@ -723,7 +728,7 @@ mod tests {
     #[cfg(feature = "v1")]
     fn test_mount_cgroup_v1() -> Result<()> {
         // arrange
-        let tmp = create_temp_dir("test_mount_cgroup_v1")?;
+        let tmp = tempfile::tempdir().unwrap();
         let container_cgroup = PathBuf::from("/sys/fs/cgroup");
 
         let spec_cgroup_mount = SpecMountBuilder::default()
@@ -760,7 +765,7 @@ mod tests {
 
         let expected = MountArgs {
             source: Some(PathBuf::from("tmpfs".to_owned())),
-            target: tmp.join_safely(&container_cgroup)?,
+            target: tmp.path().join_safely(&container_cgroup)?,
             fstype: Some("tmpfs".to_owned()),
             flags: MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
             data: Some("mode=755".to_owned()),
@@ -771,7 +776,10 @@ mod tests {
             let subsystem_name = host_mount.file_name().and_then(|f| f.to_str()).unwrap();
             let expected = MountArgs {
                 source: Some(PathBuf::from("cgroup".to_owned())),
-                target: tmp.join_safely(&container_cgroup)?.join(subsystem_name),
+                target: tmp
+                    .path()
+                    .join_safely(&container_cgroup)?
+                    .join(subsystem_name),
                 fstype: Some("cgroup".to_owned()),
                 flags: MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
                 data: Some(
@@ -793,7 +801,7 @@ mod tests {
     #[cfg(feature = "v2")]
     fn test_mount_cgroup_v2() -> Result<()> {
         // arrange
-        let tmp = create_temp_dir("test_mount_cgroup_v2")?;
+        let tmp = tempfile::tempdir().unwrap();
         let container_cgroup = PathBuf::from("/sys/fs/cgroup");
 
         let spec_cgroup_mount = SpecMountBuilder::default()
@@ -825,7 +833,7 @@ mod tests {
         // assert
         let expected = MountArgs {
             source: Some(PathBuf::from("cgroup".to_owned())),
-            target: tmp.join_safely(container_cgroup)?,
+            target: tmp.path().join_safely(container_cgroup)?,
             fstype: Some("cgroup2".to_owned()),
             flags: MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
             data: Some("".to_owned()),
