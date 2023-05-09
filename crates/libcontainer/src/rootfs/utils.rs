@@ -1,13 +1,7 @@
-use anyhow::{anyhow, Result};
-use nix::{mount::MsFlags, sys::stat::SFlag, NixPath};
-use oci_spec::runtime::{LinuxDevice, LinuxDeviceBuilder, LinuxDeviceType, Mount};
-use procfs::process::MountInfo;
-use std::{
-    path::{Path, PathBuf},
-    str::FromStr,
-};
-
 use crate::syscall::linux::{self, MountAttrOption};
+use nix::{mount::MsFlags, sys::stat::SFlag};
+use oci_spec::runtime::{LinuxDevice, LinuxDeviceBuilder, LinuxDeviceType, Mount};
+use std::{path::PathBuf, str::FromStr};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MountOptionConfig {
@@ -183,66 +177,13 @@ pub fn parse_mount(m: &Mount) -> MountOptionConfig {
     }
 }
 
-/// Find parent mount of rootfs in given mount infos
-pub fn find_parent_mount(rootfs: &Path, mount_infos: Vec<MountInfo>) -> Result<MountInfo> {
-    // find the longest mount point
-    let parent_mount_info = mount_infos
-        .into_iter()
-        .filter(|mi| rootfs.starts_with(&mi.mount_point))
-        .max_by(|mi1, mi2| mi1.mount_point.len().cmp(&mi2.mount_point.len()))
-        .ok_or_else(|| anyhow!("couldn't find parent mount of {}", rootfs.display()))?;
-    Ok(parent_mount_info)
-}
-
 #[cfg(test)]
 mod tests {
     use crate::syscall::linux::MountAttr;
 
     use super::*;
-    use anyhow::Context;
+
     use oci_spec::runtime::MountBuilder;
-
-    #[test]
-    fn test_find_parent_mount() -> anyhow::Result<()> {
-        let mount_infos = vec![
-            MountInfo {
-                mnt_id: 11,
-                pid: 10,
-                majmin: "".to_string(),
-                root: "/".to_string(),
-                mount_point: PathBuf::from("/"),
-                mount_options: Default::default(),
-                opt_fields: vec![],
-                fs_type: "ext4".to_string(),
-                mount_source: Some("/dev/sda1".to_string()),
-                super_options: Default::default(),
-            },
-            MountInfo {
-                mnt_id: 12,
-                pid: 11,
-                majmin: "".to_string(),
-                root: "/".to_string(),
-                mount_point: PathBuf::from("/proc"),
-                mount_options: Default::default(),
-                opt_fields: vec![],
-                fs_type: "proc".to_string(),
-                mount_source: Some("proc".to_string()),
-                super_options: Default::default(),
-            },
-        ];
-
-        let res = find_parent_mount(Path::new("/path/to/rootfs"), mount_infos)
-            .context("Failed to get parent mount")?;
-        assert_eq!(res.mnt_id, 11);
-        Ok(())
-    }
-
-    #[test]
-    fn test_find_parent_mount_with_empty_mount_infos() {
-        let mount_infos = vec![];
-        let res = find_parent_mount(Path::new("/path/to/rootfs"), mount_infos);
-        assert!(res.is_err());
-    }
 
     #[test]
     fn test_to_sflag() {

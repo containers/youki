@@ -1,7 +1,6 @@
 use super::utils::to_sflag;
 use crate::syscall::{syscall::create_syscall, Syscall};
 use crate::utils::PathBufExt;
-use anyhow::{bail, Context, Result};
 use nix::{
     fcntl::{open, OFlag},
     mount::MsFlags,
@@ -10,6 +9,24 @@ use nix::{
 };
 use oci_spec::runtime::LinuxDevice;
 use std::path::{Path, PathBuf};
+
+#[derive(Debug, thiserror::Error)]
+pub enum DeviceError {
+    #[error("{0:?} is not a valid device path")]
+    InvalidDevicePath(std::path::PathBuf),
+    #[error("failed to bind dev")]
+    BindDev {
+        source: crate::error::UnifiedSyscallError,
+    },
+    #[error("failed syscall to create device")]
+    Syscall(#[from] crate::syscall::SyscallError),
+    #[error(transparent)]
+    Other(Box<dyn std::error::Error + Send + Sync>),
+    #[error("{0}")]
+    Custom(String),
+}
+
+type Result<T> = std::result::Result<T, DeviceError>;
 
 pub struct Device {
     syscall: Box<dyn Syscall>,
@@ -41,7 +58,11 @@ impl Device {
             .into_iter()
             .map(|dev| {
                 if !dev.path().starts_with("/dev") {
-                    bail!("{} is not a valid device path", dev.path().display());
+                    tracing::error!(
+                        "{:?} is not a valid device path starting with /dev",
+                        dev.path()
+                    );
+                    return Err(DeviceError::InvalidDevicePath(dev.path().to_path_buf()));
                 }
 
                 if bind {
@@ -57,22 +78,38 @@ impl Device {
     }
 
     fn bind_dev(&self, rootfs: &Path, dev: &LinuxDevice) -> Result<()> {
-        let full_container_path = create_container_dev_path(rootfs, dev)
-            .with_context(|| format!("could not create container path for device {dev:?}"))?;
+        let full_container_path = create_container_dev_path(rootfs, dev)?;
+        tracing::debug!(
+            "bind_dev with full container path {:?}",
+            full_container_path
+        );
 
         let fd = open(
             &full_container_path,
             OFlag::O_RDWR | OFlag::O_CREAT,
             Mode::from_bits_truncate(0o644),
-        )?;
-        close(fd)?;
-        self.syscall.mount(
-            Some(dev.path()),
-            &full_container_path,
-            Some("bind"),
-            MsFlags::MS_BIND,
-            None,
-        )?;
+        )
+        .map_err(|err| {
+            tracing::error!("failed to open bind dev {:?}: {}", full_container_path, err);
+            DeviceError::BindDev { source: err.into() }
+        })?;
+        close(fd).map_err(|err| DeviceError::BindDev { source: err.into() })?;
+        self.syscall
+            .mount(
+                Some(dev.path()),
+                &full_container_path,
+                Some("bind"),
+                MsFlags::MS_BIND,
+                None,
+            )
+            .map_err(|err| {
+                tracing::error!(
+                    "failed to mount bind dev {:?}: {}",
+                    full_container_path,
+                    err
+                );
+                DeviceError::BindDev { source: err.into() }
+            })?;
 
         Ok(())
     }
@@ -85,8 +122,7 @@ impl Device {
                 | ((major & !0xfff) << 32)) as u64
         }
 
-        let full_container_path = create_container_dev_path(rootfs, dev)
-            .with_context(|| format!("could not create container path for device {dev:?}"))?;
+        let full_container_path = create_container_dev_path(rootfs, dev)?;
 
         self.syscall.mknod(
             &full_container_path,
@@ -105,18 +141,31 @@ impl Device {
 }
 
 fn create_container_dev_path(rootfs: &Path, dev: &LinuxDevice) -> Result<PathBuf> {
-    let relative_dev_path = dev
-        .path()
-        .as_relative()
-        .with_context(|| format!("could not convert {:?} to relative path", dev.path()))?;
-    let full_container_path = safe_path::scoped_join(rootfs, relative_dev_path)
-        .with_context(|| format!("could not join {:?} with {:?}", rootfs, dev.path()))?;
-
-    crate::utils::create_dir_all(
+    let relative_dev_path = dev.path().as_relative().map_err(|err| {
+        tracing::error!(
+            "failed to convert {:?} to relative path: {}",
+            dev.path(),
+            err
+        );
+        DeviceError::Other(err.into())
+    })?;
+    let full_container_path = safe_path::scoped_join(rootfs, relative_dev_path).map_err(|err| {
+        tracing::error!("failed to join {rootfs:?} with {:?}: {err}", dev.path());
+        DeviceError::Other(err.into())
+    })?;
+    std::fs::create_dir_all(
         full_container_path
             .parent()
             .unwrap_or_else(|| Path::new("")),
-    )?;
+    )
+    .map_err(|err| {
+        tracing::error!(
+            "failed to create parent dir of {:?}: {}",
+            full_container_path,
+            err
+        );
+        DeviceError::Other(err.into())
+    })?;
 
     Ok(full_container_path)
 }

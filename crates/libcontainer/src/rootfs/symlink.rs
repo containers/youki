@@ -1,7 +1,18 @@
 use crate::syscall::{syscall::create_syscall, Syscall};
-use anyhow::{bail, Context, Result};
 use std::fs::remove_file;
 use std::path::Path;
+
+#[derive(Debug, thiserror::Error)]
+pub enum SymlinkError {
+    #[error("syscall failed")]
+    Syscall {
+        source: crate::syscall::SyscallError,
+    },
+    #[error("failed symlink: {msg}")]
+    Other { msg: String },
+}
+
+type Result<T> = std::result::Result<T, SymlinkError>;
 
 pub struct Symlink {
     syscall: Box<dyn Syscall>,
@@ -33,7 +44,10 @@ impl Symlink {
             let link = cgroup_root.join(comount);
             self.syscall
                 .symlink(Path::new(subsystem_name), &link)
-                .with_context(|| format!("failed to symlink {link:?} to {subsystem_name:?}"))?;
+                .map_err(|err| {
+                    tracing::error!("failed to symlink {link:?} to {subsystem_name:?}");
+                    SymlinkError::Syscall { source: err }
+                })?;
         }
 
         Ok(())
@@ -43,13 +57,18 @@ impl Symlink {
         let ptmx = rootfs.join("dev/ptmx");
         if let Err(e) = remove_file(&ptmx) {
             if e.kind() != ::std::io::ErrorKind::NotFound {
-                bail!("could not delete /dev/ptmx")
+                return Err(SymlinkError::Other {
+                    msg: "could not delete /dev/ptmx".into(),
+                });
             }
         }
 
         self.syscall
             .symlink(Path::new("pts/ptmx"), &ptmx)
-            .context("failed to symlink ptmx")?;
+            .map_err(|err| {
+                tracing::error!("failed to symlink ptmx");
+                SymlinkError::Syscall { source: err }
+            })?;
         Ok(())
     }
 
@@ -59,7 +78,10 @@ impl Symlink {
         if Path::new("/proc/kcore").exists() {
             self.syscall
                 .symlink(Path::new("/proc/kcore"), &rootfs.join("dev/kcore"))
-                .context("Failed to symlink kcore")?;
+                .map_err(|err| {
+                    tracing::error!("failed to symlink kcore");
+                    SymlinkError::Syscall { source: err }
+                })?;
         }
         Ok(())
     }
@@ -74,7 +96,10 @@ impl Symlink {
         for (src, dst) in defaults {
             self.syscall
                 .symlink(Path::new(src), &rootfs.join(dst))
-                .context("failed to symlink defaults")?;
+                .map_err(|err| {
+                    tracing::error!("failed to symlink defaults");
+                    SymlinkError::Syscall { source: err }
+                })?;
         }
 
         Ok(())
@@ -87,6 +112,7 @@ mod tests {
     #[cfg(feature = "v1")]
     use crate::syscall::linux::LinuxSyscall;
     use crate::syscall::test::TestHelperSyscall;
+    use anyhow::{Context, Result};
     #[cfg(feature = "v1")]
     use nix::{
         fcntl::{open, OFlag},
