@@ -1,21 +1,75 @@
 //! tty (teletype) for user-system interaction
 
-use std::io::IoSlice;
-use std::os::unix::fs::symlink;
-use std::os::unix::io::AsRawFd;
-use std::os::unix::prelude::RawFd;
-use std::path::Path;
-
-use anyhow::Context;
-use anyhow::{bail, Result};
 use nix::errno::Errno;
 use nix::sys::socket::{self, UnixAddr};
 use nix::unistd::close;
 use nix::unistd::dup2;
+use std::io::IoSlice;
+use std::os::unix::fs::symlink;
+use std::os::unix::io::AsRawFd;
+use std::os::unix::prelude::RawFd;
+use std::path::{Path, PathBuf};
 
-const STDIN: i32 = 0;
-const STDOUT: i32 = 1;
-const STDERR: i32 = 2;
+use crate::error::UnifiedSyscallError;
+
+#[derive(Debug)]
+pub enum StdIO {
+    Stdin = 0,
+    Stdout = 1,
+    Stderr = 2,
+}
+
+impl From<StdIO> for i32 {
+    fn from(value: StdIO) -> Self {
+        match value {
+            StdIO::Stdin => 0,
+            StdIO::Stdout => 1,
+            StdIO::Stderr => 2,
+        }
+    }
+}
+
+impl std::fmt::Display for StdIO {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StdIO::Stdin => write!(f, "stdin"),
+            StdIO::Stdout => write!(f, "stdout"),
+            StdIO::Stderr => write!(f, "stderr"),
+        }
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum TTYError {
+    #[error("failed to connect/duplicate {stdio}")]
+    ConnectStdIO { source: nix::Error, stdio: StdIO },
+    #[error("failed to create console socket")]
+    CreateConsoleSocket {
+        source: nix::Error,
+        socket_name: String,
+    },
+    #[error("failed to symlink console socket into container_dir")]
+    Symlink {
+        source: std::io::Error,
+        linked: Box<PathBuf>,
+        console_socket_path: Box<PathBuf>,
+    },
+    #[error("invalid socker name: {socket_name:?}")]
+    InvalidSocketName {
+        socket_name: String,
+        source: nix::Error,
+    },
+    #[error("failed to create console socket fd")]
+    CreateConsoleSocketFd { source: UnifiedSyscallError },
+    #[error("could not create pseudo terminal")]
+    CreatePseudoTerminal { source: nix::Error },
+    #[error("failed to send pty master")]
+    SendPtyMaster { source: nix::Error },
+    #[error("could not close console socket")]
+    CloseConsoleSocket { source: nix::Error },
+}
+
+type Result<T> = std::result::Result<T, TTYError>;
 
 // TODO: Handling when there isn't console-socket.
 pub fn setup_console_socket(
@@ -24,21 +78,31 @@ pub fn setup_console_socket(
     socket_name: &str,
 ) -> Result<RawFd> {
     let linked = container_dir.join(socket_name);
-    symlink(console_socket_path, linked)?;
+    symlink(console_socket_path, &linked).map_err(|err| TTYError::Symlink {
+        source: err,
+        linked: linked.to_path_buf().into(),
+        console_socket_path: console_socket_path.to_path_buf().into(),
+    })?;
 
     let mut csocketfd = socket::socket(
         socket::AddressFamily::Unix,
         socket::SockType::Stream,
         socket::SockFlag::empty(),
         None,
-    )?;
-    csocketfd = match socket::connect(csocketfd, &socket::UnixAddr::new(socket_name)?) {
-        Err(errno) => {
-            if !matches!(errno, Errno::ENOENT) {
-                bail!("failed to open {}", socket_name);
-            }
-            -1
-        }
+    )
+    .map_err(|err| TTYError::CreateConsoleSocketFd { source: err.into() })?;
+    csocketfd = match socket::connect(
+        csocketfd,
+        &socket::UnixAddr::new(socket_name).map_err(|err| TTYError::InvalidSocketName {
+            source: err,
+            socket_name: socket_name.to_string(),
+        })?,
+    ) {
+        Err(Errno::ENOENT) => -1,
+        Err(errno) => Err(TTYError::CreateConsoleSocket {
+            source: errno,
+            socket_name: socket_name.to_string(),
+        })?,
         Ok(()) => csocketfd,
     };
     Ok(csocketfd)
@@ -47,8 +111,8 @@ pub fn setup_console_socket(
 pub fn setup_console(console_fd: &RawFd) -> Result<()> {
     // You can also access pty master, but it is better to use the API.
     // ref. https://github.com/containerd/containerd/blob/261c107ffc4ff681bc73988f64e3f60c32233b37/vendor/github.com/containerd/go-runc/console.go#L139-L154
-    let openpty_result =
-        nix::pty::openpty(None, None).context("could not create pseudo terminal")?;
+    let openpty_result = nix::pty::openpty(None, None)
+        .map_err(|err| TTYError::CreatePseudoTerminal { source: err })?;
     let pty_name: &[u8] = b"/dev/ptmx";
     let iov = [IoSlice::new(pty_name)];
     let fds = [openpty_result.master];
@@ -60,23 +124,34 @@ pub fn setup_console(console_fd: &RawFd) -> Result<()> {
         socket::MsgFlags::empty(),
         None,
     )
-    .context("failed to send pty master")?;
+    .map_err(|err| TTYError::SendPtyMaster { source: err })?;
 
     if unsafe { libc::ioctl(openpty_result.slave, libc::TIOCSCTTY) } < 0 {
         log::warn!("could not TIOCSCTTY");
     };
     let slave = openpty_result.slave;
-    connect_stdio(&slave, &slave, &slave).context("could not dup tty to stderr")?;
-    close(console_fd.as_raw_fd()).context("could not close console socket")?;
+    connect_stdio(&slave, &slave, &slave)?;
+    close(console_fd.as_raw_fd()).map_err(|err| TTYError::CloseConsoleSocket { source: err })?;
+
     Ok(())
 }
 
 fn connect_stdio(stdin: &RawFd, stdout: &RawFd, stderr: &RawFd) -> Result<()> {
-    dup2(stdin.as_raw_fd(), STDIN)?;
-    dup2(stdout.as_raw_fd(), STDOUT)?;
+    dup2(stdin.as_raw_fd(), StdIO::Stdin.into()).map_err(|err| TTYError::ConnectStdIO {
+        source: err,
+        stdio: StdIO::Stdin,
+    })?;
+    dup2(stdout.as_raw_fd(), StdIO::Stdout.into()).map_err(|err| TTYError::ConnectStdIO {
+        source: err,
+        stdio: StdIO::Stdout,
+    })?;
     // FIXME: Rarely does it fail.
     // error message: `Error: Resource temporarily unavailable (os error 11)`
-    dup2(stderr.as_raw_fd(), STDERR)?;
+    dup2(stderr.as_raw_fd(), StdIO::Stderr.into()).map_err(|err| TTYError::ConnectStdIO {
+        source: err,
+        stdio: StdIO::Stderr,
+    })?;
+
     Ok(())
 }
 
@@ -84,12 +159,12 @@ fn connect_stdio(stdin: &RawFd, stdout: &RawFd, stderr: &RawFd) -> Result<()> {
 mod tests {
     use super::*;
 
+    use anyhow::Result;
+    use serial_test::serial;
     use std::env;
     use std::fs::{self, File};
     use std::os::unix::net::UnixListener;
     use std::path::PathBuf;
-
-    use serial_test::serial;
 
     const CONSOLE_SOCKET: &str = "console-socket";
 
