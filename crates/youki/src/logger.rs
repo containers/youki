@@ -55,16 +55,20 @@ pub fn init(
     // crate makes it hard to build a single layer with different conditions.
     match (log_file, log_format) {
         (None, LogFormat::Text) => {
-            // Text to stdout
-            tracing_subscriber::fmt().with_max_level(level).init();
+            // Text to stderr
+            tracing_subscriber::fmt()
+                .with_max_level(level)
+                .with_writer(std::io::stderr)
+                .init();
         }
         (None, LogFormat::Json) => {
-            // JSON to stdout
+            // JSON to stderr
             tracing_subscriber::fmt()
                 .json()
                 .flatten_event(true)
                 .with_span_list(false)
                 .with_max_level(level)
+                .with_writer(std::io::stderr)
                 .init();
         }
         (Some(path), LogFormat::Text) => {
