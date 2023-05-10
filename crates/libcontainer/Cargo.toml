@@ -23,7 +23,7 @@ cgroupsv2_devices = ["libcgroups/cgroupsv2_devices"]
 anyhow = "1.0"
 bitflags = "2.2.1"
 caps = "0.5.5"
-chrono = { version = "0.4", features = ["serde"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
 crossbeam-channel = "0.5"
 fastrand = "^1.7.0"
 futures = { version = "0.3", features = ["thread-pool"] }

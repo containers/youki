@@ -27,7 +27,7 @@ features = ["std", "suggestions", "derive", "cargo", "help", "usage", "error-con
 
 [dependencies]
 anyhow = "1.0.71"
-chrono = { version = "0.4", features = ["serde"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
 libcgroups = { version = "0.0.5", path = "../libcgroups", default-features = false }
 libcontainer = { version = "0.0.5", path = "../libcontainer", default-features = false }
 liboci-cli = { version = "0.0.5", path = "../liboci-cli" }
