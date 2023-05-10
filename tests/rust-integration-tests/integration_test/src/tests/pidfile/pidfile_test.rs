@@ -1,6 +1,6 @@
 use crate::utils::{
-    create_temp_dir, delete_container, generate_uuid, get_runtime_path, get_state, kill_container,
-    prepare_bundle, State, TempDir,
+    delete_container, generate_uuid, get_runtime_path, get_state, kill_container, prepare_bundle,
+    State,
 };
 use anyhow::anyhow;
 use std::{
@@ -11,7 +11,7 @@ use test_framework::{Test, TestGroup, TestResult};
 use uuid::Uuid;
 
 #[inline]
-fn cleanup(id: &Uuid, bundle: &TempDir) {
+fn cleanup(id: &Uuid, bundle: &tempfile::TempDir) {
     let str_id = id.to_string();
     kill_container(&str_id, bundle).unwrap().wait().unwrap();
     delete_container(&str_id, bundle).unwrap().wait().unwrap();
@@ -22,11 +22,10 @@ fn cleanup(id: &Uuid, bundle: &TempDir) {
 fn test_pidfile() -> TestResult {
     // create id for the container and pidfile
     let container_id = generate_uuid();
-    let pidfile_uuid = generate_uuid();
 
     // create temp dir for bundle and for storing the pid
-    let bundle = prepare_bundle(&container_id).unwrap();
-    let pidfile_dir = create_temp_dir(&pidfile_uuid).unwrap();
+    let bundle = prepare_bundle().unwrap();
+    let pidfile_dir = tempfile::tempdir().unwrap();
     let pidfile_path = pidfile_dir.as_ref().join("pidfile");
     let _ = File::create(&pidfile_path).unwrap();
 

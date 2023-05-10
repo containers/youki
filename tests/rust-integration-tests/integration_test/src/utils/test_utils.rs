@@ -121,7 +121,7 @@ pub fn test_outside_container(
 ) -> TestResult {
     let id = generate_uuid();
     let id_str = id.to_string();
-    let bundle = prepare_bundle(&id).unwrap();
+    let bundle = prepare_bundle().unwrap();
     set_config(&bundle, &spec).unwrap();
     let create_result = create_container(&id_str, &bundle).unwrap().wait();
     let (out, err) = get_state(&id_str, &bundle).unwrap();
@@ -148,7 +148,7 @@ pub fn test_inside_container(
 ) -> TestResult {
     let id = generate_uuid();
     let id_str = id.to_string();
-    let bundle = prepare_bundle(&id).unwrap();
+    let bundle = prepare_bundle().unwrap();
 
     // This will do the required setup for the test
     test_result!(setup_for_test(

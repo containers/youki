@@ -1,4 +1,3 @@
-use super::{create_temp_dir, TempDir};
 use anyhow::{Context, Result};
 use flate2::read::GzDecoder;
 use oci_spec::runtime::{Process, Spec};
@@ -8,6 +7,7 @@ use std::env;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use tar::Archive;
+use tempfile::TempDir;
 use uuid::Uuid;
 
 static RUNTIME_PATH: OnceCell<PathBuf> = OnceCell::new();
@@ -57,8 +57,8 @@ pub fn generate_uuid() -> Uuid {
 }
 
 /// Creates a bundle directory in a temp directory
-pub fn prepare_bundle(id: &Uuid) -> Result<TempDir> {
-    let temp_dir = create_temp_dir(id)?;
+pub fn prepare_bundle() -> Result<TempDir> {
+    let temp_dir = tempfile::tempdir()?;
     let tar_file_name = "bundle.tar.gz";
     let tar_source = std::env::current_dir()?.join(tar_file_name);
     let tar_target = temp_dir.as_ref().join(tar_file_name);

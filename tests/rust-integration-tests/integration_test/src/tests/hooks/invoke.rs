@@ -69,7 +69,7 @@ fn get_test(test_name: &'static str) -> Test {
             let spec = get_spec();
             let id = generate_uuid();
             let id_str = id.to_string();
-            let bundle = prepare_bundle(&id).unwrap();
+            let bundle = prepare_bundle().unwrap();
             set_config(&bundle, &spec).unwrap();
             create_container(&id_str, &bundle).unwrap().wait().unwrap();
             start_container(&id_str, &bundle).unwrap().wait().unwrap();
