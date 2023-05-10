@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use liboci_cli::Delete;
 
 pub fn delete(args: Delete, root_path: PathBuf) -> Result<()> {
-    log::debug!("start deleting {}", args.container_id);
+    tracing::debug!("start deleting {}", args.container_id);
     if !container_exists(&root_path, &args.container_id)? && args.force {
         return Ok(());
     }

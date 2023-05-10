@@ -13,7 +13,7 @@ pub struct DefaultExecutor {}
 
 impl Executor for DefaultExecutor {
     fn exec(&self, spec: &Spec) -> Result<()> {
-        log::debug!("Executing workload with default handler");
+        tracing::debug!("Executing workload with default handler");
         let args = spec
             .process()
             .as_ref()

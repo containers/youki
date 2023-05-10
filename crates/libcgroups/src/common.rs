@@ -349,7 +349,7 @@ pub fn create_cgroup_manager<P: Into<PathBuf>>(
 fn create_v1_cgroup_manager(
     cgroup_path: PathBuf,
 ) -> Result<v1::manager::Manager, v1::manager::V1ManagerError> {
-    log::info!("cgroup manager V1 will be used");
+    tracing::info!("cgroup manager V1 will be used");
     v1::manager::Manager::new(cgroup_path)
 }
 
@@ -362,7 +362,7 @@ fn create_v1_cgroup_manager(_cgroup_path: PathBuf) -> Result<Box<dyn CgroupManag
 fn create_v2_cgroup_manager(
     cgroup_path: PathBuf,
 ) -> Result<v2::manager::Manager, v2::manager::V2ManagerError> {
-    log::info!("cgroup manager V2 will be used");
+    tracing::info!("cgroup manager V2 will be used");
     v2::manager::Manager::new(DEFAULT_CGROUP_ROOT.into(), cgroup_path)
 }
 
@@ -384,7 +384,7 @@ fn create_systemd_cgroup_manager(
 
     let use_system = nix::unistd::geteuid().is_root();
 
-    log::info!(
+    tracing::info!(
         "systemd cgroup manager with system bus {} will be used",
         use_system
     );
@@ -405,7 +405,7 @@ fn create_systemd_cgroup_manager(
 }
 
 pub fn get_all_pids(path: &Path) -> Result<Vec<Pid>, WrappedIoError> {
-    log::debug!("scan pids in folder: {:?}", path);
+    tracing::debug!("scan pids in folder: {:?}", path);
     let mut result = vec![];
     walk_dir(path, &mut |p| {
         let file_path = p.join(CGROUP_PROCS);

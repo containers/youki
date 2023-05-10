@@ -140,7 +140,7 @@ impl Container {
             self.set_status(ContainerStatus::Stopped).save()?;
         }
 
-        log::debug!("container {} checkpointed", self.id());
+        tracing::debug!("container {} checkpointed", self.id());
         Ok(())
     }
 }

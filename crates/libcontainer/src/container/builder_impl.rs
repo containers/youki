@@ -104,7 +104,7 @@ impl<'a> ContainerBuilderImpl<'a> {
         // set). All children inherit their parent's oom_score_adj value on
         // fork(2) so this will always be propagated properly.
         if let Some(oom_score_adj) = process.oom_score_adj() {
-            log::debug!("Set OOM score to {}", oom_score_adj);
+            tracing::debug!("Set OOM score to {}", oom_score_adj);
             let mut f = fs::File::create("/proc/self/oom_score_adj")?;
             f.write_all(oom_score_adj.to_string().as_bytes())?;
         }

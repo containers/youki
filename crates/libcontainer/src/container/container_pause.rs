@@ -44,10 +44,10 @@ impl Container {
             libcgroups::common::create_cgroup_manager(cgroups_path, use_systemd, self.id())?;
         cmanager.freeze(FreezerState::Frozen)?;
 
-        log::debug!("saving paused status");
+        tracing::debug!("saving paused status");
         self.set_status(ContainerStatus::Paused).save()?;
 
-        log::debug!("container {} paused", self.id());
+        tracing::debug!("container {} paused", self.id());
         Ok(())
     }
 }

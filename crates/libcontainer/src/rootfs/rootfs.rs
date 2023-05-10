@@ -35,7 +35,7 @@ impl RootFS {
         bind_devices: bool,
         cgroup_ns: bool,
     ) -> Result<()> {
-        log::debug!("Prepare rootfs: {:?}", rootfs);
+        tracing::debug!("Prepare rootfs: {:?}", rootfs);
         let mut flags = MsFlags::MS_REC;
         let linux = spec.linux().as_ref().context("no linux in spec")?;
 
@@ -56,7 +56,7 @@ impl RootFS {
             .make_parent_mount_private(rootfs)
             .context("failed to change parent mount of rootfs private")?;
 
-        log::debug!("mount root fs {:?}", rootfs);
+        tracing::debug!("mount root fs {:?}", rootfs);
         self.syscall.mount(
             Some(rootfs),
             rootfs,
@@ -112,7 +112,7 @@ impl RootFS {
         };
 
         if let Some(flags) = flags {
-            log::debug!("make root mount {:?}", flags);
+            tracing::debug!("make root mount {:?}", flags);
             self.syscall
                 .mount(None, Path::new("/"), None, flags, None)?;
         }

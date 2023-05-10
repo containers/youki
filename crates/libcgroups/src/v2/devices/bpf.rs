@@ -106,7 +106,7 @@ pub mod prog {
             #[allow(unused_unsafe)]
             let prog_fd = unsafe { bpf_prog_get_fd_by_id(*prog_id) };
             if prog_fd < 0 {
-                log::debug!("bpf_prog_get_fd_by_id failed: {}", errno::errno());
+                tracing::debug!("bpf_prog_get_fd_by_id failed: {}", errno::errno());
                 continue;
             }
             prog_fds.push(ProgramInfo {

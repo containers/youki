@@ -28,7 +28,7 @@ impl Controller for Freezer {
     type Resource = FreezerState;
 
     fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<(), Self::Error> {
-        log::debug!("Apply Freezer cgroup config");
+        tracing::debug!("Apply Freezer cgroup config");
         std::fs::create_dir_all(cgroup_root).wrap_create_dir(cgroup_root)?;
 
         if let Some(freezer_state) = Self::needs_to_handle(controller_opt) {
@@ -87,7 +87,7 @@ impl Freezer {
                             }
                             FREEZER_STATE_FROZEN => {
                                 if i > 1 {
-                                    log::debug!("frozen after {} retries", i)
+                                    tracing::debug!("frozen after {} retries", i)
                                 }
                                 return Ok(());
                             }

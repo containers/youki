@@ -127,7 +127,7 @@ pub fn setup_console(console_fd: &RawFd) -> Result<()> {
     .map_err(|err| TTYError::SendPtyMaster { source: err })?;
 
     if unsafe { libc::ioctl(openpty_result.slave, libc::TIOCSCTTY) } < 0 {
-        log::warn!("could not TIOCSCTTY");
+        tracing::warn!("could not TIOCSCTTY");
     };
     let slave = openpty_result.slave;
     connect_stdio(&slave, &slave, &slave)?;

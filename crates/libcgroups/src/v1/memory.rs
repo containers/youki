@@ -98,7 +98,7 @@ impl Controller for Memory {
         controller_opt: &ControllerOpt,
         cgroup_root: &Path,
     ) -> Result<(), V1MemoryControllerError> {
-        log::debug!("Apply Memory cgroup config");
+        tracing::debug!("Apply Memory cgroup config");
 
         if let Some(memory) = &controller_opt.resources.memory() {
             let reservation = memory.reservation().unwrap_or(0);

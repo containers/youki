@@ -186,7 +186,7 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
             if action == default_action {
                 // When the action is the same as the default action, the rule is redundant. We can
                 // skip this here to avoid failing when we add the rules.
-                log::warn!(
+                tracing::warn!(
                     "detect a seccomp action that is the same as the default action: {:?}",
                     syscall
                 );
@@ -199,7 +199,7 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
                     Err(_) => {
                         // If we failed to resolve the syscall by name, likely the kernel
                         // doeesn't support this syscall. So it is safe to skip...
-                        log::warn!(
+                        tracing::warn!(
                             "failed to resolve syscall, likely kernel doesn't support this. {:?}",
                             name
                         );
@@ -228,7 +228,7 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
                             );
                             ctx.add_rule_conditional(action, sc, &[cmp])
                                 .map_err(|err| {
-                                    log::error!(
+                                    tracing::error!(
                                         "failed to add seccomp action: {:?}. Cmp: {:?} Syscall: {name}", &action, cmp,
                                     );
                                     SeccompError::AddRule {
@@ -239,7 +239,10 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
                     }
                     None => {
                         ctx.add_rule(action, sc).map_err(|err| {
-                            log::error!("failed to add seccomp rule: {:?}. Syscall: {name}", &sc);
+                            tracing::error!(
+                                "failed to add seccomp rule: {:?}. Syscall: {name}",
+                                &sc
+                            );
                             SeccompError::AddRule { source: err }
                         })?;
                     }

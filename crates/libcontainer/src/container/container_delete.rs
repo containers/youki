@@ -33,7 +33,7 @@ impl Container {
         self.refresh_status()
             .context("failed to refresh container status")?;
 
-        log::debug!("container status: {:?}", self.status());
+        tracing::debug!("container status: {:?}", self.status());
 
         // Check if container is allowed to be deleted based on container status.
         match self.status() {
@@ -69,7 +69,7 @@ impl Container {
 
         if let Some(true) = &self.clean_up_intel_rdt_subdirectory() {
             if let Err(err) = delete_resctrl_subdirectory(self.id()) {
-                log::warn!(
+                tracing::warn!(
                     "failed to delete resctrl subdirectory due to: {err:?}, continue to delete"
                 );
             }
@@ -78,7 +78,7 @@ impl Container {
         if self.root.exists() {
             match YoukiConfig::load(&self.root) {
                 Ok(config) => {
-                    log::debug!("config: {:?}", config);
+                    tracing::debug!("config: {:?}", config);
 
                     // remove the cgroup created for the container
                     // check https://man7.org/linux/man-pages/man7/cgroups.7.html
@@ -106,12 +106,14 @@ impl Container {
                     // created, but the container config is not yet generated
                     // from the OCI spec. In this case, we assume as if we
                     // successfully deleted the config and moving on.
-                    log::warn!("skipping loading youki config due to: {err:?}, continue to delete");
+                    tracing::warn!(
+                        "skipping loading youki config due to: {err:?}, continue to delete"
+                    );
                 }
             }
 
             // remove the directory storing container state
-            log::debug!("remove dir {:?}", self.root);
+            tracing::debug!("remove dir {:?}", self.root);
             fs::remove_dir_all(&self.root).with_context(|| {
                 format!("failed to remove container dir {}", self.root.display())
             })?;

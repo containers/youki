@@ -112,7 +112,7 @@ impl<'a> TenantContainerBuilder<'a> {
         self.adapt_spec_for_tenant(&mut spec, &container)
             .context("failed to adapt spec for tenant")?;
 
-        log::debug!("{:#?}", spec);
+        tracing::debug!("{:#?}", spec);
 
         unistd::chdir(&container_dir)?;
         let notify_path = Self::setup_notify_listener(&container_dir)?;

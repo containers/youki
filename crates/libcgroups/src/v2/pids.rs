@@ -17,7 +17,7 @@ impl Controller for Pids {
         controller_opt: &ControllerOpt,
         cgroup_root: &std::path::Path,
     ) -> Result<(), Self::Error> {
-        log::debug!("Apply pids cgroup v2 config");
+        tracing::debug!("Apply pids cgroup v2 config");
         if let Some(pids) = &controller_opt.resources.pids() {
             Self::apply(cgroup_root, pids)?;
         }

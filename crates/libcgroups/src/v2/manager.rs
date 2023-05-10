@@ -180,7 +180,7 @@ impl CgroupManager for Manager {
 
     fn remove(&self) -> Result<(), Self::Error> {
         if self.full_path.exists() {
-            log::debug!("remove cgroup {:?}", self.full_path);
+            tracing::debug!("remove cgroup {:?}", self.full_path);
             let kill_file = self.full_path.join(CGROUP_KILL);
             if kill_file.exists() {
                 fs::write(&kill_file, "1").wrap_write(&kill_file, "1")?;

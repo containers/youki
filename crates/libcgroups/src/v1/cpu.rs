@@ -25,7 +25,7 @@ impl Controller for Cpu {
     type Resource = LinuxCpu;
 
     fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<(), Self::Error> {
-        log::debug!("Apply Cpu cgroup config");
+        tracing::debug!("Apply Cpu cgroup config");
 
         if let Some(cpu) = Self::needs_to_handle(controller_opt) {
             Self::apply(cgroup_root, cpu)?;

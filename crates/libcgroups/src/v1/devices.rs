@@ -11,7 +11,7 @@ impl Controller for Devices {
     type Resource = ();
 
     fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<(), Self::Error> {
-        log::debug!("Apply Devices cgroup config");
+        tracing::debug!("Apply Devices cgroup config");
 
         if let Some(devices) = controller_opt.resources.devices().as_ref() {
             for d in devices {

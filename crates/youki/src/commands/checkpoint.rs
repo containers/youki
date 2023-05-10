@@ -7,7 +7,7 @@ use anyhow::{Context, Result};
 use liboci_cli::Checkpoint;
 
 pub fn checkpoint(args: Checkpoint, root_path: PathBuf) -> Result<()> {
-    log::debug!("start checkpointing container {}", args.container_id);
+    tracing::debug!("start checkpointing container {}", args.container_id);
     let mut container = load_container(root_path, &args.container_id)?;
     let opts = libcontainer::container::CheckpointOptions {
         ext_unix_sk: args.ext_unix_sk,

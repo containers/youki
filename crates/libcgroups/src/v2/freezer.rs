@@ -131,7 +131,7 @@ impl Freezer {
             if line.starts_with("frozen ") {
                 if line.starts_with("frozen 1") {
                     if iter > 1 {
-                        log::debug!("frozen after {} retries", iter)
+                        tracing::debug!("frozen after {} retries", iter)
                     }
                     return Ok(FreezerState::Frozen);
                 }

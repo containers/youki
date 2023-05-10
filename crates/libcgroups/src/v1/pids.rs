@@ -18,7 +18,7 @@ impl Controller for Pids {
     type Resource = LinuxPids;
 
     fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<(), Self::Error> {
-        log::debug!("Apply pids cgroup config");
+        tracing::debug!("Apply pids cgroup config");
 
         if let Some(pids) = &controller_opt.resources.pids() {
             Self::apply(cgroup_root, pids)?;

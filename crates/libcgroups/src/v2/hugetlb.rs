@@ -35,7 +35,7 @@ impl Controller for HugeTlb {
         controller_opt: &ControllerOpt,
         cgroup_root: &std::path::Path,
     ) -> Result<(), Self::Error> {
-        log::debug!("Apply hugetlb cgroup v2 config");
+        tracing::debug!("Apply hugetlb cgroup v2 config");
         if let Some(hugepage_limits) = controller_opt.resources.hugepage_limits() {
             for hugetlb in hugepage_limits {
                 Self::apply(cgroup_root, hugetlb)?

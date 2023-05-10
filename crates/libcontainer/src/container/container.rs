@@ -198,7 +198,7 @@ impl Container {
     }
 
     pub fn save(&self) -> Result<()> {
-        log::debug!("Save container status: {:?} in {:?}", self, self.root);
+        tracing::debug!("Save container status: {:?} in {:?}", self, self.root);
         self.state.save(&self.root)
     }
 

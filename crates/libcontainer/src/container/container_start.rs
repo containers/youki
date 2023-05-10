@@ -40,7 +40,7 @@ impl Container {
                 self.id(),
                 self.status()
             );
-            log::error!("{}", err_msg);
+            tracing::error!("{}", err_msg);
             bail!(err_msg);
         }
 

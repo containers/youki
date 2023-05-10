@@ -12,7 +12,7 @@ impl Controller for NetworkPriority {
     type Resource = LinuxNetwork;
 
     fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<(), Self::Error> {
-        log::debug!("Apply NetworkPriority cgroup config");
+        tracing::debug!("Apply NetworkPriority cgroup config");
 
         if let Some(network) = Self::needs_to_handle(controller_opt) {
             Self::apply(cgroup_root, network)?;

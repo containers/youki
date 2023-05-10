@@ -113,7 +113,7 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, bo
         .wait_for_init_ready()
         .context("failed to wait for init ready")?;
 
-    log::debug!("init pid is {:?}", init_pid);
+    tracing::debug!("init pid is {:?}", init_pid);
 
     // Before the main process returns, we want to make sure the intermediate
     // process is exit and reaped. By this point, the intermediate process
@@ -122,16 +122,16 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, bo
     match waitpid(intermediate_pid, None) {
         Ok(WaitStatus::Exited(_, 0)) => (),
         Ok(WaitStatus::Exited(_, s)) => {
-            log::warn!("intermediate process failed with exit status: {s}");
+            tracing::warn!("intermediate process failed with exit status: {s}");
         }
         Ok(WaitStatus::Signaled(_, sig, _)) => {
-            log::warn!("intermediate process killed with signal: {sig}")
+            tracing::warn!("intermediate process killed with signal: {sig}")
         }
         Ok(_) => (),
         Err(nix::errno::Errno::ECHILD) => {
             // This is safe because intermediate_process and main_process check if the process is
             // finished by piping instead of exit code.
-            log::warn!("intermediate process already reaped");
+            tracing::warn!("intermediate process already reaped");
         }
         Err(err) => bail!("failed to wait for intermediate process: {err}"),
     };
@@ -147,7 +147,7 @@ fn sync_seccomp(
     main_receiver: &mut channel::MainReceiver,
 ) -> Result<()> {
     if seccomp::is_notify(seccomp) {
-        log::debug!("main process waiting for sync seccomp");
+        tracing::debug!("main process waiting for sync seccomp");
         let seccomp_fd = main_receiver.wait_for_seccomp_request()?;
         let listener_path = seccomp
             .listener_path()
@@ -199,7 +199,7 @@ fn sync_seccomp_send_msg(listener_path: &Path, msg: &[u8], fd: i32) -> Result<()
 }
 
 fn setup_mapping(rootless: &Rootless, pid: Pid) -> Result<()> {
-    log::debug!("write mapping for pid {:?}", pid);
+    tracing::debug!("write mapping for pid {:?}", pid);
     if !rootless.privileged {
         // The main process is running as an unprivileged user and cannot write the mapping
         // until "deny" has been written to setgroups. See CVE-2014-8989.

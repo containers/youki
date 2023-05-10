@@ -110,7 +110,7 @@ impl<'a> InitContainerBuilder<'a> {
 
     fn create_container_dir(&self) -> Result<PathBuf> {
         let container_dir = self.base.root_path.join(&self.base.container_id);
-        log::debug!("container directory will be {:?}", container_dir);
+        tracing::debug!("container directory will be {:?}", container_dir);
 
         if container_dir.exists() {
             bail!("container {} already exists", self.base.container_id);

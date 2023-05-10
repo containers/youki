@@ -28,7 +28,7 @@ impl Controller for Cpu {
         properties: &mut HashMap<&str, Box<dyn RefArg>>,
     ) -> Result<(), Self::Error> {
         if let Some(cpu) = options.resources.cpu() {
-            log::debug!("Applying cpu resource restrictions");
+            tracing::debug!("Applying cpu resource restrictions");
             Self::apply(cpu, properties)?;
         }
 
