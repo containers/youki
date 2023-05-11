@@ -106,7 +106,8 @@ youki is not at the practical stage yet. However, it is getting closer to practi
 ![youki demo](docs/demo.gif)
 
 |        Feature        |                   Description                   |                                                State                                                |
-| :-------------------: | :---------------------------------------------: | :-------------------------------------------------------------------------------------------------: |
+|:---------------------:|:-----------------------------------------------:| :-------------------------------------------------------------------------------------------------: |
+|      Containerd       |             Running via Containerd              |                                                 ✅                                                  |
 |        Docker         |               Running via Docker                |                                                 ✅                                                  |
 |        Podman         |               Running via Podman                |                                                 ✅                                                  |
 |      pivot_root       |            Change the root directory            |                                                 ✅                                                  |
