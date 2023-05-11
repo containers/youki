@@ -58,6 +58,7 @@ pub fn init(
             // Text to stderr
             tracing_subscriber::fmt()
                 .with_max_level(level)
+                .without_time()
                 .with_writer(std::io::stderr)
                 .init();
         }
