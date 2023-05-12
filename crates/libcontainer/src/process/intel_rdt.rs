@@ -7,26 +7,85 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{bail, Context, Result};
 use nix::unistd::Pid;
 use oci_spec::runtime::LinuxIntelRdt;
 use procfs::process::Process;
 
-pub fn delete_resctrl_subdirectory(id: &str) -> Result<()> {
-    let dir = find_resctrl_mount_point().context("failed to find a mounted resctrl file system")?;
-    let container_resctrl_path = dir.join(id).canonicalize()?;
+#[derive(Debug, thiserror::Error)]
+pub enum IntelRdtError {
+    #[error(transparent)]
+    ProcError(#[from] procfs::ProcError),
+    #[error("failed to find resctrl mount point")]
+    ResctrlMountPointNotFound,
+    #[error("failed to find ID for resctrl")]
+    ResctrlIdNotFound,
+    #[error("existing schemata found but data did not match")]
+    ExistingSchemataMismatch,
+    #[error("failed to read existing schemata")]
+    ReadSchemata(#[source] std::io::Error),
+    #[error("failed to write schemata")]
+    WriteSchemata(#[source] std::io::Error),
+    #[error("failed to open schemata file")]
+    OpenSchemata(#[source] std::io::Error),
+    #[error(transparent)]
+    ParseLine(#[from] ParseLineError),
+    #[error("no resctrl subdirectory found for container id")]
+    NoResctrlSubdirectory,
+    #[error("failed to remove subdirectory")]
+    RemoveSubdirectory(#[source] std::io::Error),
+    #[error("no parent for resctrl subdirectory")]
+    NoResctrlSubdirectoryParent,
+    #[error("invalid resctrl directory")]
+    InvalidResctrlDirectory,
+    #[error("resctrl closID directory didn't exist")]
+    NoClosIDDirectory,
+    #[error("failed to write to resctrl closID directory")]
+    WriteClosIDDirectory(#[source] std::io::Error),
+    #[error("failed to open resctrl closID directory")]
+    OpenClosIDDirectory(#[source] std::io::Error),
+    #[error("failed to create resctrl closID directory")]
+    CreateClosIDDirectory(#[source] std::io::Error),
+    #[error("failed to canonicalize path")]
+    Canonicalize(#[source] std::io::Error),
+}
 
+#[derive(Debug, thiserror::Error)]
+pub enum ParseLineError {
+    #[error("MB line doesn't match validation")]
+    MBLine,
+    #[error("MB token has wrong number of fields")]
+    MBToken,
+    #[error("L3 line doesn't match validation")]
+    L3Line,
+    #[error("L3 token has wrong number of fields")]
+    L3Token,
+}
+
+type Result<T> = std::result::Result<T, IntelRdtError>;
+
+pub fn delete_resctrl_subdirectory(id: &str) -> Result<()> {
+    let dir = find_resctrl_mount_point().map_err(|err| {
+        tracing::error!("failed to find resctrl mount point: {}", err);
+        err
+    })?;
+    let container_resctrl_path = dir.join(id).canonicalize().map_err(|err| {
+        tracing::error!(?dir, ?id, "failed to canonicalize path: {}", err);
+        IntelRdtError::Canonicalize(err)
+    })?;
     match container_resctrl_path.parent() {
         // Make sure the container_id really exists and the directory
         // is inside the resctrl fs.
         Some(parent) => {
             if parent == dir && container_resctrl_path.exists() {
-                fs::remove_dir(container_resctrl_path)?;
+                fs::remove_dir(&container_resctrl_path).map_err(|err| {
+                    tracing::error!(path = ?container_resctrl_path, "failed to remove resctrl subdirectory: {}", err);
+                    IntelRdtError::RemoveSubdirectory(err)
+                })?;
             } else {
-                bail!("No resctrl subdirectory found for container id");
+                return Err(IntelRdtError::NoResctrlSubdirectory);
             }
         }
-        None => bail!("No parent for resctrl dir"),
+        None => return Err(IntelRdtError::NoResctrlSubdirectoryParent),
     }
     Ok(())
 }
@@ -39,12 +98,15 @@ pub fn find_resctrl_mount_point() -> Result<PathBuf> {
     for mount_info in mount_infos.iter() {
         // "resctrl" type fs can be mounted only once.
         if mount_info.fs_type == "resctrl" {
-            let path = mount_info.mount_point.clone().canonicalize()?;
+            let path = mount_info.mount_point.clone().canonicalize().map_err(|err| {
+                tracing::error!(path = ?mount_info.mount_point, "failed to canonicalize path: {}", err);
+                IntelRdtError::Canonicalize(err)
+            })?;
             return Ok(path);
         }
     }
 
-    bail!("resctrl mount point not found");
+    Err(IntelRdtError::ResctrlMountPointNotFound)
 }
 
 /// Adds container PID to the tasks file in the correct resctrl
@@ -59,22 +121,35 @@ fn write_container_pid_to_resctrl_tasks(
     let tasks = path.to_owned().join(id).join("tasks");
     let dir = tasks.parent();
     match dir {
-        None => bail!("invalid resctrl directory"),
+        None => Err(IntelRdtError::InvalidResctrlDirectory),
         Some(resctrl_container_dir) => {
             let mut created_dir = false;
             if !resctrl_container_dir.exists() {
                 if only_clos_id_set {
                     // Directory doesn't exist and only clos_id is set: error out.
-                    bail!("resctrl closID directory didn't exist");
+                    return Err(IntelRdtError::NoClosIDDirectory);
                 }
-                fs::create_dir_all(resctrl_container_dir)?;
+                fs::create_dir_all(resctrl_container_dir).map_err(|err| {
+                    tracing::error!("failed to create resctrl subdirectory: {}", err);
+                    IntelRdtError::CreateClosIDDirectory(err)
+                })?;
                 created_dir = true;
             }
             // TODO(ipuustin): File doesn't need to be created, but it's easier
             // to test this way. Fix the tests so that the fake resctrl
             // filesystem is pre-populated.
-            let mut file = OpenOptions::new().create(true).append(true).open(tasks)?;
-            write!(file, "{init_pid}")?;
+            let mut file = OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(tasks)
+                .map_err(|err| {
+                    tracing::error!("failed to open resctrl tasks file: {}", err);
+                    IntelRdtError::OpenClosIDDirectory(err)
+                })?;
+            write!(file, "{init_pid}").map_err(|err| {
+                tracing::error!("failed to write to resctrl tasks file: {}", err);
+                IntelRdtError::WriteClosIDDirectory(err)
+            })?;
             Ok(created_dir)
         }
     }
@@ -125,7 +200,7 @@ struct ParsedLine {
 }
 
 /// Parse tokens ("1=7000") from a "MB:" line.
-fn parse_mb_line(line: &str) -> Result<HashMap<String, String>> {
+fn parse_mb_line(line: &str) -> std::result::Result<HashMap<String, String>, ParseLineError> {
     let mut token_map = HashMap::new();
 
     static MB_VALIDATE_RE: Lazy<Regex> = Lazy::new(|| {
@@ -135,7 +210,7 @@ fn parse_mb_line(line: &str) -> Result<HashMap<String, String>> {
     static MB_CAPTURE_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(\w+)\s*=\s*(\w+)").unwrap());
 
     if !MB_VALIDATE_RE.is_match(line) {
-        bail!("MB line doesn't match validation")
+        return Err(ParseLineError::MBLine);
     }
 
     for token in MB_CAPTURE_RE.captures_iter(line) {
@@ -143,7 +218,7 @@ fn parse_mb_line(line: &str) -> Result<HashMap<String, String>> {
             (Some(key), Some(value)) => {
                 token_map.insert(key.as_str().to_string(), value.as_str().to_string());
             }
-            _ => bail!("MB token has wrong number of fields"),
+            _ => return Err(ParseLineError::MBToken),
         }
     }
 
@@ -151,7 +226,7 @@ fn parse_mb_line(line: &str) -> Result<HashMap<String, String>> {
 }
 
 /// Parse tokens ("0=ffff") from a L3{,CODE,DATA} line.
-fn parse_l3_line(line: &str) -> Result<HashMap<String, String>> {
+fn parse_l3_line(line: &str) -> std::result::Result<HashMap<String, String>, ParseLineError> {
     let mut token_map = HashMap::new();
 
     static L3_VALIDATE_RE: Lazy<Regex> = Lazy::new(|| {
@@ -165,7 +240,7 @@ fn parse_l3_line(line: &str) -> Result<HashMap<String, String>> {
     // The capture regexp also removes leading zeros from mask values.
 
     if !L3_VALIDATE_RE.is_match(line) {
-        bail!("L3 line doesn't match validation")
+        return Err(ParseLineError::L3Line);
     }
 
     for token in L3_CAPTURE_RE.captures_iter(line) {
@@ -173,7 +248,7 @@ fn parse_l3_line(line: &str) -> Result<HashMap<String, String>> {
             (Some(key), Some(value)) => {
                 token_map.insert(key.as_str().to_string(), value.as_str().to_string());
             }
-            _ => bail!("L3 token has wrong number of fields"),
+            _ => return Err(ParseLineError::L3Token),
         }
     }
 
@@ -200,7 +275,7 @@ fn get_line_type(line: &str) -> LineType {
 }
 
 /// Parse a resctrl line.
-fn parse_line(line: &str) -> Option<Result<ParsedLine>> {
+fn parse_line(line: &str) -> Option<std::result::Result<ParsedLine, ParseLineError>> {
     let line_type = get_line_type(line);
 
     let maybe_tokens = match line_type {
@@ -233,11 +308,11 @@ fn is_same_schema(combined_schema: &str, existing_schema: &str) -> Result<bool> 
     let combined = combined_schema
         .lines()
         .filter_map(parse_line)
-        .collect::<Result<Vec<ParsedLine>>>()?;
+        .collect::<std::result::Result<Vec<ParsedLine>, _>>()?;
     let existing = existing_schema
         .lines()
         .filter_map(parse_line)
-        .collect::<Result<Vec<ParsedLine>>>()?;
+        .collect::<std::result::Result<Vec<ParsedLine>, _>>()?;
 
     // Compare the two sets of parsed lines.
     Ok(compare_lines(&combined, &existing))
@@ -262,19 +337,23 @@ fn write_resctrl_schemata(
     if let Some(combined_schema) = maybe_combined_schema {
         if clos_id_was_set && !created_dir {
             // Compare existing schema and error out if no match.
-            let data = fs::read_to_string(&schemata)?;
+            let data = fs::read_to_string(&schemata).map_err(IntelRdtError::ReadSchemata)?;
             if !is_same_schema(&combined_schema, &data)? {
-                bail!("existing schemata found but data did not match");
+                Err(IntelRdtError::ExistingSchemataMismatch)?;
             }
         } else {
             // Write the combined schema to the schemata file.
             // TODO(ipuustin): File doesn't need to be created, but it's easier
             // to test this way. Fix the tests so that the fake resctrl
             // filesystem is pre-populated.
-            let mut file = OpenOptions::new().create(true).write(true).open(schemata)?;
+            let mut file = OpenOptions::new()
+                .create(true)
+                .write(true)
+                .open(schemata)
+                .map_err(IntelRdtError::OpenSchemata)?;
             // Prevent write!() from writing the newline with a separate call.
             let schema_with_newline = combined_schema + "\n";
-            write!(file, "{schema_with_newline}")?;
+            write!(file, "{schema_with_newline}").map_err(IntelRdtError::WriteSchemata)?;
         }
     }
 
@@ -290,19 +369,24 @@ pub fn setup_intel_rdt(
     intel_rdt: &LinuxIntelRdt,
 ) -> Result<bool> {
     // Find mounted resctrl filesystem, error out if it can't be found.
-    let path =
-        find_resctrl_mount_point().context("failed to find a mounted resctrl file system")?;
+    let path = find_resctrl_mount_point().map_err(|err| {
+        tracing::error!("failed to find a mounted resctrl file system");
+        err
+    })?;
     let clos_id_set = intel_rdt.clos_id().is_some();
     let only_clos_id_set =
         clos_id_set && intel_rdt.l3_cache_schema().is_none() && intel_rdt.mem_bw_schema().is_none();
     let id = match (intel_rdt.clos_id(), maybe_container_id) {
         (Some(clos_id), _) => clos_id,
         (None, Some(container_id)) => container_id,
-        (None, None) => bail!("failed to find ID for resctrl"),
+        (None, None) => Err(IntelRdtError::ResctrlIdNotFound)?,
     };
 
     let created_dir = write_container_pid_to_resctrl_tasks(&path, id, *init_pid, only_clos_id_set)
-        .context("failed to write container pid to resctrl tasks file")?;
+        .map_err(|err| {
+            tracing::error!("failed to write container pid to resctrl tasks file");
+            err
+        })?;
     write_resctrl_schemata(
         &path,
         id,
@@ -311,7 +395,10 @@ pub fn setup_intel_rdt(
         clos_id_set,
         created_dir,
     )
-    .context("failed to write schemas to resctrl schemata file")?;
+    .map_err(|err| {
+        tracing::error!("failed to write schemata to resctrl schemata file");
+        err
+    })?;
 
     // If closID is not set and the runtime has created the sub-directory,
     // the runtime MUST remove the sub-directory when the container is deleted.
