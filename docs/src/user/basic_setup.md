@@ -36,7 +36,7 @@ $ sudo dnf install   \
       dbus-devel     \
       elfutils-libelf-devel \
       libseccomp-devel \
-      libclang-dev
+      clang-devel
 ```
 
 ---
