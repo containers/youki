@@ -46,7 +46,7 @@ pub fn container_intermediate_process(
     if let Some(user_namespace) = namespaces.get(LinuxNamespaceType::User) {
         namespaces.unshare_or_setns(user_namespace)?;
         if user_namespace.path().is_none() {
-            log::debug!("creating new user namespace");
+            tracing::debug!("creating new user namespace");
             // child needs to be dumpable, otherwise the non root parent is not
             // allowed to write the uid/gid maps
             prctl::set_dumpable(true).unwrap();
@@ -119,7 +119,7 @@ pub fn container_intermediate_process(
                     write(exec_notify_fd, buf.as_bytes())?;
                     close(exec_notify_fd)?;
                 }
-                log::error!("failed to initialize container process: {e}");
+                tracing::error!("failed to initialize container process: {e}");
                 Err(ProcessError::InitProcessFailed { msg: e.to_string() })
             }
         }

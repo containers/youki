@@ -1,15 +1,12 @@
 //! Default Youki Logger
 
 use anyhow::{bail, Context, Result};
-use log::{LevelFilter, Log, Metadata, Record};
-use once_cell::sync::OnceCell;
 use std::borrow::Cow;
-use std::fs::{File, OpenOptions};
-use std::io::{stderr, Write};
+use std::fs::OpenOptions;
 use std::path::PathBuf;
 use std::str::FromStr;
+use tracing::metadata::LevelFilter;
 
-pub static LOG_FILE: OnceCell<Option<File>> = OnceCell::new();
 const LOG_LEVEL_ENV_NAME: &str = "YOUKI_LOG_LEVEL";
 const LOG_FORMAT_TEXT: &str = "text";
 const LOG_FORMAT_JSON: &str = "json";
@@ -25,35 +22,6 @@ const DEFAULT_LOG_LEVEL: &str = "debug";
 /// If not in debug mode, default level is warn to get important logs
 #[cfg(not(debug_assertions))]
 const DEFAULT_LOG_LEVEL: &str = "warn";
-
-/// Initialize the logger, must be called before accessing the logger
-/// Multiple parts might call this at once, but the actual initialization
-/// is done only once due to use of OnceCell
-pub fn init(
-    log_debug_flag: bool,
-    log_file: Option<PathBuf>,
-    log_format: Option<String>,
-) -> Result<()> {
-    let level = detect_log_level(log_debug_flag).context("failed to parse log level")?;
-    let format = detect_log_format(log_format).context("failed to detect log format")?;
-    let _ = LOG_FILE.get_or_init(|| -> Option<File> {
-        log_file.map(|path| {
-            OpenOptions::new()
-                .create(true)
-                .write(true)
-                .truncate(false)
-                .open(path)
-                .expect("failed opening log file")
-        })
-    });
-
-    let logger = YoukiLogger::new(level.to_level(), format);
-    log::set_boxed_logger(Box::new(logger))
-        .map(|()| log::set_max_level(level))
-        .expect("set logger failed");
-
-    Ok(())
-}
 
 fn detect_log_format(log_format: Option<String>) -> Result<LogFormat> {
     match log_format.as_deref() {
@@ -74,91 +42,74 @@ fn detect_log_level(is_debug: bool) -> Result<LevelFilter> {
     Ok(LevelFilter::from_str(filter.as_ref())?)
 }
 
-struct YoukiLogger {
-    /// Indicates level up to which logs are to be printed
-    level: Option<log::Level>,
-    format: LogFormat,
-}
+pub fn init(
+    log_debug_flag: bool,
+    log_file: Option<PathBuf>,
+    log_format: Option<String>,
+) -> Result<()> {
+    let level = detect_log_level(log_debug_flag).context("failed to parse log level")?;
+    let log_format = detect_log_format(log_format).context("failed to detect log format")?;
 
-impl YoukiLogger {
-    /// Create new logger
-    pub fn new(level: Option<log::Level>, format: LogFormat) -> Self {
-        Self { level, format }
-    }
-}
-
-/// Implements Log interface given by log crate, so we can use its functionality
-impl Log for YoukiLogger {
-    /// Check if level of given log is enabled or not
-    fn enabled(&self, metadata: &Metadata) -> bool {
-        if let Some(level) = self.level {
-            metadata.level() <= level
-        } else {
-            false
+    // I really dislike how we have to specify individual branch for each
+    // combination, but I can't find any better way to do this. The tracing
+    // crate makes it hard to build a single layer with different conditions.
+    match (log_file, log_format) {
+        (None, LogFormat::Text) => {
+            // Text to stderr
+            tracing_subscriber::fmt()
+                .with_max_level(level)
+                .without_time()
+                .with_writer(std::io::stderr)
+                .init();
+        }
+        (None, LogFormat::Json) => {
+            // JSON to stderr
+            tracing_subscriber::fmt()
+                .json()
+                .flatten_event(true)
+                .with_span_list(false)
+                .with_max_level(level)
+                .with_writer(std::io::stderr)
+                .init();
+        }
+        (Some(path), LogFormat::Text) => {
+            // Log file with text format
+            let file = OpenOptions::new()
+                .create(true)
+                .write(true)
+                .truncate(false)
+                .open(path)
+                .with_context(|| "failed to open log file")?;
+            tracing_subscriber::fmt()
+                .with_writer(file)
+                .with_max_level(level)
+                .init();
+        }
+        (Some(path), LogFormat::Json) => {
+            // Log file with JSON format
+            let file = OpenOptions::new()
+                .create(true)
+                .write(true)
+                .truncate(false)
+                .open(path)
+                .with_context(|| "failed to open log file")?;
+            tracing_subscriber::fmt()
+                .json()
+                .flatten_event(true)
+                .with_span_list(false)
+                .with_writer(file)
+                .with_max_level(level)
+                .init();
         }
     }
 
-    /// Function to carry out logging
-    fn log(&self, record: &Record) {
-        if self.enabled(record.metadata()) {
-            let log_msg = match self.format {
-                LogFormat::Text => text_format(record),
-                LogFormat::Json => json_format(record),
-            };
-            // if log file is set, write to it, else write to stderr
-            if let Some(mut log_file) = LOG_FILE.get().unwrap().as_ref() {
-                let _ = writeln!(log_file, "{log_msg}");
-            } else {
-                let _ = writeln!(stderr(), "{log_msg}");
-            }
-        }
-    }
-
-    /// Flush logs to file
-    fn flush(&self) {
-        if let Some(mut log_file) = LOG_FILE.get().unwrap().as_ref() {
-            log_file.flush().expect("failed to flush");
-        } else {
-            stderr().flush().expect("failed to flush");
-        }
-    }
-}
-
-fn json_format(record: &log::Record) -> String {
-    serde_json::to_string(&serde_json::json!({
-        "level": record.level().to_string(),
-        "time": chrono::Local::now().to_rfc3339(),
-        "message": record.args(),
-    }))
-    .expect("serde::to_string with string keys will not fail")
-}
-
-fn text_format(record: &log::Record) -> String {
-    let log_msg = match (record.file(), record.line()) {
-        (Some(file), Some(line)) => format!(
-            "[{} {}:{}] {} {}\r",
-            record.level(),
-            file,
-            line,
-            chrono::Local::now().to_rfc3339(),
-            record.args()
-        ),
-        (_, _) => format!(
-            "[{}] {} {}\r",
-            record.level(),
-            chrono::Local::now().to_rfc3339(),
-            record.args()
-        ),
-    };
-
-    log_msg
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use serial_test::serial;
-
     use super::*;
+    use serial_test::serial;
     use std::{env, path::Path};
 
     struct LogLevelGuard {
@@ -186,7 +137,7 @@ mod tests {
     #[test]
     fn test_detect_log_level_is_debug() {
         let _guard = LogLevelGuard::new("error").unwrap();
-        assert_eq!(detect_log_level(true).unwrap(), LevelFilter::Debug)
+        assert_eq!(detect_log_level(true).unwrap(), LevelFilter::DEBUG)
     }
 
     #[test]
@@ -195,9 +146,9 @@ mod tests {
         let _guard = LogLevelGuard::new("error").unwrap();
         env::remove_var(LOG_LEVEL_ENV_NAME);
         if cfg!(debug_assertions) {
-            assert_eq!(detect_log_level(false).unwrap(), LevelFilter::Debug)
+            assert_eq!(detect_log_level(false).unwrap(), LevelFilter::DEBUG)
         } else {
-            assert_eq!(detect_log_level(false).unwrap(), LevelFilter::Warn)
+            assert_eq!(detect_log_level(false).unwrap(), LevelFilter::WARN)
         }
     }
 
@@ -205,15 +156,22 @@ mod tests {
     #[serial]
     fn test_detect_log_level_from_env() {
         let _guard = LogLevelGuard::new("error").unwrap();
-        assert_eq!(detect_log_level(false).unwrap(), LevelFilter::Error)
+        assert_eq!(detect_log_level(false).unwrap(), LevelFilter::ERROR)
     }
 
     #[test]
-    fn test_logfile() {
-        let temp_dir = tempfile::tempdir().expect("failed to create tempdir for logfile");
+    fn test_json_logfile() -> Result<()> {
+        let temp_dir = tempfile::tempdir()?;
         let log_file = Path::join(temp_dir.path(), "test.log");
-
-        init(true, Some(log_file.to_owned()), None).expect("failed to initialize logger");
+        let _guard = LogLevelGuard::new("error").unwrap();
+        // Note, we can only init the tracing once, so we have to test in a
+        // single unit test. The orders are important here.
+        init(
+            false,
+            Some(log_file.to_owned()),
+            Some(LOG_FORMAT_JSON.to_owned()),
+        )
+        .context("failed to initialize logger")?;
         assert!(
             log_file
                 .as_path()
@@ -223,17 +181,26 @@ mod tests {
                 == 0,
             "a new logfile should be empty"
         );
-
-        log::info!("testing this");
-
-        assert!(
-            log_file
-                .as_path()
-                .metadata()
-                .expect("failed to get logfile metadata")
-                .len()
-                > 0,
-            "some log should be written into the logfile"
-        );
+        // Test that info level is not logged into the logfile because we set the log level to error.
+        tracing::info!("testing this");
+        if log_file
+            .as_path()
+            .metadata()
+            .expect("failed to get logfile metadata")
+            .len()
+            != 0
+        {
+            let data = std::fs::read_to_string(&log_file).context("failed to read logfile")?;
+            bail!("info level should not be logged into the logfile, but got: {data}")
+        }
+        // Test that the message logged is actually JSON format.
+        tracing::error!("testing json log");
+        let data = std::fs::read_to_string(&log_file).context("failed to read logfile")?;
+        if data.is_empty() {
+            bail!("logfile should not be empty")
+        }
+        serde_json::from_str::<serde_json::Value>(&data)
+            .context(format!("failed to parse log file content: {data}"))?;
+        Ok(())
     }
 }

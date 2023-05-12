@@ -20,7 +20,7 @@ impl Controller for Pids {
         properties: &mut HashMap<&str, Box<dyn RefArg>>,
     ) -> Result<(), Self::Error> {
         if let Some(pids) = options.resources.pids() {
-            log::debug!("Applying pids resource restrictions");
+            tracing::debug!("Applying pids resource restrictions");
             Self::apply(pids, properties);
         }
 

@@ -44,7 +44,7 @@ impl Controller for Unified {
         properties: &mut HashMap<&str, Box<dyn RefArg>>,
     ) -> Result<(), Self::Error> {
         if let Some(unified) = options.resources.unified() {
-            log::debug!("applying unified resource restrictions");
+            tracing::debug!("applying unified resource restrictions");
             Self::apply(unified, systemd_version, properties)?;
         }
 
@@ -138,7 +138,7 @@ impl Unified {
                     properties.insert(pids::TASKS_MAX, Box::new(pids as u64));
                 }
 
-                unknown => log::warn!("could not apply {}. Unknown property.", unknown),
+                unknown => tracing::warn!("could not apply {}. Unknown property.", unknown),
             }
         }
 

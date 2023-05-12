@@ -83,7 +83,7 @@ fn main() -> Result<()> {
         eprintln!("log init failed: {e:?}");
     }
 
-    log::debug!(
+    tracing::debug!(
         "started by user {} with {:?}",
         nix::unistd::geteuid(),
         std::env::args_os()
@@ -135,7 +135,7 @@ fn main() -> Result<()> {
     };
 
     if let Err(ref e) = cmd_result {
-        log::error!("error in executing command: {:?}", e);
+        tracing::error!("error in executing command: {:?}", e);
     }
     cmd_result
 }

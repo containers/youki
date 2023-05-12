@@ -16,9 +16,9 @@ use libcgroups::{
     v2::controller_type::ControllerType,
 };
 use libcontainer::utils::PathBufExt;
-use log::debug;
 use oci_spec::runtime::{LinuxCpuBuilder, Spec};
 use test_framework::{assert_result_eq, test_result, ConditionalTest, TestGroup, TestResult};
+use tracing::debug;
 
 use super::create_spec;
 
@@ -317,7 +317,7 @@ fn read_cgroup_data(cgroup_name: &str, cgroup_file: &str) -> Result<String> {
         .join(cgroup_name)
         .join(cgroup_file);
 
-    log::debug!("reading value from {:?}", cgroup_path);
+    debug!("reading value from {:?}", cgroup_path);
     let content = fs::read_to_string(&cgroup_path)
         .with_context(|| format!("failed to read {cgroup_path:?}"))?;
     let trimmed = content.trim();

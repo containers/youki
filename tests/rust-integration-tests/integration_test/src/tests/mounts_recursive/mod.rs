@@ -1,5 +1,5 @@
 use crate::utils::test_inside_container;
-use anyhow::{anyhow, Context};
+use anyhow::Context;
 use nix::libc;
 use nix::mount::{mount, umount, MsFlags};
 use nix::sys::stat::Mode;
@@ -548,19 +548,14 @@ fn check_recursive_rnosymfollow() -> TestResult {
     );
     let result = test_inside_container(spec, &|_| {
         let original_file_path = format!("{}/{}", rnosymfollow_dir_path.to_str().unwrap(), "file");
-        File::create(original_file_path.clone())?;
+        let file = File::create(&original_file_path)?;
         let link_file_path = format!("{}/{}", rnosymfollow_dir_path.to_str().unwrap(), "link");
         println!("original file: {original_file_path:?},link file: {link_file_path:?}");
-        let mode = libc::S_ISUID | libc::S_ISGID;
-        let result = unsafe {
-            libc::chmod(
-                original_file_path.as_ptr() as *const ::std::os::raw::c_char,
-                mode,
-            )
-        };
-        if result == -1 {
-            return Err(anyhow!(std::io::Error::last_os_error()));
-        };
+        let mut permission = file.metadata()?.permissions();
+        permission.set_mode(permission.mode() | libc::S_ISUID | libc::S_ISGID);
+        file.set_permissions(permission)
+            .with_context(|| "failed to set permission")?;
+
         symlink(original_file_path, link_file_path)?;
         println!("symlink success");
         Ok(())

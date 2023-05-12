@@ -33,7 +33,7 @@ impl Controller for Io {
     type Error = V2IoControllerError;
 
     fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<(), Self::Error> {
-        log::debug!("Apply io cgroup v2 config");
+        tracing::debug!("Apply io cgroup v2 config");
         if let Some(io) = &controller_opt.resources.block_io() {
             Self::apply(cgroup_root, io)?;
         }

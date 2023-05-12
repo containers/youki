@@ -51,7 +51,7 @@ impl Devices {
         cgroup_root: &Path,
         linux_devices: &Option<Vec<LinuxDeviceCgroup>>,
     ) -> Result<(), DevicesControllerError> {
-        log::debug!("Apply Devices cgroup config");
+        tracing::debug!("Apply Devices cgroup config");
 
         // FIXME: should we start as "deny all"?
         let mut emulator = emulator::Emulator::with_default_allow(false);
@@ -59,7 +59,7 @@ impl Devices {
         // FIXME: apply user-defined and default rules in which order?
         if let Some(devices) = linux_devices {
             for d in devices {
-                log::debug!("apply user defined rule: {:?}", d);
+                tracing::debug!("apply user defined rule: {:?}", d);
                 emulator.add_rule(d);
             }
         }
@@ -70,7 +70,7 @@ impl Devices {
         ]
         .concat()
         {
-            log::debug!("apply default rule: {:?}", d);
+            tracing::debug!("apply default rule: {:?}", d);
             emulator.add_rule(&d);
         }
 

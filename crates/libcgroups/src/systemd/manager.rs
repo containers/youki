@@ -293,7 +293,7 @@ impl Manager {
         while let Some(component) = components.next() {
             current_path = current_path.join(component);
             if !current_path.exists() {
-                log::warn!(
+                tracing::warn!(
                     "{:?} does not exist. Resource restrictions might not work correctly",
                     current_path
                 );
@@ -357,7 +357,7 @@ impl CgroupManager for Manager {
             return Ok(());
         }
 
-        log::debug!("Starting {:?}", self.unit_name);
+        tracing::debug!("Starting {:?}", self.unit_name);
         self.client.start_transient_unit(
             &self.container_name,
             pid.as_raw() as u32,
@@ -394,7 +394,7 @@ impl CgroupManager for Manager {
         }
 
         Unified::apply(controller_opt, systemd_version, &mut properties)?;
-        log::debug!("{:?}", properties);
+        tracing::debug!("{:?}", properties);
 
         if !properties.is_empty() {
             self.ensure_controllers_attached()?;
@@ -407,7 +407,7 @@ impl CgroupManager for Manager {
     }
 
     fn remove(&self) -> Result<(), Self::Error> {
-        log::debug!("remove {}", self.unit_name);
+        tracing::debug!("remove {}", self.unit_name);
         if self.client.transient_unit_exists(&self.unit_name) {
             self.client.stop_transient_unit(&self.unit_name)?;
         }

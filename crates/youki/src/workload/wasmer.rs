@@ -12,7 +12,7 @@ pub struct WasmerExecutor {}
 
 impl Executor for WasmerExecutor {
     fn exec(&self, spec: &Spec) -> Result<()> {
-        log::debug!("Executing workload with wasmer handler");
+        tracing::debug!("Executing workload with wasmer handler");
         let process = spec.process().as_ref();
 
         let args = process.and_then(|p| p.args().as_ref()).unwrap_or(&EMPTY);

@@ -79,7 +79,7 @@ impl NotifyListener {
                 socket
                     .read_to_string(&mut response)
                     .map_err(NotifyListenerError::Read)?;
-                log::debug!("received: {}", response);
+                tracing::debug!("received: {}", response);
             }
             Err(e) => Err(NotifyListenerError::Accept(e))?,
         }
@@ -105,7 +105,7 @@ impl NotifySocket {
     }
 
     pub fn notify_container_start(&mut self) -> Result<()> {
-        log::debug!("notify container start");
+        tracing::debug!("notify container start");
         let cwd = env::current_dir().map_err(NotifyListenerError::GetCwd)?;
         let workdir = self
             .path
@@ -127,7 +127,7 @@ impl NotifySocket {
         stream
             .write_all(b"start container")
             .map_err(NotifyListenerError::SendStartContainer)?;
-        log::debug!("notify finished");
+        tracing::debug!("notify finished");
         unistd::chdir(&cwd).map_err(|e| NotifyListenerError::Chdir {
             source: e,
             path: cwd,

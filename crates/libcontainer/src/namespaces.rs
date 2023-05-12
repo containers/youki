@@ -84,7 +84,7 @@ impl Namespaces {
     }
 
     pub fn unshare_or_setns(&self, namespace: &LinuxNamespace) -> Result<()> {
-        log::debug!("unshare or setns: {:?}", namespace);
+        tracing::debug!("unshare or setns: {:?}", namespace);
         match namespace.path() {
             Some(path) => {
                 let fd = fcntl::open(path, fcntl::OFlag::empty(), stat::Mode::empty()).map_err(

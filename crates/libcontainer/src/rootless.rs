@@ -92,7 +92,7 @@ impl<'a> Rootless<'a> {
         }
 
         if user_namespace.is_some() && user_namespace.unwrap().path().is_none() {
-            log::debug!("rootless container should be created");
+            tracing::debug!("rootless container should be created");
 
             validate_spec_for_rootless(spec)
                 .context("The spec failed to comply to rootless requirement")?;
@@ -104,13 +104,13 @@ impl<'a> Rootless<'a> {
 
             Ok(Some(rootless))
         } else {
-            log::debug!("This is NOT a rootless container");
+            tracing::debug!("This is NOT a rootless container");
             Ok(None)
         }
     }
 
     pub fn write_uid_mapping(&self, target_pid: Pid) -> Result<()> {
-        log::debug!("Write UID mapping for {:?}", target_pid);
+        tracing::debug!("Write UID mapping for {:?}", target_pid);
         if let Some(uid_mappings) = self.uid_mappings {
             write_id_mapping(
                 target_pid,
@@ -124,7 +124,7 @@ impl<'a> Rootless<'a> {
     }
 
     pub fn write_gid_mapping(&self, target_pid: Pid) -> Result<()> {
-        log::debug!("Write GID mapping for {:?}", target_pid);
+        tracing::debug!("Write GID mapping for {:?}", target_pid);
         if let Some(gid_mappings) = self.gid_mappings {
             return write_id_mapping(
                 target_pid,
@@ -305,7 +305,7 @@ fn write_id_mapping(
     mappings: &[LinuxIdMapping],
     map_binary: Option<&Path>,
 ) -> Result<()> {
-    log::debug!("Write ID mapping: {:?}", mappings);
+    tracing::debug!("Write ID mapping: {:?}", mappings);
 
     match mappings.len() {
         0 => bail!("at least one id mapping needs to be defined"),

@@ -32,7 +32,7 @@ impl Controller for CpuSet {
         properties: &mut HashMap<&str, Box<dyn RefArg>>,
     ) -> Result<(), Self::Error> {
         if let Some(cpu) = options.resources.cpu() {
-            log::debug!("Applying cpuset resource restrictions");
+            tracing::debug!("Applying cpuset resource restrictions");
             return Self::apply(cpu, systemd_version, properties);
         }
 

@@ -12,7 +12,7 @@ use liboci_cli::Pause;
 // https://man7.org/linux/man-pages/man7/cgroups.7.html
 // https://www.kernel.org/doc/Documentation/cgroup-v1/freezer-subsystem.txt
 pub fn pause(args: Pause, root_path: PathBuf) -> Result<()> {
-    log::debug!("start pausing container {}", args.container_id);
+    tracing::debug!("start pausing container {}", args.container_id);
     let mut container = load_container(root_path, &args.container_id)?;
     container
         .pause()

@@ -12,7 +12,7 @@ pub struct WasmtimeExecutor {}
 
 impl Executor for WasmtimeExecutor {
     fn exec(&self, spec: &Spec) -> Result<()> {
-        log::info!("Executing workload with wasmtime handler");
+        tracing::info!("Executing workload with wasmtime handler");
         let process = spec.process().as_ref();
 
         let args = spec

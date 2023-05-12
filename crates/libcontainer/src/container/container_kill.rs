@@ -60,7 +60,7 @@ impl Container {
         let signal = signal.into().into_raw();
         let pid = self.pid().unwrap();
 
-        log::debug!("kill signal {} to {}", signal, pid);
+        tracing::debug!("kill signal {} to {}", signal, pid);
         let res = signal::kill(pid, signal);
 
         match res {
@@ -98,7 +98,7 @@ impl Container {
         let cmanger = create_cgroup_manager(cgroups_path, use_systemd, self.id())?;
         let ret = cmanger.freeze(libcgroups::common::FreezerState::Frozen);
         if ret.is_err() {
-            log::warn!(
+            tracing::warn!(
                 "failed to freeze container {}, error: {}",
                 self.id(),
                 ret.unwrap_err()
@@ -106,7 +106,7 @@ impl Container {
         }
         let pids = cmanger.get_all_pids()?;
         pids.iter().try_for_each(|&pid| {
-            log::debug!("kill signal {} to {}", signal, pid);
+            tracing::debug!("kill signal {} to {}", signal, pid);
             let res = signal::kill(pid, signal);
             match res {
                 Err(nix::errno::Errno::ESRCH) => {
@@ -118,7 +118,7 @@ impl Container {
         })?;
         let ret = cmanger.freeze(libcgroups::common::FreezerState::Thawed);
         if ret.is_err() {
-            log::warn!(
+            tracing::warn!(
                 "failed to thaw container {}, error: {}",
                 self.id(),
                 ret.unwrap_err()

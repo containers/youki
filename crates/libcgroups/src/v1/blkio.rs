@@ -83,7 +83,7 @@ impl Controller for Blkio {
     type Resource = LinuxBlockIo;
 
     fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<(), Self::Error> {
-        log::debug!("Apply blkio cgroup config");
+        tracing::debug!("Apply blkio cgroup config");
 
         if let Some(blkio) = Self::needs_to_handle(controller_opt) {
             Self::apply(cgroup_root, blkio)?;

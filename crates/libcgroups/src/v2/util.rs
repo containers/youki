@@ -48,7 +48,7 @@ pub fn get_available_controllers<P: AsRef<Path>>(
             "io" => controllers.push(ControllerType::Io),
             "memory" => controllers.push(ControllerType::Memory),
             "pids" => controllers.push(ControllerType::Pids),
-            tpe => log::warn!("Controller {} is not yet implemented.", tpe),
+            tpe => tracing::warn!("Controller {} is not yet implemented.", tpe),
         }
     }
 

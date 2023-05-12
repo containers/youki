@@ -48,7 +48,7 @@ impl Mount {
     }
 
     pub fn setup_mount(&self, mount: &SpecMount, options: &MountOptions) -> Result<()> {
-        log::debug!("mounting {:?}", mount);
+        tracing::debug!("mounting {:?}", mount);
         let mut mount_option_config = parse_mount(mount);
 
         match mount.typ().as_deref() {
@@ -99,7 +99,7 @@ impl Mount {
 
     #[cfg(feature = "v1")]
     fn mount_cgroup_v1(&self, cgroup_mount: &SpecMount, options: &MountOptions) -> Result<()> {
-        log::debug!("Mounting cgroup v1 filesystem");
+        tracing::debug!("Mounting cgroup v1 filesystem");
         // create tmpfs into which the cgroup subsystems will be mounted
         let tmpfs = SpecMountBuilder::default()
             .source("tmpfs")
@@ -123,7 +123,7 @@ impl Mount {
             .into_iter()
             .filter(|p| p.as_path().starts_with(DEFAULT_CGROUP_ROOT))
             .collect();
-        log::debug!("cgroup mounts: {:?}", host_mounts);
+        tracing::debug!("cgroup mounts: {:?}", host_mounts);
 
         // get process cgroups
         let process_cgroups: HashMap<String, String> = Process::myself()?
@@ -132,13 +132,13 @@ impl Mount {
             .into_iter()
             .map(|c| (c.controllers.join(","), c.pathname))
             .collect();
-        log::debug!("Process cgroups: {:?}", process_cgroups);
+        tracing::debug!("Process cgroups: {:?}", process_cgroups);
 
         let cgroup_root = options
             .root
             .join_safely(cgroup_mount.destination())
             .context("could not join rootfs path with cgroup mount destination")?;
-        log::debug!("cgroup root: {:?}", cgroup_root);
+        tracing::debug!("cgroup root: {:?}", cgroup_root);
 
         let symlink = Symlink::new();
 
@@ -165,7 +165,7 @@ impl Mount {
 
                 symlink.setup_comount_symlinks(&cgroup_root, subsystem_name)?;
             } else {
-                log::warn!("could not get subsystem name from {:?}", host_mount);
+                tracing::warn!("could not get subsystem name from {:?}", host_mount);
             }
         }
 
@@ -182,7 +182,7 @@ impl Mount {
         subsystem_name: &str,
         named: bool,
     ) -> Result<()> {
-        log::debug!(
+        tracing::debug!(
             "Mounting (namespaced) {:?} cgroup subsystem",
             subsystem_name
         );
@@ -230,7 +230,7 @@ impl Mount {
         host_mount: &Path,
         process_cgroups: &HashMap<String, String>,
     ) -> Result<()> {
-        log::debug!("Mounting (emulated) {:?} cgroup subsystem", subsystem_name);
+        tracing::debug!("Mounting (emulated) {:?} cgroup subsystem", subsystem_name);
         let named_hierarchy: Cow<str> = if named {
             format!("name={subsystem_name}").into()
         } else {
@@ -264,12 +264,12 @@ impl Mount {
                         .collect::<Vec<String>>(),
                 )
                 .build()?;
-            log::debug!("Mounting emulated cgroup subsystem: {:?}", emulated);
+            tracing::debug!("Mounting emulated cgroup subsystem: {:?}", emulated);
 
             self.setup_mount(&emulated, options)
                 .with_context(|| format!("failed to mount {subsystem_name} cgroup hierarchy"))?;
         } else {
-            log::warn!("Could not mount {:?} cgroup subsystem", subsystem_name);
+            tracing::warn!("Could not mount {:?} cgroup subsystem", subsystem_name);
         }
 
         Ok(())
@@ -282,7 +282,7 @@ impl Mount {
         options: &MountOptions,
         mount_option_config: &MountOptionConfig,
     ) -> Result<()> {
-        log::debug!("Mounting cgroup v2 filesystem");
+        tracing::debug!("Mounting cgroup v2 filesystem");
 
         let cgroup_mount = SpecMountBuilder::default()
             .typ("cgroup2")
@@ -290,7 +290,7 @@ impl Mount {
             .destination(cgroup_mount.destination())
             .options(Vec::new())
             .build()?;
-        log::debug!("{:?}", cgroup_mount);
+        tracing::debug!("{:?}", cgroup_mount);
 
         if self
             .mount_into_container(
@@ -320,7 +320,7 @@ impl Mount {
                 .options(Vec::new())
                 .build()
                 .context("failed to build cgroup bind mount")?;
-            log::debug!("{:?}", bind_mount);
+            tracing::debug!("{:?}", bind_mount);
 
             let mut mount_option_config = (*mount_option_config).clone();
             mount_option_config.flags |= MsFlags::MS_BIND;

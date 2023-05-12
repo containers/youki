@@ -65,7 +65,7 @@ impl MainSender {
     // requests the Main to write the id mappings for the intermediate process
     // this needs to be done from the parent see https://man7.org/linux/man-pages/man7/user_namespaces.7.html
     pub fn identifier_mapping_request(&mut self) -> Result<(), ChannelError> {
-        log::debug!("send identifier mapping request");
+        tracing::debug!("send identifier mapping request");
         self.sender.send(Message::WriteMapping)?;
 
         Ok(())
@@ -80,7 +80,7 @@ impl MainSender {
 
     pub fn intermediate_ready(&mut self, pid: Pid) -> Result<(), ChannelError> {
         // Send over the IntermediateReady follow by the pid.
-        log::debug!("sending init pid ({:?})", pid);
+        tracing::debug!("sending init pid ({:?})", pid);
         self.sender.send(Message::IntermediateReady(pid.as_raw()))?;
 
         Ok(())
@@ -216,7 +216,7 @@ pub struct IntermediateSender {
 
 impl IntermediateSender {
     pub fn mapping_written(&mut self) -> Result<(), ChannelError> {
-        log::debug!("identifier mapping written");
+        tracing::debug!("identifier mapping written");
         self.sender.send(Message::MappingWritten)?;
 
         Ok(())
@@ -236,7 +236,7 @@ pub struct IntermediateReceiver {
 impl IntermediateReceiver {
     // wait until the parent process has finished writing the id mappings
     pub fn wait_for_mapping_ack(&mut self) -> Result<(), ChannelError> {
-        log::debug!("waiting for mapping ack");
+        tracing::debug!("waiting for mapping ack");
         let msg = self
             .receiver
             .recv()

@@ -124,7 +124,7 @@ impl CapabilityExt for SpecCapability {
 /// effective capability set is set of capabilities used by kernel to perform checks
 /// see <https://man7.org/linux/man-pages/man7/capabilities.7.html> for more information
 pub fn reset_effective<S: Syscall + ?Sized>(syscall: &S) -> Result<(), SyscallError> {
-    log::debug!("reset all caps");
+    tracing::debug!("reset all caps");
     syscall.set_capability(CapSet::Effective, &caps::all())?;
     Ok(())
 }
@@ -134,7 +134,7 @@ pub fn drop_privileges<S: Syscall + ?Sized>(
     cs: &LinuxCapabilities,
     syscall: &S,
 ) -> Result<(), SyscallError> {
-    log::debug!("dropping bounding capabilities to {:?}", cs.bounding());
+    tracing::debug!("dropping bounding capabilities to {:?}", cs.bounding());
     if let Some(bounding) = cs.bounding() {
         syscall.set_capability(CapSet::Bounding, &to_set(bounding))?;
     }
@@ -154,7 +154,7 @@ pub fn drop_privileges<S: Syscall + ?Sized>(
     if let Some(ambient) = cs.ambient() {
         // check specifically for ambient, as those might not always be available
         if let Err(e) = syscall.set_capability(CapSet::Ambient, &to_set(ambient)) {
-            log::error!("failed to set ambient capabilities: {}", e);
+            tracing::error!("failed to set ambient capabilities: {}", e);
         }
     }
 

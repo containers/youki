@@ -34,7 +34,7 @@ impl Unified {
         cgroup_path: &Path,
         controllers: &[ControllerType],
     ) -> Result<(), V2UnifiedError> {
-        log::debug!("Apply unified cgroup config");
+        tracing::debug!("Apply unified cgroup config");
         for (cgroup_file, value) in unified {
             if let Err(err) = common::write_cgroup_file_str(cgroup_path.join(cgroup_file), value) {
                 let (subsystem, _) = cgroup_file.split_once('.').unwrap_or((cgroup_file, ""));

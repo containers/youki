@@ -137,7 +137,7 @@ impl SystemdClient for Client {
         properties.push(("DefaultDependencies", Variant(Box::new(false))));
         properties.push(("PIDs", Variant(Box::new(vec![pid]))));
 
-        log::debug!("Starting transient unit: {:?}", properties);
+        tracing::debug!("Starting transient unit: {:?}", properties);
         proxy
             .start_transient_unit(unit_name, "replace", properties, vec![])
             .map_err(|err| SystemdClientError::FailedTransient {

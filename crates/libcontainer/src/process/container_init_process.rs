@@ -23,13 +23,13 @@ use std::{
 use crate::seccomp;
 
 #[cfg(not(feature = "libseccomp"))]
-use log::warn;
+use tracing::warn;
 
 fn sysctl(kernel_params: &HashMap<String, String>) -> Result<()> {
     let sys = PathBuf::from("/proc/sys");
     for (kernel_param, value) in kernel_params {
         let path = sys.join(kernel_param.replace('.', "/"));
-        log::debug!(
+        tracing::debug!(
             "apply value {} to kernel parameter {}.",
             value,
             kernel_param
@@ -77,7 +77,7 @@ fn readonly_path(path: &Path, syscall: &dyn Syscall) -> Result<()> {
         None,
     )?;
 
-    log::debug!("readonly path {:?} mounted", path);
+    tracing::debug!("readonly path {:?} mounted", path);
     Ok(())
 }
 
@@ -94,7 +94,7 @@ fn masked_path(path: &Path, mount_label: &Option<String>, syscall: &dyn Syscall)
         match err {
             SyscallError::Mount { source: errno } => match errno {
                 nix::errno::Errno::ENOENT => {
-                    log::warn!("masked path {:?} not exist", path);
+                    tracing::warn!("masked path {:?} not exist", path);
                 }
                 nix::errno::Errno::ENOTDIR => {
                     let label = match mount_label {
@@ -316,7 +316,7 @@ pub fn container_init_process(
             let listen_fds = match listen_fds_str.parse::<i32>() {
                 std::result::Result::Ok(v) => v,
                 Err(error) => {
-                    log::warn!(
+                    tracing::warn!(
                         "LISTEN_FDS entered is not a fd. Ignore the value. {:?}",
                         error
                     );
@@ -340,7 +340,7 @@ pub fn container_init_process(
         }
         Err(env::VarError::NotPresent) => args.preserve_fds,
         Err(env::VarError::NotUnicode(value)) => {
-            log::warn!(
+            tracing::warn!(
                 "LISTEN_FDS entered is malformed: {:?}. Ignore the value.",
                 &value
             );
@@ -545,7 +545,7 @@ fn sync_seccomp(
     init_receiver: &mut channel::InitReceiver,
 ) -> Result<()> {
     if let Some(fd) = fd {
-        log::debug!("init process sync seccomp, notify fd: {}", fd);
+        tracing::debug!("init process sync seccomp, notify fd: {}", fd);
         main_sender.seccomp_notify_request(fd)?;
         init_receiver.wait_for_seccomp_request_done()?;
         // Once we are sure the seccomp notify fd is sent, we can safely close

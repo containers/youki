@@ -250,7 +250,7 @@ impl Syscall for LinuxSyscall {
         // open the path as directory and read only
         let newroot =
             open(path, OFlag::O_DIRECTORY | OFlag::O_RDONLY, Mode::empty()).map_err(|errno| {
-                log::error!("failed to open {:?}", path);
+                tracing::error!("failed to open {:?}", path);
                 SyscallError::PivotRoot { source: errno }
             })?;
 
@@ -263,7 +263,7 @@ impl Syscall for LinuxSyscall {
         // so we can move the original root there, and then unmount that. This way saves the creation of the temporary
         // directory to put original root directory.
         pivot_root(path, path).map_err(|errno| {
-            log::error!("failed to pivot root to {:?}", path);
+            tracing::error!("failed to pivot root to {:?}", path);
             SyscallError::PivotRoot { source: errno }
         })?;
 
@@ -277,7 +277,7 @@ impl Syscall for LinuxSyscall {
             None::<&str>,
         )
         .map_err(|errno| {
-            log::error!("failed to make original root directory rslave");
+            tracing::error!("failed to make original root directory rslave");
             SyscallError::PivotRoot { source: errno }
         })?;
 
@@ -286,12 +286,12 @@ impl Syscall for LinuxSyscall {
         // to be free of activity to actually unmount
         // see https://man7.org/linux/man-pages/man2/umount2.2.html for more information
         umount2("/", MntFlags::MNT_DETACH).map_err(|errno| {
-            log::error!("failed to unmount old root directory");
+            tracing::error!("failed to unmount old root directory");
             SyscallError::PivotRoot { source: errno }
         })?;
         // Change directory to the new root
         fchdir(newroot).map_err(|errno| {
-            log::error!("failed to change directory to new root");
+            tracing::error!("failed to change directory to new root");
             SyscallError::PivotRoot { source: errno }
         })?;
 
@@ -466,14 +466,14 @@ impl Syscall for LinuxSyscall {
 
     fn symlink(&self, original: &Path, link: &Path) -> Result<()> {
         symlink(original, link).map_err(|err| {
-            log::error!("failed to create symlink from {original:?} to {link:?}: {err}");
+            tracing::error!("failed to create symlink from {original:?} to {link:?}: {err}");
             SyscallError::Symlink { source: err }
         })
     }
 
     fn mknod(&self, path: &Path, kind: SFlag, perm: Mode, dev: u64) -> Result<()> {
         mknod(path, kind, perm, dev).map_err(|errno| {
-            log::error!(
+            tracing::error!(
                 "failed to mknod {path:?}, kind {kind:?}, perm {perm:?}, dev {dev:?}: {errno}"
             );
             SyscallError::Mknod { source: errno }
@@ -482,7 +482,7 @@ impl Syscall for LinuxSyscall {
 
     fn chown(&self, path: &Path, owner: Option<Uid>, group: Option<Gid>) -> Result<()> {
         chown(path, owner, group).map_err(|errno| {
-            log::error!("failed to chown {path:?} to {owner:?}:{group:?}: {errno}");
+            tracing::error!("failed to chown {path:?} to {owner:?}:{group:?}: {errno}");
             SyscallError::Chown { source: errno }
         })
     }

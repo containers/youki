@@ -45,7 +45,7 @@ fn container_clone<F: FnOnce() -> Result<i32>>(
             // Inside the cloned process
             let ret = match cb() {
                 Err(error) => {
-                    log::debug!("failed to run child process in clone: {:?}", error);
+                    tracing::debug!("failed to run child process in clone: {:?}", error);
                     -1
                 }
                 Ok(exit_code) => exit_code,

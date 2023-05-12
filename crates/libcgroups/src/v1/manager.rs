@@ -87,7 +87,7 @@ impl Manager {
             if let Ok(subsystem_path) = Self::get_subsystem_path(&cgroup_path, subsystem) {
                 subsystems.insert(*subsystem, subsystem_path);
             } else {
-                log::warn!("cgroup {} not supported on this system", subsystem);
+                tracing::warn!("cgroup {} not supported on this system", subsystem);
             }
         }
 
@@ -98,7 +98,7 @@ impl Manager {
         cgroup_path: &Path,
         subsystem: &CtrlType,
     ) -> Result<PathBuf, V1ManagerError> {
-        log::debug!("Get path for subsystem: {}", subsystem);
+        tracing::debug!("Get path for subsystem: {}", subsystem);
         let mount_point = util::get_subsystem_mount_point(subsystem)?;
 
         let cgroup = Process::myself()?
@@ -218,7 +218,7 @@ impl CgroupManager for Manager {
     fn remove(&self) -> Result<(), Self::Error> {
         for cgroup_path in &self.subsystems {
             if cgroup_path.1.exists() {
-                log::debug!("remove cgroup {:?}", cgroup_path.1);
+                tracing::debug!("remove cgroup {:?}", cgroup_path.1);
                 let procs_path = cgroup_path.1.join(CGROUP_PROCS);
                 let procs = fs::read_to_string(&procs_path).wrap_read(&procs_path)?;
 

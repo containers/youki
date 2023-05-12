@@ -34,7 +34,7 @@ impl Controller for Memory {
         properties: &mut HashMap<&str, Box<dyn RefArg>>,
     ) -> Result<(), Self::Error> {
         if let Some(memory) = options.resources.memory() {
-            log::debug!("applying memory resource restrictions");
+            tracing::debug!("applying memory resource restrictions");
             return Self::apply(memory, properties);
         }
 
