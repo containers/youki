@@ -24,4 +24,3 @@ spec:
         image: nginx:1.16.1
         ports:
         - containerPort: 80
-      automountServiceAccountToken: false
