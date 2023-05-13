@@ -1,7 +1,30 @@
-use crate::process::{ProcessError, Result};
 use libc::SIGCHLD;
 use nix::unistd::Pid;
 use prctl;
+
+#[derive(Debug, thiserror::Error)]
+pub enum CloneError {
+    #[error("failed to clone process using clone3")]
+    Clone(#[source] nix::Error),
+}
+
+type Result<T> = std::result::Result<T, CloneError>;
+
+#[derive(Debug, thiserror::Error)]
+pub enum CallbackError {
+    #[error(transparent)]
+    IntermediateProcess(
+        #[from] crate::process::container_intermediate_process::IntermediateProcessError,
+    ),
+    #[error(transparent)]
+    InitProcess(#[from] crate::process::container_init_process::InitProcessError),
+    // Need a fake error for testing
+    #[error("unknown")]
+    #[cfg(test)]
+    Test,
+}
+
+type CallbackResult<T> = std::result::Result<T, CallbackError>;
 
 // Fork/Clone a sibling process that shares the same parent as the calling
 // process. This is used to launch the container init process so the parent
@@ -10,7 +33,10 @@ use prctl;
 // youki main process) will exit and the init process will be re-parented to the
 // process 1 (system init process), which is not the right behavior of what we
 // look for.
-pub fn container_clone_sibling<F: FnOnce() -> Result<i32>>(child_name: &str, cb: F) -> Result<Pid> {
+pub fn container_clone_sibling<F: FnOnce() -> CallbackResult<i32>>(
+    child_name: &str,
+    cb: F,
+) -> Result<Pid> {
     let mut clone = clone3::Clone3::default();
     // Note: normally, an exit signal is required, but when using
     // `CLONE_PARENT`, the `clone3` will return EINVAL if an exit signal is set.
@@ -25,7 +51,7 @@ pub fn container_clone_sibling<F: FnOnce() -> Result<i32>>(child_name: &str, cb:
 // fork/clone situations. We decided to minimally support kernel version >= 5.4,
 // and `clone3` requires only kernel version >= 5.3. Therefore, we don't need to
 // fall back to `clone` or `fork`.
-fn container_clone<F: FnOnce() -> Result<i32>>(
+fn container_clone<F: FnOnce() -> CallbackResult<i32>>(
     child_name: &str,
     cb: F,
     mut clone_cmd: clone3::Clone3,
@@ -35,10 +61,9 @@ fn container_clone<F: FnOnce() -> Result<i32>>(
     // code returned by the callback. If there was any error when trying to run
     // callback, exit with -1
     match unsafe {
-        clone_cmd.call().map_err(|err| ProcessError::CloneFailed {
-            errno: nix::errno::from_i32(err.0),
-            child_name: child_name.to_string(),
-        })?
+        clone_cmd
+            .call()
+            .map_err(|err| CloneError::Clone(nix::errno::from_i32(err.0)))?
     } {
         0 => {
             prctl::set_name(child_name).expect("failed to set name");
@@ -62,7 +87,7 @@ fn container_clone<F: FnOnce() -> Result<i32>>(
 // using clone, we would have to manually make sure all the variables are
 // correctly send to the new process, especially Rust borrow checker will be a
 // lot of hassel to deal with every details.
-pub fn container_fork<F: FnOnce() -> Result<i32>>(child_name: &str, cb: F) -> Result<Pid> {
+pub fn container_fork<F: FnOnce() -> CallbackResult<i32>>(child_name: &str, cb: F) -> Result<Pid> {
     // Using `clone3` to mimic the effect of `fork`.
     let mut clone = clone3::Clone3::default();
     clone.exit_signal(SIGCHLD as u64);
@@ -94,7 +119,7 @@ mod test {
 
     #[test]
     fn test_container_err_fork() -> Result<()> {
-        let pid = container_fork("test:child", || Err(ProcessError::Unknown))?;
+        let pid = container_fork("test:child", || Err(CallbackError::Test))?;
         match waitpid(pid, None).expect("wait pid failed.") {
             WaitStatus::Exited(p, status) => {
                 assert_eq!(pid, p);
