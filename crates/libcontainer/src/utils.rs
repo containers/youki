@@ -318,31 +318,6 @@ pub fn ensure_procfs(path: &Path) -> Result<(), EnsureProcfsError> {
     Ok(())
 }
 
-pub fn get_executable_path(name: &str, path_var: &str) -> Option<PathBuf> {
-    let paths = path_var.trim_start_matches("PATH=");
-    // if path has / in it, we have to assume absolute path, as per runc impl
-    if name.contains('/') && PathBuf::from(name).exists() {
-        return Some(PathBuf::from(name));
-    }
-    for path in paths.split(':') {
-        let potential_path = PathBuf::from(path).join(name);
-        if potential_path.exists() {
-            return Some(potential_path);
-        }
-    }
-    None
-}
-
-pub fn is_executable(path: &Path) -> Result<bool, std::io::Error> {
-    use std::os::unix::fs::PermissionsExt;
-    let metadata = path.metadata()?;
-    let permissions = metadata.permissions();
-    // we have to check if the path is file and the execute bit
-    // is set. In case of directories, the execute bit is also set,
-    // so have to check if this is a file or not
-    Ok(metadata.is_file() && permissions.mode() & 0o001 != 0)
-}
-
 #[cfg(test)]
 pub(crate) mod test_utils {
     use crate::process::channel;
@@ -448,43 +423,5 @@ mod tests {
         assert_eq!(env_output.get_key_value(&key), Some((&key, &value)));
 
         Ok(())
-    }
-
-    #[test]
-    fn test_get_executable_path() {
-        let non_existing_abs_path = "/some/non/existent/absolute/path";
-        let existing_abs_path = "/usr/bin/sh";
-        let existing_binary = "sh";
-        let non_existing_binary = "non-existent";
-        let path_value = "PATH=/usr/bin:/bin";
-
-        assert_eq!(
-            get_executable_path(existing_abs_path, path_value),
-            Some(PathBuf::from(existing_abs_path))
-        );
-        assert_eq!(get_executable_path(non_existing_abs_path, path_value), None);
-
-        assert_eq!(
-            get_executable_path(existing_binary, path_value),
-            Some(PathBuf::from("/usr/bin/sh"))
-        );
-
-        assert_eq!(get_executable_path(non_existing_binary, path_value), None);
-    }
-
-    #[test]
-    fn test_is_executable() {
-        let tmp = tempfile::tempdir().expect("create temp directory for test");
-        let executable_path = PathBuf::from("/bin/sh");
-        let directory_path = tmp.path();
-        let non_executable_path = directory_path.join("non_executable_file");
-        let non_existent_path = PathBuf::from("/some/non/existent/path");
-
-        File::create(non_executable_path.as_path()).unwrap();
-
-        assert!(is_executable(&non_existent_path).is_err());
-        assert!(is_executable(&executable_path).unwrap());
-        assert!(!is_executable(&non_executable_path).unwrap());
-        assert!(!is_executable(directory_path).unwrap());
     }
 }
