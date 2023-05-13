@@ -1968,6 +1968,7 @@ dependencies = [
  "rand",
  "regex",
  "rust-criu",
+ "safe-path",
  "serde",
  "serde_json",
  "serial_test",
@@ -3144,6 +3145,15 @@ name = "ryu"
 version = "1.0.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f91339c0467de62360649f8d3e185ca8de4224ff281f66000de5eb2a77a79041"
+
+[[package]]
+name = "safe-path"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "980abdd3220aa19b67ca3ea07b173ca36383f18ae48cde696d90c8af39447ffb"
+dependencies = [
+ "libc",
+]
 
 [[package]]
 name = "same-file"

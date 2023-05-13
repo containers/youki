@@ -1,6 +1,6 @@
 use super::utils::to_sflag;
 use crate::syscall::{syscall::create_syscall, Syscall};
-use crate::utils::{self, PathBufExt};
+use crate::utils::PathBufExt;
 use anyhow::{bail, Context, Result};
 use nix::{
     fcntl::{open, OFlag},
@@ -109,7 +109,7 @@ fn create_container_dev_path(rootfs: &Path, dev: &LinuxDevice) -> Result<PathBuf
         .path()
         .as_relative()
         .with_context(|| format!("could not convert {:?} to relative path", dev.path()))?;
-    let full_container_path = utils::secure_join(rootfs, relative_dev_path)
+    let full_container_path = safe_path::scoped_join(rootfs, relative_dev_path)
         .with_context(|| format!("could not join {:?} with {:?}", rootfs, dev.path()))?;
 
     crate::utils::create_dir_all(

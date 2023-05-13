@@ -3,7 +3,6 @@ use super::symlink::Symlink;
 use super::utils::{find_parent_mount, parse_mount, MountOptionConfig};
 use crate::{
     syscall::{linux, syscall::create_syscall, Syscall, SyscallError},
-    utils,
     utils::PathBufExt,
 };
 #[cfg(feature = "v2")]
@@ -15,6 +14,7 @@ use libcgroups::common::DEFAULT_CGROUP_ROOT;
 use nix::{dir::Dir, errno::Errno, fcntl::OFlag, mount::MsFlags, sys::stat::Mode};
 use oci_spec::runtime::{Mount as SpecMount, MountBuilder as SpecMountBuilder};
 use procfs::process::{MountInfo, MountOptFields, Process};
+use safe_path;
 use std::fs::{canonicalize, create_dir_all, OpenOptions};
 use std::mem;
 use std::os::unix::io::AsRawFd;
@@ -380,7 +380,7 @@ impl Mount {
             }
         }
 
-        let dest_for_host = utils::secure_join(rootfs, m.destination())
+        let dest_for_host = safe_path::scoped_join(rootfs, m.destination())
             .with_context(|| format!("failed to join {:?} with {:?}", rootfs, m.destination()))?;
 
         let dest = Path::new(&dest_for_host);
