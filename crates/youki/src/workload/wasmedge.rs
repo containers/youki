@@ -48,18 +48,18 @@ impl Executor for WasmEdgeExecutor {
         Ok(())
     }
 
-    fn can_handle(&self, spec: &Spec) -> Result<bool> {
+    fn can_handle(&self, spec: &Spec) -> bool {
         if let Some(annotations) = spec.annotations() {
             if let Some(handler) = annotations.get("run.oci.handler") {
-                return Ok(handler == "wasm");
+                return handler == "wasm";
             }
 
             if let Some(variant) = annotations.get("module.wasm.image/variant") {
-                return Ok(variant == "compat");
+                return variant == "compat";
             }
         }
 
-        Ok(false)
+        false
     }
 
     fn name(&self) -> &'static str {

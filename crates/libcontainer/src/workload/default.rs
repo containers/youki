@@ -1,6 +1,5 @@
 use std::ffi::CString;
 
-use anyhow::{bail, Context, Result};
 use nix::unistd;
 use oci_spec::runtime::Spec;
 
@@ -8,12 +7,22 @@ use super::{Executor, EMPTY};
 
 const EXECUTOR_NAME: &str = "default";
 
+#[derive(Debug, thiserror::Error)]
+pub enum DefaultExecutorError {
+    #[error("missing args")]
+    MissingArgs,
+    #[error("failed to convert path to cstring")]
+    NullExecutorPath,
+    #[error("failed to execvp")]
+    ExecutionFailed(#[from] nix::Error),
+}
+
 #[derive(Default)]
 pub struct DefaultExecutor {}
 
 impl Executor for DefaultExecutor {
-    fn exec(&self, spec: &Spec) -> Result<()> {
-        tracing::debug!("Executing workload with default handler");
+    fn exec(&self, spec: &Spec) -> anyhow::Result<()> {
+        tracing::debug!("executing workload with default handler");
         let args = spec
             .process()
             .as_ref()
@@ -21,25 +30,30 @@ impl Executor for DefaultExecutor {
             .unwrap_or(&EMPTY);
 
         if args.is_empty() {
-            bail!("at least one process arg must be specified")
+            Err(DefaultExecutorError::MissingArgs)?;
         }
 
         let executable = args[0].as_str();
-        let p = CString::new(executable.as_bytes())
-            .with_context(|| format!("failed to convert path {executable:?} to cstring"))?;
+        let p = CString::new(executable.as_bytes()).map_err(|err| {
+            tracing::error!("failed to convert path {executable:?} to cstring: {}", err,);
+            DefaultExecutorError::NullExecutorPath
+        })?;
         let a: Vec<CString> = args
             .iter()
             .map(|s| CString::new(s.as_bytes()).unwrap_or_default())
             .collect();
-        unistd::execvp(&p, &a)?;
+        unistd::execvp(&p, &a).map_err(|err| {
+            tracing::error!(?err, filename = ?p, args = ?a, "failed to execvp");
+            DefaultExecutorError::ExecutionFailed(err)
+        })?;
 
         // After do_exec is called, the process is replaced with the container
         // payload through execvp, so it should never reach here.
         unreachable!();
     }
 
-    fn can_handle(&self, _: &Spec) -> Result<bool> {
-        Ok(true)
+    fn can_handle(&self, _: &Spec) -> bool {
+        true
     }
 
     fn name(&self) -> &'static str {
