@@ -1,4 +1,5 @@
 use super::args::{ContainerArgs, ContainerType};
+use crate::error::MissingSpecError;
 use crate::namespaces::NamespaceError;
 use crate::syscall::{Syscall, SyscallError};
 use crate::{apparmor, notify_socket, rootfs, workload};
@@ -40,10 +41,8 @@ pub enum InitProcessError {
     ReopenDevNull(#[source] std::io::Error),
     #[error("failed to unix syscall")]
     NixOther(#[source] nix::Error),
-    #[error("no linux in spec")]
-    NoLinuxSpec,
-    #[error("no process in spec")]
-    NoProcessSpec,
+    #[error(transparent)]
+    MissingSpec(#[from] crate::error::MissingSpecError),
     #[error("failed to setup tty")]
     Tty(#[source] tty::TTYError),
     #[error("failed to run hooks")]
@@ -62,8 +61,6 @@ pub enum InitProcessError {
     InvalidExecutable(String),
     #[error("io error")]
     Io(#[source] std::io::Error),
-    #[error("no args in spec")]
-    NoArgs,
     #[error(transparent)]
     Channel(#[from] channel::ChannelError),
     #[error("setgroup is disabled")]
@@ -339,11 +336,14 @@ pub fn container_init_process(
 ) -> Result<()> {
     let syscall = args.syscall;
     let spec = args.spec;
-    let linux = spec.linux().as_ref().ok_or(InitProcessError::NoLinuxSpec)?;
+    let linux = spec
+        .linux()
+        .as_ref()
+        .ok_or(MissingSpecError::MissingLinux)?;
     let proc = spec
         .process()
         .as_ref()
-        .ok_or(InitProcessError::NoProcessSpec)?;
+        .ok_or(MissingSpecError::MissingProcess)?;
     let mut envs: Vec<String> = proc.env().as_ref().unwrap_or(&vec![]).clone();
     let rootfs_path = args.rootfs;
     let hooks = spec.hooks().as_ref();
@@ -690,8 +690,8 @@ pub fn container_init_process(
         unreachable!("should not be back here");
     } else {
         tracing::error!("on non-Windows, at least one process arg entry is required");
-        Err(InitProcessError::NoArgs)
-    }
+        Err(MissingSpecError::MissingArgs)
+    }?
 }
 
 // Before 3.19 it was possible for an unprivileged user to enter an user namespace,

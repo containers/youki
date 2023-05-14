@@ -1,3 +1,4 @@
+use crate::error::MissingSpecError;
 use crate::namespaces::Namespaces;
 use nix::unistd::Pid;
 use oci_spec::runtime::{Linux, LinuxIdMapping, LinuxNamespace, LinuxNamespaceType, Mount, Spec};
@@ -62,8 +63,8 @@ impl RootlessIDMapper {
 
 #[derive(Debug, thiserror::Error)]
 pub enum RootlessError {
-    #[error("no linux in spec")]
-    NoLinuxSpec,
+    #[error(transparent)]
+    MissingSpec(#[from] crate::error::MissingSpecError),
     #[error("rootless container requires valid user namespace definition")]
     NoUserNamespace,
     #[error("invalid spec for rootless container")]
@@ -82,8 +83,8 @@ type Result<T> = std::result::Result<T, RootlessError>;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ValidateSpecError {
-    #[error("no linux in spec")]
-    NoLinuxSpec,
+    #[error(transparent)]
+    MissingSpec(#[from] crate::error::MissingSpecError),
     #[error("rootless container requires valid user namespace definition")]
     NoUserNamespace,
     #[error("rootless container requires valid uid mappings")]
@@ -138,7 +139,10 @@ pub struct Rootless<'a> {
 
 impl<'a> Rootless<'a> {
     pub fn new(spec: &'a Spec) -> Result<Option<Rootless<'a>>> {
-        let linux = spec.linux().as_ref().ok_or(RootlessError::NoLinuxSpec)?;
+        let linux = spec
+            .linux()
+            .as_ref()
+            .ok_or(MissingSpecError::MissingLinux)?;
         let namespaces = Namespaces::from(linux.namespaces().as_ref());
         let user_namespace = namespaces.get(LinuxNamespaceType::User);
 
@@ -251,7 +255,7 @@ fn validate_spec_for_rootless(spec: &Spec) -> std::result::Result<(), ValidateSp
     let linux = spec
         .linux()
         .as_ref()
-        .ok_or(ValidateSpecError::NoLinuxSpec)?;
+        .ok_or(MissingSpecError::MissingLinux)?;
     let namespaces = Namespaces::from(linux.namespaces().as_ref());
     if namespaces.get(LinuxNamespaceType::User).is_none() {
         return Err(ValidateSpecError::NoUserNamespace);

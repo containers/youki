@@ -5,7 +5,10 @@ use super::{
     utils::default_devices,
     Result, RootfsError,
 };
-use crate::syscall::{syscall::create_syscall, Syscall};
+use crate::{
+    error::MissingSpecError,
+    syscall::{syscall::create_syscall, Syscall},
+};
 use nix::mount::MsFlags;
 use oci_spec::runtime::{Linux, Spec};
 use std::path::Path;
@@ -37,7 +40,10 @@ impl RootFS {
     ) -> Result<()> {
         tracing::debug!("Prepare rootfs: {:?}", rootfs);
         let mut flags = MsFlags::MS_REC;
-        let linux = spec.linux().as_ref().ok_or(RootfsError::NoLinuxSpec)?;
+        let linux = spec
+            .linux()
+            .as_ref()
+            .ok_or(MissingSpecError::MissingLinux)?;
 
         match linux.rootfs_propagation().as_deref() {
             Some("shared") => flags |= MsFlags::MS_SHARED,

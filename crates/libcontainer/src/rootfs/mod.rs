@@ -17,8 +17,8 @@ pub mod utils;
 pub enum RootfsError {
     #[error("failed syscall")]
     Syscall(#[from] crate::syscall::SyscallError),
-    #[error("no linux in spec")]
-    NoLinuxSpec,
+    #[error(transparent)]
+    MissingSpec(#[from] crate::error::MissingSpecError),
     #[error("unknown rootfs propagation")]
     UnknownRootfsPropagation(String),
     #[error(transparent)]

@@ -1,3 +1,4 @@
+use crate::error::MissingSpecError;
 use crate::{namespaces::Namespaces, process::channel, process::fork};
 use libcgroups::common::CgroupManager;
 use nix::unistd::{close, write};
@@ -11,10 +12,6 @@ use super::container_init_process::container_init_process;
 
 #[derive(Debug, thiserror::Error)]
 pub enum IntermediateProcessError {
-    #[error("missing linux in spec")]
-    NoLinuxSpec,
-    #[error("missing process in spec")]
-    NoProcessSpec,
     #[error(transparent)]
     Channel(#[from] channel::ChannelError),
     #[error(transparent)]
@@ -29,6 +26,8 @@ pub enum IntermediateProcessError {
     Procfs(#[from] procfs::ProcError),
     #[error("exec notify failed")]
     ExecNotify(#[source] nix::Error),
+    #[error(transparent)]
+    MissingSpec(#[from] crate::error::MissingSpecError),
 }
 
 type Result<T> = std::result::Result<T, IntermediateProcessError>;
@@ -46,7 +45,7 @@ pub fn container_intermediate_process(
     let linux = spec
         .linux()
         .as_ref()
-        .ok_or(IntermediateProcessError::NoLinuxSpec)?;
+        .ok_or(MissingSpecError::MissingLinux)?;
     let namespaces = Namespaces::from(linux.namespaces().as_ref());
 
     // this needs to be done before we create the init process, so that the init
@@ -100,7 +99,7 @@ pub fn container_intermediate_process(
     let proc = spec
         .process()
         .as_ref()
-        .ok_or(IntermediateProcessError::NoProcessSpec)?;
+        .ok_or(MissingSpecError::MissingProcess)?;
     if let Some(rlimits) = proc.rlimits() {
         for rlimit in rlimits {
             command.set_rlimit(rlimit)?;
