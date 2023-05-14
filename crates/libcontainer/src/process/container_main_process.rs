@@ -17,8 +17,6 @@ pub enum ProcessError {
     SetGroupsDeny(#[source] std::io::Error),
     #[error(transparent)]
     Rootless(#[from] crate::rootless::RootlessError),
-    #[error("failed seccomp listener")]
-    SeccompListener(#[from] crate::process::seccomp_listener::SeccompListenerError),
     #[error("container state is required")]
     ContainerStateRequired,
     #[error("failed to wait for intermediate process")]
@@ -27,6 +25,9 @@ pub enum ProcessError {
     IntelRdt(#[from] crate::process::intel_rdt::IntelRdtError),
     #[error("failed to create intermediate process")]
     IntermediateProcessFailed(#[source] fork::CloneError),
+    #[error("failed seccomp listener")]
+    #[cfg(feature = "libseccomp")]
+    SeccompListener(#[from] crate::process::seccomp_listener::SeccompListenerError),
 }
 
 type Result<T> = std::result::Result<T, ProcessError>;

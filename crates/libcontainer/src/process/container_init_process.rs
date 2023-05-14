@@ -56,6 +56,7 @@ pub enum InitProcessError {
     #[error("invalid umask")]
     InvalidUmask(u32),
     #[error(transparent)]
+    #[cfg(feature = "libseccomp")]
     Seccomp(#[from] seccomp::SeccompError),
     #[error("invalid executable: {0}")]
     InvalidExecutable(String),
