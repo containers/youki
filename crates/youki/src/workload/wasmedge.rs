@@ -2,7 +2,7 @@ use anyhow::Result;
 use oci_spec::runtime::Spec;
 use wasmedge_sdk::{
     config::{CommonConfigOptions, ConfigBuilder, HostRegistrationConfigOptions},
-    params, Vm,
+    params, VmBuilder,
 };
 
 use libcontainer::workload::Executor;
@@ -28,22 +28,22 @@ impl Executor for WasmEdgeExecutor {
             .build()?;
 
         // create a vm with the config settings
-        let mut vm = Vm::new(Some(config))?;
+        let mut vm = VmBuilder::new()
+            .with_config(config)
+            .build()?
+            .register_module_from_file("main", cmd)?;
 
         // initialize the wasi module with the parsed parameters
-        let mut wasi_instance = vm.wasi_module()?;
+        let wasi_instance = vm
+            .wasi_module_mut()
+            .expect("config doesn't contain HostRegistrationConfigOptions");
         wasi_instance.initialize(
             Some(args.iter().map(|s| s as &str).collect()),
             Some(envs.iter().map(|s| s as &str).collect()),
             None,
         );
 
-        let mut vm = vm.register_module_from_file("main", cmd)?;
-
-        let ins = vm.named_module("main")?;
-        ins.func("_start")
-            .expect("Not found '_start' func in the 'main' module instance")
-            .call(&mut vm, params!())?;
+        vm.run_func(Some("main"), "_start", params!())?;
 
         Ok(())
     }
