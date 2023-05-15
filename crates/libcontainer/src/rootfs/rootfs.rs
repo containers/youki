@@ -3,9 +3,12 @@ use super::{
     mount::{Mount, MountOptions},
     symlink::Symlink,
     utils::default_devices,
+    Result, RootfsError,
 };
-use crate::syscall::{syscall::create_syscall, Syscall};
-use anyhow::{bail, Context, Result};
+use crate::{
+    error::MissingSpecError,
+    syscall::{syscall::create_syscall, Syscall},
+};
 use nix::mount::MsFlags;
 use oci_spec::runtime::{Linux, Spec};
 use std::path::Path;
@@ -37,24 +40,26 @@ impl RootFS {
     ) -> Result<()> {
         tracing::debug!("Prepare rootfs: {:?}", rootfs);
         let mut flags = MsFlags::MS_REC;
-        let linux = spec.linux().as_ref().context("no linux in spec")?;
+        let linux = spec
+            .linux()
+            .as_ref()
+            .ok_or(MissingSpecError::MissingLinux)?;
 
         match linux.rootfs_propagation().as_deref() {
             Some("shared") => flags |= MsFlags::MS_SHARED,
             Some("private") => flags |= MsFlags::MS_PRIVATE,
             Some("slave" | "unbindable") | None => flags |= MsFlags::MS_SLAVE,
-            Some(uknown) => bail!("unknown rootfs_propagation: {}", uknown),
+            Some(uknown) => {
+                return Err(RootfsError::UnknownRootfsPropagation(uknown.to_string()));
+            }
         }
 
         self.syscall
-            .mount(None, Path::new("/"), None, flags, None)
-            .context("failed to mount rootfs")?;
+            .mount(None, Path::new("/"), None, flags, None)?;
 
         let mounter = Mount::new();
 
-        mounter
-            .make_parent_mount_private(rootfs)
-            .context("failed to change parent mount of rootfs private")?;
+        mounter.make_parent_mount_private(rootfs)?;
 
         tracing::debug!("mount root fs {:?}", rootfs);
         self.syscall.mount(
@@ -73,19 +78,13 @@ impl RootFS {
 
         if let Some(mounts) = spec.mounts() {
             for mount in mounts {
-                mounter
-                    .setup_mount(mount, &global_options)
-                    .with_context(|| format!("failed to setup mount {mount:#?}"))?;
+                mounter.setup_mount(mount, &global_options)?;
             }
         }
 
         let symlinker = Symlink::new();
-        symlinker
-            .setup_kcore_symlink(rootfs)
-            .context("failed to  setup kcore symlink")?;
-        symlinker
-            .setup_default_symlinks(rootfs)
-            .context("failed to setup default symlinks")?;
+        symlinker.setup_kcore_symlink(rootfs)?;
+        symlinker.setup_default_symlinks(rootfs)?;
 
         let devicer = Device::new();
         if let Some(added_devices) = linux.devices() {

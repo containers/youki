@@ -1,4 +1,4 @@
-use crate::process::{ProcessError, Result};
+use crate::error::MissingSpecError;
 use crate::{namespaces::Namespaces, process::channel, process::fork};
 use libcgroups::common::CgroupManager;
 use nix::unistd::{close, write};
@@ -10,6 +10,28 @@ use std::convert::From;
 use super::args::{ContainerArgs, ContainerType};
 use super::container_init_process::container_init_process;
 
+#[derive(Debug, thiserror::Error)]
+pub enum IntermediateProcessError {
+    #[error(transparent)]
+    Channel(#[from] channel::ChannelError),
+    #[error(transparent)]
+    Namespace(#[from] crate::namespaces::NamespaceError),
+    #[error(transparent)]
+    Syscall(#[from] crate::syscall::SyscallError),
+    #[error("failed to launch init process")]
+    InitProcess(#[source] fork::CloneError),
+    #[error("cgroup error: {0}")]
+    Cgroup(String),
+    #[error(transparent)]
+    Procfs(#[from] procfs::ProcError),
+    #[error("exec notify failed")]
+    ExecNotify(#[source] nix::Error),
+    #[error(transparent)]
+    MissingSpec(#[from] crate::error::MissingSpecError),
+}
+
+type Result<T> = std::result::Result<T, IntermediateProcessError>;
+
 pub fn container_intermediate_process(
     args: &ContainerArgs,
     intermediate_chan: &mut (channel::IntermediateSender, channel::IntermediateReceiver),
@@ -20,7 +42,10 @@ pub fn container_intermediate_process(
     let (init_sender, init_receiver) = init_chan;
     let command = &args.syscall;
     let spec = &args.spec;
-    let linux = spec.linux().as_ref().ok_or(ProcessError::NoLinuxSpec)?;
+    let linux = spec
+        .linux()
+        .as_ref()
+        .ok_or(MissingSpecError::MissingLinux)?;
     let namespaces = Namespaces::from(linux.namespaces().as_ref());
 
     // this needs to be done before we create the init process, so that the init
@@ -50,18 +75,14 @@ pub fn container_intermediate_process(
             // child needs to be dumpable, otherwise the non root parent is not
             // allowed to write the uid/gid maps
             prctl::set_dumpable(true).unwrap();
-            main_sender
-                .identifier_mapping_request()
-                .map_err(|err| ProcessError::ChannelError {
-                    msg: "failed to send id mapping request".into(),
-                    source: err,
-                })?;
-            inter_receiver
-                .wait_for_mapping_ack()
-                .map_err(|err| ProcessError::ChannelError {
-                    msg: "failed to hear back mapping ack".into(),
-                    source: err,
-                })?;
+            main_sender.identifier_mapping_request().map_err(|err| {
+                tracing::error!("failed to send id mapping request: {}", err);
+                err
+            })?;
+            inter_receiver.wait_for_mapping_ack().map_err(|err| {
+                tracing::error!("failed to receive id mapping ack: {}", err);
+                err
+            })?;
             prctl::set_dumpable(false).unwrap();
         }
 
@@ -75,7 +96,10 @@ pub fn container_intermediate_process(
     }
 
     // set limits and namespaces to the process
-    let proc = spec.process().as_ref().ok_or(ProcessError::NoProcessSpec)?;
+    let proc = spec
+        .process()
+        .as_ref()
+        .ok_or(MissingSpecError::MissingProcess)?;
     if let Some(rlimits) = proc.rlimits() {
         for rlimit in rlimits {
             command.set_rlimit(rlimit)?;
@@ -99,63 +123,70 @@ pub fn container_intermediate_process(
         // We are inside the forked process here. The first thing we have to do
         // is to close any unused senders, since fork will make a dup for all
         // the socket.
-        init_sender
-            .close()
-            .map_err(|err| ProcessError::ChannelError {
-                msg: "failed to close receiver in init process".into(),
-                source: err,
-            })?;
-        inter_sender
-            .close()
-            .map_err(|err| ProcessError::ChannelError {
-                msg: "failed to close sender in the intermediate process".into(),
-                source: err,
-            })?;
+        init_sender.close().map_err(|err| {
+            tracing::error!("failed to close receiver in init process: {}", err);
+            IntermediateProcessError::Channel(err)
+        })?;
+        inter_sender.close().map_err(|err| {
+            tracing::error!(
+                "failed to close sender in the intermediate process: {}",
+                err
+            );
+            IntermediateProcessError::Channel(err)
+        })?;
         match container_init_process(args, main_sender, init_receiver) {
             Ok(_) => Ok(0),
             Err(e) => {
                 if let ContainerType::TenantContainer { exec_notify_fd } = args.container_type {
                     let buf = format!("{e}");
-                    write(exec_notify_fd, buf.as_bytes())?;
-                    close(exec_notify_fd)?;
+                    write(exec_notify_fd, buf.as_bytes()).map_err(|err| {
+                        tracing::error!("failed to write to exec notify fd: {}", err);
+                        IntermediateProcessError::ExecNotify(err)
+                    })?;
+                    close(exec_notify_fd).map_err(|err| {
+                        tracing::error!("failed to close exec notify fd: {}", err);
+                        IntermediateProcessError::ExecNotify(err)
+                    })?;
                 }
                 tracing::error!("failed to initialize container process: {e}");
-                Err(ProcessError::InitProcessFailed { msg: e.to_string() })
+                Err(e.into())
             }
         }
+    })
+    .map_err(|err| {
+        tracing::error!("failed to fork init process: {}", err);
+        IntermediateProcessError::InitProcess(err)
     })?;
 
     // Close the exec_notify_fd in this process
     if let ContainerType::TenantContainer { exec_notify_fd } = args.container_type {
-        close(exec_notify_fd)?;
+        close(exec_notify_fd).map_err(|err| {
+            tracing::error!("failed to close exec notify fd: {}", err);
+            IntermediateProcessError::ExecNotify(err)
+        })?;
     }
 
-    main_sender
-        .intermediate_ready(pid)
-        .map_err(|err| ProcessError::ChannelError {
-            msg: "failed to wait on intermediate channel".into(),
-            source: err,
-        })?;
+    main_sender.intermediate_ready(pid).map_err(|err| {
+        tracing::error!("failed to wait on intermediate process: {}", err);
+        err
+    })?;
 
     // Close unused senders here so we don't have lingering socket around.
-    main_sender
-        .close()
-        .map_err(|err| ProcessError::ChannelError {
-            msg: "failed to close unused main sender".into(),
-            source: err,
-        })?;
-    inter_sender
-        .close()
-        .map_err(|err| ProcessError::ChannelError {
-            msg: "failed to close sender in the intermediate process".into(),
-            source: err,
-        })?;
-    init_sender
-        .close()
-        .map_err(|err| ProcessError::ChannelError {
-            msg: "failed to close unused init sender".into(),
-            source: err,
-        })?;
+    main_sender.close().map_err(|err| {
+        tracing::error!("failed to close unused main sender: {}", err);
+        err
+    })?;
+    inter_sender.close().map_err(|err| {
+        tracing::error!(
+            "failed to close sender in the intermediate process: {}",
+            err
+        );
+        err
+    })?;
+    init_sender.close().map_err(|err| {
+        tracing::error!("failed to close unused init sender: {}", err);
+        err
+    })?;
     Ok(pid)
 }
 
@@ -168,12 +199,10 @@ fn apply_cgroups<
     init: bool,
 ) -> Result<()> {
     let pid = Pid::from_raw(Process::myself()?.pid());
-    cmanager
-        .add_task(pid)
-        .map_err(|err| ProcessError::CgroupAdd {
-            pid,
-            msg: err.to_string(),
-        })?;
+    cmanager.add_task(pid).map_err(|err| {
+        tracing::error!(?pid, ?err, ?init, "failed to add task to cgroup");
+        IntermediateProcessError::Cgroup(err.to_string())
+    })?;
 
     if let Some(resources) = resources {
         if init {
@@ -184,11 +213,10 @@ fn apply_cgroups<
                 disable_oom_killer: false,
             };
 
-            cmanager
-                .apply(&controller_opt)
-                .map_err(|err| ProcessError::CgroupApply {
-                    msg: err.to_string(),
-                })?;
+            cmanager.apply(&controller_opt).map_err(|err| {
+                tracing::error!(?pid, ?err, ?init, "failed to apply cgroup");
+                IntermediateProcessError::Cgroup(err.to_string())
+            })?;
         }
     }
 

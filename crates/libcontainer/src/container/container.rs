@@ -199,7 +199,9 @@ impl Container {
 
     pub fn save(&self) -> Result<()> {
         tracing::debug!("Save container status: {:?} in {:?}", self, self.root);
-        self.state.save(&self.root)
+        self.state.save(&self.root)?;
+
+        Ok(())
     }
 
     pub fn spec(&self) -> Result<YoukiConfig> {
