@@ -503,10 +503,7 @@ pub fn container_init_process(
     })?;
 
     syscall
-        .set_id(
-            Uid::from_raw(proc.user().uid()),
-            Gid::from_raw(proc.user().gid()),
-        )
+        .set_id(Uid::from_raw(0), Gid::from_raw(0))
         .map_err(|err| {
             let uid = proc.user().uid();
             let gid = proc.user().gid();

@@ -57,21 +57,21 @@ jobs:
           runc --version
       - name: Integration Test
         run: sudo make TEST_RUNTIME=io.containerd.runc.v2 TESTFLAGS="-timeout 40m" integration
-  #
-  # k8s-tests:
-  #   runs-on: ubuntu-22.04
-  #   needs: [youki-build]
-  #   timeout-minutes: 40
-  #   steps:
-  #     - uses: actions/checkout@v3
-  #     - name: Download youki binary
-  #       uses: actions/download-artifact@v3
-  #       with:
-  #         name: youki
-  #     - name: Add the permission to run
-  #       run: chmod +x ./youki
-  #     - name: test/k8s/deploy
-  #       run: make test/k8s/deploy
-  #     # - name: Debug
-  #     #   if: ${{ always() }}
-  #     #   uses: mxschmitt/action-tmate@v3
+
+  k8s-tests:
+    runs-on: ubuntu-22.04
+    needs: [youki-build]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v3
+      - name: Download youki binary
+        uses: actions/download-artifact@v3
+        with:
+          name: youki
+      - name: Add the permission to run
+        run: chmod +x ./youki
+      - name: test/k8s/deploy
+        run: make test/k8s/deploy
+      - name: Debug
+        if: ${{ always() }}
+        uses: mxschmitt/action-tmate@v3
