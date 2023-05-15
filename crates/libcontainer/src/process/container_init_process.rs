@@ -330,6 +330,8 @@ fn reopen_dev_null() -> Result<()> {
     Ok(())
 }
 
+// Some variables are unused in the case where libseccomp feature is not enabled.
+#[allow(unused_variables)]
 pub fn container_init_process(
     args: &ContainerArgs,
     main_sender: &mut channel::MainSender,

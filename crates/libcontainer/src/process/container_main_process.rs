@@ -1,5 +1,4 @@
 use crate::{
-    container::ContainerProcessState,
     process::{
         args::ContainerArgs, channel, container_intermediate_process, fork,
         intel_rdt::setup_intel_rdt,
@@ -89,8 +88,9 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, bo
     let mut need_to_clean_up_intel_rdt_subdirectory = false;
 
     if let Some(linux) = container_args.spec.linux() {
+        #[cfg(feature = "libseccomp")]
         if let Some(seccomp) = linux.seccomp() {
-            let state = ContainerProcessState {
+            let state = crate::container::ContainerProcessState {
                 oci_version: container_args.spec.version().to_string(),
                 // runc hardcode the `seccompFd` name for fds.
                 fds: vec![String::from("seccompFd")],
@@ -103,7 +103,6 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, bo
                     .state
                     .clone(),
             };
-            #[cfg(feature = "libseccomp")]
             crate::process::seccomp_listener::sync_seccomp(
                 seccomp,
                 &state,
@@ -111,6 +110,7 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, bo
                 main_receiver,
             )?;
         }
+
         if let Some(intel_rdt) = linux.intel_rdt() {
             let container_id = container_args
                 .container
