@@ -42,10 +42,7 @@ pub fn container_intermediate_process(
     let (init_sender, init_receiver) = init_chan;
     let command = &args.syscall;
     let spec = &args.spec;
-    let linux = spec
-        .linux()
-        .as_ref()
-        .ok_or(MissingSpecError::MissingLinux)?;
+    let linux = spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
     let namespaces = Namespaces::from(linux.namespaces().as_ref());
 
     // this needs to be done before we create the init process, so that the init
@@ -96,10 +93,7 @@ pub fn container_intermediate_process(
     }
 
     // set limits and namespaces to the process
-    let proc = spec
-        .process()
-        .as_ref()
-        .ok_or(MissingSpecError::MissingProcess)?;
+    let proc = spec.process().as_ref().ok_or(MissingSpecError::Process)?;
     if let Some(rlimits) = proc.rlimits() {
         for rlimit in rlimits {
             command.set_rlimit(rlimit)?;

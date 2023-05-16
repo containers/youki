@@ -118,7 +118,7 @@ pub struct State {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub creator: Option<u32>,
     // Specifies if systemd should be used to manage cgroups
-    pub use_systemd: Option<bool>,
+    pub use_systemd: bool,
     // Specifies if the Intel RDT subdirectory needs be cleaned up.
     pub clean_up_intel_rdt_subdirectory: Option<bool>,
 }
@@ -141,7 +141,7 @@ impl State {
             annotations: Some(HashMap::default()),
             created: None,
             creator: None,
-            use_systemd: None,
+            use_systemd: false,
             clean_up_intel_rdt_subdirectory: None,
         }
     }

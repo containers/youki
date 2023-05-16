@@ -1,11 +1,11 @@
 use crate::{
     config::YoukiConfig,
+    error::LibcontainerError,
     hooks,
     notify_socket::{NotifySocket, NOTIFY_FILE},
 };
 
 use super::{Container, ContainerStatus};
-use anyhow::{bail, Context, Result};
 use nix::{sys::signal, unistd};
 
 impl Container {
@@ -30,49 +30,57 @@ impl Container {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn start(&mut self) -> Result<()> {
-        self.refresh_status()
-            .context("failed to refresh container status")?;
+    pub fn start(&mut self) -> Result<(), LibcontainerError> {
+        self.refresh_status()?;
 
         if !self.can_start() {
-            let err_msg = format!(
-                "{} could not be started because it was {:?}",
-                self.id(),
-                self.status()
-            );
-            tracing::error!("{}", err_msg);
-            bail!(err_msg);
+            tracing::error!(status = ?self.status(), id = ?self.id(), "cannot start container due to incorrect state");
+            return Err(LibcontainerError::IncorrectContainerStatus);
         }
 
-        let config = YoukiConfig::load(&self.root)
-            .with_context(|| format!("failed to load runtime spec for container {}", self.id()))?;
+        let config = YoukiConfig::load(&self.root).map_err(|err| {
+            tracing::error!(
+                "failed to load runtime spec for container {}: {}",
+                self.id(),
+                err
+            );
+            err
+        })?;
         if let Some(hooks) = config.hooks.as_ref() {
             // While prestart is marked as deprecated in the OCI spec, the docker and integration test still
             // uses it.
             #[allow(deprecated)]
-            let ret = hooks::run_hooks(hooks.prestart().as_ref(), Some(self))
-                .with_context(|| "failed to run pre start hooks");
-            if ret.is_err() {
+            hooks::run_hooks(hooks.prestart().as_ref(), Some(self)).map_err(|err| {
+                tracing::error!("failed to run pre start hooks: {}", err);
                 // In the case where prestart hook fails, the runtime must
                 // stop the container before generating an error and exiting.
-                self.kill(signal::Signal::SIGKILL, true)?;
-                return ret;
-            }
+                let _ = self.kill(signal::Signal::SIGKILL, true);
+
+                err
+            })?;
         }
 
-        unistd::chdir(self.root.as_os_str())?;
+        unistd::chdir(self.root.as_os_str()).map_err(|err| {
+            tracing::error!("failed to change directory to container root: {}", err);
+            LibcontainerError::OtherSyscall(err)
+        })?;
 
         let mut notify_socket = NotifySocket::new(self.root.join(NOTIFY_FILE));
         notify_socket.notify_container_start()?;
         self.set_status(ContainerStatus::Running)
             .save()
-            .with_context(|| format!("could not save state for container {}", self.id()))?;
+            .map_err(|err| {
+                tracing::error!(id = ?self.id(), ?err, "failed to save state for container");
+                err
+            })?;
 
         // Run post start hooks. It runs after the container process is started.
         // It is called in the runtime namespace.
         if let Some(hooks) = config.hooks.as_ref() {
-            hooks::run_hooks(hooks.poststart().as_ref(), Some(self))
-                .with_context(|| "failed to run post start hooks")?;
+            hooks::run_hooks(hooks.poststart().as_ref(), Some(self)).map_err(|err| {
+                tracing::error!("failed to run post start hooks: {}", err);
+                err
+            })?;
         }
 
         Ok(())

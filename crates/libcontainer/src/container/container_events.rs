@@ -34,9 +34,7 @@ impl Container {
         }
 
         let cgroups_path = self.spec()?.cgroup_path;
-        let use_systemd = self
-            .systemd()
-            .context("could not determine cgroup manager")?;
+        let use_systemd = self.systemd();
 
         let cgroup_manager =
             libcgroups::common::create_cgroup_manager(cgroups_path, use_systemd, self.id())?;

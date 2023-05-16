@@ -12,11 +12,6 @@ pub enum AppArmorError {
         profile: String,
         source: std::io::Error,
     },
-    #[error("failed to read AppArmor profile: {source} {path}")]
-    ReadProfile {
-        path: String,
-        source: std::io::Error,
-    },
     #[error(transparent)]
     EnsureProcfs(#[from] utils::EnsureProcfsError),
 }
@@ -26,12 +21,8 @@ type Result<T> = std::result::Result<T, AppArmorError>;
 const ENABLED_PARAMETER_PATH: &str = "/sys/module/apparmor/parameters/enabled";
 
 /// Checks if AppArmor has been enabled on the system.
-pub fn is_enabled() -> Result<bool> {
-    let aa_enabled =
-        fs::read_to_string(ENABLED_PARAMETER_PATH).map_err(|e| AppArmorError::ReadProfile {
-            path: ENABLED_PARAMETER_PATH.to_string(),
-            source: e,
-        })?;
+pub fn is_enabled() -> std::result::Result<bool, std::io::Error> {
+    let aa_enabled = fs::read_to_string(ENABLED_PARAMETER_PATH)?;
     Ok(aa_enabled.starts_with('Y'))
 }
 
