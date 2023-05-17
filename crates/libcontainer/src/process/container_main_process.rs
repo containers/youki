@@ -63,8 +63,8 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, bo
         err
     })?;
 
-    let (inter_sender, _) = inter_chan;
-    let (init_sender, _) = init_chan;
+    let (inter_sender, inter_receiver) = inter_chan;
+    let (init_sender, init_receiver) = init_chan;
 
     // If creating a rootless container, the intermediate process will ask
     // the main process to set up uid and gid mapping, once the intermediate
@@ -134,6 +134,23 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, bo
     })?;
 
     tracing::debug!("init pid is {:?}", init_pid);
+
+    // Close the receiver ends to avoid leaking file descriptors.
+
+    inter_receiver.close().map_err(|err| {
+        tracing::error!("failed to close intermediate process receiver: {}", err);
+        err
+    })?;
+
+    init_receiver.close().map_err(|err| {
+        tracing::error!("failed to close init process receiver: {}", err);
+        err
+    })?;
+
+    main_receiver.close().map_err(|err| {
+        tracing::error!("failed to close main process receiver: {}", err);
+        err
+    })?;
 
     // Before the main process returns, we want to make sure the intermediate
     // process is exit and reaped. By this point, the intermediate process
