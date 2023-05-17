@@ -26,9 +26,11 @@ pub enum MissingSpecError {
 #[derive(Debug, thiserror::Error)]
 pub enum LibcontainerError {
     #[error("failed to perform operation due to incorrect container status")]
-    IncorrectContainerStatus,
+    IncorrectStatus,
     #[error("container already exists")]
-    ContainerAlreadyExists,
+    Exist,
+    #[error("container state directory does not exist")]
+    NoDirectory,
     #[error("invalid input")]
     InvalidInput(String),
     #[error("requires at least one executors")]
@@ -57,18 +59,30 @@ pub enum LibcontainerError {
     State(#[from] crate::container::state::StateError),
     #[error("oci spec error")]
     Spec(#[from] oci_spec::OciSpecError),
-    #[error("cgroups error: {0}")]
-    Cgroups(String),
+    // #[error("cgroups error: {0}")]
+    // Cgroups(String),
     #[error(transparent)]
     MainProcess(#[from] crate::process::container_main_process::ProcessError),
     #[error(transparent)]
     Procfs(#[from] procfs::ProcError),
+    #[error(transparent)]
+    Capabilities(#[from] caps::errors::CapsError),
+    #[error(transparent)]
+    CgroupManager(#[from] libcgroups::common::AnyManagerError),
+    #[error(transparent)]
+    CgroupCreate(#[from] libcgroups::common::CreateCgroupSetupError),
+    #[error(transparent)]
+    CgroupGet(#[from] libcgroups::common::GetCgroupSetupError),
 
     // Catch all errors that are not covered by the above
     #[error("syscall error")]
     OtherSyscall(#[source] nix::Error),
     #[error("IO error")]
     OtherIO(#[source] std::io::Error),
+    #[error("Serialization error")]
+    OtherSerialization(#[source] serde_json::Error),
+    #[error("{0}")]
+    OtherCgroup(String),
     #[error("{0}")]
     Other(String),
 }

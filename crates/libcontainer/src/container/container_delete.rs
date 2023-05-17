@@ -58,7 +58,7 @@ impl Container {
                         status = ?self.status(),
                         "delete requires the container state to be stopped or created",
                     );
-                    return Err(LibcontainerError::IncorrectContainerStatus);
+                    return Err(LibcontainerError::IncorrectStatus);
                 }
             }
         }
@@ -87,11 +87,10 @@ impl Container {
                         &config.cgroup_path,
                         use_systemd,
                         self.id(),
-                    )
-                    .map_err(|err| LibcontainerError::Cgroups(err.to_string()))?;
+                    )?;
                     cmanager.remove().map_err(|err| {
                         tracing::error!(cgroup_path = ?config.cgroup_path, "failed to remove cgroup due to: {err:?}");
-                        LibcontainerError::Cgroups(err.to_string())
+                        err
                     })?;
 
                     if let Some(hooks) = config.hooks.as_ref() {

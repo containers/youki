@@ -1,5 +1,6 @@
+use crate::error::LibcontainerError;
+
 use super::{Container, ContainerStatus};
-use anyhow::{bail, Context, Result};
 use libcgroups::common::{CgroupManager, FreezerState};
 
 impl Container {
@@ -24,16 +25,12 @@ impl Container {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn pause(&mut self) -> Result<()> {
-        self.refresh_status()
-            .context("failed to refresh container status")?;
+    pub fn pause(&mut self) -> Result<(), LibcontainerError> {
+        self.refresh_status()?;
 
         if !self.can_pause() {
-            bail!(
-                "{} could not be paused because it was {:?}",
-                self.id(),
-                self.status()
-            );
+            tracing::error!(status = ?self.status(), id = ?self.id(), "cannot pause container");
+            return Err(LibcontainerError::IncorrectStatus);
         }
 
         let cgroups_path = self.spec()?.cgroup_path;

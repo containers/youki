@@ -77,8 +77,7 @@ impl<'a> ContainerBuilderImpl<'a> {
             cgroups_path,
             self.use_systemd || self.rootless.is_some(),
             &self.container_id,
-        )
-        .map_err(|err| LibcontainerError::Cgroups(err.to_string()))?;
+        )?;
         let process = self
             .spec
             .process()
@@ -189,8 +188,7 @@ impl<'a> ContainerBuilderImpl<'a> {
             cgroups_path,
             self.use_systemd || self.rootless.is_some(),
             &self.container_id,
-        )
-        .map_err(|err| LibcontainerError::Cgroups(err.to_string()))?;
+        )?;
 
         let mut errors = Vec::new();
 
