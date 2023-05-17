@@ -59,8 +59,6 @@ pub enum LibcontainerError {
     State(#[from] crate::container::state::StateError),
     #[error("oci spec error")]
     Spec(#[from] oci_spec::OciSpecError),
-    // #[error("cgroups error: {0}")]
-    // Cgroups(String),
     #[error(transparent)]
     MainProcess(#[from] crate::process::container_main_process::ProcessError),
     #[error(transparent)]
