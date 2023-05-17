@@ -1,19 +1,18 @@
-use anyhow::Result;
 use oci_spec::runtime::Spec;
 use wasmedge_sdk::{
     config::{CommonConfigOptions, ConfigBuilder, HostRegistrationConfigOptions},
     params, VmBuilder,
 };
 
-use libcontainer::workload::Executor;
+use libcontainer::workload::{Executor, ExecutorError};
 
 const EXECUTOR_NAME: &str = "wasmedge";
 
 #[derive(Default)]
 pub struct WasmEdgeExecutor {}
 
-impl Executor for WasmEdgeExecutor {
-    fn exec(&self, spec: &Spec) -> Result<()> {
+impl WasmEdgeExecutor {
+    fn exec_inner(spec: &Spec) -> anyhow::Result<()> {
         // parse wasi parameters
         let args = get_args(spec);
         let mut cmd = args[0].clone();
@@ -46,6 +45,15 @@ impl Executor for WasmEdgeExecutor {
         vm.run_func(Some("main"), "_start", params!())?;
 
         Ok(())
+    }
+}
+
+impl Executor for WasmEdgeExecutor {
+    fn exec(&self, spec: &Spec) -> Result<(), ExecutorError> {
+        Self::exec_inner(spec).map_err(|err| {
+            tracing::error!(?err, "failed to execute workload with wasmedge handler");
+            ExecutorError::Execution(err.into())
+        })
     }
 
     fn can_handle(&self, spec: &Spec) -> bool {

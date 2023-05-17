@@ -3,15 +3,15 @@ use oci_spec::runtime::Spec;
 use wasmer::{Instance, Module, Store};
 use wasmer_wasix::WasiEnv;
 
-use libcontainer::workload::{Executor, EMPTY};
+use libcontainer::workload::{Executor, ExecutorError, EMPTY};
 
 const EXECUTOR_NAME: &str = "wasmer";
 
 #[derive(Default)]
 pub struct WasmerExecutor {}
 
-impl Executor for WasmerExecutor {
-    fn exec(&self, spec: &Spec) -> Result<()> {
+impl WasmerExecutor {
+    fn exec_inner(spec: &Spec) -> anyhow::Result<()> {
         tracing::debug!("Executing workload with wasmer handler");
         let process = spec.process().as_ref();
 
@@ -65,6 +65,15 @@ impl Executor for WasmerExecutor {
         wasi_env.cleanup(&mut store, None);
 
         Ok(())
+    }
+}
+
+impl Executor for WasmerExecutor {
+    fn exec(&self, spec: &Spec) -> Result<(), ExecutorError> {
+        Self::exec_inner(spec).map_err(|err| {
+            tracing::error!(?err, "failed to execute workload with wasmer handler");
+            ExecutorError::Execution(err.into())
+        })
     }
 
     fn can_handle(&self, spec: &Spec) -> bool {

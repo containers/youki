@@ -3,15 +3,15 @@ use oci_spec::runtime::Spec;
 use wasmtime::*;
 use wasmtime_wasi::WasiCtxBuilder;
 
-use libcontainer::workload::{Executor, EMPTY};
+use libcontainer::workload::{Executor, ExecutorError, EMPTY};
 
 const EXECUTOR_NAME: &str = "wasmtime";
 
 #[derive(Default)]
 pub struct WasmtimeExecutor {}
 
-impl Executor for WasmtimeExecutor {
-    fn exec(&self, spec: &Spec) -> Result<()> {
+impl WasmtimeExecutor {
+    fn exec_inner(spec: &Spec) -> anyhow::Result<()> {
         tracing::info!("Executing workload with wasmtime handler");
         let process = spec.process().as_ref();
 
@@ -75,6 +75,15 @@ impl Executor for WasmtimeExecutor {
         start
             .call(&mut store, &[], &mut [])
             .context("wasm module was not executed successfully")
+    }
+}
+
+impl Executor for WasmtimeExecutor {
+    fn exec(&self, spec: &Spec) -> Result<(), ExecutorError> {
+        Self::exec_inner(spec).map_err(|err| {
+            tracing::error!(?err, "failed to execute workload with wasmtime handler");
+            ExecutorError::Execution(err.into())
+        })
     }
 
     fn can_handle(&self, spec: &Spec) -> bool {

@@ -3,25 +3,15 @@ use std::ffi::CString;
 use nix::unistd;
 use oci_spec::runtime::Spec;
 
-use super::{Executor, EMPTY};
+use super::{Executor, ExecutorError, EMPTY};
 
 const EXECUTOR_NAME: &str = "default";
-
-#[derive(Debug, thiserror::Error)]
-pub enum DefaultExecutorError {
-    #[error("missing args")]
-    MissingArgs,
-    #[error("failed to convert path to cstring")]
-    NullExecutorPath,
-    #[error("failed to execvp")]
-    ExecutionFailed(#[from] nix::Error),
-}
 
 #[derive(Default)]
 pub struct DefaultExecutor {}
 
 impl Executor for DefaultExecutor {
-    fn exec(&self, spec: &Spec) -> anyhow::Result<()> {
+    fn exec(&self, spec: &Spec) -> Result<(), ExecutorError> {
         tracing::debug!("executing workload with default handler");
         let args = spec
             .process()
@@ -30,13 +20,14 @@ impl Executor for DefaultExecutor {
             .unwrap_or(&EMPTY);
 
         if args.is_empty() {
-            Err(DefaultExecutorError::MissingArgs)?;
+            tracing::error!("no arguments provided to execute");
+            Err(ExecutorError::InvalidArg)?;
         }
 
         let executable = args[0].as_str();
         let p = CString::new(executable.as_bytes()).map_err(|err| {
             tracing::error!("failed to convert path {executable:?} to cstring: {}", err,);
-            DefaultExecutorError::NullExecutorPath
+            ExecutorError::InvalidArg
         })?;
         let a: Vec<CString> = args
             .iter()
@@ -44,7 +35,7 @@ impl Executor for DefaultExecutor {
             .collect();
         unistd::execvp(&p, &a).map_err(|err| {
             tracing::error!(?err, filename = ?p, args = ?a, "failed to execvp");
-            DefaultExecutorError::ExecutionFailed(err)
+            ExecutorError::Execution(err.into())
         })?;
 
         // After do_exec is called, the process is replaced with the container
