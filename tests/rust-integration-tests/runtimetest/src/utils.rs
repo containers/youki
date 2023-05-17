@@ -299,7 +299,7 @@ pub fn test_mount_noreleatime_option(path: &str) -> Result<(), std::io::Error> {
 // Do not update access times for (all types of) files on this mount.
 // case:
 // 1. touch rnoatime.txt file, get atime
-// 2. caat rnoatime.txt, check atime wheather update, if update return error, else return Ok
+// 2. cat rnoatime.txt, check atime wheather update, if update return error, else return Ok
 pub fn test_mount_rnoatime_option(path: &str) -> Result<(), std::io::Error> {
     let test_file_path = PathBuf::from(path).join("rnoatime.txt");
     Command::new("touch")
