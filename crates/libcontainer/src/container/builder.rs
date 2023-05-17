@@ -1,7 +1,7 @@
+use crate::error::{ErrInvalidID, LibcontainerError};
 use crate::workload::default::DefaultExecutor;
 use crate::workload::{Executor, ExecutorManager};
 use crate::{syscall::Syscall, utils::PathBufExt};
-use anyhow::{anyhow, bail, Context, Result};
 use std::path::PathBuf;
 
 use super::{init_builder::InitContainerBuilder, tenant_builder::TenantContainerBuilder};
@@ -93,18 +93,20 @@ impl<'a> ContainerBuilder<'a> {
     ///
     /// In addition, IDs that can't be used to represent a file name
     /// (such as . or ..) are rejected.
-    pub fn validate_id(self) -> Result<Self> {
+    pub fn validate_id(self) -> Result<Self, LibcontainerError> {
         let container_id = self.container_id.clone();
         if container_id.is_empty() {
-            return Err(anyhow!("invalid container ID format: {:?}", container_id));
+            Err(ErrInvalidID::Empty)?;
         }
+
         if container_id == "." || container_id == ".." {
-            return Err(anyhow!("invalid container ID format: {:?}", container_id));
+            Err(ErrInvalidID::FileName)?;
         }
+
         for c in container_id.chars() {
             match c {
                 'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '+' | '-' | '.' => (),
-                _ => return Err(anyhow!("invalid container ID format: {:?}", container_id)),
+                _ => Err(ErrInvalidID::InvalidChars(c))?,
             }
         }
         Ok(self)
@@ -166,11 +168,12 @@ impl<'a> ContainerBuilder<'a> {
     /// )
     /// .with_root_path("/run/containers/youki").expect("invalid root path");
     /// ```
-    pub fn with_root_path<P: Into<PathBuf>>(mut self, path: P) -> Result<Self> {
+    pub fn with_root_path<P: Into<PathBuf>>(mut self, path: P) -> Result<Self, LibcontainerError> {
         let path = path.into();
-        self.root_path = path
-            .canonicalize_safely()
-            .with_context(|| format!("failed to canonicalize root path {path:?}"))?;
+        self.root_path = path.canonicalize_safely().map_err(|err| {
+            tracing::error!(?path, ?err, "failed to canonicalize root path");
+            LibcontainerError::InvalidInput(format!("invalid root path {path:?}: {err:?}"))
+        })?;
 
         Ok(self)
     }
@@ -190,15 +193,15 @@ impl<'a> ContainerBuilder<'a> {
     /// )
     /// .with_pid_file(Some("/var/run/docker.pid")).expect("invalid pid file");
     /// ```
-    pub fn with_pid_file<P: Into<PathBuf>>(mut self, path: Option<P>) -> Result<Self> {
-        self.pid_file = match path {
-            Some(path) => {
-                let p = path.into();
-                Some(
-                    p.canonicalize_safely()
-                        .with_context(|| format!("failed to canonicalize pid file {p:?}"))?,
-                )
-            }
+    pub fn with_pid_file<P: Into<PathBuf>>(
+        mut self,
+        path: Option<P>,
+    ) -> Result<Self, LibcontainerError> {
+        self.pid_file = match path.map(|p| p.into()) {
+            Some(path) => Some(path.canonicalize_safely().map_err(|err| {
+                tracing::error!(?path, ?err, "failed to canonicalize pid file");
+                LibcontainerError::InvalidInput(format!("invalid pid file path {path:?}: {err:?}"))
+            })?),
             None => None,
         };
 
@@ -259,9 +262,12 @@ impl<'a> ContainerBuilder<'a> {
     /// )
     /// .with_executor(vec![Box::<DefaultExecutor>::default()]);
     /// ```
-    pub fn with_executor(mut self, executors: Vec<Box<dyn Executor>>) -> Result<Self> {
+    pub fn with_executor(
+        mut self,
+        executors: Vec<Box<dyn Executor>>,
+    ) -> Result<Self, LibcontainerError> {
         if executors.is_empty() {
-            bail!("executors must not be empty");
+            return Err(LibcontainerError::NoExecutors);
         };
         self.executor_manager = ExecutorManager { executors };
         Ok(self)

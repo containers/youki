@@ -37,9 +37,7 @@ impl Container {
         }
 
         let cgroups_path = self.spec()?.cgroup_path;
-        let use_systemd = self
-            .systemd()
-            .context("container state does not contain cgroup manager")?;
+        let use_systemd = self.systemd();
         let cmanager =
             libcgroups::common::create_cgroup_manager(cgroups_path, use_systemd, self.id())?;
         cmanager.freeze(FreezerState::Frozen)?;

@@ -139,10 +139,7 @@ pub struct Rootless<'a> {
 
 impl<'a> Rootless<'a> {
     pub fn new(spec: &'a Spec) -> Result<Option<Rootless<'a>>> {
-        let linux = spec
-            .linux()
-            .as_ref()
-            .ok_or(MissingSpecError::MissingLinux)?;
+        let linux = spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
         let namespaces = Namespaces::from(linux.namespaces().as_ref());
         let user_namespace = namespaces.get(LinuxNamespaceType::User);
 
@@ -252,10 +249,7 @@ pub fn unprivileged_user_ns_enabled() -> Result<bool> {
 /// running in rootless mode
 fn validate_spec_for_rootless(spec: &Spec) -> std::result::Result<(), ValidateSpecError> {
     tracing::debug!(?spec, "validating spec for rootless container");
-    let linux = spec
-        .linux()
-        .as_ref()
-        .ok_or(MissingSpecError::MissingLinux)?;
+    let linux = spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
     let namespaces = Namespaces::from(linux.namespaces().as_ref());
     if namespaces.get(LinuxNamespaceType::User).is_none() {
         return Err(ValidateSpecError::NoUserNamespace);

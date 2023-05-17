@@ -1,8 +1,7 @@
 use super::{Container, ContainerStatus};
-use crate::config::YoukiConfig;
 use crate::hooks;
 use crate::process::intel_rdt::delete_resctrl_subdirectory;
-use anyhow::{bail, Context, Result};
+use crate::{config::YoukiConfig, error::LibcontainerError};
 use libcgroups::{self, common::CgroupManager};
 use nix::sys::signal;
 use std::fs;
@@ -29,9 +28,8 @@ impl Container {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn delete(&mut self, force: bool) -> Result<()> {
-        self.refresh_status()
-            .context("failed to refresh container status")?;
+    pub fn delete(&mut self, force: bool) -> Result<(), LibcontainerError> {
+        self.refresh_status()?;
 
         tracing::debug!("container status: {:?}", self.status());
 
@@ -55,11 +53,12 @@ impl Container {
                     self.do_kill(signal::Signal::SIGKILL, true)?;
                     self.set_status(ContainerStatus::Stopped).save()?;
                 } else {
-                    bail!(
-                        "{} could not be deleted because it was {:?}",
-                        self.id(),
-                        self.status()
-                    )
+                    tracing::error!(
+                        id = ?self.id(),
+                        status = ?self.status(),
+                        "delete requires the container state to be stopped or created",
+                    );
+                    return Err(LibcontainerError::IncorrectContainerStatus);
                 }
             }
         }
@@ -83,22 +82,23 @@ impl Container {
                     // remove the cgroup created for the container
                     // check https://man7.org/linux/man-pages/man7/cgroups.7.html
                     // creating and removing cgroups section for more information on cgroups
-                    let use_systemd = self
-                        .systemd()
-                        .context("container state does not contain cgroup manager")?;
+                    let use_systemd = self.systemd();
                     let cmanager = libcgroups::common::create_cgroup_manager(
                         &config.cgroup_path,
                         use_systemd,
                         self.id(),
                     )
-                    .context("failed to create cgroup manager")?;
-                    cmanager.remove().with_context(|| {
-                        format!("failed to remove cgroup {}", config.cgroup_path.display())
+                    .map_err(|err| LibcontainerError::Cgroups(err.to_string()))?;
+                    cmanager.remove().map_err(|err| {
+                        tracing::error!(cgroup_path = ?config.cgroup_path, "failed to remove cgroup due to: {err:?}");
+                        LibcontainerError::Cgroups(err.to_string())
                     })?;
 
                     if let Some(hooks) = config.hooks.as_ref() {
-                        hooks::run_hooks(hooks.poststop().as_ref(), Some(self))
-                            .with_context(|| "failed to run post stop hooks")?;
+                        hooks::run_hooks(hooks.poststop().as_ref(), Some(self)).map_err(|err| {
+                            tracing::error!(err = ?err, "failed to run post stop hooks");
+                            err
+                        })?;
                     }
                 }
                 Err(err) => {
@@ -114,8 +114,9 @@ impl Container {
 
             // remove the directory storing container state
             tracing::debug!("remove dir {:?}", self.root);
-            fs::remove_dir_all(&self.root).with_context(|| {
-                format!("failed to remove container dir {}", self.root.display())
+            fs::remove_dir_all(&self.root).map_err(|err| {
+                tracing::error!(?err, path = ?self.root, "failed to remove container dir");
+                LibcontainerError::OtherIO(err)
             })?;
         }
 

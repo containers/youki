@@ -1,7 +1,7 @@
 //! Contains functionality of kill container command
 use std::{convert::TryInto, path::PathBuf};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 
 use crate::commands::load_container;
 use libcontainer::{container::ContainerStatus, signal::Signal};
@@ -15,9 +15,9 @@ pub fn kill(args: Kill, root_path: PathBuf) -> Result<()> {
         Err(e) => {
             // see https://github.com/containers/youki/issues/1314
             if container.status() == ContainerStatus::Stopped {
-                return Err(e.context("container not running"));
+                return Err(anyhow!(e).context("container not running"));
             }
-            Err(e)
+            Err(anyhow!(e).context("failed to kill container"))
         }
     }
 }

@@ -339,14 +339,8 @@ pub fn container_init_process(
 ) -> Result<()> {
     let syscall = args.syscall;
     let spec = args.spec;
-    let linux = spec
-        .linux()
-        .as_ref()
-        .ok_or(MissingSpecError::MissingLinux)?;
-    let proc = spec
-        .process()
-        .as_ref()
-        .ok_or(MissingSpecError::MissingProcess)?;
+    let linux = spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
+    let proc = spec.process().as_ref().ok_or(MissingSpecError::Process)?;
     let mut envs: Vec<String> = proc.env().as_ref().unwrap_or(&vec![]).clone();
     let rootfs_path = args.rootfs;
     let hooks = spec.hooks().as_ref();
@@ -693,7 +687,7 @@ pub fn container_init_process(
         unreachable!("should not be back here");
     } else {
         tracing::error!("on non-Windows, at least one process arg entry is required");
-        Err(MissingSpecError::MissingArgs)
+        Err(MissingSpecError::Args)
     }?
 }
 

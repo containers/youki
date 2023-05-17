@@ -59,9 +59,7 @@ fn create_cgroup_manager<P: AsRef<Path>>(
 ) -> Result<AnyCgroupManager> {
     let container = load_container(root_path, container_id)?;
     let cgroups_path = container.spec()?.cgroup_path;
-    let systemd_cgroup = container
-        .systemd()
-        .context("could not determine cgroup manager")?;
+    let systemd_cgroup = container.systemd();
 
     Ok(libcgroups::common::create_cgroup_manager(
         cgroups_path,

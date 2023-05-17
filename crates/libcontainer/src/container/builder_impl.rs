@@ -1,5 +1,6 @@
 use super::{Container, ContainerStatus};
 use crate::{
+    error::{LibcontainerError, MissingSpecError},
     hooks,
     notify_socket::NotifyListener,
     process::{
@@ -12,7 +13,6 @@ use crate::{
     utils,
     workload::ExecutorManager,
 };
-use anyhow::{bail, Context, Result};
 use libcgroups::common::CgroupManager;
 use nix::unistd::Pid;
 use oci_spec::runtime::Spec;
@@ -51,16 +51,14 @@ pub(super) struct ContainerBuilderImpl<'a> {
 }
 
 impl<'a> ContainerBuilderImpl<'a> {
-    pub(super) fn create(&mut self) -> Result<Pid> {
-        match self.run_container().context("failed to create container") {
+    pub(super) fn create(&mut self) -> Result<Pid, LibcontainerError> {
+        match self.run_container() {
             Ok(pid) => Ok(pid),
             Err(outer) => {
                 // Only the init container should be cleaned up in the case of
                 // an error.
                 if matches!(self.container_type, ContainerType::InitContainer) {
-                    if let Err(inner) = self.cleanup_container() {
-                        return Err(outer.context(inner));
-                    }
+                    self.cleanup_container()?;
                 }
 
                 Err(outer)
@@ -68,8 +66,8 @@ impl<'a> ContainerBuilderImpl<'a> {
         }
     }
 
-    fn run_container(&mut self) -> Result<Pid> {
-        let linux = self.spec.linux().as_ref().context("no linux in spec")?;
+    fn run_container(&mut self) -> Result<Pid, LibcontainerError> {
+        let linux = self.spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
         let cgroups_path = utils::get_cgroup_path(
             linux.cgroups_path(),
             &self.container_id,
@@ -79,8 +77,13 @@ impl<'a> ContainerBuilderImpl<'a> {
             cgroups_path,
             self.use_systemd || self.rootless.is_some(),
             &self.container_id,
-        )?;
-        let process = self.spec.process().as_ref().context("No process in spec")?;
+        )
+        .map_err(|err| LibcontainerError::Cgroups(err.to_string()))?;
+        let process = self
+            .spec
+            .process()
+            .as_ref()
+            .ok_or(MissingSpecError::Process)?;
 
         if matches!(self.container_type, ContainerType::InitContainer) {
             if let Some(hooks) = self.spec.hooks() {
@@ -105,8 +108,15 @@ impl<'a> ContainerBuilderImpl<'a> {
         // fork(2) so this will always be propagated properly.
         if let Some(oom_score_adj) = process.oom_score_adj() {
             tracing::debug!("Set OOM score to {}", oom_score_adj);
-            let mut f = fs::File::create("/proc/self/oom_score_adj")?;
-            f.write_all(oom_score_adj.to_string().as_bytes())?;
+            let mut f = fs::File::create("/proc/self/oom_score_adj").map_err(|err| {
+                tracing::error!("failed to open /proc/self/oom_score_adj: {}", err);
+                LibcontainerError::OtherIO(err)
+            })?;
+            f.write_all(oom_score_adj.to_string().as_bytes())
+                .map_err(|err| {
+                    tracing::error!("failed to write to /proc/self/oom_score_adj: {}", err);
+                    LibcontainerError::OtherIO(err)
+                })?;
         }
 
         // Make the process non-dumpable, to avoid various race conditions that
@@ -140,11 +150,19 @@ impl<'a> ContainerBuilderImpl<'a> {
         };
 
         let (init_pid, need_to_clean_up_intel_rdt_dir) =
-            process::container_main_process::container_main_process(&container_args)?;
+            process::container_main_process::container_main_process(&container_args).map_err(
+                |err| {
+                    tracing::error!(?err, "failed to run container process");
+                    LibcontainerError::MainProcess(err)
+                },
+            )?;
 
         // if file to write the pid to is specified, write pid of the child
         if let Some(pid_file) = &self.pid_file {
-            fs::write(pid_file, format!("{init_pid}")).context("failed to write pid file")?;
+            fs::write(pid_file, format!("{init_pid}")).map_err(|err| {
+                tracing::error!("failed to write pid to file: {}", err);
+                LibcontainerError::OtherIO(err)
+            })?;
         }
 
         if let Some(container) = &mut self.container {
@@ -154,15 +172,14 @@ impl<'a> ContainerBuilderImpl<'a> {
                 .set_creator(nix::unistd::geteuid().as_raw())
                 .set_pid(init_pid.as_raw())
                 .set_clean_up_intel_rdt_directory(need_to_clean_up_intel_rdt_dir)
-                .save()
-                .context("Failed to save container state")?;
+                .save()?;
         }
 
         Ok(init_pid)
     }
 
-    fn cleanup_container(&self) -> Result<()> {
-        let linux = self.spec.linux().as_ref().context("no linux in spec")?;
+    fn cleanup_container(&self) -> Result<(), LibcontainerError> {
+        let linux = self.spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
         let cgroups_path = utils::get_cgroup_path(
             linux.cgroups_path(),
             &self.container_id,
@@ -172,37 +189,37 @@ impl<'a> ContainerBuilderImpl<'a> {
             cgroups_path,
             self.use_systemd || self.rootless.is_some(),
             &self.container_id,
-        )?;
+        )
+        .map_err(|err| LibcontainerError::Cgroups(err.to_string()))?;
 
         let mut errors = Vec::new();
 
-        if let Err(e) = cmanager.remove().context("failed to remove cgroup") {
+        if let Err(e) = cmanager.remove() {
+            tracing::error!(error = ?e, "failed to remove cgroup manager");
             errors.push(e.to_string());
         }
 
         if let Some(container) = &self.container {
             if let Some(true) = container.clean_up_intel_rdt_subdirectory() {
-                if let Err(e) = delete_resctrl_subdirectory(container.id()).with_context(|| {
-                    format!(
-                        "failed to delete resctrl subdirectory: {:?}",
-                        container.id()
-                    )
-                }) {
+                if let Err(e) = delete_resctrl_subdirectory(container.id()) {
+                    tracing::error!(id = ?container.id(), error = ?e, "failed to delete resctrl subdirectory");
                     errors.push(e.to_string());
                 }
             }
 
             if container.root.exists() {
-                if let Err(e) = fs::remove_dir_all(&container.root)
-                    .with_context(|| format!("could not delete {:?}", container.root))
-                {
+                if let Err(e) = fs::remove_dir_all(&container.root) {
+                    tracing::error!(container_root = ?container.root, error = ?e, "failed to delete container root");
                     errors.push(e.to_string());
                 }
             }
         }
 
         if !errors.is_empty() {
-            bail!("failed to cleanup container: {}", errors.join(";"));
+            return Err(LibcontainerError::Other(format!(
+                "failed to cleanup container: {}",
+                errors.join(";")
+            )));
         }
 
         Ok(())

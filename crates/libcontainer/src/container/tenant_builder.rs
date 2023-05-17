@@ -376,11 +376,7 @@ impl<'a> TenantContainerBuilder<'a> {
     }
 
     fn should_use_systemd(&self, container: &Container) -> bool {
-        if let Some(use_systemd) = container.systemd() {
-            return use_systemd;
-        }
-
-        false
+        container.systemd()
     }
 
     fn setup_notify_listener(container_dir: &Path) -> Result<PathBuf> {

@@ -40,10 +40,7 @@ impl RootFS {
     ) -> Result<()> {
         tracing::debug!("Prepare rootfs: {:?}", rootfs);
         let mut flags = MsFlags::MS_REC;
-        let linux = spec
-            .linux()
-            .as_ref()
-            .ok_or(MissingSpecError::MissingLinux)?;
+        let linux = spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
 
         match linux.rootfs_propagation().as_deref() {
             Some("shared") => flags |= MsFlags::MS_SHARED,
