@@ -27,8 +27,6 @@ pub trait Executor {
 
 #[derive(Debug, thiserror::Error)]
 pub enum ExecutorManagerError {
-    #[error("missing executor")]
-    MissingExecutor,
     #[error("failed executor {name}")]
     ExecutionFailed {
         source: Box<dyn std::error::Error + Send + Sync>,
@@ -46,7 +44,7 @@ pub struct ExecutorManager {
 impl ExecutorManager {
     pub fn exec(&self, spec: &Spec) -> Result<(), ExecutorManagerError> {
         if self.executors.is_empty() {
-            return Err(ExecutorManagerError::MissingExecutor);
+            return Err(ExecutorManagerError::NoExecutorFound);
         };
 
         for executor in self.executors.iter() {

@@ -25,7 +25,7 @@ impl Executor for DefaultExecutor {
         }
 
         let executable = args[0].as_str();
-        let p = CString::new(executable.as_bytes()).map_err(|err| {
+        let cstring_path = CString::new(executable.as_bytes()).map_err(|err| {
             tracing::error!("failed to convert path {executable:?} to cstring: {}", err,);
             ExecutorError::InvalidArg
         })?;
@@ -33,8 +33,8 @@ impl Executor for DefaultExecutor {
             .iter()
             .map(|s| CString::new(s.as_bytes()).unwrap_or_default())
             .collect();
-        unistd::execvp(&p, &a).map_err(|err| {
-            tracing::error!(?err, filename = ?p, args = ?a, "failed to execvp");
+        unistd::execvp(&cstring_path, &a).map_err(|err| {
+            tracing::error!(?err, filename = ?cstring_path, args = ?a, "failed to execvp");
             ExecutorError::Execution(err.into())
         })?;
 
