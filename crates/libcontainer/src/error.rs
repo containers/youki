@@ -75,9 +75,9 @@ pub enum LibcontainerError {
     // Catch all errors that are not covered by the above
     #[error("syscall error")]
     OtherSyscall(#[source] nix::Error),
-    #[error("IO error")]
+    #[error("io error")]
     OtherIO(#[source] std::io::Error),
-    #[error("Serialization error")]
+    #[error("serialization error")]
     OtherSerialization(#[source] serde_json::Error),
     #[error("{0}")]
     OtherCgroup(String),
