@@ -285,34 +285,27 @@ pub fn create_dir_all_with_mode<P: AsRef<Path>>(
 
 #[derive(Debug, thiserror::Error)]
 pub enum EnsureProcfsError {
-    #[error("failed to open {path:?}")]
-    OpenProcfs {
-        source: std::io::Error,
-        path: PathBuf,
-    },
-    #[error("failed to get statfs for {path:?}")]
-    StatfsProcfs { source: nix::Error, path: PathBuf },
-    #[error("{path:?} is not on the procfs")]
-    NotProcfs { path: PathBuf },
+    #[error(transparent)]
+    Nix(#[from] nix::Error),
+    #[error(transparent)]
+    IO(#[from] std::io::Error),
 }
 
 // Make sure a given path is on procfs. This is to avoid the security risk that
 // /proc path is mounted over. Ref: CVE-2019-16884
 pub fn ensure_procfs(path: &Path) -> Result<(), EnsureProcfsError> {
-    let procfs_fd = fs::File::open(path).map_err(|err| EnsureProcfsError::OpenProcfs {
-        source: err,
-        path: path.to_path_buf(),
+    let procfs_fd = fs::File::open(path).map_err(|err| {
+        tracing::error!(?err, ?path, "failed to open procfs file");
+        err
     })?;
-    let fstat_info =
-        statfs::fstatfs(&procfs_fd.as_raw_fd()).map_err(|err| EnsureProcfsError::StatfsProcfs {
-            source: err,
-            path: path.to_path_buf(),
-        })?;
+    let fstat_info = statfs::fstatfs(&procfs_fd.as_raw_fd()).map_err(|err| {
+        tracing::error!(?err, ?path, "failed to fstatfs the procfs");
+        err
+    })?;
 
     if fstat_info.filesystem_type() != statfs::PROC_SUPER_MAGIC {
-        return Err(EnsureProcfsError::NotProcfs {
-            path: path.to_path_buf(),
-        });
+        tracing::error!(?path, "given path is not on the procfs");
+        Err(nix::Error::EINVAL)?;
     }
 
     Ok(())
