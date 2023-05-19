@@ -35,7 +35,7 @@ impl Container {
 
         if !self.can_start() {
             tracing::error!(status = ?self.status(), id = ?self.id(), "cannot start container due to incorrect state");
-            return Err(LibcontainerError::IncorrectContainerStatus);
+            return Err(LibcontainerError::IncorrectStatus);
         }
 
         let config = YoukiConfig::load(&self.root).map_err(|err| {

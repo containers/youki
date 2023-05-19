@@ -4,9 +4,19 @@ pub mod default;
 
 pub static EMPTY: Vec<String> = Vec::new();
 
+#[derive(Debug, thiserror::Error)]
+pub enum ExecutorError {
+    #[error("invalid argument")]
+    InvalidArg,
+    #[error("failed to execute workload")]
+    Execution(#[from] Box<dyn std::error::Error + Send + Sync>),
+    #[error("{0}")]
+    Other(String),
+}
+
 pub trait Executor {
     /// Executes the workload
-    fn exec(&self, spec: &Spec) -> anyhow::Result<()>;
+    fn exec(&self, spec: &Spec) -> Result<(), ExecutorError>;
 
     /// Checks if the handler is able to handle the workload
     fn can_handle(&self, spec: &Spec) -> bool;
@@ -17,8 +27,6 @@ pub trait Executor {
 
 #[derive(Debug, thiserror::Error)]
 pub enum ExecutorManagerError {
-    #[error("missing executor")]
-    MissingExecutor,
     #[error("failed executor {name}")]
     ExecutionFailed {
         source: Box<dyn std::error::Error + Send + Sync>,
@@ -36,7 +44,7 @@ pub struct ExecutorManager {
 impl ExecutorManager {
     pub fn exec(&self, spec: &Spec) -> Result<(), ExecutorManagerError> {
         if self.executors.is_empty() {
-            return Err(ExecutorManagerError::MissingExecutor);
+            return Err(ExecutorManagerError::NoExecutorFound);
         };
 
         for executor in self.executors.iter() {

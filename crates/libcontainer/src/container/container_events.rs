@@ -1,7 +1,8 @@
 use std::{thread, time::Duration};
 
+use crate::error::LibcontainerError;
+
 use super::{Container, ContainerStatus};
-use anyhow::{bail, Context, Result};
 use libcgroups::common::CgroupManager;
 
 impl Container {
@@ -26,11 +27,11 @@ impl Container {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn events(&mut self, interval: u32, stats: bool) -> Result<()> {
-        self.refresh_status()
-            .context("failed to refresh container status")?;
+    pub fn events(&mut self, interval: u32, stats: bool) -> Result<(), LibcontainerError> {
+        self.refresh_status()?;
         if !self.state.status.eq(&ContainerStatus::Running) {
-            bail!("{} is not in running state", self.id());
+            tracing::error!(id = ?self.id(), status = ?self.state.status, "container is not running");
+            return Err(LibcontainerError::IncorrectStatus);
         }
 
         let cgroups_path = self.spec()?.cgroup_path;
@@ -41,11 +42,19 @@ impl Container {
         match stats {
             true => {
                 let stats = cgroup_manager.stats()?;
-                println!("{}", serde_json::to_string_pretty(&stats)?);
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&stats)
+                        .map_err(LibcontainerError::OtherSerialization)?
+                );
             }
             false => loop {
                 let stats = cgroup_manager.stats()?;
-                println!("{}", serde_json::to_string_pretty(&stats)?);
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&stats)
+                        .map_err(LibcontainerError::OtherSerialization)?
+                );
                 thread::sleep(Duration::from_secs(interval as u64));
             },
         }

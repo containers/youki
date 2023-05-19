@@ -122,7 +122,7 @@ impl<'a> InitContainerBuilder<'a> {
 
         if container_dir.exists() {
             tracing::error!(id = self.base.container_id, dir = ?container_dir, "container already exists");
-            return Err(LibcontainerError::ContainerAlreadyExists);
+            return Err(LibcontainerError::Exist);
         }
 
         std::fs::create_dir_all(&container_dir).map_err(|err| {

@@ -37,7 +37,7 @@ impl Container {
             }
             false => {
                 tracing::error!(id = ?self.id(), status = ?self.status(), "cannot kill container due to incorrect state");
-                return Err(LibcontainerError::IncorrectContainerStatus);
+                return Err(LibcontainerError::IncorrectStatus);
             }
         }
         self.set_status(ContainerStatus::Stopped).save()?;
@@ -76,16 +76,13 @@ impl Container {
         // For cgroup V1, a frozon process cannot respond to signals,
         // so we need to thaw it. Only thaw the cgroup for SIGKILL.
         if self.status() == ContainerStatus::Paused && signal == signal::Signal::SIGKILL {
-            match get_cgroup_setup().map_err(|err| LibcontainerError::Cgroups(err.to_string()))? {
+            match get_cgroup_setup()? {
                 libcgroups::common::CgroupSetup::Legacy
                 | libcgroups::common::CgroupSetup::Hybrid => {
                     let cgroups_path = self.spec()?.cgroup_path;
                     let use_systemd = self.systemd();
-                    let cmanger = create_cgroup_manager(cgroups_path, use_systemd, self.id())
-                        .map_err(|err| LibcontainerError::Cgroups(err.to_string()))?;
-                    cmanger
-                        .freeze(libcgroups::common::FreezerState::Thawed)
-                        .map_err(|err| LibcontainerError::Cgroups(err.to_string()))?;
+                    let cmanger = create_cgroup_manager(cgroups_path, use_systemd, self.id())?;
+                    cmanger.freeze(libcgroups::common::FreezerState::Thawed)?;
                 }
                 libcgroups::common::CgroupSetup::Unified => {}
             }
@@ -97,8 +94,7 @@ impl Container {
         let signal = signal.into().into_raw();
         let cgroups_path = self.spec()?.cgroup_path;
         let use_systemd = self.systemd();
-        let cmanger = create_cgroup_manager(cgroups_path, use_systemd, self.id())
-            .map_err(|err| LibcontainerError::Cgroups(err.to_string()))?;
+        let cmanger = create_cgroup_manager(cgroups_path, use_systemd, self.id())?;
 
         if let Err(e) = cmanger.freeze(libcgroups::common::FreezerState::Frozen) {
             tracing::warn!(
@@ -108,9 +104,7 @@ impl Container {
             );
         }
 
-        let pids = cmanger
-            .get_all_pids()
-            .map_err(|err| LibcontainerError::Cgroups(err.to_string()))?;
+        let pids = cmanger.get_all_pids()?;
         pids.iter()
             .try_for_each(|&pid| {
                 tracing::debug!("kill signal {} to {}", signal, pid);

@@ -1,6 +1,6 @@
 use super::{Container, ContainerStatus};
 use crate::container::container::CheckpointOptions;
-use anyhow::{bail, Context, Result};
+use crate::error::LibcontainerError;
 
 use libcgroups::common::CgroupSetup::{Hybrid, Legacy};
 #[cfg(feature = "v1")]
@@ -14,19 +14,15 @@ const CRIU_CHECKPOINT_LOG_FILE: &str = "dump.log";
 const DESCRIPTORS_JSON: &str = "descriptors.json";
 
 impl Container {
-    pub fn checkpoint(&mut self, opts: &CheckpointOptions) -> Result<()> {
-        self.refresh_status()
-            .context("failed to refresh container status")?;
+    pub fn checkpoint(&mut self, opts: &CheckpointOptions) -> Result<(), LibcontainerError> {
+        self.refresh_status()?;
 
         // can_pause() checks if the container is running. That also works for
         // checkpoitning. is_running() would make more sense here, but let's
         // just reuse existing functions.
         if !self.can_pause() {
-            bail!(
-                "{} could not be checkpointed because it was {:?}",
-                self.id(),
-                self.status()
-            );
+            tracing::error!(status = ?self.status(), id = ?self.id(), "cannot checkpoint container because it is not running");
+            return Err(LibcontainerError::IncorrectStatus);
         }
 
         let mut criu = rust_criu::Criu::new().unwrap();
@@ -51,17 +47,18 @@ impl Container {
                     criu.set_external_mount(dest.clone(), dest);
                 }
                 Some("cgroup") => {
-                    match libcgroups::common::get_cgroup_setup()
-                        .context("failed to determine cgroup setup")?
-                    {
+                    match libcgroups::common::get_cgroup_setup()? {
                         // For v1 it is necessary to list all cgroup mounts as external mounts
                         Legacy | Hybrid => {
                             #[cfg(not(feature = "v1"))]
                             panic!("libcontainer can't run in a Legacy or Hybrid cgroup setup without the v1 feature");
                             #[cfg(feature = "v1")]
-                            for mp in libcgroups::v1::util::list_subsystem_mount_points()
-                                .context("failed to get subsystem mount points")?
-                            {
+                            for mp in libcgroups::v1::util::list_subsystem_mount_points().map_err(
+                                |err| {
+                                    tracing::error!(?err, "failed to get subsystem mount points");
+                                    LibcontainerError::OtherCgroup(err.to_string())
+                                },
+                            )? {
                                 let cgroup_mount = mp
                                     .clone()
                                     .into_os_string()
@@ -79,15 +76,17 @@ impl Container {
             }
         }
 
-        let directory = std::fs::File::open(&opts.image_path)
-            .with_context(|| format!("failed to open {:?}", opts.image_path))?;
+        let directory = std::fs::File::open(&opts.image_path).map_err(|err| {
+            tracing::error!(path = ?opts.image_path, ?err, "failed to open criu image directory");
+            LibcontainerError::OtherIO(err)
+        })?;
         criu.set_images_dir_fd(directory.as_raw_fd());
 
         // It seems to be necessary to be defined outside of 'if' to
         // keep the FD open until CRIU uses it.
         let work_dir: std::fs::File;
         if let Some(wp) = &opts.work_path {
-            work_dir = std::fs::File::open(wp)?;
+            work_dir = std::fs::File::open(wp).map_err(LibcontainerError::OtherIO)?;
             criu.set_work_dir_fd(work_dir.as_raw_fd());
         }
 
@@ -103,8 +102,14 @@ impl Container {
             descriptors.push(link_path);
         }
         let descriptors_json_path = opts.image_path.join(DESCRIPTORS_JSON);
-        let mut descriptors_json = File::create(descriptors_json_path)?;
-        write!(descriptors_json, "{}", serde_json::to_string(&descriptors)?)?;
+        let mut descriptors_json =
+            File::create(descriptors_json_path).map_err(LibcontainerError::OtherIO)?;
+        write!(
+            descriptors_json,
+            "{}",
+            serde_json::to_string(&descriptors).map_err(LibcontainerError::OtherSerialization)?
+        )
+        .map_err(LibcontainerError::OtherIO)?;
 
         criu.set_log_file(CRIU_CHECKPOINT_LOG_FILE.to_string());
         criu.set_log_level(4);
@@ -123,18 +128,11 @@ impl Container {
                 .into_string()
                 .unwrap(),
         );
-        if let Err(e) = criu.dump() {
-            bail!(
-                "checkpointing container {} failed with {:?}. Please check CRIU logfile {:}/{}",
-                self.id(),
-                e,
-                opts.work_path
-                    .as_ref()
-                    .unwrap_or(&opts.image_path)
-                    .display(),
-                CRIU_CHECKPOINT_LOG_FILE
-            );
-        }
+
+        criu.dump().map_err(|err| {
+            tracing::error!(?err, id = ?self.id(), logfile = ?opts.image_path.join(CRIU_CHECKPOINT_LOG_FILE), "checkpointing container failed");
+            LibcontainerError::Other(err.to_string())
+        })?;
 
         if !opts.leave_running {
             self.set_status(ContainerStatus::Stopped).save()?;

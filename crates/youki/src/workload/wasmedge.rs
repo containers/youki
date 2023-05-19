@@ -1,11 +1,10 @@
-use anyhow::Result;
 use oci_spec::runtime::Spec;
 use wasmedge_sdk::{
     config::{CommonConfigOptions, ConfigBuilder, HostRegistrationConfigOptions},
     params, VmBuilder,
 };
 
-use libcontainer::workload::Executor;
+use libcontainer::workload::{Executor, ExecutorError};
 
 const EXECUTOR_NAME: &str = "wasmedge";
 
@@ -13,7 +12,7 @@ const EXECUTOR_NAME: &str = "wasmedge";
 pub struct WasmEdgeExecutor {}
 
 impl Executor for WasmEdgeExecutor {
-    fn exec(&self, spec: &Spec) -> Result<()> {
+    fn exec(&self, spec: &Spec) -> Result<(), ExecutorError> {
         // parse wasi parameters
         let args = get_args(spec);
         let mut cmd = args[0].clone();
@@ -25,14 +24,23 @@ impl Executor for WasmEdgeExecutor {
         // create configuration with `wasi` option enabled
         let config = ConfigBuilder::new(CommonConfigOptions::default())
             .with_host_registration_config(HostRegistrationConfigOptions::default().wasi(true))
-            .build()?;
+            .build()
+            .map_err(|err| {
+                ExecutorError::Other(format!("failed to create wasmedge config: {}", err))
+            })?;
 
         // create a vm with the config settings
         let mut vm = VmBuilder::new()
             .with_config(config)
-            .build()?
-            .register_module_from_file("main", cmd)?;
-
+            .build()
+            .map_err(|err| ExecutorError::Other(format!("failed to create wasmedge vm: {}", err)))?
+            .register_module_from_file("main", cmd)
+            .map_err(|err| {
+                ExecutorError::Other(format!(
+                    "failed to register wasmedge module from the file: {}",
+                    err
+                ))
+            })?;
         // initialize the wasi module with the parsed parameters
         let wasi_instance = vm
             .wasi_module_mut()
@@ -43,7 +51,8 @@ impl Executor for WasmEdgeExecutor {
             None,
         );
 
-        vm.run_func(Some("main"), "_start", params!())?;
+        vm.run_func(Some("main"), "_start", params!())
+            .map_err(|err| ExecutorError::Execution(err))?;
 
         Ok(())
     }

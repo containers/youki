@@ -232,10 +232,10 @@ pub fn create_dir_all<P: AsRef<Path>>(path: P) -> Result<(), WrappedIOError> {
     })
 }
 
-pub fn open<P: AsRef<Path>>(path: P) -> Result<File, WrappedIOError> {
-    File::open(path.as_ref()).map_err(|err| WrappedIOError::Open {
-        source: err,
-        path: path.as_ref().to_path_buf(),
+pub fn open<P: AsRef<Path>>(path: P) -> Result<File, std::io::Error> {
+    File::open(path.as_ref()).map_err(|err| {
+        tracing::error!(path = ?path.as_ref(), ?err, "failed to open file");
+        err
     })
 }
 

@@ -1,9 +1,8 @@
-use anyhow::{bail, Context, Result};
 use oci_spec::runtime::Spec;
 use wasmer::{Instance, Module, Store};
 use wasmer_wasix::WasiEnv;
 
-use libcontainer::workload::{Executor, EMPTY};
+use libcontainer::workload::{Executor, ExecutorError, EMPTY};
 
 const EXECUTOR_NAME: &str = "wasmer";
 
@@ -11,8 +10,8 @@ const EXECUTOR_NAME: &str = "wasmer";
 pub struct WasmerExecutor {}
 
 impl Executor for WasmerExecutor {
-    fn exec(&self, spec: &Spec) -> Result<()> {
-        tracing::debug!("Executing workload with wasmer handler");
+    fn exec(&self, spec: &Spec) -> Result<(), ExecutorError> {
+        tracing::debug!("executing workload with wasmer handler");
         let process = spec.process().as_ref();
 
         let args = process.and_then(|p| p.args().as_ref()).unwrap_or(&EMPTY);
@@ -27,40 +26,51 @@ impl Executor for WasmerExecutor {
             });
 
         if args.is_empty() {
-            bail!("at least one process arg must be specified")
+            tracing::error!("at least one process arg must be specified");
+            return Err(ExecutorError::InvalidArg);
         }
 
         if !args[0].ends_with(".wasm") && !args[0].ends_with(".wat") {
-            bail!(
+            tracing::error!(
                 "first argument must be a wasm or wat module, but was {}",
                 args[0]
-            )
+            );
+            return Err(ExecutorError::InvalidArg);
         }
 
         let mut store = Store::default();
-        let module = Module::from_file(&store, &args[0])
-            .with_context(|| format!("could not load wasm module from {}", &args[0]))?;
+        let module = Module::from_file(&store, &args[0]).map_err(|err| {
+            tracing::error!(err = ?err, file = ?args[0], "could not load wasm module from file");
+            ExecutorError::Other("could not load wasm module from file".to_string())
+        })?;
 
         let mut wasi_env = WasiEnv::builder("youki_wasm_app")
             .args(args.iter().skip(1))
             .envs(env)
-            .finalize(&mut store)?;
+            .finalize(&mut store)
+            .map_err(|err| ExecutorError::Other(format!("could not create wasi env: {}", err)))?;
 
-        let imports = wasi_env
-            .import_object(&mut store, &module)
-            .context("could not retrieve wasm imports")?;
-        let instance = Instance::new(&mut store, &module, &imports)
-            .context("wasm module could not be instantiated")?;
+        let imports = wasi_env.import_object(&mut store, &module).map_err(|err| {
+            ExecutorError::Other(format!("could not retrieve wasm imports: {}", err))
+        })?;
+        let instance = Instance::new(&mut store, &module, &imports).map_err(|err| {
+            ExecutorError::Other(format!("could not instantiate wasm module: {}", err))
+        })?;
 
-        wasi_env.initialize(&mut store, instance.clone())?;
+        wasi_env
+            .initialize(&mut store, instance.clone())
+            .map_err(|err| {
+                ExecutorError::Other(format!("could not initialize wasi env: {}", err))
+            })?;
 
-        let start = instance
-            .exports
-            .get_function("_start")
-            .context("could not retrieve wasm module main function")?;
+        let start = instance.exports.get_function("_start").map_err(|err| {
+            ExecutorError::Other(format!(
+                "could not retrieve wasm module main function: {err}"
+            ))
+        })?;
         start
             .call(&mut store, &[])
-            .context("wasm module was not executed successfully")?;
+            .map_err(|err| ExecutorError::Execution(err.into()))?;
 
         wasi_env.cleanup(&mut store, None);
 
@@ -89,6 +99,7 @@ impl Executor for WasmerExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::{Context, Result};
     use oci_spec::runtime::SpecBuilder;
     use std::collections::HashMap;
 
