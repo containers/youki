@@ -7,7 +7,6 @@
 //! UTS (hostname and domain information, processes will think they're running on servers with different names),
 //! Cgroup (Resource limits, execution priority etc.)
 
-use crate::error::UnifiedSyscallError;
 use crate::syscall::{syscall::create_syscall, Syscall};
 use nix::{fcntl, sched::CloneFlags, sys::stat, unistd};
 use oci_spec::runtime::{LinuxNamespace, LinuxNamespaceType};
@@ -17,12 +16,12 @@ type Result<T> = std::result::Result<T, NamespaceError>;
 
 #[derive(Debug, thiserror::Error)]
 pub enum NamespaceError {
-    #[error("failed to set namespace")]
-    ApplyNamespaceSyscallFailed {
-        namespace: Box<LinuxNamespace>,
-        #[source]
-        err: UnifiedSyscallError,
-    },
+    #[error(transparent)]
+    Nix(#[from] nix::Error),
+    #[error(transparent)]
+    IO(#[from] std::io::Error),
+    #[error(transparent)]
+    Syscall(#[from] crate::syscall::SyscallError),
 }
 
 static ORDERED_NAMESPACES: &[CloneFlags] = &[
@@ -88,28 +87,28 @@ impl Namespaces {
         match namespace.path() {
             Some(path) => {
                 let fd = fcntl::open(path, fcntl::OFlag::empty(), stat::Mode::empty()).map_err(
-                    |err| NamespaceError::ApplyNamespaceSyscallFailed {
-                        namespace: Box::new(namespace.to_owned()),
-                        err: err.into(),
+                    |err| {
+                        tracing::error!(?err, ?namespace, "failed to open namespace file");
+                        err
                     },
                 )?;
                 self.command
                     .set_ns(fd, get_clone_flag(namespace.typ()))
-                    .map_err(|err| NamespaceError::ApplyNamespaceSyscallFailed {
-                        namespace: Box::new(namespace.to_owned()),
-                        err: err.into(),
+                    .map_err(|err| {
+                        tracing::error!(?err, ?namespace, "failed to set namespace");
+                        err
                     })?;
-                unistd::close(fd).map_err(|err| NamespaceError::ApplyNamespaceSyscallFailed {
-                    namespace: Box::new(namespace.to_owned()),
-                    err: err.into(),
+                unistd::close(fd).map_err(|err| {
+                    tracing::error!(?err, ?namespace, "failed to close namespace file");
+                    err
                 })?;
             }
             None => {
                 self.command
                     .unshare(get_clone_flag(namespace.typ()))
-                    .map_err(|err| NamespaceError::ApplyNamespaceSyscallFailed {
-                        namespace: Box::new(namespace.to_owned()),
-                        err: err.into(),
+                    .map_err(|err| {
+                        tracing::error!(?err, ?namespace, "failed to unshare namespace");
+                        err
                     })?;
             }
         }

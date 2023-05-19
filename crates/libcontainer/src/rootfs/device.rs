@@ -14,12 +14,10 @@ use std::path::{Path, PathBuf};
 pub enum DeviceError {
     #[error("{0:?} is not a valid device path")]
     InvalidDevicePath(std::path::PathBuf),
-    #[error("failed to bind dev")]
-    BindDev {
-        source: crate::error::UnifiedSyscallError,
-    },
     #[error("failed syscall to create device")]
     Syscall(#[from] crate::syscall::SyscallError),
+    #[error(transparent)]
+    Nix(#[from] nix::Error),
     #[error(transparent)]
     Other(Box<dyn std::error::Error + Send + Sync>),
     #[error("{0}")]
@@ -91,9 +89,9 @@ impl Device {
         )
         .map_err(|err| {
             tracing::error!("failed to open bind dev {:?}: {}", full_container_path, err);
-            DeviceError::BindDev { source: err.into() }
+            err
         })?;
-        close(fd).map_err(|err| DeviceError::BindDev { source: err.into() })?;
+        close(fd)?;
         self.syscall
             .mount(
                 Some(dev.path()),
@@ -108,7 +106,7 @@ impl Device {
                     full_container_path,
                     err
                 );
-                DeviceError::BindDev { source: err.into() }
+                err
             })?;
 
         Ok(())
