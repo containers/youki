@@ -164,47 +164,97 @@ mod tests {
     }
 
     #[test]
-    fn test_json_logfile() -> Result<()> {
-        let temp_dir = tempfile::tempdir()?;
-        let log_file = Path::join(temp_dir.path(), "test.log");
-        let _guard = LogLevelGuard::new("error").unwrap();
-        // Note, we can only init the tracing once, so we have to test in a
-        // single unit test. The orders are important here.
-        init(
-            false,
-            Some(log_file.to_owned()),
-            Some(LOG_FORMAT_JSON.to_owned()),
-        )
-        .context("failed to initialize logger")?;
-        assert!(
-            log_file
+    fn test_init_many_times() -> Result<()> {
+        let cb = || -> Result<()> {
+            let temp_dir = tempfile::tempdir()?;
+            let log_file = Path::join(temp_dir.path(), "test.log");
+            let _guard = LogLevelGuard::new("error").unwrap();
+            init(false, Some(log_file.to_owned()), None)?;
+            Ok(())
+        };
+        common::test_utils::test_in_child_process(cb)
+            .with_context(|| "failed the first init tracing")?;
+        common::test_utils::test_in_child_process(cb)
+            .with_context(|| "failed the second init tracing")?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_higher_loglevel_no_log() -> Result<()> {
+        common::test_utils::test_in_child_process(|| {
+            let temp_dir = tempfile::tempdir()?;
+            let log_file = Path::join(temp_dir.path(), "test.log");
+            let _guard = LogLevelGuard::new("error").unwrap();
+            // Note, we can only init the tracing once, so we have to test in a
+            // single unit test. The orders are important here.
+            init(
+                false,
+                Some(log_file.to_owned()),
+                Some(LOG_FORMAT_JSON.to_owned()),
+            )
+            .context("failed to initialize logger")?;
+            assert!(
+                log_file
+                    .as_path()
+                    .metadata()
+                    .expect("failed to get logfile metadata")
+                    .len()
+                    == 0,
+                "a new logfile should be empty"
+            );
+            // Test that info level is not logged into the logfile because we set the log level to error.
+            tracing::info!("testing this");
+            if log_file
                 .as_path()
                 .metadata()
                 .expect("failed to get logfile metadata")
                 .len()
-                == 0,
-            "a new logfile should be empty"
-        );
-        // Test that info level is not logged into the logfile because we set the log level to error.
-        tracing::info!("testing this");
-        if log_file
-            .as_path()
-            .metadata()
-            .expect("failed to get logfile metadata")
-            .len()
-            != 0
-        {
+                != 0
+            {
+                let data = std::fs::read_to_string(&log_file).context("failed to read logfile")?;
+                bail!("info level should not be logged into the logfile, but got: {data}")
+            }
+
+            Ok(())
+        })?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_json_logfile() -> Result<()> {
+        common::test_utils::test_in_child_process(|| {
+            let temp_dir = tempfile::tempdir()?;
+            let log_file = Path::join(temp_dir.path(), "test.log");
+            let _guard = LogLevelGuard::new("error").unwrap();
+            // Note, we can only init the tracing once, so we have to test in a
+            // single unit test. The orders are important here.
+            init(
+                false,
+                Some(log_file.to_owned()),
+                Some(LOG_FORMAT_JSON.to_owned()),
+            )
+            .context("failed to initialize logger")?;
+            assert!(
+                log_file
+                    .as_path()
+                    .metadata()
+                    .expect("failed to get logfile metadata")
+                    .len()
+                    == 0,
+                "a new logfile should be empty"
+            );
+            // Test that the message logged is actually JSON format.
+            tracing::error!("testing json log");
             let data = std::fs::read_to_string(&log_file).context("failed to read logfile")?;
-            bail!("info level should not be logged into the logfile, but got: {data}")
-        }
-        // Test that the message logged is actually JSON format.
-        tracing::error!("testing json log");
-        let data = std::fs::read_to_string(&log_file).context("failed to read logfile")?;
-        if data.is_empty() {
-            bail!("logfile should not be empty")
-        }
-        serde_json::from_str::<serde_json::Value>(&data)
-            .context(format!("failed to parse log file content: {data}"))?;
+            if data.is_empty() {
+                bail!("logfile should not be empty")
+            }
+            serde_json::from_str::<serde_json::Value>(&data)
+                .context(format!("failed to parse log file content: {data}"))?;
+            Ok(())
+        })?;
+
         Ok(())
     }
 }
