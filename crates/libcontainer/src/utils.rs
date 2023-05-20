@@ -158,49 +158,24 @@ pub fn get_cgroup_path(
     }
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum WrappedIOError {
-    #[error("failed to read from {path:?}")]
-    ReadFile {
-        source: std::io::Error,
-        path: PathBuf,
-    },
-    #[error("failed to write to {path:?}")]
-    WriteFile {
-        source: std::io::Error,
-        path: PathBuf,
-    },
-    #[error("failed to open {path:?}")]
-    Open {
-        source: std::io::Error,
-        path: PathBuf,
-    },
-    #[error("failed to create directory {path:?}")]
-    CreateDirAll {
-        source: std::io::Error,
-        path: PathBuf,
-    },
-    #[error("failed to get metadata")]
-    GetMetadata { source: std::io::Error },
-    #[error("metada doesn't match the expected attributes")]
-    MetadataMismatch,
-}
-
 pub fn write_file<P: AsRef<Path>, C: AsRef<[u8]>>(
     path: P,
     contents: C,
-) -> Result<(), WrappedIOError> {
-    fs::write(path.as_ref(), contents).map_err(|err| WrappedIOError::WriteFile {
-        source: err,
-        path: path.as_ref().to_path_buf(),
-    })
+) -> Result<(), std::io::Error> {
+    fs::write(path.as_ref(), contents).map_err(|err| {
+        tracing::error!(path = ?path.as_ref(), ?err, "failed to write file");
+        err
+    })?;
+
+    Ok(())
 }
 
-pub fn create_dir_all<P: AsRef<Path>>(path: P) -> Result<(), WrappedIOError> {
-    fs::create_dir_all(path.as_ref()).map_err(|err| WrappedIOError::CreateDirAll {
-        source: err,
-        path: path.as_ref().to_path_buf(),
-    })
+pub fn create_dir_all<P: AsRef<Path>>(path: P) -> Result<(), std::io::Error> {
+    fs::create_dir_all(path.as_ref()).map_err(|err| {
+        tracing::error!(path = ?path.as_ref(), ?err, "failed to create directory");
+        err
+    })?;
+    Ok(())
 }
 
 pub fn open<P: AsRef<Path>>(path: P) -> Result<File, std::io::Error> {
@@ -208,6 +183,14 @@ pub fn open<P: AsRef<Path>>(path: P) -> Result<File, std::io::Error> {
         tracing::error!(path = ?path.as_ref(), ?err, "failed to open file");
         err
     })
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum MkdirWithModeError {
+    #[error("IO error")]
+    Io(#[from] std::io::Error),
+    #[error("metada doesn't match the expected attributes")]
+    MetadataMismatch,
 }
 
 /// Creates the specified directory and all parent directories with the specified mode. Ensures
@@ -227,30 +210,23 @@ pub fn create_dir_all_with_mode<P: AsRef<Path>>(
     path: P,
     owner: u32,
     mode: Mode,
-) -> Result<(), WrappedIOError> {
+) -> Result<(), MkdirWithModeError> {
     let path = path.as_ref();
     if !path.exists() {
         DirBuilder::new()
             .recursive(true)
             .mode(mode.bits())
-            .create(path)
-            .map_err(|err| WrappedIOError::CreateDirAll {
-                source: err,
-                path: path.to_path_buf(),
-            })?;
+            .create(path)?;
     }
 
-    let metadata = path
-        .metadata()
-        .map_err(|err| WrappedIOError::GetMetadata { source: err })?;
-
+    let metadata = path.metadata()?;
     if metadata.is_dir()
         && metadata.st_uid() == owner
         && metadata.st_mode() & mode.bits() == mode.bits()
     {
         Ok(())
     } else {
-        Err(WrappedIOError::MetadataMismatch)
+        Err(MkdirWithModeError::MetadataMismatch)
     }
 }
 
@@ -285,7 +261,7 @@ pub fn ensure_procfs(path: &Path) -> Result<(), EnsureProcfsError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use anyhow::Result;
+    use anyhow::{bail, Result};
 
     #[test]
     pub fn test_get_unix_user() {
@@ -332,6 +308,59 @@ mod tests {
             "There should be exactly one entry inside"
         );
         assert_eq!(env_output.get_key_value(&key), Some((&key, &value)));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_create_dir_all_with_mode() -> Result<()> {
+        {
+            let temdir = tempfile::tempdir()?;
+            let path = temdir.path().join("test");
+            let uid = nix::unistd::getuid().as_raw();
+            let mode = Mode::S_IRWXU;
+            create_dir_all_with_mode(&path, uid, mode)?;
+            let metadata = path.metadata()?;
+            assert!(path.is_dir());
+            assert_eq!(metadata.st_uid(), uid);
+            assert_eq!(metadata.st_mode() & mode.bits(), mode.bits());
+        }
+        {
+            let temdir = tempfile::tempdir()?;
+            let path = temdir.path().join("test");
+            let mode = Mode::S_IRWXU;
+            std::fs::create_dir(&path)?;
+            assert!(path.is_dir());
+            match create_dir_all_with_mode(&path, 8899, mode) {
+                Err(MkdirWithModeError::MetadataMismatch) => {}
+                _ => bail!("should return MetadataMismatch"),
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_io() -> Result<()> {
+        {
+            let tempdir = tempfile::tempdir()?;
+            let path = tempdir.path().join("test");
+            write_file(&path, "test".as_bytes())?;
+            open(&path)?;
+            assert!(create_dir_all(path).is_err());
+        }
+        {
+            let tempdir = tempfile::tempdir()?;
+            let path = tempdir.path().join("test");
+            create_dir_all(&path)?;
+            assert!(write_file(&path, "test".as_bytes()).is_err());
+        }
+        {
+            let tempdir = tempfile::tempdir()?;
+            let path = tempdir.path().join("test");
+            assert!(open(&path).is_err());
+            create_dir_all(&path)?;
+            assert!(path.is_dir())
+        }
 
         Ok(())
     }
