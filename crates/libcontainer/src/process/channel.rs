@@ -1,14 +1,7 @@
 use crate::process::message::Message;
-use nix::{
-    sys::socket::{self, UnixAddr},
-    unistd::{self, Pid},
-};
-use serde::{Deserialize, Serialize};
-use std::{
-    io::{IoSlice, IoSliceMut},
-    marker::PhantomData,
-    os::unix::prelude::{AsRawFd, RawFd},
-};
+use common::channel::{channel, Receiver, Sender};
+use nix::unistd::Pid;
+use std::os::unix::prelude::{AsRawFd, RawFd};
 
 #[derive(Debug, thiserror::Error)]
 pub enum ChannelError {
@@ -21,24 +14,14 @@ pub enum ChannelError {
     ReceiveError {
         msg: String,
         #[source]
-        source: BaseChannelError,
+        source: common::channel::ChannelError,
     },
     #[error(transparent)]
-    BaseChannelError(#[from] BaseChannelError),
+    BaseChannelError(#[from] common::channel::ChannelError),
     #[error("missing fds from seccomp request")]
     MissingSeccompFds,
     #[error("exec process failed with error {0}")]
     ExecError(String),
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum BaseChannelError {
-    #[error("failed unix syscalls")]
-    UnixError(#[from] nix::Error),
-    #[error("failed serde serialization")]
-    SerdeError(#[from] serde_json::Error),
-    #[error("channel connection broken")]
-    BrokenChannel,
 }
 
 /// Channel Design
@@ -311,204 +294,6 @@ impl InitReceiver {
 
         Ok(())
     }
-}
-
-pub struct Receiver<T> {
-    receiver: RawFd,
-    phantom: PhantomData<T>,
-}
-
-pub struct Sender<T> {
-    sender: RawFd,
-    phantom: PhantomData<T>,
-}
-
-impl<T> Sender<T>
-where
-    T: Serialize,
-{
-    fn send_iovec(
-        &mut self,
-        iov: &[IoSlice],
-        fds: Option<&[RawFd]>,
-    ) -> Result<usize, BaseChannelError> {
-        let cmsgs = if let Some(fds) = fds {
-            vec![socket::ControlMessage::ScmRights(fds)]
-        } else {
-            vec![]
-        };
-        socket::sendmsg::<UnixAddr>(self.sender, iov, &cmsgs, socket::MsgFlags::empty(), None)
-            .map_err(|e| e.into())
-    }
-
-    fn send_slice_with_len(
-        &mut self,
-        data: &[u8],
-        fds: Option<&[RawFd]>,
-    ) -> Result<usize, BaseChannelError> {
-        let len = data.len() as u64;
-        // Here we prefix the length of the data onto the serialized data.
-        let iov = [
-            IoSlice::new(unsafe {
-                std::slice::from_raw_parts(
-                    (&len as *const u64) as *const u8,
-                    std::mem::size_of::<u64>(),
-                )
-            }),
-            IoSlice::new(data),
-        ];
-        self.send_iovec(&iov[..], fds)
-    }
-
-    pub fn send(&mut self, object: T) -> Result<(), BaseChannelError> {
-        let payload = serde_json::to_vec(&object)?;
-        self.send_slice_with_len(&payload, None)?;
-
-        Ok(())
-    }
-
-    pub fn send_fds(&mut self, object: T, fds: &[RawFd]) -> Result<(), BaseChannelError> {
-        let payload = serde_json::to_vec(&object)?;
-        self.send_slice_with_len(&payload, Some(fds))?;
-
-        Ok(())
-    }
-
-    pub fn close(&self) -> Result<(), BaseChannelError> {
-        Ok(unistd::close(self.sender)?)
-    }
-}
-
-impl<T> Receiver<T>
-where
-    T: serde::de::DeserializeOwned,
-{
-    fn peek_size_iovec(&mut self) -> Result<u64, BaseChannelError> {
-        let mut len: u64 = 0;
-        let mut iov = [IoSliceMut::new(unsafe {
-            std::slice::from_raw_parts_mut(
-                (&mut len as *mut u64) as *mut u8,
-                std::mem::size_of::<u64>(),
-            )
-        })];
-        let _ =
-            socket::recvmsg::<UnixAddr>(self.receiver, &mut iov, None, socket::MsgFlags::MSG_PEEK)?;
-        match len {
-            0 => Err(BaseChannelError::BrokenChannel),
-            _ => Ok(len),
-        }
-    }
-
-    fn recv_into_iovec<F>(
-        &mut self,
-        iov: &mut [IoSliceMut],
-    ) -> Result<(usize, Option<F>), BaseChannelError>
-    where
-        F: Default + AsMut<[RawFd]>,
-    {
-        let mut cmsgspace = nix::cmsg_space!(F);
-        let msg = socket::recvmsg::<UnixAddr>(
-            self.receiver,
-            iov,
-            Some(&mut cmsgspace),
-            socket::MsgFlags::MSG_CMSG_CLOEXEC,
-        )?;
-
-        // Sending multiple SCM_RIGHTS message will led to platform dependent
-        // behavior, with some system choose to return EINVAL when sending or
-        // silently only process the first msg or send all of it. Here we assume
-        // there is only one SCM_RIGHTS message and will only process the first
-        // message.
-        let fds: Option<F> = msg
-            .cmsgs()
-            .find_map(|cmsg| {
-                if let socket::ControlMessageOwned::ScmRights(fds) = cmsg {
-                    Some(fds)
-                } else {
-                    None
-                }
-            })
-            .map(|fds| {
-                let mut fds_array: F = Default::default();
-                <F as AsMut<[RawFd]>>::as_mut(&mut fds_array).clone_from_slice(&fds);
-                fds_array
-            });
-
-        Ok((msg.bytes, fds))
-    }
-
-    fn recv_into_buf_with_len<F>(&mut self) -> Result<(Vec<u8>, Option<F>), BaseChannelError>
-    where
-        F: Default + AsMut<[RawFd]>,
-    {
-        let msg_len = self.peek_size_iovec()?;
-        let mut len: u64 = 0;
-        let mut buf = vec![0u8; msg_len as usize];
-        let (bytes, fds) = {
-            let mut iov = [
-                IoSliceMut::new(unsafe {
-                    std::slice::from_raw_parts_mut(
-                        (&mut len as *mut u64) as *mut u8,
-                        std::mem::size_of::<u64>(),
-                    )
-                }),
-                IoSliceMut::new(&mut buf),
-            ];
-            self.recv_into_iovec(&mut iov)?
-        };
-
-        match bytes {
-            0 => Err(BaseChannelError::BrokenChannel),
-            _ => Ok((buf, fds)),
-        }
-    }
-
-    // Recv the next message of type T.
-    pub fn recv(&mut self) -> Result<T, BaseChannelError> {
-        let (buf, _) = self.recv_into_buf_with_len::<[RawFd; 0]>()?;
-        Ok(serde_json::from_slice(&buf[..])?)
-    }
-
-    // Works similar to `recv`, but will look for fds sent by SCM_RIGHTS
-    // message.  We use F as as `[RawFd; n]`, where `n` is the number of
-    // descriptors you want to receive.
-    pub fn recv_with_fds<F>(&mut self) -> Result<(T, Option<F>), BaseChannelError>
-    where
-        F: Default + AsMut<[RawFd]>,
-    {
-        let (buf, fds) = self.recv_into_buf_with_len::<F>()?;
-        Ok((serde_json::from_slice(&buf[..])?, fds))
-    }
-
-    pub fn close(&self) -> Result<(), BaseChannelError> {
-        Ok(unistd::close(self.receiver)?)
-    }
-}
-
-pub fn channel<T>() -> Result<(Sender<T>, Receiver<T>), BaseChannelError>
-where
-    T: for<'de> Deserialize<'de> + Serialize,
-{
-    let (os_sender, os_receiver) = unix_channel()?;
-    let receiver = Receiver {
-        receiver: os_receiver,
-        phantom: PhantomData,
-    };
-    let sender = Sender {
-        sender: os_sender,
-        phantom: PhantomData,
-    };
-    Ok((sender, receiver))
-}
-
-// Use socketpair as the underlying pipe.
-fn unix_channel() -> Result<(RawFd, RawFd), BaseChannelError> {
-    Ok(socket::socketpair(
-        socket::AddressFamily::Unix,
-        socket::SockType::SeqPacket,
-        None,
-        socket::SockFlag::SOCK_CLOEXEC,
-    )?)
 }
 
 #[cfg(test)]

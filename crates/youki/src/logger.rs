@@ -60,7 +60,8 @@ pub fn init(
                 .with_max_level(level)
                 .without_time()
                 .with_writer(std::io::stderr)
-                .init();
+                .try_init()
+                .map_err(|e| anyhow::anyhow!("failed to init logger: {}", e))?;
         }
         (None, LogFormat::Json) => {
             // JSON to stderr
@@ -70,7 +71,8 @@ pub fn init(
                 .with_span_list(false)
                 .with_max_level(level)
                 .with_writer(std::io::stderr)
-                .init();
+                .try_init()
+                .map_err(|e| anyhow::anyhow!("failed to init logger: {}", e))?;
         }
         (Some(path), LogFormat::Text) => {
             // Log file with text format
@@ -83,7 +85,8 @@ pub fn init(
             tracing_subscriber::fmt()
                 .with_writer(file)
                 .with_max_level(level)
-                .init();
+                .try_init()
+                .map_err(|e| anyhow::anyhow!("failed to init logger: {}", e))?;
         }
         (Some(path), LogFormat::Json) => {
             // Log file with JSON format
@@ -99,7 +102,8 @@ pub fn init(
                 .with_span_list(false)
                 .with_writer(file)
                 .with_max_level(level)
-                .init();
+                .try_init()
+                .map_err(|e| anyhow::anyhow!("failed to init logger: {}", e))?;
         }
     }
 

@@ -45,11 +45,12 @@ regex = "1.7.3"
 thiserror = "1.0.24"
 tracing = { version = "0.1.37", features = ["attributes"]}
 safe-path = "0.1.0"
+common = {version = "0.1.0", path = "../common"}
 
 [dev-dependencies]
 oci-spec = { version = "^0.6.0", features = ["proptests", "runtime"] }
 quickcheck = "1"
 serial_test = "2.0.0"
-rand = "0.8.5"
 tempfile = "3"
 anyhow = "1.0"
+common = {version = "0.1.0", path = "../common", features = ["test_utils"]}

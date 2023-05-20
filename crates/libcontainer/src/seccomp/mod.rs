@@ -281,8 +281,8 @@ pub fn is_notify(seccomp: &LinuxSeccomp) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::test_utils;
     use anyhow::{bail, Context, Result};
+    use common::test_utils;
     use oci_spec::runtime::Arch;
     use oci_spec::runtime::{LinuxSeccompBuilder, LinuxSyscallBuilder};
     use serial_test::serial;

@@ -449,7 +449,7 @@ mod tests {
     };
     use serial_test::serial;
 
-    use crate::utils::test_utils::gen_u32;
+    use common::test_utils::gen_u32;
 
     use super::*;
 
