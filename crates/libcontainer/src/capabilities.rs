@@ -1,8 +1,8 @@
 //! Handles Management of Capabilities
 use crate::syscall::{Syscall, SyscallError};
+
 use caps::Capability as CapsCapability;
 use caps::*;
-
 use oci_spec::runtime::{Capabilities, Capability as SpecCapability, LinuxCapabilities};
 
 /// Converts a list of capability types to capabilities has set
@@ -120,41 +120,54 @@ impl CapabilityExt for SpecCapability {
     }
 }
 
-/// reset capabilities of process calling this to effective capabilities
-/// effective capability set is set of capabilities used by kernel to perform checks
-/// see <https://man7.org/linux/man-pages/man7/capabilities.7.html> for more information
-pub fn reset_effective<S: Syscall + ?Sized>(syscall: &S) -> Result<(), SyscallError> {
-    tracing::debug!("reset all caps");
-    syscall.set_capability(CapSet::Effective, &caps::all())?;
-    Ok(())
+pub fn keep(keep_caps: bool) -> Result<(), SyscallError> {
+    prctl::set_keep_capabilities(keep_caps).map_err(|errno| SyscallError::PrctlSetKeepCapabilites {
+        errno: nix::errno::from_i32(errno),
+        value: keep_caps,
+    })
 }
 
-/// Drop any extra granted capabilities, and reset to defaults which are in oci specification
-pub fn drop_privileges<S: Syscall + ?Sized>(
+pub fn apply_bounding<S: Syscall + ?Sized>(
     cs: &LinuxCapabilities,
     syscall: &S,
 ) -> Result<(), SyscallError> {
-    tracing::debug!("dropping bounding capabilities to {:?}", cs.bounding());
+    tracing::debug!("applying bounding capabilities to {:?}", cs.bounding());
     if let Some(bounding) = cs.bounding() {
-        syscall.set_capability(CapSet::Bounding, &to_set(bounding))?;
+        if !bounding.is_empty() {
+            syscall.set_capability(CapSet::Bounding, &to_set(bounding))?;
+        }
     }
 
+    Ok(())
+}
+
+pub fn apply<S: Syscall + ?Sized>(cs: &LinuxCapabilities, syscall: &S) -> Result<(), SyscallError> {
+    apply_bounding(cs, syscall)?;
+
     if let Some(effective) = cs.effective() {
-        syscall.set_capability(CapSet::Effective, &to_set(effective))?;
+        if !effective.is_empty() {
+            syscall.set_capability(CapSet::Effective, &to_set(effective))?;
+        }
     }
 
     if let Some(permitted) = cs.permitted() {
-        syscall.set_capability(CapSet::Permitted, &to_set(permitted))?;
+        if !permitted.is_empty() {
+            syscall.set_capability(CapSet::Permitted, &to_set(permitted))?;
+        }
     }
 
     if let Some(inheritable) = cs.inheritable() {
-        syscall.set_capability(CapSet::Inheritable, &to_set(inheritable))?;
+        if !inheritable.is_empty() {
+            syscall.set_capability(CapSet::Inheritable, &to_set(inheritable))?;
+        }
     }
 
     if let Some(ambient) = cs.ambient() {
-        // check specifically for ambient, as those might not always be available
-        if let Err(e) = syscall.set_capability(CapSet::Ambient, &to_set(ambient)) {
-            tracing::error!("failed to set ambient capabilities: {}", e);
+        if !ambient.is_empty() {
+            // check specifically for ambient, as those might not always be available
+            if let Err(e) = syscall.set_capability(CapSet::Ambient, &to_set(ambient)) {
+                tracing::error!("failed to set ambient capabilities: {}", e);
+            }
         }
     }
 
@@ -164,22 +177,9 @@ pub fn drop_privileges<S: Syscall + ?Sized>(
 #[cfg(test)]
 mod tests {
     use oci_spec::runtime::LinuxCapabilitiesBuilder;
-    use std::collections::HashSet;
 
     use super::*;
     use crate::syscall::test::TestHelperSyscall;
-
-    #[test]
-    fn test_reset_effective() {
-        let test_command = TestHelperSyscall::default();
-        assert!(reset_effective(&test_command).is_ok());
-        let set_capability_args: Vec<_> = test_command
-            .get_set_capability_args()
-            .into_iter()
-            .map(|(_capset, caps)| caps)
-            .collect();
-        assert_eq!(set_capability_args, vec![caps::all()]);
-    }
 
     #[test]
     fn test_convert_oci_spec_to_caps_type() {
@@ -542,7 +542,7 @@ mod tests {
     }
 
     #[test]
-    fn test_drop_privileges() {
+    fn test_apply_bounding() {
         struct Testcase {
             name: String,
             input: LinuxCapabilities,
@@ -568,55 +568,31 @@ mod tests {
                     .ambient(cps.clone().into_iter().collect::<Capabilities>())
                     .build()
                     .unwrap(),
-                want: vec![
-                    (CapSet::Bounding, cps.clone()),
-                    (CapSet::Effective, cps.clone()),
-                    (CapSet::Permitted, cps.clone()),
-                    (CapSet::Inheritable, cps.clone()),
-                    (CapSet::Ambient, cps.clone()),
-                ],
+                want: vec![(CapSet::Bounding, cps.clone())],
             },
             Testcase {
-                name: format!("partial LinuxCapabilities fields with caps: {cps:?}"),
+                name: "empty".to_string(),
+                input: LinuxCapabilitiesBuilder::default()
+                    .bounding(Vec::new().into_iter().collect::<Capabilities>())
+                    .build()
+                    .unwrap(),
+                want: vec![],
+            },
+            Testcase {
+                name: format!("only bounding caps: {cps:?}"),
                 input: LinuxCapabilitiesBuilder::default()
                     .bounding(cps.clone().into_iter().collect::<Capabilities>())
-                    .effective(cps.clone().into_iter().collect::<Capabilities>())
-                    .permitted(cps.clone().into_iter().collect::<Capabilities>())
                     .build()
                     .unwrap(),
-                want: vec![
-                    (CapSet::Bounding, cps.clone()),
-                    (CapSet::Effective, cps.clone()),
-                    (CapSet::Permitted, cps.clone()),
-                    (CapSet::Inheritable, cps.clone()),
-                    (CapSet::Ambient, cps.clone()),
-                ],
-            },
-            Testcase {
-                name: format!("empty LinuxCapabilities fields with caps: {cps:?}"),
-                input: LinuxCapabilitiesBuilder::default()
-                    .bounding(HashSet::new())
-                    .effective(HashSet::new())
-                    .inheritable(HashSet::new())
-                    .permitted(HashSet::new())
-                    .ambient(HashSet::new())
-                    .build()
-                    .unwrap(),
-                want: vec![
-                    (CapSet::Bounding, cps.clone()),
-                    (CapSet::Effective, cps.clone()),
-                    (CapSet::Permitted, cps.clone()),
-                    (CapSet::Inheritable, cps.clone()),
-                    (CapSet::Ambient, cps),
-                ],
+                want: vec![(CapSet::Bounding, cps)],
             },
         ];
 
         for test in tests {
             let test_command = TestHelperSyscall::default();
             assert!(
-                drop_privileges(&test.input, &test_command).is_ok(),
-                "{}, drop_privileges is not ok",
+                apply_bounding(&test.input, &test_command).is_ok(),
+                "{}, apply_bounding is not ok",
                 test.name
             );
 

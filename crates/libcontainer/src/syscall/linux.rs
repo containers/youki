@@ -1,5 +1,14 @@
 //! Implements Command trait for Linux systems
-use caps::{CapSet, CapsHashSet};
+use std::ffi::{CStr, CString, OsStr};
+use std::fs;
+use std::os::unix::ffi::OsStrExt;
+use std::os::unix::fs::symlink;
+use std::os::unix::io::RawFd;
+use std::str::FromStr;
+use std::sync::Arc;
+use std::{any::Any, mem, path::Path, ptr};
+
+use caps::{self, CapSet, CapsHashSet};
 use libc::{c_char, setdomainname, uid_t};
 use nix::fcntl;
 use nix::{
@@ -12,19 +21,11 @@ use nix::{
     unistd::{chown, fchdir, pivot_root, setgroups, sethostname, Gid, Uid},
 };
 use oci_spec::runtime::LinuxRlimit;
-use std::ffi::{CStr, CString, OsStr};
-use std::fs;
-use std::os::unix::ffi::OsStrExt;
-use std::os::unix::fs::symlink;
-use std::os::unix::io::RawFd;
-use std::str::FromStr;
-use std::sync::Arc;
-use std::{any::Any, mem, path::Path, ptr};
 use syscalls::{syscall, Sysno, Sysno::close_range};
 
 use super::{Result, Syscall, SyscallError};
 use crate::syscall::syscall::CloseRange;
-use crate::{capabilities, utils};
+use crate::utils;
 
 // Flags used in mount_setattr(2).
 // see https://man7.org/linux/man-pages/man2/mount_setattr.2.html.
@@ -306,30 +307,11 @@ impl Syscall for LinuxSyscall {
 
     /// set uid and gid for process
     fn set_id(&self, uid: Uid, gid: Gid) -> Result<()> {
-        prctl::set_keep_capabilities(true).map_err(|errno| {
-            SyscallError::PrctlSetKeepCapabilites {
-                errno: nix::errno::from_i32(errno),
-                value: true,
-            }
-        })?;
         // args : real *id, effective *id, saved set *id respectively
         unistd::setresgid(gid, gid, gid)
             .map_err(|errno| SyscallError::SetRealGid { errno, gid })?;
         unistd::setresuid(uid, uid, uid)
             .map_err(|errno| SyscallError::SetRealUid { errno, uid })?;
-
-        // if not the root user, reset capabilities to effective capabilities,
-        // which are used by kernel to perform checks
-        // see https://man7.org/linux/man-pages/man7/capabilities.7.html for more information
-        if uid != Uid::from_raw(0) {
-            capabilities::reset_effective(self)?;
-        }
-        prctl::set_keep_capabilities(false).map_err(|errno| {
-            SyscallError::PrctlSetKeepCapabilites {
-                errno: nix::errno::from_i32(errno),
-                value: false,
-            }
-        })?;
         Ok(())
     }
 
@@ -356,7 +338,7 @@ impl Syscall for LinuxSyscall {
                 }
             }
             _ => {
-                caps::set(None, cset, value)?;
+                apply_caps(0, cset, value)?;
             }
         }
         Ok(())
@@ -626,4 +608,72 @@ mod tests {
         unistd::close(fd)?;
         Ok(())
     }
+}
+
+const CAPS_V3: u32 = 0x20080522;
+
+fn apply_caps(tid: i32, cset: CapSet, value: &CapsHashSet) -> Result<()> {
+    let mut hdr = CapUserHeader {
+        version: CAPS_V3,
+        pid: tid,
+    };
+    let mut data: CapUserData = Default::default();
+    {
+        let (s1, s0) = match cset {
+            CapSet::Effective => (&mut data.effective_s1, &mut data.effective_s0),
+            CapSet::Inheritable => (&mut data.inheritable_s1, &mut data.inheritable_s0),
+            CapSet::Permitted => (&mut data.permitted_s1, &mut data.permitted_s0),
+            CapSet::Bounding | CapSet::Ambient => {
+                return Err(SyscallError::SetCaps("not a base set".into()))
+            }
+        };
+        *s1 = 0;
+        *s0 = 0;
+        for c in value {
+            match c.index() {
+                0..=31 => {
+                    *s0 |= c.bitmask() as u32;
+                }
+                32..=63 => {
+                    *s1 |= (c.bitmask() >> 32) as u32;
+                }
+                _ => {
+                    return Err(SyscallError::SetCaps(
+                        format!("overlarge capability index {}", c.index()).into(),
+                    ))
+                }
+            }
+        }
+    }
+    capset(&mut hdr, &data)
+}
+
+fn capset(hdr: &mut CapUserHeader, data: &CapUserData) -> Result<()> {
+    let r = unsafe { libc::syscall(126, hdr, data) };
+    match r {
+        0 => Ok(()),
+        _ => Err(SyscallError::SetCaps(
+            format!("capset failure: {}", std::io::Error::last_os_error()).into(),
+        )),
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+#[repr(C)]
+struct CapUserData {
+    effective_s0: u32,
+    permitted_s0: u32,
+    inheritable_s0: u32,
+    effective_s1: u32,
+    permitted_s1: u32,
+    inheritable_s1: u32,
+}
+
+#[derive(Debug)]
+#[repr(C)]
+struct CapUserHeader {
+    // Linux capabilities version (runtime kernel support)
+    version: u32,
+    // Process ID (thread)
+    pid: i32,
 }

@@ -490,24 +490,6 @@ pub fn container_init_process(
             }
         }
     };
-
-    set_supplementary_gids(proc.user(), args.rootless, syscall).map_err(|err| {
-        tracing::error!(?err, "failed to set supplementary gids");
-        err
-    })?;
-
-    syscall
-        .set_id(
-            Uid::from_raw(proc.user().uid()),
-            Gid::from_raw(proc.user().gid()),
-        )
-        .map_err(|err| {
-            let uid = proc.user().uid();
-            let gid = proc.user().gid();
-            tracing::error!(?err, ?uid, ?gid, "failed to set uid and gid");
-            InitProcessError::SyscallOther(err)
-        })?;
-
     // Take care of LISTEN_FDS used for systemd-active-socket. If the value is
     // not 0, then we have to preserve those fds as well, and set up the correct
     // environment variables.
@@ -581,23 +563,46 @@ pub fn container_init_process(
         tracing::warn!("seccomp not available, unable to enforce no_new_privileges!")
     }
 
-    capabilities::reset_effective(syscall).map_err(|err| {
-        tracing::error!(?err, "failed to reset effective capabilities");
-        InitProcessError::SyscallOther(err)
-    })?;
     if let Some(caps) = proc.capabilities() {
-        capabilities::drop_privileges(caps, syscall).map_err(|err| {
-            tracing::error!(?err, "failed to drop capabilities");
+        capabilities::apply_bounding(caps, syscall).map_err(|err| {
+            tracing::error!(?err, "failed to apply bounding capabilities");
             InitProcessError::SyscallOther(err)
         })?;
     }
 
-    // Change directory to process.cwd if process.cwd is not empty
-    if do_chdir {
-        unistd::chdir(proc.cwd()).map_err(|err| {
-            let cwd = proc.cwd();
-            tracing::error!(?err, ?cwd, "failed to chdir to cwd");
-            InitProcessError::NixOther(err)
+    keep_caps(|| {
+        set_supplementary_gids(proc.user(), args.rootless, syscall).map_err(|err| {
+            tracing::error!(?err, "failed to set supplementary gids");
+            err
+        })?;
+
+        syscall
+            .set_id(
+                Uid::from_raw(proc.user().uid()),
+                Gid::from_raw(proc.user().gid()),
+            )
+            .map_err(|err| {
+                let uid = proc.user().uid();
+                let gid = proc.user().gid();
+                tracing::error!(?err, ?uid, ?gid, "failed to set uid and gid");
+                InitProcessError::SyscallOther(err)
+            })?;
+
+        // Change directory to process.cwd if process.cwd is not empty
+        if do_chdir {
+            unistd::chdir(proc.cwd()).map_err(|err| {
+                let cwd = proc.cwd();
+                tracing::error!(?err, ?cwd, "failed to chdir to cwd");
+                InitProcessError::NixOther(err)
+            })?;
+        }
+        Ok(())
+    })?;
+
+    if let Some(caps) = proc.capabilities() {
+        capabilities::apply(caps, syscall).map_err(|err| {
+            tracing::error!(?err, "failed to drop capabilities");
+            InitProcessError::SyscallOther(err)
         })?;
     }
 
@@ -760,6 +765,12 @@ fn set_supplementary_gids(
     }
 
     Ok(())
+}
+
+fn keep_caps<F: Fn() -> Result<()>>(f: F) -> Result<()> {
+    capabilities::keep(true).map_err(InitProcessError::SyscallOther)?;
+    f()?;
+    capabilities::keep(false).map_err(InitProcessError::SyscallOther)
 }
 
 #[cfg(feature = "libseccomp")]
