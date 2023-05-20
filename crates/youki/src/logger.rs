@@ -169,7 +169,7 @@ mod tests {
             let temp_dir = tempfile::tempdir()?;
             let log_file = Path::join(temp_dir.path(), "test.log");
             let _guard = LogLevelGuard::new("error").unwrap();
-            init(false, Some(log_file.to_owned()), None)?;
+            init(false, Some(log_file), None)?;
             Ok(())
         };
         common::test_utils::test_in_child_process(cb)

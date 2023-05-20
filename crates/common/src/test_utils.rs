@@ -79,6 +79,8 @@ pub fn gen_u32() -> u32 {
 
 #[cfg(test)]
 mod tests {
+    use core::panic;
+
     use super::*;
     use anyhow::{bail, Result};
 
@@ -94,12 +96,10 @@ mod tests {
 
     #[test]
     fn test_panic_child_process() -> Result<()> {
-        if test_in_child_process(|| {
-            assert!(false, "this is a panic test");
-            Ok(())
-        })
-        .is_ok()
-        {
+        let ret = test_in_child_process(|| {
+            panic!("test panic");
+        });
+        if ret.is_ok() {
             bail!("expecting the child process to panic")
         }
 
