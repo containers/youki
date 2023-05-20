@@ -1,16 +1,14 @@
 //! Utility functionality
 
 use std::collections::HashMap;
-use std::ffi::CString;
 use std::fs::{self, DirBuilder, File};
 use std::os::linux::fs::MetadataExt;
 use std::os::unix::fs::DirBuilderExt;
-use std::os::unix::prelude::{AsRawFd, OsStrExt};
+use std::os::unix::prelude::AsRawFd;
 use std::path::{Component, Path, PathBuf};
 
 use nix::sys::stat::Mode;
 use nix::sys::statfs;
-use nix::unistd;
 use nix::unistd::{Uid, User};
 
 #[derive(Debug, thiserror::Error)]
@@ -143,33 +141,6 @@ pub fn get_user_home(uid: u32) -> Option<PathBuf> {
         Some(user) => Some(user.dir),
         None => None,
     }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum DoExecError {
-    #[error("failed to convert path to cstring")]
-    PathToCString {
-        source: std::ffi::NulError,
-        path: PathBuf,
-    },
-    #[error("failed to execvp")]
-    Execvp { source: nix::Error },
-}
-
-pub fn do_exec(path: impl AsRef<Path>, args: &[String]) -> Result<(), DoExecError> {
-    let p = CString::new(path.as_ref().as_os_str().as_bytes()).map_err(|e| {
-        DoExecError::PathToCString {
-            source: e,
-            path: path.as_ref().to_path_buf(),
-        }
-    })?;
-    let c_args: Vec<CString> = args
-        .iter()
-        .map(|s| CString::new(s.as_bytes()).unwrap_or_default())
-        .collect();
-    unistd::execvp(&p, &c_args).map_err(|err| DoExecError::Execvp { source: err })?;
-
-    Ok(())
 }
 
 /// If None, it will generate a default path for cgroups.
