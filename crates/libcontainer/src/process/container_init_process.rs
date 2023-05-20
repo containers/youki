@@ -170,7 +170,7 @@ fn readonly_path(path: &Path, syscall: &dyn Syscall) -> Result<()> {
         MsFlags::MS_BIND | MsFlags::MS_REC,
         None,
     ) {
-        if let SyscallError::Mount { source: errno } = err {
+        if let SyscallError::Nix(errno) = err {
             // ignore error if path is not exist.
             if matches!(errno, nix::errno::Errno::ENOENT) {
                 return Ok(());
@@ -214,15 +214,11 @@ fn masked_path(path: &Path, mount_label: &Option<String>, syscall: &dyn Syscall)
         None,
     ) {
         match err {
-            SyscallError::Mount {
-                source: nix::errno::Errno::ENOENT,
-            } => {
+            SyscallError::Nix(nix::errno::Errno::ENOENT) => {
                 // ignore error if path is not exist.
                 tracing::warn!("masked path {:?} not exist", path);
             }
-            SyscallError::Mount {
-                source: nix::errno::Errno::ENOTDIR,
-            } => {
+            SyscallError::Nix(nix::errno::Errno::ENOTDIR) => {
                 let label = match mount_label {
                     Some(l) => format!("context=\"{l}\""),
                     None => "".to_string(),
@@ -968,9 +964,7 @@ mod tests {
             .downcast_ref::<TestHelperSyscall>()
             .unwrap();
         mocks.set_ret_err(ArgName::Mount, || {
-            Err(SyscallError::Mount {
-                source: nix::errno::Errno::ENOENT,
-            })
+            Err(SyscallError::Nix(nix::errno::Errno::ENOENT))
         });
 
         assert!(masked_path(Path::new("/proc/self"), &None, syscall.as_ref()).is_ok());
@@ -986,9 +980,7 @@ mod tests {
             .downcast_ref::<TestHelperSyscall>()
             .unwrap();
         mocks.set_ret_err(ArgName::Mount, || {
-            Err(SyscallError::Mount {
-                source: nix::errno::Errno::ENOTDIR,
-            })
+            Err(SyscallError::Nix(nix::errno::Errno::ENOTDIR))
         });
 
         assert!(masked_path(Path::new("/proc/self"), &None, syscall.as_ref()).is_ok());
@@ -1013,9 +1005,7 @@ mod tests {
             .downcast_ref::<TestHelperSyscall>()
             .unwrap();
         mocks.set_ret_err(ArgName::Mount, || {
-            Err(SyscallError::Mount {
-                source: nix::errno::Errno::ENOTDIR,
-            })
+            Err(SyscallError::Nix(nix::errno::Errno::ENOTDIR))
         });
 
         assert!(masked_path(
@@ -1045,9 +1035,7 @@ mod tests {
             .downcast_ref::<TestHelperSyscall>()
             .unwrap();
         mocks.set_ret_err(ArgName::Mount, || {
-            Err(SyscallError::Mount {
-                source: nix::errno::Errno::UnknownErrno,
-            })
+            Err(SyscallError::Nix(nix::errno::Errno::UnknownErrno))
         });
 
         assert!(masked_path(Path::new("/proc/self"), &None, syscall.as_ref()).is_err());

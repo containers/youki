@@ -10,8 +10,6 @@ use std::os::unix::io::AsRawFd;
 use std::os::unix::prelude::RawFd;
 use std::path::{Path, PathBuf};
 
-use crate::error::UnifiedSyscallError;
-
 #[derive(Debug)]
 pub enum StdIO {
     Stdin = 0,
@@ -60,7 +58,7 @@ pub enum TTYError {
         source: nix::Error,
     },
     #[error("failed to create console socket fd")]
-    CreateConsoleSocketFd { source: UnifiedSyscallError },
+    CreateConsoleSocketFd { source: nix::Error },
     #[error("could not create pseudo terminal")]
     CreatePseudoTerminal { source: nix::Error },
     #[error("failed to send pty master")]
@@ -90,7 +88,7 @@ pub fn setup_console_socket(
         socket::SockFlag::empty(),
         None,
     )
-    .map_err(|err| TTYError::CreateConsoleSocketFd { source: err.into() })?;
+    .map_err(|err| TTYError::CreateConsoleSocketFd { source: err })?;
     csocketfd = match socket::connect(
         csocketfd,
         &socket::UnixAddr::new(socket_name).map_err(|err| TTYError::InvalidSocketName {

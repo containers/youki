@@ -1,7 +1,6 @@
 //! An interface trait so that rest of Youki can call
 //! necessary functions without having to worry about their
 //! implementation details
-use bitflags::bitflags;
 use caps::{CapSet, CapsHashSet};
 use libc;
 use nix::{
@@ -64,10 +63,3 @@ pub fn create_syscall() -> Box<dyn Syscall> {
         Box::new(LinuxSyscall)
     }
 }
-
-bitflags! {
-pub struct CloseRange : u32 {
-    const NONE = 0b00000000;
-    const UNSHARE = 0b00000010;
-    const CLOEXEC = 0b00000100;
-}}
