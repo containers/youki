@@ -161,34 +161,26 @@ mod tests {
                 wait::waitpid(child, None)?;
             }
             unistd::ForkResult::Child => {
-                // We don't want to enable tracing in the parent process because
-                // it will mess up other tracing tests in the parent process
-                // (cargo test process).  So we only enable tracing in the child
-                // process.
-                let _ = tracing_subscriber::fmt()
-                    .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-                    .try_init();
-
                 // Inside P1. Fork P2 as mock container init process and run
                 // signal handler process inside.
                 match unsafe { unistd::fork()? } {
                     unistd::ForkResult::Parent { child } => {
                         // Inside P1.
-                        tracing::trace!("P1 waiting for signal");
-                        handle_foreground(child).map_err(|err| {
+                        let _ = handle_foreground(child).map_err(|err| {
+                            // Since we are in a child process, we want to use trace to log the error.
+                            let _ = tracing_subscriber::fmt()
+                                .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+                                .try_init();
                             tracing::error!(?err, "failed to handle foreground");
                             err
-                        })?;
-                        tracing::trace!("P1 finished waiting for signal");
+                        });
                         std::process::exit(0);
                     }
                     unistd::ForkResult::Child => {
-                        tracing::trace!("P2 waiting for signal");
                         let mut signal_set = SigSet::empty();
                         signal_set.add(SIGINT);
                         signal_set.thread_block()?;
                         signal_set.wait()?;
-                        tracing::trace!("P2 received signal, exiting");
                         std::process::exit(0);
                     }
                 };
