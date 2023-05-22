@@ -1,5 +1,5 @@
+use crate::channel::{channel, Receiver, Sender};
 use crate::process::message::Message;
-use common::channel::{channel, Receiver, Sender};
 use nix::unistd::Pid;
 use std::os::unix::prelude::{AsRawFd, RawFd};
 
@@ -14,10 +14,10 @@ pub enum ChannelError {
     ReceiveError {
         msg: String,
         #[source]
-        source: common::channel::ChannelError,
+        source: crate::channel::ChannelError,
     },
     #[error(transparent)]
-    BaseChannelError(#[from] common::channel::ChannelError),
+    BaseChannelError(#[from] crate::channel::ChannelError),
     #[error("missing fds from seccomp request")]
     MissingSeccompFds,
     #[error("exec process failed with error {0}")]

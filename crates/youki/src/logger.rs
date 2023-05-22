@@ -113,6 +113,7 @@ pub fn init(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use libcontainer::test_utils::TestCallbackError;
     use serial_test::serial;
     use std::{env, path::Path};
 
@@ -165,34 +166,31 @@ mod tests {
 
     #[test]
     fn test_init_many_times() -> Result<()> {
-        let cb = || -> Result<()> {
-            let temp_dir = tempfile::tempdir()?;
+        let cb = || {
+            let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
             let log_file = Path::join(temp_dir.path(), "test.log");
             let _guard = LogLevelGuard::new("error").unwrap();
-            init(false, Some(log_file), None)?;
+            init(false, Some(log_file), None)
+                .map_err(|err| TestCallbackError::Other(err.into()))?;
             Ok(())
         };
-        common::test_utils::test_in_child_process(cb)
+        libcontainer::test_utils::test_in_child_process(cb)
             .with_context(|| "failed the first init tracing")?;
-        common::test_utils::test_in_child_process(cb)
+        libcontainer::test_utils::test_in_child_process(cb)
             .with_context(|| "failed the second init tracing")?;
         Ok(())
     }
 
     #[test]
     fn test_higher_loglevel_no_log() -> Result<()> {
-        common::test_utils::test_in_child_process(|| {
-            let temp_dir = tempfile::tempdir()?;
+        libcontainer::test_utils::test_in_child_process(|| {
+            let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
             let log_file = Path::join(temp_dir.path(), "test.log");
             let _guard = LogLevelGuard::new("error").unwrap();
             // Note, we can only init the tracing once, so we have to test in a
             // single unit test. The orders are important here.
-            init(
-                false,
-                Some(log_file.to_owned()),
-                Some(LOG_FORMAT_JSON.to_owned()),
-            )
-            .context("failed to initialize logger")?;
+            init(false, Some(log_file.to_owned()), None)
+                .map_err(|err| TestCallbackError::Other(err.into()))?;
             assert!(
                 log_file
                     .as_path()
@@ -207,12 +205,15 @@ mod tests {
             if log_file
                 .as_path()
                 .metadata()
-                .expect("failed to get logfile metadata")
+                .map_err(|err| format!("failed to get logfile metadata: {err:?}"))?
                 .len()
                 != 0
             {
-                let data = std::fs::read_to_string(&log_file).context("failed to read logfile")?;
-                bail!("info level should not be logged into the logfile, but got: {data}")
+                let data = std::fs::read_to_string(&log_file)
+                    .map_err(|err| format!("failed to read the logfile: {err:?}"))?;
+                Err(TestCallbackError::Custom(format!(
+                    "info level should not be logged into the logfile, but got: {data}"
+                )))?;
             }
 
             Ok(())
@@ -223,8 +224,8 @@ mod tests {
 
     #[test]
     fn test_json_logfile() -> Result<()> {
-        common::test_utils::test_in_child_process(|| {
-            let temp_dir = tempfile::tempdir()?;
+        libcontainer::test_utils::test_in_child_process(|| {
+            let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
             let log_file = Path::join(temp_dir.path(), "test.log");
             let _guard = LogLevelGuard::new("error").unwrap();
             // Note, we can only init the tracing once, so we have to test in a
@@ -234,7 +235,7 @@ mod tests {
                 Some(log_file.to_owned()),
                 Some(LOG_FORMAT_JSON.to_owned()),
             )
-            .context("failed to initialize logger")?;
+            .map_err(|err| TestCallbackError::Other(err.into()))?;
             assert!(
                 log_file
                     .as_path()
@@ -246,12 +247,13 @@ mod tests {
             );
             // Test that the message logged is actually JSON format.
             tracing::error!("testing json log");
-            let data = std::fs::read_to_string(&log_file).context("failed to read logfile")?;
+            let data = std::fs::read_to_string(&log_file)
+                .map_err(|err| format!("failed to read the logfile: {err:?}"))?;
             if data.is_empty() {
-                bail!("logfile should not be empty")
+                Err("logfile should not be empty")?;
             }
             serde_json::from_str::<serde_json::Value>(&data)
-                .context(format!("failed to parse log file content: {data}"))?;
+                .map_err(|err| format!("failed to parse {data}: {err:?}"))?;
             Ok(())
         })?;
 

@@ -97,7 +97,7 @@ pub fn container_fork<F: FnOnce() -> CallbackResult<i32>>(child_name: &str, cb: 
 
 #[cfg(test)]
 mod test {
-    use common::channel::channel;
+    use crate::channel::channel;
 
     use super::*;
     use anyhow::{bail, Context, Result};

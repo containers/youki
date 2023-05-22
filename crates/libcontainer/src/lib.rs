@@ -1,5 +1,6 @@
 pub mod apparmor;
 pub mod capabilities;
+pub mod channel;
 pub mod config;
 pub mod container;
 pub mod error;
@@ -13,6 +14,8 @@ pub mod rootless;
 pub mod seccomp;
 pub mod signal;
 pub mod syscall;
+#[cfg(feature = "test_utils")]
+pub mod test_utils;
 pub mod tty;
 pub mod utils;
 pub mod workload;

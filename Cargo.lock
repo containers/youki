@@ -509,18 +509,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "common"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "nix",
- "rand",
- "serde",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
 name = "const_fn"
 version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1926,7 +1914,6 @@ dependencies = [
  "caps",
  "chrono",
  "clone3",
- "common",
  "crossbeam-channel",
  "fastrand",
  "futures",
@@ -1941,6 +1928,7 @@ dependencies = [
  "prctl",
  "procfs",
  "quickcheck",
+ "rand",
  "regex",
  "rust-criu",
  "safe-path",
@@ -5426,7 +5414,6 @@ dependencies = [
  "chrono",
  "clap",
  "clap_complete",
- "common",
  "libcgroups",
  "libcontainer",
  "liboci-cli",
