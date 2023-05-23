@@ -53,6 +53,7 @@ tracing-subscriber = { version = "0.3.16", features = ["json", "env-filter"] }
 serial_test = "2.0.0"
 tempfile = "3"
 scopeguard = "1.1.0"
+libcontainer = {version = "0.0.5", path = "../libcontainer", features = ["test_utils"]}
 
 [build-dependencies]
 anyhow = "1.0.71"

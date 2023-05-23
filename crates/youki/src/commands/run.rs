@@ -54,12 +54,14 @@ pub fn run(args: Run, root_path: PathBuf, systemd_cgroup: bool) -> Result<i32> {
 // The youki main process will wait and reap the container init process. The
 // youki main process also forwards most of the signals to the container init
 // process.
+#[tracing::instrument(level = "trace")]
 fn handle_foreground(init_pid: Pid) -> Result<i32> {
+    tracing::trace!("waiting for container init process to exit");
     // We mask all signals here and forward most of the signals to the container
     // init process.
     let signal_set = SigSet::all();
     signal_set
-        .thread_set_mask()
+        .thread_block()
         .with_context(|| "failed to call pthread_sigmask")?;
     loop {
         match signal_set
@@ -70,6 +72,7 @@ fn handle_foreground(init_pid: Pid) -> Result<i32> {
                 // Reap all child until either container init process exits or
                 // no more child to be reaped. Once the container init process
                 // exits we can then return.
+                tracing::trace!("reaping child processes");
                 loop {
                     match waitpid(None, Some(WaitPidFlag::WNOHANG))? {
                         WaitStatus::Exited(pid, status) => {
@@ -102,8 +105,15 @@ fn handle_foreground(init_pid: Pid) -> Result<i32> {
                 // TODO: resize the terminal
             }
             signal => {
+                tracing::trace!(?signal, "forwarding signal");
                 // There is nothing we can do if we fail to forward the signal.
-                let _ = kill(init_pid, Some(signal));
+                let _ = kill(init_pid, Some(signal)).map_err(|err| {
+                    tracing::warn!(
+                        ?err,
+                        ?signal,
+                        "failed to forward signal to container init process",
+                    );
+                });
             }
         }
     }
@@ -114,14 +124,14 @@ mod tests {
     use std::time::Duration;
 
     use nix::{
-        sys::{signal::Signal::SIGKILL, wait},
+        sys::{signal::Signal::SIGINT, wait},
         unistd,
     };
 
     use super::*;
 
     #[test]
-    fn test_foreground_forward_sigkill() -> Result<()> {
+    fn test_foreground_forward_sig() -> Result<()> {
         // To set up the test correctly, we need to run the test in dedicated
         // process, so the rust unit test runtime and other unit tests will not
         // mess with the signal handling. We use `sigkill` as a simple way to
@@ -144,10 +154,10 @@ mod tests {
                 // but I'd rather not over-engineer this now. We can revisit
                 // this later if the test becomes flaky.
                 std::thread::sleep(Duration::from_secs(1));
-                // Send the `sigkill` signal to P1 who will forward the signal
+                // Send the `sigint` signal to P1 who will forward the signal
                 // to P2. P2 will then exit and send a sigchld to P1. P1 will
                 // then reap P2 and exits. In P0, we can then reap P1.
-                kill(child, SIGKILL)?;
+                kill(child, SIGINT)?;
                 wait::waitpid(child, None)?;
             }
             unistd::ForkResult::Child => {
@@ -156,13 +166,22 @@ mod tests {
                 match unsafe { unistd::fork()? } {
                     unistd::ForkResult::Parent { child } => {
                         // Inside P1.
-                        handle_foreground(child)?;
+                        let _ = handle_foreground(child).map_err(|err| {
+                            // Since we are in a child process, we want to use trace to log the error.
+                            let _ = tracing_subscriber::fmt()
+                                .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+                                .try_init();
+                            tracing::error!(?err, "failed to handle foreground");
+                            err
+                        });
+                        std::process::exit(0);
                     }
                     unistd::ForkResult::Child => {
-                        // Inside P2. This process block and waits the `sigkill`
-                        // from the parent. Use thread::sleep here with a long
-                        // duration to minimic blocking forever.
-                        std::thread::sleep(Duration::from_secs(3600));
+                        let mut signal_set = SigSet::empty();
+                        signal_set.add(SIGINT);
+                        signal_set.thread_block()?;
+                        signal_set.wait()?;
+                        std::process::exit(0);
                     }
                 };
             }
@@ -190,6 +209,7 @@ mod tests {
                     unistd::ForkResult::Parent { child } => {
                         // Inside P1.
                         handle_foreground(child)?;
+                        wait::waitpid(child, None)?;
                     }
                     unistd::ForkResult::Child => {
                         // Inside P2. The process exits after 1 second.

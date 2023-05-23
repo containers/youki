@@ -312,59 +312,6 @@ pub fn ensure_procfs(path: &Path) -> Result<(), EnsureProcfsError> {
 }
 
 #[cfg(test)]
-pub(crate) mod test_utils {
-    use crate::process::channel;
-    use anyhow::Context;
-    use anyhow::{bail, Result};
-    use nix::sys::wait;
-    use rand::Rng;
-    use serde::{Deserialize, Serialize};
-
-    #[derive(Debug, Serialize, Deserialize)]
-    struct TestResult {
-        success: bool,
-        message: String,
-    }
-
-    #[allow(dead_code)]
-    pub fn test_in_child_process<F: FnOnce() -> Result<()>>(cb: F) -> Result<()> {
-        let (mut sender, mut receiver) = channel::channel::<TestResult>()?;
-        match unsafe { nix::unistd::fork()? } {
-            nix::unistd::ForkResult::Parent { child } => {
-                let res = receiver.recv()?;
-                wait::waitpid(child, None)?;
-
-                if !res.success {
-                    bail!("child process failed: {}", res.message);
-                }
-            }
-            nix::unistd::ForkResult::Child => {
-                let test_result = match cb() {
-                    Ok(_) => TestResult {
-                        success: true,
-                        message: String::new(),
-                    },
-                    Err(err) => TestResult {
-                        success: false,
-                        message: err.to_string(),
-                    },
-                };
-                sender
-                    .send(test_result)
-                    .context("failed to send from the child process")?;
-                std::process::exit(0);
-            }
-        };
-
-        Ok(())
-    }
-
-    pub fn gen_u32() -> u32 {
-        rand::thread_rng().gen()
-    }
-}
-
-#[cfg(test)]
 mod tests {
     use super::*;
     use anyhow::Result;

@@ -281,8 +281,8 @@ pub fn is_notify(seccomp: &LinuxSeccomp) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::test_utils;
-    use anyhow::{bail, Context, Result};
+    use crate::test_utils::{self, TestCallbackError};
+    use anyhow::{Context, Result};
     use oci_spec::runtime::Arch;
     use oci_spec::runtime::{LinuxSeccompBuilder, LinuxSyscallBuilder};
     use serial_test::serial;
@@ -316,17 +316,20 @@ mod tests {
 
         test_utils::test_in_child_process(|| {
             let _ = prctl::set_no_new_privileges(true);
-            initialize_seccomp(&seccomp_profile)?;
+            initialize_seccomp(&seccomp_profile).expect("failed to initialize seccomp");
             let ret = nix::unistd::getcwd();
             if ret.is_ok() {
-                bail!("getcwd didn't error out as seccomp profile specified");
+                Err(TestCallbackError::Custom(
+                    "getcwd didn't error out as seccomp profile specified".to_string(),
+                ))?;
             }
 
             if let Some(errno) = ret.err() {
                 if errno != nix::errno::from_i32(expect_error) {
-                    bail!(
-                        "getcwd failed but we didn't get the expected error from seccomp profile: {}", errno
-                    );
+                    Err(TestCallbackError::Custom(format!(
+                        "getcwd failed but we didn't get the expected error from seccomp profile: {}",
+                        errno
+                    )))?;
                 }
             }
 
@@ -348,7 +351,7 @@ mod tests {
         let seccomp_profile = spec.linux().as_ref().unwrap().seccomp().as_ref().unwrap();
         test_utils::test_in_child_process(|| {
             let _ = prctl::set_no_new_privileges(true);
-            initialize_seccomp(seccomp_profile)?;
+            initialize_seccomp(seccomp_profile).expect("failed to initialize seccomp");
 
             Ok(())
         })?;
@@ -370,9 +373,12 @@ mod tests {
             .build()?;
         test_utils::test_in_child_process(|| {
             let _ = prctl::set_no_new_privileges(true);
-            let fd = initialize_seccomp(&seccomp_profile)?;
+            let fd =
+                initialize_seccomp(&seccomp_profile).expect("failed to initialize seccomp profile");
             if fd.is_none() {
-                bail!("failed to get a seccomp notify fd with notify seccomp profile");
+                Err(TestCallbackError::Custom(
+                    "failed to get a seccomp notify fd with notify seccomp profile".to_string(),
+                ))?;
             }
 
             Ok(())
