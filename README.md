@@ -153,7 +153,8 @@ $ sudo apt-get install   \
       build-essential    \
       libelf-dev \
       libseccomp-dev \
-      libclang-dev
+      libclang-dev \
+      libssl-devel
 ```
 
 ### Fedora, Centos, RHEL and related distributions
@@ -165,7 +166,8 @@ $ sudo dnf install   \
       dbus-devel     \
       elfutils-libelf-devel \
       libseccomp-devel \
-      clang-devel
+      clang-devel \
+      openssl-devel
 ```
 
 ## Build
