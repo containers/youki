@@ -153,23 +153,25 @@
 <p>You can use Youki by itself to start and run containers, but it can be a little tedious, as it is a low-level container runtime. You can use a High-level container runtime, with its runtime set to Youki, so that it will be easier to use. Both of these are explained in the <a href="./basic_usage.html">Basic Usage</a>. For using it along with an high-level runtime, you will to install one such as Docker or Podman. This documentation uses Docker in its examples, which can be installed from <a href="https://docs.docker.com/engine/install">here</a>.</p>
 <p>To compile and run, Youki itself depends on some underlying libraries being installed. You can install them using your respective package manager as shown below.</p>
 <h4 id="debian-ubuntu-and-related-distributions"><a class="header" href="#debian-ubuntu-and-related-distributions">Debian, Ubuntu and related distributions</a></h4>
-<pre><code class="language-console">$ sudo apt-get install   \
-      pkg-config         \
-      libsystemd-dev     \
-      libdbus-glib-1-dev \
-      build-essential    \
-      libelf-dev \
-      libseccomp-dev \
-      libclang-dev
+<pre><code class="language-console">$ sudo apt-get install    \
+      pkg-config          \
+      libsystemd-dev      \
+      libdbus-glib-1-dev  \
+      build-essential     \
+      libelf-dev          \
+      libseccomp-dev      \
+      libclang-dev        \
+      libssl-dev
 </code></pre>
-<h4 id="fedora-centos-rhel-and-related-distributions"><a class="header" href="#fedora-centos-rhel-and-related-distributions">Fedora, Centos, RHEL and related distributions</a></h4>
-<pre><code class="language-console">$ sudo dnf install   \
-      pkg-config     \
-      systemd-devel  \
-      dbus-devel     \
+<h4 id="fedora-centos-rhel-and-related-distributions"><a class="header" href="#fedora-centos-rhel-and-related-distributions">Fedora, CentOS, RHEL and related distributions</a></h4>
+<pre><code class="language-console">$ sudo dnf install          \
+      pkg-config            \
+      systemd-devel         \
+      dbus-devel            \
       elfutils-libelf-devel \
-      libseccomp-devel \
-      clang-devel
+      libseccomp-devel      \
+      clang-devel           \
+      openssl-devel
 </code></pre>
 <hr />
 <h3 id="getting-the-source"><a class="header" href="#getting-the-source">Getting the source</a></h3>
