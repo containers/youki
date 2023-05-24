@@ -14,7 +14,7 @@ Vagrant.configure("2") do |config|
     config.vm.provision "shell", inline: <<-SHELL
       set -e -u -o pipefail
       yum update -y
-      yum install -y git gcc docker systemd-devel dbus-devel libseccomp-devel
+      yum install -y git gcc docker systemd-devel dbus-devel libseccomp-devel wget openssl-devel
       grubby --update-kernel=ALL --args="systemd.unified_cgroup_hierarchy=0"
       service docker start
       curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -23,4 +23,3 @@ Vagrant.configure("2") do |config|
     config.ssh.username = 'root'
     config.ssh.insert_key = 'true'
   end
-

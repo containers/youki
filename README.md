@@ -146,27 +146,27 @@ For other platforms, please use the [Vagrantfile](#setting-up-vagrant) that we h
 ### Debian, Ubuntu and related distributions
 
 ```console
-$ sudo apt-get install   \
-      pkg-config         \
-      libsystemd-dev     \
-      libdbus-glib-1-dev \
-      build-essential    \
-      libelf-dev \
-      libseccomp-dev \
-      libclang-dev \
-      libssl-devel
+$ sudo apt-get install    \
+      pkg-config          \
+      libsystemd-dev      \
+      libdbus-glib-1-dev  \
+      build-essential     \
+      libelf-dev          \
+      libseccomp-dev      \
+      libclang-dev        \
+      libssl-dev
 ```
 
-### Fedora, Centos, RHEL and related distributions
+### Fedora, CentOS, RHEL and related distributions
 
 ```console
-$ sudo dnf install   \
-      pkg-config     \
-      systemd-devel  \
-      dbus-devel     \
+$ sudo dnf install          \
+      pkg-config            \
+      systemd-devel         \
+      dbus-devel            \
       elfutils-libelf-devel \
-      libseccomp-devel \
-      clang-devel \
+      libseccomp-devel      \
+      clang-devel           \
       openssl-devel
 ```
 
