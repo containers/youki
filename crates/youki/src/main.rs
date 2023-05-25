@@ -78,8 +78,7 @@ fn main() -> Result<()> {
     let opts = Opts::parse();
     let mut app = Opts::command();
 
-    if let Err(e) = crate::logger::init(opts.global.debug, opts.global.log, opts.global.log_format)
-    {
+    if let Err(e) = crate::logger::init_observability(&opts) {
         eprintln!("log init failed: {e:?}");
     }
 
