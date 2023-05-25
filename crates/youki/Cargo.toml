@@ -57,4 +57,4 @@ libcontainer = {version = "0.0.5", path = "../libcontainer", features = ["test_u
 
 [build-dependencies]
 anyhow = "1.0.71"
-vergen = {version ="8.2.0", features =["git","gitcl"]}
+vergen = {version ="8.2.1", features =["git","gitcl"]}
