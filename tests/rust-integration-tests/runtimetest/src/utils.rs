@@ -426,6 +426,28 @@ pub fn test_mount_rnosymfollow_option(path: &str) -> Result<(), std::io::Error> 
     }
 }
 
+pub fn test_mount_rsymfollow_option(path: &str) -> Result<(), std::io::Error> {
+    let path = format!("{}/{}", path, "link");
+    let metadata = match symlink_metadata(path.clone()) {
+        Ok(metadata) => metadata,
+        Err(e) => {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("get file symlink_metadata err {path:?}, {e}"),
+            ));
+        }
+    };
+    // check symbolic is followed
+    if metadata.file_type().is_symlink() && metadata.mode() & 0o777 == 0o777 {
+        Ok(())
+    } else {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("get file symlink_metadata err {path:?}"),
+        ))
+    }
+}
+
 pub fn test_mount_rsuid_option(path: &str) -> Result<(), std::io::Error> {
     let path = PathBuf::from(path).join("file");
 

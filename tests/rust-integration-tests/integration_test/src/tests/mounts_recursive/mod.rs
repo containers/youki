@@ -565,6 +565,44 @@ fn check_recursive_rnosymfollow() -> TestResult {
     result
 }
 
+fn check_recursive_rsymfollow() -> TestResult {
+    let rsymfollow_dir_path = PathBuf::from_str("/tmp/rsymfollow").unwrap();
+    let mount_dest_path = PathBuf::from_str("/mnt/rsymfollow").unwrap();
+    fs::create_dir_all(rsymfollow_dir_path.clone()).unwrap();
+
+    let mount_options = vec![
+        "rbind".to_string(),
+        "rsymfollow".to_string(),
+        "rsuid".to_string(),
+    ];
+    let mut mount_spec = Mount::default();
+    mount_spec
+        .set_destination(mount_dest_path)
+        .set_typ(None)
+        .set_source(Some(rsymfollow_dir_path.clone()))
+        .set_options(Some(mount_options));
+    let spec = get_spec(
+        vec![mount_spec],
+        vec!["runtimetest".to_string(), "mounts_recursive".to_string()],
+    );
+    let result = test_inside_container(spec, &|_| {
+        let original_file_path = format!("{}/{}", rsymfollow_dir_path.to_str().unwrap(), "file");
+        let file = File::create(&original_file_path)?;
+        let link_file_path = format!("{}/{}", rsymfollow_dir_path.to_str().unwrap(), "link");
+        let mut permission = file.metadata()?.permissions();
+        permission.set_mode(permission.mode() | libc::S_ISUID | libc::S_ISGID);
+        file.set_permissions(permission)
+            .with_context(|| "failed to set permission")?;
+
+        symlink(original_file_path, link_file_path)?;
+        println!("symlink success");
+        Ok(())
+    });
+
+    fs::remove_dir_all(rsymfollow_dir_path).unwrap();
+    result
+}
+
 /// this mount test how to work?
 /// 1. Create mount_options based on the mount properties of the test
 /// 2. Create OCI.Spec content, container one process is runtimetest,(runtimetest is cargo model, file path `tests/rust-integration-tests/runtimetest/`)
@@ -586,6 +624,7 @@ pub fn get_mounts_recursive_test() -> TestGroup {
     let rnoatime_test = Test::new("rnoatime_test", Box::new(check_recursive_rnoatime));
     let rstrictatime_test = Test::new("rstrictatime_test", Box::new(check_recursive_rstrictatime));
     let rnosymfollow_test = Test::new("rnosymfollow_test", Box::new(check_recursive_rnosymfollow));
+    let rsymfollow_test = Test::new("rsymfollow_test", Box::new(check_recursive_rsymfollow));
 
     let mut tg = TestGroup::new("mounts_recursive");
     tg.add(vec![
@@ -604,6 +643,7 @@ pub fn get_mounts_recursive_test() -> TestGroup {
         Box::new(rnoatime_test),
         Box::new(rstrictatime_test),
         Box::new(rnosymfollow_test),
+        Box::new(rsymfollow_test),
     ]);
 
     tg
