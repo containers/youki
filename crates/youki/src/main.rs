@@ -2,7 +2,7 @@
 //! Container Runtime written in Rust, inspired by [railcar](https://github.com/oracle/railcar)
 //! This crate provides a container runtime which can be used by a high-level container runtime to run containers.
 mod commands;
-mod logger;
+mod observability;
 mod rootpath;
 mod workload;
 
@@ -78,7 +78,7 @@ fn main() -> Result<()> {
     let opts = Opts::parse();
     let mut app = Opts::command();
 
-    if let Err(e) = crate::logger::init_observability(&opts) {
+    if let Err(e) = crate::observability::init(&opts) {
         eprintln!("log init failed: {e:?}");
     }
 

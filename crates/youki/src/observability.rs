@@ -1,5 +1,3 @@
-//! Default Youki Logger
-
 use anyhow::{bail, Context, Result};
 use std::borrow::Cow;
 use std::fs::OpenOptions;
@@ -60,7 +58,7 @@ impl From<&crate::Opts> for ObservabilityConfig {
     }
 }
 
-pub fn init_observability<T>(config: T) -> Result<()>
+pub fn init<T>(config: T) -> Result<()>
 where
     T: Into<ObservabilityConfig>,
 {
@@ -203,7 +201,7 @@ mod tests {
                 log_file: Some(log_file),
                 log_format: None,
             };
-            init_observability(config).map_err(|err| TestCallbackError::Other(err.into()))?;
+            init(config).map_err(|err| TestCallbackError::Other(err.into()))?;
             Ok(())
         };
         libcontainer::test_utils::test_in_child_process(cb)
@@ -226,7 +224,7 @@ mod tests {
                 log_file: Some(log_file.clone()),
                 log_format: None,
             };
-            init_observability(config).map_err(|err| TestCallbackError::Other(err.into()))?;
+            init(config).map_err(|err| TestCallbackError::Other(err.into()))?;
             assert!(
                 log_file
                     .as_path()
@@ -271,7 +269,7 @@ mod tests {
                 log_file: Some(log_file.clone()),
                 log_format: Some(LOG_FORMAT_JSON.to_owned()),
             };
-            init_observability(config).map_err(|err| TestCallbackError::Other(err.into()))?;
+            init(config).map_err(|err| TestCallbackError::Other(err.into()))?;
             assert!(
                 log_file
                     .as_path()
