@@ -32,4 +32,4 @@ This exposes several modules, each dealing with a specific aspect of working wit
 
 - `tty` : this deals with setting up the tty for the container process.
 
-- `utils` : provides various utility functions, such as `parse_env` to parse the env variables, `do_exec` to do an exec syscall and execute a binary in the container process, `get_cgroups_path`, `create_dir_all_with_mode` etc.
+- `utils` : provides various utility functions, such as `parse_env` to parse the env variables, `get_cgroups_path`, `create_dir_all_with_mode` etc.

@@ -38,7 +38,7 @@ impl Executor for DefaultExecutor {
             ExecutorError::Execution(err.into())
         })?;
 
-        // After do_exec is called, the process is replaced with the container
+        // After execvp is called, the process is replaced with the container
         // payload through execvp, so it should never reach here.
         unreachable!();
     }
