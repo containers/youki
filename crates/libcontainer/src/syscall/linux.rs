@@ -481,6 +481,7 @@ impl Syscall for LinuxSyscall {
         Ok(())
     }
 
+    #[tracing::instrument(skip(self))]
     fn mount(
         &self,
         source: Option<&Path>,
@@ -489,10 +490,20 @@ impl Syscall for LinuxSyscall {
         flags: MsFlags,
         data: Option<&str>,
     ) -> Result<()> {
-        mount(source, target, fstype, flags, data).map_err(|err| {
-            tracing::error!(
-                "failed to mount {source:?} to {target:?} with fstype {fstype:?}, flags {flags:?}, data {data:?}: {err}",
-            );
+        mount(source, target, fstype, flags, data)
+        .map_err(|err| {
+            // ENOTDIR and ENOENT are sometimes expected when mounting, so we
+            // don't log anything. Instead, the caller should decide whether to
+            // log or not.  Other error codes are unexpected, so we log them.
+            match err {
+                nix::Error::ENOTDIR | nix::Error::ENOENT => {},
+                _ => {
+                    tracing::error!(
+                        "failed to mount {source:?} to {target:?} with fstype {fstype:?}, flags {flags:?}, data {data:?}: {err}",
+                    );
+                }
+            };
+
             err
         })?;
 
