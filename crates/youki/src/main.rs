@@ -15,6 +15,14 @@ use crate::commands::info;
 
 use liboci_cli::{CommonCmd, GlobalOpts, StandardCmd};
 
+// Additional options that are not defined in OCI runtime-spec, but are used by Youki.
+#[derive(Parser, Debug)]
+struct YoukiExtendOpts {
+    /// Enable logging to systemd-journald
+    #[clap(long)]
+    pub systemd_log: bool,
+}
+
 // High-level commandline option definition
 // This takes global options as well as individual commands as specified in [OCI runtime-spec](https://github.com/opencontainers/runtime-spec/blob/master/runtime.md)
 // Also check [runc commandline documentation](https://github.com/opencontainers/runc/blob/master/man/runc.8.md) for more explanation
@@ -23,6 +31,9 @@ use liboci_cli::{CommonCmd, GlobalOpts, StandardCmd};
 struct Opts {
     #[clap(flatten)]
     global: GlobalOpts,
+
+    #[clap(flatten)]
+    youki_extend: YoukiExtendOpts,
 
     #[clap(subcommand)]
     subcmd: SubCommand,
@@ -78,9 +89,10 @@ fn main() -> Result<()> {
     let opts = Opts::parse();
     let mut app = Opts::command();
 
-    if let Err(e) = crate::observability::init(&opts) {
-        eprintln!("log init failed: {e:?}");
-    }
+    crate::observability::init(&opts).map_err(|err| {
+        eprintln!("failed to initialize observability: {}", err);
+        err
+    })?;
 
     tracing::debug!(
         "started by user {} with {:?}",

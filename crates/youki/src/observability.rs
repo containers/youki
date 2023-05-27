@@ -4,8 +4,7 @@ use std::fs::OpenOptions;
 use std::path::PathBuf;
 use std::str::FromStr;
 use tracing::Level;
-use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::prelude::*;
 
 const LOG_LEVEL_ENV_NAME: &str = "YOUKI_LOG_LEVEL";
 const LOG_FORMAT_TEXT: &str = "text";
@@ -42,10 +41,12 @@ fn detect_log_level(is_debug: bool) -> Result<Level> {
     Ok(Level::from_str(filter.as_ref())?)
 }
 
+#[derive(Debug, Default)]
 pub struct ObservabilityConfig {
     pub log_debug_flag: bool,
     pub log_file: Option<PathBuf>,
     pub log_format: Option<String>,
+    pub systemd_log: bool,
 }
 
 impl From<&crate::Opts> for ObservabilityConfig {
@@ -54,6 +55,7 @@ impl From<&crate::Opts> for ObservabilityConfig {
             log_debug_flag: opts.global.debug,
             log_file: opts.global.log.to_owned(),
             log_format: opts.global.log_format.to_owned(),
+            systemd_log: opts.youki_extend.systemd_log,
         }
     }
 }
@@ -68,12 +70,19 @@ where
     let log_level_filter = tracing_subscriber::filter::LevelFilter::from(level);
     let log_format = detect_log_format(config.log_format.as_deref())
         .with_context(|| "failed to detect log format")?;
-
-    let subscriber = tracing_subscriber::registry().with(log_level_filter);
+    let systemd_journald = if config.systemd_log {
+        Some(tracing_journald::layer()?.with_syslog_identifier("youki".to_string()))
+    } else {
+        None
+    };
+    let subscriber = tracing_subscriber::registry()
+        .with(log_level_filter)
+        .with(systemd_journald);
 
     // I really dislike how we have to specify individual branch for each
     // combination, but I can't find any better way to do this. The tracing
-    // crate makes it hard to build a single layer with different conditions.
+    // crate makes it hard to build a single format layer with different
+    // conditions.
     match (config.log_file.as_ref(), log_format) {
         (None, LogFormat::Text) => {
             // Text to stderr
@@ -197,9 +206,8 @@ mod tests {
             let log_file = Path::join(temp_dir.path(), "test.log");
             let _guard = LogLevelGuard::new("error").unwrap();
             let config = ObservabilityConfig {
-                log_debug_flag: false,
                 log_file: Some(log_file),
-                log_format: None,
+                ..Default::default()
             };
             init(config).map_err(|err| TestCallbackError::Other(err.into()))?;
             Ok(())
@@ -220,9 +228,8 @@ mod tests {
             // Note, we can only init the tracing once, so we have to test in a
             // single unit test. The orders are important here.
             let config = ObservabilityConfig {
-                log_debug_flag: false,
                 log_file: Some(log_file.clone()),
-                log_format: None,
+                ..Default::default()
             };
             init(config).map_err(|err| TestCallbackError::Other(err.into()))?;
             assert!(
@@ -265,9 +272,9 @@ mod tests {
             // Note, we can only init the tracing once, so we have to test in a
             // single unit test. The orders are important here.
             let config = ObservabilityConfig {
-                log_debug_flag: false,
                 log_file: Some(log_file.clone()),
                 log_format: Some(LOG_FORMAT_JSON.to_owned()),
+                ..Default::default()
             };
             init(config).map_err(|err| TestCallbackError::Other(err.into()))?;
             assert!(
