@@ -1941,17 +1941,14 @@ dependencies = [
  "caps",
  "chrono",
  "clone3",
- "crossbeam-channel",
  "fastrand",
  "futures",
  "libc",
  "libcgroups",
  "libseccomp",
- "mio",
  "nix",
  "oci-spec",
  "once_cell",
- "path-clean 1.0.1",
  "prctl",
  "procfs",
  "quickcheck",
@@ -1962,7 +1959,6 @@ dependencies = [
  "serde",
  "serde_json",
  "serial_test",
- "syscalls",
  "tempfile",
  "thiserror",
  "tracing",
@@ -2158,7 +2154,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eebffdb73fe72e917997fad08bdbf31ac50b0fa91cec93e69a0662e4264d454c"
 dependencies = [
  "libc",
- "log",
  "wasi 0.11.0+wasi-snapshot-preview1",
  "windows-sys 0.48.0",
 ]
@@ -2437,12 +2432,6 @@ name = "path-clean"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ecba01bf2678719532c5e3059e0b5f0811273d94b397088b82e3bd0a78c78fdd"
-
-[[package]]
-name = "path-clean"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17359afc20d7ab31fdb42bb844c8b3bb1dabd7dcf7e68428492da7f16966fcef"
 
 [[package]]
 name = "peeking_take_while"
@@ -3290,17 +3279,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde_repr"
-version = "0.1.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bcec881020c684085e55a25f7fd888954d56609ef363479dc5a1305eb0d40cab"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.16",
-]
-
-[[package]]
 name = "serde_urlencoded"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3556,17 +3534,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
-]
-
-[[package]]
-name = "syscalls"
-version = "0.6.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41a292bad4a4fdbab06bb5399d2d578e4afed89e6701b47a75cf952d510c1473"
-dependencies = [
- "cc",
- "serde",
- "serde_repr",
 ]
 
 [[package]]
@@ -5034,7 +5001,7 @@ dependencies = [
  "lexical-sort",
  "memmap2",
  "once_cell",
- "path-clean 0.1.0",
+ "path-clean",
  "rand",
  "serde",
  "serde_cbor",

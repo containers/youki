@@ -98,14 +98,14 @@ pub fn run_hooks(hooks: Option<&Vec<Hook>>, container: Option<&Container>) -> Re
                 // use pid to identify the process and send a kill signal. This
                 // is what the Command.kill() does under the hood anyway. When
                 // timeout, we have to kill the process and clean up properly.
-                let (s, r) = crossbeam_channel::unbounded();
+                let (s, r) = std::sync::mpsc::channel();
                 thread::spawn(move || {
                     let res = hook_process.wait();
                     let _ = s.send(res);
                 });
                 match r.recv_timeout(time::Duration::from_secs(timeout_sec as u64)) {
                     Ok(res) => res,
-                    Err(crossbeam_channel::RecvTimeoutError::Timeout) => {
+                    Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
                         // Kill the process. There is no need to further clean
                         // up because we will be error out.
                         let _ = signal::kill(hook_process_pid, signal::Signal::SIGKILL);
