@@ -1,11 +1,10 @@
-//! Default Youki Logger
-
 use anyhow::{bail, Context, Result};
 use std::borrow::Cow;
 use std::fs::OpenOptions;
 use std::path::PathBuf;
 use std::str::FromStr;
-use tracing::metadata::LevelFilter;
+use tracing::Level;
+use tracing_subscriber::prelude::*;
 
 const LOG_LEVEL_ENV_NAME: &str = "YOUKI_LOG_LEVEL";
 const LOG_FORMAT_TEXT: &str = "text";
@@ -23,15 +22,15 @@ const DEFAULT_LOG_LEVEL: &str = "debug";
 #[cfg(not(debug_assertions))]
 const DEFAULT_LOG_LEVEL: &str = "warn";
 
-fn detect_log_format(log_format: Option<String>) -> Result<LogFormat> {
-    match log_format.as_deref() {
+fn detect_log_format(log_format: Option<&str>) -> Result<LogFormat> {
+    match log_format {
         None | Some(LOG_FORMAT_TEXT) => Ok(LogFormat::Text),
         Some(LOG_FORMAT_JSON) => Ok(LogFormat::Json),
         Some(unknown) => bail!("unknown log format: {}", unknown),
     }
 }
 
-fn detect_log_level(is_debug: bool) -> Result<LevelFilter> {
+fn detect_log_level(is_debug: bool) -> Result<Level> {
     let filter: Cow<str> = if is_debug {
         "debug".into()
     } else if let Ok(level) = std::env::var(LOG_LEVEL_ENV_NAME) {
@@ -39,38 +38,73 @@ fn detect_log_level(is_debug: bool) -> Result<LevelFilter> {
     } else {
         DEFAULT_LOG_LEVEL.into()
     };
-    Ok(LevelFilter::from_str(filter.as_ref())?)
+    Ok(Level::from_str(filter.as_ref())?)
 }
 
-pub fn init(
-    log_debug_flag: bool,
-    log_file: Option<PathBuf>,
-    log_format: Option<String>,
-) -> Result<()> {
-    let level = detect_log_level(log_debug_flag).context("failed to parse log level")?;
-    let log_format = detect_log_format(log_format).context("failed to detect log format")?;
+#[derive(Debug, Default)]
+pub struct ObservabilityConfig {
+    pub log_debug_flag: bool,
+    pub log_file: Option<PathBuf>,
+    pub log_format: Option<String>,
+    pub systemd_log: bool,
+}
+
+impl From<&crate::Opts> for ObservabilityConfig {
+    fn from(opts: &crate::Opts) -> Self {
+        Self {
+            log_debug_flag: opts.global.debug,
+            log_file: opts.global.log.to_owned(),
+            log_format: opts.global.log_format.to_owned(),
+            systemd_log: opts.youki_extend.systemd_log,
+        }
+    }
+}
+
+pub fn init<T>(config: T) -> Result<()>
+where
+    T: Into<ObservabilityConfig>,
+{
+    let config = config.into();
+    let level =
+        detect_log_level(config.log_debug_flag).with_context(|| "failed to parse log level")?;
+    let log_level_filter = tracing_subscriber::filter::LevelFilter::from(level);
+    let log_format = detect_log_format(config.log_format.as_deref())
+        .with_context(|| "failed to detect log format")?;
+    let systemd_journald = if config.systemd_log {
+        Some(tracing_journald::layer()?.with_syslog_identifier("youki".to_string()))
+    } else {
+        None
+    };
+    let subscriber = tracing_subscriber::registry()
+        .with(log_level_filter)
+        .with(systemd_journald);
 
     // I really dislike how we have to specify individual branch for each
     // combination, but I can't find any better way to do this. The tracing
-    // crate makes it hard to build a single layer with different conditions.
-    match (log_file, log_format) {
+    // crate makes it hard to build a single format layer with different
+    // conditions.
+    match (config.log_file.as_ref(), log_format) {
         (None, LogFormat::Text) => {
             // Text to stderr
-            tracing_subscriber::fmt()
-                .with_max_level(level)
-                .without_time()
-                .with_writer(std::io::stderr)
+            subscriber
+                .with(
+                    tracing_subscriber::fmt::layer()
+                        .without_time()
+                        .with_writer(std::io::stderr),
+                )
                 .try_init()
                 .map_err(|e| anyhow::anyhow!("failed to init logger: {}", e))?;
         }
         (None, LogFormat::Json) => {
             // JSON to stderr
-            tracing_subscriber::fmt()
-                .json()
-                .flatten_event(true)
-                .with_span_list(false)
-                .with_max_level(level)
-                .with_writer(std::io::stderr)
+            subscriber
+                .with(
+                    tracing_subscriber::fmt::layer()
+                        .json()
+                        .flatten_event(true)
+                        .with_span_list(false)
+                        .with_writer(std::io::stderr),
+                )
                 .try_init()
                 .map_err(|e| anyhow::anyhow!("failed to init logger: {}", e))?;
         }
@@ -82,9 +116,8 @@ pub fn init(
                 .truncate(false)
                 .open(path)
                 .with_context(|| "failed to open log file")?;
-            tracing_subscriber::fmt()
-                .with_writer(file)
-                .with_max_level(level)
+            subscriber
+                .with(tracing_subscriber::fmt::layer().with_writer(file))
                 .try_init()
                 .map_err(|e| anyhow::anyhow!("failed to init logger: {}", e))?;
         }
@@ -96,12 +129,14 @@ pub fn init(
                 .truncate(false)
                 .open(path)
                 .with_context(|| "failed to open log file")?;
-            tracing_subscriber::fmt()
-                .json()
-                .flatten_event(true)
-                .with_span_list(false)
-                .with_writer(file)
-                .with_max_level(level)
+            subscriber
+                .with(
+                    tracing_subscriber::fmt::layer()
+                        .json()
+                        .flatten_event(true)
+                        .with_span_list(false)
+                        .with_writer(file),
+                )
                 .try_init()
                 .map_err(|e| anyhow::anyhow!("failed to init logger: {}", e))?;
         }
@@ -142,7 +177,7 @@ mod tests {
     #[test]
     fn test_detect_log_level_is_debug() {
         let _guard = LogLevelGuard::new("error").unwrap();
-        assert_eq!(detect_log_level(true).unwrap(), LevelFilter::DEBUG)
+        assert_eq!(detect_log_level(true).unwrap(), tracing::Level::DEBUG)
     }
 
     #[test]
@@ -151,9 +186,9 @@ mod tests {
         let _guard = LogLevelGuard::new("error").unwrap();
         env::remove_var(LOG_LEVEL_ENV_NAME);
         if cfg!(debug_assertions) {
-            assert_eq!(detect_log_level(false).unwrap(), LevelFilter::DEBUG)
+            assert_eq!(detect_log_level(false).unwrap(), tracing::Level::DEBUG)
         } else {
-            assert_eq!(detect_log_level(false).unwrap(), LevelFilter::WARN)
+            assert_eq!(detect_log_level(false).unwrap(), tracing::Level::WARN)
         }
     }
 
@@ -161,7 +196,7 @@ mod tests {
     #[serial]
     fn test_detect_log_level_from_env() {
         let _guard = LogLevelGuard::new("error").unwrap();
-        assert_eq!(detect_log_level(false).unwrap(), LevelFilter::ERROR)
+        assert_eq!(detect_log_level(false).unwrap(), tracing::Level::ERROR)
     }
 
     #[test]
@@ -170,8 +205,11 @@ mod tests {
             let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
             let log_file = Path::join(temp_dir.path(), "test.log");
             let _guard = LogLevelGuard::new("error").unwrap();
-            init(false, Some(log_file), None)
-                .map_err(|err| TestCallbackError::Other(err.into()))?;
+            let config = ObservabilityConfig {
+                log_file: Some(log_file),
+                ..Default::default()
+            };
+            init(config).map_err(|err| TestCallbackError::Other(err.into()))?;
             Ok(())
         };
         libcontainer::test_utils::test_in_child_process(cb)
@@ -189,8 +227,11 @@ mod tests {
             let _guard = LogLevelGuard::new("error").unwrap();
             // Note, we can only init the tracing once, so we have to test in a
             // single unit test. The orders are important here.
-            init(false, Some(log_file.to_owned()), None)
-                .map_err(|err| TestCallbackError::Other(err.into()))?;
+            let config = ObservabilityConfig {
+                log_file: Some(log_file.clone()),
+                ..Default::default()
+            };
+            init(config).map_err(|err| TestCallbackError::Other(err.into()))?;
             assert!(
                 log_file
                     .as_path()
@@ -230,12 +271,12 @@ mod tests {
             let _guard = LogLevelGuard::new("error").unwrap();
             // Note, we can only init the tracing once, so we have to test in a
             // single unit test. The orders are important here.
-            init(
-                false,
-                Some(log_file.to_owned()),
-                Some(LOG_FORMAT_JSON.to_owned()),
-            )
-            .map_err(|err| TestCallbackError::Other(err.into()))?;
+            let config = ObservabilityConfig {
+                log_file: Some(log_file.clone()),
+                log_format: Some(LOG_FORMAT_JSON.to_owned()),
+                ..Default::default()
+            };
+            init(config).map_err(|err| TestCallbackError::Other(err.into()))?;
             assert!(
                 log_file
                     .as_path()
