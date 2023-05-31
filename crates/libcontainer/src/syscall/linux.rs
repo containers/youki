@@ -481,7 +481,6 @@ impl Syscall for LinuxSyscall {
         Ok(())
     }
 
-    #[tracing::instrument(skip(self))]
     fn mount(
         &self,
         source: Option<&Path>,

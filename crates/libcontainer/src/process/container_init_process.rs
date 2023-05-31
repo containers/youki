@@ -216,7 +216,6 @@ fn masked_path(path: &Path, mount_label: &Option<String>, syscall: &dyn Syscall)
         match err {
             SyscallError::Nix(nix::errno::Errno::ENOENT) => {
                 // ignore error if path is not exist.
-                tracing::warn!("masked path {:?} not exist", path);
             }
             SyscallError::Nix(nix::errno::Errno::ENOTDIR) => {
                 let label = match mount_label {
