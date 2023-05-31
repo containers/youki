@@ -102,9 +102,9 @@ impl Device {
             )
             .map_err(|err| {
                 tracing::error!(
-                    "failed to mount bind dev {:?}: {}",
-                    full_container_path,
-                    err
+                    ?err,
+                    path = ?full_container_path,
+                    "failed to mount bind dev",
                 );
                 err
             })?;
@@ -122,17 +122,41 @@ impl Device {
 
         let full_container_path = create_container_dev_path(rootfs, dev)?;
 
-        self.syscall.mknod(
-            &full_container_path,
-            to_sflag(dev.typ()),
-            Mode::from_bits_truncate(dev.file_mode().unwrap_or(0)),
-            makedev(dev.major(), dev.minor()),
-        )?;
-        self.syscall.chown(
-            &full_container_path,
-            dev.uid().map(Uid::from_raw),
-            dev.gid().map(Gid::from_raw),
-        )?;
+        self.syscall
+            .mknod(
+                &full_container_path,
+                to_sflag(dev.typ()),
+                Mode::from_bits_truncate(dev.file_mode().unwrap_or(0)),
+                makedev(dev.major(), dev.minor()),
+            )
+            .map_err(|err| {
+                tracing::error!(
+                    ?err,
+                    path = ?full_container_path,
+                    major = ?dev.major(),
+                    minor = ?dev.minor(),
+                    "failed to mknod device"
+                );
+
+                err
+            })?;
+        self.syscall
+            .chown(
+                &full_container_path,
+                dev.uid().map(Uid::from_raw),
+                dev.gid().map(Gid::from_raw),
+            )
+            .map_err(|err| {
+                tracing::error!(
+                    path = ?full_container_path,
+                    ?err,
+                    uid = ?dev.uid(),
+                    gid = ?dev.gid(),
+                    "failed to chown device"
+                );
+
+                err
+            })?;
 
         Ok(())
     }

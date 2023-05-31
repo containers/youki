@@ -96,7 +96,10 @@ pub fn container_intermediate_process(
     let proc = spec.process().as_ref().ok_or(MissingSpecError::Process)?;
     if let Some(rlimits) = proc.rlimits() {
         for rlimit in rlimits {
-            command.set_rlimit(rlimit)?;
+            command.set_rlimit(rlimit).map_err(|err| {
+                tracing::error!(?err, ?rlimit, "failed to set rlimit");
+                err
+            })?;
         }
     }
 
