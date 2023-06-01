@@ -1,5 +1,5 @@
-///! Contains utility functions for testing
-///! Similar to https://github.com/opencontainers/runtime-tools/blob/master/validation/util/test.go
+//! Contains utility functions for testing
+//! Similar to https://github.com/opencontainers/runtime-tools/blob/master/validation/util/test.go
 use super::{generate_uuid, prepare_bundle, set_config};
 use super::{get_runtime_path, get_runtimetest_path};
 use anyhow::{anyhow, bail, Context, Result};

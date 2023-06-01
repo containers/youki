@@ -1,4 +1,4 @@
-///! Contains definition for a simple and commonly usable test structure
+//! Contains definition for a simple and commonly usable test structure
 use crate::testable::{TestResult, Testable};
 
 // type alias for the test function
