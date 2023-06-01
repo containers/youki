@@ -1,4 +1,4 @@
-///! Contains structure for a test group
+//! Contains structure for a test group
 use crate::testable::{TestResult, Testable, TestableGroup};
 use crossbeam::thread;
 use std::collections::BTreeMap;
