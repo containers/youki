@@ -32,14 +32,16 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
       - name: Install requirements
         run: sudo ./.github/scripts/dependency.sh
+      - name: Install just
+        uses: taiki-e/install-action@just
       - name: Install runc 1.1.0
         run: |
           wget -q https://github.com/opencontainers/runc/releases/download/v1.1.0/runc.amd64
           sudo mv runc.amd64 /usr/bin/runc
           sudo chmod 755 /usr/bin/runc
       - name: Build
-        run: make youki-release runtimetest rust-oci-tests-bin
+        run: just youki-release runtimetest rust-oci-tests-bin
       - name: Validate tests on runc
-        run: make validate-rust-oci-runc
+        run: just validate-rust-oci-runc
       - name: Validate tests on youki
-        run: make rust-oci-tests
+        run: just rust-oci-tests

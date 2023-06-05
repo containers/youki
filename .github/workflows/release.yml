@@ -16,12 +16,14 @@ jobs:
         run: sudo ./.github/scripts/dependency.sh
       - name: Setup Rust toolchain and cache
         uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
+      - name: Install just
+        uses: taiki-e/install-action@just
       - name: Build
-        run: make youki-release
+        run: just youki-release
       - name: test
         # TODO(utam0k): The feature test needs nightly
         # run: make unittest featuretest oci-tests
-        run: make unittest oci-tests
+        run: just unittest oci-tests
 
   upload:
     name: Upload
@@ -33,8 +35,9 @@ jobs:
         run: sudo ./.github/scripts/dependency.sh
       - name: Setup Rust toolchain and cache
         uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
+      - uses: taiki-e/install-action@just
       - name: Release build
-        run: make youki-release
+        run: just youki-release
       - name: Create output directory
         run: mkdir output
       - name: Copy files to output

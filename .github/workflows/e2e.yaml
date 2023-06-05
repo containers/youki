@@ -18,8 +18,10 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
       - name: Install requirements
         run: sudo ./.github/scripts/dependency.sh
+      - name: Install just
+        uses: taiki-e/install-action@just
       - name: Build youki
-        run: make youki-release
+        run: just youki-release
       - name: Upload youki binary
         uses: actions/upload-artifact@v3
         with:
