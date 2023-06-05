@@ -106,12 +106,14 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
       - name: Install requirements
         run: sudo ./.github/scripts/dependency.sh
+      - name: Install just
+        uses: taiki-e/install-action@just
       - uses: actions/setup-go@v3
         with:
           go-version: "1.17.6"
           cache: true
           cache-dependency-path: tests/oci-runtime-tests/src/github.com/opencontainers/runtime-tools/go.sum
       - name: Build
-        run: make youki-release
+        run: just youki-release
       - name: Run integration tests
-        run: make oci-tests
+        run: just oci-tests
