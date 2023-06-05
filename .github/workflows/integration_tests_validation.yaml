@@ -25,7 +25,7 @@ jobs:
     needs: [changes]
     if: ${{ !contains(needs.changes.outputs.dirs, '[]') }}
     runs-on: ubuntu-20.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v3
       - name: Setup Rust toolchain and cache

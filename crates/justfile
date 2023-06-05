@@ -11,5 +11,5 @@ release:
 
 # clean the generated artifacts
 clean:
-    rm ./youki_bin || true # rm fails if youki bin is not present,  so we || with true
+    rm -f ./youki_bin
     cargo clean
