@@ -1,4 +1,4 @@
-///! This exposes the main control wrapper to control the tests
+//! This exposes the main control wrapper to control the tests
 use crate::testable::{TestResult, TestableGroup};
 use anyhow::Result;
 use crossbeam::thread;

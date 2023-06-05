@@ -1,4 +1,4 @@
-///! Contains definition for a tests which should be conditionally run
+//! Contains definition for a tests which should be conditionally run
 use crate::testable::{TestResult, Testable};
 
 // type aliases for test function signature

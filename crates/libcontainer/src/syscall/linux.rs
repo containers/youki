@@ -349,14 +349,10 @@ impl Syscall for LinuxSyscall {
     /// Disassociate parts of execution context
     // see https://man7.org/linux/man-pages/man2/unshare.2.html for more information
     fn unshare(&self, flags: CloneFlags) -> Result<()> {
-        unshare(flags).map_err(|err| {
-            tracing::error!(?err, ?flags, "failed to unshare");
-            err
-        })?;
+        unshare(flags)?;
 
         Ok(())
     }
-
     /// Set capabilities for container process
     fn set_capability(&self, cset: CapSet, value: &CapsHashSet) -> Result<()> {
         match cset {
@@ -382,10 +378,7 @@ impl Syscall for LinuxSyscall {
 
     /// Sets hostname for process
     fn set_hostname(&self, hostname: &str) -> Result<()> {
-        sethostname(hostname).map_err(|err| {
-            tracing::error!(?hostname, "failed to set hostname");
-            err
-        })?;
+        sethostname(hostname)?;
         Ok(())
     }
 
@@ -396,15 +389,9 @@ impl Syscall for LinuxSyscall {
         let len = domainname.len();
         match unsafe { setdomainname(ptr, len) } {
             0 => Ok(()),
-            -1 => {
-                tracing::error!(?domainname, "failed to set domainname");
-                Err(nix::Error::last())
-            }
+            -1 => Err(nix::Error::last()),
 
-            _ => {
-                tracing::error!(?domainname, "failed to set domainname for unknown reason");
-                Err(nix::Error::UnknownErrno)
-            }
+            _ => Err(nix::Error::UnknownErrno),
         }?;
 
         Ok(())
@@ -425,14 +412,8 @@ impl Syscall for LinuxSyscall {
 
         match res {
             0 => Ok(()),
-            -1 => {
-                tracing::error!(?res, rlimit = ?rlimit.typ(), "failed to set rlimit");
-                Err(SyscallError::Nix(nix::Error::last()))
-            }
-            _ => {
-                tracing::error!(?res, rlimit = ?rlimit.typ(), "failed to set rlimit for unknown reason");
-                Err(SyscallError::Nix(nix::Error::UnknownErrno))
-            }
+            -1 => Err(SyscallError::Nix(nix::Error::last())),
+            _ => Err(SyscallError::Nix(nix::Error::UnknownErrno)),
         }?;
 
         Ok(())
@@ -473,10 +454,7 @@ impl Syscall for LinuxSyscall {
     }
 
     fn chroot(&self, path: &Path) -> Result<()> {
-        unistd::chroot(path).map_err(|err| {
-            tracing::error!(?err, ?path, "failed to chroot");
-            err
-        })?;
+        unistd::chroot(path)?;
 
         Ok(())
     }
@@ -489,41 +467,24 @@ impl Syscall for LinuxSyscall {
         flags: MsFlags,
         data: Option<&str>,
     ) -> Result<()> {
-        mount(source, target, fstype, flags, data).map_err(|err| {
-            tracing::error!(
-                "failed to mount {source:?} to {target:?} with fstype {fstype:?}, flags {flags:?}, data {data:?}: {err}",
-            );
-            err
-        })?;
-
+        mount(source, target, fstype, flags, data)?;
         Ok(())
     }
 
     fn symlink(&self, original: &Path, link: &Path) -> Result<()> {
-        symlink(original, link).map_err(|err| {
-            tracing::error!("failed to create symlink from {original:?} to {link:?}: {err}");
-            err
-        })?;
+        symlink(original, link)?;
 
         Ok(())
     }
 
     fn mknod(&self, path: &Path, kind: SFlag, perm: Mode, dev: u64) -> Result<()> {
-        mknod(path, kind, perm, dev).map_err(|errno| {
-            tracing::error!(
-                "failed to mknod {path:?}, kind {kind:?}, perm {perm:?}, dev {dev:?}: {errno}"
-            );
-            errno
-        })?;
+        mknod(path, kind, perm, dev)?;
 
         Ok(())
     }
 
     fn chown(&self, path: &Path, owner: Option<Uid>, group: Option<Gid>) -> Result<()> {
-        chown(path, owner, group).map_err(|errno| {
-            tracing::error!("failed to chown {path:?} to {owner:?}:{group:?}: {errno}");
-            errno
-        })?;
+        chown(path, owner, group)?;
 
         Ok(())
     }
@@ -552,16 +513,10 @@ impl Syscall for LinuxSyscall {
                         // kernel 5.11. If the kernel is older we emulate close_range in userspace.
                         Self::emulate_close_range(preserve_fds)
                     }
-                    e => {
-                        tracing::error!(errno = ?e, "failed to close_range");
-                        Err(SyscallError::Nix(e))
-                    }
+                    e => Err(SyscallError::Nix(e)),
                 }
             }
-            _ => {
-                tracing::error!("failed to close_range unknown failure");
-                Err(SyscallError::Nix(nix::errno::Errno::UnknownErrno))
-            }
+            _ => Err(SyscallError::Nix(nix::errno::Errno::UnknownErrno)),
         }?;
 
         Ok(())

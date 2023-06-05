@@ -38,7 +38,7 @@ impl RootFS {
         bind_devices: bool,
         cgroup_ns: bool,
     ) -> Result<()> {
-        tracing::debug!("Prepare rootfs: {:?}", rootfs);
+        tracing::debug!(?rootfs, "prepare rootfs");
         let mut flags = MsFlags::MS_REC;
         let linux = spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
 
@@ -52,20 +52,34 @@ impl RootFS {
         }
 
         self.syscall
-            .mount(None, Path::new("/"), None, flags, None)?;
+            .mount(None, Path::new("/"), None, flags, None)
+            .map_err(|err| {
+                tracing::error!(
+                    ?err,
+                    ?flags,
+                    "failed to change the mount propagation type of the root"
+                );
+
+                err
+            })?;
 
         let mounter = Mount::new();
 
         mounter.make_parent_mount_private(rootfs)?;
 
         tracing::debug!("mount root fs {:?}", rootfs);
-        self.syscall.mount(
-            Some(rootfs),
-            rootfs,
-            None,
-            MsFlags::MS_BIND | MsFlags::MS_REC,
-            None,
-        )?;
+        self.syscall
+            .mount(
+                Some(rootfs),
+                rootfs,
+                None,
+                MsFlags::MS_BIND | MsFlags::MS_REC,
+                None,
+            )
+            .map_err(|err| {
+                tracing::error!(?rootfs, ?err, "failed to bind mount rootfs");
+                err
+            })?;
 
         let global_options = MountOptions {
             root: rootfs,
@@ -108,9 +122,16 @@ impl RootFS {
         };
 
         if let Some(flags) = flags {
-            tracing::debug!("make root mount {:?}", flags);
             self.syscall
-                .mount(None, Path::new("/"), None, flags, None)?;
+                .mount(None, Path::new("/"), None, flags, None)
+                .map_err(|err| {
+                    tracing::error!(
+                        ?err,
+                        ?flags,
+                        "failed to adjust the mount propagation type of the root"
+                    );
+                    err
+                })?;
         }
 
         Ok(())
