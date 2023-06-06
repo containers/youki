@@ -78,7 +78,7 @@ format:
 clean:
     ./scripts/clean.sh {{ ROOT }}
 
-prepare-ci:
+ci-prepare:
     #!/usr/bin/env bash
     set -euo pipefail
 
@@ -102,21 +102,5 @@ prepare-ci:
         fi
     fi
 
-    # Check if system is Fedora
-    if [[ -f /etc/fedora-release ]]; then
-        echo "System is Fedora"
-        sudo dnf -y update
-        sudo dnf install -y \
-            pkg-config \
-            systemd-devel \
-            dbus-devel \
-            elfutils-libelf-devel \
-            libseccomp-devel \
-            clang-devel \
-            openssl-devel \
-            criu
-        exit 0
-    fi
-
-    echo "Unknown system for `prepare` automation. You will need to forge your own path. Good luck!"
+    echo "Unknown system. The CI is only configured for Ubuntu. You will need to forge your own path. Good luck!"
     exit 1
