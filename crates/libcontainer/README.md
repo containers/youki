@@ -8,11 +8,11 @@ Do this by using adding flags to Cargo. Use the `--no-default-features` flag fol
 
 Next you will also need the `+nightly` flags when building with `rustup` and `cargo`.
 
-```bash 
-# Add rustup +nigthly musl to toolchain
+```bash
+# Add rustup +nightly musl to toolchain
 rustup +nightly target add $(uname -m)-unknown-linux-musl
 
-# Build rustup +nigthly stdlib with musl
+# Build rustup +nightly stdlib with musl
 rustup +nightly toolchain install nightly-$(uname -m)-unknown-linux-musl
 
 # Build musl standard library

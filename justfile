@@ -38,7 +38,7 @@ unittest:
     cd ./crates
     LD_LIBRARY_PATH=${HOME}/.wasmedge/lib cargo test --all --all-targets --all-features
 
-# run purmutated faeture compilation tests
+# run purmutated feature compilation tests
 featuretest:
     ./scripts/features_test.sh
 

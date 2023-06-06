@@ -80,7 +80,7 @@ fn sync_seccomp_send_msg(listener_path: &Path, msg: &[u8], fd: i32) -> Result<()
         tracing::error!(
             ?err,
             ?listener_path,
-            "failed to connect to seccomp notify listerner path"
+            "failed to connect to seccomp notify listener path"
         );
         SeccompListenerError::UnixOther(err)
     })?;

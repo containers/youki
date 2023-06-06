@@ -166,8 +166,8 @@ pub fn test_device_unaccess(path: &str) -> Result<(), std::io::Error> {
 // change time (ctime).
 // case:
 // 1. create test.txt file, get one atime
-// 2. cat a.txt, get two atime; check atime wheather update, conditions are met atime less than or equal mtime or ctime
-// 3. cat a.txt, get three atime, check now two atime wheather equal three atime
+// 2. cat a.txt, get two atime; check atime whether update, conditions are met atime less than or equal mtime or ctime
+// 3. cat a.txt, get three atime, check now two atime whether equal three atime
 pub fn test_mount_releatime_option(path: &str) -> Result<(), std::io::Error> {
     let test_file_path = PathBuf::from(path).join("test.txt");
     Command::new("touch")
@@ -231,8 +231,8 @@ pub fn test_mount_releatime_option(path: &str) -> Result<(), std::io::Error> {
 
 // case: because filesystem having relatime option
 // 1. create test.txt file, get one atime
-// 2. cat a.txt, get two atime; check atime wheather update
-// 3. cat a.txt, get three atime, check now two atime wheather equal three atime
+// 2. cat a.txt, get two atime; check atime whether update
+// 3. cat a.txt, get three atime, check now two atime whether equal three atime
 pub fn test_mount_noreleatime_option(path: &str) -> Result<(), std::io::Error> {
     let test_file_path = PathBuf::from(path).join("noreleatime.txt");
     Command::new("touch")
@@ -299,7 +299,7 @@ pub fn test_mount_noreleatime_option(path: &str) -> Result<(), std::io::Error> {
 // Do not update access times for (all types of) files on this mount.
 // case:
 // 1. touch rnoatime.txt file, get atime
-// 2. cat rnoatime.txt, check atime wheather update, if update return error, else return Ok
+// 2. cat rnoatime.txt, check atime whether update, if update return error, else return Ok
 pub fn test_mount_rnoatime_option(path: &str) -> Result<(), std::io::Error> {
     let test_file_path = PathBuf::from(path).join("rnoatime.txt");
     Command::new("touch")

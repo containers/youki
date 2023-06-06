@@ -108,7 +108,7 @@ done
 
 for case in "${test_cases[@]}"; do
   if ! check_environment $case; then
-    echo "Skip $case bacause your environment doesn't support this test case"
+    echo "Skip $case because your environment doesn't support this test case"
     continue
   fi
 
@@ -122,7 +122,7 @@ for case in "${test_cases[@]}"; do
   sudo RUST_BACKTRACE=1 RUNTIME=${RUNTIME} ${OCI_TEST_DIR}/validation/$case >$logfile 2>&1 || (cat $logfile && exit 1)
   if [ 0 -ne $(grep "not ok" $logfile | wc -l ) ]; then
     if [ 0 -eq $(grep "# cgroupv2 is not supported yet " $logfile | wc -l ) ]; then
-      echo "Skip $case bacause oci-runtime-tools doesn't support cgroup v2"
+      echo "Skip $case because oci-runtime-tools doesn't support cgroup v2"
       continue;
     fi
     cat $logfile

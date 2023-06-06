@@ -11,7 +11,7 @@ pub struct MountOptionConfig {
     /// Mount data applied to the mount.
     pub data: String,
 
-    /// RecAttr represents mount properties to be applied recrusively.
+    /// RecAttr represents mount properties to be applied recursively.
     pub rec_attr: Option<linux::MountAttr>,
 }
 

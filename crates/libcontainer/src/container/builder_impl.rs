@@ -27,7 +27,7 @@ pub(super) struct ContainerBuilderImpl<'a> {
     pub use_systemd: bool,
     /// Id of the container
     pub container_id: String,
-    /// OCI complient runtime spec
+    /// OCI compliant runtime spec
     pub spec: &'a Spec,
     /// Root filesystem of the container
     pub rootfs: PathBuf,

@@ -1,4 +1,5 @@
-#!/bin/bash -ue
+#!/usr/bin/env bash
+set -euo pipefail
 
 # This is a simple script to stress test `cargo test` to rule out flaky tests.
 

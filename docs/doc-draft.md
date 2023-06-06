@@ -25,7 +25,7 @@ sequenceDiagram
 participant U as User
 participant D as Docker
 participant Y_Main as Youki(Main Process)
-participant Y_Intermediate as Youki(Intermeidate Process)
+participant Y_Intermediate as Youki(Intermediate Process)
 participant Y_init as Youki(Init Process)
 
 
@@ -122,5 +122,4 @@ This contains functionality regarding pausing and resuming container. Pausing a 
 - [cgroups man page](https://man7.org/linux/man-pages/man7/cgroups.7.html)
 - [freezer cgroup kernel documentation](https://www.kernel.org/doc/Documentation/cgroup-v1/freezer-subsystem.txt)
 
-[oci runtime specification]: https://github.com/opencontainers/runtime-spec/blob/master/runtime.md
 [runc man pages]: (https://github.com/opencontainers/runc/blob/master/man/runc.8.md)

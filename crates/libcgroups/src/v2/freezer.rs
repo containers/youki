@@ -21,7 +21,7 @@ pub enum V2FreezerError {
     #[error("freezer not supported: {0}")]
     NotSupported(WrappedIoError),
     #[error("expected \"cgroup.freeze\" to be in state {expected:?} but was in {actual:?}")]
-    ExepectedToBe {
+    ExpectedToBe {
         expected: FreezerState,
         actual: FreezerState,
     },
@@ -74,7 +74,7 @@ impl Freezer {
         // confirm that the cgroup did actually change states.
         let actual_state = Self::read_freezer_state(path)?;
         if !actual_state.eq(&freezer_state) {
-            return Err(V2FreezerError::ExepectedToBe {
+            return Err(V2FreezerError::ExpectedToBe {
                 expected: freezer_state,
                 actual: actual_state,
             });

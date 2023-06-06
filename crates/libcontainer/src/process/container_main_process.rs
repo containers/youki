@@ -267,7 +267,7 @@ mod tests {
 
     #[test]
     #[serial]
-    fn setup_gid_mapping_should_successed() -> Result<()> {
+    fn setup_gid_mapping_should_succeed() -> Result<()> {
         let gid_mapping = LinuxIdMappingBuilder::default()
             .host_id(getgid())
             .container_id(0u32)
