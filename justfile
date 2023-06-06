@@ -66,9 +66,13 @@ hack-bpftrace:
     BPFTRACE_STRLEN=120 ./hack/debug.bt
 
 # run linting on project
-lint:
+lint: spellcheck
     cargo fmt --all -- --check
     cargo clippy --all --all-targets --all-features -- -D warnings
+
+# run spellcheck
+spellcheck:
+    typos
 
 # run format on project
 format:
@@ -77,6 +81,10 @@ format:
 # cleans up generated artifacts
 clean:
     ./scripts/clean.sh {{ ROOT }}
+
+# install tools used in dev
+dev-prepare:
+    cargo install typos-cli
 
 ci-prepare:
     #!/usr/bin/env bash
