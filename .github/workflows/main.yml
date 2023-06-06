@@ -9,68 +9,62 @@ on:
 
 jobs:
   changes:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     timeout-minutes: 15
     outputs:
-      dirs: ${{ steps.filter.outputs.changes }}
+      any_modified: ${{ steps.filter.outputs.any_modified }}
     steps:
       - uses: actions/checkout@v3
-      - uses: dorny/paths-filter@v2
+      - uses: tj-actions/changed-files@v36
         id: filter
         with:
-          filters: |
-            crates/youki: 
-              - 'crates/youki/**'
-            crates/libcontainer: 
-              - 'crates/libcontainer/**'
-            crates/libcgroups: 
-              - 'crates/libcgroups/**'
-            tests/rust-integration-tests/runtimetest: 
-              - './tests/rust-integration-tests/runtimetest/**'
-            tests/rust-integration-tests/integration_test: 
-              - './tests/rust-integration-tests/integration_test/**'
-            tests/rust-integration-tests/test_framework:
-              - './tests/rust-integration-tests/test_framework/**'
-
+          files_ignore: |
+            docs
+            LICENSE
+            **.md
+      - name: List all changed files
+        run: |
+          for file in ${{ steps.filter.outputs.all_modified_files }}; do
+            echo "$file was changed"
+          done
   check:
     needs: [changes]
-    if: ${{ !contains(needs.changes.outputs.dirs, '[]') }}
-    runs-on: ubuntu-20.04
+    if: needs.changes.outputs.any_modified == 'true'
+    runs-on: ubuntu-22.04
     timeout-minutes: 15
-    strategy:
-      matrix:
-        dirs: ${{ fromJSON(needs.changes.outputs.dirs) }}
     steps:
       - uses: actions/checkout@v3
       - name: Setup Rust toolchain and cache
-        uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
-      - run: rustup component add rustfmt clippy
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: rustfmt, clippy
+      - uses: taiki-e/install-action@just
       - name: Install requirements
-        run: sudo ./.github/scripts/dependency.sh
-      - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev libseccomp-dev
-      - name: Check formatting
-        run: cargo fmt --all -- --check
-        working-directory: ${{matrix.dirs}}
-      - name: Check clippy lints
-        working-directory: ${{matrix.dirs}}
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: just ci-prepare
+      - name: Check formatting and lints
+        run: just lint
 
   tests:
-    runs-on: ubuntu-20.04
+    needs: [changes]
+    if: needs.changes.outputs.any_modified == 'true'
+    runs-on: ubuntu-22.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v3
-      - name: Install rus
-        run: rustup show
-      - run: sudo apt-get -y update
-      - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev libseccomp-dev
+      - name: Setup Rust toolchain and cache
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: taiki-e/install-action@just
+      - name: Install requirements
+        run: just ci-prepare
       - name: Run tests
         run: |
           export LD_LIBRARY_PATH=$HOME/.wasmedge/lib
           cd ./crates && cargo test --all --all-features --no-fail-fast
 
   coverage:
-    runs-on: ubuntu-20.04
+    needs: [changes]
+    if: needs.changes.outputs.any_modified == 'true'
+    runs-on: ubuntu-22.04
     timeout-minutes: 15
     name: Run test coverage
     steps:
@@ -83,37 +77,15 @@ jobs:
         uses: taiki-e/install-action@v1
         with:
           tool: cargo-llvm-cov@0.4.0
+      - uses: taiki-e/install-action@just
       - name: Install requirements
-        run: sudo ./.github/scripts/dependency.sh
+        run: just ci-prepare
       - name: Run Test Coverage for youki
         run: |
           cargo llvm-cov clean --workspace
           cargo llvm-cov --no-report
           cargo llvm-cov --no-run --lcov --ignore-filename-regex "libcgroups/src/systemd/dbus/systemd_api.rs" --output-path ./coverage.lcov
       - name: Upload Youki Code Coverage Results
-        uses: codecov/codecov-action@v2
+        uses: codecov/codecov-action@v3
         with:
           file: ./coverage.lcov
-
-  integration_tests:
-    runs-on: ubuntu-20.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          submodules: recursive
-      - name: Setup Rust toolchain and cache
-        uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
-      - name: Install requirements
-        run: sudo ./.github/scripts/dependency.sh
-      - name: Install just
-        uses: taiki-e/install-action@just
-      - uses: actions/setup-go@v3
-        with:
-          go-version: "1.17.6"
-          cache: true
-          cache-dependency-path: tests/oci-runtime-tests/src/github.com/opencontainers/runtime-tools/go.sum
-      - name: Build
-        run: just youki-release
-      - name: Run integration tests
-        run: just oci-tests
