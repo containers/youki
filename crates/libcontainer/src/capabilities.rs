@@ -125,7 +125,9 @@ impl CapabilityExt for SpecCapability {
 /// see <https://man7.org/linux/man-pages/man7/capabilities.7.html> for more information
 pub fn reset_effective<S: Syscall + ?Sized>(syscall: &S) -> Result<(), SyscallError> {
     tracing::debug!("reset all caps");
-    syscall.set_capability(CapSet::Effective, &caps::all())?;
+    // permitted capabilities are all the capabilities that we are allowed to acquire
+    let permitted = caps::read(None, CapSet::Permitted)?;
+    syscall.set_capability(CapSet::Effective, &permitted)?;
     Ok(())
 }
 
@@ -172,13 +174,14 @@ mod tests {
     #[test]
     fn test_reset_effective() {
         let test_command = TestHelperSyscall::default();
+        let permitted_caps = caps::read(None, CapSet::Permitted).unwrap();
         assert!(reset_effective(&test_command).is_ok());
         let set_capability_args: Vec<_> = test_command
             .get_set_capability_args()
             .into_iter()
             .map(|(_capset, caps)| caps)
             .collect();
-        assert_eq!(set_capability_args, vec![caps::all()]);
+        assert_eq!(set_capability_args, vec![permitted_caps]);
     }
 
     #[test]
