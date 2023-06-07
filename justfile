@@ -66,7 +66,7 @@ hack-bpftrace:
     BPFTRACE_STRLEN=120 ./hack/debug.bt
 
 # run linting on project
-lint: spellcheck
+lint:
     cargo fmt --all -- --check
     cargo clippy --all --all-targets --all-features -- -D warnings
 
