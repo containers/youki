@@ -32,10 +32,13 @@ Here is why we are writing a new container runtime in Rust.
   <summary>Details about the benchmark</summary>
 
   - A command used for the benchmark
-    ```console
-    $ hyperfine --prepare 'sudo sync; echo 3 | sudo tee /proc/sys/vm/drop_caches' --warmup 10 --min-runs 100 'sudo ./youki create -b tutorial a && sudo ./youki start a && sudo ./youki delete -f a'
+
+    ```bash
+    hyperfine --prepare 'sudo sync; echo 3 | sudo tee /proc/sys/vm/drop_caches' --warmup 10 --min-runs 100 'sudo ./youki create -b tutorial a && sudo ./youki start a && sudo ./youki delete -f a'
     ```
+
   - Environment
+
     ```console
     $ ./youki info
     Version           0.0.1
@@ -91,6 +94,7 @@ Here is why we are writing a new container runtime in Rust.
     spec: 1.0.0
     +SYSTEMD +SELINUX +APPARMOR +CAP +SECCOMP +EBPF +CRIU +YAJL
     ```
+
   </details>
 
 - The development of [railcar](https://github.com/oracle/railcar) has been suspended. This project was very nice but is no longer being developed. This project is inspired by it.
@@ -143,6 +147,8 @@ For other platforms, please use the [Vagrantfile](#setting-up-vagrant) that we h
 
 ## Dependencies
 
+To install `just`, follow the instruction [here](https://github.com/casey/just#installation).
+
 ### Debian, Ubuntu and related distributions
 
 ```console
@@ -172,11 +178,11 @@ $ sudo dnf install          \
 
 ## Build
 
-```console
-$ git clone git@github.com:containers/youki.git
-$ cd youki
-$ make youki-dev # or youki-release
-$ ./youki -h # you can get information about youki command
+```bash
+git clone git@github.com:containers/youki.git
+cd youki
+just youki-dev # or youki-release
+./youki -h # you can get information about youki command
 ```
 
 ## Tutorial
@@ -189,21 +195,21 @@ $ ./youki -h # you can get information about youki command
 
 Let's try to run a container that executes `sleep 30` with youki. This tutorial may need root permission.
 
-```console
-$ git clone git@github.com:containers/youki.git
-$ cd youki
-$ make youki-dev # or youki-release
+```bash
+git clone git@github.com:containers/youki.git
+cd youki
+just youki-dev # or youki-release
 
-$ mkdir -p tutorial/rootfs
-$ cd tutorial
+mkdir -p tutorial/rootfs
+cd tutorial
 # use docker to export busybox into the rootfs directory
-$ docker export $(docker create busybox) | tar -C rootfs -xvf -
+docker export $(docker create busybox) | tar -C rootfs -xvf -
 ```
 
 Then, we need to prepare a configuration file. This file contains metadata and specs for a container, such as the process to run, environment variables to inject, sandboxing features to use, etc.
 
-```console
-$ ../youki spec  # will generate a spec file named config.json
+```bash
+../youki spec  # will generate a spec file named config.json
 ```
 
 We can edit the `config.json` to add customized behaviors for container. Here, we modify the `process` field to run `sleep 30`.
@@ -221,13 +227,13 @@ We can edit the `config.json` to add customized behaviors for container. Here, w
 
 Then we can explore the lifecycle of a container:
 
-```console
-$ cd ..                                                # go back to the repository root
-$ sudo ./youki create -b tutorial tutorial_container   # create a container with name `tutorial_container`
-$ sudo ./youki state tutorial_container                # you can see the state the container is `created`
-$ sudo ./youki start tutorial_container                # start the container
-$ sudo ./youki list                                    # will show the list of containers, the container is `running`
-$ sudo ./youki delete tutorial_container               # delete the container
+```bash
+cd ..                                                # go back to the repository root
+sudo ./youki create -b tutorial tutorial_container   # create a container with name `tutorial_container`
+sudo ./youki state tutorial_container                # you can see the state the container is `created`
+sudo ./youki start tutorial_container                # start the container
+sudo ./youki list                                    # will show the list of containers, the container is `running`
+sudo ./youki delete tutorial_container               # delete the container
 ```
 
 Change the command to be executed in `config.json` and try something other than `sleep 30`.
@@ -236,7 +242,7 @@ Change the command to be executed in `config.json` and try something other than 
 
 `youki` provides the ability to run containers as non-root user([rootless mode](https://docs.docker.com/engine/security/rootless/)). To run a container in rootless mode, we need to add some extra options in `config.json`, other steps are same with above:
 
-```console
+```bash
 $ mkdir -p tutorial/rootfs
 $ cd tutorial
 # use docker to export busybox into the rootfs directory
@@ -252,13 +258,13 @@ $ ../youki run rootless-container   # will create and run a container with rootl
 
 Start the docker daemon.
 
-```console
-$ dockerd --experimental --add-runtime="youki=$(pwd)/youki"
+```bash
+dockerd --experimental --add-runtime="youki=$(pwd)/youki"
 ```
 
 If you get an error like the below, that means your normal Docker daemon is running, and it needs to be stopped. Do that with your init system (i.e., with systemd, run `systemctl stop docker`, as root if necessary).
 
-```
+```console
 failed to start daemon: pid file found, ensure docker is not running or delete /var/run/docker.pid
 ```
 
@@ -266,44 +272,44 @@ Now repeat the command, which should start the docker daemon.
 
 You can use youki in a different terminal to start the container.
 
-```console
-$ docker run -it --rm --runtime youki busybox
+```bash
+docker run -it --rm --runtime youki busybox
 ```
 
 Afterwards, you can close the docker daemon process in other the other terminal. To restart normal docker daemon (if you had stopped it before), run:
 
-```console
-$ systemctl start docker # might need root permission
+```bash
+systemctl start docker # might need root permission
 ```
 
 ### Integration Tests
 
 Go and node-tap are required to run integration tests. See the [opencontainers/runtime-tools](https://github.com/opencontainers/runtime-tools) README for details.
 
-```console
-$ git submodule update --init --recursive
-$ make oci-tests
+```bash
+git submodule update --init --recursive
+just oci-tests
 ```
 
 ### Setting up Vagrant
 
 You can try youki on platforms other than Linux by using the Vagrantfile we have prepared. We have prepared two environments for vagrant, namely rootless mode and rootful mode
 
-```console
-$ git clone git@github.com:containers/youki.git
-$ cd youki
+```bash
+git clone git@github.com:containers/youki.git
+cd youki
 
 # If you want to develop in rootless mode, and this is the default mode
-$ vagrant up
-$ vagrant ssh
+vagrant up
+vagrant ssh
 
 # or if you want to develop in rootful mode
-$ VAGRANT_VAGRANTFILE=Vagrantfile.root vagrant up
-$ VAGRANT_VAGRANTFILE=Vagrantfile.root vagrant ssh
+VAGRANT_VAGRANTFILE=Vagrantfile.root vagrant up
+VAGRANT_VAGRANTFILE=Vagrantfile.root vagrant ssh
 
 # in virtual machine
-$ cd youki
-$ make youki-dev # or youki-release
+cd youki
+just youki-dev # or youki-release
 ```
 
 # Community

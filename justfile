@@ -3,7 +3,6 @@ alias youki := youki-dev
 
 ROOT := `git rev-parse --show-toplevel`
 
-
 # build
 
 # build all binaries
@@ -11,24 +10,22 @@ build-all: youki-release rust-oci-tests-bin runtimetest
 
 # build youki in dev mode
 youki-dev:
-    ./scripts/build.sh -o {{ROOT}} -c youki
+    ./scripts/build.sh -o {{ ROOT }} -c youki
 
 # build youki in release mode
 youki-release:
-    ./scripts/build.sh -o {{ROOT}} -r -c youki
+    ./scripts/build.sh -o {{ ROOT }} -r -c youki
 
 # build runtimetest binary
 runtimetest:
-    ./scripts/build.sh -o {{ROOT}} -r -c runtimetest
+    ./scripts/build.sh -o {{ ROOT }} -r -c runtimetest
 
 # build rust oci tests binary
 rust-oci-tests-bin:
-    ./scripts/build.sh -o {{ROOT}} -r -c integration-test
-
+    ./scripts/build.sh -o {{ ROOT }} -r -c integration-test
 
 
 # Tests
-
 
 # run oci tests
 test-oci: oci-tests rust-oci-tests
@@ -46,13 +43,12 @@ featuretest:
     ./scripts/features_test.sh
 
 # run oci integration tests
-oci-tests: youki-release
-    ./scripts/oci_integration_tests.sh {{ROOT}}
-
+oci-tests: 
+    ./scripts/oci_integration_tests.sh {{ ROOT }}
 
 # run rust oci integration tests
 rust-oci-tests: youki-release runtimetest rust-oci-tests-bin
-    ./scripts/rust_integration_tests.sh {{ROOT}}/youki
+    ./scripts/rust_integration_tests.sh {{ ROOT }}/youki
 
 # validate rust oci integration tests on runc
 validate-rust-oci-runc: runtimetest rust-oci-tests-bin
@@ -63,7 +59,7 @@ containerd-test: youki-dev
 	VAGRANT_VAGRANTFILE=Vagrantfile.containerd2youki vagrant up
 	VAGRANT_VAGRANTFILE=Vagrantfile.containerd2youki vagrant provision --provision-with test
 
-#misc
+# misc
 
 # run bpftrace hack
 hack-bpftrace:
@@ -72,8 +68,39 @@ hack-bpftrace:
 # run linting on project
 lint:
     cargo fmt --all -- --check
-    cargo clippy --all-targets --all-features -- -D warnings
+    cargo clippy --all --all-targets --all-features -- -D warnings
+
+# run format on project
+format:
+    cargo fmt --all
 
 # cleans up generated artifacts
 clean:
-    ./scripts/clean.sh {{ROOT}}
+    ./scripts/clean.sh {{ ROOT }}
+
+ci-prepare:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # Check if system is Ubuntu
+    if [[ -f /etc/lsb-release ]]; then
+        source /etc/lsb-release
+        if [[ $DISTRIB_ID == "Ubuntu" ]]; then
+            echo "System is Ubuntu"
+            sudo apt-get -y update
+            sudo apt-get install -y \
+                pkg-config \
+                libsystemd-dev \
+                libdbus-glib-1-dev \
+                build-essential \
+                libelf-dev \
+                libseccomp-dev \
+                libclang-dev \
+                libssl-dev \
+                criu
+            exit 0
+        fi
+    fi
+
+    echo "Unknown system. The CI is only configured for Ubuntu. You will need to forge your own path. Good luck!"
+    exit 1
