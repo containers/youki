@@ -40,7 +40,7 @@ jobs:
           components: rustfmt, clippy
 
       - name: typos-action
-        uses: crate-ci/typos@v1.0.4
+        uses: crate-ci/typos@v1.14.12
 
       - uses: taiki-e/install-action@just
 
