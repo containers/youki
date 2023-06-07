@@ -122,4 +122,7 @@ This contains functionality regarding pausing and resuming container. Pausing a 
 - [cgroups man page](https://man7.org/linux/man-pages/man7/cgroups.7.html)
 - [freezer cgroup kernel documentation](https://www.kernel.org/doc/Documentation/cgroup-v1/freezer-subsystem.txt)
 
-[runc man pages]: (https://github.com/opencontainers/runc/blob/master/man/runc.8.md)
+## Other references
+
+- [oci runtime specification](https://github.com/opencontainers/runtime-spec/blob/master/runtime.md)
+- [runc man pages](https://github.com/opencontainers/runc/blob/master/man/runc.8.md)

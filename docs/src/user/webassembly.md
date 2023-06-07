@@ -10,19 +10,19 @@ There are 3 things you need to do to run a WebAssembly module with youki.
 
 - Run `build.sh` with `-f wasm-wasmedge` option.
 
-    ```console
+    ```bash
     ./scripts/build.sh -o . -r -f wasm-wasmedge
     ```
 
     > The `wasm-wasmedge` feature will install WasmEdge Runtime library in the `$HOME/.wasmedge` directory.
     > To make the library available in your system, run the following command:
->
+    >
     > ```bash
     > export LD_LIBRARY_PATH=$HOME/.wasmedge/lib
     > ```
->
+    >
     > or
->
+    >
     > ```bash
     > source $HOME/.wasmedge/env
     > ```
@@ -30,7 +30,7 @@ There are 3 things you need to do to run a WebAssembly module with youki.
 
 - Run `build.sh` with `-f wasm-wasmer` option.
 
-    ```console
+    ```bash
     ./scripts/build.sh -o . -r -f wasm-wasmer
     ```
 
@@ -43,14 +43,16 @@ It also needs to specify a valid .wasm (webassembly binary) or .wat (webassembly
 ```json
 "ociVersion": "1.0.2-dev",
 "annotations": {
- "run.oci.handler": "wasm"
+    "run.oci.handler": "wasm"
 },
 "process": {
     "args": [
-  "hello.wasm",
-  "hello",
+        "hello.wasm",
+        "hello",
         "world"
-  ],
+    ],
+...
+}
 ...
 ```
 
@@ -109,7 +111,7 @@ sudo buildah build --annotation "module.wasm.image/variant=compat" -t wasm-modul
 
 Run podman with youki as runtime. [^1]
 
-```console
+```bash
 sudo podman --runtime /PATH/WHARE/YOU/BUILT/WITH/WASM-WASMER/youki run localhost/wasm-module 1 2 3
 ```
 
