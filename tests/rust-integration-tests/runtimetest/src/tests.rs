@@ -195,7 +195,7 @@ pub fn validate_mounts_recursive(spec: &Spec) {
                             let rest =
                                 utils::test_device_unaccess(mount.destination().to_str().unwrap());
                             if rest.is_ok() {
-                                // beacuse /rnodev/null device not access,so rest is err
+                                // because /rnodev/null device not access,so rest is err
                                 eprintln!("error in testing rnodev recursive mounting");
                             }
                         }

@@ -194,7 +194,7 @@ mod tests {
     fn test_foreground_exit() -> Result<()> {
         // The setup is similar to `handle_foreground`, but instead of
         // forwarding signal, the container init process will exit. Again, we
-        // use `sleep` to simulate the conditions to aovid fine grained
+        // use `sleep` to simulate the conditions to avoid fine grained
         // synchronization for now.
         match unsafe { unistd::fork()? } {
             unistd::ForkResult::Parent { child } => {

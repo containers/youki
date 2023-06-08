@@ -13,7 +13,7 @@ pub const ALLOWED_NODES: &str = "AllowedMemoryNodes";
 
 #[derive(thiserror::Error, Debug)]
 pub enum SystemdCpuSetError {
-    #[error("setting cpuset restrictions requires systemd version greather than 243")]
+    #[error("setting cpuset restrictions requires systemd version greater than 243")]
     OldSystemd,
     #[error("could not create bitmask for cpus: {0}")]
     CpusBitmask(BitmaskError),

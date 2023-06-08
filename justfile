@@ -38,7 +38,7 @@ unittest:
     cd ./crates
     LD_LIBRARY_PATH=${HOME}/.wasmedge/lib cargo test --all --all-targets --all-features
 
-# run purmutated faeture compilation tests
+# run purmutated feature compilation tests
 featuretest:
     ./scripts/features_test.sh
 
@@ -70,6 +70,10 @@ lint:
     cargo fmt --all -- --check
     cargo clippy --all --all-targets --all-features -- -D warnings
 
+# run spellcheck
+spellcheck:
+    typos
+
 # run format on project
 format:
     cargo fmt --all
@@ -77,6 +81,10 @@ format:
 # cleans up generated artifacts
 clean:
     ./scripts/clean.sh {{ ROOT }}
+
+# install tools used in dev
+dev-prepare:
+    cargo install typos-cli
 
 ci-prepare:
     #!/usr/bin/env bash

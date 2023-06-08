@@ -189,7 +189,7 @@ pub fn open<P: AsRef<Path>>(path: P) -> Result<File, std::io::Error> {
 pub enum MkdirWithModeError {
     #[error("IO error")]
     Io(#[from] std::io::Error),
-    #[error("metada doesn't match the expected attributes")]
+    #[error("metadata doesn't match the expected attributes")]
     MetadataMismatch,
 }
 

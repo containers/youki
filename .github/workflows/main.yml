@@ -38,9 +38,15 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: rustfmt, clippy
+
+      - name: typos-action
+        uses: crate-ci/typos@v1.14.12
+
       - uses: taiki-e/install-action@just
+
       - name: Install requirements
         run: just ci-prepare
+
       - name: Check formatting and lints
         run: just lint
 

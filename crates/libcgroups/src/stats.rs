@@ -335,7 +335,7 @@ pub enum ParseNestedKeyedDataError {
     DoesNotConform { path: PathBuf },
 }
 
-/// Parses a file that is structed according to the nested keyed format
+/// Parses a file that is structured according to the nested keyed format
 pub fn parse_nested_keyed_data(
     file_path: &Path,
 ) -> Result<HashMap<String, Vec<String>>, ParseNestedKeyedDataError> {

@@ -46,8 +46,8 @@ impl RootFS {
             Some("shared") => flags |= MsFlags::MS_SHARED,
             Some("private") => flags |= MsFlags::MS_PRIVATE,
             Some("slave" | "unbindable") | None => flags |= MsFlags::MS_SLAVE,
-            Some(uknown) => {
-                return Err(RootfsError::UnknownRootfsPropagation(uknown.to_string()));
+            Some(unknown) => {
+                return Err(RootfsError::UnknownRootfsPropagation(unknown.to_string()));
             }
         }
 
