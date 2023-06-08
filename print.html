@@ -363,7 +363,7 @@ sudo ./youki list
 # delete the container
 sudo ./youki delete tutorial_container
 </code></pre>
-<p>The example above shows how to run Youki in a 'rootful' way. To run it without root permissions, that is, in rootless mode, few chagnes are required.</p>
+<p>The example above shows how to run Youki in a 'rootful' way. To run it without root permissions, that is, in rootless mode, few changes are required.</p>
 <p>First, after exporting the rootfs from docker, while generating the config, you will need to pass the rootless flag. This will generate the config withe the options needed for rootless operation of the container.</p>
 <pre><code class="language-console">../youki spec --rootless
 </code></pre>
@@ -562,11 +562,11 @@ sudo ./youki delete tutorial_container
 <ul>
 <li>
 <p>Run <code>build.sh</code> with <code>-f wasm-wasmedge</code> option.</p>
-<pre><code class="language-console">./scripts/build.sh -o . -r -f wasm-wasmedge
+<pre><code class="language-bash">./scripts/build.sh -o . -r -f wasm-wasmedge
 </code></pre>
 <blockquote>
-<p>The <code>wasm-wasmedge</code> feature will install WasmEdge Runtime library in the <code>$HOME/.wasmedge</code> directory. 
-To make the library avaible in your system, run the following command:</p>
+<p>The <code>wasm-wasmedge</code> feature will install WasmEdge Runtime library in the <code>$HOME/.wasmedge</code> directory.
+To make the library available in your system, run the following command:</p>
 <pre><code class="language-bash">export LD_LIBRARY_PATH=$HOME/.wasmedge/lib
 </code></pre>
 <p>or</p>
@@ -576,27 +576,29 @@ To make the library avaible in your system, run the following command:</p>
 </li>
 <li>
 <p>Run <code>build.sh</code> with <code>-f wasm-wasmer</code> option.</p>
-<pre><code class="language-console">./scripts/build.sh -o . -r -f wasm-wasmer
+<pre><code class="language-bash">./scripts/build.sh -o . -r -f wasm-wasmer
 </code></pre>
 </li>
 </ul>
 <h2 id="build-a-container-image-with-the-webassembly-module"><a class="header" href="#build-a-container-image-with-the-webassembly-module">Build a container image with the WebAssembly module</a></h2>
-<p>If you want to run a webassembly module with youki, your config.json has to include either <strong>runc.oci.handler</strong> or <strong>module.wasm.image/variant=compat&quot;</strong>. </p>
-<p>It also needs to specifiy a valid .wasm (webassembly binary) or .wat (webassembly test) module as entrypoint for the container. If a wat module is specified it will be compiled to a wasm module by youki before it is executed. The module also needs to be available in the root filesystem of the container obviously.</p>
+<p>If you want to run a webassembly module with youki, your config.json has to include either <strong>runc.oci.handler</strong> or <strong>module.wasm.image/variant=compat&quot;</strong>.</p>
+<p>It also needs to specify a valid .wasm (webassembly binary) or .wat (webassembly test) module as entrypoint for the container. If a wat module is specified it will be compiled to a wasm module by youki before it is executed. The module also needs to be available in the root filesystem of the container obviously.</p>
 <pre><code class="language-json">&quot;ociVersion&quot;: &quot;1.0.2-dev&quot;,
 &quot;annotations&quot;: {
-	&quot;run.oci.handler&quot;: &quot;wasm&quot;
+    &quot;run.oci.handler&quot;: &quot;wasm&quot;
 },
 &quot;process&quot;: {
     &quot;args&quot;: [
-		&quot;hello.wasm&quot;,
-		&quot;hello&quot;,
+        &quot;hello.wasm&quot;,
+        &quot;hello&quot;,
         &quot;world&quot;
-		],
+    ],
+...
+}
 ...
 </code></pre>
 <h3 id="compile-a-sample-wasm-module"><a class="header" href="#compile-a-sample-wasm-module">Compile a sample wasm module</a></h3>
-<p>A simple wasm module can be created by running </p>
+<p>A simple wasm module can be created by running</p>
 <pre><code class="language-console">rustup target add wasm32-wasi
 cargo new wasm-module --bin
 cd ./wasm-module
@@ -629,7 +631,7 @@ ENTRYPOINT [&quot;wasm-module.wasm&quot;]
 </code></pre>
 <h2 id="run-the-wasm-module-with-youki-and-podman"><a class="header" href="#run-the-wasm-module-with-youki-and-podman">Run the wasm module with youki and podman</a></h2>
 <p>Run podman with youki as runtime. <sup class="footnote-reference"><a href="#1">1</a></sup></p>
-<pre><code class="language-console">sudo podman --runtime /PATH/WHARE/YOU/BUILT/WITH/WASM-WASMER/youki run localhost/wasm-module 1 2 3
+<pre><code class="language-bash">sudo podman --runtime /PATH/WHARE/YOU/BUILT/WITH/WASM-WASMER/youki run localhost/wasm-module 1 2 3
 </code></pre>
 <div class="footnote-definition" id="1"><sup class="footnote-definition-label">1</sup>
 <p>You might need <code>sudo</code> because of <a href="https://github.com/containers/youki/issues/719">#719</a>.</p>
@@ -757,7 +759,7 @@ cd -
 <ul>
 <li>CPU stats including usage and throttling</li>
 <li>Memory stats including usage of normal and swap memory, usage of kernel memory, page cache in bytes etc</li>
-<li>Pid stat including current active pids nd maximum allowed pids</li>
+<li>Pid stat including current active pids and maximum allowed pids</li>
 <li>Block IO stats such as number of bytest transferred to/from a device in the cgroup, io operations performed by a device in the cgroup, amount of time cgroup had access to a device etc</li>
 <li>Huge TLB stats such as usage and maximum usage etc.</li>
 <li>Function to get pid stats</li>
@@ -839,7 +841,7 @@ cd -
 <p align="center">
   <img src="developer/../assets/control_flow.drawio.svg">
 </p>
-<p>When given the create command, Youki will load the specification, configuration, sockets etc., and use clone syscall to create an intermediate process. This process will set the cgroups and capabilities, and then fork to the init process. Reason to create this intermediate prcoess is that the clone syscall cannot enter into existing pid namespace that has been created for the container. Thus first we need to make a transition to that namespace in the intermediate process and fork that to the container process. After that the main youki process is requested the uid and gid mappings, and after receiving them the intermediate process sets these mapping, fork the init process and return pid of this init process to the main youki process before exiting.</p>
+<p>When given the create command, Youki will load the specification, configuration, sockets etc., and use clone syscall to create an intermediate process. This process will set the cgroups and capabilities, and then fork to the init process. Reason to create this intermediate process is that the clone syscall cannot enter into existing pid namespace that has been created for the container. Thus first we need to make a transition to that namespace in the intermediate process and fork that to the container process. After that the main youki process is requested the uid and gid mappings, and after receiving them the intermediate process sets these mapping, fork the init process and return pid of this init process to the main youki process before exiting.</p>
 <p>The init process then transition completely into the new namespace setup for the container (the init process only transitions the pid namespace). It changes the root mountpoint for the process using <a href="https://man7.org/linux/man-pages/man2/pivot_root.2.html">pivot_root</a>, so that the container process can get impression that it has a complete root path access. After that the init process sets up the capabilities and seccomp, and sends the seccomp notify fd to the main youki process. When the seccomp agent running on the host system sets up the seccomp profile, it notifies the init process, after which it can execute the programto be executed inside the container. Thus the init process then sends ready notification to the main youki process, and waits for the start signal.</p>
 <p>The main youki process which started creating the container, when receives the ready signals update the pid file of the container process and exits. This concludes the creation of the container.</p>
 <p>To start the container, when youki start it executed along with the container id, start signal is sent to the waiting container init process, and the the youki process exists.</p>
