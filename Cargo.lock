@@ -3369,9 +3369,9 @@ dependencies = [
 
 [[package]]
 name = "shared-buffer"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96a4987984c21cbd48a683c00975a0a9652d1882e8e986c42223f65440f4668f"
+checksum = "2cf61602ee61e2f83dd016b3e6387245291cf728ea071c378b35088125b4d995"
 dependencies = [
  "bytes",
  "memmap2 0.6.2",
