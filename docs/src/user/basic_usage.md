@@ -34,7 +34,7 @@ This will start the daemon and hang up the console. You can either start this as
 
 In case you don't stop the original daemon, you can get an error message after previous command
 
-```
+```console
 failed to start daemon: pid file found, ensure docker is not running or delete /var/run/docker.pid
 ```
 
@@ -63,19 +63,29 @@ let docker know youki
 ([source](https://docs.docker.com/engine/reference/commandline/dockerd/#on-linux)).
 You may need to create this file, if it does not yet exist. A sample content of it:
 
-```
+```json
 {
   "default-runtime": "runc",
   "runtimes": {
     "youki": {
-      "path": "/path/to/youki/youki"
+      "path": "/path/to/youki/youki",
+      "runtimeArgs": [
+          "--debug",
+          "--systemd-log"
+      ]
     }
   }
 }
 ```
 
 After this (need to restart docker at the first time), you can use youki
-with docker: `docker run --runtime youki ...`.
+with docker: `docker run --runtime youki ...`. You can verify the runtime includes `youki`:
+
+```console
+$ docker info|grep -i runtime
+ Runtimes: youki runc
+ Default Runtime: runc
+```
 
 #### Using Youki Standalone
 
