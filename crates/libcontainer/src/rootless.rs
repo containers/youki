@@ -1,5 +1,5 @@
 use crate::error::MissingSpecError;
-use crate::namespaces::Namespaces;
+use crate::namespaces::{NamespaceError, Namespaces};
 use nix::unistd::Pid;
 use oci_spec::runtime::{Linux, LinuxIdMapping, LinuxNamespace, LinuxNamespaceType, Mount, Spec};
 use std::fs;
@@ -103,6 +103,8 @@ pub enum ValidateSpecError {
     MountGidMapping(u32),
     #[error("mount options require mapping gid inside the rootless container")]
     MountUidMapping(u32),
+    #[error(transparent)]
+    Namespaces(#[from] NamespaceError),
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -140,8 +142,11 @@ pub struct Rootless<'a> {
 impl<'a> Rootless<'a> {
     pub fn new(spec: &'a Spec) -> Result<Option<Rootless<'a>>> {
         let linux = spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
-        let namespaces = Namespaces::from(linux.namespaces().as_ref());
-        let user_namespace = namespaces.get(LinuxNamespaceType::User);
+        let namespaces = Namespaces::try_from(linux.namespaces().as_ref())
+            .map_err(ValidateSpecError::Namespaces)?;
+        let user_namespace = namespaces
+            .get(LinuxNamespaceType::User)
+            .map_err(ValidateSpecError::Namespaces)?;
 
         // If conditions requires us to use rootless, we must either create a new
         // user namespace or enter an existing.
@@ -156,7 +161,7 @@ impl<'a> Rootless<'a> {
                 tracing::error!("failed to validate spec for rootless container: {}", err);
                 err
             })?;
-            let mut rootless = Rootless::from(linux);
+            let mut rootless = Rootless::try_from(linux)?;
             if let Some((uid_binary, gid_binary)) = lookup_map_binaries(linux)? {
                 rootless.newuidmap = Some(uid_binary);
                 rootless.newgidmap = Some(gid_binary);
@@ -200,11 +205,16 @@ impl<'a> Rootless<'a> {
     }
 }
 
-impl<'a> From<&'a Linux> for Rootless<'a> {
-    fn from(linux: &'a Linux) -> Self {
-        let namespaces = Namespaces::from(linux.namespaces().as_ref());
-        let user_namespace = namespaces.get(LinuxNamespaceType::User);
-        Self {
+impl<'a> TryFrom<&'a Linux> for Rootless<'a> {
+    type Error = RootlessError;
+
+    fn try_from(linux: &'a Linux) -> Result<Self> {
+        let namespaces = Namespaces::try_from(linux.namespaces().as_ref())
+            .map_err(ValidateSpecError::Namespaces)?;
+        let user_namespace = namespaces
+            .get(LinuxNamespaceType::User)
+            .map_err(ValidateSpecError::Namespaces)?;
+        Ok(Self {
             newuidmap: None,
             newgidmap: None,
             uid_mappings: linux.uid_mappings().as_ref(),
@@ -212,7 +222,7 @@ impl<'a> From<&'a Linux> for Rootless<'a> {
             user_namespace: user_namespace.cloned(),
             privileged: nix::unistd::geteuid().is_root(),
             rootless_id_mapper: RootlessIDMapper::new(),
-        }
+        })
     }
 }
 
@@ -250,8 +260,8 @@ pub fn unprivileged_user_ns_enabled() -> Result<bool> {
 fn validate_spec_for_rootless(spec: &Spec) -> std::result::Result<(), ValidateSpecError> {
     tracing::debug!(?spec, "validating spec for rootless container");
     let linux = spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
-    let namespaces = Namespaces::from(linux.namespaces().as_ref());
-    if namespaces.get(LinuxNamespaceType::User).is_none() {
+    let namespaces = Namespaces::try_from(linux.namespaces().as_ref())?;
+    if namespaces.get(LinuxNamespaceType::User)?.is_none() {
         return Err(ValidateSpecError::NoUserNamespace);
     }
 

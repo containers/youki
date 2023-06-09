@@ -5,7 +5,6 @@ use nix::unistd::{close, write};
 use nix::unistd::{Gid, Pid, Uid};
 use oci_spec::runtime::{LinuxNamespaceType, LinuxResources};
 use procfs::process::Process;
-use std::convert::From;
 
 use super::args::{ContainerArgs, ContainerType};
 use super::container_init_process::container_init_process;
@@ -43,7 +42,7 @@ pub fn container_intermediate_process(
     let command = &args.syscall;
     let spec = &args.spec;
     let linux = spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
-    let namespaces = Namespaces::from(linux.namespaces().as_ref());
+    let namespaces = Namespaces::try_from(linux.namespaces().as_ref())?;
 
     // this needs to be done before we create the init process, so that the init
     // process will already be captured by the cgroup. It also needs to be done
@@ -65,7 +64,7 @@ pub fn container_intermediate_process(
     // namespace will be created, check
     // https://man7.org/linux/man-pages/man7/user_namespaces.7.html for more
     // information
-    if let Some(user_namespace) = namespaces.get(LinuxNamespaceType::User) {
+    if let Some(user_namespace) = namespaces.get(LinuxNamespaceType::User)? {
         namespaces.unshare_or_setns(user_namespace)?;
         if user_namespace.path().is_none() {
             tracing::debug!("creating new user namespace");
@@ -104,7 +103,7 @@ pub fn container_intermediate_process(
     }
 
     // Pid namespace requires an extra fork to enter, so we enter pid namespace now.
-    if let Some(pid_namespace) = namespaces.get(LinuxNamespaceType::Pid) {
+    if let Some(pid_namespace) = namespaces.get(LinuxNamespaceType::Pid)? {
         namespaces.unshare_or_setns(pid_namespace)?;
     }
 

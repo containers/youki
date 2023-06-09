@@ -78,6 +78,7 @@ fn translate_arch(arch: Arch) -> ScmpArch {
 }
 
 fn translate_action(action: LinuxSeccompAction, errno: Option<u32>) -> Result<ScmpAction> {
+    tracing::trace!(?action, ?errno, "translating action");
     let errno = errno.map(|e| e as i32).unwrap_or(libc::EPERM);
     let action = match action {
         LinuxSeccompAction::ScmpActKill => ScmpAction::KillThread,
@@ -94,6 +95,7 @@ fn translate_action(action: LinuxSeccompAction, errno: Option<u32>) -> Result<Sc
         LinuxSeccompAction::ScmpActLog => ScmpAction::Log,
     };
 
+    tracing::trace!(?action, "translated action");
     Ok(action)
 }
 
