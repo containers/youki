@@ -30,7 +30,9 @@ echo '   [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.youki.options]
 echo '     BinaryName = "/usr/local/bin/youki"' >> /etc/containerd/config.toml
 sed -i 's,SystemdCgroup = true,,' /etc/containerd/config.toml
 EOF
-COPY .github/scripts/dependency.sh .github/scripts/dependency.sh
-RUN apt-get update && .github/scripts/dependency.sh
+COPY justfile justfile
+RUN curl -o just.tar.gz -L https://github.com/casey/just/releases/download/1.14.0/just-1.14.0-x86_64-unknown-linux-musl.tar.gz
+RUN tar zxvf just.tar.gz just
+RUN ./just ci-prepare
 COPY --link --from=shim /* /usr/local/bin/
 
