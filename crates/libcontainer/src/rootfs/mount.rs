@@ -497,7 +497,7 @@ impl Mount {
                 err
             })?;
 
-            if src.is_file() {
+            if src.is_file() && !dest.exists() {
                 OpenOptions::new()
                     .create(true)
                     .write(true)

@@ -78,8 +78,6 @@ tracepoint:syscalls:sys_enter_setresuid
     printf("ruid=%d, euid=%d, suid=%d\n", args->ruid, args->euid, args->suid);
 }
 
-
-
 END
 {
     clear(@filename);
