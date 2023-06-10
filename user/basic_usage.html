@@ -162,7 +162,7 @@
 </code></pre>
 <p>This will start the daemon and hang up the console. You can either start this as a background process to continue using the same terminal, or use another terminal, which will make it easier to stop the docker daemon later.</p>
 <p>In case you don't stop the original daemon, you can get an error message after previous command</p>
-<pre><code>failed to start daemon: pid file found, ensure docker is not running or delete /var/run/docker.pid
+<pre><code class="language-console">failed to start daemon: pid file found, ensure docker is not running or delete /var/run/docker.pid
 </code></pre>
 <p>Now that the docker daemon is running, you can use docker normally as you will, but you will be able to specify Youki as its low-level runtime to actually create, start and stop the containers.</p>
 <p>You can try running a container such as</p>
@@ -178,17 +178,25 @@
 let docker know youki
 (<a href="https://docs.docker.com/engine/reference/commandline/dockerd/#on-linux">source</a>).
 You may need to create this file, if it does not yet exist. A sample content of it:</p>
-<pre><code>{
+<pre><code class="language-json">{
   &quot;default-runtime&quot;: &quot;runc&quot;,
   &quot;runtimes&quot;: {
     &quot;youki&quot;: {
-      &quot;path&quot;: &quot;/path/to/youki/youki&quot;
+      &quot;path&quot;: &quot;/path/to/youki/youki&quot;,
+      &quot;runtimeArgs&quot;: [
+          &quot;--debug&quot;,
+          &quot;--systemd-log&quot;
+      ]
     }
   }
 }
 </code></pre>
 <p>After this (need to restart docker at the first time), you can use youki
-with docker: <code>docker run --runtime youki ...</code>.</p>
+with docker: <code>docker run --runtime youki ...</code>. You can verify the runtime includes <code>youki</code>:</p>
+<pre><code class="language-console">$ docker info|grep -i runtime
+ Runtimes: youki runc
+ Default Runtime: runc
+</code></pre>
 <h4 id="using-youki-standalone"><a class="header" href="#using-youki-standalone">Using Youki Standalone</a></h4>
 <p>Youki can also be used directly, without a higher-level runtime such as Docker to create, start, stop and delete the container, but the process can be tedious. Here we will show how you can do that, to run a simple container with desired program running in it.</p>
 <p>Note that we will still be using Docker to generate the rootfs required for running the container.</p>
