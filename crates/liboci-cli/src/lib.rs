@@ -70,9 +70,10 @@ pub struct GlobalOpts {
     // Example in future : '--debug     change log level to debug. (default: "warn")'
     #[clap(long)]
     pub debug: bool,
-    // Set a consistent behavior like in runc and crun: set log to the last given value
+    /// set the log file to write youki logs to (default is '/dev/stderr')
     #[clap(short, long, overrides_with("log"))]
     pub log: Option<PathBuf>,
+    /// set the log format ('text' (default), or 'json') (default: "text")
     #[clap(long)]
     pub log_format: Option<String>,
     /// root directory to store container state

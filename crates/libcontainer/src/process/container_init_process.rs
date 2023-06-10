@@ -271,7 +271,7 @@ fn apply_rest_namespaces(
         })?;
 
     // Only set the host name if entering into a new uts namespace
-    if let Some(uts_namespace) = namespaces.get(LinuxNamespaceType::Uts) {
+    if let Some(uts_namespace) = namespaces.get(LinuxNamespaceType::Uts)? {
         if uts_namespace.path().is_none() {
             if let Some(hostname) = spec.hostname() {
                 syscall.set_hostname(hostname).map_err(|err| {
@@ -340,7 +340,7 @@ pub fn container_init_process(
     let rootfs_path = args.rootfs;
     let hooks = spec.hooks().as_ref();
     let container = args.container.as_ref();
-    let namespaces = Namespaces::from(linux.namespaces().as_ref());
+    let namespaces = Namespaces::try_from(linux.namespaces().as_ref())?;
 
     setsid().map_err(|err| {
         tracing::error!(?err, "failed to setsid to create a session");
@@ -370,14 +370,14 @@ pub fn container_init_process(
             })?;
         }
 
-        let bind_service = namespaces.get(LinuxNamespaceType::User).is_some();
+        let bind_service = namespaces.get(LinuxNamespaceType::User)?.is_some();
         let rootfs = RootFS::new();
         rootfs
             .prepare_rootfs(
                 spec,
                 rootfs_path,
                 bind_service,
-                namespaces.get(LinuxNamespaceType::Cgroup).is_some(),
+                namespaces.get(LinuxNamespaceType::Cgroup)?.is_some(),
             )
             .map_err(|err| {
                 tracing::error!(?err, "failed to prepare rootfs");
@@ -388,7 +388,7 @@ pub fn container_init_process(
         // we use pivot_root, but if we are on the host mount namespace, we will
         // use simple chroot. Scary things will happen if you try to pivot_root
         // in the host mount namespace...
-        if namespaces.get(LinuxNamespaceType::Mount).is_some() {
+        if namespaces.get(LinuxNamespaceType::Mount)?.is_some() {
             // change the root of filesystem of the process to the rootfs
             syscall.pivot_rootfs(rootfs_path).map_err(|err| {
                 tracing::error!(?err, ?rootfs_path, "failed to pivot root");
@@ -848,7 +848,7 @@ mod tests {
                 .typ(LinuxNamespaceType::Pid)
                 .build()?,
         ];
-        let namespaces = Namespaces::from(Some(&linux_spaces));
+        let namespaces = Namespaces::try_from(Some(&linux_spaces))?;
 
         apply_rest_namespaces(&namespaces, &spec, syscall.as_ref())?;
 

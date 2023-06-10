@@ -28,7 +28,7 @@ fastrand = "^1.7.0"
 futures = { version = "0.3", features = ["thread-pool"] }
 libc = "0.2.146"
 nix = "0.26.2"
-oci-spec = { version = "^0.6.0", features = ["runtime"] }
+oci-spec = { version = "^0.6.1", features = ["runtime"] }
 once_cell = "1.18.0"
 procfs = "0.15.1"
 prctl = "1.0.0"

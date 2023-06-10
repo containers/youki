@@ -78,6 +78,7 @@ fn translate_arch(arch: Arch) -> ScmpArch {
 }
 
 fn translate_action(action: LinuxSeccompAction, errno: Option<u32>) -> Result<ScmpAction> {
+    tracing::trace!(?action, ?errno, "translating action");
     let errno = errno.map(|e| e as i32).unwrap_or(libc::EPERM);
     let action = match action {
         LinuxSeccompAction::ScmpActKill => ScmpAction::KillThread,
@@ -94,6 +95,7 @@ fn translate_action(action: LinuxSeccompAction, errno: Option<u32>) -> Result<Sc
         LinuxSeccompAction::ScmpActLog => ScmpAction::Log,
     };
 
+    tracing::trace!(?action, "translated action");
     Ok(action)
 }
 
@@ -139,9 +141,11 @@ fn check_seccomp(seccomp: &LinuxSeccomp) -> Result<()> {
     Ok(())
 }
 
+#[tracing::instrument(level = "trace", skip(seccomp))]
 pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
     check_seccomp(seccomp)?;
 
+    tracing::trace!(default_action = ?seccomp.default_action(), errno = ?seccomp.default_errno_ret(), "initializing seccomp");
     let default_action = translate_action(seccomp.default_action(), seccomp.default_errno_ret())?;
     let mut ctx =
         ScmpFilterContext::new_filter(default_action).map_err(|err| SeccompError::NewFilter {
@@ -165,6 +169,7 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
 
     if let Some(architectures) = seccomp.architectures() {
         for &arch in architectures {
+            tracing::trace!(?arch, "adding architecture");
             ctx.add_arch(translate_arch(arch))
                 .map_err(|err| SeccompError::AddArch { source: err, arch })?;
         }
@@ -226,6 +231,7 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
                                 translate_op(arg.op(), arg.value_two()),
                                 arg.value(),
                             );
+                            tracing::trace!(?name, ?action, ?arg, "add seccomp conditional rule");
                             ctx.add_rule_conditional(action, sc, &[cmp])
                                 .map_err(|err| {
                                     tracing::error!(
@@ -238,6 +244,7 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
                         }
                     }
                     None => {
+                        tracing::trace!(?name, ?action, "add seccomp rule");
                         ctx.add_rule(action, sc).map_err(|err| {
                             tracing::error!(
                                 "failed to add seccomp rule: {:?}. Syscall: {name}",

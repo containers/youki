@@ -24,7 +24,6 @@ runtimetest:
 rust-oci-tests-bin:
     ./scripts/build.sh -o {{ ROOT }} -r -c integration-test
 
-
 # Tests
 
 # run oci tests
@@ -86,6 +85,7 @@ clean:
 dev-prepare:
     cargo install typos-cli
 
+# setup dependencies in CI
 ci-prepare:
     #!/usr/bin/env bash
     set -euo pipefail
