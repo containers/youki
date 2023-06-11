@@ -40,7 +40,7 @@ jobs:
       - name: Install just
         uses: taiki-e/install-action@just
       - name: Install requirements
-        run: just ci-prepare
+        run: sudo env PATH=$PATH just ci-prepare
       - name: Install runc 1.1.0
         run: |
           wget -q https://github.com/opencontainers/runc/releases/download/v1.1.0/runc.amd64

@@ -21,6 +21,6 @@ spec:
       runtimeClassName: youki
       containers:
       - name: nginx
-        image: nginx:1.16.1
+        image: nginx:alpine
         ports:
         - containerPort: 80

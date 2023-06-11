@@ -1,7 +1,7 @@
 alias build := youki-release
 alias youki := youki-dev
 
-ROOT := `git rev-parse --show-toplevel`
+KIND_CLUSTER_NAME := 'youki'
 
 # build
 
@@ -10,19 +10,19 @@ build-all: youki-release rust-oci-tests-bin runtimetest
 
 # build youki in dev mode
 youki-dev:
-    ./scripts/build.sh -o {{ ROOT }} -c youki
+    {{ justfile_directory() }}/scripts/build.sh -o {{ justfile_directory() }} -c youki
 
 # build youki in release mode
 youki-release:
-    ./scripts/build.sh -o {{ ROOT }} -r -c youki
+    {{ justfile_directory() }}/scripts/build.sh -o . -r -c youki
 
 # build runtimetest binary
 runtimetest:
-    ./scripts/build.sh -o {{ ROOT }} -r -c runtimetest
+    {{ justfile_directory() }}/scripts/build.sh -o . -r -c runtimetest
 
 # build rust oci tests binary
 rust-oci-tests-bin:
-    ./scripts/build.sh -o {{ ROOT }} -r -c integration-test
+    {{ justfile_directory() }}/scripts/build.sh -o {{ justfile_directory() }} -r -c integration-test
 
 # Tests
 
@@ -43,11 +43,11 @@ featuretest:
 
 # run oci integration tests
 oci-tests: 
-    ./scripts/oci_integration_tests.sh {{ ROOT }}
+    ./scripts/oci_integration_tests.sh {{ justfile_directory() }}
 
 # run rust oci integration tests
 rust-oci-tests: youki-release runtimetest rust-oci-tests-bin
-    ./scripts/rust_integration_tests.sh {{ ROOT }}/youki
+    ./scripts/rust_integration_tests.sh ./youki
 
 # validate rust oci integration tests on runc
 validate-rust-oci-runc: runtimetest rust-oci-tests-bin
@@ -55,8 +55,37 @@ validate-rust-oci-runc: runtimetest rust-oci-tests-bin
 
 # run containerd integration tests
 containerd-test: youki-dev
-	VAGRANT_VAGRANTFILE=Vagrantfile.containerd2youki vagrant up
-	VAGRANT_VAGRANTFILE=Vagrantfile.containerd2youki vagrant provision --provision-with test
+    VAGRANT_VAGRANTFILE=Vagrantfile.containerd2youki vagrant up
+    VAGRANT_VAGRANTFILE=Vagrantfile.containerd2youki vagrant provision --provision-with test
+
+[private]
+kind-cluster: bin-kind
+    #!/usr/bin/env bash
+    set -euxo pipefail
+
+    mkdir -p tests/k8s/_out/
+    docker buildx build -f tests/k8s/Dockerfile --iidfile=tests/k8s/_out/img --load .
+    image=$(cat tests/k8s/_out/img)
+    bin/kind create cluster --name {{ KIND_CLUSTER_NAME }} --image=$image
+
+# run youki with kind
+test-kind: kind-cluster
+    kubectl --context=kind-{{ KIND_CLUSTER_NAME }} apply -f tests/k8s/deploy.yaml
+    kubectl --context=kind-{{ KIND_CLUSTER_NAME }} wait deployment nginx-deployment --for condition=Available=True --timeout=90s
+    kubectl --context=kind-{{ KIND_CLUSTER_NAME }} get pods -o wide
+    kubectl --context=kind-{{ KIND_CLUSTER_NAME }} delete -f tests/k8s/deploy.yaml
+
+# Bin
+
+[private]
+bin-kind:
+	docker buildx build --output=bin/ -f tests/k8s/Dockerfile --target kind-bin .
+
+# Clean
+
+# Clean kind test env
+clean-test-kind:
+	kind delete cluster --name {{ KIND_CLUSTER_NAME }}
 
 # misc
 
@@ -79,7 +108,7 @@ format:
 
 # cleans up generated artifacts
 clean:
-    ./scripts/clean.sh {{ ROOT }}
+    ./scripts/clean.sh .
 
 # install tools used in dev
 dev-prepare:
@@ -95,8 +124,8 @@ ci-prepare:
         source /etc/lsb-release
         if [[ $DISTRIB_ID == "Ubuntu" ]]; then
             echo "System is Ubuntu"
-            sudo apt-get -y update
-            sudo apt-get install -y \
+            apt-get -y update
+            apt-get install -y \
                 pkg-config \
                 libsystemd-dev \
                 libdbus-glib-1-dev \
