@@ -24,7 +24,7 @@ test_utils = ["dep:rand"]
 bitflags = "2.3.1"
 caps = "0.5.5"
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
-fastrand = "^1.7.0"
+fastrand = "^2.0.0"
 futures = { version = "0.3", features = ["thread-pool"] }
 libc = "0.2.146"
 nix = "0.26.2"
