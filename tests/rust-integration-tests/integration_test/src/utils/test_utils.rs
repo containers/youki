@@ -48,9 +48,6 @@ pub fn create_container<P: AsRef<Path>>(id: &str, dir: P) -> Result<Child> {
         // in test_inside_container function
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        // set log level to error only, otherwise
-        // we get warnings in stderr
-        .env("YOUKI_LOG_LEVEL", "error")
         .arg("--root")
         .arg(dir.as_ref().join("runtime"))
         .arg("create")

@@ -160,6 +160,7 @@ $ sudo apt-get install    \
       libelf-dev          \
       libseccomp-dev      \
       libclang-dev        \
+      glibc-static        \
       libssl-dev
 ```
 

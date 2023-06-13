@@ -217,7 +217,7 @@ pub fn test_mount_releatime_option(path: &str) -> Result<(), std::io::Error> {
     println!(
         "{:?} file three metadata atime is {:?}",
         test_file_path,
-        two_metadata.atime()
+        three_metadata.atime()
     );
     if two_metadata.atime() != three_metadata.atime() {
         return Err(std::io::Error::new(
@@ -282,8 +282,8 @@ pub fn test_mount_noreleatime_option(path: &str) -> Result<(), std::io::Error> {
     println!(
         "{:?} file three atime is {:?},mtime is {:?},current time is {:?}",
         test_file_path,
-        two_metadata.atime(),
-        two_metadata.mtime(),
+        three_metadata.atime(),
+        three_metadata.mtime(),
         std::time::SystemTime::now()
     );
 
