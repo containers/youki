@@ -20,7 +20,7 @@ jobs:
         with:
           files: |
             .github/workflows/integration_tests_validation.yaml
-            integration_test/tests/rust-integration-tests/**
+            tests/rust-integration-tests/**
           files_ignore: |
             **.md
       - name: List all changed files
