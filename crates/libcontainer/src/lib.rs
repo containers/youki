@@ -14,7 +14,6 @@ pub mod rootless;
 pub mod seccomp;
 pub mod signal;
 pub mod syscall;
-#[cfg(feature = "test_utils")]
 pub mod test_utils;
 pub mod tty;
 pub mod utils;

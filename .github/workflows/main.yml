@@ -27,6 +27,7 @@ jobs:
           for file in ${{ steps.filter.outputs.all_modified_files }}; do
             echo "$file was changed"
           done
+
   check:
     needs: [changes]
     if: needs.changes.outputs.any_modified == 'true'
@@ -66,6 +67,8 @@ jobs:
         run: |
           export LD_LIBRARY_PATH=$HOME/.wasmedge/lib
           cd ./crates && cargo test --all --all-features --no-fail-fast
+      - name: Run feature tests
+        run: just featuretest
 
   coverage:
     needs: [changes]

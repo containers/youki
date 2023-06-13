@@ -1,5 +1,4 @@
 use nix::sys::wait;
-use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 // Normally, error types are not implemented as serialize/deserialize, but to
@@ -84,11 +83,15 @@ where
     let (mut sender, mut receiver) = crate::channel::channel::<ClosureResult>()?;
     match unsafe { nix::unistd::fork().map_err(TestError::Fork)? } {
         nix::unistd::ForkResult::Parent { child } => {
+            // Close unused senders
+            sender.close().map_err(TestError::Channel)?;
             let res = receiver.recv().map_err(TestError::Channel)?;
             wait::waitpid(child, None).map_err(TestError::Wait)?;
             res.map_err(|err| TestError::Execution(Box::new(err)))?;
         }
         nix::unistd::ForkResult::Child => {
+            // Close unused receiver in the child
+            receiver.close().map_err(TestError::Channel)?;
             let test_result = match std::panic::catch_unwind(cb) {
                 Ok(ret) => ret.map_err(|err| ErrorEnclosure::new(&err)),
                 Err(_) => Err(ErrorEnclosure::new(&TestError::Panic)),
@@ -102,10 +105,6 @@ where
     };
 
     Ok(())
-}
-
-pub fn gen_u32() -> u32 {
-    rand::thread_rng().gen()
 }
 
 #[cfg(test)]

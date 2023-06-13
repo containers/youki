@@ -112,8 +112,8 @@ mod tests {
     #[cfg(feature = "v1")]
     use crate::syscall::linux::LinuxSyscall;
     use crate::syscall::test::TestHelperSyscall;
-    use anyhow::{Context, Result};
     #[cfg(feature = "v1")]
+    use anyhow::{Context, Result};
     use nix::{
         fcntl::{open, OFlag},
         sys::stat::Mode,

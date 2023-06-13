@@ -33,6 +33,7 @@ use crate::v1::ControllerType;
 pub struct Manager {
     subsystems: HashMap<CtrlType, PathBuf>,
 }
+
 #[derive(thiserror::Error, Debug)]
 pub enum V1ManagerError {
     #[error("io error: {0}")]

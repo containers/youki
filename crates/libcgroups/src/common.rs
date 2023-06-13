@@ -16,11 +16,8 @@ use oci_spec::runtime::{
     LinuxDevice, LinuxDeviceBuilder, LinuxDeviceCgroup, LinuxDeviceCgroupBuilder, LinuxDeviceType,
 };
 
-#[cfg(feature = "systemd")]
 use super::systemd;
-#[cfg(feature = "v1")]
 use super::v1;
-#[cfg(feature = "v2")]
 use super::v2;
 
 use super::stats::Stats;
@@ -354,8 +351,10 @@ fn create_v1_cgroup_manager(
 }
 
 #[cfg(not(feature = "v1"))]
-fn create_v1_cgroup_manager(_cgroup_path: PathBuf) -> Result<Box<dyn CgroupManager>> {
-    bail!("cgroup v1 feature is required, but was not enabled during compile time");
+fn create_v1_cgroup_manager(
+    _cgroup_path: PathBuf,
+) -> Result<v1::manager::Manager, v1::manager::V1ManagerError> {
+    Err(v1::manager::V1ManagerError::NotEnabled)
 }
 
 #[cfg(feature = "v2")]
@@ -367,8 +366,10 @@ fn create_v2_cgroup_manager(
 }
 
 #[cfg(not(feature = "v2"))]
-fn create_v2_cgroup_manager(_cgroup_path: PathBuf) -> Result<Box<dyn CgroupManager>> {
-    bail!("cgroup v2 feature is required, but was not enabled during compile time");
+fn create_v2_cgroup_manager(
+    _cgroup_path: PathBuf,
+) -> Result<v2::manager::Manager, v2::manager::V2ManagerError> {
+    Err(v2::manager::V2ManagerError::NotEnabled)
 }
 
 #[cfg(feature = "systemd")]
@@ -400,8 +401,8 @@ fn create_systemd_cgroup_manager(
 fn create_systemd_cgroup_manager(
     _cgroup_path: PathBuf,
     _container_name: &str,
-) -> Result<Box<dyn CgroupManager>> {
-    bail!("systemd cgroup feature is required, but was not enabled during compile time");
+) -> Result<systemd::manager::Manager, systemd::manager::SystemdManagerError> {
+    Err(systemd::manager::SystemdManagerError::NotEnabled)
 }
 
 pub fn get_all_pids(path: &Path) -> Result<Vec<Pid>, WrappedIoError> {
