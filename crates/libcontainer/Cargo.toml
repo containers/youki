@@ -21,7 +21,7 @@ cgroupsv2_devices = ["libcgroups/cgroupsv2_devices"]
 test_utils = ["dep:rand"]
 
 [dependencies]
-bitflags = "2.3.1"
+bitflags = "2.3.2"
 caps = "0.5.5"
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
 fastrand = "^2.0.0"
