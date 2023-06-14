@@ -21,6 +21,9 @@ struct YoukiExtendOpts {
     /// Enable logging to systemd-journald
     #[clap(long)]
     pub systemd_log: bool,
+    /// set the log level (default is 'error')
+    #[clap(long)]
+    pub log_level: Option<String>,
 }
 
 // High-level commandline option definition

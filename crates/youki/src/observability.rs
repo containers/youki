@@ -55,7 +55,7 @@ impl From<&crate::Opts> for ObservabilityConfig {
     fn from(opts: &crate::Opts) -> Self {
         Self {
             log_debug_flag: opts.global.debug,
-            log_level: opts.global.log_level.to_owned(),
+            log_level: opts.youki_extend.log_level.to_owned(),
             log_file: opts.global.log.to_owned(),
             log_format: opts.global.log_format.to_owned(),
             systemd_log: opts.youki_extend.systemd_log,

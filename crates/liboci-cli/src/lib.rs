@@ -72,9 +72,6 @@ pub struct GlobalOpts {
     /// change log level to debug, but the `log-level` flag takes precedence
     #[clap(long)]
     pub debug: bool,
-    /// set the log level (default is 'warn')
-    #[clap(long)]
-    pub log_level: Option<String>,
     /// set the log format ('text' (default), or 'json') (default: "text")
     #[clap(long)]
     pub log_format: Option<String>,
