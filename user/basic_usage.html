@@ -252,6 +252,13 @@ sudo ./youki delete tutorial_container
 ./youki list
 ./youki delete rootless_container
 </code></pre>
+<h4 id="log-level"><a class="header" href="#log-level">Log level</a></h4>
+<p><code>youki</code> defaults the log level to <code>error</code> in the release build. In the debug
+build, the log level defaults to <code>debug</code>. The <code>--log-level</code> flag can be used to
+set the log-level. For least amount of log, we recommend using the <code>error</code> log
+level. For the most spammy logging, we have a <code>trace</code> level.</p>
+<p>For compatibility with <code>runc</code> and <code>crun</code>, we have a <code>--debug</code> flag to set the
+log level to <code>debug</code>. This flag is ignored if <code>--log-level</code> is also set.</p>
 
                     </main>
 
