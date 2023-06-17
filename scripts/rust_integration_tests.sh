@@ -24,7 +24,7 @@ if [ ! -f ${ROOT}/bundle.tar.gz ]; then
 fi
 touch ${LOGFILE}
 
-sudo YOUKI_LOG_LEVEL="error" ${ROOT}/integration_test run --runtime "$RUNTIME" --runtimetest ${ROOT}/runtimetest > $LOGFILE
+sudo ${ROOT}/integration_test run --runtime "$RUNTIME" --runtimetest ${ROOT}/runtimetest > $LOGFILE
 
 if [ 0 -ne $(grep "not ok" $LOGFILE | wc -l ) ]; then
     cat $LOGFILE

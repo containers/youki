@@ -66,13 +66,12 @@ pub enum CommonCmd {
 // flags, but these are commonly accepted by runtimes
 #[derive(Parser, Debug)]
 pub struct GlobalOpts {
-    /// change log level to debug.
-    // Example in future : '--debug     change log level to debug. (default: "warn")'
-    #[clap(long)]
-    pub debug: bool,
     /// set the log file to write youki logs to (default is '/dev/stderr')
     #[clap(short, long, overrides_with("log"))]
     pub log: Option<PathBuf>,
+    /// change log level to debug, but the `log-level` flag takes precedence
+    #[clap(long)]
+    pub debug: bool,
     /// set the log format ('text' (default), or 'json') (default: "text")
     #[clap(long)]
     pub log_format: Option<String>,

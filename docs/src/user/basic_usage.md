@@ -171,3 +171,13 @@ cd ..
 ./youki list
 ./youki delete rootless_container
 ```
+
+#### Log level
+
+`youki` defaults the log level to `error` in the release build. In the debug
+build, the log level defaults to `debug`. The `--log-level` flag can be used to
+set the log-level. For least amount of log, we recommend using the `error` log
+level. For the most spammy logging, we have a `trace` level.
+
+For compatibility with `runc` and `crun`, we have a `--debug` flag to set the
+log level to `debug`. This flag is ignored if `--log-level` is also set.
