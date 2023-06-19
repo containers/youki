@@ -18,7 +18,6 @@ systemd = ["libcgroups/systemd", "v2"]
 v2 = ["libcgroups/v2"]
 v1 = ["libcgroups/v1"]
 cgroupsv2_devices = ["libcgroups/cgroupsv2_devices"]
-test_utils = ["dep:rand"]
 
 [dependencies]
 bitflags = "2.3.2"
@@ -42,7 +41,6 @@ regex = "1.8.4"
 thiserror = "1.0.24"
 tracing = { version = "0.1.37", features = ["attributes"]}
 safe-path = "0.1.0"
-rand = { version = "0.8.5", optional = true }
 
 [dev-dependencies]
 oci-spec = { version = "^0.6.0", features = ["proptests", "runtime"] }
@@ -50,3 +48,4 @@ quickcheck = "1"
 serial_test = "2.0.0"
 tempfile = "3"
 anyhow = "1.0"
+rand = { version = "0.8.5" }

@@ -452,16 +452,18 @@ fn write_id_mapping(
 mod tests {
     use std::fs;
 
+    use super::*;
     use anyhow::Result;
     use nix::unistd::getpid;
     use oci_spec::runtime::{
         LinuxBuilder, LinuxIdMappingBuilder, LinuxNamespaceBuilder, SpecBuilder,
     };
+    use rand::Rng;
     use serial_test::serial;
 
-    use crate::test_utils::gen_u32;
-
-    use super::*;
+    fn gen_u32() -> u32 {
+        rand::thread_rng().gen()
+    }
 
     #[test]
     fn test_validate_ok() -> Result<()> {

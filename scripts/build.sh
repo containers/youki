@@ -1,6 +1,5 @@
-#!/bin/bash
-
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
 ROOT=$(git rev-parse --show-toplevel)
 
@@ -13,6 +12,7 @@ VERSION=debug
 TARGET="$(uname -m)-unknown-linux-gnu"
 CRATE="youki"
 RUNTIMETEST_TARGET="$ROOT/runtimetest-target"
+features=""
 while getopts f:ro:c:h OPT; do
     case $OPT in
         f) features=${OPTARG}
