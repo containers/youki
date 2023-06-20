@@ -22,7 +22,7 @@ cgroupsv2_devices = ["rbpf", "libbpf-sys", "errno", "libc"]
 [dependencies]
 nix = "0.26.2"
 procfs = "0.15.1"
-oci-spec = { version = "^0.6.1", features = ["runtime"] }
+oci-spec = { version = "0.6.1", features = ["runtime"] }
 dbus = { version = "0.9.7", optional = true }
 fixedbitset = "0.4.2"
 serde = { version = "1.0", features = ["derive"] }
@@ -35,7 +35,7 @@ tracing = { version = "0.1.37", features = ["attributes"]}
 
 [dev-dependencies]
 anyhow = "1.0"
-oci-spec = { version = "^0.6.0", features = ["proptests", "runtime"] }
+oci-spec = { version = "0.6.1", features = ["proptests", "runtime"] }
 quickcheck = "1"
 mockall = { version = "0.11.4", features = [] }
 clap = "4.1.6"
