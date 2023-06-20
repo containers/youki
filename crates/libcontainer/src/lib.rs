@@ -18,3 +18,7 @@ pub mod test_utils;
 pub mod tty;
 pub mod utils;
 pub mod workload;
+
+// Because the `libcontainer` api uses the oci_spec who resides in a different
+// crate, we re-export the version of oci_spec this crate uses.
+pub use oci_spec;
