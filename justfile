@@ -32,7 +32,7 @@ rust-oci-tests-bin:
 test-oci: oci-tests rust-oci-tests
 
 # run all tests except rust-oci 
-test-all: unittest featuretest oci-tests containerd-test # currently not doing rust-oci here
+test-all: unittest test-features oci-tests containerd-test # currently not doing rust-oci here
 
 # run cargo unittests
 unittest:
@@ -40,8 +40,12 @@ unittest:
     LD_LIBRARY_PATH=${HOME}/.wasmedge/lib cargo test --all --all-targets --all-features
 
 # run permutated feature compilation tests
-featuretest:
+test-features:
     {{ cwd }}/scripts/features_test.sh
+
+# run test against musl target
+test-musl:
+    {{ cwd }}/scripts/musl_test.sh
 
 # run oci integration tests
 oci-tests: 
@@ -137,6 +141,26 @@ ci-prepare:
                 libclang-dev \
                 libssl-dev \
                 criu
+            exit 0
+        fi
+    fi
+
+    echo "Unknown system. The CI is only configured for Ubuntu. You will need to forge your own path. Good luck!"
+    exit 1
+
+ci-musl-prepare: ci-prepare
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # Check if system is Ubuntu
+    if [[ -f /etc/lsb-release ]]; then
+        source /etc/lsb-release
+        if [[ $DISTRIB_ID == "Ubuntu" ]]; then
+            echo "System is Ubuntu"
+            apt-get -y update
+            apt-get install -y \
+                musl-dev \
+                musl-tools
             exit 0
         fi
     fi
