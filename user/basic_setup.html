@@ -88,11 +88,33 @@
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
 
+        <!-- Track and set sidebar scroll position -->
+        <script>
+            var sidebarScrollbox = document.querySelector('#sidebar .sidebar-scrollbox');
+            sidebarScrollbox.addEventListener('click', function(e) {
+                if (e.target.tagName === 'A') {
+                    sessionStorage.setItem('sidebar-scroll', sidebarScrollbox.scrollTop);
+                }
+            }, { passive: true });
+            var sidebarScrollTop = sessionStorage.getItem('sidebar-scroll');
+            sessionStorage.removeItem('sidebar-scroll');
+            if (sidebarScrollTop) {
+                // preserve sidebar scroll position when navigating via links within sidebar
+                sidebarScrollbox.scrollTop = sidebarScrollTop;
+            } else {
+                // scroll sidebar to current active section when navigating via "next/previous chapter" buttons
+                var activeSection = document.querySelector('#sidebar .active');
+                if (activeSection) {
+                    activeSection.scrollIntoView({ block: 'center' });
+                }
+            }
+        </script>
+
         <div id="page-wrapper" class="page-wrapper">
 
             <div class="page">
                                 <div id="menu-bar-hover-placeholder"></div>
-                <div id="menu-bar" class="menu-bar sticky bordered">
+                <div id="menu-bar" class="menu-bar sticky">
                     <div class="left-buttons">
                         <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
                             <i class="fa fa-bars"></i>
@@ -148,11 +170,11 @@
 <p>This explains the requirements for compiling Youki as a binary, to use it as a low-level container runtime, or to depend once of its crates as dependency for your own project.</p>
 <p>Youki currently only supports Linux Platform, and to use it on other platform you will need to use some kind of virtualization. The repo itself provides Vagrantfile that provides basic setup to use Youki on non-Linux system using Vagrant. The last sub-section explains using this vagrantfile.</p>
 <p>Also note that Youki currently only supports and expects systemd as init system, and would not work on other systems. There is currently work on-going to put systemd dependent features behind a feature flag, but till then you will need a systemd enabled system to work with Youki.</p>
-<h3 id="requirements"><a class="header" href="#requirements">Requirements</a></h3>
+<h2 id="requirements"><a class="header" href="#requirements">Requirements</a></h2>
 <p>As Youki is written in Rust, you will need to install and setup Rust toolchain to compile it. The instructions for that can be found on Rust's official site <a href="https://www.rust-lang.org/tools/install">here</a>.</p>
 <p>You can use Youki by itself to start and run containers, but it can be a little tedious, as it is a low-level container runtime. You can use a High-level container runtime, with its runtime set to Youki, so that it will be easier to use. Both of these are explained in the <a href="./basic_usage.html">Basic Usage</a>. For using it along with an high-level runtime, you will to install one such as Docker or Podman. This documentation uses Docker in its examples, which can be installed from <a href="https://docs.docker.com/engine/install">here</a>.</p>
 <p>To compile and run, Youki itself depends on some underlying libraries being installed. You can install them using your respective package manager as shown below.</p>
-<h4 id="debian-ubuntu-and-related-distributions"><a class="header" href="#debian-ubuntu-and-related-distributions">Debian, Ubuntu and related distributions</a></h4>
+<h3 id="debian-ubuntu-and-related-distributions"><a class="header" href="#debian-ubuntu-and-related-distributions">Debian, Ubuntu and related distributions</a></h3>
 <pre><code class="language-console">$ sudo apt-get install    \
       pkg-config          \
       libsystemd-dev      \
@@ -163,7 +185,7 @@
       libclang-dev        \
       libssl-dev
 </code></pre>
-<h4 id="fedora-centos-rhel-and-related-distributions"><a class="header" href="#fedora-centos-rhel-and-related-distributions">Fedora, CentOS, RHEL and related distributions</a></h4>
+<h3 id="fedora-centos-rhel-and-related-distributions"><a class="header" href="#fedora-centos-rhel-and-related-distributions">Fedora, CentOS, RHEL and related distributions</a></h3>
 <pre><code class="language-console">$ sudo dnf install          \
       pkg-config            \
       systemd-devel         \
@@ -174,22 +196,31 @@
       openssl-devel
 </code></pre>
 <hr />
-<h3 id="getting-the-source"><a class="header" href="#getting-the-source">Getting the source</a></h3>
+<h2 id="quick-install"><a class="header" href="#quick-install">Quick install</a></h2>
+<p>Install from the GitHub release.
+Note that this way also requires the aforementioned installation.</p>
+<pre><code class="language-console">$ wget https://github.com/containers/youki/releases/download/v0.1.0/youki_0_1_0_linux.tar.gz
+$ tar -zxvf youki_0_1_0_linux.tar.gz youki_0_1_0_linux/youki-0.1.0/youki
+# Maybe you need root privileges.
+$ mv youki_0_1_0_linux/youki-0.1.0/youki /usr/local/bin/youki
+$ rm -rf youki_0_1_0_linux.tar.gz youki_0_1_0_linux
+</code></pre>
+<h2 id="getting-the-source"><a class="header" href="#getting-the-source">Getting the source</a></h2>
 <p>Currently Youki can only be installed from the source code itself, so you will need to clone the Youki GitHub repository to get the source code for using it as a runtime. If you are using any crates of Youki as dependency you need to do this step, as Cargo will automatically clone the repository for you.</p>
 <p>To clone the repository, run</p>
-<pre><code class="language-console">git clone https://github.com/containers/youki.git
+<pre><code class="language-console">$ git clone https://github.com/containers/youki.git
 </code></pre>
 <p>This will create a directory named youki in the directory you ran the command in. This youki directory will be referred to as root directory throughout the documentation.</p>
-<h3 id="installing-the-source"><a class="header" href="#installing-the-source">Installing the source</a></h3>
+<h2 id="installing-the-source"><a class="header" href="#installing-the-source">Installing the source</a></h2>
 <p>Once you have cloned the source, you can build it using</p>
 <pre><code class="language-console"># go into the cloned directory
-cd youki
-make youki-dev # or youki-release
-./youki -h # get information about youki command
+$ cd youki
+$ make youki-dev # or youki-release
+$ ./youki -h # get information about youki command
 </code></pre>
 <p>This will build the Youki binary, and put it at the root level of the cloned directory, that is in the youki/ .</p>
 <hr />
-<h3 id="using-sub-crates-as-dependency"><a class="header" href="#using-sub-crates-as-dependency">Using sub-crates as dependency</a></h3>
+<h2 id="using-sub-crates-as-dependency"><a class="header" href="#using-sub-crates-as-dependency">Using sub-crates as dependency</a></h2>
 <p>To use any of the sub-crate as a dependency in your own project, you can specify the dependency as follows,</p>
 <pre><code class="language-toml">[dependencies]
 ...
@@ -201,18 +232,18 @@ liboci-cli = { git = &quot;https://github.com/containers/Youki.git&quot; }
 <pre><code>use liboci_cli::{...}
 </code></pre>
 <hr />
-<h3 id="using-vagrant-to-run-youki-on-non-linux-platform"><a class="header" href="#using-vagrant-to-run-youki-on-non-linux-platform">Using Vagrant to run Youki on non-Linux Platform</a></h3>
+<h2 id="using-vagrant-to-run-youki-on-non-linux-platform"><a class="header" href="#using-vagrant-to-run-youki-on-non-linux-platform">Using Vagrant to run Youki on non-Linux Platform</a></h2>
 <p>As explained before, Youki only support Linux, and to build/use it on non-Linux Platforms, you will need to use some kind of virtualization. The repo provides a Vagrantfile to do the required VM setup using Vagrant, which can be installed from <a href="https://www.vagrantup.com/docs/installation">here</a>.</p>
 <p>Once installed and setup, you can run vagrant commands in the cloned directory to run Youki inside the VM created by vagrant :</p>
 <pre><code class="language-console"># in the youki directory
 
 # for rootless mode, which is default
-vagrant up
-vagrant ssh
+$ vagrant up
+$ vagrant ssh
 
 # or if you want to develop in rootful mode
-VAGRANT_VAGRANTFILE=Vagrantfile.root vagrant up
-VAGRANT_VAGRANTFILE=Vagrantfile.root vagrant ssh
+$ VAGRANT_VAGRANTFILE=Vagrantfile.root vagrant up
+$ VAGRANT_VAGRANTFILE=Vagrantfile.root vagrant ssh
 
 # in virtual machine
 $ cd youki
