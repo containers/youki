@@ -12,6 +12,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "addr2line"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f4fa78e18c64fce05e902adecd7a5eed15a5e0a3439f7b0e169f0252214865e3"
+dependencies = [
+ "gimli 0.27.2",
+]
+
+[[package]]
 name = "adler"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -176,16 +185,16 @@ checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
 name = "backtrace"
-version = "0.3.67"
+version = "0.3.68"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "233d376d6d185f2a3093e58f283f60f880315b6c60075b01f36b3b85154564ca"
+checksum = "4319208da049c43661739c5fade2ba182f09d1dc2299b32298d3a31692b17e12"
 dependencies = [
- "addr2line",
+ "addr2line 0.20.0",
  "cc",
  "cfg-if 1.0.0",
  "libc",
- "miniz_oxide 0.6.2",
- "object",
+ "miniz_oxide",
+ "object 0.31.1",
  "rustc-demangle",
 ]
 
@@ -1248,7 +1257,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3b9429470923de8e8cbd4d2dc513535400b4b3fef0319fb5c4e1f520a7bef743"
 dependencies = [
  "crc32fast",
- "miniz_oxide 0.7.1",
+ "miniz_oxide",
 ]
 
 [[package]]
@@ -2183,15 +2192,6 @@ checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
 
 [[package]]
 name = "miniz_oxide"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b275950c28b37e794e8c55d88aeb5e139d0ce23fdbbeda68f8d7174abdf9e8fa"
-dependencies = [
- "adler",
-]
-
-[[package]]
-name = "miniz_oxide"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e7810e0be55b428ada41041c41f32c9f1a42817901b4ccf45fa3d4b6561e74c7"
@@ -2367,6 +2367,15 @@ dependencies = [
  "crc32fast",
  "hashbrown 0.13.2",
  "indexmap 1.9.3",
+ "memchr",
+]
+
+[[package]]
+name = "object"
+version = "0.31.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8bda667d9f2b5051b8833f59f3bf748b28ef54f850f4fcb389a252aa383866d1"
+dependencies = [
  "memchr",
 ]
 
@@ -4786,7 +4795,7 @@ dependencies = [
  "indexmap 1.9.3",
  "libc",
  "log",
- "object",
+ "object 0.30.4",
  "once_cell",
  "paste",
  "psm",
@@ -4873,7 +4882,7 @@ dependencies = [
  "cranelift-wasm",
  "gimli 0.27.2",
  "log",
- "object",
+ "object 0.30.4",
  "target-lexicon",
  "thiserror",
  "wasmparser 0.107.0",
@@ -4892,7 +4901,7 @@ dependencies = [
  "cranelift-control",
  "cranelift-native",
  "gimli 0.27.2",
- "object",
+ "object 0.30.4",
  "target-lexicon",
  "wasmtime-environ",
 ]
@@ -4908,7 +4917,7 @@ dependencies = [
  "gimli 0.27.2",
  "indexmap 1.9.3",
  "log",
- "object",
+ "object 0.30.4",
  "serde",
  "target-lexicon",
  "thiserror",
@@ -4938,7 +4947,7 @@ version = "10.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5f0f2eaeb01bb67266416507829bd8e0bb60278444e4cbd048e280833ebeaa02"
 dependencies = [
- "addr2line",
+ "addr2line 0.19.0",
  "anyhow",
  "bincode",
  "cfg-if 1.0.0",
@@ -4946,7 +4955,7 @@ dependencies = [
  "gimli 0.27.2",
  "ittapi",
  "log",
- "object",
+ "object 0.30.4",
  "rustc-demangle",
  "rustix 0.37.19",
  "serde",
@@ -4964,7 +4973,7 @@ version = "10.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f42e59d62542bfb73ce30672db7eaf4084a60b434b688ac4f05b287d497de082"
 dependencies = [
- "object",
+ "object 0.30.4",
  "once_cell",
  "rustix 0.37.19",
 ]
@@ -5055,7 +5064,7 @@ dependencies = [
  "anyhow",
  "cranelift-codegen 0.97.1",
  "gimli 0.27.2",
- "object",
+ "object 0.30.4",
  "target-lexicon",
  "wasmparser 0.107.0",
  "wasmtime-cranelift-shared",
