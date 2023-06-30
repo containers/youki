@@ -12,6 +12,10 @@
 youki is an implementation of the [OCI runtime-spec](https://github.com/opencontainers/runtime-spec) in Rust, similar to [runc](https://github.com/opencontainers/runc).  
 Your ideas are welcome [here](https://github.com/containers/youki/issues/10).
 
+# Quick Install
+
+[User Documentation](https://containers.github.io/youki/user/basic_setup.html#quick-install)
+
 # About the name
 
 youki is pronounced as /joʊki/ or yoh-key.
@@ -97,7 +101,6 @@ Here is why we are writing a new container runtime in Rust.
 
   </details>
 
-- The development of [railcar](https://github.com/oracle/railcar) has been suspended. This project was very nice but is no longer being developed. This project is inspired by it.
 - I have fun implementing this. In fact, this may be the most important.
 
 # Related project
