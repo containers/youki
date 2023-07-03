@@ -20,17 +20,17 @@ use super::{
 };
 
 // Builder that can be used to configure the properties of a new container
-pub struct InitContainerBuilder<'a> {
-    base: ContainerBuilder<'a>,
+pub struct InitContainerBuilder {
+    base: ContainerBuilder,
     bundle: PathBuf,
     use_systemd: bool,
     detached: bool,
 }
 
-impl<'a> InitContainerBuilder<'a> {
+impl InitContainerBuilder {
     /// Generates the base configuration for a new container from which
     /// configuration methods can be chained
-    pub(super) fn new(builder: ContainerBuilder<'a>, bundle: PathBuf) -> Self {
+    pub(super) fn new(builder: ContainerBuilder, bundle: PathBuf) -> Self {
         Self {
             base: builder,
             bundle,

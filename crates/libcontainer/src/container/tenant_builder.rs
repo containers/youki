@@ -32,8 +32,8 @@ const TENANT_TTY: &str = "tenant-tty-";
 
 /// Builder that can be used to configure the properties of a process
 /// that will join an existing container sandbox
-pub struct TenantContainerBuilder<'a> {
-    base: ContainerBuilder<'a>,
+pub struct TenantContainerBuilder {
+    base: ContainerBuilder,
     env: HashMap<String, String>,
     cwd: Option<PathBuf>,
     args: Vec<String>,
@@ -43,11 +43,11 @@ pub struct TenantContainerBuilder<'a> {
     detached: bool,
 }
 
-impl<'a> TenantContainerBuilder<'a> {
+impl TenantContainerBuilder {
     /// Generates the base configuration for a process that will join
     /// an existing container sandbox from which configuration methods
     /// can be chained
-    pub(super) fn new(builder: ContainerBuilder<'a>) -> Self {
+    pub(super) fn new(builder: ContainerBuilder) -> Self {
         Self {
             base: builder,
             env: HashMap::new(),
