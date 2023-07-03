@@ -8,7 +8,7 @@ use crate::{
         intel_rdt::delete_resctrl_subdirectory,
     },
     rootless::Rootless,
-    syscall::Syscall,
+    syscall::{syscall::SyscallType, Syscall},
     utils,
     workload::ExecutorManager,
 };
@@ -21,7 +21,7 @@ pub(super) struct ContainerBuilderImpl<'a> {
     /// Flag indicating if an init or a tenant container should be created
     pub container_type: ContainerType,
     /// Interface to operating system primitives
-    pub syscall: &'a dyn Syscall,
+    pub syscall: SyscallType,
     /// Flag indicating if systemd should be used for cgroup management
     pub use_systemd: bool,
     /// Id of the container

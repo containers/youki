@@ -56,10 +56,31 @@ pub trait Syscall {
     ) -> Result<()>;
 }
 
-pub fn create_syscall() -> Box<dyn Syscall> {
-    if cfg!(test) {
-        Box::<TestHelperSyscall>::default()
-    } else {
-        Box::new(LinuxSyscall)
+#[derive(Clone, Copy)]
+pub enum SyscallType {
+    Linux,
+    Test,
+}
+
+impl Default for SyscallType {
+    fn default() -> Self {
+        if cfg!(test) {
+            SyscallType::Test
+        } else {
+            SyscallType::Linux
+        }
     }
+}
+
+impl SyscallType {
+    pub fn create_syscall(&self) -> Box<dyn Syscall> {
+        match self {
+            SyscallType::Linux => Box::new(LinuxSyscall),
+            SyscallType::Test => Box::new(TestHelperSyscall::default()),
+        }
+    }
+}
+
+pub fn create_syscall() -> Box<dyn Syscall> {
+    SyscallType::default().create_syscall()
 }

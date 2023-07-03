@@ -332,7 +332,7 @@ pub fn container_init_process(
     main_sender: &mut channel::MainSender,
     init_receiver: &mut channel::InitReceiver,
 ) -> Result<()> {
-    let syscall = args.syscall;
+    let syscall = args.syscall.create_syscall();
     let spec = args.spec;
     let linux = spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
     let proc = spec.process().as_ref().ok_or(MissingSpecError::Process)?;
@@ -359,7 +359,7 @@ pub fn container_init_process(
         })?;
     }
 
-    apply_rest_namespaces(&namespaces, spec, syscall)?;
+    apply_rest_namespaces(&namespaces, spec, syscall.as_ref())?;
 
     if let Some(true) = proc.no_new_privileges() {
         let _ = prctl::set_no_new_privileges(true);
@@ -457,7 +457,7 @@ pub fn container_init_process(
     if let Some(paths) = linux.readonly_paths() {
         // mount readonly path
         for path in paths {
-            readonly_path(Path::new(path), syscall).map_err(|err| {
+            readonly_path(Path::new(path), syscall.as_ref()).map_err(|err| {
                 tracing::error!(?err, ?path, "failed to set readonly path");
                 err
             })?;
@@ -467,7 +467,7 @@ pub fn container_init_process(
     if let Some(paths) = linux.masked_paths() {
         // mount masked path
         for path in paths {
-            masked_path(Path::new(path), linux.mount_label(), syscall).map_err(|err| {
+            masked_path(Path::new(path), linux.mount_label(), syscall.as_ref()).map_err(|err| {
                 tracing::error!(?err, ?path, "failed to set masked path");
                 err
             })?;
@@ -491,7 +491,7 @@ pub fn container_init_process(
         }
     };
 
-    set_supplementary_gids(proc.user(), &args.rootless, syscall).map_err(|err| {
+    set_supplementary_gids(proc.user(), &args.rootless, syscall.as_ref()).map_err(|err| {
         tracing::error!(?err, "failed to set supplementary gids");
         err
     })?;
@@ -581,12 +581,12 @@ pub fn container_init_process(
         tracing::warn!("seccomp not available, unable to enforce no_new_privileges!")
     }
 
-    capabilities::reset_effective(syscall).map_err(|err| {
+    capabilities::reset_effective(syscall.as_ref()).map_err(|err| {
         tracing::error!(?err, "failed to reset effective capabilities");
         InitProcessError::SyscallOther(err)
     })?;
     if let Some(caps) = proc.capabilities() {
-        capabilities::drop_privileges(caps, syscall).map_err(|err| {
+        capabilities::drop_privileges(caps, syscall.as_ref()).map_err(|err| {
             tracing::error!(?err, "failed to drop capabilities");
             InitProcessError::SyscallOther(err)
         })?;

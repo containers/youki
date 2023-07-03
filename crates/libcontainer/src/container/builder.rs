@@ -1,4 +1,5 @@
 use crate::error::{ErrInvalidID, LibcontainerError};
+use crate::syscall::syscall::SyscallType;
 use crate::workload::default::DefaultExecutor;
 use crate::workload::{Executor, ExecutorManager};
 use crate::{syscall::Syscall, utils::PathBufExt};
@@ -6,13 +7,13 @@ use std::path::PathBuf;
 
 use super::{init_builder::InitContainerBuilder, tenant_builder::TenantContainerBuilder};
 
-pub struct ContainerBuilder<'a> {
+pub struct ContainerBuilder {
     /// Id of the container
     pub(super) container_id: String,
     /// Root directory for container state
     pub(super) root_path: PathBuf,
     /// Interface to operating system primitives
-    pub(super) syscall: &'a dyn Syscall,
+    pub(super) syscall: SyscallType,
     /// File which will be used to communicate the pid of the
     /// container process to the higher level runtime
     pub(super) pid_file: Option<PathBuf>,
@@ -45,7 +46,7 @@ pub struct ContainerBuilder<'a> {
 /// .as_init("/var/run/docker/bundle")
 /// .build();
 /// ```
-impl<'a> ContainerBuilder<'a> {
+impl ContainerBuilder {
     /// Generates the base configuration for a container which can be
     /// transformed into either a init container or a tenant container
     ///
@@ -61,7 +62,7 @@ impl<'a> ContainerBuilder<'a> {
     ///     create_syscall().as_ref(),
     /// );
     /// ```
-    pub fn new(container_id: String, syscall: &'a dyn Syscall) -> Self {
+    pub fn new(container_id: String, syscall: SyscallType) -> Self {
         let root_path = PathBuf::from("/run/youki");
         Self {
             container_id,
@@ -129,7 +130,7 @@ impl<'a> ContainerBuilder<'a> {
     /// .build();
     /// ```
     #[allow(clippy::wrong_self_convention)]
-    pub fn as_tenant(self) -> TenantContainerBuilder<'a> {
+    pub fn as_tenant(self) -> TenantContainerBuilder {
         TenantContainerBuilder::new(self)
     }
 
@@ -150,7 +151,7 @@ impl<'a> ContainerBuilder<'a> {
     /// .build();
     /// ```
     #[allow(clippy::wrong_self_convention)]
-    pub fn as_init<P: Into<PathBuf>>(self, bundle: P) -> InitContainerBuilder<'a> {
+    pub fn as_init<P: Into<PathBuf>>(self, bundle: P) -> InitContainerBuilder {
         InitContainerBuilder::new(self, bundle.into())
     }
 
@@ -276,8 +277,8 @@ impl<'a> ContainerBuilder<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::container::builder::ContainerBuilder;
     use crate::syscall::syscall::create_syscall;
+    use crate::{container::builder::ContainerBuilder, syscall::syscall::SyscallType};
     use anyhow::{Context, Result};
     use std::path::PathBuf;
 
@@ -285,42 +286,41 @@ mod tests {
     fn test_failable_functions() -> Result<()> {
         let root_path_temp_dir = tempfile::tempdir().context("failed to create temp dir")?;
         let pid_file_temp_dir = tempfile::tempdir().context("failed to create temp dir")?;
-        let syscall = create_syscall();
+        let syscall = SyscallType::default();
 
-        ContainerBuilder::new("74f1a4cb3801".to_owned(), syscall.as_ref())
+        ContainerBuilder::new("74f1a4cb3801".to_owned(), syscall)
             .with_root_path(root_path_temp_dir.path())?
             .with_pid_file(Some(pid_file_temp_dir.path().join("fake.pid")))?
             .with_console_socket(Some("/var/run/docker/sock.tty"))
             .as_init("/var/run/docker/bundle");
 
         // accept None pid file.
-        ContainerBuilder::new("74f1a4cb3801".to_owned(), syscall.as_ref())
-            .with_pid_file::<PathBuf>(None)?;
+        ContainerBuilder::new("74f1a4cb3801".to_owned(), syscall).with_pid_file::<PathBuf>(None)?;
 
         // accept absolute root path which does not exist
         let abs_root_path = PathBuf::from("/not/existing/path");
-        let path_builder = ContainerBuilder::new("74f1a4cb3801".to_owned(), syscall.as_ref())
+        let path_builder = ContainerBuilder::new("74f1a4cb3801".to_owned(), syscall)
             .with_root_path(&abs_root_path)
             .context("build container")?;
         assert_eq!(path_builder.root_path, abs_root_path);
 
         // accept relative root path which does not exist
         let cwd = std::env::current_dir().context("get current dir")?;
-        let path_builder = ContainerBuilder::new("74f1a4cb3801".to_owned(), syscall.as_ref())
+        let path_builder = ContainerBuilder::new("74f1a4cb3801".to_owned(), syscall)
             .with_root_path("./not/existing/path")
             .context("build container")?;
         assert_eq!(path_builder.root_path, cwd.join("not/existing/path"));
 
         // accept absolute pid path which does not exist
         let abs_pid_path = PathBuf::from("/not/existing/path");
-        let path_builder = ContainerBuilder::new("74f1a4cb3801".to_owned(), syscall.as_ref())
+        let path_builder = ContainerBuilder::new("74f1a4cb3801".to_owned(), syscall)
             .with_pid_file(Some(&abs_pid_path))
             .context("build container")?;
         assert_eq!(path_builder.pid_file, Some(abs_pid_path));
 
         // accept relative pid path which does not exist
         let cwd = std::env::current_dir().context("get current dir")?;
-        let path_builder = ContainerBuilder::new("74f1a4cb3801".to_owned(), syscall.as_ref())
+        let path_builder = ContainerBuilder::new("74f1a4cb3801".to_owned(), syscall)
             .with_pid_file(Some("./not/existing/path"))
             .context("build container")?;
         assert_eq!(path_builder.pid_file, Some(cwd.join("not/existing/path")));
@@ -330,22 +330,21 @@ mod tests {
 
     #[test]
     fn test_validate_id() -> Result<()> {
-        let syscall = create_syscall();
+        let syscall = SyscallType::default();
         // validate container_id
-        let result = ContainerBuilder::new("$#".to_owned(), syscall.as_ref()).validate_id();
+        let result = ContainerBuilder::new("$#".to_owned(), syscall).validate_id();
         assert!(result.is_err());
 
-        let result = ContainerBuilder::new(".".to_owned(), syscall.as_ref()).validate_id();
+        let result = ContainerBuilder::new(".".to_owned(), syscall).validate_id();
         assert!(result.is_err());
 
-        let result = ContainerBuilder::new("..".to_owned(), syscall.as_ref()).validate_id();
+        let result = ContainerBuilder::new("..".to_owned(), syscall).validate_id();
         assert!(result.is_err());
 
-        let result = ContainerBuilder::new("...".to_owned(), syscall.as_ref()).validate_id();
+        let result = ContainerBuilder::new("...".to_owned(), syscall).validate_id();
         assert!(result.is_ok());
 
-        let result =
-            ContainerBuilder::new("74f1a4cb3801".to_owned(), syscall.as_ref()).validate_id();
+        let result = ContainerBuilder::new("74f1a4cb3801".to_owned(), syscall).validate_id();
         assert!(result.is_ok());
         Ok(())
     }
