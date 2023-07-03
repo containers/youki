@@ -84,12 +84,12 @@ pub struct Manager {
 impl Manager {
     /// Constructs a new cgroup manager with root path being the mount point
     /// of a cgroup v2 fs and cgroup path being a relative path from the root
-    pub fn new(root_path: PathBuf, cgroup_path: PathBuf) -> Result<Self, V2ManagerError> {
-        let full_path = root_path.join_safely(&cgroup_path)?;
+    pub fn new(root_path: PathBuf, cgroup_path: &Path) -> Result<Self, V2ManagerError> {
+        let full_path = root_path.join_safely(cgroup_path)?;
 
         Ok(Self {
             root_path,
-            cgroup_path,
+            cgroup_path: cgroup_path.to_owned(),
             full_path,
         })
     }

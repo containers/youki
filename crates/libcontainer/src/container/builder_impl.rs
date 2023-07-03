@@ -2,7 +2,6 @@ use super::{Container, ContainerStatus};
 use crate::{
     error::{LibcontainerError, MissingSpecError},
     hooks,
-    notify_socket::NotifyListener,
     process::{
         self,
         args::{ContainerArgs, ContainerType},
@@ -73,11 +72,11 @@ impl<'a> ContainerBuilderImpl<'a> {
             &self.container_id,
             self.rootless.is_some(),
         );
-        let cmanager = libcgroups::common::create_cgroup_manager(
-            cgroups_path,
-            self.use_systemd || self.rootless.is_some(),
-            &self.container_id,
-        )?;
+        let cgroup_config = libcgroups::common::CgroupConfig {
+            cgroup_path: cgroups_path,
+            systemd_cgroup: self.use_systemd || self.rootless.is_some(),
+            container_name: self.container_id.to_owned(),
+        };
         let process = self
             .spec
             .process()
@@ -137,7 +136,7 @@ impl<'a> ContainerBuilderImpl<'a> {
             preserve_fds: self.preserve_fds,
             container: &self.container,
             rootless: &self.rootless,
-            cgroup_manager: cmanager,
+            cgroup_config,
             detached: self.detached,
             executor_manager: &self.executor_manager,
         };
@@ -178,11 +177,12 @@ impl<'a> ContainerBuilderImpl<'a> {
             &self.container_id,
             self.rootless.is_some(),
         );
-        let cmanager = libcgroups::common::create_cgroup_manager(
-            cgroups_path,
-            self.use_systemd || self.rootless.is_some(),
-            &self.container_id,
-        )?;
+        let cmanager =
+            libcgroups::common::create_cgroup_manager(&libcgroups::common::CgroupConfig {
+                cgroup_path: cgroups_path.to_owned(),
+                systemd_cgroup: self.use_systemd || self.rootless.is_some(),
+                container_name: self.container_id.to_string(),
+            })?;
 
         let mut errors = Vec::new();
 

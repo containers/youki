@@ -176,11 +176,11 @@ pub enum SystemdManagerError {
 impl Manager {
     pub fn new(
         root_path: PathBuf,
-        cgroups_path: PathBuf,
+        cgroups_path: &Path,
         container_name: String,
         use_system: bool,
     ) -> Result<Self, SystemdManagerError> {
-        let mut destructured_path = cgroups_path.as_path().try_into()?;
+        let mut destructured_path = cgroups_path.try_into()?;
         ensure_parent_unit(&mut destructured_path, use_system);
 
         let client = match use_system {
@@ -191,7 +191,7 @@ impl Manager {
         let (cgroups_path, delegation_boundary) =
             Self::construct_cgroups_path(&destructured_path, &client)?;
         let full_path = root_path.join_safely(&cgroups_path)?;
-        let fs_manager = FsManager::new(root_path.clone(), cgroups_path.clone())?;
+        let fs_manager = FsManager::new(root_path.clone(), &cgroups_path)?;
 
         Ok(Manager {
             root_path,

@@ -1,4 +1,4 @@
-use libcgroups::common::AnyCgroupManager;
+use libcgroups::common::CgroupConfig;
 use oci_spec::runtime::Spec;
 use std::os::unix::prelude::RawFd;
 use std::path::PathBuf;
@@ -33,8 +33,8 @@ pub struct ContainerArgs<'a> {
     pub container: &'a Option<Container>,
     /// Options for rootless containers
     pub rootless: &'a Option<Rootless<'a>>,
-    /// Cgroup Manager
-    pub cgroup_manager: AnyCgroupManager,
+    /// Cgroup Manager Config
+    pub cgroup_config: CgroupConfig,
     /// If the container is to be run in detached mode
     pub detached: bool,
     /// Manage the functions that actually run on the container
