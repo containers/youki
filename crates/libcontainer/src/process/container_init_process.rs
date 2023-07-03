@@ -486,7 +486,7 @@ pub fn container_init_process(
         }
     };
 
-    set_supplementary_gids(proc.user(), args.rootless, syscall).map_err(|err| {
+    set_supplementary_gids(proc.user(), &args.rootless, syscall).map_err(|err| {
         tracing::error!(?err, "failed to set supplementary gids");
         err
     })?;

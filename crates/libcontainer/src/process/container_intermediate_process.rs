@@ -36,11 +36,11 @@ pub fn container_intermediate_process(
     intermediate_chan: &mut (channel::IntermediateSender, channel::IntermediateReceiver),
     init_chan: &mut (channel::InitSender, channel::InitReceiver),
     main_sender: &mut channel::MainSender,
-) -> Result<Pid> {
+) -> Result<()> {
     let (inter_sender, inter_receiver) = intermediate_chan;
     let (init_sender, init_receiver) = init_chan;
-    let command = &args.syscall;
-    let spec = &args.spec;
+    let command = args.syscall;
+    let spec = args.spec;
     let linux = spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
     let namespaces = Namespaces::try_from(linux.namespaces().as_ref())?;
 
@@ -115,6 +115,7 @@ pub fn container_intermediate_process(
     // configuration. The youki main process can decide what to do with the init
     // process and the intermediate process can just exit safely after the job
     // is done.
+
     let pid = fork::container_clone_sibling("youki:[2:INIT]", || {
         // We are inside the forked process here. The first thing we have to do
         // is to close any unused senders, since fork will make a dup for all
@@ -131,7 +132,7 @@ pub fn container_intermediate_process(
             IntermediateProcessError::Channel(err)
         })?;
         match container_init_process(args, main_sender, init_receiver) {
-            Ok(_) => Ok(0),
+            Ok(_) => Ok(()),
             Err(e) => {
                 if let ContainerType::TenantContainer { exec_notify_fd } = args.container_type {
                     let buf = format!("{e}");
@@ -183,7 +184,8 @@ pub fn container_intermediate_process(
         tracing::error!("failed to close unused init sender: {}", err);
         err
     })?;
-    Ok(pid)
+
+    Ok(())
 }
 
 fn apply_cgroups<
