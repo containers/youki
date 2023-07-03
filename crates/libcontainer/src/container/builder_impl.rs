@@ -90,12 +90,6 @@ impl<'a> ContainerBuilderImpl<'a> {
             }
         }
 
-        // Need to create the notify socket before we pivot root, since the unix
-        // domain socket used here is outside of the rootfs of container. During
-        // exec, need to create the socket before we enter into existing mount
-        // namespace.
-        let notify_socket: NotifyListener = NotifyListener::new(&self.notify_path)?;
-
         // If Out-of-memory score adjustment is set in specification.  set the score
         // value for the current process check
         // https://dev.to/rrampage/surviving-the-linux-oom-killer-2ki9 for some more
@@ -139,7 +133,7 @@ impl<'a> ContainerBuilderImpl<'a> {
             spec: self.spec,
             rootfs: &self.rootfs,
             console_socket: self.console_socket,
-            notify_socket,
+            notify_socket_path: self.notify_path.to_owned(),
             preserve_fds: self.preserve_fds,
             container: &self.container,
             rootless: &self.rootless,

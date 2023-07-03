@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use crate::rootless::Rootless;
 use crate::workload::ExecutorManager;
-use crate::{container::Container, notify_socket::NotifyListener, syscall::Syscall};
+use crate::{container::Container, syscall::Syscall};
 
 #[derive(Debug, Copy, Clone)]
 pub enum ContainerType {
@@ -13,6 +13,7 @@ pub enum ContainerType {
     TenantContainer { exec_notify_fd: RawFd },
 }
 
+#[derive(Clone)]
 pub struct ContainerArgs<'a> {
     /// Indicates if an init or a tenant container should be created
     pub container_type: ContainerType,
@@ -25,7 +26,7 @@ pub struct ContainerArgs<'a> {
     /// Socket to communicate the file descriptor of the ptty
     pub console_socket: Option<RawFd>,
     /// The Unix Domain Socket to communicate container start
-    pub notify_socket: NotifyListener,
+    pub notify_socket_path: PathBuf,
     /// File descriptors preserved/passed to the container init process.
     pub preserve_fds: i32,
     /// Container state
