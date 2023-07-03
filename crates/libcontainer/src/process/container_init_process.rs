@@ -333,11 +333,11 @@ pub fn container_init_process(
     init_receiver: &mut channel::InitReceiver,
 ) -> Result<()> {
     let syscall = args.syscall.create_syscall();
-    let spec = args.spec;
+    let spec = &args.spec;
     let linux = spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
     let proc = spec.process().as_ref().ok_or(MissingSpecError::Process)?;
     let mut envs: Vec<String> = proc.env().as_ref().unwrap_or(&vec![]).clone();
-    let rootfs_path = args.rootfs;
+    let rootfs_path = &args.rootfs;
     let hooks = spec.hooks().as_ref();
     let container = args.container.as_ref();
     let namespaces = Namespaces::try_from(linux.namespaces().as_ref())?;
@@ -359,7 +359,7 @@ pub fn container_init_process(
         })?;
     }
 
-    apply_rest_namespaces(&namespaces, spec, syscall.as_ref())?;
+    apply_rest_namespaces(&namespaces, &spec, syscall.as_ref())?;
 
     if let Some(true) = proc.no_new_privileges() {
         let _ = prctl::set_no_new_privileges(true);
@@ -379,7 +379,7 @@ pub fn container_init_process(
         let rootfs = RootFS::new();
         rootfs
             .prepare_rootfs(
-                spec,
+                &spec,
                 rootfs_path,
                 bind_service,
                 namespaces.get(LinuxNamespaceType::Cgroup)?.is_some(),
@@ -678,7 +678,7 @@ pub fn container_init_process(
     }
 
     if proc.args().is_some() {
-        args.executor_manager.exec(spec).map_err(|err| {
+        args.executor_manager.exec(&spec).map_err(|err| {
             tracing::error!(?err, "failed to execute payload");
             err
         })?;

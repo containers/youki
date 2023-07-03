@@ -129,8 +129,8 @@ impl<'a> ContainerBuilderImpl<'a> {
         let container_args = ContainerArgs {
             container_type: self.container_type,
             syscall: self.syscall,
-            spec: self.spec,
-            rootfs: &self.rootfs,
+            spec: self.spec.to_owned(),
+            rootfs: self.rootfs.to_owned(),
             console_socket: self.console_socket,
             notify_socket_path: self.notify_path.to_owned(),
             preserve_fds: self.preserve_fds,

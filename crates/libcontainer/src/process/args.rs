@@ -21,9 +21,9 @@ pub struct ContainerArgs<'a> {
     /// Interface to operating system primitives
     pub syscall: SyscallType,
     /// OCI compliant runtime spec
-    pub spec: &'a Spec,
+    pub spec: Spec,
     /// Root filesystem of the container
-    pub rootfs: &'a PathBuf,
+    pub rootfs: PathBuf,
     /// Socket to communicate the file descriptor of the ptty
     pub console_socket: Option<RawFd>,
     /// The Unix Domain Socket to communicate container start

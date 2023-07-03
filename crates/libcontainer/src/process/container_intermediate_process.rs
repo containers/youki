@@ -40,7 +40,7 @@ pub fn container_intermediate_process(
     let (inter_sender, inter_receiver) = intermediate_chan;
     let (init_sender, init_receiver) = init_chan;
     let command = args.syscall.create_syscall();
-    let spec = args.spec;
+    let spec = &args.spec;
     let linux = spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
     let namespaces = Namespaces::try_from(linux.namespaces().as_ref())?;
     let cgroup_manager = libcgroups::common::create_cgroup_manager(&args.cgroup_config).unwrap();
