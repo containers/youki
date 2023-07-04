@@ -1,4 +1,4 @@
-use oci_spec::runtime::Spec;
+use libcontainer::oci_spec::runtime::Spec;
 use wasmtime::*;
 use wasmtime_wasi::WasiCtxBuilder;
 

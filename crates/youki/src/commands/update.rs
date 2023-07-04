@@ -6,8 +6,8 @@ use crate::commands::create_cgroup_manager;
 use anyhow::Result;
 use libcgroups::common::CgroupManager;
 use libcgroups::{self, common::ControllerOpt};
+use libcontainer::oci_spec::runtime::{LinuxPidsBuilder, LinuxResources, LinuxResourcesBuilder};
 use liboci_cli::Update;
-use oci_spec::runtime::{LinuxPidsBuilder, LinuxResources, LinuxResourcesBuilder};
 
 pub fn update(args: Update, root_path: PathBuf) -> Result<()> {
     let cmanager = create_cgroup_manager(root_path, &args.container_id)?;

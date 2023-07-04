@@ -1,10 +1,10 @@
 use anyhow::Result;
-use nix;
-use oci_spec::runtime::Mount;
-use oci_spec::runtime::{
+use libcontainer::oci_spec::runtime::Mount;
+use libcontainer::oci_spec::runtime::{
     LinuxBuilder, LinuxIdMappingBuilder, LinuxNamespace, LinuxNamespaceBuilder, LinuxNamespaceType,
     Spec,
 };
+use nix;
 use serde_json::to_writer_pretty;
 use std::fs::File;
 use std::io::{BufWriter, Write};
@@ -17,12 +17,13 @@ pub fn get_default() -> Result<Spec> {
 
 pub fn get_rootless() -> Result<Spec> {
     // Remove network and user namespace from the default spec
-    let mut namespaces: Vec<LinuxNamespace> = oci_spec::runtime::get_default_namespaces()
-        .into_iter()
-        .filter(|ns| {
-            ns.typ() != LinuxNamespaceType::Network && ns.typ() != LinuxNamespaceType::User
-        })
-        .collect();
+    let mut namespaces: Vec<LinuxNamespace> =
+        libcontainer::oci_spec::runtime::get_default_namespaces()
+            .into_iter()
+            .filter(|ns| {
+                ns.typ() != LinuxNamespaceType::Network && ns.typ() != LinuxNamespaceType::User
+            })
+            .collect();
 
     // Add user namespace
     namespaces.push(
@@ -50,7 +51,7 @@ pub fn get_rootless() -> Result<Spec> {
 
     // Prepare the mounts
 
-    let mut mounts: Vec<Mount> = oci_spec::runtime::get_default_mounts();
+    let mut mounts: Vec<Mount> = libcontainer::oci_spec::runtime::get_default_mounts();
     for mount in &mut mounts {
         if mount.destination().eq(Path::new("/sys")) {
             mount

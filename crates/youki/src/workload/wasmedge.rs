@@ -1,4 +1,4 @@
-use oci_spec::runtime::Spec;
+use libcontainer::oci_spec::runtime::Spec;
 use wasmedge_sdk::{
     config::{CommonConfigOptions, ConfigBuilder, HostRegistrationConfigOptions},
     params, VmBuilder,

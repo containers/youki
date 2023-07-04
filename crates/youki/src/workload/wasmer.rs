@@ -1,4 +1,4 @@
-use oci_spec::runtime::Spec;
+use libcontainer::oci_spec::runtime::Spec;
 use wasmer::{Instance, Module, Store};
 use wasmer_wasix::WasiEnv;
 
@@ -100,7 +100,7 @@ impl Executor for WasmerExecutor {
 mod tests {
     use super::*;
     use anyhow::{Context, Result};
-    use oci_spec::runtime::SpecBuilder;
+    use libcontainer::oci_spec::runtime::SpecBuilder;
     use std::collections::HashMap;
 
     #[test]

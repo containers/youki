@@ -5595,7 +5595,6 @@ dependencies = [
  "libcontainer",
  "liboci-cli",
  "nix",
- "oci-spec",
  "once_cell",
  "pentacle",
  "procfs",
