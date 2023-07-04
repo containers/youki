@@ -341,11 +341,7 @@ pub fn container_init_process(
     let hooks = spec.hooks().as_ref();
     let container = args.container.as_ref();
     let namespaces = Namespaces::try_from(linux.namespaces().as_ref())?;
-    // Need to create the notify socket before we pivot root, since the unix
-    // domain socket used here is outside of the rootfs of container. During
-    // exec, need to create the socket before we enter into existing mount
-    // namespace.
-    let notify_listener = notify_socket::NotifyListener::new(args.notify_socket_path.as_ref())?;
+    let notify_listener = &args.notify_socket;
 
     setsid().map_err(|err| {
         tracing::error!(?err, "failed to setsid to create a session");

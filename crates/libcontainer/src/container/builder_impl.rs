@@ -123,6 +123,15 @@ impl ContainerBuilderImpl {
             prctl::set_dumpable(false).unwrap();
         }
 
+        // Need to create the notify socket before we pivot root, since the unix
+        // domain socket used here is outside of the rootfs of container. During
+        // exec, need to create the socket before we enter into existing mount
+        // namespace. We also need to create to socket before entering into the
+        // user namespace in the case that the path is located in paths only
+        // root can access.
+        let notify_listener =
+            crate::notify_socket::NotifyListener::new(self.notify_path.as_path())?;
+
         // This container_args will be passed to the container processes,
         // therefore we will have to move all the variable by value. Since self
         // is a shared reference, we have to clone these variables here.
@@ -132,7 +141,7 @@ impl ContainerBuilderImpl {
             spec: self.spec.to_owned(),
             rootfs: self.rootfs.to_owned(),
             console_socket: self.console_socket,
-            notify_socket_path: self.notify_path.to_owned(),
+            notify_socket: notify_listener,
             preserve_fds: self.preserve_fds,
             container: self.container.to_owned(),
             rootless: self.rootless.to_owned(),
