@@ -6,11 +6,12 @@ use libcontainer::workload::{Executor, ExecutorError, EMPTY};
 
 const EXECUTOR_NAME: &str = "wasmer";
 
-#[derive(Default)]
-pub struct WasmerExecutor {}
+pub fn get_executor() -> Executor {
+    return Box::new(|spec: &Spec| -> Result<(), ExecutorError> {
+        if !can_handle(spec) {
+            return Err(ExecutorError::CantHandle(EXECUTOR_NAME));
+        }
 
-impl Executor for WasmerExecutor {
-    fn exec(&self, spec: &Spec) -> Result<(), ExecutorError> {
         tracing::debug!("executing workload with wasmer handler");
         let process = spec.process().as_ref();
 
@@ -75,25 +76,21 @@ impl Executor for WasmerExecutor {
         wasi_env.cleanup(&mut store, None);
 
         Ok(())
-    }
+    });
+}
 
-    fn can_handle(&self, spec: &Spec) -> bool {
-        if let Some(annotations) = spec.annotations() {
-            if let Some(handler) = annotations.get("run.oci.handler") {
-                return handler == "wasm";
-            }
-
-            if let Some(variant) = annotations.get("module.wasm.image/variant") {
-                return variant == "compat";
-            }
+fn can_handle(spec: &Spec) -> bool {
+    if let Some(annotations) = spec.annotations() {
+        if let Some(handler) = annotations.get("run.oci.handler") {
+            return handler == "wasm";
         }
 
-        false
+        if let Some(variant) = annotations.get("module.wasm.image/variant") {
+            return variant == "compat";
+        }
     }
 
-    fn name(&self) -> &'static str {
-        EXECUTOR_NAME
-    }
+    false
 }
 
 #[cfg(test)]
@@ -112,7 +109,7 @@ mod tests {
             .build()
             .context("build spec")?;
 
-        assert!(WasmerExecutor::default().can_handle(&spec));
+        assert!(can_handle(&spec));
 
         Ok(())
     }
@@ -126,7 +123,7 @@ mod tests {
             .build()
             .context("build spec")?;
 
-        assert!(WasmerExecutor::default().can_handle(&spec));
+        assert!(can_handle(&spec));
 
         Ok(())
     }
@@ -135,7 +132,7 @@ mod tests {
     fn test_can_handle_no_execute() -> Result<()> {
         let spec = SpecBuilder::default().build().context("build spec")?;
 
-        assert!(!WasmerExecutor::default().can_handle(&spec));
+        assert!(!can_handle(&spec));
 
         Ok(())
     }

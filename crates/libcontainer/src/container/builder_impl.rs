@@ -8,9 +8,9 @@ use crate::{
         intel_rdt::delete_resctrl_subdirectory,
     },
     rootless::Rootless,
-    syscall::{syscall::SyscallType, Syscall},
+    syscall::syscall::SyscallType,
     utils,
-    workload::ExecutorManager,
+    workload::Executor,
 };
 use libcgroups::common::CgroupManager;
 use nix::unistd::Pid;
@@ -46,7 +46,7 @@ pub(super) struct ContainerBuilderImpl<'a> {
     /// If the container is to be run in detached mode
     pub detached: bool,
     /// Default executes the specified execution of a generic command
-    pub executor_manager: ExecutorManager,
+    pub executor: Executor,
 }
 
 impl<'a> ContainerBuilderImpl<'a> {
@@ -138,7 +138,7 @@ impl<'a> ContainerBuilderImpl<'a> {
             rootless: &self.rootless,
             cgroup_config,
             detached: self.detached,
-            executor_manager: &self.executor_manager,
+            executor: self.executor.clone(),
         };
 
         let (init_pid, need_to_clean_up_intel_rdt_dir) =

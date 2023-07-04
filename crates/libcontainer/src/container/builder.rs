@@ -1,8 +1,7 @@
 use crate::error::{ErrInvalidID, LibcontainerError};
 use crate::syscall::syscall::SyscallType;
-use crate::workload::default::DefaultExecutor;
-use crate::workload::{Executor, ExecutorManager};
-use crate::{syscall::Syscall, utils::PathBufExt};
+use crate::utils::PathBufExt;
+use crate::workload::{self, Executor};
 use std::path::PathBuf;
 
 use super::{init_builder::InitContainerBuilder, tenant_builder::TenantContainerBuilder};
@@ -23,7 +22,7 @@ pub struct ContainerBuilder {
     pub(super) preserve_fds: i32,
     /// Manage the functions that actually run on the container
     /// Default executes the specified execution of a generic command
-    pub(super) executor_manager: ExecutorManager,
+    pub(super) executor: Executor,
 }
 
 /// Builder that can be used to configure the common properties of
@@ -71,9 +70,7 @@ impl ContainerBuilder {
             pid_file: None,
             console_socket: None,
             preserve_fds: 0,
-            executor_manager: ExecutorManager {
-                executors: vec![Box::<DefaultExecutor>::default()],
-            },
+            executor: workload::default::get_executor(),
         }
     }
 
@@ -263,21 +260,14 @@ impl ContainerBuilder {
     /// )
     /// .with_executor(vec![Box::<DefaultExecutor>::default()]);
     /// ```
-    pub fn with_executor(
-        mut self,
-        executors: Vec<Box<dyn Executor>>,
-    ) -> Result<Self, LibcontainerError> {
-        if executors.is_empty() {
-            return Err(LibcontainerError::NoExecutors);
-        };
-        self.executor_manager = ExecutorManager { executors };
+    pub fn with_executor(mut self, executor: Executor) -> Result<Self, LibcontainerError> {
+        self.executor = executor;
         Ok(self)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::syscall::syscall::create_syscall;
     use crate::{container::builder::ContainerBuilder, syscall::syscall::SyscallType};
     use anyhow::{Context, Result};
     use std::path::PathBuf;

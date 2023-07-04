@@ -6,12 +6,13 @@ use libcontainer::workload::{Executor, ExecutorError, EMPTY};
 
 const EXECUTOR_NAME: &str = "wasmtime";
 
-#[derive(Default)]
-pub struct WasmtimeExecutor {}
+pub fn get_executor() -> Executor {
+    return Box::new(|spec: &Spec| -> Result<(), ExecutorError> {
+        if !can_handle(spec) {
+            return Err(ExecutorError::CantHandle(EXECUTOR_NAME));
+        }
 
-impl Executor for WasmtimeExecutor {
-    fn exec(&self, spec: &Spec) -> Result<(), ExecutorError> {
-        tracing::info!("Executing workload with wasmtime handler");
+        tracing::debug!("executing workload with wasmtime handler");
         let process = spec.process().as_ref();
 
         let args = spec
@@ -85,23 +86,19 @@ impl Executor for WasmtimeExecutor {
         start
             .call(&mut store, &[], &mut [])
             .map_err(|err| ExecutorError::Execution(err.into()))
-    }
+    });
+}
 
-    fn can_handle(&self, spec: &Spec) -> bool {
-        if let Some(annotations) = spec.annotations() {
-            if let Some(handler) = annotations.get("run.oci.handler") {
-                return handler == "wasm";
-            }
-
-            if let Some(variant) = annotations.get("module.wasm.image/variant") {
-                return variant == "compat";
-            }
+fn can_handle(spec: &Spec) -> bool {
+    if let Some(annotations) = spec.annotations() {
+        if let Some(handler) = annotations.get("run.oci.handler") {
+            return handler == "wasm";
         }
 
-        false
+        if let Some(variant) = annotations.get("module.wasm.image/variant") {
+            return variant == "compat";
+        }
     }
 
-    fn name(&self) -> &'static str {
-        EXECUTOR_NAME
-    }
+    false
 }

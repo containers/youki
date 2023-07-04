@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
-use libcontainer::{container::builder::ContainerBuilder, syscall::syscall::create_syscall};
+use libcontainer::{container::builder::ContainerBuilder, syscall::syscall::SyscallType};
 use liboci_cli::Run;
 use nix::{
     sys::{
@@ -12,12 +12,11 @@ use nix::{
     unistd::Pid,
 };
 
-use crate::workload::executor::default_executors;
+use crate::workload::executor::default_executor;
 
 pub fn run(args: Run, root_path: PathBuf, systemd_cgroup: bool) -> Result<i32> {
-    let syscall = create_syscall();
-    let mut container = ContainerBuilder::new(args.container_id.clone(), syscall.as_ref())
-        .with_executor(default_executors())?
+    let mut container = ContainerBuilder::new(args.container_id.clone(), SyscallType::default())
+        .with_executor(default_executor())?
         .with_pid_file(args.pid_file.as_ref())?
         .with_console_socket(args.console_socket.as_ref())
         .with_root_path(root_path)?

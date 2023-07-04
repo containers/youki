@@ -8,11 +8,14 @@ use libcontainer::workload::{Executor, ExecutorError};
 
 const EXECUTOR_NAME: &str = "wasmedge";
 
-#[derive(Default)]
-pub struct WasmEdgeExecutor {}
+pub fn get_executor() -> Executor {
+    return Box::new(|spec: &Spec| -> Result<(), ExecutorError> {
+        if !can_handle(spec) {
+            return Err(ExecutorError::CantHandle(EXECUTOR_NAME));
+        }
 
-impl Executor for WasmEdgeExecutor {
-    fn exec(&self, spec: &Spec) -> Result<(), ExecutorError> {
+        tracing::debug!("executing workload with wasmedge handler");
+
         // parse wasi parameters
         let args = get_args(spec);
         let mut cmd = args[0].clone();
@@ -55,25 +58,21 @@ impl Executor for WasmEdgeExecutor {
             .map_err(|err| ExecutorError::Execution(err))?;
 
         Ok(())
-    }
+    });
+}
 
-    fn can_handle(&self, spec: &Spec) -> bool {
-        if let Some(annotations) = spec.annotations() {
-            if let Some(handler) = annotations.get("run.oci.handler") {
-                return handler == "wasm";
-            }
-
-            if let Some(variant) = annotations.get("module.wasm.image/variant") {
-                return variant == "compat";
-            }
+fn can_handle(spec: &Spec) -> bool {
+    if let Some(annotations) = spec.annotations() {
+        if let Some(handler) = annotations.get("run.oci.handler") {
+            return handler == "wasm";
         }
 
-        false
+        if let Some(variant) = annotations.get("module.wasm.image/variant") {
+            return variant == "compat";
+        }
     }
 
-    fn name(&self) -> &'static str {
-        EXECUTOR_NAME
-    }
+    false
 }
 
 fn get_args(spec: &Spec) -> &[String] {
