@@ -20,7 +20,7 @@ pub enum CloneError {
     StackAllocation(#[source] nix::Error),
     #[error("failed to create stack guard page")]
     GuardPage(#[source] nix::Error),
-    #[error("unkown error code {0}")]
+    #[error("unknown error code {0}")]
     UnknownErrno(i32),
 }
 
@@ -72,9 +72,9 @@ fn clone_internal(
     }
 }
 
-// Unlike the clone call, clone3 is currently using the kernel syscall, mimicing
+// Unlike the clone call, clone3 is currently using the kernel syscall, mimicking
 // the interface of fork. There is not need to explicitly manage the memory, so
-// we can safely passin the callback closure as reference.
+// we can safely passing the callback closure as reference.
 fn clone3(cb: &mut CloneCb, flags: u64, exit_signal: Option<u64>) -> Result<Pid, CloneError> {
     #[repr(C)]
     struct clone3_args {
@@ -155,9 +155,9 @@ fn clone(cb: CloneCb, flags: u64, exit_signal: Option<u64>) -> Result<Pid, Clone
     // here to create the stack.  Instead of guessing how much space the child
     // process needs, we allocate through mmap to the system default limit,
     // which is 8MB on most of the linux system today. This is OK since mmap
-    // will only researve the address space upfront, instead of allocating
+    // will only reserve the address space upfront, instead of allocating
     // physical memory upfront.  The stack will grow as needed, up to the size
-    // researved, so no wasted memory here. Lastly, the child stack only needs
+    // reserved, so no wasted memory here. Lastly, the child stack only needs
     // to support the container init process set up code in Youki. When Youki
     // calls exec into the container payload, exec will reset the stack.  Note,
     // do not use MAP_GROWSDOWN since it is not well supported.
@@ -174,7 +174,7 @@ fn clone(cb: CloneCb, flags: u64, exit_signal: Option<u64>) -> Result<Pid, Clone
         .map_err(CloneError::StackAllocation)?
     };
     unsafe {
-        // Consistant with how pthread_create sets up the stack, we create a
+        // Consistent with how pthread_create sets up the stack, we create a
         // guard page of 1 page, to protect the child stack collision. Note, for
         // clone call, the child stack will grow downward, so the bottom of the
         // child stack is in the beginning.
@@ -193,7 +193,7 @@ fn clone(cb: CloneCb, flags: u64, exit_signal: Option<u64>) -> Result<Pid, Clone
     // function pointer in C. The box closure in Rust is both a function pointer
     // and a struct. However, when casting the box closure into libc::c_void,
     // the function pointer will be lost. Therefore, to work around the issue,
-    // we double box the closure. This is consistant with how std::unix::thread
+    // we double box the closure. This is consistent with how std::unix::thread
     // handles the closure.
     // Ref: https://github.com/rust-lang/rust/blob/master/library/std/src/sys/unix/thread.rs
     let data = Box::into_raw(Box::new(cb));
