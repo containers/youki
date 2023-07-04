@@ -222,7 +222,7 @@ mod tests {
         let tmp = tempfile::tempdir()?;
         let id_mapper = RootlessIDMapper::new_test(tmp.path().to_path_buf());
         let rootless = Rootless {
-            uid_mappings: Some(&uid_mappings),
+            uid_mappings: Some(uid_mappings),
             privileged: true,
             rootless_id_mapper: id_mapper.clone(),
             ..Default::default()
@@ -277,7 +277,7 @@ mod tests {
         let tmp = tempfile::tempdir()?;
         let id_mapper = RootlessIDMapper::new_test(tmp.path().to_path_buf());
         let rootless = Rootless {
-            gid_mappings: Some(&gid_mappings),
+            gid_mappings: Some(gid_mappings),
             rootless_id_mapper: id_mapper.clone(),
             ..Default::default()
         };

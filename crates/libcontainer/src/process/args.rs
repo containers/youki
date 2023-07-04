@@ -15,7 +15,7 @@ pub enum ContainerType {
 }
 
 #[derive(Clone)]
-pub struct ContainerArgs<'a> {
+pub struct ContainerArgs {
     /// Indicates if an init or a tenant container should be created
     pub container_type: ContainerType,
     /// Interface to operating system primitives
@@ -31,9 +31,9 @@ pub struct ContainerArgs<'a> {
     /// File descriptors preserved/passed to the container init process.
     pub preserve_fds: i32,
     /// Container state
-    pub container: &'a Option<Container>,
+    pub container: Option<Container>,
     /// Options for rootless containers
-    pub rootless: &'a Option<Rootless<'a>>,
+    pub rootless: Option<Rootless>,
     /// Cgroup Manager Config
     pub cgroup_config: CgroupConfig,
     /// If the container is to be run in detached mode

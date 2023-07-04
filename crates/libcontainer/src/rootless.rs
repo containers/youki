@@ -122,15 +122,15 @@ pub enum MappingError {
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct Rootless<'a> {
+pub struct Rootless {
     /// Location of the newuidmap binary
     pub newuidmap: Option<PathBuf>,
     /// Location of the newgidmap binary
     pub newgidmap: Option<PathBuf>,
     /// Mappings for user ids
-    pub(crate) uid_mappings: Option<&'a Vec<LinuxIdMapping>>,
+    pub(crate) uid_mappings: Option<Vec<LinuxIdMapping>>,
     /// Mappings for group ids
-    pub(crate) gid_mappings: Option<&'a Vec<LinuxIdMapping>>,
+    pub(crate) gid_mappings: Option<Vec<LinuxIdMapping>>,
     /// Info on the user namespaces
     pub user_namespace: Option<LinuxNamespace>,
     /// Is rootless container requested by a privileged user
@@ -139,8 +139,8 @@ pub struct Rootless<'a> {
     pub rootless_id_mapper: RootlessIDMapper,
 }
 
-impl<'a> Rootless<'a> {
-    pub fn new(spec: &'a Spec) -> Result<Option<Rootless<'a>>> {
+impl Rootless {
+    pub fn new(spec: &Spec) -> Result<Option<Rootless>> {
         let linux = spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
         let namespaces = Namespaces::try_from(linux.namespaces().as_ref())
             .map_err(ValidateSpecError::Namespaces)?;
@@ -176,7 +176,7 @@ impl<'a> Rootless<'a> {
 
     pub fn write_uid_mapping(&self, target_pid: Pid) -> Result<()> {
         tracing::debug!("write UID mapping for {:?}", target_pid);
-        if let Some(uid_mappings) = self.uid_mappings {
+        if let Some(uid_mappings) = self.uid_mappings.as_ref() {
             write_id_mapping(
                 target_pid,
                 self.rootless_id_mapper.get_uid_path(&target_pid).as_path(),
@@ -189,7 +189,7 @@ impl<'a> Rootless<'a> {
 
     pub fn write_gid_mapping(&self, target_pid: Pid) -> Result<()> {
         tracing::debug!("write GID mapping for {:?}", target_pid);
-        if let Some(gid_mappings) = self.gid_mappings {
+        if let Some(gid_mappings) = self.gid_mappings.as_ref() {
             write_id_mapping(
                 target_pid,
                 self.rootless_id_mapper.get_gid_path(&target_pid).as_path(),
@@ -205,10 +205,10 @@ impl<'a> Rootless<'a> {
     }
 }
 
-impl<'a> TryFrom<&'a Linux> for Rootless<'a> {
+impl TryFrom<&Linux> for Rootless {
     type Error = RootlessError;
 
-    fn try_from(linux: &'a Linux) -> Result<Self> {
+    fn try_from(linux: &Linux) -> Result<Self> {
         let namespaces = Namespaces::try_from(linux.namespaces().as_ref())
             .map_err(ValidateSpecError::Namespaces)?;
         let user_namespace = namespaces
@@ -217,8 +217,8 @@ impl<'a> TryFrom<&'a Linux> for Rootless<'a> {
         Ok(Self {
             newuidmap: None,
             newgidmap: None,
-            uid_mappings: linux.uid_mappings().as_ref(),
-            gid_mappings: linux.gid_mappings().as_ref(),
+            uid_mappings: linux.uid_mappings().to_owned(),
+            gid_mappings: linux.gid_mappings().to_owned(),
             user_namespace: user_namespace.cloned(),
             privileged: nix::unistd::geteuid().is_root(),
             rootless_id_mapper: RootlessIDMapper::new(),

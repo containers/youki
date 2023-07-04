@@ -17,7 +17,7 @@ use nix::unistd::Pid;
 use oci_spec::runtime::Spec;
 use std::{fs, io::Write, os::unix::prelude::RawFd, path::PathBuf};
 
-pub(super) struct ContainerBuilderImpl<'a> {
+pub(super) struct ContainerBuilderImpl {
     /// Flag indicating if an init or a tenant container should be created
     pub container_type: ContainerType,
     /// Interface to operating system primitives
@@ -27,7 +27,7 @@ pub(super) struct ContainerBuilderImpl<'a> {
     /// Id of the container
     pub container_id: String,
     /// OCI compliant runtime spec
-    pub spec: &'a Spec,
+    pub spec: Spec,
     /// Root filesystem of the container
     pub rootfs: PathBuf,
     /// File which will be used to communicate the pid of the
@@ -36,7 +36,7 @@ pub(super) struct ContainerBuilderImpl<'a> {
     /// Socket to communicate the file descriptor of the ptty
     pub console_socket: Option<RawFd>,
     /// Options for rootless containers
-    pub rootless: Option<Rootless<'a>>,
+    pub rootless: Option<Rootless>,
     /// Path to the Unix Domain Socket to communicate container start
     pub notify_path: PathBuf,
     /// Container state
@@ -49,7 +49,7 @@ pub(super) struct ContainerBuilderImpl<'a> {
     pub executor: Executor,
 }
 
-impl<'a> ContainerBuilderImpl<'a> {
+impl ContainerBuilderImpl {
     pub(super) fn create(&mut self) -> Result<Pid, LibcontainerError> {
         match self.run_container() {
             Ok(pid) => Ok(pid),
@@ -134,8 +134,8 @@ impl<'a> ContainerBuilderImpl<'a> {
             console_socket: self.console_socket,
             notify_socket_path: self.notify_path.to_owned(),
             preserve_fds: self.preserve_fds,
-            container: &self.container,
-            rootless: &self.rootless,
+            container: self.container.to_owned(),
+            rootless: self.rootless.to_owned(),
             cgroup_config,
             detached: self.detached,
             executor: self.executor.clone(),
