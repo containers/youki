@@ -32,7 +32,7 @@ impl Executor for WasmEdgeExecutor {
         // create a vm with the config settings
         let mut vm = VmBuilder::new()
             .with_config(config)
-            .build()
+            .build::<()>()
             .map_err(|err| ExecutorError::Other(format!("failed to create wasmedge vm: {}", err)))?
             .register_module_from_file("main", cmd)
             .map_err(|err| {
