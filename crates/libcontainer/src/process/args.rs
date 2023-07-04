@@ -28,7 +28,7 @@ pub struct ContainerArgs {
     /// Socket to communicate the file descriptor of the ptty
     pub console_socket: Option<RawFd>,
     /// The Unix Domain Socket to communicate container start
-    pub notify_socket: NotifyListener,
+    pub notify_listener: NotifyListener,
     /// File descriptors preserved/passed to the container init process.
     pub preserve_fds: i32,
     /// Container state

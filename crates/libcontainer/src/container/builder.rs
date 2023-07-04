@@ -252,9 +252,9 @@ impl ContainerBuilder {
     /// )
     /// .with_executor(get_executor());
     /// ```
-    pub fn with_executor(mut self, executor: Executor) -> Result<Self, LibcontainerError> {
+    pub fn with_executor(mut self, executor: Executor) -> Self {
         self.executor = executor;
-        Ok(self)
+        self
     }
 }
 

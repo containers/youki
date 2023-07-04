@@ -14,7 +14,7 @@ use crate::workload::executor::default_executor;
 // associated with it like any other process.
 pub fn create(args: Create, root_path: PathBuf, systemd_cgroup: bool) -> Result<()> {
     ContainerBuilder::new(args.container_id.clone(), SyscallType::default())
-        .with_executor(default_executor())?
+        .with_executor(default_executor())
         .with_pid_file(args.pid_file.as_ref())?
         .with_console_socket(args.console_socket.as_ref())
         .with_root_path(root_path)?

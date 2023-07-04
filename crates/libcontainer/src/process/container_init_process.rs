@@ -341,7 +341,7 @@ pub fn container_init_process(
     let hooks = spec.hooks().as_ref();
     let container = args.container.as_ref();
     let namespaces = Namespaces::try_from(linux.namespaces().as_ref())?;
-    let notify_listener = &args.notify_socket;
+    let notify_listener = &args.notify_listener;
 
     setsid().map_err(|err| {
         tracing::error!(?err, "failed to setsid to create a session");

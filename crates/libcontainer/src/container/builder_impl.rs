@@ -141,7 +141,7 @@ impl ContainerBuilderImpl {
             spec: self.spec.to_owned(),
             rootfs: self.rootfs.to_owned(),
             console_socket: self.console_socket,
-            notify_socket: notify_listener,
+            notify_listener,
             preserve_fds: self.preserve_fds,
             container: self.container.to_owned(),
             rootless: self.rootless.to_owned(),
