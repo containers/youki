@@ -32,12 +32,11 @@ pub struct ContainerBuilder {
 ///
 /// ```no_run
 /// use libcontainer::container::builder::ContainerBuilder;
-/// use libcontainer::syscall::syscall::create_syscall;
-/// use libcontainer::workload::default::DefaultExecutor;
+/// use libcontainer::syscall::syscall::SyscallType;
 ///
 /// ContainerBuilder::new(
 ///     "74f1a4cb3801".to_owned(),
-///     create_syscall().as_ref(),
+///     SyscallType::default(),
 /// )
 /// .with_root_path("/run/containers/youki").expect("invalid root path")
 /// .with_pid_file(Some("/var/run/docker.pid")).expect("invalid pid file")
@@ -53,12 +52,11 @@ impl ContainerBuilder {
     ///
     /// ```no_run
     /// use libcontainer::container::builder::ContainerBuilder;
-    /// use libcontainer::syscall::syscall::create_syscall;
-    /// use libcontainer::workload::default::DefaultExecutor;
+    /// use libcontainer::syscall::syscall::SyscallType;
     ///
     /// let builder = ContainerBuilder::new(
     ///     "74f1a4cb3801".to_owned(),
-    ///     create_syscall().as_ref(),
+    ///     SyscallType::default(),
     /// );
     /// ```
     pub fn new(container_id: String, syscall: SyscallType) -> Self {
@@ -115,12 +113,11 @@ impl ContainerBuilder {
     ///
     /// ```no_run
     /// # use libcontainer::container::builder::ContainerBuilder;
-    /// # use libcontainer::syscall::syscall::create_syscall;
-    /// # use libcontainer::workload::default::DefaultExecutor;
+    /// # use libcontainer::syscall::syscall::SyscallType;
     ///
     /// ContainerBuilder::new(
     ///     "74f1a4cb3801".to_owned(),
-    ///     create_syscall().as_ref(),
+    ///     SyscallType::default(),
     /// )
     /// .as_tenant()
     /// .with_container_args(vec!["sleep".to_owned(), "9001".to_owned()])
@@ -136,12 +133,11 @@ impl ContainerBuilder {
     ///
     /// ```no_run
     /// # use libcontainer::container::builder::ContainerBuilder;
-    /// # use libcontainer::syscall::syscall::create_syscall;
-    /// # use libcontainer::workload::default::DefaultExecutor;
+    /// # use libcontainer::syscall::syscall::SyscallType;
     ///
     /// ContainerBuilder::new(
     ///     "74f1a4cb3801".to_owned(),
-    ///     create_syscall().as_ref(),
+    ///     SyscallType::default(),
     /// )
     /// .as_init("/var/run/docker/bundle")
     /// .with_systemd(false)
@@ -157,12 +153,11 @@ impl ContainerBuilder {
     ///
     /// ```no_run
     /// # use libcontainer::container::builder::ContainerBuilder;
-    /// # use libcontainer::syscall::syscall::create_syscall;
-    /// # use libcontainer::workload::default::DefaultExecutor;
+    /// # use libcontainer::syscall::syscall::SyscallType;
     ///
     /// ContainerBuilder::new(
     ///     "74f1a4cb3801".to_owned(),
-    ///     create_syscall().as_ref(),
+    ///     SyscallType::default(),
     /// )
     /// .with_root_path("/run/containers/youki").expect("invalid root path");
     /// ```
@@ -182,12 +177,11 @@ impl ContainerBuilder {
     ///
     /// ```no_run
     /// # use libcontainer::container::builder::ContainerBuilder;
-    /// # use libcontainer::syscall::syscall::create_syscall;
-    /// # use libcontainer::workload::default::DefaultExecutor;
+    /// # use libcontainer::syscall::syscall::SyscallType;
     ///
     /// ContainerBuilder::new(
     ///     "74f1a4cb3801".to_owned(),
-    ///     create_syscall().as_ref(),
+    ///     SyscallType::default(),
     /// )
     /// .with_pid_file(Some("/var/run/docker.pid")).expect("invalid pid file");
     /// ```
@@ -212,12 +206,11 @@ impl ContainerBuilder {
     ///
     /// ```no_run
     /// # use libcontainer::container::builder::ContainerBuilder;
-    /// # use libcontainer::syscall::syscall::create_syscall;
-    /// # use libcontainer::workload::default::DefaultExecutor;
+    /// # use libcontainer::syscall::syscall::SyscallType;
     ///
     /// ContainerBuilder::new(
     ///     "74f1a4cb3801".to_owned(),
-    ///     create_syscall().as_ref(),
+    ///     SyscallType::default(),
     /// )
     /// .with_console_socket(Some("/var/run/docker/sock.tty"));
     /// ```
@@ -232,12 +225,11 @@ impl ContainerBuilder {
     ///
     /// ```no_run
     /// # use libcontainer::container::builder::ContainerBuilder;
-    /// # use libcontainer::syscall::syscall::create_syscall;
-    /// # use libcontainer::workload::default::DefaultExecutor;
+    /// # use libcontainer::syscall::syscall::SyscallType;
     ///
     /// ContainerBuilder::new(
     ///     "74f1a4cb3801".to_owned(),
-    ///     create_syscall().as_ref(),
+    ///     SyscallType::default(),
     /// )
     /// .with_preserved_fds(5);
     /// ```
@@ -251,14 +243,14 @@ impl ContainerBuilder {
     ///
     /// ```no_run
     /// # use libcontainer::container::builder::ContainerBuilder;
-    /// # use libcontainer::syscall::syscall::create_syscall;
-    /// # use libcontainer::workload::default::DefaultExecutor;
+    /// # use libcontainer::syscall::syscall::SyscallType;
+    /// # use libcontainer::workload::default::get_executor;
     ///
     /// ContainerBuilder::new(
     ///     "74f1a4cb3801".to_owned(),
-    ///     create_syscall().as_ref(),
+    ///     SyscallType::default(),
     /// )
-    /// .with_executor(vec![Box::<DefaultExecutor>::default()]);
+    /// .with_executor(get_executor());
     /// ```
     pub fn with_executor(mut self, executor: Executor) -> Result<Self, LibcontainerError> {
         self.executor = executor;
