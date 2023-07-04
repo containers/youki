@@ -1,6 +1,8 @@
 use crate::{
     process::{
-        args::ContainerArgs, channel, container_intermediate_process, fork,
+        args::ContainerArgs,
+        channel, container_intermediate_process,
+        fork::{self, CloneCb},
         intel_rdt::setup_intel_rdt,
     },
     rootless::Rootless,
@@ -41,24 +43,33 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, bo
     let inter_chan = channel::intermediate_channel()?;
     let init_chan = channel::init_channel()?;
 
-    let cb: fork::CloneCb = Box::new({
+    let cb: CloneCb = {
         let container_args = container_args.clone();
         let mut main_sender = main_sender.clone();
         let mut inter_chan = inter_chan.clone();
         let mut init_chan = init_chan.clone();
-        move || {
-            container_intermediate_process::container_intermediate_process(
+        Box::new(move || {
+            if let Err(ret) = prctl::set_name("youki:[1:INTER]") {
+                tracing::error!(?ret, "failed to set name for child process");
+                return ret;
+            }
+
+            match container_intermediate_process::container_intermediate_process(
                 &container_args,
                 &mut inter_chan,
                 &mut init_chan,
                 &mut main_sender,
-            )?;
+            ) {
+                Ok(_) => 0,
+                Err(err) => {
+                    tracing::error!(?err, "failed to run intermediate process");
+                    -1
+                }
+            }
+        })
+    };
 
-            Ok(())
-        }
-    });
-
-    let intermediate_pid = fork::container_clone("youki:[1:INTER]", cb).map_err(|err| {
+    let intermediate_pid = fork::container_clone(cb).map_err(|err| {
         tracing::error!("failed to fork intermediate process: {}", err);
         ProcessError::IntermediateProcessFailed(err)
     })?;
