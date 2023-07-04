@@ -24,12 +24,15 @@ pub enum CloneError {
     UnknownErrno(i32),
 }
 
-// The clone callback is used in clone system call. It is a boxed closure and it
-// needs to trasfer the ownership of related memory to the new process. The
-// interface returns i32 which is typical for C functions.
+/// The callback function used in clone system call. The return value is i32
+/// which is consistent with C functions return code. The closure is boxed
+/// because we will have to correctly transfer the ownership of the closure
+/// memory on the heap to the new process. The trait has to be `FnMut` because
+/// we need to be able to call the closure multiple times, once in clone3 and
+/// once in clone if fallback is required.
 pub type CloneCb = Box<dyn FnMut() -> i32>;
 
-// Fork/Clone a sibling process that shares the same parent as the calling
+// Clone a sibling process that shares the same parent as the calling
 // process. This is used to launch the container init process so the parent
 // process of the calling process can receive ownership of the process. If we
 // clone a child process as the init process, the calling process (likely the
@@ -45,16 +48,12 @@ pub fn container_clone_sibling(cb: CloneCb) -> Result<Pid, CloneError> {
     clone_internal(cb, libc::CLONE_PARENT as u64, None)
 }
 
-// Execute the cb in another process. Make the fork works more like thread_spawn
-// or clone, so it is easier to reason. Compared to clone call, fork is easier
-// to use since fork will magically take care of all the variable copying. If
-// using clone, we would have to manually make sure all the variables are
-// correctly send to the new process, especially Rust borrow checker will be a
-// lot of hassel to deal with every details.
+// Clone a child process and execute the callback.
 pub fn container_clone(cb: CloneCb) -> Result<Pid, CloneError> {
     clone_internal(cb, 0, Some(SIGCHLD as u64))
 }
 
+// An internal wrapper to manage the clone3 vs clone fallback logic.
 fn clone_internal(
     mut cb: CloneCb,
     flags: u64,
@@ -62,6 +61,7 @@ fn clone_internal(
 ) -> Result<Pid, CloneError> {
     match clone3(&mut cb, flags, exit_signal) {
         Ok(pid) => return Ok(pid),
+        // For now, we decide to only fallback on ENOSYS
         Err(CloneError::Clone(nix::Error::ENOSYS)) => {
             tracing::debug!("clone3 is not supported, fallback to clone");
             let pid = clone(cb, flags, exit_signal)?;
@@ -72,6 +72,9 @@ fn clone_internal(
     }
 }
 
+// Unlike the clone call, clone3 is currently using the kernel syscall, mimicing
+// the interface of fork. There is not need to explicitly manage the memory, so
+// we can safely passin the callback closure as reference.
 fn clone3(cb: &mut CloneCb, flags: u64, exit_signal: Option<u64>) -> Result<Pid, CloneError> {
     #[repr(C)]
     struct clone3_args {
@@ -103,7 +106,11 @@ fn clone3(cb: &mut CloneCb, flags: u64, exit_signal: Option<u64>) -> Result<Pid,
     let args_ptr = &mut args as *mut clone3_args;
     let args_size = std::mem::size_of::<clone3_args>();
     // For now, we can only use clone3 as a kernel syscall. Libc wrapper is not
-    // available yet.
+    // available yet. This can have undefined behavior because libc authors do
+    // not like people calling kernel syscall to directly create processes. Libc
+    // does perform additional bookkeeping when calling clone or fork. So far,
+    // we have not observed any issues with calling clone3 directly, but we
+    // should keep an eye on it.
     match unsafe { libc::syscall(libc::SYS_clone3, args_ptr, args_size) } {
         -1 => {
             return Err(CloneError::Clone(nix::Error::last()));
@@ -118,11 +125,6 @@ fn clone3(cb: &mut CloneCb, flags: u64, exit_signal: Option<u64>) -> Result<Pid,
     };
 }
 
-/// clone uses syscall clone(2) to create a new process for the container init
-/// process. Using clone syscall gives us better control over how to can create
-/// the new container process, where we can enter into namespaces directly instead
-/// of using unshare and fork. This call will only create one new process, instead
-/// of two using fork.
 fn clone(cb: CloneCb, flags: u64, exit_signal: Option<u64>) -> Result<Pid, CloneError> {
     const DEFAULT_STACK_SIZE: usize = 8 * 1024 * 1024; // 8M
     const DEFAULT_PAGE_SIZE: usize = 4 * 1024; // 4K
