@@ -6,7 +6,7 @@ use oci_spec::runtime::Spec;
 use super::{Executor, ExecutorError, EMPTY};
 
 pub fn get_executor() -> Executor {
-    return Box::new(|spec: &Spec| -> Result<(), ExecutorError> {
+    Box::new(|spec: &Spec| -> Result<(), ExecutorError> {
         tracing::debug!("executing workload with default handler");
         let args = spec
             .process()
@@ -36,5 +36,5 @@ pub fn get_executor() -> Executor {
         // After execvp is called, the process is replaced with the container
         // payload through execvp, so it should never reach here.
         unreachable!();
-    });
+    })
 }

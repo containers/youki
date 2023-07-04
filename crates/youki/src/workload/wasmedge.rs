@@ -9,7 +9,7 @@ use libcontainer::workload::{Executor, ExecutorError};
 const EXECUTOR_NAME: &str = "wasmedge";
 
 pub fn get_executor() -> Executor {
-    return Box::new(|spec: &Spec| -> Result<(), ExecutorError> {
+    Box::new(|spec: &Spec| -> Result<(), ExecutorError> {
         if !can_handle(spec) {
             return Err(ExecutorError::CantHandle(EXECUTOR_NAME));
         }
@@ -58,7 +58,7 @@ pub fn get_executor() -> Executor {
             .map_err(|err| ExecutorError::Execution(err))?;
 
         Ok(())
-    });
+    })
 }
 
 fn can_handle(spec: &Spec) -> bool {

@@ -7,7 +7,7 @@ use libcontainer::workload::{Executor, ExecutorError, EMPTY};
 const EXECUTOR_NAME: &str = "wasmer";
 
 pub fn get_executor() -> Executor {
-    return Box::new(|spec: &Spec| -> Result<(), ExecutorError> {
+    Box::new(|spec: &Spec| -> Result<(), ExecutorError> {
         if !can_handle(spec) {
             return Err(ExecutorError::CantHandle(EXECUTOR_NAME));
         }
@@ -76,7 +76,7 @@ pub fn get_executor() -> Executor {
         wasi_env.cleanup(&mut store, None);
 
         Ok(())
-    });
+    })
 }
 
 fn can_handle(spec: &Spec) -> bool {

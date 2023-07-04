@@ -2,7 +2,7 @@ use libcontainer::workload::{Executor, ExecutorError};
 use oci_spec::runtime::Spec;
 
 pub fn default_executor() -> Executor {
-    return Box::new(|spec: &Spec| -> Result<(), ExecutorError> {
+    Box::new(|spec: &Spec| -> Result<(), ExecutorError> {
         #[cfg(feature = "wasm-wasmer")]
         match super::wasmer::get_executor()(spec) {
             Ok(_) => return Ok(()),
@@ -22,6 +22,8 @@ pub fn default_executor() -> Executor {
             Err(err) => return Err(err),
         }
 
+        // Leave the default executor as the last option, which executes normal
+        // container workloads.
         libcontainer::workload::default::get_executor()(spec)
-    });
+    })
 }

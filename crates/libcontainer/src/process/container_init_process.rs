@@ -359,7 +359,7 @@ pub fn container_init_process(
         })?;
     }
 
-    apply_rest_namespaces(&namespaces, &spec, syscall.as_ref())?;
+    apply_rest_namespaces(&namespaces, spec, syscall.as_ref())?;
 
     if let Some(true) = proc.no_new_privileges() {
         let _ = prctl::set_no_new_privileges(true);
@@ -379,7 +379,7 @@ pub fn container_init_process(
         let rootfs = RootFS::new();
         rootfs
             .prepare_rootfs(
-                &spec,
+                spec,
                 rootfs_path,
                 bind_service,
                 namespaces.get(LinuxNamespaceType::Cgroup)?.is_some(),
@@ -678,7 +678,7 @@ pub fn container_init_process(
     }
 
     if proc.args().is_some() {
-        (args.executor)(&spec).map_err(|err| {
+        (args.executor)(spec).map_err(|err| {
             tracing::error!(?err, "failed to execute payload");
             err
         })?;

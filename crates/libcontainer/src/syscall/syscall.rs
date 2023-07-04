@@ -76,7 +76,7 @@ impl SyscallType {
     pub fn create_syscall(&self) -> Box<dyn Syscall> {
         match self {
             SyscallType::Linux => Box::new(LinuxSyscall),
-            SyscallType::Test => Box::new(TestHelperSyscall::default()),
+            SyscallType::Test => Box::<TestHelperSyscall>::default(),
         }
     }
 }

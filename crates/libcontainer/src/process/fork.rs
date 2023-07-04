@@ -60,7 +60,7 @@ fn clone_internal(
     exit_signal: Option<u64>,
 ) -> Result<Pid, CloneError> {
     match clone3(&mut cb, flags, exit_signal) {
-        Ok(pid) => return Ok(pid),
+        Ok(pid) => Ok(pid),
         // For now, we decide to only fallback on ENOSYS
         Err(CloneError::Clone(nix::Error::ENOSYS)) => {
             tracing::debug!("clone3 is not supported, fallback to clone");
@@ -68,7 +68,7 @@ fn clone_internal(
 
             Ok(pid)
         }
-        Err(err) => return Err(err),
+        Err(err) => Err(err),
     }
 }
 
@@ -112,17 +112,15 @@ fn clone3(cb: &mut CloneCb, flags: u64, exit_signal: Option<u64>) -> Result<Pid,
     // we have not observed any issues with calling clone3 directly, but we
     // should keep an eye on it.
     match unsafe { libc::syscall(libc::SYS_clone3, args_ptr, args_size) } {
-        -1 => {
-            return Err(CloneError::Clone(nix::Error::last()));
-        }
+        -1 => Err(CloneError::Clone(nix::Error::last())),
         0 => {
             // Inside the cloned process, we execute the callback and exit with
             // the return code.
             std::process::exit(cb());
         }
-        ret if ret >= 0 => return Ok(Pid::from_raw(ret as i32)),
-        ret => return Err(CloneError::UnknownErrno(ret as i32)),
-    };
+        ret if ret >= 0 => Ok(Pid::from_raw(ret as i32)),
+        ret => Err(CloneError::UnknownErrno(ret as i32)),
+    }
 }
 
 fn clone(cb: CloneCb, flags: u64, exit_signal: Option<u64>) -> Result<Pid, CloneError> {

@@ -179,7 +179,7 @@ impl ContainerBuilderImpl {
         );
         let cmanager =
             libcgroups::common::create_cgroup_manager(&libcgroups::common::CgroupConfig {
-                cgroup_path: cgroups_path.to_owned(),
+                cgroup_path: cgroups_path,
                 systemd_cgroup: self.use_systemd || self.rootless.is_some(),
                 container_name: self.container_id.to_string(),
             })?;
