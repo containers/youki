@@ -1,5 +1,5 @@
+use libcontainer::oci_spec::runtime::Spec;
 use libcontainer::workload::{Executor, ExecutorError};
-use oci_spec::runtime::Spec;
 
 pub fn default_executor() -> Executor {
     Box::new(|spec: &Spec| -> Result<(), ExecutorError> {
