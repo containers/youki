@@ -108,6 +108,48 @@ pub fn container_intermediate_process(
         namespaces.unshare_or_setns(pid_namespace)?;
     }
 
+    let cb: fork::CloneCb = Box::new({
+        let args = args.clone();
+        let init_sender = init_sender.clone();
+        let inter_sender = inter_sender.clone();
+        let mut main_sender = main_sender.clone();
+        let mut init_receiver = init_receiver.clone();
+        move || {
+            // We are inside the forked process here. The first thing we have to do
+            // is to close any unused senders, since fork will make a dup for all
+            // the socket.
+            init_sender.close().map_err(|err| {
+                tracing::error!("failed to close receiver in init process: {}", err);
+                IntermediateProcessError::Channel(err)
+            })?;
+            inter_sender.close().map_err(|err| {
+                tracing::error!(
+                    "failed to close sender in the intermediate process: {}",
+                    err
+                );
+                IntermediateProcessError::Channel(err)
+            })?;
+            match container_init_process(&args, &mut main_sender, &mut init_receiver) {
+                Ok(_) => Ok(()),
+                Err(e) => {
+                    if let ContainerType::TenantContainer { exec_notify_fd } = args.container_type {
+                        let buf = format!("{e}");
+                        write(exec_notify_fd, buf.as_bytes()).map_err(|err| {
+                            tracing::error!("failed to write to exec notify fd: {}", err);
+                            IntermediateProcessError::ExecNotify(err)
+                        })?;
+                        close(exec_notify_fd).map_err(|err| {
+                            tracing::error!("failed to close exec notify fd: {}", err);
+                            IntermediateProcessError::ExecNotify(err)
+                        })?;
+                    }
+                    tracing::error!("failed to initialize container process: {e}");
+                    Err(e.into())
+                }
+            }
+        }
+    });
+
     // We have to record the pid of the init process. The init process will be
     // inside the pid namespace, so we can't rely on the init process to send us
     // the correct pid. We also want to clone the init process as a sibling
@@ -116,42 +158,7 @@ pub fn container_intermediate_process(
     // configuration. The youki main process can decide what to do with the init
     // process and the intermediate process can just exit safely after the job
     // is done.
-
-    let pid = fork::container_clone_sibling("youki:[2:INIT]", || {
-        // We are inside the forked process here. The first thing we have to do
-        // is to close any unused senders, since fork will make a dup for all
-        // the socket.
-        init_sender.close().map_err(|err| {
-            tracing::error!("failed to close receiver in init process: {}", err);
-            IntermediateProcessError::Channel(err)
-        })?;
-        inter_sender.close().map_err(|err| {
-            tracing::error!(
-                "failed to close sender in the intermediate process: {}",
-                err
-            );
-            IntermediateProcessError::Channel(err)
-        })?;
-        match container_init_process(args, main_sender, init_receiver) {
-            Ok(_) => Ok(()),
-            Err(e) => {
-                if let ContainerType::TenantContainer { exec_notify_fd } = args.container_type {
-                    let buf = format!("{e}");
-                    write(exec_notify_fd, buf.as_bytes()).map_err(|err| {
-                        tracing::error!("failed to write to exec notify fd: {}", err);
-                        IntermediateProcessError::ExecNotify(err)
-                    })?;
-                    close(exec_notify_fd).map_err(|err| {
-                        tracing::error!("failed to close exec notify fd: {}", err);
-                        IntermediateProcessError::ExecNotify(err)
-                    })?;
-                }
-                tracing::error!("failed to initialize container process: {e}");
-                Err(e.into())
-            }
-        }
-    })
-    .map_err(|err| {
+    let pid = fork::container_clone_sibling("youki:[2:INIT]", cb).map_err(|err| {
         tracing::error!("failed to fork init process: {}", err);
         IntermediateProcessError::InitProcess(err)
     })?;

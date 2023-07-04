@@ -41,9 +41,14 @@ pub enum CallbackError {
 
 type CallbackResult<T> = std::result::Result<T, CallbackError>;
 
-// The clone callback is used in clone call. It is a boxed closure and it needs
-// to trasfer the ownership of related memory to the new process.
-type CloneCb = Box<dyn FnOnce() -> i32>;
+// This callback signature is used in the public rust interface with easier to
+// use rust error types.
+pub type CloneCb = Box<dyn FnOnce() -> CallbackResult<()>>;
+
+// The clone callback is used in clone system call. It is a boxed closure and it
+// needs to trasfer the ownership of related memory to the new process. The
+// interface returns i32 which is typical for C functions.
+type CloneSystemCb = Box<dyn FnOnce() -> i32>;
 
 // Fork/Clone a sibling process that shares the same parent as the calling
 // process. This is used to launch the container init process so the parent
@@ -52,10 +57,7 @@ type CloneCb = Box<dyn FnOnce() -> i32>;
 // youki main process) will exit and the init process will be re-parented to the
 // process 1 (system init process), which is not the right behavior of what we
 // look for.
-pub fn container_clone_sibling<'a, F: FnMut() -> CallbackResult<()> + 'a>(
-    child_name: &str,
-    cb: F,
-) -> Result<Pid, CloneError> {
+pub fn container_clone_sibling(child_name: &str, cb: CloneCb) -> Result<Pid, CloneError> {
     // Note: normally, an exit signal is required, but when using
     // `CLONE_PARENT`, the `clone3` will return EINVAL if an exit signal is set.
     // The older `clone` will not return EINVAL in this case. Instead it ignores
@@ -70,21 +72,20 @@ pub fn container_clone_sibling<'a, F: FnMut() -> CallbackResult<()> + 'a>(
 // using clone, we would have to manually make sure all the variables are
 // correctly send to the new process, especially Rust borrow checker will be a
 // lot of hassel to deal with every details.
-pub fn container_clone<'a, F: FnMut() -> CallbackResult<()> + 'a>(
-    child_name: &str,
-    cb: F,
-) -> Result<Pid, CloneError> {
+pub fn container_clone(child_name: &str, cb: CloneCb) -> Result<Pid, CloneError> {
     clone_internal(child_name, cb, 0, Some(SIGCHLD as u64))
 }
 
-fn clone_internal<'a, F: FnMut() -> CallbackResult<()> + 'a>(
+fn clone_internal(
     child_name: &str,
-    mut cb: F,
+    cb: CloneCb,
     flags: u64,
     exit_signal: Option<u64>,
 ) -> Result<Pid, CloneError> {
-    let mut child_closure = || {
-        if let Err(ret) = prctl::set_name(child_name) {
+    // Prepare a owned string for the closure
+    let child_name = child_name.to_owned();
+    let child_closure = Box::new(move || {
+        if let Err(ret) = prctl::set_name(child_name.as_str()) {
             tracing::error!(?ret, "failed to set name for child process");
             return ret;
         }
@@ -95,25 +96,23 @@ fn clone_internal<'a, F: FnMut() -> CallbackResult<()> + 'a>(
                 -1
             }
         }
-    };
+    });
 
-    match clone3(&mut child_closure, flags, exit_signal) {
+    match clone3(child_closure, flags, exit_signal) {
         Ok(pid) => return Ok(pid),
         Err(CloneError::Clone(nix::Error::ENOSYS)) => {
             tracing::debug!("clone3 is not supported, fallback to clone");
-            let pid = clone(&mut child_closure, flags, exit_signal)?;
+            // let pid = clone(child_closure, flags, exit_signal)?;
 
-            Ok(pid)
+            // Ok(pid)
+
+            todo!()
         }
         Err(err) => return Err(err),
     }
 }
 
-fn clone3<'a, F: FnMut() -> i32 + 'a>(
-    mut cb: F,
-    flags: u64,
-    exit_signal: Option<u64>,
-) -> Result<Pid, CloneError> {
+fn clone3(cb: CloneSystemCb, flags: u64, exit_signal: Option<u64>) -> Result<Pid, CloneError> {
     #[repr(C)]
     struct clone3_args {
         flags: u64,
@@ -165,11 +164,7 @@ fn clone3<'a, F: FnMut() -> i32 + 'a>(
 /// the new container process, where we can enter into namespaces directly instead
 /// of using unshare and fork. This call will only create one new process, instead
 /// of two using fork.
-fn clone<'a, F: FnMut() -> i32 + 'a>(
-    cb: F,
-    flags: u64,
-    exit_signal: Option<u64>,
-) -> Result<Pid, CloneError> {
+fn clone(cb: CloneSystemCb, flags: u64, exit_signal: Option<u64>) -> Result<Pid, CloneError> {
     const DEFAULT_STACK_SIZE: usize = 8 * 1024 * 1024; // 8M
     const DEFAULT_PAGE_SIZE: usize = 4 * 1024; // 4K
 
@@ -240,13 +235,13 @@ fn clone<'a, F: FnMut() -> i32 + 'a>(
     // we double box the closure. This is consistant with how std::unix::thread
     // handles the closure.
     // Ref: https://github.com/rust-lang/rust/blob/master/library/std/src/sys/unix/thread.rs
-    let data = Box::into_raw(Box::new(Box::new(cb)));
+    let data = Box::into_raw(Box::new(cb));
     // The main is a wrapper function passed into clone call below. The "data"
     // arg is actually a raw pointer to a Box closure. so here, we re-box the
     // pointer back into a box closure so the main takes ownership of the
     // memory. Then we can call the closure passed in.
     extern "C" fn main(data: *mut libc::c_void) -> libc::c_int {
-        unsafe { Box::from_raw(data as *mut CloneCb)() as i32 }
+        unsafe { Box::from_raw(data as *mut CloneSystemCb)() as i32 }
     }
 
     // The nix::sched::clone wrapper doesn't provide the right interface.  Using
@@ -289,7 +284,7 @@ mod test {
 
     #[test]
     fn test_container_fork() -> Result<()> {
-        let pid = container_clone("test:child", || Ok(()))?;
+        let pid = container_clone("test:child", Box::new(|| Ok(())))?;
         match waitpid(pid, None).expect("wait pid failed.") {
             WaitStatus::Exited(p, status) => {
                 assert_eq!(pid, p);
@@ -302,7 +297,7 @@ mod test {
 
     #[test]
     fn test_container_err_fork() -> Result<()> {
-        let pid = container_clone("test:child", || Err(CallbackError::Test))?;
+        let pid = container_clone("test:child", Box::new(|| Err(CallbackError::Test)))?;
         match waitpid(pid, None).expect("wait pid failed.") {
             WaitStatus::Exited(p, status) => {
                 assert_eq!(pid, p);
@@ -354,7 +349,7 @@ mod test {
             unistd::ForkResult::Child => {
                 // Inside the forked process. We call `container_clone` and pass
                 // the pid to the parent process.
-                let pid = container_clone_sibling("test:child", || Ok(()))?;
+                let pid = container_clone_sibling("test:child", Box::new(|| Ok(())))?;
                 sender.send(pid.as_raw())?;
                 sender.close()?;
                 std::process::exit(0);
@@ -408,7 +403,8 @@ mod test {
                 ));
             }
 
-            let pid = container_clone("test:child", || Ok(())).map_err(|err| err.to_string())?;
+            let pid = container_clone("test:child", Box::new(|| Ok(())))
+                .map_err(|err| err.to_string())?;
             match waitpid(pid, None).expect("wait pid failed.") {
                 WaitStatus::Exited(p, status) => {
                     assert_eq!(pid, p);

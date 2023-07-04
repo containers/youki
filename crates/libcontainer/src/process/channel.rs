@@ -40,6 +40,7 @@ pub fn main_channel() -> Result<(MainSender, MainReceiver), ChannelError> {
     Ok((MainSender { sender }, MainReceiver { receiver }))
 }
 
+#[derive(Clone)]
 pub struct MainSender {
     sender: Sender<Message>,
 }
@@ -87,6 +88,7 @@ impl MainSender {
     }
 }
 
+#[derive(Clone)]
 pub struct MainReceiver {
     receiver: Receiver<Message>,
 }
@@ -193,6 +195,7 @@ pub fn intermediate_channel() -> Result<(IntermediateSender, IntermediateReceive
     ))
 }
 
+#[derive(Clone)]
 pub struct IntermediateSender {
     sender: Sender<Message>,
 }
@@ -212,6 +215,7 @@ impl IntermediateSender {
     }
 }
 
+#[derive(Clone)]
 pub struct IntermediateReceiver {
     receiver: Receiver<Message>,
 }
@@ -248,6 +252,7 @@ pub fn init_channel() -> Result<(InitSender, InitReceiver), ChannelError> {
     Ok((InitSender { sender }, InitReceiver { receiver }))
 }
 
+#[derive(Clone)]
 pub struct InitSender {
     sender: Sender<Message>,
 }
@@ -266,6 +271,7 @@ impl InitSender {
     }
 }
 
+#[derive(Clone)]
 pub struct InitReceiver {
     receiver: Receiver<Message>,
 }

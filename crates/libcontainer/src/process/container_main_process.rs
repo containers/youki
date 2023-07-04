@@ -37,34 +37,41 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, bo
     // cloned process, we have to be deligent about closing any unused channel.
     // At minimum, we have to close down any unused senders. The corresponding
     // receivers will be cleaned up once the senders are closed down.
-    let (main_sender, main_receiver) = &mut channel::main_channel()?;
-    let inter_chan = &mut channel::intermediate_channel()?;
-    let init_chan = &mut channel::init_channel()?;
+    let (main_sender, mut main_receiver) = channel::main_channel()?;
+    let inter_chan = channel::intermediate_channel()?;
+    let init_chan = channel::init_channel()?;
 
-    let intermediate_pid = fork::container_clone("youki:[1:INTER]", || {
-        container_intermediate_process::container_intermediate_process(
-            container_args,
-            inter_chan,
-            init_chan,
-            main_sender,
-        )?;
+    let cb: fork::CloneCb = Box::new({
+        let container_args = container_args.clone();
+        let mut main_sender = main_sender.clone();
+        let mut inter_chan = inter_chan.clone();
+        let mut init_chan = init_chan.clone();
+        move || {
+            container_intermediate_process::container_intermediate_process(
+                &container_args,
+                &mut inter_chan,
+                &mut init_chan,
+                &mut main_sender,
+            )?;
 
-        Ok(())
-    })
-    .map_err(|err| {
+            Ok(())
+        }
+    });
+
+    let intermediate_pid = fork::container_clone("youki:[1:INTER]", cb).map_err(|err| {
         tracing::error!("failed to fork intermediate process: {}", err);
         ProcessError::IntermediateProcessFailed(err)
     })?;
 
     // Close down unused fds. The corresponding fds are duplicated to the
-    // child process during fork.
+    // child process during clone.
     main_sender.close().map_err(|err| {
         tracing::error!("failed to close unused sender: {}", err);
         err
     })?;
 
-    let (inter_sender, inter_receiver) = inter_chan;
-    let (init_sender, init_receiver) = init_chan;
+    let (mut inter_sender, inter_receiver) = inter_chan;
+    let (mut init_sender, init_receiver) = init_chan;
 
     // If creating a rootless container, the intermediate process will ask
     // the main process to set up uid and gid mapping, once the intermediate
@@ -106,8 +113,8 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, bo
             crate::process::seccomp_listener::sync_seccomp(
                 seccomp,
                 &state,
-                init_sender,
-                main_receiver,
+                &mut init_sender,
+                &mut main_receiver,
             )?;
         }
 
