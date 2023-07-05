@@ -4,6 +4,7 @@
 [files]
 extend-exclude = [
     "**/*.svg",
+    "tests/oci-runtime-tests/**"
 ]
 
 [default.extend-identifiers]
