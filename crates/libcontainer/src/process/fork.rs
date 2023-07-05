@@ -25,11 +25,14 @@ pub enum CloneError {
 }
 
 /// The callback function used in clone system call. The return value is i32
-/// which is consistent with C functions return code. The closure is boxed
-/// because we will have to correctly transfer the ownership of the closure
-/// memory on the heap to the new process. The trait has to be `FnMut` because
-/// we need to be able to call the closure multiple times, once in clone3 and
-/// once in clone if fallback is required.
+/// which is consistent with C functions return code. The trait has to be
+/// `FnMut` because we need to be able to call the closure multiple times, once
+/// in clone3 and once in clone if fallback is required. The closure is boxed
+/// because we need to store the closure on heap, not stack in the case of
+/// `clone`. Unlike `fork` or `clone3`, the `clone` glibc wrapper requires us to
+/// pass in a child stack, which is empty. By storing the closure in heap, we
+/// can then in the new process to re-box the heap memory back to a closure
+/// correctly.
 pub type CloneCb = Box<dyn FnMut() -> i32>;
 
 // Clone a sibling process that shares the same parent as the calling
@@ -196,9 +199,9 @@ fn clone(cb: CloneCb, flags: u64, exit_signal: Option<u64>) -> Result<Pid, Clone
     // Ref: https://github.com/rust-lang/rust/blob/master/library/std/src/sys/unix/thread.rs
     let data = Box::into_raw(Box::new(cb));
     // The main is a wrapper function passed into clone call below. The "data"
-    // arg is actually a raw pointer to a Box closure. so here, we re-box the
+    // arg is actually a raw pointer to the Box closure. so here, we re-box the
     // pointer back into a box closure so the main takes ownership of the
-    // memory. Then we can call the closure passed in.
+    // memory. Then we can call the closure.
     extern "C" fn main(data: *mut libc::c_void) -> libc::c_int {
         unsafe { Box::from_raw(data as *mut CloneCb)() }
     }
@@ -213,22 +216,26 @@ fn clone(cb: CloneCb, flags: u64, exit_signal: Option<u64>) -> Result<Pid, Clone
     // right ownership to the new child process.
     // Ref: https://github.com/nix-rust/nix/issues/919
     // Ref: https://github.com/nix-rust/nix/pull/920
-    match unsafe {
+    let ret = unsafe {
         libc::clone(
             main,
             child_stack_top,
             combined_flags,
             data as *mut libc::c_void,
         )
-    } {
-        -1 => {
-            // Since the clone call failed, the closure passed in didn't get
-            // consumed. To complete the circle, we can safely box up the
-            // closure again and let rust manage this memory for us.
-            unsafe { drop(Box::from_raw(data)) };
-            Err(CloneError::Clone(nix::Error::last()))
-        }
-        pid => Ok(Pid::from_raw(pid)),
+    };
+
+    // After the clone returns, the heap memory associated with the Box closure
+    // is duplicated in the cloned process. Therefore, we can safely re-box the
+    // closure from the raw pointer and let rust to continue managing the
+    // memory. We call drop here explicitly to avoid the warning that the
+    // closure is not used. This is correct since the closure is called in the
+    // cloned process, not the parent process.
+    unsafe { drop(Box::from_raw(data)) };
+    match ret {
+        -1 => Err(CloneError::Clone(nix::Error::last())),
+        pid if ret > 0 => Ok(Pid::from_raw(pid)),
+        _ => unreachable!("clone returned a negative pid {ret}"),
     }
 }
 
