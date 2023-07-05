@@ -237,7 +237,7 @@ dependencies = [
  "regex",
  "rustc-hash",
  "shlex",
- "syn 2.0.16",
+ "syn 2.0.23",
 ]
 
 [[package]]
@@ -2637,12 +2637,12 @@ dependencies = [
 
 [[package]]
 name = "prettyplease"
-version = "0.2.9"
+version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9825a04601d60621feed79c4e6b56d65db77cdca55cef43b46b0de1096d1c282"
+checksum = "92139198957b410250d43fad93e630d956499a625c527eda65175c8680f83387"
 dependencies = [
  "proc-macro2",
- "syn 2.0.16",
+ "syn 2.0.23",
 ]
 
 [[package]]
@@ -4528,7 +4528,7 @@ checksum = "372985c17ffd2705e0cc14aa85e96c546d04823aec07ec1e0da0a2983c9eb655"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.16",
+ "syn 2.0.23",
 ]
 
 [[package]]
