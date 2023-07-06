@@ -77,7 +77,7 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.any_modified == 'true'
     runs-on: ubuntu-22.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v3
       # We do not use `actions-rust-lang/setup-rust-toolchain` here because we
