@@ -14,12 +14,12 @@ pub struct Exec {
     /// Current working directory of the container
     pub cwd: Option<PathBuf>,
     /// Environment variables that should be set in the container
-    #[clap(short, long, value_parser = parse_key_val::<String, String>, number_of_values = 1)]
+    #[clap(short, long, value_parser = parse_env::<String, String>, number_of_values = 1)]
     pub env: Vec<(String, String)>,
     #[clap(short, long)]
     pub tty: bool,
     /// Run the command as a user
-    #[clap(short, long, value_parser = parse_colon_separated_pair::<u32, u32>)]
+    #[clap(short, long, value_parser = parse_user::<u32, u32>)]
     pub user: Option<(u32, Option<u32>)>,
     /// Add additional group IDs. Can be specified multiple times
     #[clap(long, short = 'g', number_of_values = 1)]
@@ -64,7 +64,7 @@ pub struct Exec {
     pub command: Vec<String>,
 }
 
-fn parse_key_val<T, U>(s: &str) -> Result<(T, U), Box<dyn Error + Send + Sync + 'static>>
+fn parse_env<T, U>(s: &str) -> Result<(T, U), Box<dyn Error + Send + Sync + 'static>>
 where
     T: std::str::FromStr,
     T::Err: Error + Send + Sync + 'static,
@@ -73,13 +73,11 @@ where
 {
     let pos = s
         .find('=')
-        .ok_or_else(|| format!("invalid KEY=value: no `=` found in `{s}`"))?;
+        .ok_or_else(|| format!("invalid VAR=value: no `=` found in `{s}`"))?;
     Ok((s[..pos].parse()?, s[pos + 1..].parse()?))
 }
 
-fn parse_colon_separated_pair<T, U>(
-    s: &str,
-) -> Result<(T, Option<U>), Box<dyn Error + Send + Sync + 'static>>
+fn parse_user<T, U>(s: &str) -> Result<(T, Option<U>), Box<dyn Error + Send + Sync + 'static>>
 where
     T: std::str::FromStr,
     T::Err: Error + Send + Sync + 'static,
