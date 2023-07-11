@@ -69,7 +69,7 @@ pub enum InitProcessError {
     #[error(transparent)]
     NotifyListener(#[from] notify_socket::NotifyListenerError),
     #[error(transparent)]
-    Workload(#[from] workload::ExecutorManagerError),
+    Workload(#[from] workload::ExecutorError),
     #[error("invalid io priority class: {0}")]
     IoPriorityClass(String),
 }
@@ -679,7 +679,7 @@ pub fn container_init_process(
     }
 
     if proc.args().is_some() {
-        args.executor_manager.exec(spec).map_err(|err| {
+        (args.executor)(spec).map_err(|err| {
             tracing::error!(?err, "failed to execute payload");
             err
         })?;
