@@ -33,11 +33,12 @@ impl Container {
             return Err(LibcontainerError::IncorrectStatus);
         }
 
-        let cgroups_path = self.spec()?.cgroup_path;
-        let use_systemd = self.systemd();
-
         let cgroup_manager =
-            libcgroups::common::create_cgroup_manager(cgroups_path, use_systemd, self.id())?;
+            libcgroups::common::create_cgroup_manager(libcgroups::common::CgroupConfig {
+                cgroup_path: self.spec()?.cgroup_path,
+                systemd_cgroup: self.systemd(),
+                container_name: self.id().to_string(),
+            })?;
         match stats {
             true => {
                 let stats = cgroup_manager.stats()?;

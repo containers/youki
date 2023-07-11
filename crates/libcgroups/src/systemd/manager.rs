@@ -180,7 +180,7 @@ impl Manager {
         container_name: String,
         use_system: bool,
     ) -> Result<Self, SystemdManagerError> {
-        let mut destructured_path = cgroups_path.as_path().try_into()?;
+        let mut destructured_path: CgroupsPath = cgroups_path.as_path().try_into()?;
         ensure_parent_unit(&mut destructured_path, use_system);
 
         let client = match use_system {

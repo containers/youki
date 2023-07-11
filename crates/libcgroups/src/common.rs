@@ -316,17 +316,22 @@ pub enum CreateCgroupSetupError {
     Systemd(#[from] systemd::manager::SystemdManagerError),
 }
 
-pub fn create_cgroup_manager<P: Into<PathBuf>>(
-    cgroup_path: P,
-    systemd_cgroup: bool,
-    container_name: &str,
+#[derive(Clone)]
+pub struct CgroupConfig {
+    pub cgroup_path: PathBuf,
+    pub systemd_cgroup: bool,
+    pub container_name: String,
+}
+
+pub fn create_cgroup_manager(
+    config: CgroupConfig,
 ) -> Result<AnyCgroupManager, CreateCgroupSetupError> {
     let cgroup_setup = get_cgroup_setup().map_err(|err| match err {
         GetCgroupSetupError::WrappedIo(err) => CreateCgroupSetupError::WrappedIo(err),
         GetCgroupSetupError::NonDefault => CreateCgroupSetupError::NonDefault,
         GetCgroupSetupError::FailedToDetect => CreateCgroupSetupError::FailedToDetect,
     })?;
-    let cgroup_path = cgroup_path.into();
+    let cgroup_path = config.cgroup_path.as_path();
 
     match cgroup_setup {
         CgroupSetup::Legacy | CgroupSetup::Hybrid => {
@@ -334,17 +339,17 @@ pub fn create_cgroup_manager<P: Into<PathBuf>>(
         }
         CgroupSetup::Unified => {
             // ref https://github.com/opencontainers/runtime-spec/blob/main/config-linux.md#cgroups-path
-            if cgroup_path.is_absolute() || !systemd_cgroup {
+            if cgroup_path.is_absolute() || !config.systemd_cgroup {
                 return Ok(create_v2_cgroup_manager(cgroup_path)?.any());
             }
-            Ok(create_systemd_cgroup_manager(cgroup_path, container_name)?.any())
+            Ok(create_systemd_cgroup_manager(cgroup_path, config.container_name.as_str())?.any())
         }
     }
 }
 
 #[cfg(feature = "v1")]
 fn create_v1_cgroup_manager(
-    cgroup_path: PathBuf,
+    cgroup_path: &Path,
 ) -> Result<v1::manager::Manager, v1::manager::V1ManagerError> {
     tracing::info!("cgroup manager V1 will be used");
     v1::manager::Manager::new(cgroup_path)
@@ -352,29 +357,29 @@ fn create_v1_cgroup_manager(
 
 #[cfg(not(feature = "v1"))]
 fn create_v1_cgroup_manager(
-    _cgroup_path: PathBuf,
+    _cgroup_path: &Path,
 ) -> Result<v1::manager::Manager, v1::manager::V1ManagerError> {
     Err(v1::manager::V1ManagerError::NotEnabled)
 }
 
 #[cfg(feature = "v2")]
 fn create_v2_cgroup_manager(
-    cgroup_path: PathBuf,
+    cgroup_path: &Path,
 ) -> Result<v2::manager::Manager, v2::manager::V2ManagerError> {
     tracing::info!("cgroup manager V2 will be used");
-    v2::manager::Manager::new(DEFAULT_CGROUP_ROOT.into(), cgroup_path)
+    v2::manager::Manager::new(DEFAULT_CGROUP_ROOT.into(), cgroup_path.to_owned())
 }
 
 #[cfg(not(feature = "v2"))]
 fn create_v2_cgroup_manager(
-    _cgroup_path: PathBuf,
+    _cgroup_path: &Path,
 ) -> Result<v2::manager::Manager, v2::manager::V2ManagerError> {
     Err(v2::manager::V2ManagerError::NotEnabled)
 }
 
 #[cfg(feature = "systemd")]
 fn create_systemd_cgroup_manager(
-    cgroup_path: PathBuf,
+    cgroup_path: &Path,
     container_name: &str,
 ) -> Result<systemd::manager::Manager, systemd::manager::SystemdManagerError> {
     if !systemd::booted() {
@@ -391,7 +396,7 @@ fn create_systemd_cgroup_manager(
     );
     systemd::manager::Manager::new(
         DEFAULT_CGROUP_ROOT.into(),
-        cgroup_path,
+        cgroup_path.to_owned(),
         container_name.into(),
         use_system,
     )
@@ -399,7 +404,7 @@ fn create_systemd_cgroup_manager(
 
 #[cfg(not(feature = "systemd"))]
 fn create_systemd_cgroup_manager(
-    _cgroup_path: PathBuf,
+    _cgroup_path: &Path,
     _container_name: &str,
 ) -> Result<systemd::manager::Manager, systemd::manager::SystemdManagerError> {
     Err(systemd::manager::SystemdManagerError::NotEnabled)
