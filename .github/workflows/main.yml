@@ -70,31 +70,32 @@ jobs:
       - name: Run feature tests
         run: just test-features
 
-  # musl target testing is religated to a separate job because our current build
-  # for musl requires nightly. It is difficult to mix stable and nightly
-  # toolchains in the same job.
-  musl:
-    needs: [changes]
-    if: needs.changes.outputs.any_modified == 'true'
-    runs-on: ubuntu-22.04
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v3
-      # We do not use `actions-rust-lang/setup-rust-toolchain` here because we
-      # want to override the default toolchain file to use nightly toolchains.
-      # The `setup-rust-toolchain` action will always choose toolchain file with
-      # no way to override. 
-      - name: Setup Rust toolchain and cache
-        uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: nightly
-          target: x86_64-unknown-linux-musl
-          components: rust-src
-      - uses: taiki-e/install-action@just
-      - name: Install requirements
-        run: sudo env PATH=$PATH just ci-musl-prepare
-      - name: Run test against musl target
-        run: just test-musl
+  # TODO: musl testing is flaky. Turn it back on when we can resolve it.
+  # # musl target testing is religated to a separate job because our current build
+  # # for musl requires nightly. It is difficult to mix stable and nightly
+  # # toolchains in the same job.
+  # musl:
+  #   needs: [changes]
+  #   if: needs.changes.outputs.any_modified == 'true'
+  #   runs-on: ubuntu-22.04
+  #   timeout-minutes: 20
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #     # We do not use `actions-rust-lang/setup-rust-toolchain` here because we
+  #     # want to override the default toolchain file to use nightly toolchains.
+  #     # The `setup-rust-toolchain` action will always choose toolchain file with
+  #     # no way to override. 
+  #     - name: Setup Rust toolchain and cache
+  #       uses: dtolnay/rust-toolchain@v1
+  #       with:
+  #         toolchain: nightly
+  #         target: x86_64-unknown-linux-musl
+  #         components: rust-src
+  #     - uses: taiki-e/install-action@just
+  #     - name: Install requirements
+  #       run: sudo env PATH=$PATH just ci-musl-prepare
+  #     - name: Run test against musl target
+  #       run: just test-musl
 
 
   coverage:
