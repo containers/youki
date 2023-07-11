@@ -6,13 +6,13 @@ test_musl() {
     cargo +nightly build \
         -Zbuild-std \
         --target $(uname -m)-unknown-linux-musl \
-        --package libcontainer \
-        --no-default-features -F v2
+        --package "$1" \
+        --no-default-features -F "$2"
     cargo +nightly test \
         -Zbuild-std \
         --target $(uname -m)-unknown-linux-musl \
-        --package libcontainer \
-        --no-default-features -F v2
+        --package "$1" \
+        --no-default-features -F "$2"
 }
 
 test_musl "libcontainer" "v1"
