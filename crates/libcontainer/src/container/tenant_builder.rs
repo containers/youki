@@ -8,6 +8,7 @@ use oci_spec::runtime::{
 };
 use procfs::process::Namespace;
 
+use std::rc::Rc;
 use std::{
     collections::HashMap,
     convert::TryFrom,
@@ -132,7 +133,7 @@ impl TenantContainerBuilder {
             pid_file: self.base.pid_file,
             console_socket: csocketfd,
             use_systemd,
-            spec: &spec,
+            spec: Rc::new(spec),
             rootfs,
             rootless,
             notify_path: notify_path.clone(),

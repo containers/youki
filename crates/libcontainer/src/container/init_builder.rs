@@ -4,6 +4,7 @@ use rootless::Rootless;
 use std::{
     fs,
     path::{Path, PathBuf},
+    rc::Rc,
 };
 
 use crate::{
@@ -99,7 +100,7 @@ impl InitContainerBuilder {
             pid_file: self.base.pid_file,
             console_socket: csocketfd,
             use_systemd: self.use_systemd,
-            spec: &spec,
+            spec: Rc::new(spec),
             rootfs,
             rootless,
             notify_path,
