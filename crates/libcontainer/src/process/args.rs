@@ -3,10 +3,11 @@ use oci_spec::runtime::Spec;
 use std::os::unix::prelude::RawFd;
 use std::path::PathBuf;
 
+use crate::container::Container;
+use crate::notify_socket::NotifyListener;
 use crate::rootless::Rootless;
 use crate::syscall::syscall::SyscallType;
 use crate::workload::ExecutorManager;
-use crate::{container::Container, notify_socket::NotifyListener};
 
 #[derive(Debug, Copy, Clone)]
 pub enum ContainerType {
@@ -26,7 +27,7 @@ pub struct ContainerArgs<'a> {
     /// Socket to communicate the file descriptor of the ptty
     pub console_socket: Option<RawFd>,
     /// The Unix Domain Socket to communicate container start
-    pub notify_socket: NotifyListener,
+    pub notify_listener: NotifyListener,
     /// File descriptors preserved/passed to the container init process.
     pub preserve_fds: i32,
     /// Container state

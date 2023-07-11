@@ -1,6 +1,7 @@
 use nix::unistd::{self, close};
 use std::env;
 use std::io::prelude::*;
+use std::os::fd::FromRawFd;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
@@ -9,7 +10,7 @@ pub const NOTIFY_FILE: &str = "notify.sock";
 
 #[derive(Debug, thiserror::Error)]
 pub enum NotifyListenerError {
-    #[error("failed to chdir while creating notify socket")]
+    #[error("failed to chdir {path} while creating notify socket: {source}")]
     Chdir { source: nix::Error, path: PathBuf },
     #[error("invalid path: {0}")]
     InvalidPath(PathBuf),
@@ -43,6 +44,7 @@ pub struct NotifyListener {
 
 impl NotifyListener {
     pub fn new(socket_path: &Path) -> Result<Self> {
+        tracing::debug!(?socket_path, "create notify listener");
         // Unix domain socket has a maximum length of 108, different from
         // normal path length of 255. Due to how docker create the path name
         // to the container working directory, there is a high chance that
@@ -56,6 +58,7 @@ impl NotifyListener {
             .file_name()
             .ok_or_else(|| NotifyListenerError::InvalidPath(socket_path.to_owned()))?;
         let cwd = env::current_dir().map_err(NotifyListenerError::GetCwd)?;
+        tracing::debug!(?cwd, "the cwd to create the notify socket");
         unistd::chdir(workdir).map_err(|e| NotifyListenerError::Chdir {
             source: e,
             path: workdir.to_owned(),
@@ -90,6 +93,15 @@ impl NotifyListener {
     pub fn close(&self) -> Result<()> {
         close(self.socket.as_raw_fd()).map_err(NotifyListenerError::Close)?;
         Ok(())
+    }
+}
+
+impl Clone for NotifyListener {
+    fn clone(&self) -> Self {
+        let fd = self.socket.as_raw_fd();
+        // This is safe because we just duplicate a valid fd.
+        let socket = unsafe { UnixListener::from_raw_fd(fd) };
+        Self { socket }
     }
 }
 
