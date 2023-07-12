@@ -120,7 +120,7 @@ fn main() -> Result<()> {
                 commands::checkpoint::checkpoint(checkpoint, root_path)
             }
             CommonCmd::Events(events) => commands::events::events(events, root_path),
-            CommonCmd::Exec(exec) => match commands::exec::exec(exec, root_path) {
+            CommonCmd::Exec(exec) => match commands::exec::exec(*exec, root_path) {
                 Ok(exit_code) => std::process::exit(exit_code),
                 Err(e) => {
                     eprintln!("exec failed : {e}");

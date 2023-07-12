@@ -52,7 +52,7 @@ pub enum StandardCmd {
 pub enum CommonCmd {
     Checkpointt(Checkpoint),
     Events(Events),
-    Exec(Exec),
+    Exec(Box<Exec>),
     Features(Features),
     List(List),
     Pause(Pause),
