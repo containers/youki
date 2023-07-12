@@ -48,9 +48,9 @@ struct Opts {
 enum SubCommand {
     // Standard and common commands handled by the liboci_cli crate
     #[clap(flatten)]
-    Standard(liboci_cli::StandardCmd),
+    Standard(Box<liboci_cli::StandardCmd>),
     #[clap(flatten)]
-    Common(liboci_cli::CommonCmd),
+    Common(Box<liboci_cli::CommonCmd>),
 
     // Youki specific extensions
     Info(info::Info),
@@ -106,7 +106,7 @@ fn main() -> Result<()> {
     let systemd_cgroup = opts.global.systemd_cgroup;
 
     let cmd_result = match opts.subcmd {
-        SubCommand::Standard(cmd) => match cmd {
+        SubCommand::Standard(cmd) => match *cmd {
             StandardCmd::Create(create) => {
                 commands::create::create(create, root_path, systemd_cgroup)
             }
@@ -115,12 +115,12 @@ fn main() -> Result<()> {
             StandardCmd::Delete(delete) => commands::delete::delete(delete, root_path),
             StandardCmd::State(state) => commands::state::state(state, root_path),
         },
-        SubCommand::Common(cmd) => match cmd {
+        SubCommand::Common(cmd) => match *cmd {
             CommonCmd::Checkpointt(checkpoint) => {
                 commands::checkpoint::checkpoint(checkpoint, root_path)
             }
             CommonCmd::Events(events) => commands::events::events(events, root_path),
-            CommonCmd::Exec(exec) => match commands::exec::exec(*exec, root_path) {
+            CommonCmd::Exec(exec) => match commands::exec::exec(exec, root_path) {
                 Ok(exit_code) => std::process::exit(exit_code),
                 Err(e) => {
                     eprintln!("exec failed : {e}");
