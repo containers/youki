@@ -16,6 +16,7 @@ Interface](https://github.com/opencontainers/runtime-tools/blob/master/docs/comm
 | checkpoint |            |                   | ✅   | ✅   |       |
 | events     | ✅         |                   | ✅   |      | ✅    |
 | exec       | ✅         |                   | ✅   | ✅   | ✅    |
+| features   | ✅         |                   | 🏴   |     |      |
 | list       | ✅         |                   | ✅   | ✅   | ✅    |
 | pause      | ✅         |                   | ✅   | ✅   | ✅    |
 | ps         | ✅         |                   | ✅   | ✅   | ✅    |
@@ -24,3 +25,6 @@ Interface](https://github.com/opencontainers/runtime-tools/blob/master/docs/comm
 | run        | ✅         |                   | ✅   | ✅   | ✅    |
 | spec       | ✅         |                   | ✅   | ✅   | ✅    |
 | update     |            |                   | ✅   | ✅   |       |
+
+🏴 The `features` subcommand is [implemented](https://github.com/opencontainers/runc/pull/3296)
+in `runc`, but not documented.

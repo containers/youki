@@ -13,6 +13,7 @@ pub mod create;
 pub mod delete;
 pub mod events;
 pub mod exec;
+pub mod features;
 pub mod info;
 pub mod kill;
 pub mod list;
