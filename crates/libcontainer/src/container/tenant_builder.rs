@@ -19,7 +19,7 @@ use std::{
     str::FromStr,
 };
 
-use crate::error::{LibcontainerError, MissingSpecError};
+use crate::error::{ErrInvalidSpec, LibcontainerError, MissingSpecError};
 use crate::process::args::ContainerType;
 use crate::{capabilities::CapabilityExt, container::builder_impl::ContainerBuilderImpl};
 use crate::{notify_socket::NotifySocket, rootless::Rootless, tty, utils};
@@ -188,8 +188,42 @@ impl TenantContainerBuilder {
             err
         })?;
 
+        Self::validate_spec(&spec)?;
+
         spec.canonicalize_rootfs(container.bundle())?;
         Ok(spec)
+    }
+
+    fn validate_spec(spec: &Spec) -> Result<(), LibcontainerError> {
+        let version = spec.version();
+        if !version.starts_with("1.") {
+            tracing::error!(
+                "runtime spec has incompatible version '{}'. Only 1.X.Y is supported",
+                spec.version()
+            );
+            Err(ErrInvalidSpec::UnsupportedVersion)?;
+        }
+
+        if let Some(process) = spec.process() {
+            if let Some(io_priority) = process.io_priority() {
+                let priority = io_priority.priority();
+                let iop_class_res = serde_json::to_string(&io_priority.class());
+                match iop_class_res {
+                    Ok(iop_class) => {
+                        if !(0..=7).contains(&priority) {
+                            tracing::error!(?priority, "io priority '{}' not between 0 and 7 (inclusive), class '{}' not in (IO_PRIO_CLASS_RT,IO_PRIO_CLASS_BE,IO_PRIO_CLASS_IDLE)",priority, iop_class);
+                            Err(ErrInvalidSpec::IoPriority)?;
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!(?priority, ?e, "failed to parse io priority class");
+                        Err(ErrInvalidSpec::IoPriority)?;
+                    }
+                }
+            }
+        }
+
+        Ok(())
     }
 
     fn load_container_state(&self, container_dir: PathBuf) -> Result<Container, LibcontainerError> {

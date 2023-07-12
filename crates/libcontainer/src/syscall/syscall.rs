@@ -54,6 +54,7 @@ pub trait Syscall {
         mount_attr: &MountAttr,
         size: libc::size_t,
     ) -> Result<()>;
+    fn set_io_priority(&self, class: i64, priority: i64) -> Result<()>;
 }
 
 #[derive(Clone, Copy)]
