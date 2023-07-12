@@ -41,7 +41,7 @@ pub mod prog {
     pub fn load(license: &str, insns: &[u8]) -> Result<RawFd, super::BpfError> {
         let insns_cnt = insns.len() / std::mem::size_of::<bpf_insn>();
         let insns = insns as *const _ as *const bpf_insn;
-        let opts = libbpf_sys::bpf_prog_load_opts {
+        let mut opts = libbpf_sys::bpf_prog_load_opts {
             kern_version: 0,
             log_buf: ptr::null_mut::<::std::os::raw::c_char>(),
             log_size: 0,
@@ -55,7 +55,7 @@ pub mod prog {
                 license as *const _ as *const ::std::os::raw::c_char,
                 insns,
                 insns_cnt as u64,
-                &opts,
+                &mut opts as *mut libbpf_sys::bpf_prog_load_opts,
             )
         };
 
