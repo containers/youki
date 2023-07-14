@@ -4,8 +4,9 @@ use std::os::unix::prelude::RawFd;
 use std::path::PathBuf;
 
 use crate::rootless::Rootless;
+use crate::syscall::syscall::SyscallType;
 use crate::workload::ExecutorManager;
-use crate::{container::Container, notify_socket::NotifyListener, syscall::Syscall};
+use crate::{container::Container, notify_socket::NotifyListener};
 
 #[derive(Debug, Copy, Clone)]
 pub enum ContainerType {
@@ -17,7 +18,7 @@ pub struct ContainerArgs<'a> {
     /// Indicates if an init or a tenant container should be created
     pub container_type: ContainerType,
     /// Interface to operating system primitives
-    pub syscall: &'a dyn Syscall,
+    pub syscall: SyscallType,
     /// OCI compliant runtime spec
     pub spec: &'a Spec,
     /// Root filesystem of the container

@@ -2,14 +2,13 @@ use anyhow::Result;
 use nix::sys::wait::{waitpid, WaitStatus};
 use std::path::PathBuf;
 
-use libcontainer::{container::builder::ContainerBuilder, syscall::syscall::create_syscall};
+use libcontainer::{container::builder::ContainerBuilder, syscall::syscall::SyscallType};
 use liboci_cli::Exec;
 
 use crate::workload::executor::default_executors;
 
 pub fn exec(args: Exec, root_path: PathBuf) -> Result<i32> {
-    let syscall = create_syscall();
-    let pid = ContainerBuilder::new(args.container_id.clone(), syscall.as_ref())
+    let pid = ContainerBuilder::new(args.container_id.clone(), SyscallType::default())
         .with_executor(default_executors())?
         .with_root_path(root_path)?
         .with_console_socket(args.console_socket.as_ref())

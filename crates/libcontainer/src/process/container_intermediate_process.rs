@@ -39,7 +39,7 @@ pub fn container_intermediate_process(
 ) -> Result<Pid> {
     let (inter_sender, inter_receiver) = intermediate_chan;
     let (init_sender, init_receiver) = init_chan;
-    let command = &args.syscall;
+    let command = args.syscall.create_syscall();
     let spec = &args.spec;
     let linux = spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
     let namespaces = Namespaces::try_from(linux.namespaces().as_ref())?;
