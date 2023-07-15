@@ -99,7 +99,15 @@ impl NotifyListener {
 impl Clone for NotifyListener {
     fn clone(&self) -> Self {
         let fd = self.socket.as_raw_fd();
-        // This is safe because we just duplicate a valid fd.
+        // This is safe because we just duplicate a valid fd. Theoratically, to
+        // truely clone a unix listener, we have to use dup(2) to duplicate the
+        // fd, and then use from_raw_fd to create a new UnixListener. However,
+        // for our purposes, fd is just an integer to pass around for the same
+        // socket. Our main usage is to pass the notify_listener across process
+        // boundry. Since fd tables are cloned during clone/fork calls, this
+        // should be safe to use, as long as we be careful with not closing the
+        // same fd in different places. If we observe an issue, we will switch
+        // to `dup`.
         let socket = unsafe { UnixListener::from_raw_fd(fd) };
         Self { socket }
     }
@@ -145,5 +153,41 @@ impl NotifySocket {
             path: cwd,
         })?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use tempfile::tempdir;
+
+    use super::*;
+
+    #[test]
+    /// Test that the listener can be cloned and function correctly. This test
+    /// also serves as a test for the normal case.
+    fn test_notify_listener_clone() {
+        let tempdir = tempdir().unwrap();
+        let socket_path = tempdir.path().join("notify.sock");
+        // listener needs to be created first because it will create the socket.
+        let listener = NotifyListener::new(&socket_path).unwrap();
+        let mut socket = NotifySocket::new({
+            let socket_path = socket_path.clone();
+            socket_path
+        });
+        // This is safe without race because the unix domain socket is already
+        // created. It is OK for the socket to send the start notification
+        // before the listener wait is called.
+        let thread_handle = std::thread::spawn({
+            move || {
+                // We clone the listener and listen on the cloned listener to
+                // make sure the cloned fd functions correctly.
+                let cloned_listener = listener.clone();
+                cloned_listener.wait_for_container_start().unwrap();
+                cloned_listener.close().unwrap();
+            }
+        });
+
+        socket.notify_container_start().unwrap();
+        thread_handle.join().unwrap();
     }
 }
