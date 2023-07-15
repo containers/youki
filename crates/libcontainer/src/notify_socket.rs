@@ -170,10 +170,7 @@ mod test {
         let socket_path = tempdir.path().join("notify.sock");
         // listener needs to be created first because it will create the socket.
         let listener = NotifyListener::new(&socket_path).unwrap();
-        let mut socket = NotifySocket::new({
-            let socket_path = socket_path.clone();
-            socket_path
-        });
+        let mut socket = NotifySocket::new(socket_path.clone());
         // This is safe without race because the unix domain socket is already
         // created. It is OK for the socket to send the start notification
         // before the listener wait is called.
