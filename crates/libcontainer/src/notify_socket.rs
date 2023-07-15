@@ -99,12 +99,12 @@ impl NotifyListener {
 impl Clone for NotifyListener {
     fn clone(&self) -> Self {
         let fd = self.socket.as_raw_fd();
-        // This is safe because we just duplicate a valid fd. Theoratically, to
-        // truely clone a unix listener, we have to use dup(2) to duplicate the
+        // This is safe because we just duplicate a valid fd. Theoretically, to
+        // truly clone a unix listener, we have to use dup(2) to duplicate the
         // fd, and then use from_raw_fd to create a new UnixListener. However,
         // for our purposes, fd is just an integer to pass around for the same
         // socket. Our main usage is to pass the notify_listener across process
-        // boundry. Since fd tables are cloned during clone/fork calls, this
+        // boundary. Since fd tables are cloned during clone/fork calls, this
         // should be safe to use, as long as we be careful with not closing the
         // same fd in different places. If we observe an issue, we will switch
         // to `dup`.
