@@ -559,6 +559,25 @@ impl Syscall for LinuxSyscall {
         }?;
         Ok(())
     }
+
+    fn set_io_priority(&self, class: i64, priority: i64) -> Result<()> {
+        let ioprio_who_progress: libc::c_int = 1;
+        let ioprio_who_pid = 0;
+        let iop = (class << 13) | priority;
+        match unsafe {
+            libc::syscall(
+                libc::SYS_ioprio_set,
+                ioprio_who_progress,
+                ioprio_who_pid,
+                iop as libc::c_ulong,
+            )
+        } {
+            0 => Ok(()),
+            -1 => Err(nix::Error::last()),
+            _ => Err(nix::Error::UnknownErrno),
+        }?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]

@@ -88,4 +88,6 @@ pub enum ErrInvalidSpec {
     UnsupportedVersion,
     #[error("apparmor is specified but not enabled on this system")]
     AppArmorNotEnabled,
+    #[error("invalid io priority or class.")]
+    IoPriority,
 }

@@ -43,6 +43,12 @@ pub struct ChownArgs {
     pub group: Option<Gid>,
 }
 
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct IoPriorityArgs {
+    pub class: i64,
+    pub priority: i64,
+}
+
 #[derive(Default)]
 struct Mock {
     values: Vec<Box<dyn Any>>,
@@ -62,6 +68,7 @@ pub enum ArgName {
     Domainname,
     Groups,
     Capability,
+    IoPriority,
 }
 
 impl ArgName {
@@ -77,6 +84,7 @@ impl ArgName {
             ArgName::Domainname,
             ArgName::Groups,
             ArgName::Capability,
+            ArgName::IoPriority,
         ]
         .iter()
         .copied()
@@ -249,6 +257,13 @@ impl Syscall for TestHelperSyscall {
     ) -> Result<()> {
         todo!()
     }
+
+    fn set_io_priority(&self, class: i64, priority: i64) -> Result<()> {
+        self.mocks.act(
+            ArgName::IoPriority,
+            Box::new(IoPriorityArgs { class, priority }),
+        )
+    }
 }
 
 impl TestHelperSyscall {
@@ -349,5 +364,14 @@ impl TestHelperSyscall {
             .iter()
             .map(|x| x.downcast_ref::<Vec<Gid>>().unwrap().clone())
             .collect::<Vec<Vec<Gid>>>()
+    }
+
+    pub fn get_io_priority_args(&self) -> Vec<IoPriorityArgs> {
+        self.mocks
+            .fetch(ArgName::IoPriority)
+            .values
+            .iter()
+            .map(|x| x.downcast_ref::<IoPriorityArgs>().unwrap().clone())
+            .collect::<Vec<IoPriorityArgs>>()
     }
 }
