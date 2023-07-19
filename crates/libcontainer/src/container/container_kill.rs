@@ -1,6 +1,6 @@
 use super::{Container, ContainerStatus};
 use crate::{error::LibcontainerError, signal::Signal};
-use libcgroups::common::{create_cgroup_manager, get_cgroup_setup, CgroupManager};
+use libcgroups::common::{get_cgroup_setup, CgroupManager};
 use nix::sys::signal::{self};
 
 impl Container {
@@ -78,10 +78,14 @@ impl Container {
             match get_cgroup_setup()? {
                 libcgroups::common::CgroupSetup::Legacy
                 | libcgroups::common::CgroupSetup::Hybrid => {
-                    let cgroups_path = self.spec()?.cgroup_path;
-                    let use_systemd = self.systemd();
-                    let cmanger = create_cgroup_manager(cgroups_path, use_systemd, self.id())?;
-                    cmanger.freeze(libcgroups::common::FreezerState::Thawed)?;
+                    let cmanager = libcgroups::common::create_cgroup_manager(
+                        libcgroups::common::CgroupConfig {
+                            cgroup_path: self.spec()?.cgroup_path,
+                            systemd_cgroup: self.systemd(),
+                            container_name: self.id().to_string(),
+                        },
+                    )?;
+                    cmanager.freeze(libcgroups::common::FreezerState::Thawed)?;
                 }
                 libcgroups::common::CgroupSetup::Unified => {}
             }
@@ -91,11 +95,14 @@ impl Container {
 
     fn kill_all_processes<S: Into<Signal>>(&self, signal: S) -> Result<(), LibcontainerError> {
         let signal = signal.into().into_raw();
-        let cgroups_path = self.spec()?.cgroup_path;
-        let use_systemd = self.systemd();
-        let cmanger = create_cgroup_manager(cgroups_path, use_systemd, self.id())?;
+        let cmanager =
+            libcgroups::common::create_cgroup_manager(libcgroups::common::CgroupConfig {
+                cgroup_path: self.spec()?.cgroup_path,
+                systemd_cgroup: self.systemd(),
+                container_name: self.id().to_string(),
+            })?;
 
-        if let Err(e) = cmanger.freeze(libcgroups::common::FreezerState::Frozen) {
+        if let Err(e) = cmanager.freeze(libcgroups::common::FreezerState::Frozen) {
             tracing::warn!(
                 err = ?e,
                 id = ?self.id(),
@@ -103,7 +110,7 @@ impl Container {
             );
         }
 
-        let pids = cmanger.get_all_pids()?;
+        let pids = cmanager.get_all_pids()?;
         pids.iter()
             .try_for_each(|&pid| {
                 tracing::debug!("kill signal {} to {}", signal, pid);
@@ -117,7 +124,7 @@ impl Container {
                 }
             })
             .map_err(LibcontainerError::OtherSyscall)?;
-        if let Err(err) = cmanger.freeze(libcgroups::common::FreezerState::Thawed) {
+        if let Err(err) = cmanager.freeze(libcgroups::common::FreezerState::Thawed) {
             tracing::warn!(
                 err = ?err,
                 id = ?self.id(),

@@ -82,10 +82,10 @@ pub enum V1ManagerError {
 
 impl Manager {
     /// Constructs a new cgroup manager with cgroups_path being relative to the root of the subsystem
-    pub fn new(cgroup_path: PathBuf) -> Result<Self, V1ManagerError> {
+    pub fn new(cgroup_path: &Path) -> Result<Self, V1ManagerError> {
         let mut subsystems = HashMap::<CtrlType, PathBuf>::new();
         for subsystem in CONTROLLERS {
-            if let Ok(subsystem_path) = Self::get_subsystem_path(&cgroup_path, subsystem) {
+            if let Ok(subsystem_path) = Self::get_subsystem_path(cgroup_path, subsystem) {
                 subsystems.insert(*subsystem, subsystem_path);
             } else {
                 tracing::warn!("cgroup {} not supported on this system", subsystem);

@@ -1,6 +1,7 @@
 use nix::unistd::{self, close};
 use std::env;
 use std::io::prelude::*;
+use std::os::fd::FromRawFd;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
@@ -9,7 +10,7 @@ pub const NOTIFY_FILE: &str = "notify.sock";
 
 #[derive(Debug, thiserror::Error)]
 pub enum NotifyListenerError {
-    #[error("failed to chdir while creating notify socket")]
+    #[error("failed to chdir {path} while creating notify socket: {source}")]
     Chdir { source: nix::Error, path: PathBuf },
     #[error("invalid path: {0}")]
     InvalidPath(PathBuf),
@@ -43,6 +44,7 @@ pub struct NotifyListener {
 
 impl NotifyListener {
     pub fn new(socket_path: &Path) -> Result<Self> {
+        tracing::debug!(?socket_path, "create notify listener");
         // Unix domain socket has a maximum length of 108, different from
         // normal path length of 255. Due to how docker create the path name
         // to the container working directory, there is a high chance that
@@ -56,6 +58,7 @@ impl NotifyListener {
             .file_name()
             .ok_or_else(|| NotifyListenerError::InvalidPath(socket_path.to_owned()))?;
         let cwd = env::current_dir().map_err(NotifyListenerError::GetCwd)?;
+        tracing::debug!(?cwd, "the cwd to create the notify socket");
         unistd::chdir(workdir).map_err(|e| NotifyListenerError::Chdir {
             source: e,
             path: workdir.to_owned(),
@@ -90,6 +93,23 @@ impl NotifyListener {
     pub fn close(&self) -> Result<()> {
         close(self.socket.as_raw_fd()).map_err(NotifyListenerError::Close)?;
         Ok(())
+    }
+}
+
+impl Clone for NotifyListener {
+    fn clone(&self) -> Self {
+        let fd = self.socket.as_raw_fd();
+        // This is safe because we just duplicate a valid fd. Theoretically, to
+        // truly clone a unix listener, we have to use dup(2) to duplicate the
+        // fd, and then use from_raw_fd to create a new UnixListener. However,
+        // for our purposes, fd is just an integer to pass around for the same
+        // socket. Our main usage is to pass the notify_listener across process
+        // boundary. Since fd tables are cloned during clone/fork calls, this
+        // should be safe to use, as long as we be careful with not closing the
+        // same fd in different places. If we observe an issue, we will switch
+        // to `dup`.
+        let socket = unsafe { UnixListener::from_raw_fd(fd) };
+        Self { socket }
     }
 }
 
@@ -133,5 +153,38 @@ impl NotifySocket {
             path: cwd,
         })?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use tempfile::tempdir;
+
+    use super::*;
+
+    #[test]
+    /// Test that the listener can be cloned and function correctly. This test
+    /// also serves as a test for the normal case.
+    fn test_notify_listener_clone() {
+        let tempdir = tempdir().unwrap();
+        let socket_path = tempdir.path().join("notify.sock");
+        // listener needs to be created first because it will create the socket.
+        let listener = NotifyListener::new(&socket_path).unwrap();
+        let mut socket = NotifySocket::new(socket_path.clone());
+        // This is safe without race because the unix domain socket is already
+        // created. It is OK for the socket to send the start notification
+        // before the listener wait is called.
+        let thread_handle = std::thread::spawn({
+            move || {
+                // We clone the listener and listen on the cloned listener to
+                // make sure the cloned fd functions correctly.
+                let cloned_listener = listener.clone();
+                cloned_listener.wait_for_container_start().unwrap();
+                cloned_listener.close().unwrap();
+            }
+        });
+
+        socket.notify_container_start().unwrap();
+        thread_handle.join().unwrap();
     }
 }

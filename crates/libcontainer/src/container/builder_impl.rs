@@ -73,11 +73,11 @@ impl<'a> ContainerBuilderImpl<'a> {
             &self.container_id,
             self.rootless.is_some(),
         );
-        let cmanager = libcgroups::common::create_cgroup_manager(
-            cgroups_path,
-            self.use_systemd || self.rootless.is_some(),
-            &self.container_id,
-        )?;
+        let cgroup_config = libcgroups::common::CgroupConfig {
+            cgroup_path: cgroups_path,
+            systemd_cgroup: self.use_systemd || self.rootless.is_some(),
+            container_name: self.container_id.to_owned(),
+        };
         let process = self
             .spec
             .process()
@@ -93,8 +93,10 @@ impl<'a> ContainerBuilderImpl<'a> {
         // Need to create the notify socket before we pivot root, since the unix
         // domain socket used here is outside of the rootfs of container. During
         // exec, need to create the socket before we enter into existing mount
-        // namespace.
-        let notify_socket: NotifyListener = NotifyListener::new(&self.notify_path)?;
+        // namespace. We also need to create to socket before entering into the
+        // user namespace in the case that the path is located in paths only
+        // root can access.
+        let notify_listener = NotifyListener::new(&self.notify_path)?;
 
         // If Out-of-memory score adjustment is set in specification.  set the score
         // value for the current process check
@@ -139,11 +141,11 @@ impl<'a> ContainerBuilderImpl<'a> {
             spec: self.spec,
             rootfs: &self.rootfs,
             console_socket: self.console_socket,
-            notify_socket,
+            notify_listener,
             preserve_fds: self.preserve_fds,
             container: &self.container,
             rootless: &self.rootless,
-            cgroup_manager: cmanager,
+            cgroup_config,
             detached: self.detached,
             executor_manager: &self.executor_manager,
         };
@@ -184,11 +186,12 @@ impl<'a> ContainerBuilderImpl<'a> {
             &self.container_id,
             self.rootless.is_some(),
         );
-        let cmanager = libcgroups::common::create_cgroup_manager(
-            cgroups_path,
-            self.use_systemd || self.rootless.is_some(),
-            &self.container_id,
-        )?;
+        let cmanager =
+            libcgroups::common::create_cgroup_manager(libcgroups::common::CgroupConfig {
+                cgroup_path: cgroups_path,
+                systemd_cgroup: self.use_systemd || self.rootless.is_some(),
+                container_name: self.container_id.to_string(),
+            })?;
 
         let mut errors = Vec::new();
 
