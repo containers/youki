@@ -23,7 +23,21 @@ This crate also provides an interface for Apparmor which is another Linux Kernel
 - tty module which daels with providing terminal interface to the container process
   - [pseudoterminal man page](https://man7.org/linux/man-pages/man7/pty.7.html) : Information about the pseudoterminal system, useful to understand console_socket parameter in create subcommand
 
-#### Namespaces : namespaces provide isolation of resources such as filesystem, process ids networks etc on kernel level. This module contains structs and functions related to applying or un-applying namespaces to the calling process.
+#### Executor
+
+By default and traditionally, the executor forks and execs into the binary
+command that specified in the oci spec. Using executors, we can override this
+behavior. For example, `youki` uses executor to implement running wasm
+workloads. Instead of running the command specified in the process section of
+the OCI spec, the wasm related executors can choose to execute wasm code
+instead. The executor will run at the end of the container init process.
+
+The API accepts only a single executor, so when using multiple executors, (try
+wasm first, then defaults to running a binary), the users should compose
+multiple executors into a single executor. The executor will return an error
+when the executor can't handle the workload.
+
+#### Namespaces : namespaces provide isolation of resources such as filesystem, process ids networks etc on kernel level. This module contains structs and functions related to applying or un-applying namespaces to the calling process
 
 - [pid namespace man page](https://man7.org/linux/man-pages/man7/pid_namespaces.7.html)
 - [CLONE_NEWUSER flag](https://man7.org/linux/man-pages/man2/clone.2.html)
@@ -40,7 +54,7 @@ Pausing a container indicates suspending all processes in it. This can be done w
 - [cgroups man page](https://man7.org/linux/man-pages/man7/cgroups.7.html)
 - [freezer cgroup kernel documentation](https://www.kernel.org/doc/Documentation/cgroup-v1/freezer-subsystem.txt)
 
-#### The following are some resources that can help understand with various Linux features used in the code of this crate.
+#### The following are some resources that can help understand with various Linux features used in the code of this crate
 
 - [oom-score-adj](https://dev.to/rrampage/surviving-the-linux-oom-killer-2ki9)
 - [unshare man page](https://man7.org/linux/man-pages/man1/unshare.1.html)

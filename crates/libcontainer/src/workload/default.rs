@@ -5,13 +5,10 @@ use oci_spec::runtime::Spec;
 
 use super::{Executor, ExecutorError, EMPTY};
 
-const EXECUTOR_NAME: &str = "default";
-
-#[derive(Default)]
-pub struct DefaultExecutor {}
-
-impl Executor for DefaultExecutor {
-    fn exec(&self, spec: &Spec) -> Result<(), ExecutorError> {
+/// Return the default executor. The default executor will execute the command
+/// specified in the oci spec.
+pub fn get_executor() -> Executor {
+    Box::new(|spec: &Spec| -> Result<(), ExecutorError> {
         tracing::debug!("executing workload with default handler");
         let args = spec
             .process()
@@ -41,13 +38,5 @@ impl Executor for DefaultExecutor {
         // After execvp is called, the process is replaced with the container
         // payload through execvp, so it should never reach here.
         unreachable!();
-    }
-
-    fn can_handle(&self, _: &Spec) -> bool {
-        true
-    }
-
-    fn name(&self) -> &'static str {
-        EXECUTOR_NAME
-    }
+    })
 }

@@ -7,8 +7,7 @@ use crate::container::Container;
 use crate::notify_socket::NotifyListener;
 use crate::rootless::Rootless;
 use crate::syscall::syscall::SyscallType;
-use crate::workload::ExecutorManager;
-
+use crate::workload::Executor;
 #[derive(Debug, Copy, Clone)]
 pub enum ContainerType {
     InitContainer,
@@ -39,5 +38,5 @@ pub struct ContainerArgs<'a> {
     /// If the container is to be run in detached mode
     pub detached: bool,
     /// Manage the functions that actually run on the container
-    pub executor_manager: &'a ExecutorManager,
+    pub executor: Executor,
 }

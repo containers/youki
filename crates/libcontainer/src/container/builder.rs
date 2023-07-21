@@ -1,8 +1,7 @@
 use crate::error::{ErrInvalidID, LibcontainerError};
 use crate::syscall::syscall::SyscallType;
 use crate::utils::PathBufExt;
-use crate::workload::default::DefaultExecutor;
-use crate::workload::{Executor, ExecutorManager};
+use crate::workload::{self, Executor};
 use std::path::PathBuf;
 
 use super::{init_builder::InitContainerBuilder, tenant_builder::TenantContainerBuilder};
@@ -21,9 +20,9 @@ pub struct ContainerBuilder {
     pub(super) console_socket: Option<PathBuf>,
     /// File descriptors to be passed into the container process
     pub(super) preserve_fds: i32,
-    /// Manage the functions that actually run on the container
-    /// Default executes the specified execution of a generic command
-    pub(super) executor_manager: ExecutorManager,
+    /// The function that actually runs on the container init process. Default
+    /// is to execute the specified command in the oci spec.
+    pub(super) executor: Executor,
 }
 
 /// Builder that can be used to configure the common properties of
@@ -69,9 +68,7 @@ impl ContainerBuilder {
             pid_file: None,
             console_socket: None,
             preserve_fds: 0,
-            executor_manager: ExecutorManager {
-                executors: vec![Box::<DefaultExecutor>::default()],
-            },
+            executor: workload::default::get_executor(),
         }
     }
 
@@ -247,23 +244,17 @@ impl ContainerBuilder {
     /// ```no_run
     /// # use libcontainer::container::builder::ContainerBuilder;
     /// # use libcontainer::syscall::syscall::SyscallType;
-    /// # use libcontainer::workload::default::DefaultExecutor;
+    /// # use libcontainer::workload::default::get_executor;
     ///
     /// ContainerBuilder::new(
     ///     "74f1a4cb3801".to_owned(),
     ///     SyscallType::default(),
     /// )
-    /// .with_executor(vec![Box::<DefaultExecutor>::default()]);
+    /// .with_executor(get_executor());
     /// ```
-    pub fn with_executor(
-        mut self,
-        executors: Vec<Box<dyn Executor>>,
-    ) -> Result<Self, LibcontainerError> {
-        if executors.is_empty() {
-            return Err(LibcontainerError::NoExecutors);
-        };
-        self.executor_manager = ExecutorManager { executors };
-        Ok(self)
+    pub fn with_executor(mut self, executor: Executor) -> Self {
+        self.executor = executor;
+        self
     }
 }
 

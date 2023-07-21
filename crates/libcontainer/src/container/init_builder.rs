@@ -106,7 +106,7 @@ impl InitContainerBuilder {
             container: Some(container.clone()),
             preserve_fds: self.base.preserve_fds,
             detached: self.detached,
-            executor_manager: self.base.executor_manager,
+            executor: self.base.executor,
         };
 
         builder_impl.create()?;

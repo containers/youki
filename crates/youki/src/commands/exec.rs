@@ -5,11 +5,11 @@ use std::path::PathBuf;
 use libcontainer::{container::builder::ContainerBuilder, syscall::syscall::SyscallType};
 use liboci_cli::Exec;
 
-use crate::workload::executor::default_executors;
+use crate::workload::executor::default_executor;
 
 pub fn exec(args: Exec, root_path: PathBuf) -> Result<i32> {
     let pid = ContainerBuilder::new(args.container_id.clone(), SyscallType::default())
-        .with_executor(default_executors())?
+        .with_executor(default_executor())
         .with_root_path(root_path)?
         .with_console_socket(args.console_socket.as_ref())
         .with_pid_file(args.pid_file.as_ref())?
