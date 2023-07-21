@@ -20,8 +20,8 @@ pub struct ContainerBuilder {
     pub(super) console_socket: Option<PathBuf>,
     /// File descriptors to be passed into the container process
     pub(super) preserve_fds: i32,
-    /// Manage the functions that actually run on the container
-    /// Default executes the specified execution of a generic command
+    /// The function that actually runs on the container init process. Default
+    /// is to execute the specified command in the oci spec.
     pub(super) executor: Executor,
 }
 

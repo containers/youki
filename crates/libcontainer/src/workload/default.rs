@@ -5,6 +5,8 @@ use oci_spec::runtime::Spec;
 
 use super::{Executor, ExecutorError, EMPTY};
 
+/// Return the default executor. The default executor will execute the command
+/// specified in the oci spec.
 pub fn get_executor() -> Executor {
     Box::new(|spec: &Spec| -> Result<(), ExecutorError> {
         tracing::debug!("executing workload with default handler");
