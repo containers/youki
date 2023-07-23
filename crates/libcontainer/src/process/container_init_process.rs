@@ -335,11 +335,11 @@ pub fn container_init_process(
     init_receiver: &mut channel::InitReceiver,
 ) -> Result<()> {
     let syscall = args.syscall.create_syscall();
-    let spec = args.spec;
+    let spec = &args.spec;
     let linux = spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
     let proc = spec.process().as_ref().ok_or(MissingSpecError::Process)?;
     let mut envs: Vec<String> = proc.env().as_ref().unwrap_or(&vec![]).clone();
-    let rootfs_path = args.rootfs;
+    let rootfs_path = &args.rootfs;
     let hooks = spec.hooks().as_ref();
     let container = args.container.as_ref();
     let namespaces = Namespaces::try_from(linux.namespaces().as_ref())?;
@@ -492,7 +492,7 @@ pub fn container_init_process(
         }
     };
 
-    set_supplementary_gids(proc.user(), args.rootless, syscall.as_ref()).map_err(|err| {
+    set_supplementary_gids(proc.user(), &args.rootless, syscall.as_ref()).map_err(|err| {
         tracing::error!(?err, "failed to set supplementary gids");
         err
     })?;

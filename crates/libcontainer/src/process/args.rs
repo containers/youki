@@ -2,6 +2,7 @@ use libcgroups::common::CgroupConfig;
 use oci_spec::runtime::Spec;
 use std::os::unix::prelude::RawFd;
 use std::path::PathBuf;
+use std::rc::Rc;
 
 use crate::container::Container;
 use crate::notify_socket::NotifyListener;
@@ -14,15 +15,16 @@ pub enum ContainerType {
     TenantContainer { exec_notify_fd: RawFd },
 }
 
-pub struct ContainerArgs<'a> {
+#[derive(Clone)]
+pub struct ContainerArgs {
     /// Indicates if an init or a tenant container should be created
     pub container_type: ContainerType,
     /// Interface to operating system primitives
     pub syscall: SyscallType,
     /// OCI compliant runtime spec
-    pub spec: &'a Spec,
+    pub spec: Rc<Spec>,
     /// Root filesystem of the container
-    pub rootfs: &'a PathBuf,
+    pub rootfs: PathBuf,
     /// Socket to communicate the file descriptor of the ptty
     pub console_socket: Option<RawFd>,
     /// The Unix Domain Socket to communicate container start
@@ -30,9 +32,9 @@ pub struct ContainerArgs<'a> {
     /// File descriptors preserved/passed to the container init process.
     pub preserve_fds: i32,
     /// Container state
-    pub container: &'a Option<Container>,
+    pub container: Option<Container>,
     /// Options for rootless containers
-    pub rootless: &'a Option<Rootless<'a>>,
+    pub rootless: Option<Rootless>,
     /// Cgroup Manager Config
     pub cgroup_config: CgroupConfig,
     /// If the container is to be run in detached mode

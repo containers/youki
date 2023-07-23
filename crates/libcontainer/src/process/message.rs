@@ -2,7 +2,7 @@ use core::fmt;
 use serde::{Deserialize, Serialize};
 
 /// Used as a wrapper for messages to be sent between child and parent processes
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum Message {
     IntermediateReady(i32),
     InitReady,
