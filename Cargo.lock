@@ -4573,9 +4573,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-encoder"
-version = "0.31.0"
+version = "0.30.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06a3d1b4a575ffb873679402b2aedb3117555eb65c27b1b86c8a91e574bc2a2a"
+checksum = "b2f8e9778e04cbf44f58acc301372577375a666b966c50b03ef46144f80436a8"
 dependencies = [
  "leb128",
 ]
@@ -4586,9 +4586,9 @@ version = "0.1.0"
 
 [[package]]
 name = "wasmedge-macro"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "372985c17ffd2705e0cc14aa85e96c546d04823aec07ec1e0da0a2983c9eb655"
+checksum = "ad17cbd3b8a8ed1cba44755e616495e13baf3f7e7f9576df7d7a357b928c070a"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4597,9 +4597,9 @@ dependencies = [
 
 [[package]]
 name = "wasmedge-sdk"
-version = "0.9.0"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e30b3d1a423ee62c0016bbfd07bdca4669a30cd167d7ff528caff559b467c17b"
+checksum = "4ab1a3beab101c87a51692630a7b29d71cdc061ac06bf31c089b16f094952c3d"
 dependencies = [
  "anyhow",
  "num-derive",
@@ -4608,19 +4608,21 @@ dependencies = [
  "wasmedge-macro",
  "wasmedge-sys",
  "wasmedge-types",
- "wat",
 ]
 
 [[package]]
 name = "wasmedge-sys"
-version = "0.14.0"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3db99e2ef8cf618f832f1ecf32c3b86e8ce0fb2f31013426040ae514a981312c"
+checksum = "157f13aa077203259d7771f606f0206feb7cb6bb2b0894f93439a8af1bda4ab9"
 dependencies = [
  "bindgen",
  "cmake",
+ "lazy_static",
  "libc",
+ "parking_lot",
  "paste",
+ "rand",
  "scoped-tls",
  "thiserror",
  "wasmedge-macro",
@@ -5215,23 +5217,23 @@ dependencies = [
 
 [[package]]
 name = "wast"
-version = "62.0.0"
+version = "61.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7f7ee878019d69436895f019b65f62c33da63595d8e857cbdc87c13ecb29a32"
+checksum = "dc6b347851b52fd500657d301155c79e8c67595501d179cef87b6f04ebd25ac4"
 dependencies = [
  "leb128",
  "memchr",
  "unicode-width",
- "wasm-encoder 0.31.0",
+ "wasm-encoder 0.30.0",
 ]
 
 [[package]]
 name = "wat"
-version = "1.0.68"
+version = "1.0.67"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "295572bf24aa5b685a971a83ad3e8b6e684aaad8a9be24bc7bf59bed84cc1c08"
+checksum = "459e764d27c3ab7beba1ebd617cc025c7e76dea6e7c5ce3189989a970aea3491"
 dependencies = [
- "wast 62.0.0",
+ "wast 61.0.0",
 ]
 
 [[package]]
