@@ -6,8 +6,11 @@ use libcontainer::workload::{Executor, ExecutorError, EMPTY};
 
 const EXECUTOR_NAME: &str = "wasmtime";
 
-pub fn get_executor() -> Executor {
-    Box::new(|spec: &Spec| -> Result<(), ExecutorError> {
+#[derive(Clone)]
+pub struct WasmtimeExecutor {}
+
+impl Executor for WasmtimeExecutor {
+    fn exec(&self, spec: &Spec) -> Result<(), ExecutorError> {
         if !can_handle(spec) {
             return Err(ExecutorError::CantHandle(EXECUTOR_NAME));
         }
@@ -86,7 +89,11 @@ pub fn get_executor() -> Executor {
         start
             .call(&mut store, &[], &mut [])
             .map_err(|err| ExecutorError::Execution(err.into()))
-    })
+    }
+}
+
+pub fn get_executor() -> WasmtimeExecutor {
+    WasmtimeExecutor {}
 }
 
 fn can_handle(spec: &Spec) -> bool {

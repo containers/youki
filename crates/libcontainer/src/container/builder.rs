@@ -22,7 +22,7 @@ pub struct ContainerBuilder {
     pub(super) preserve_fds: i32,
     /// The function that actually runs on the container init process. Default
     /// is to execute the specified command in the oci spec.
-    pub(super) executor: Executor,
+    pub(super) executor: Box<dyn Executor>,
 }
 
 /// Builder that can be used to configure the common properties of
@@ -252,8 +252,8 @@ impl ContainerBuilder {
     /// )
     /// .with_executor(get_executor());
     /// ```
-    pub fn with_executor(mut self, executor: Executor) -> Self {
-        self.executor = executor;
+    pub fn with_executor(mut self, executor: impl Executor + 'static) -> Self {
+        self.executor = Box::new(executor);
         self
     }
 }

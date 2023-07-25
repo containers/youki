@@ -678,16 +678,20 @@ pub fn container_init_process(
         }
     }
 
-    if proc.args().is_some() {
-        (args.executor)(spec).map_err(|err| {
-            tracing::error!(?err, "failed to execute payload");
-            err
-        })?;
-        unreachable!("should not be back here");
-    } else {
+    if proc.args().is_none() {
         tracing::error!("on non-Windows, at least one process arg entry is required");
-        Err(MissingSpecError::Args)
-    }?
+        Err(MissingSpecError::Args)?;
+    }
+
+    args.executor.exec(spec).map_err(|err| {
+        tracing::error!(?err, "failed to execute payload");
+        err
+    })?;
+
+    // Once the executor is executed without error, it should not return. For
+    // example, the default executor is expected to call `exec` and replace the
+    // current process.
+    unreachable!("the executor should not return if it is successful.");
 }
 
 // Before 3.19 it was possible for an unprivileged user to enter an user namespace,

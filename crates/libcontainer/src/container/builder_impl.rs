@@ -47,7 +47,7 @@ pub(super) struct ContainerBuilderImpl {
     /// If the container is to be run in detached mode
     pub detached: bool,
     /// Default executes the specified execution of a generic command
-    pub executor: Executor,
+    pub executor: Box<dyn Executor>,
 }
 
 impl ContainerBuilderImpl {

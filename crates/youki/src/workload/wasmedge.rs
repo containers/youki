@@ -8,8 +8,11 @@ use libcontainer::workload::{Executor, ExecutorError};
 
 const EXECUTOR_NAME: &str = "wasmedge";
 
-pub fn get_executor() -> Executor {
-    Box::new(|spec: &Spec| -> Result<(), ExecutorError> {
+#[derive(Clone)]
+pub struct WasmedgeExecutor {}
+
+impl Executor for WasmedgeExecutor {
+    fn exec(&self, spec: &Spec) -> Result<(), ExecutorError> {
         if !can_handle(spec) {
             return Err(ExecutorError::CantHandle(EXECUTOR_NAME));
         }
@@ -58,7 +61,11 @@ pub fn get_executor() -> Executor {
             .map_err(|err| ExecutorError::Execution(err))?;
 
         Ok(())
-    })
+    }
+}
+
+pub fn get_executor() -> WasmedgeExecutor {
+    WasmedgeExecutor {}
 }
 
 fn can_handle(spec: &Spec) -> bool {
