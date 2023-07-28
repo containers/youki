@@ -96,7 +96,8 @@ pub fn validate_domainname(spec: &Spec) {
         if actual_domainname_cstr.to_str().unwrap() != expected_domainname {
             eprintln!(
                 "Unexpected domainname, expected: {:?} found: {:?}",
-                expected_domainname, actual_domainname
+                expected_domainname,
+                actual_domainname_cstr.to_str().unwrap()
             );
         }
     }
