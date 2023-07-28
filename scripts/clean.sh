@@ -1,10 +1,9 @@
-#! /bin/bash
-# we don't set -eu here, as some of the binaries might be potentially be missing
-# and that is fine, that means they are already removed.
+#!/usr/bin/env bash
+set -euo pipefail
 
 for bin in youki integration_test runtimetest test.log; do
     if [ -f $bin ]; then
-        rm ${1}/$bin
+        rm -f ${1}/$bin
     fi
 done
 

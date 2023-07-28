@@ -1,8 +1,8 @@
 use std::os::unix::io::AsRawFd;
 use std::path::Path;
 
-use anyhow::Result;
-
+use super::bpf::BpfError;
+use super::program::ProgramError;
 use super::*;
 use nix::fcntl::OFlag;
 use nix::sys::stat::Mode;
@@ -21,8 +21,23 @@ const LICENSE: &str = "Apache";
 
 pub struct Devices {}
 
+#[derive(thiserror::Error, Debug)]
+pub enum DevicesControllerError {
+    #[error("bpf error: {0}")]
+    Bpf(#[from] BpfError),
+    #[error("nix error: {0}")]
+    Nix(#[from] nix::Error),
+    #[error("program error: {0}")]
+    Program(#[from] ProgramError),
+}
+
 impl Controller for Devices {
-    fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()> {
+    type Error = DevicesControllerError;
+
+    fn apply(
+        controller_opt: &ControllerOpt,
+        cgroup_root: &Path,
+    ) -> Result<(), DevicesControllerError> {
         #[cfg(not(feature = "cgroupsv2_devices"))]
         return Ok(());
 
@@ -35,8 +50,8 @@ impl Devices {
     pub fn apply_devices(
         cgroup_root: &Path,
         linux_devices: &Option<Vec<LinuxDeviceCgroup>>,
-    ) -> Result<()> {
-        log::debug!("Apply Devices cgroup config");
+    ) -> Result<(), DevicesControllerError> {
+        tracing::debug!("Apply Devices cgroup config");
 
         // FIXME: should we start as "deny all"?
         let mut emulator = emulator::Emulator::with_default_allow(false);
@@ -44,8 +59,8 @@ impl Devices {
         // FIXME: apply user-defined and default rules in which order?
         if let Some(devices) = linux_devices {
             for d in devices {
-                log::debug!("apply user defined rule: {:?}", d);
-                emulator.add_rule(d)?;
+                tracing::debug!("apply user defined rule: {:?}", d);
+                emulator.add_rule(d);
             }
         }
 
@@ -55,8 +70,8 @@ impl Devices {
         ]
         .concat()
         {
-            log::debug!("apply default rule: {:?}", d);
-            emulator.add_rule(&d)?;
+            tracing::debug!("apply default rule: {:?}", d);
+            emulator.add_rule(&d);
         }
 
         let prog = program::Program::from_rules(&emulator.rules, emulator.default_allow)?;
@@ -71,7 +86,7 @@ impl Devices {
         //  2. attach this program (not use BPF_F_REPLACE, see below)
         //  3. detach all programs of 1
         //
-        // runc will use BPF_F_REPLACE to replace currently attached progam if:
+        // runc will use BPF_F_REPLACE to replace currently attached program if:
         //   1. BPF_F_REPLACE is supported by kernel
         //   2. there is exactly one attached program
         // https://github.com/opencontainers/runc/blob/8e6871a3b14bb74e0ef358aca3b9f8f9cb80f041/libcontainer/cgroups/ebpf/ebpf_linux.go#L165
@@ -114,7 +129,7 @@ mod tests {
     #[serial(bpf)] // mock contexts are shared
     fn test_apply_devices() {
         // arrange
-        let (tmp, _) = setup("test_apply_devices", "some.value");
+        let (tmp, _) = setup("some.value");
         let a_type = LinuxDeviceCgroupBuilder::default()
             .typ(LinuxDeviceType::A)
             .build()
@@ -136,14 +151,14 @@ mod tests {
         detach2.expect().never();
 
         // act
-        Devices::apply_devices(&tmp, &Some(vec![a_type])).expect("Could not apply devices");
+        Devices::apply_devices(tmp.path(), &Some(vec![a_type])).expect("Could not apply devices");
     }
 
     #[test]
     #[serial(bpf)] // mock contexts are shared
     fn test_existing_programs() {
         // arrange
-        let (tmp, _) = setup("test_existing_programs", "some.value");
+        let (tmp, _) = setup("some.value");
         let a_type = LinuxDeviceCgroupBuilder::default()
             .typ(LinuxDeviceType::A)
             .build()
@@ -172,6 +187,6 @@ mod tests {
         detach2.expect().once().returning(|_, _| Ok(()));
 
         // act
-        Devices::apply_devices(&tmp, &Some(vec![a_type])).expect("Could not apply devices");
+        Devices::apply_devices(tmp.path(), &Some(vec![a_type])).expect("Could not apply devices");
     }
 }

@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use anyhow::{bail, Context, Result};
 use dbus::arg::RefArg;
 use oci_spec::runtime::LinuxMemory;
 
@@ -14,18 +13,29 @@ pub const MEMORY_HIGH: &str = "MemoryHigh";
 pub const MEMORY_MAX: &str = "MemoryMax";
 pub const MEMORY_SWAP: &str = "MemorySwapMax";
 
+#[derive(thiserror::Error, Debug)]
+pub enum SystemdMemoryError {
+    #[error("invalid memory reservation value: {0}")]
+    ReservationValue(i64),
+    #[error("invalid memory limit value: {0}")]
+    MemoryLimit(i64),
+    #[error("cgroup v2 swap value cannot be calculated from swap of {swap} and limit of {limit}")]
+    SwapValue { swap: i64, limit: String },
+}
+
 pub struct Memory {}
 
 impl Controller for Memory {
+    type Error = SystemdMemoryError;
+
     fn apply(
         options: &ControllerOpt,
         _: u32,
         properties: &mut HashMap<&str, Box<dyn RefArg>>,
-    ) -> Result<()> {
+    ) -> Result<(), Self::Error> {
         if let Some(memory) = options.resources.memory() {
-            log::debug!("applying memory resource restrictions");
-            return Self::apply(memory, properties)
-                .context("could not apply memory resource restrictions");
+            tracing::debug!("applying memory resource restrictions");
+            return Self::apply(memory, properties);
         }
 
         Ok(())
@@ -33,7 +43,10 @@ impl Controller for Memory {
 }
 
 impl Memory {
-    fn apply(memory: &LinuxMemory, properties: &mut HashMap<&str, Box<dyn RefArg>>) -> Result<()> {
+    fn apply(
+        memory: &LinuxMemory,
+        properties: &mut HashMap<&str, Box<dyn RefArg>>,
+    ) -> Result<(), SystemdMemoryError> {
         if let Some(reservation) = memory.reservation() {
             match reservation {
                 1..=i64::MAX => {
@@ -42,7 +55,7 @@ impl Memory {
                 -1 => {
                     properties.insert(MEMORY_LOW, Box::new(u64::MAX));
                 }
-                _ => bail!("invalid memory reservation value: {}", reservation),
+                _ => return Err(SystemdMemoryError::ReservationValue(reservation)),
             }
         }
 
@@ -54,12 +67,11 @@ impl Memory {
                 -1 => {
                     properties.insert(MEMORY_MAX, Box::new(u64::MAX));
                 }
-                _ => bail!("invalid memory limit value: {}", limit),
+                _ => return Err(SystemdMemoryError::MemoryLimit(limit)),
             }
         }
 
-        Self::apply_swap(memory.swap(), memory.limit(), properties)
-            .context("could not apply swap")?;
+        Self::apply_swap(memory.swap(), memory.limit(), properties)?;
         Ok(())
     }
 
@@ -72,7 +84,7 @@ impl Memory {
         swap: Option<i64>,
         limit: Option<i64>,
         properties: &mut HashMap<&str, Box<dyn RefArg>>,
-    ) -> Result<()> {
+    ) -> Result<(), SystemdMemoryError> {
         let value: Box<dyn RefArg> = match (limit, swap) {
             // memory is unlimited and swap not specified -> assume swap unlimited
             (Some(-1), None) => Box::new(u64::MAX),
@@ -84,11 +96,13 @@ impl Memory {
             // if swap is greater than zero and memory limit is unspecified swap cannot be
             // calculated. If memory limit is zero the container would have only swap. If
             // memory is unlimited it would be bigger than swap.
-            (_, Some(0)) | (None | Some(0) | Some(-1), Some(1..=i64::MAX)) => bail!(
-                "cgroup v2 swap value cannot be calculated from swap of {} and limit of {}",
-                swap.unwrap(),
-                limit.map_or("none".to_owned(), |v| v.to_string())
-            ),
+            (_, Some(0)) | (None | Some(0) | Some(-1), Some(1..=i64::MAX)) => {
+                return Err(SystemdMemoryError::SwapValue {
+                    swap: swap.unwrap(),
+                    limit: limit.map_or("none".to_owned(), |v| v.to_string()),
+                })
+            }
+
             (Some(l), Some(s)) if l < s => Box::new((s - l) as u64),
             _ => return Ok(()),
         };
@@ -100,6 +114,7 @@ impl Memory {
 
 #[cfg(test)]
 mod tests {
+    use anyhow::{Context, Result};
     use dbus::arg::ArgType;
     use oci_spec::runtime::LinuxMemoryBuilder;
 

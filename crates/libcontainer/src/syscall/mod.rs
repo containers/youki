@@ -8,3 +8,16 @@ pub mod syscall;
 pub mod test;
 
 pub use syscall::Syscall;
+#[derive(Debug, thiserror::Error)]
+pub enum SyscallError {
+    #[error("unexpected mount attr option: {0}")]
+    UnexpectedMountAttrOption(String),
+    #[error(transparent)]
+    Nix(#[from] nix::Error),
+    #[error(transparent)]
+    IO(#[from] std::io::Error),
+    #[error("failed to set capabilities: {0}")]
+    SetCaps(#[from] caps::errors::CapsError),
+}
+
+type Result<T> = std::result::Result<T, SyscallError>;

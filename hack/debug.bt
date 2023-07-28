@@ -1,0 +1,86 @@
+#!/usr/bin/env bpftrace
+
+BEGIN
+{
+    printf("Tracing Youki syscalls... Hit Ctrl-C to end.\n");
+    printf("%-12s %15s %-8s %-9s %s\n", "TIME", "COMMAND", "PID", "EVENT", "CONTENT");
+}
+
+tracepoint:syscalls:sys_enter_write
+/comm == "4"|| comm == "youki" || comm == "youki:[1:INTER]" || comm == "youki:[2:INIT]"/
+{
+
+    $s = str(args->buf, args->count);
+    if ($s != "\n") {
+        printf("%-12ld %15s %-8d %-9s ", elapsed , comm, pid, "write");
+        printf("fd=%d, %s\n", args->fd, $s);
+    }
+}
+
+tracepoint:syscalls:sys_enter_open,
+tracepoint:syscalls:sys_enter_openat
+/comm == "4"|| comm == "youki" || comm == "youki:[1:INTER]" || comm == "youki:[2:INIT]"/
+{
+	@filename[tid] = args->filename;
+}
+
+
+tracepoint:syscalls:sys_exit_open,
+tracepoint:syscalls:sys_exit_openat
+/@filename[tid]/
+{
+	$ret = args->ret;
+	$fd = $ret >= 0 ? $ret : -1;
+	$errno = $ret >= 0 ? 0 : - $ret;
+
+    printf("%-12ld %15s %-8d %-9s ", elapsed , comm, pid, "open");
+	printf("errno=%d, fd=%d, file=%s\n", $errno, $fd, str(@filename[tid]));
+	delete(@filename[tid]);
+}
+
+tracepoint:syscalls:sys_enter_clone3
+/comm == "4"|| comm == "youki" || comm == "youki:[1:INTER]" || comm == "youki:[2:INIT]"/
+{
+    printf("%-12ld %15s %-8d %-9s\n", elapsed , comm, pid, "clone3");
+}
+
+tracepoint:syscalls:sys_enter_setns
+/comm == "4"|| comm == "youki" || comm == "youki:[1:INTER]" || comm == "youki:[2:INIT]"/
+{
+    printf("%-12ld %15s %-8d %-9s ", elapsed , comm, pid, "setns");
+	printf("fd=%d, flag=%d\n", args->fd, args->flags);
+}
+
+tracepoint:syscalls:sys_enter_capset
+/comm == "4"|| comm == "youki" || comm == "youki:[1:INTER]" || comm == "youki:[2:INIT]"/
+{
+    printf("%-12ld %15s %-8d %-9s\n", elapsed , comm, pid, "capset");
+}
+
+tracepoint:syscalls:sys_enter_pivot_root
+/comm == "4"|| comm == "youki" || comm == "youki:[1:INTER]" || comm == "youki:[2:INIT]"/
+{
+    printf("%-12ld %15s %-8d %-9s ", elapsed , comm, pid, "pivt_root");
+	printf("new_root=%s, put_old=%s\n", str(args->new_root), str(args->put_old));
+}
+
+tracepoint:syscalls:sys_enter_mount
+/comm == "4"|| comm == "youki" || comm == "youki:[1:INTER]" || comm == "youki:[2:INIT]"/
+{
+    printf("%-12ld %15s %-8d %-9s ", elapsed , comm, pid, "mount");
+    printf("dev_name=%s, dir_name=%s\n", str(args->dev_name), str(args->dir_name));
+}
+
+tracepoint:syscalls:sys_enter_setresuid
+/comm == "4"|| comm == "youki" || comm == "youki:[1:INTER]" || comm == "youki:[2:INIT]"/
+{
+    printf("%-12ld %15s %-8d %-9s ", elapsed , comm, pid, "setresuid");
+    printf("ruid=%d, euid=%d, suid=%d\n", args->ruid, args->euid, args->suid);
+}
+
+END
+{
+    clear(@filename);
+    printf("Tracing ended.\n");
+}
+

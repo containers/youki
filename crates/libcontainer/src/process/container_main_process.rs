@@ -1,63 +1,70 @@
 use crate::{
-    container::ContainerProcessState,
     process::{
-        args::{ContainerArgs, ContainerType},
-        channel, container_intermediate_process, fork,
+        args::ContainerArgs, channel, container_intermediate_process, fork,
+        intel_rdt::setup_intel_rdt,
     },
     rootless::Rootless,
-    seccomp, utils,
 };
-use anyhow::{Context, Result};
-use nix::{
-    sys::{
-        socket::{self, UnixAddr},
-        wait::{waitpid, WaitStatus},
-    },
-    unistd::{self, Pid},
-};
-use oci_spec::runtime;
-use std::{io::IoSlice, path::Path};
+use nix::sys::wait::{waitpid, WaitStatus};
+use nix::unistd::Pid;
 
-pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, Pid)> {
+#[derive(Debug, thiserror::Error)]
+pub enum ProcessError {
+    #[error(transparent)]
+    Channel(#[from] channel::ChannelError),
+    #[error("failed to write deny to setgroups")]
+    SetGroupsDeny(#[source] std::io::Error),
+    #[error(transparent)]
+    Rootless(#[from] crate::rootless::RootlessError),
+    #[error("container state is required")]
+    ContainerStateRequired,
+    #[error("failed to wait for intermediate process")]
+    WaitIntermediateProcess(#[source] nix::Error),
+    #[error(transparent)]
+    IntelRdt(#[from] crate::process::intel_rdt::IntelRdtError),
+    #[error("failed to create intermediate process")]
+    IntermediateProcessFailed(#[source] fork::CloneError),
+    #[error("failed seccomp listener")]
+    #[cfg(feature = "libseccomp")]
+    SeccompListener(#[from] crate::process::seccomp_listener::SeccompListenerError),
+}
+
+type Result<T> = std::result::Result<T, ProcessError>;
+
+pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, bool)> {
     // We use a set of channels to communicate between parent and child process.
     // Each channel is uni-directional. Because we will pass these channel to
-    // forked process, we have to be deligent about closing any unused channel.
+    // cloned process, we have to be deligent about closing any unused channel.
     // At minimum, we have to close down any unused senders. The corresponding
     // receivers will be cleaned up once the senders are closed down.
     let (main_sender, main_receiver) = &mut channel::main_channel()?;
     let inter_chan = &mut channel::intermediate_channel()?;
     let init_chan = &mut channel::init_channel()?;
 
-    let intermediate_pid = fork::container_fork(|| {
-        let container_pid = container_intermediate_process::container_intermediate_process(
+    let intermediate_pid = fork::container_fork("youki:[1:INTER]", || {
+        container_intermediate_process::container_intermediate_process(
             container_args,
             inter_chan,
             init_chan,
             main_sender,
         )?;
 
-        if matches!(
-            container_args.container_type,
-            ContainerType::TenantContainer { exec_notify_fd: _ }
-        ) && !container_args.detached
-        {
-            match waitpid(container_pid, None)? {
-                WaitStatus::Exited(_, s) => Ok(s),
-                WaitStatus::Signaled(_, sig, _) => Ok(sig as i32),
-                _ => Ok(0),
-            }
-        } else {
-            Ok(0)
-        }
+        Ok(0)
+    })
+    .map_err(|err| {
+        tracing::error!("failed to fork intermediate process: {}", err);
+        ProcessError::IntermediateProcessFailed(err)
     })?;
+
     // Close down unused fds. The corresponding fds are duplicated to the
     // child process during fork.
-    main_sender
-        .close()
-        .context("failed to close unused sender")?;
+    main_sender.close().map_err(|err| {
+        tracing::error!("failed to close unused sender: {}", err);
+        err
+    })?;
 
-    let (inter_sender, _) = inter_chan;
-    let (init_sender, _) = init_chan;
+    let (inter_sender, inter_receiver) = inter_chan;
+    let (init_sender, init_receiver) = init_chan;
 
     // If creating a rootless container, the intermediate process will ask
     // the main process to set up uid and gid mapping, once the intermediate
@@ -70,17 +77,20 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, Pi
 
     // At this point, we don't need to send any message to intermediate process anymore,
     // so we want to close this sender at the earliest point.
-    inter_sender
-        .close()
-        .context("failed to close unused intermediate sender")?;
+    inter_sender.close().map_err(|err| {
+        tracing::error!("failed to close unused intermediate sender: {}", err);
+        err
+    })?;
 
     // The intermediate process will send the init pid once it forks the init
     // process.  The intermediate process should exit after this point.
     let init_pid = main_receiver.wait_for_intermediate_ready()?;
+    let mut need_to_clean_up_intel_rdt_subdirectory = false;
 
     if let Some(linux) = container_args.spec.linux() {
+        #[cfg(feature = "libseccomp")]
         if let Some(seccomp) = linux.seccomp() {
-            let state = ContainerProcessState {
+            let state = crate::container::ContainerProcessState {
                 oci_version: container_args.spec.version().to_string(),
                 // runc hardcode the `seccompFd` name for fds.
                 fds: vec![String::from("seccompFd")],
@@ -89,110 +99,100 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, Pi
                 state: container_args
                     .container
                     .as_ref()
-                    .context("container state is required")?
+                    .ok_or(ProcessError::ContainerStateRequired)?
                     .state
                     .clone(),
             };
-            sync_seccomp(seccomp, &state, init_sender, main_receiver)
-                .context("failed to sync seccomp with init")?;
+            crate::process::seccomp_listener::sync_seccomp(
+                seccomp,
+                &state,
+                init_sender,
+                main_receiver,
+            )?;
+        }
+
+        if let Some(intel_rdt) = linux.intel_rdt() {
+            let container_id = container_args
+                .container
+                .as_ref()
+                .map(|container| container.id());
+            need_to_clean_up_intel_rdt_subdirectory =
+                setup_intel_rdt(container_id, &init_pid, intel_rdt)?;
         }
     }
 
     // We don't need to send anything to the init process after this point, so
     // close the sender.
-    init_sender
-        .close()
-        .context("failed to close unused init sender")?;
-
-    main_receiver
-        .wait_for_init_ready()
-        .context("failed to wait for init ready")?;
-
-    log::debug!("init pid is {:?}", init_pid);
-
-    // here we send both intermediate and init pid, because :
-    // init pid is required for writing it to pid_file (if) given by the high-level runtime
-    // intermediate pid is required in the case when we call exec, as we nned to wait for the
-    // intermediate process to exit, which itself waits for child process (the exec process) to exit
-    // in order to get the proper exit code. We cannot simply wait for the init_pid , that is the actual container
-    // process, as it is not (direect) child of our process
-    Ok((intermediate_pid, init_pid))
-}
-
-fn sync_seccomp(
-    seccomp: &runtime::LinuxSeccomp,
-    state: &ContainerProcessState,
-    init_sender: &mut channel::InitSender,
-    main_receiver: &mut channel::MainReceiver,
-) -> Result<()> {
-    if seccomp::is_notify(seccomp) {
-        log::debug!("main process waiting for sync seccomp");
-        let seccomp_fd = main_receiver.wait_for_seccomp_request()?;
-        let listener_path = seccomp
-            .listener_path()
-            .as_ref()
-            .context("notify will require seccomp listener path to be set")?;
-        let encoded_state =
-            serde_json::to_vec(state).context("failed to encode container process state")?;
-        sync_seccomp_send_msg(listener_path, &encoded_state, seccomp_fd)
-            .context("failed to send msg to seccomp listener")?;
-        init_sender.seccomp_notify_done()?;
-        // Once we sent the seccomp notify fd to the seccomp listener, we can
-        // safely close the fd. The SCM_RIGHTS msg will duplicate the fd to the
-        // process on the other end of the listener.
-        let _ = unistd::close(seccomp_fd);
-    }
-
-    Ok(())
-}
-
-fn sync_seccomp_send_msg(listener_path: &Path, msg: &[u8], fd: i32) -> Result<()> {
-    // The seccomp listener has specific instructions on how to transmit the
-    // information through seccomp listener.  Therefore, we have to use
-    // libc/nix APIs instead of Rust std lib APIs to maintain flexibility.
-    let socket = socket::socket(
-        socket::AddressFamily::Unix,
-        socket::SockType::Stream,
-        socket::SockFlag::empty(),
-        None,
-    )
-    .context("failed to create unix domain socket for seccomp listener")?;
-    let unix_addr = socket::UnixAddr::new(listener_path).context("failed to create unix addr")?;
-    socket::connect(socket, &unix_addr).with_context(|| {
-        format!(
-            "failed to connect to seccomp notify listerner path: {:?}",
-            listener_path
-        )
+    init_sender.close().map_err(|err| {
+        tracing::error!("failed to close unused init sender: {}", err);
+        err
     })?;
-    // We have to use sendmsg here because the spec requires us to send seccomp notify fds through
-    // SCM_RIGHTS message.
-    // Ref: https://man7.org/linux/man-pages/man3/sendmsg.3p.html
-    // Ref: https://man7.org/linux/man-pages/man3/cmsg.3.html
-    let iov = [IoSlice::new(msg)];
-    let fds = [fd];
-    let cmsgs = socket::ControlMessage::ScmRights(&fds);
-    socket::sendmsg::<UnixAddr>(socket, &iov, &[cmsgs], socket::MsgFlags::empty(), None)
-        .context("failed to write container state to seccomp listener")?;
-    // The spec requires the listener socket to be closed immediately after sending.
-    let _ = unistd::close(socket);
 
-    Ok(())
+    main_receiver.wait_for_init_ready().map_err(|err| {
+        tracing::error!("failed to wait for init ready: {}", err);
+        err
+    })?;
+
+    tracing::debug!("init pid is {:?}", init_pid);
+
+    // Close the receiver ends to avoid leaking file descriptors.
+
+    inter_receiver.close().map_err(|err| {
+        tracing::error!("failed to close intermediate process receiver: {}", err);
+        err
+    })?;
+
+    init_receiver.close().map_err(|err| {
+        tracing::error!("failed to close init process receiver: {}", err);
+        err
+    })?;
+
+    main_receiver.close().map_err(|err| {
+        tracing::error!("failed to close main process receiver: {}", err);
+        err
+    })?;
+
+    // Before the main process returns, we want to make sure the intermediate
+    // process is exit and reaped. By this point, the intermediate process
+    // should already exited successfully. If intermediate process errors out,
+    // the `init_ready` will not be sent.
+    match waitpid(intermediate_pid, None) {
+        Ok(WaitStatus::Exited(_, 0)) => (),
+        Ok(WaitStatus::Exited(_, s)) => {
+            tracing::warn!("intermediate process failed with exit status: {s}");
+        }
+        Ok(WaitStatus::Signaled(_, sig, _)) => {
+            tracing::warn!("intermediate process killed with signal: {sig}")
+        }
+        Ok(_) => (),
+        Err(nix::errno::Errno::ECHILD) => {
+            // This is safe because intermediate_process and main_process check if the process is
+            // finished by piping instead of exit code.
+            tracing::warn!("intermediate process already reaped");
+        }
+        Err(err) => return Err(ProcessError::WaitIntermediateProcess(err)),
+    };
+
+    Ok((init_pid, need_to_clean_up_intel_rdt_subdirectory))
 }
 
 fn setup_mapping(rootless: &Rootless, pid: Pid) -> Result<()> {
-    log::debug!("write mapping for pid {:?}", pid);
+    tracing::debug!("write mapping for pid {:?}", pid);
     if !rootless.privileged {
         // The main process is running as an unprivileged user and cannot write the mapping
         // until "deny" has been written to setgroups. See CVE-2014-8989.
-        utils::write_file(format!("/proc/{}/setgroups", pid), "deny")?;
+        std::fs::write(format!("/proc/{pid}/setgroups"), "deny")
+            .map_err(ProcessError::SetGroupsDeny)?;
     }
 
-    rootless
-        .write_uid_mapping(pid)
-        .context(format!("failed to map uid of pid {}", pid))?;
-    rootless
-        .write_gid_mapping(pid)
-        .context(format!("failed to map gid of pid {}", pid))?;
+    rootless.write_uid_mapping(pid).map_err(|err| {
+        tracing::error!("failed to write uid mapping for pid {:?}: {}", pid, err);
+        err
+    })?;
+    rootless.write_gid_mapping(pid).map_err(|err| {
+        tracing::error!("failed to write gid mapping for pid {:?}: {}", pid, err);
+        err
+    })?;
     Ok(())
 }
 
@@ -200,18 +200,15 @@ fn setup_mapping(rootless: &Rootless, pid: Pid) -> Result<()> {
 mod tests {
     use super::*;
     use crate::process::channel::{intermediate_channel, main_channel};
-    use crate::rootless::{get_gid_path, get_uid_path};
+    use crate::rootless::RootlessIDMapper;
+    use anyhow::Result;
     use nix::{
         sched::{unshare, CloneFlags},
         unistd::{self, getgid, getuid},
     };
-    use oci_spec::runtime::{
-        LinuxIdMappingBuilder, LinuxSeccompAction, LinuxSeccompBuilder, LinuxSyscallBuilder,
-    };
+    use oci_spec::runtime::LinuxIdMappingBuilder;
     use serial_test::serial;
     use std::fs;
-
-    use crate::utils::TempDir;
 
     #[test]
     #[serial]
@@ -222,9 +219,12 @@ mod tests {
             .size(1u32)
             .build()?;
         let uid_mappings = vec![uid_mapping];
+        let tmp = tempfile::tempdir()?;
+        let id_mapper = RootlessIDMapper::new_test(tmp.path().to_path_buf());
         let rootless = Rootless {
-            uid_mappings: Some(&uid_mappings),
+            uid_mappings: Some(uid_mappings),
             privileged: true,
+            rootless_id_mapper: id_mapper.clone(),
             ..Default::default()
         };
         let (mut parent_sender, mut parent_receiver) = main_channel()?;
@@ -234,16 +234,13 @@ mod tests {
                 parent_receiver.wait_for_mapping_request()?;
                 parent_receiver.close()?;
 
-                let tempdir = TempDir::new(get_uid_path(&child).parent().unwrap())?;
-                let uid_map_path = tempdir.join("uid_map");
-                let _ = fs::File::create(&uid_map_path)?;
-
-                let tempdir = TempDir::new(get_gid_path(&child).parent().unwrap())?;
-                let gid_map_path = tempdir.join("gid_map");
-                let _ = fs::File::create(gid_map_path)?;
-
+                // In test, we fake the uid path in /proc/{pid}/uid_map, so we
+                // need to ensure the path exists before we write the mapping.
+                // The path requires the pid we use, so we can only do do after
+                // obtaining the child pid here.
+                id_mapper.ensure_uid_path(&child)?;
                 setup_mapping(&rootless, child)?;
-                let line = fs::read_to_string(uid_map_path)?;
+                let line = fs::read_to_string(id_mapper.get_uid_path(&child))?;
                 let line_splited = line.split_whitespace();
                 for (act, expect) in line_splited.zip([
                     uid_mapping.container_id().to_string(),
@@ -270,15 +267,18 @@ mod tests {
 
     #[test]
     #[serial]
-    fn setup_gid_mapping_should_successed() -> Result<()> {
+    fn setup_gid_mapping_should_succeed() -> Result<()> {
         let gid_mapping = LinuxIdMappingBuilder::default()
             .host_id(getgid())
             .container_id(0u32)
             .size(1u32)
             .build()?;
         let gid_mappings = vec![gid_mapping];
+        let tmp = tempfile::tempdir()?;
+        let id_mapper = RootlessIDMapper::new_test(tmp.path().to_path_buf());
         let rootless = Rootless {
-            gid_mappings: Some(&gid_mappings),
+            gid_mappings: Some(gid_mappings),
+            rootless_id_mapper: id_mapper.clone(),
             ..Default::default()
         };
         let (mut parent_sender, mut parent_receiver) = main_channel()?;
@@ -288,16 +288,13 @@ mod tests {
                 parent_receiver.wait_for_mapping_request()?;
                 parent_receiver.close()?;
 
-                let tempdir = TempDir::new(get_uid_path(&child).parent().unwrap())?;
-                let uid_map_path = tempdir.join("uid_map");
-                let _ = fs::File::create(uid_map_path)?;
-
-                let tempdir = TempDir::new(get_gid_path(&child).parent().unwrap())?;
-                let gid_map_path = tempdir.join("gid_map");
-                let _ = fs::File::create(&gid_map_path)?;
-
+                // In test, we fake the gid path in /proc/{pid}/gid_map, so we
+                // need to ensure the path exists before we write the mapping.
+                // The path requires the pid we use, so we can only do do after
+                // obtaining the child pid here.
+                id_mapper.ensure_gid_path(&child)?;
                 setup_mapping(&rootless, child)?;
-                let line = fs::read_to_string(gid_map_path)?;
+                let line = fs::read_to_string(id_mapper.get_gid_path(&child))?;
                 let line_splited = line.split_whitespace();
                 for (act, expect) in line_splited.zip([
                     gid_mapping.container_id().to_string(),
@@ -323,65 +320,6 @@ mod tests {
                 std::process::exit(0);
             }
         }
-        Ok(())
-    }
-
-    #[test]
-    #[serial]
-    fn test_sync_seccomp() -> Result<()> {
-        use std::io::Read;
-        use std::os::unix::io::IntoRawFd;
-        use std::os::unix::net::UnixListener;
-        use std::thread;
-        use utils::create_temp_dir;
-
-        let tmp_dir = create_temp_dir("test_sync_seccomp")?;
-        let scmp_file = std::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .open(tmp_dir.path().join("scmp_file"))?;
-
-        std::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .open(tmp_dir.path().join("socket_file.sock"))?;
-
-        let (mut main_sender, mut main_receiver) = channel::main_channel()?;
-        let (mut init_sender, mut init_receiver) = channel::init_channel()?;
-        let socket_path = tmp_dir.path().join("socket_file.sock");
-        let socket_path_seccomp_th = socket_path.clone();
-
-        let state = ContainerProcessState::default();
-        let want = serde_json::to_string(&state)?;
-        let th = thread::spawn(move || {
-            sync_seccomp(
-                &LinuxSeccompBuilder::default()
-                    .listener_path(socket_path_seccomp_th)
-                    .syscalls(vec![LinuxSyscallBuilder::default()
-                        .action(LinuxSeccompAction::ScmpActNotify)
-                        .build()
-                        .unwrap()])
-                    .build()
-                    .unwrap(),
-                &state,
-                &mut init_sender,
-                &mut main_receiver,
-            )
-            .unwrap();
-        });
-
-        let fd = scmp_file.into_raw_fd();
-        assert!(main_sender.seccomp_notify_request(fd).is_ok());
-
-        fs::remove_file(socket_path.clone())?;
-        let lis = UnixListener::bind(socket_path)?;
-        let (mut socket, _) = lis.accept()?;
-        let mut got = String::new();
-        socket.read_to_string(&mut got)?;
-        assert!(init_receiver.wait_for_seccomp_request_done().is_ok());
-
-        assert_eq!(want, got);
-        assert!(th.join().is_ok());
         Ok(())
     }
 }

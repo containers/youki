@@ -1,7 +1,9 @@
 use std::{thread, time::Duration};
 
+use crate::error::LibcontainerError;
+
 use super::{Container, ContainerStatus};
-use anyhow::{bail, Context, Result};
+use libcgroups::common::CgroupManager;
 
 impl Container {
     /// Displays container events
@@ -10,10 +12,13 @@ impl Container {
     ///
     /// ```no_run
     /// use libcontainer::container::builder::ContainerBuilder;
-    /// use libcontainer::syscall::syscall::create_syscall;
+    /// use libcontainer::syscall::syscall::SyscallType;
     ///
     /// # fn main() -> anyhow::Result<()> {
-    /// let mut container = ContainerBuilder::new("74f1a4cb3801".to_owned(), create_syscall().as_ref())
+    /// let mut container = ContainerBuilder::new(
+    ///     "74f1a4cb3801".to_owned(),
+    ///     SyscallType::default(),
+    /// )
     /// .as_init("/var/run/docker/bundle")
     /// .build()?;
     ///
@@ -21,28 +26,35 @@ impl Container {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn events(&mut self, interval: u32, stats: bool) -> Result<()> {
-        self.refresh_status()
-            .context("failed to refresh container status")?;
+    pub fn events(&mut self, interval: u32, stats: bool) -> Result<(), LibcontainerError> {
+        self.refresh_status()?;
         if !self.state.status.eq(&ContainerStatus::Running) {
-            bail!("{} is not in running state", self.id());
+            tracing::error!(id = ?self.id(), status = ?self.state.status, "container is not running");
+            return Err(LibcontainerError::IncorrectStatus);
         }
 
-        let cgroups_path = self.spec()?.cgroup_path;
-        let use_systemd = self
-            .systemd()
-            .context("could not determine cgroup manager")?;
-
         let cgroup_manager =
-            libcgroups::common::create_cgroup_manager(cgroups_path, use_systemd, self.id())?;
+            libcgroups::common::create_cgroup_manager(libcgroups::common::CgroupConfig {
+                cgroup_path: self.spec()?.cgroup_path,
+                systemd_cgroup: self.systemd(),
+                container_name: self.id().to_string(),
+            })?;
         match stats {
             true => {
                 let stats = cgroup_manager.stats()?;
-                println!("{}", serde_json::to_string_pretty(&stats)?);
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&stats)
+                        .map_err(LibcontainerError::OtherSerialization)?
+                );
             }
             false => loop {
                 let stats = cgroup_manager.stats()?;
-                println!("{}", serde_json::to_string_pretty(&stats)?);
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&stats)
+                        .map_err(LibcontainerError::OtherSerialization)?
+                );
                 thread::sleep(Duration::from_secs(interval as u64));
             },
         }

@@ -2,24 +2,29 @@
 //! Container Runtime written in Rust, inspired by [railcar](https://github.com/oracle/railcar)
 //! This crate provides a container runtime which can be used by a high-level container runtime to run containers.
 mod commands;
-mod logger;
+mod observability;
+mod rootpath;
+mod workload;
 
-use anyhow::bail;
 use anyhow::Context;
 use anyhow::Result;
 use clap::CommandFactory;
 use clap::{crate_version, Parser};
-use nix::libc;
-use std::fs;
-use std::path::{Path, PathBuf};
 
 use crate::commands::info;
-use libcontainer::rootless::rootless_required;
-use libcontainer::utils::create_dir_all_with_mode;
-use nix::sys::stat::Mode;
-use nix::unistd::getuid;
 
 use liboci_cli::{CommonCmd, GlobalOpts, StandardCmd};
+
+// Additional options that are not defined in OCI runtime-spec, but are used by Youki.
+#[derive(Parser, Debug)]
+struct YoukiExtendOpts {
+    /// Enable logging to systemd-journald
+    #[clap(long)]
+    pub systemd_log: bool,
+    /// set the log level (default is 'error')
+    #[clap(long)]
+    pub log_level: Option<String>,
+}
 
 // High-level commandline option definition
 // This takes global options as well as individual commands as specified in [OCI runtime-spec](https://github.com/opencontainers/runtime-spec/blob/master/runtime.md)
@@ -29,6 +34,9 @@ use liboci_cli::{CommonCmd, GlobalOpts, StandardCmd};
 struct Opts {
     #[clap(flatten)]
     global: GlobalOpts,
+
+    #[clap(flatten)]
+    youki_extend: YoukiExtendOpts,
 
     #[clap(subcommand)]
     subcmd: SubCommand,
@@ -40,9 +48,9 @@ struct Opts {
 enum SubCommand {
     // Standard and common commands handled by the liboci_cli crate
     #[clap(flatten)]
-    Standard(liboci_cli::StandardCmd),
+    Standard(Box<liboci_cli::StandardCmd>),
     #[clap(flatten)]
-    Common(liboci_cli::CommonCmd),
+    Common(Box<liboci_cli::CommonCmd>),
 
     // Youki specific extensions
     Info(info::Info),
@@ -61,7 +69,7 @@ macro_rules! youki_version {
             "\ncommit: ",
             crate_version!(),
             "-0-",
-            env!("VERGEN_GIT_SHA_SHORT")
+            env!("VERGEN_GIT_SHA")
         )
     };
 }
@@ -84,21 +92,21 @@ fn main() -> Result<()> {
     let opts = Opts::parse();
     let mut app = Opts::command();
 
-    if let Err(e) = crate::logger::init(opts.global.debug, opts.global.log, opts.global.log_format)
-    {
-        eprintln!("log init failed: {:?}", e);
-    }
+    crate::observability::init(&opts).map_err(|err| {
+        eprintln!("failed to initialize observability: {}", err);
+        err
+    })?;
 
-    log::debug!(
+    tracing::debug!(
         "started by user {} with {:?}",
         nix::unistd::geteuid(),
         std::env::args_os()
     );
-    let root_path = determine_root_path(opts.global.root)?;
+    let root_path = rootpath::determine(opts.global.root)?;
     let systemd_cgroup = opts.global.systemd_cgroup;
 
     let cmd_result = match opts.subcmd {
-        SubCommand::Standard(cmd) => match cmd {
+        SubCommand::Standard(cmd) => match *cmd {
             StandardCmd::Create(create) => {
                 commands::create::create(create, root_path, systemd_cgroup)
             }
@@ -107,7 +115,7 @@ fn main() -> Result<()> {
             StandardCmd::Delete(delete) => commands::delete::delete(delete, root_path),
             StandardCmd::State(state) => commands::state::state(state, root_path),
         },
-        SubCommand::Common(cmd) => match cmd {
+        SubCommand::Common(cmd) => match *cmd {
             CommonCmd::Checkpointt(checkpoint) => {
                 commands::checkpoint::checkpoint(checkpoint, root_path)
             }
@@ -115,15 +123,22 @@ fn main() -> Result<()> {
             CommonCmd::Exec(exec) => match commands::exec::exec(exec, root_path) {
                 Ok(exit_code) => std::process::exit(exit_code),
                 Err(e) => {
-                    eprintln!("exec failed : {}", e);
+                    eprintln!("exec failed : {e}");
                     std::process::exit(-1);
                 }
             },
+            CommonCmd::Features(features) => commands::features::features(features),
             CommonCmd::List(list) => commands::list::list(list, root_path),
             CommonCmd::Pause(pause) => commands::pause::pause(pause, root_path),
             CommonCmd::Ps(ps) => commands::ps::ps(ps, root_path),
             CommonCmd::Resume(resume) => commands::resume::resume(resume, root_path),
-            CommonCmd::Run(run) => commands::run::run(run, root_path, systemd_cgroup),
+            CommonCmd::Run(run) => match commands::run::run(run, root_path, systemd_cgroup) {
+                Ok(exit_code) => std::process::exit(exit_code),
+                Err(e) => {
+                    eprintln!("run failed : {e}");
+                    std::process::exit(-1);
+                }
+            },
             CommonCmd::Spec(spec) => commands::spec_json::spec(spec),
             CommonCmd::Update(update) => commands::update::update(update, root_path),
         },
@@ -135,200 +150,7 @@ fn main() -> Result<()> {
     };
 
     if let Err(ref e) = cmd_result {
-        log::error!("error in executing command: {:?}", e);
+        tracing::error!("error in executing command: {:?}", e);
     }
     cmd_result
-}
-
-fn determine_root_path(root_path: Option<PathBuf>) -> Result<PathBuf> {
-    let uid = getuid().as_raw();
-
-    if let Some(path) = root_path {
-        if !path.exists() {
-            create_dir_all_with_mode(&path, uid, Mode::S_IRWXU)?;
-        }
-        let path = path.canonicalize()?;
-        return Ok(path);
-    }
-
-    if !rootless_required() {
-        let path = get_default_not_rootless_path();
-        create_dir_all_with_mode(&path, uid, Mode::S_IRWXU)?;
-        return Ok(path);
-    }
-
-    // see https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
-    if let Ok(path) = std::env::var("XDG_RUNTIME_DIR") {
-        let path = Path::new(&path).join("youki");
-        if create_dir_all_with_mode(&path, uid, Mode::S_IRWXU).is_ok() {
-            return Ok(path);
-        }
-    }
-
-    // XDG_RUNTIME_DIR is not set, try the usual location
-    let path = get_default_rootless_path(uid);
-    if create_dir_all_with_mode(&path, uid, Mode::S_IRWXU).is_ok() {
-        return Ok(path);
-    }
-
-    if let Ok(path) = std::env::var("HOME") {
-        if let Ok(resolved) = fs::canonicalize(path) {
-            let run_dir = resolved.join(".youki/run");
-            if create_dir_all_with_mode(&run_dir, uid, Mode::S_IRWXU).is_ok() {
-                return Ok(run_dir);
-            }
-        }
-    }
-
-    let tmp_dir = PathBuf::from(format!("/tmp/youki-{}", uid));
-    if create_dir_all_with_mode(&tmp_dir, uid, Mode::S_IRWXU).is_ok() {
-        return Ok(tmp_dir);
-    }
-
-    bail!("could not find a storage location with suitable permissions for the current user");
-}
-
-#[cfg(not(test))]
-fn get_default_not_rootless_path() -> PathBuf {
-    PathBuf::from("/run/youki")
-}
-
-#[cfg(test)]
-fn get_default_not_rootless_path() -> PathBuf {
-    libcontainer::utils::get_temp_dir_path("default_youki_path")
-}
-
-#[cfg(not(test))]
-fn get_default_rootless_path(uid: libc::uid_t) -> PathBuf {
-    PathBuf::from(format!("/run/user/{}/youki", uid))
-}
-
-#[cfg(test)]
-fn get_default_rootless_path(uid: libc::uid_t) -> PathBuf {
-    libcontainer::utils::get_temp_dir_path(format!("default_rootless_youki_path_{}", uid).as_str())
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::determine_root_path;
-    use anyhow::{Context, Result};
-    use libcontainer::utils::{get_temp_dir_path, TempDir};
-    use nix::sys::stat::Mode;
-    use nix::unistd::getuid;
-    use std::fs;
-    use std::fs::Permissions;
-    use std::os::unix::fs::PermissionsExt;
-    use std::path::{Path, PathBuf};
-
-    #[test]
-    fn test_determine_root_path_use_specified_by_user() -> Result<()> {
-        // Create directory if it does not exist and return absolute path.
-        let specified_path = get_temp_dir_path("provided_path");
-        // Make sure directory does not exist.
-        remove_dir(&specified_path)?;
-        let non_abs_path = specified_path.join("../provided_path");
-        let path = determine_root_path(Some(non_abs_path)).context("failed with specified path")?;
-        assert_eq!(path, specified_path);
-
-        // Return absolute path if directory exists.
-        let specified_path = get_temp_dir_path("provided_path2");
-        let _temp_dir = TempDir::new(&specified_path).context("failed to create temp dir")?;
-        let non_abs_path = specified_path.join("../provided_path2");
-        let path = determine_root_path(Some(non_abs_path)).context("failed with specified path")?;
-        assert_eq!(path, specified_path);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_determine_root_path_non_rootless() -> Result<()> {
-        // If we do not have root privileges skip the test as it will not succeed.
-        if !getuid().is_root() {
-            return Ok(());
-        }
-
-        let expected_path = get_temp_dir_path("default_youki_path");
-
-        let path = determine_root_path(None).context("failed with default non rootless path")?;
-        assert_eq!(path, expected_path);
-        assert!(path.exists());
-
-        fs::remove_dir(&expected_path).context("failed to remove dir")?;
-
-        // Setup TempDir with invalid permissions so it is cleaned up after test.
-        let _temp_dir = TempDir::new(&expected_path).context("failed to create temp dir")?;
-        fs::set_permissions(&expected_path, Permissions::from_mode(Mode::S_IRUSR.bits()))
-            .context("failed to set invalid permissions")?;
-
-        assert!(determine_root_path(None).is_err());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_determine_root_path_rootless() -> Result<()> {
-        std::env::set_var("YOUKI_USE_ROOTLESS", "true");
-
-        // XDG_RUNTIME_DIR
-        let xdg_dir = get_temp_dir_path("xdg_runtime");
-        std::env::set_var("XDG_RUNTIME_DIR", &xdg_dir);
-        let path = determine_root_path(None).context("failed with $XDG_RUNTIME_DIR path")?;
-        assert_eq!(path, xdg_dir.join("youki"));
-        assert!(path.exists());
-
-        std::env::remove_var("XDG_RUNTIME_DIR");
-
-        // Default rootless location
-        let uid = getuid().as_raw();
-        let default_rootless_path =
-            get_temp_dir_path(format!("default_rootless_youki_path_{}", uid).as_str());
-        // Create temp dir so it gets cleaned up. This is needed as we later switch permissions of this directory.
-        let _temp_dir =
-            TempDir::new(&default_rootless_path).context("failed to create temp dir")?;
-        let path = determine_root_path(None).context("failed with default rootless path")?;
-        assert_eq!(path, default_rootless_path);
-        assert!(path.exists());
-
-        // Set invalid permissions to default rootless path so that it fails for the next test.
-        fs::set_permissions(
-            default_rootless_path,
-            Permissions::from_mode(Mode::S_IRUSR.bits()),
-        )
-        .context("failed to set invalid permissions")?;
-
-        // Use HOME env var
-        let home_path = get_temp_dir_path("youki_home");
-        fs::create_dir_all(&home_path).context("failed to create fake home path")?;
-        std::env::set_var("HOME", &home_path);
-        let path = determine_root_path(None).context("failed with $HOME path")?;
-        assert_eq!(path, home_path.join(".youki/run"));
-        assert!(path.exists());
-
-        std::env::remove_var("HOME");
-
-        // Use temp dir
-        let expected_temp_path = PathBuf::from(format!("/tmp/youki-{}", uid));
-        // Create temp dir so it gets cleaned up. This is needed as we later switch permissions of this directory.
-        let _temp_dir = TempDir::new(&expected_temp_path).context("failed to create temp dir")?;
-        let path = determine_root_path(None).context("failed with temp path")?;
-        assert_eq!(path, expected_temp_path);
-
-        // Set invalid permissions to temp path so determine_root_path fails.
-        fs::set_permissions(
-            expected_temp_path,
-            Permissions::from_mode(Mode::S_IRUSR.bits()),
-        )
-        .context("failed to set invalid permissions")?;
-
-        assert!(determine_root_path(None).is_err());
-
-        Ok(())
-    }
-
-    fn remove_dir(path: &Path) -> Result<()> {
-        if path.exists() {
-            fs::remove_dir(path).context("failed to remove directory")?;
-        }
-        Ok(())
-    }
 }

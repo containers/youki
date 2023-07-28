@@ -1,14 +1,39 @@
+use crate::utils;
+use oci_spec::runtime::{Hooks, Spec};
+use serde::{Deserialize, Serialize};
 use std::{
     fs,
+    io::{BufReader, BufWriter, Write},
     path::{Path, PathBuf},
 };
 
-use anyhow::{Context, Result};
-use serde::{Deserialize, Serialize};
+#[derive(Debug, thiserror::Error)]
+pub enum ConfigError {
+    #[error("failed to save config")]
+    SaveIO {
+        source: std::io::Error,
+        path: PathBuf,
+    },
+    #[error("failed to save config")]
+    SaveEncode {
+        source: serde_json::Error,
+        path: PathBuf,
+    },
+    #[error("failed to parse config")]
+    LoadIO {
+        source: std::io::Error,
+        path: PathBuf,
+    },
+    #[error("failed to parse config")]
+    LoadParse {
+        source: serde_json::Error,
+        path: PathBuf,
+    },
+    #[error("missing linux in spec")]
+    MissingLinux,
+}
 
-use oci_spec::runtime::{Hooks, Spec};
-
-use crate::utils;
+type Result<T> = std::result::Result<T, ConfigError>;
 
 const YOUKI_CONFIG_NAME: &str = "youki_config.json";
 
@@ -28,7 +53,7 @@ impl<'a> YoukiConfig {
             cgroup_path: utils::get_cgroup_path(
                 spec.linux()
                     .as_ref()
-                    .context("no linux in spec")?
+                    .ok_or(ConfigError::MissingLinux)?
                     .cgroups_path(),
                 container_id,
                 rootless,
@@ -37,24 +62,43 @@ impl<'a> YoukiConfig {
     }
 
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        let file = fs::File::create(path.as_ref().join(YOUKI_CONFIG_NAME))?;
-        serde_json::to_writer(&file, self)?;
+        let file = fs::File::create(path.as_ref().join(YOUKI_CONFIG_NAME)).map_err(|err| {
+            ConfigError::SaveIO {
+                source: err,
+                path: path.as_ref().to_owned(),
+            }
+        })?;
+        let mut writer = BufWriter::new(file);
+        serde_json::to_writer(&mut writer, self).map_err(|err| ConfigError::SaveEncode {
+            source: err,
+            path: path.as_ref().to_owned(),
+        })?;
+        writer.flush().map_err(|err| ConfigError::SaveIO {
+            source: err,
+            path: path.as_ref().to_owned(),
+        })?;
+
         Ok(())
     }
 
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path = path.as_ref();
-        let file = fs::File::open(path.join(YOUKI_CONFIG_NAME))?;
-        let config = serde_json::from_reader(&file)
-            .with_context(|| format!("failed to load config from {:?}", path))?;
+        let file =
+            fs::File::open(path.join(YOUKI_CONFIG_NAME)).map_err(|err| ConfigError::LoadIO {
+                source: err,
+                path: path.to_owned(),
+            })?;
+        let reader = BufReader::new(file);
+        let config = serde_json::from_reader(reader).map_err(|err| ConfigError::LoadParse {
+            source: err,
+            path: path.to_owned(),
+        })?;
         Ok(config)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::create_temp_dir;
-
     use super::*;
     use anyhow::Result;
 
@@ -72,7 +116,7 @@ mod tests {
     #[test]
     fn test_config_save_and_load() -> Result<()> {
         let container_id = "sample";
-        let tmp = create_temp_dir("test_config_save_and_load").expect("create test directory");
+        let tmp = tempfile::tempdir().expect("create temp dir");
         let spec = Spec::default();
         let config = YoukiConfig::from_spec(&spec, container_id, false)?;
         config.save(&tmp)?;

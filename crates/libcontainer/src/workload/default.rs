@@ -1,18 +1,15 @@
 use std::ffi::CString;
 
-use anyhow::{bail, Context, Result};
 use nix::unistd;
 use oci_spec::runtime::Spec;
 
-use super::{Executor, EMPTY};
+use super::{Executor, ExecutorError, EMPTY};
 
-const EXECUTOR_NAME: &str = "default";
-
-pub struct DefaultExecutor {}
-
-impl Executor for DefaultExecutor {
-    fn exec(spec: &Spec) -> Result<()> {
-        log::debug!("Executing workload with default handler");
+/// Return the default executor. The default executor will execute the command
+/// specified in the oci spec.
+pub fn get_executor() -> Executor {
+    Box::new(|spec: &Spec| -> Result<(), ExecutorError> {
+        tracing::debug!("executing workload with default handler");
         let args = spec
             .process()
             .as_ref()
@@ -20,28 +17,26 @@ impl Executor for DefaultExecutor {
             .unwrap_or(&EMPTY);
 
         if args.is_empty() {
-            bail!("at least one process arg must be specified")
+            tracing::error!("no arguments provided to execute");
+            Err(ExecutorError::InvalidArg)?;
         }
 
         let executable = args[0].as_str();
-        let p = CString::new(executable.as_bytes())
-            .with_context(|| format!("failed to convert path {:?} to cstring", executable))?;
+        let cstring_path = CString::new(executable.as_bytes()).map_err(|err| {
+            tracing::error!("failed to convert path {executable:?} to cstring: {}", err,);
+            ExecutorError::InvalidArg
+        })?;
         let a: Vec<CString> = args
             .iter()
             .map(|s| CString::new(s.as_bytes()).unwrap_or_default())
             .collect();
-        unistd::execvp(&p, &a)?;
+        unistd::execvp(&cstring_path, &a).map_err(|err| {
+            tracing::error!(?err, filename = ?cstring_path, args = ?a, "failed to execvp");
+            ExecutorError::Execution(err.into())
+        })?;
 
-        // After do_exec is called, the process is replaced with the container
+        // After execvp is called, the process is replaced with the container
         // payload through execvp, so it should never reach here.
         unreachable!();
-    }
-
-    fn can_handle(_: &Spec) -> Result<bool> {
-        Ok(true)
-    }
-
-    fn name() -> &'static str {
-        EXECUTOR_NAME
-    }
+    })
 }

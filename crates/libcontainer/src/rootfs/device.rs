@@ -1,7 +1,6 @@
 use super::utils::to_sflag;
 use crate::syscall::{syscall::create_syscall, Syscall};
-use crate::utils::{self, PathBufExt};
-use anyhow::{bail, Context, Result};
+use crate::utils::PathBufExt;
 use nix::{
     fcntl::{open, OFlag},
     mount::MsFlags,
@@ -10,6 +9,22 @@ use nix::{
 };
 use oci_spec::runtime::LinuxDevice;
 use std::path::{Path, PathBuf};
+
+#[derive(Debug, thiserror::Error)]
+pub enum DeviceError {
+    #[error("{0:?} is not a valid device path")]
+    InvalidDevicePath(std::path::PathBuf),
+    #[error("failed syscall to create device")]
+    Syscall(#[from] crate::syscall::SyscallError),
+    #[error(transparent)]
+    Nix(#[from] nix::Error),
+    #[error(transparent)]
+    Other(Box<dyn std::error::Error + Send + Sync>),
+    #[error("{0}")]
+    Custom(String),
+}
+
+type Result<T> = std::result::Result<T, DeviceError>;
 
 pub struct Device {
     syscall: Box<dyn Syscall>,
@@ -28,6 +43,10 @@ impl Device {
         }
     }
 
+    pub fn new_with_syscall(syscall: Box<dyn Syscall>) -> Device {
+        Device { syscall }
+    }
+
     pub fn create_devices<'a, I>(&self, rootfs: &Path, devices: I, bind: bool) -> Result<()>
     where
         I: IntoIterator<Item = &'a LinuxDevice>,
@@ -37,7 +56,11 @@ impl Device {
             .into_iter()
             .map(|dev| {
                 if !dev.path().starts_with("/dev") {
-                    bail!("{} is not a valid device path", dev.path().display());
+                    tracing::error!(
+                        "{:?} is not a valid device path starting with /dev",
+                        dev.path()
+                    );
+                    return Err(DeviceError::InvalidDevicePath(dev.path().to_path_buf()));
                 }
 
                 if bind {
@@ -53,22 +76,38 @@ impl Device {
     }
 
     fn bind_dev(&self, rootfs: &Path, dev: &LinuxDevice) -> Result<()> {
-        let full_container_path = create_container_dev_path(rootfs, dev)
-            .with_context(|| format!("could not create container path for device {:?}", dev))?;
+        let full_container_path = create_container_dev_path(rootfs, dev)?;
+        tracing::debug!(
+            "bind_dev with full container path {:?}",
+            full_container_path
+        );
 
         let fd = open(
             &full_container_path,
             OFlag::O_RDWR | OFlag::O_CREAT,
             Mode::from_bits_truncate(0o644),
-        )?;
+        )
+        .map_err(|err| {
+            tracing::error!("failed to open bind dev {:?}: {}", full_container_path, err);
+            err
+        })?;
         close(fd)?;
-        self.syscall.mount(
-            Some(dev.path()),
-            &full_container_path,
-            Some("bind"),
-            MsFlags::MS_BIND,
-            None,
-        )?;
+        self.syscall
+            .mount(
+                Some(dev.path()),
+                &full_container_path,
+                Some("bind"),
+                MsFlags::MS_BIND,
+                None,
+            )
+            .map_err(|err| {
+                tracing::error!(
+                    ?err,
+                    path = ?full_container_path,
+                    "failed to mount bind dev",
+                );
+                err
+            })?;
 
         Ok(())
     }
@@ -81,38 +120,74 @@ impl Device {
                 | ((major & !0xfff) << 32)) as u64
         }
 
-        let full_container_path = create_container_dev_path(rootfs, dev)
-            .with_context(|| format!("could not create container path for device {:?}", dev))?;
+        let full_container_path = create_container_dev_path(rootfs, dev)?;
 
-        self.syscall.mknod(
-            &full_container_path,
-            to_sflag(dev.typ()),
-            Mode::from_bits_truncate(dev.file_mode().unwrap_or(0)),
-            makedev(dev.major(), dev.minor()),
-        )?;
-        self.syscall.chown(
-            &full_container_path,
-            dev.uid().map(Uid::from_raw),
-            dev.gid().map(Gid::from_raw),
-        )?;
+        self.syscall
+            .mknod(
+                &full_container_path,
+                to_sflag(dev.typ()),
+                Mode::from_bits_truncate(dev.file_mode().unwrap_or(0)),
+                makedev(dev.major(), dev.minor()),
+            )
+            .map_err(|err| {
+                tracing::error!(
+                    ?err,
+                    path = ?full_container_path,
+                    major = ?dev.major(),
+                    minor = ?dev.minor(),
+                    "failed to mknod device"
+                );
+
+                err
+            })?;
+        self.syscall
+            .chown(
+                &full_container_path,
+                dev.uid().map(Uid::from_raw),
+                dev.gid().map(Gid::from_raw),
+            )
+            .map_err(|err| {
+                tracing::error!(
+                    path = ?full_container_path,
+                    ?err,
+                    uid = ?dev.uid(),
+                    gid = ?dev.gid(),
+                    "failed to chown device"
+                );
+
+                err
+            })?;
 
         Ok(())
     }
 }
 
 fn create_container_dev_path(rootfs: &Path, dev: &LinuxDevice) -> Result<PathBuf> {
-    let relative_dev_path = dev
-        .path()
-        .as_relative()
-        .with_context(|| format!("could not convert {:?} to relative path", dev.path()))?;
-    let full_container_path = utils::secure_join(rootfs, relative_dev_path)
-        .with_context(|| format!("could not join {:?} with {:?}", rootfs, dev.path()))?;
-
-    crate::utils::create_dir_all(
+    let relative_dev_path = dev.path().as_relative().map_err(|err| {
+        tracing::error!(
+            "failed to convert {:?} to relative path: {}",
+            dev.path(),
+            err
+        );
+        DeviceError::Other(err.into())
+    })?;
+    let full_container_path = safe_path::scoped_join(rootfs, relative_dev_path).map_err(|err| {
+        tracing::error!("failed to join {rootfs:?} with {:?}: {err}", dev.path());
+        DeviceError::Other(err.into())
+    })?;
+    std::fs::create_dir_all(
         full_container_path
             .parent()
             .unwrap_or_else(|| Path::new("")),
-    )?;
+    )
+    .map_err(|err| {
+        tracing::error!(
+            "failed to create parent dir of {:?}: {}",
+            full_container_path,
+            err
+        );
+        DeviceError::Other(err.into())
+    })?;
 
     Ok(full_container_path)
 }
@@ -121,7 +196,7 @@ fn create_container_dev_path(rootfs: &Path, dev: &LinuxDevice) -> Result<PathBuf
 mod tests {
     use super::*;
     use crate::syscall::test::{ChownArgs, MknodArgs, MountArgs, TestHelperSyscall};
-    use crate::utils::TempDir;
+    use anyhow::Result;
     use nix::{
         sys::stat::SFlag,
         unistd::{Gid, Uid},
@@ -130,9 +205,9 @@ mod tests {
     use std::path::PathBuf;
 
     #[test]
-    fn test_bind_dev() {
-        let tmp_dir = TempDir::new("/tmp/test_bind_dev").unwrap();
-        let device = Device::new();
+    fn test_bind_dev() -> Result<()> {
+        let tmp_dir = tempfile::tempdir()?;
+        let device = Device::new_with_syscall(Box::<TestHelperSyscall>::default());
         assert!(device
             .bind_dev(
                 tmp_dir.path(),
@@ -157,12 +232,13 @@ mod tests {
             .unwrap()
             .get_mount_args()[0];
         assert_eq!(want, *got);
+        Ok(())
     }
 
     #[test]
-    fn test_mknod_dev() {
-        let tmp_dir = TempDir::new("/tmp/test_mknod_dev").unwrap();
-        let device = Device::new();
+    fn test_mknod_dev() -> Result<()> {
+        let tmp_dir = tempfile::tempdir()?;
+        let device = Device::new_with_syscall(Box::<TestHelperSyscall>::default());
         assert!(device
             .mknod_dev(
                 tmp_dir.path(),
@@ -205,12 +281,15 @@ mod tests {
             .unwrap()
             .get_chown_args()[0];
         assert_eq!(want_chown, *got_chown);
+
+        Ok(())
     }
 
     #[test]
-    fn test_create_devices() {
-        let tmp_dir = TempDir::new("/tmp/test_create_devices").unwrap();
-        let device = Device::new();
+    fn test_create_devices() -> Result<()> {
+        let tmp_dir = tempfile::tempdir()?;
+        let device = Device::new_with_syscall(Box::<TestHelperSyscall>::default());
+
         let devices = vec![LinuxDeviceBuilder::default()
             .path(PathBuf::from("/dev/null"))
             .major(1)
@@ -258,5 +337,7 @@ mod tests {
             .unwrap()
             .get_mknod_args()[0];
         assert_eq!(want, *got);
+
+        Ok(())
     }
 }

@@ -1,7 +1,8 @@
+use crate::error::LibcontainerError;
+
 use super::{Container, ContainerStatus};
 
-use anyhow::{bail, Context, Result};
-use libcgroups::common::FreezerState;
+use libcgroups::common::{CgroupManager, FreezerState};
 
 impl Container {
     /// Resumes all processes within the container
@@ -10,10 +11,13 @@ impl Container {
     ///
     /// ```no_run
     /// use libcontainer::container::builder::ContainerBuilder;
-    /// use libcontainer::syscall::syscall::create_syscall;
+    /// use libcontainer::syscall::syscall::SyscallType;
     ///
     /// # fn main() -> anyhow::Result<()> {
-    /// let mut container = ContainerBuilder::new("74f1a4cb3801".to_owned(), create_syscall().as_ref())
+    /// let mut container = ContainerBuilder::new(
+    ///     "74f1a4cb3801".to_owned(),
+    ///     SyscallType::default(),
+    /// )
     /// .as_init("/var/run/docker/bundle")
     /// .build()?;
     ///
@@ -21,32 +25,28 @@ impl Container {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn resume(&mut self) -> Result<()> {
-        self.refresh_status()
-            .context("failed to refresh container status")?;
+    pub fn resume(&mut self) -> Result<(), LibcontainerError> {
+        self.refresh_status()?;
         // check if container can be resumed :
         // for example, a running process cannot be resumed
         if !self.can_resume() {
-            bail!(
-                "{} could not be resumed because it was {:?}",
-                self.id(),
-                self.status()
-            );
+            tracing::error!(status = ?self.status(), id = ?self.id(), "cannot resume container");
+            return Err(LibcontainerError::IncorrectStatus);
         }
 
-        let cgroups_path = self.spec()?.cgroup_path;
-        let use_systemd = self
-            .systemd()
-            .context("container state does not contain cgroup manager")?;
         let cmanager =
-            libcgroups::common::create_cgroup_manager(cgroups_path, use_systemd, self.id())?;
+            libcgroups::common::create_cgroup_manager(libcgroups::common::CgroupConfig {
+                cgroup_path: self.spec()?.cgroup_path,
+                systemd_cgroup: self.systemd(),
+                container_name: self.id().to_string(),
+            })?;
         // resume the frozen container
         cmanager.freeze(FreezerState::Thawed)?;
 
-        log::debug!("saving running status");
+        tracing::debug!("saving running status");
         self.set_status(ContainerStatus::Running).save()?;
 
-        log::debug!("container {} resumed", self.id());
+        tracing::debug!("container {} resumed", self.id());
         Ok(())
     }
 }

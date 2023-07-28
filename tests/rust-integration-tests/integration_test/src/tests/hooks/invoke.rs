@@ -26,7 +26,7 @@ fn write_log_hook(content: &str) -> Hook {
         .args(vec![
             "sh".to_string(),
             "-c".to_string(),
-            format!("echo '{}' >> {}", content, output,),
+            format!("echo '{content}' >> {output}",),
         ])
         .build()
         .expect("could not build hook")
@@ -69,7 +69,7 @@ fn get_test(test_name: &'static str) -> Test {
             let spec = get_spec();
             let id = generate_uuid();
             let id_str = id.to_string();
-            let bundle = prepare_bundle(&id).unwrap();
+            let bundle = prepare_bundle().unwrap();
             set_config(&bundle, &spec).unwrap();
             create_container(&id_str, &bundle).unwrap().wait().unwrap();
             start_container(&id_str, &bundle).unwrap().wait().unwrap();
@@ -85,7 +85,7 @@ fn get_test(test_name: &'static str) -> Test {
             delete_hook_output_file();
             if log != "pre-start1 called\npre-start2 called\npost-start1 called\npost-start2 called\npost-stop1 called\npost-stop2 called\n" {
                 return TestResult::Failed(anyhow!(
-                        "error : hooks must be called in the listed order"
+                        "error : hooks must be called in the listed order, {log:?}"
                         ));
             }
             TestResult::Passed

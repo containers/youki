@@ -32,8 +32,7 @@ pub fn validate_readonly_paths(spec: &Spec) {
                 /* This is expected */
             } else {
                 eprintln!(
-                    "in readonly paths, error in testing read access for path {} : {:?}",
-                    path, e
+                    "in readonly paths, error in testing read access for path {path} : {e:?}"
                 );
                 return;
             }
@@ -50,16 +49,12 @@ pub fn validate_readonly_paths(spec: &Spec) {
                 /* This is expected */
             } else {
                 eprintln!(
-                    "in readonly paths, error in testing write access for path {} : {:?}",
-                    path, e
+                    "in readonly paths, error in testing write access for path {path} : {e:?}"
                 );
                 return;
             }
         } else {
-            eprintln!(
-                "in readonly paths, path {} expected to not be writable, found writable",
-                path
-            );
+            eprintln!("in readonly paths, path {path} expected to not be writable, found writable");
             return;
         }
     }
@@ -75,8 +70,7 @@ pub fn validate_hostname(spec: &Spec) {
         let actual_hostname = actual_hostname.to_str().unwrap();
         if actual_hostname != expected_hostname {
             eprintln!(
-                "Unexpected hostname, expected: {:?} found: {:?}",
-                expected_hostname, actual_hostname
+                "Unexpected hostname, expected: {expected_hostname:?} found: {actual_hostname:?}"
             );
         }
     }
@@ -147,7 +141,25 @@ pub fn validate_mounts_recursive(spec: &Spec) {
                                     Ok(())
                                 })
                             {
-                                eprintln!("error in testing rro recursive mounting : {}", e);
+                                eprintln!("error in testing rro recursive mounting : {e}");
+                            }
+                        }
+                        "rrw" => {
+                            if let Err(e) =
+                                do_test_mounts_recursive(mount.destination(), &|test_file_path| {
+                                    if utils::test_write_access(test_file_path.to_str().unwrap())
+                                        .is_err()
+                                    {
+                                        // Return Err if not writeable
+                                        bail!(
+                                            "path {:?} expected to be  writable, found read-only",
+                                            test_file_path
+                                        );
+                                    }
+                                    Ok(())
+                                })
+                            {
+                                eprintln!("error in testing rro recursive mounting : {e}");
                             }
                         }
                         "rnoexec" => {
@@ -162,7 +174,112 @@ pub fn validate_mounts_recursive(spec: &Spec) {
                                     Ok(())
                                 },
                             ) {
-                                eprintln!("error in testing rnoexec recursive mounting: {}", e);
+                                eprintln!("error in testing rnoexec recursive mounting: {e}");
+                            }
+                        }
+                        "rexec" => {
+                            if let Err(e) = do_test_mounts_recursive(
+                                mount.destination(),
+                                &|test_file_path| {
+                                    if let Err(ee) = utils::test_file_executable(
+                                        test_file_path.to_str().unwrap(),
+                                    ) {
+                                        bail!("path {:?} expected to be executable, found not executable, error: {ee}", test_file_path);
+                                    }
+                                    Ok(())
+                                },
+                            ) {
+                                eprintln!("error in testing rexec recursive mounting: {e}");
+                            }
+                        }
+                        "rdiratime" => {
+                            println!("test_dir_update_access_time: {mount:?}");
+                            let rest = utils::test_dir_update_access_time(
+                                mount.destination().to_str().unwrap(),
+                            );
+                            if let Err(e) = rest {
+                                eprintln!("error in testing rdiratime recursive mounting: {e}");
+                            }
+                        }
+                        "rnodiratime" => {
+                            println!("test_dir_not_update_access_time: {mount:?}");
+                            let rest = utils::test_dir_not_update_access_time(
+                                mount.destination().to_str().unwrap(),
+                            );
+                            if let Err(e) = rest {
+                                eprintln!("error in testing rnodiratime recursive mounting: {e}");
+                            }
+                        }
+                        "rdev" => {
+                            println!("test_device_access: {mount:?}");
+                            let rest =
+                                utils::test_device_access(mount.destination().to_str().unwrap());
+                            if let Err(e) = rest {
+                                eprintln!("error in testing rdev recursive mounting: {e}");
+                            }
+                        }
+                        "rnodev" => {
+                            println!("test_device_unaccess: {mount:?}");
+                            let rest =
+                                utils::test_device_unaccess(mount.destination().to_str().unwrap());
+                            if rest.is_ok() {
+                                // because /rnodev/null device not access,so rest is err
+                                eprintln!("error in testing rnodev recursive mounting");
+                            }
+                        }
+                        "rrelatime" => {
+                            println!("rrelatime: {mount:?}");
+                            if let Err(e) = utils::test_mount_releatime_option(
+                                mount.destination().to_str().unwrap(),
+                            ) {
+                                eprintln!("path expected to be rrelatime, found not rrelatime, error: {e}");
+                            }
+                        }
+                        "rnorelatime" => {
+                            println!("rnorelatime: {mount:?}");
+                            if let Err(e) = utils::test_mount_noreleatime_option(
+                                mount.destination().to_str().unwrap(),
+                            ) {
+                                eprintln!("path expected to be rnorelatime, found not rnorelatime, error: {e}");
+                            }
+                        }
+                        "rnoatime" => {
+                            println!("rnoatime: {mount:?}");
+                            if let Err(e) = utils::test_mount_rnoatime_option(
+                                mount.destination().to_str().unwrap(),
+                            ) {
+                                eprintln!(
+                                    "path expected to be rnoatime, found not rnoatime, error: {e}"
+                                );
+                            }
+                        }
+                        "rstrictatime" => {
+                            println!("rstrictatime: {mount:?}");
+                            if let Err(e) = utils::test_mount_rstrictatime_option(
+                                mount.destination().to_str().unwrap(),
+                            ) {
+                                eprintln!("path expected to be rstrictatime, found not rstrictatime, error: {e}");
+                            }
+                        }
+                        "rnosymfollow" => {
+                            if let Err(e) = utils::test_mount_rnosymfollow_option(
+                                mount.destination().to_str().unwrap(),
+                            ) {
+                                eprintln!("path expected to be rnosymfollow, found not rnosymfollow, error: {e}");
+                            }
+                        }
+                        "rsymfollow" => {
+                            if let Err(e) = utils::test_mount_rsymfollow_option(
+                                mount.destination().to_str().unwrap(),
+                            ) {
+                                eprintln!("path expected to be rsymfollow, found not rsymfollow, error: {e}");
+                            }
+                        }
+                        "rsuid" => {
+                            if let Err(e) = utils::test_mount_rsuid_option(
+                                mount.destination().to_str().unwrap(),
+                            ) {
+                                eprintln!("path expected to be rsuid, found not rsuid, error: {e}");
                             }
                         }
                         _ => {}

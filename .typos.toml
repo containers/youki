@@ -1,0 +1,21 @@
+# Configuration Reference:
+#  - https://github.com/crate-ci/typos/blob/927308c726b1fba730f7aaa8bde602148b82004d/docs/reference.md
+
+[files]
+extend-exclude = [
+    "**/*.svg",
+    "tests/oci-runtime-tests/**"
+]
+
+[default.extend-identifiers]
+# This is a cgroup slice ID used in examples. It is easier to ignore this
+# instance than write a regex.
+569d5ce3afe1074769f67 = "569d5ce3afe1074769f67"
+
+[type.rust.extend-words]
+ser = "ser"
+flate = "flate"
+clos = "clos"
+Setted = "Setted"
+hve = "hve"
+

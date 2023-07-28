@@ -77,25 +77,16 @@ fn supports_throttle_iops() -> bool {
 fn parse_device_data<'a>(device_type: &'static str, line: &'a str) -> Result<(i64, i64, &'a str)> {
     let (device_id, value) = line
         .split_once(' ')
-        .with_context(|| format!("invalid {} device format : found {}", device_type, line))?;
+        .with_context(|| format!("invalid {device_type} device format : found {line}"))?;
     let (major_str, minor_str) = device_id.split_once(':').with_context(|| {
-        format!(
-            "invalid major-minor number format for {} device : found {}",
-            device_type, device_id
-        )
+        format!("invalid major-minor number format for {device_type} device : found {device_id}")
     })?;
 
     let major: i64 = major_str.parse().with_context(|| {
-        format!(
-            "Error in parsing {} device major number : found {}",
-            device_type, major_str
-        )
+        format!("Error in parsing {device_type} device major number : found {major_str}")
     })?;
     let minor: i64 = minor_str.parse().with_context(|| {
-        format!(
-            "Error in parsing {} device minor number : found {}",
-            device_type, minor_str
-        )
+        format!("Error in parsing {device_type} device minor number : found {minor_str}")
     })?;
 
     Ok((major, minor, value))
@@ -130,24 +121,18 @@ fn get_blkio_data(path: &Path) -> Result<BlockIO> {
         // weight
         let weight_path = path.join("blkio.weight");
         let weight_string = fs::read_to_string(&weight_path)
-            .with_context(|| format!("error in reading block io weight from {:?}", weight_path))?;
-        device.weight = weight_string.parse().with_context(|| {
-            format!("error in parsing block io weight : found {}", weight_string)
-        })?;
+            .with_context(|| format!("error in reading block io weight from {weight_path:?}"))?;
+        device.weight = weight_string
+            .parse()
+            .with_context(|| format!("error in parsing block io weight : found {weight_string}"))?;
 
         // leaf weight
         let leaf_weight_path = path.join("blkio.leaf_weight");
         let leaf_weight_string = fs::read_to_string(&leaf_weight_path).with_context(|| {
-            format!(
-                "error in reading block io leaf weight from {:?}",
-                leaf_weight_path
-            )
+            format!("error in reading block io leaf weight from {leaf_weight_path:?}")
         })?;
         device.leaf_weight = leaf_weight_string.parse().with_context(|| {
-            format!(
-                "error in parsing block io weight : found {}",
-                leaf_weight_string
-            )
+            format!("error in parsing block io weight : found {leaf_weight_string}")
         })?;
     }
 
@@ -157,10 +142,7 @@ fn get_blkio_data(path: &Path) -> Result<BlockIO> {
         // device weight
         let device_weight_path = path.join("blkio.weight_device");
         let device_weight_string = fs::read_to_string(&device_weight_path).with_context(|| {
-            format!(
-                "error in reading block io weight device from {:?}",
-                device_weight_path
-            )
+            format!("error in reading block io weight device from {device_weight_path:?}")
         })?;
         let mut weight_devices = Vec::new();
         // format is  <major>:<minor>  <bytes_per_second>
@@ -170,10 +152,7 @@ fn get_blkio_data(path: &Path) -> Result<BlockIO> {
                 major,
                 minor,
                 weight: Some(weight_str.parse().with_context(|| {
-                    format!(
-                        "error in parsing weight of weight device, found {}",
-                        weight_str
-                    )
+                    format!("error in parsing weight of weight device, found {weight_str}")
                 })?),
                 leaf_weight: None,
             });
@@ -184,18 +163,14 @@ fn get_blkio_data(path: &Path) -> Result<BlockIO> {
         let device_leaf_weight_string =
             fs::read_to_string(&device_leaf_weight_path).with_context(|| {
                 format!(
-                    "error in reading block io leaf weight device from {:?}",
-                    device_leaf_weight_path
+                    "error in reading block io leaf weight device from {device_leaf_weight_path:?}"
                 )
             })?;
 
         for line in device_leaf_weight_string.lines() {
             let (major, minor, weight_str) = parse_device_data("weight", line)?;
             let leaf_weight: u16 = weight_str.parse().with_context(|| {
-                format!(
-                    "error in parsing leaf weight of weight device : found {}",
-                    weight_str
-                )
+                format!("error in parsing leaf weight of weight device : found {weight_str}")
             })?;
             let mut found = false;
             for dev in &mut weight_devices {
@@ -226,8 +201,7 @@ fn get_blkio_data(path: &Path) -> Result<BlockIO> {
         let throttle_read_bps_string =
             fs::read_to_string(&throttle_read_bps_path).with_context(|| {
                 format!(
-                    "error in reading block io read bps device from  {:?}",
-                    throttle_read_bps_path
+                    "error in reading block io read bps device from  {throttle_read_bps_path:?}"
                 )
             })?;
         let mut throttle_devices = Vec::new();
@@ -237,10 +211,7 @@ fn get_blkio_data(path: &Path) -> Result<BlockIO> {
                 major,
                 minor,
                 rate: rate_str.parse().with_context(|| {
-                    format!(
-                        "error in parsing throttle read bps rate : found {}",
-                        rate_str
-                    )
+                    format!("error in parsing throttle read bps rate : found {rate_str}")
                 })?,
             });
         }
@@ -251,8 +222,7 @@ fn get_blkio_data(path: &Path) -> Result<BlockIO> {
         let throttle_write_bps_string =
             fs::read_to_string(&throttle_write_bps_path).with_context(|| {
                 format!(
-                    "error in reading block io write bps device from {:?}",
-                    throttle_write_bps_path
+                    "error in reading block io write bps device from {throttle_write_bps_path:?}"
                 )
             })?;
         let mut throttle_devices = Vec::new();
@@ -262,10 +232,7 @@ fn get_blkio_data(path: &Path) -> Result<BlockIO> {
                 major,
                 minor,
                 rate: rate_str.parse().with_context(|| {
-                    format!(
-                        "error in parsing throttle write bps rate : found {}",
-                        rate_str
-                    )
+                    format!("error in parsing throttle write bps rate : found {rate_str}")
                 })?,
             });
         }
@@ -279,8 +246,7 @@ fn get_blkio_data(path: &Path) -> Result<BlockIO> {
         let throttle_read_iops_string =
             fs::read_to_string(&throttle_read_iops_path).with_context(|| {
                 format!(
-                    "error in reading block io read iops device from  {:?}",
-                    throttle_read_iops_path
+                    "error in reading block io read iops device from  {throttle_read_iops_path:?}"
                 )
             })?;
         let mut throttle_devices = Vec::new();
@@ -290,10 +256,7 @@ fn get_blkio_data(path: &Path) -> Result<BlockIO> {
                 major,
                 minor,
                 rate: rate_str.parse().with_context(|| {
-                    format!(
-                        "error in parsing throttle read iops rate : found {}",
-                        rate_str
-                    )
+                    format!("error in parsing throttle read iops rate : found {rate_str}")
                 })?,
             });
         }
@@ -304,8 +267,7 @@ fn get_blkio_data(path: &Path) -> Result<BlockIO> {
         let throttle_write_iops_string = fs::read_to_string(&throttle_write_iops_path)
             .with_context(|| {
                 format!(
-                    "error in reading block io write iops device from {:?}",
-                    throttle_write_iops_path
+                    "error in reading block io write iops device from {throttle_write_iops_path:?}"
                 )
             })?;
         let mut throttle_devices = Vec::new();
@@ -315,10 +277,7 @@ fn get_blkio_data(path: &Path) -> Result<BlockIO> {
                 major,
                 minor,
                 rate: rate_str.parse().with_context(|| {
-                    format!(
-                        "error in parsing throttle write iops rate : found {}",
-                        rate_str
-                    )
+                    format!("error in parsing throttle write iops rate : found {rate_str}")
                 })?,
             });
         }

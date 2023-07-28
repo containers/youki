@@ -1,13 +1,21 @@
-use anyhow::{bail, Context, Result};
 use serde::Serialize;
-use std::{collections::HashMap, fmt::Display, fs, path::Path};
+use std::{
+    collections::HashMap,
+    fmt::Display,
+    fs,
+    num::ParseIntError,
+    path::{Path, PathBuf},
+};
+
+use crate::common::{WrapIoResult, WrappedIoError};
 
 use super::common;
 
-pub trait StatsProvider {
+pub(crate) trait StatsProvider {
+    type Error;
     type Stats;
 
-    fn stats(cgroup_path: &Path) -> Result<Self::Stats>;
+    fn stats(cgroup_path: &Path) -> Result<Self::Stats, Self::Error>;
 }
 
 /// Reports the statistics for a cgroup
@@ -188,8 +196,18 @@ pub struct PSIData {
     pub avg300: f64,
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum SupportedPageSizesError {
+    #[error("io error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("failed to parse value {value}: {err}")]
+    Parse { value: String, err: ParseIntError },
+    #[error("failed to determine page size from {dir_name}")]
+    Failed { dir_name: String },
+}
+
 /// Reports which hugepage sizes are supported by the system
-pub fn supported_page_sizes() -> Result<Vec<String>> {
+pub fn supported_page_sizes() -> Result<Vec<String>, SupportedPageSizesError> {
     let mut sizes = Vec::new();
     for hugetlb_entry in fs::read_dir("/sys/kernel/mm/hugepages")? {
         let hugetlb_entry = hugetlb_entry?;
@@ -206,12 +224,15 @@ pub fn supported_page_sizes() -> Result<Vec<String>> {
     Ok(sizes)
 }
 
-fn extract_page_size(dir_name: &str) -> Result<String> {
+fn extract_page_size(dir_name: &str) -> Result<String, SupportedPageSizesError> {
     if let Some(size) = dir_name
         .strip_prefix("hugepages-")
         .and_then(|name_stripped| name_stripped.strip_suffix("kB"))
     {
-        let size: u64 = parse_value(size)?;
+        let size: u64 = size.parse().map_err(|err| SupportedPageSizesError::Parse {
+            value: size.into(),
+            err,
+        })?;
 
         let size_moniker = if size >= (1 << 20) {
             (size >> 20).to_string() + "GB"
@@ -224,7 +245,9 @@ fn extract_page_size(dir_name: &str) -> Result<String> {
         return Ok(size_moniker);
     }
 
-    bail!("failed to determine page size from {}", dir_name);
+    Err(SupportedPageSizesError::Failed {
+        dir_name: dir_name.into(),
+    })
 }
 
 /// Parses this string slice into an u64
@@ -235,10 +258,8 @@ fn extract_page_size(dir_name: &str) -> Result<String> {
 /// let value = parse_value("32").unwrap();
 /// assert_eq!(value, 32);
 /// ```
-pub fn parse_value(value: &str) -> Result<u64> {
-    value
-        .parse()
-        .with_context(|| format!("failed to parse {}", value))
+pub fn parse_value(value: &str) -> Result<u64, ParseIntError> {
+    value.parse()
 }
 
 /// Parses a single valued file to an u64
@@ -250,58 +271,82 @@ pub fn parse_value(value: &str) -> Result<u64> {
 /// let value = parse_single_value(&Path::new("memory.current")).unwrap();
 /// assert_eq!(value, 32);
 /// ```
-pub fn parse_single_value(file_path: &Path) -> Result<u64> {
+pub fn parse_single_value(file_path: &Path) -> Result<u64, WrappedIoError> {
     let value = common::read_cgroup_file(file_path)?;
     let value = value.trim();
     if value == "max" {
         return Ok(u64::MAX);
     }
 
-    value.parse().with_context(|| {
-        format!(
-            "failed to parse value {} from {}",
-            value,
-            file_path.display()
-        )
-    })
+    value
+        .parse()
+        .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err))
+        .wrap_other(file_path)
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum ParseFlatKeyedDataError {
+    #[error("io error: {0}")]
+    WrappedIo(#[from] WrappedIoError),
+    #[error("flat keyed data at {path} contains entries that do not conform to 'key value'")]
+    DoesNotConform { path: PathBuf },
+    #[error("failed to parse value {value} from {path}")]
+    FailedToParse {
+        value: String,
+        path: PathBuf,
+        err: ParseIntError,
+    },
 }
 
 /// Parses a file that is structured according to the flat keyed format
-pub fn parse_flat_keyed_data(file_path: &Path) -> Result<HashMap<String, u64>> {
+pub(crate) fn parse_flat_keyed_data(
+    file_path: &Path,
+) -> Result<HashMap<String, u64>, ParseFlatKeyedDataError> {
     let mut stats = HashMap::new();
     let keyed_data = common::read_cgroup_file(file_path)?;
     for entry in keyed_data.lines() {
         let entry_fields: Vec<&str> = entry.split_ascii_whitespace().collect();
         if entry_fields.len() != 2 {
-            bail!(
-                "flat keyed data at {} contains entries that do not conform to 'key value'",
-                &file_path.display()
-            );
+            return Err(ParseFlatKeyedDataError::DoesNotConform {
+                path: file_path.to_path_buf(),
+            });
         }
 
         stats.insert(
             entry_fields[0].to_owned(),
-            entry_fields[1].parse().with_context(|| {
-                format!(
-                    "failed to parse value {} from {}",
-                    entry_fields[0],
-                    file_path.display()
-                )
-            })?,
+            entry_fields[1]
+                .parse()
+                .map_err(|err| ParseFlatKeyedDataError::FailedToParse {
+                    value: entry_fields[0].into(),
+                    path: file_path.to_path_buf(),
+                    err,
+                })?,
         );
     }
 
     Ok(stats)
 }
 
-/// Parses a file that is structed according to the nested keyed format
-pub fn parse_nested_keyed_data(file_path: &Path) -> Result<HashMap<String, Vec<String>>> {
+#[derive(thiserror::Error, Debug)]
+pub enum ParseNestedKeyedDataError {
+    #[error("io error: {0}")]
+    WrappedIo(#[from] WrappedIoError),
+    #[error("nested keyed data at {path} contains entries that do not conform to key format")]
+    DoesNotConform { path: PathBuf },
+}
+
+/// Parses a file that is structured according to the nested keyed format
+pub fn parse_nested_keyed_data(
+    file_path: &Path,
+) -> Result<HashMap<String, Vec<String>>, ParseNestedKeyedDataError> {
     let mut stats: HashMap<String, Vec<String>> = HashMap::new();
     let keyed_data = common::read_cgroup_file(file_path)?;
     for entry in keyed_data.lines() {
         let entry_fields: Vec<&str> = entry.split_ascii_whitespace().collect();
         if entry_fields.len() < 2 || !entry_fields[1..].iter().all(|p| p.contains('=')) {
-            bail!("nested key data at {} contains entries that do not conform to the nested key format", file_path.display());
+            return Err(ParseNestedKeyedDataError::DoesNotConform {
+                path: file_path.to_path_buf(),
+            });
         }
 
         stats.insert(
@@ -317,50 +362,76 @@ pub fn parse_nested_keyed_data(file_path: &Path) -> Result<HashMap<String, Vec<S
     Ok(stats)
 }
 
-/// Parses a file that is structed according to the nested keyed format
-/// # Example
-/// ```
-/// use libcgroups::stats::parse_device_number;
-///
-/// let (major, minor) = parse_device_number("8:0").unwrap();
-/// assert_eq!((major, minor), (8, 0));
-/// ```
-pub fn parse_device_number(device: &str) -> Result<(u64, u64)> {
+#[derive(thiserror::Error, Debug)]
+pub enum ParseDeviceNumberError {
+    #[error("failed to parse device number from {device}: expected 2 parts, found {numbers}")]
+    TooManyNumbers { device: String, numbers: usize },
+    #[error("failed to parse device number from {device}: {err}")]
+    MalformedNumber { device: String, err: ParseIntError },
+}
+
+pub(crate) fn parse_device_number(device: &str) -> Result<(u64, u64), ParseDeviceNumberError> {
     let numbers: Vec<&str> = device.split_terminator(':').collect();
     if numbers.len() != 2 {
-        bail!("failed to parse device number {}", device);
+        return Err(ParseDeviceNumberError::TooManyNumbers {
+            device: device.into(),
+            numbers: numbers.len(),
+        });
     }
 
-    Ok((numbers[0].parse()?, numbers[1].parse()?))
+    Ok((
+        numbers[0]
+            .parse()
+            .map_err(|err| ParseDeviceNumberError::MalformedNumber {
+                device: device.into(),
+                err,
+            })?,
+        numbers[1]
+            .parse()
+            .map_err(|err| ParseDeviceNumberError::MalformedNumber {
+                device: device.into(),
+                err,
+            })?,
+    ))
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum PidStatsError {
+    #[error("io error: {0}")]
+    WrappedIo(#[from] WrappedIoError),
+    #[error("failed to parse current pids: {0}")]
+    ParseCurrent(ParseIntError),
+    #[error("failed to parse pids limit: {0}")]
+    ParseLimit(ParseIntError),
 }
 
 /// Returns cgroup pid statistics
-pub fn pid_stats(cgroup_path: &Path) -> Result<PidStats> {
+pub fn pid_stats(cgroup_path: &Path) -> Result<PidStats, PidStatsError> {
     let mut stats = PidStats::default();
 
     let current = common::read_cgroup_file(cgroup_path.join("pids.current"))?;
     stats.current = current
         .trim()
         .parse()
-        .context("failed to parse current pids")?;
+        .map_err(PidStatsError::ParseCurrent)?;
 
     let limit =
         common::read_cgroup_file(cgroup_path.join("pids.max")).map(|l| l.trim().to_owned())?;
     if limit != "max" {
-        stats.limit = limit.parse().context("failed to parse pids limit")?;
+        stats.limit = limit.parse().map_err(PidStatsError::ParseLimit)?;
     }
 
     Ok(stats)
 }
 
-pub fn psi_stats(psi_file: &Path) -> Result<PSIStats> {
+pub fn psi_stats(psi_file: &Path) -> Result<PSIStats, WrappedIoError> {
     let mut stats = PSIStats::default();
 
     let psi = common::read_cgroup_file(psi_file)?;
     for line in psi.lines() {
         match &line[0..4] {
-            "some" => stats.some = parse_psi(&line[4..])?,
-            "full" => stats.full = parse_psi(&line[4..])?,
+            "some" => stats.some = parse_psi(&line[4..], psi_file)?,
+            "full" => stats.full = parse_psi(&line[4..], psi_file)?,
             _ => continue,
         }
     }
@@ -368,7 +439,9 @@ pub fn psi_stats(psi_file: &Path) -> Result<PSIStats> {
     Ok(stats)
 }
 
-fn parse_psi(stat_line: &str) -> Result<PSIData> {
+fn parse_psi(stat_line: &str, path: &Path) -> Result<PSIData, WrappedIoError> {
+    use std::io::{Error, ErrorKind};
+
     let mut psi_data = PSIData::default();
 
     for kv in stat_line.split_ascii_whitespace() {
@@ -376,17 +449,20 @@ fn parse_psi(stat_line: &str) -> Result<PSIData> {
             Some(("avg10", v)) => {
                 psi_data.avg10 = v
                     .parse()
-                    .with_context(|| format!("invalid psi value {v}"))?
+                    .map_err(|err| Error::new(ErrorKind::InvalidData, err))
+                    .wrap_other(path)?
             }
             Some(("avg60", v)) => {
                 psi_data.avg60 = v
                     .parse()
-                    .with_context(|| format!("invalid psi value {v}"))?
+                    .map_err(|err| Error::new(ErrorKind::InvalidData, err))
+                    .wrap_other(path)?
             }
             Some(("avg300", v)) => {
                 psi_data.avg300 = v
                     .parse()
-                    .with_context(|| format!("invalid psi value {v}"))?
+                    .map_err(|err| Error::new(ErrorKind::InvalidData, err))
+                    .wrap_other(path)?
             }
             _ => continue,
         }
@@ -397,7 +473,7 @@ fn parse_psi(stat_line: &str) -> Result<PSIData> {
 
 #[cfg(test)]
 mod tests {
-    use crate::test::{create_temp_dir, set_fixture};
+    use crate::test::set_fixture;
 
     use super::*;
 
@@ -421,8 +497,8 @@ mod tests {
 
     #[test]
     fn test_parse_single_value_valid() {
-        let tmp = create_temp_dir("test_parse_single_value_valid").unwrap();
-        let file_path = set_fixture(&tmp, "single_valued_file", "1200\n").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        let file_path = set_fixture(tmp.path(), "single_valued_file", "1200\n").unwrap();
 
         let value = parse_single_value(&file_path).unwrap();
         assert_eq!(value, 1200);
@@ -430,8 +506,8 @@ mod tests {
 
     #[test]
     fn test_parse_single_value_invalid_number() {
-        let tmp = create_temp_dir("test_parse_single_value_invalid_number").unwrap();
-        let file_path = set_fixture(&tmp, "single_invalid_file", "noop\n").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        let file_path = set_fixture(tmp.path(), "single_invalid_file", "noop\n").unwrap();
 
         let value = parse_single_value(&file_path);
         assert!(value.is_err());
@@ -439,8 +515,8 @@ mod tests {
 
     #[test]
     fn test_parse_single_value_multiple_entries() {
-        let tmp = create_temp_dir("test_parse_single_value_multiple_entries").unwrap();
-        let file_path = set_fixture(&tmp, "multi_valued_file", "1200\n1400\n1600").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        let file_path = set_fixture(tmp.path(), "multi_valued_file", "1200\n1400\n1600").unwrap();
 
         let value = parse_single_value(&file_path);
         assert!(value.is_err());
@@ -448,9 +524,9 @@ mod tests {
 
     #[test]
     fn test_parse_flat_keyed_data() {
-        let tmp = create_temp_dir("test_parse_flat_keyed_data").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
         let file_content = ["key1 1", "key2 2", "key3 3"].join("\n");
-        let file_path = set_fixture(&tmp, "flat_keyed_data", &file_content).unwrap();
+        let file_path = set_fixture(tmp.path(), "flat_keyed_data", &file_content).unwrap();
 
         let actual = parse_flat_keyed_data(&file_path).unwrap();
         let mut expected = HashMap::with_capacity(3);
@@ -463,9 +539,9 @@ mod tests {
 
     #[test]
     fn test_parse_flat_keyed_data_with_characters() {
-        let tmp = create_temp_dir("test_parse_flat_keyed_data_with_characters").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
         let file_content = ["key1 1", "key2 a", "key3 b"].join("\n");
-        let file_path = set_fixture(&tmp, "flat_keyed_data", &file_content).unwrap();
+        let file_path = set_fixture(tmp.path(), "flat_keyed_data", &file_content).unwrap();
 
         let result = parse_flat_keyed_data(&file_path);
         assert!(result.is_err());
@@ -473,9 +549,9 @@ mod tests {
 
     #[test]
     fn test_parse_space_separated_as_flat_keyed_data() {
-        let tmp = create_temp_dir("test_parse_space_separated_as_flat_keyed_data").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
         let file_content = ["key1", "key2", "key3", "key4"].join(" ");
-        let file_path = set_fixture(&tmp, "space_separated", &file_content).unwrap();
+        let file_path = set_fixture(tmp.path(), "space_separated", &file_content).unwrap();
 
         let result = parse_flat_keyed_data(&file_path);
         assert!(result.is_err());
@@ -483,9 +559,9 @@ mod tests {
 
     #[test]
     fn test_parse_newline_separated_as_flat_keyed_data() {
-        let tmp = create_temp_dir("test_parse_newline_separated_as_flat_keyed_data").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
         let file_content = ["key1", "key2", "key3", "key4"].join("\n");
-        let file_path = set_fixture(&tmp, "newline_separated", &file_content).unwrap();
+        let file_path = set_fixture(tmp.path(), "newline_separated", &file_content).unwrap();
 
         let result = parse_flat_keyed_data(&file_path);
         assert!(result.is_err());
@@ -493,14 +569,14 @@ mod tests {
 
     #[test]
     fn test_parse_nested_keyed_data_as_flat_keyed_data() {
-        let tmp = create_temp_dir("test_parse_nested_keyed_data_as_flat_keyed_data").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
         let file_content = [
             "key1 subkey1=value1 subkey2=value2 subkey3=value3",
             "key2 subkey1=value1 subkey2=value2 subkey3=value3",
             "key3 subkey1=value1 subkey2=value2 subkey3=value3",
         ]
         .join("\n");
-        let file_path = set_fixture(&tmp, "nested_keyed_data", &file_content).unwrap();
+        let file_path = set_fixture(tmp.path(), "nested_keyed_data", &file_content).unwrap();
 
         let result = parse_flat_keyed_data(&file_path);
         assert!(result.is_err());
@@ -508,14 +584,14 @@ mod tests {
 
     #[test]
     fn test_parse_nested_keyed_data() {
-        let tmp = create_temp_dir("test_parse_nested_keyed_data").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
         let file_content = [
             "key1 subkey1=value1 subkey2=value2 subkey3=value3",
             "key2 subkey1=value1 subkey2=value2 subkey3=value3",
             "key3 subkey1=value1 subkey2=value2 subkey3=value3",
         ]
         .join("\n");
-        let file_path = set_fixture(&tmp, "nested_keyed_data", &file_content).unwrap();
+        let file_path = set_fixture(tmp.path(), "nested_keyed_data", &file_content).unwrap();
 
         let actual = parse_nested_keyed_data(&file_path).unwrap();
         let mut expected = HashMap::with_capacity(3);
@@ -549,9 +625,9 @@ mod tests {
 
     #[test]
     fn test_parse_space_separated_as_nested_keyed_data() {
-        let tmp = create_temp_dir("test_parse_space_separated_as_nested_keyed_data").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
         let file_content = ["key1", "key2", "key3", "key4"].join(" ");
-        let file_path = set_fixture(&tmp, "space_separated", &file_content).unwrap();
+        let file_path = set_fixture(tmp.path(), "space_separated", &file_content).unwrap();
 
         let result = parse_nested_keyed_data(&file_path);
         assert!(result.is_err());
@@ -559,9 +635,9 @@ mod tests {
 
     #[test]
     fn test_parse_newline_separated_as_nested_keyed_data() {
-        let tmp = create_temp_dir("test_parse_newline_separated_as_nested_keyed_data").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
         let file_content = ["key1", "key2", "key3", "key4"].join("\n");
-        let file_path = set_fixture(&tmp, "newline_separated", &file_content).unwrap();
+        let file_path = set_fixture(tmp.path(), "newline_separated", &file_content).unwrap();
 
         let result = parse_nested_keyed_data(&file_path);
         assert!(result.is_err());
@@ -569,9 +645,9 @@ mod tests {
 
     #[test]
     fn test_parse_flat_keyed_as_nested_keyed_data() {
-        let tmp = create_temp_dir("test_parse_flat_keyed_as_nested_keyed_data").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
         let file_content = ["key1 1", "key2 2", "key3 3"].join("\n");
-        let file_path = set_fixture(&tmp, "newline_separated", &file_content).unwrap();
+        let file_path = set_fixture(tmp.path(), "newline_separated", &file_content).unwrap();
 
         let result = parse_nested_keyed_data(&file_path);
         assert!(result.is_err());
@@ -591,13 +667,13 @@ mod tests {
 
     #[test]
     fn test_parse_psi_full_stats() {
-        let tmp = create_temp_dir("test_parse_psi_full_stats").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
         let file_content = [
             "some avg10=80.00 avg60=50.00 avg300=90.00 total=0",
             "full avg10=10.00 avg60=30.00 avg300=50.00 total=0",
         ]
         .join("\n");
-        let psi_file = set_fixture(&tmp, "psi.pressure", &file_content).unwrap();
+        let psi_file = set_fixture(tmp.path(), "psi.pressure", &file_content).unwrap();
 
         let result = psi_stats(&psi_file).unwrap();
         assert_eq!(
@@ -619,9 +695,9 @@ mod tests {
 
     #[test]
     fn test_parse_psi_only_some() {
-        let tmp = create_temp_dir("test_parse_psi_only_some").unwrap();
+        let tmp = tempfile::tempdir().unwrap();
         let file_content = ["some avg10=80.00 avg60=50.00 avg300=90.00 total=0"].join("\n");
-        let psi_file = set_fixture(&tmp, "psi.pressure", &file_content).unwrap();
+        let psi_file = set_fixture(tmp.path(), "psi.pressure", &file_content).unwrap();
 
         let result = psi_stats(&psi_file).unwrap();
         assert_eq!(

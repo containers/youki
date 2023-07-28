@@ -1,4 +1,4 @@
-use crate::utils::{generate_uuid, prepare_bundle, TempDir};
+use crate::utils::{generate_uuid, prepare_bundle};
 use std::thread::sleep;
 use std::time::Duration;
 use test_framework::{TestResult, TestableGroup};
@@ -11,7 +11,7 @@ use super::{checkpoint, create, delete, exec, kill, start, state};
 const SLEEP_TIME: Duration = Duration::from_millis(75);
 
 pub struct ContainerLifecycle {
-    project_path: TempDir,
+    project_path: tempfile::TempDir,
     container_id: String,
 }
 
@@ -24,7 +24,7 @@ impl Default for ContainerLifecycle {
 impl ContainerLifecycle {
     pub fn new() -> Self {
         let id = generate_uuid();
-        let bundle_dir = prepare_bundle(&id).unwrap();
+        let bundle_dir = prepare_bundle().unwrap();
         ContainerLifecycle {
             project_path: bundle_dir,
             container_id: id.to_string(),
@@ -32,40 +32,49 @@ impl ContainerLifecycle {
     }
 
     pub fn create(&self) -> TestResult {
-        create::create(&self.project_path, &self.container_id)
+        create::create(self.project_path.path(), &self.container_id).into()
     }
 
     #[allow(dead_code)]
     pub fn exec(&self, cmd: Vec<&str>, expected_output: Option<&str>) -> TestResult {
-        exec::exec(&self.project_path, &self.container_id, cmd, expected_output)
+        exec::exec(
+            self.project_path.path(),
+            &self.container_id,
+            cmd,
+            expected_output,
+        )
+        .into()
     }
 
     pub fn start(&self) -> TestResult {
-        start::start(&self.project_path, &self.container_id)
+        start::start(self.project_path.path(), &self.container_id).into()
     }
 
     pub fn state(&self) -> TestResult {
-        state::state(&self.project_path, &self.container_id)
+        state::state(self.project_path.path(), &self.container_id).into()
     }
 
     pub fn kill(&self) -> TestResult {
-        let ret = kill::kill(&self.project_path, &self.container_id);
+        let ret = kill::kill(self.project_path.path(), &self.container_id);
         // sleep a little, so the youki process actually gets the signal and shuts down
         // otherwise, the tester moves on to next tests before the youki has gotten signal, and delete test can fail
         sleep(SLEEP_TIME);
-        ret
+        ret.into()
     }
 
     pub fn delete(&self) -> TestResult {
-        delete::delete(&self.project_path, &self.container_id)
+        delete::delete(self.project_path.path(), &self.container_id).into()
     }
 
     pub fn checkpoint_leave_running(&self) -> TestResult {
-        checkpoint::checkpoint_leave_running(&self.project_path, &self.container_id)
+        checkpoint::checkpoint_leave_running(self.project_path.path(), &self.container_id)
     }
 
     pub fn checkpoint_leave_running_work_path_tmp(&self) -> TestResult {
-        checkpoint::checkpoint_leave_running_work_path_tmp(&self.project_path, &self.container_id)
+        checkpoint::checkpoint_leave_running_work_path_tmp(
+            self.project_path.path(),
+            &self.container_id,
+        )
     }
 }
 
@@ -110,7 +119,7 @@ impl TestableGroup for ContainerLifecycle {
                 "kill" => ret.push(("kill", self.kill())),
                 "state" => ret.push(("state", self.state())),
                 "delete" => ret.push(("delete", self.delete())),
-                _ => eprintln!("No test named {} in lifecycle", name),
+                _ => eprintln!("No test named {name} in lifecycle"),
             };
         }
         ret

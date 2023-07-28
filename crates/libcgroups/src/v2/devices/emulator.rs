@@ -1,7 +1,6 @@
-use anyhow::Result;
 use oci_spec::runtime::{LinuxDeviceCgroup, LinuxDeviceType};
 
-// For cgroup v1 compatibility, runc implements a device emulator to caculate the final rules given
+// For cgroup v1 compatibility, runc implements a device emulator to calculate the final rules given
 // a list of user-defined rules.
 // https://github.com/opencontainers/runc/commit/2353ffec2bb670a200009dc7a54a56b93145f141
 //
@@ -28,29 +27,27 @@ impl Emulator {
         }
     }
 
-    pub fn add_rules(&mut self, rules: &[LinuxDeviceCgroup]) -> Result<()> {
+    pub fn add_rules(&mut self, rules: &[LinuxDeviceCgroup]) {
         for rule in rules {
-            self.add_rule(rule)?;
+            self.add_rule(rule);
         }
-        Ok(())
     }
 
-    pub fn add_rule(&mut self, rule: &LinuxDeviceCgroup) -> Result<()> {
+    pub fn add_rule(&mut self, rule: &LinuxDeviceCgroup) {
         // special case, switch to blacklist or whitelist and clear all existing rules
         // NOTE: we ignore other fields when type='a', this is same as cgroup v1 and runc
         if rule.typ().unwrap_or_default() == LinuxDeviceType::A {
             self.default_allow = rule.allow();
             self.rules.clear();
-            return Ok(());
+            return;
         }
 
         // empty access match nothing, just discard this rule
         if rule.access().is_none() {
-            return Ok(());
+            return;
         }
 
         self.rules.push(rule.clone());
-        Ok(())
     }
 }
 
@@ -79,7 +76,7 @@ mod tests {
             .unwrap();
 
         // act
-        emulator.add_rule(&cgroup).expect("add type A rule");
+        emulator.add_rule(&cgroup);
 
         // assert
         assert_eq!(emulator.rules.len(), 0);
@@ -93,7 +90,7 @@ mod tests {
         let cgroup = LinuxDeviceCgroupBuilder::default().build().unwrap();
 
         // act
-        emulator.add_rule(&cgroup).expect("add empty rule");
+        emulator.add_rule(&cgroup);
 
         // assert
         assert_eq!(emulator.rules.len(), 0);
@@ -112,7 +109,7 @@ mod tests {
             .unwrap();
 
         // act
-        emulator.add_rule(&cgroup).expect("add permission rule");
+        emulator.add_rule(&cgroup);
 
         // assert
         let top_rule = emulator.rules.first().unwrap();

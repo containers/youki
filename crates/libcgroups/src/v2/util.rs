@@ -1,32 +1,42 @@
 use std::path::{Path, PathBuf};
 
-use anyhow::{anyhow, bail, Result};
-use procfs::process::Process;
+use procfs::{process::Process, ProcError};
 
-use crate::common;
+use crate::common::{self, WrappedIoError};
 
 use super::controller_type::ControllerType;
 
 pub const CGROUP_CONTROLLERS: &str = "cgroup.controllers";
 pub const CGROUP_SUBTREE_CONTROL: &str = "cgroup.subtree_control";
 
-pub fn get_unified_mount_point() -> Result<PathBuf> {
+#[derive(thiserror::Error, Debug)]
+pub enum V2UtilError {
+    #[error("io error: {0}")]
+    WrappedIo(#[from] WrappedIoError),
+    #[error("proc error: {0}")]
+    Proc(#[from] ProcError),
+    #[error("could not find mountpoint for unified")]
+    CouldNotFind,
+    #[error("cannot get available controllers. {0} does not exist")]
+    DoesNotExist(PathBuf),
+}
+
+pub fn get_unified_mount_point() -> Result<PathBuf, V2UtilError> {
     Process::myself()?
         .mountinfo()?
         .into_iter()
         .find(|m| m.fs_type == "cgroup2")
         .map(|m| m.mount_point)
-        .ok_or_else(|| anyhow!("could not find mountpoint for unified"))
+        .ok_or(V2UtilError::CouldNotFind)
 }
 
-pub fn get_available_controllers<P: AsRef<Path>>(root_path: P) -> Result<Vec<ControllerType>> {
+pub fn get_available_controllers<P: AsRef<Path>>(
+    root_path: P,
+) -> Result<Vec<ControllerType>, V2UtilError> {
     let root_path = root_path.as_ref();
     let controllers_path = root_path.join(CGROUP_CONTROLLERS);
     if !controllers_path.exists() {
-        bail!(
-            "cannot get available controllers. {:?} does not exist",
-            controllers_path
-        )
+        return Err(V2UtilError::DoesNotExist(controllers_path));
     }
 
     let mut controllers = Vec::new();
@@ -38,7 +48,7 @@ pub fn get_available_controllers<P: AsRef<Path>>(root_path: P) -> Result<Vec<Con
             "io" => controllers.push(ControllerType::Io),
             "memory" => controllers.push(ControllerType::Memory),
             "pids" => controllers.push(ControllerType::Pids),
-            tpe => log::warn!("Controller {} is not yet implemented.", tpe),
+            tpe => tracing::warn!("Controller {} is not yet implemented.", tpe),
         }
     }
 

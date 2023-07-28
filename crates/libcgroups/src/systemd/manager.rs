@@ -1,11 +1,11 @@
 use std::{
     collections::HashMap,
+    convert::Infallible,
     fmt::{Debug, Display},
     fs::{self},
     path::Component::RootDir,
 };
 
-use anyhow::{anyhow, bail, Context, Result};
 use dbus::arg::RefArg;
 use nix::{unistd::Pid, NixPath};
 use std::path::{Path, PathBuf};
@@ -15,13 +15,17 @@ use super::{
     controller_type::{ControllerType, CONTROLLER_TYPES},
     cpu::Cpu,
     cpuset::CpuSet,
-    dbus::client::{Client, SystemdClient},
+    dbus::client::{Client, SystemdClient, SystemdClientError},
     memory::Memory,
     pids::Pids,
 };
 use crate::{
-    common::{self, CgroupManager, ControllerOpt, FreezerState, PathBufExt},
+    common::{
+        self, AnyCgroupManager, CgroupManager, ControllerOpt, FreezerState, JoinSafelyError,
+        PathBufExt, WrapIoResult, WrappedIoError,
+    },
     systemd::unified::Unified,
+    v2::manager::V2ManagerError,
 };
 use crate::{stats::Stats, v2::manager::Manager as FsManager};
 
@@ -61,19 +65,29 @@ struct CgroupsPath {
     name: String,
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum CgroupsPathError {
+    #[error("no cgroups path has been provided")]
+    NoPath,
+    #[error("cgroups path does not contain valid utf8")]
+    InvalidUtf8(PathBuf),
+    #[error("cgroups path is malformed: {0}")]
+    MalformedPath(PathBuf),
+}
+
 impl TryFrom<&Path> for CgroupsPath {
-    type Error = anyhow::Error;
+    type Error = CgroupsPathError;
 
     fn try_from(cgroups_path: &Path) -> Result<Self, Self::Error> {
         // if cgroups_path was provided it should be of the form [slice]:[prefix]:[name],
         // for example: "system.slice:docker:1234".
         if cgroups_path.len() == 0 {
-            bail!("no cgroups path has been provided");
+            return Err(CgroupsPathError::NoPath);
         }
 
         let parts = cgroups_path
             .to_str()
-            .ok_or_else(|| anyhow!("failed to parse cgroups path {:?}", cgroups_path))?
+            .ok_or_else(|| CgroupsPathError::InvalidUtf8(cgroups_path.to_path_buf()))?
             .split(':')
             .collect::<Vec<&str>>();
 
@@ -88,7 +102,7 @@ impl TryFrom<&Path> for CgroupsPath {
                 prefix: parts[1].to_owned(),
                 name: parts[2].to_owned(),
             },
-            _ => bail!("cgroup path {:?} is invalid", cgroups_path),
+            _ => return Err(CgroupsPathError::MalformedPath(cgroups_path.to_path_buf())),
         };
 
         Ok(destructured_path)
@@ -126,27 +140,56 @@ impl Debug for Manager {
     }
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum SystemdManagerError {
+    #[error("io error: {0}")]
+    WrappedIo(#[from] WrappedIoError),
+    #[error("failed to destructure cgroups path: {0}")]
+    CgroupsPath(#[from] CgroupsPathError),
+    #[error("dbus error: {0}")]
+    DBus(#[from] dbus::Error),
+    #[error("invalid slice name: {0}")]
+    InvalidSliceName(String),
+    #[error(transparent)]
+    SystemdClient(#[from] SystemdClientError),
+    #[error("failed to join safely: {0}")]
+    JoinSafely(#[from] JoinSafelyError),
+    #[error("file not found: {0}")]
+    FileNotFound(PathBuf),
+    #[error("bad delegation boundary {boundary} for cgroups path {cgroup}")]
+    BadDelegationBoundary { boundary: PathBuf, cgroup: PathBuf },
+    #[error("in v2 manager: {0}")]
+    V2Manager(#[from] V2ManagerError),
+
+    #[error("in cpu controller: {0}")]
+    Cpu(#[from] super::cpu::SystemdCpuError),
+    #[error("in cpuset controller: {0}")]
+    CpuSet(#[from] super::cpuset::SystemdCpuSetError),
+    #[error("in memory controller: {0}")]
+    Memory(#[from] super::memory::SystemdMemoryError),
+    #[error("in pids controller: {0}")]
+    Pids(Infallible),
+    #[error("in pids unified controller: {0}")]
+    Unified(#[from] super::unified::SystemdUnifiedError),
+}
+
 impl Manager {
     pub fn new(
         root_path: PathBuf,
         cgroups_path: PathBuf,
         container_name: String,
         use_system: bool,
-    ) -> Result<Self> {
-        let mut destructured_path = cgroups_path
-            .as_path()
-            .try_into()
-            .with_context(|| format!("failed to destructure cgroups path {:?}", cgroups_path))?;
+    ) -> Result<Self, SystemdManagerError> {
+        let mut destructured_path: CgroupsPath = cgroups_path.as_path().try_into()?;
         ensure_parent_unit(&mut destructured_path, use_system);
 
         let client = match use_system {
-            true => Client::new_system().context("failed to create system dbus client")?,
-            false => Client::new_session().context("failed to create session dbus client")?,
+            true => Client::new_system()?,
+            false => Client::new_session()?,
         };
 
         let (cgroups_path, delegation_boundary) =
-            Self::construct_cgroups_path(&destructured_path, &client)
-                .context("failed to construct cgroups path")?;
+            Self::construct_cgroups_path(&destructured_path, &client)?;
         let full_path = root_path.join_safely(&cgroups_path)?;
         let fs_manager = FsManager::new(root_path.clone(), cgroups_path.clone())?;
 
@@ -179,7 +222,7 @@ impl Manager {
     fn construct_cgroups_path(
         cgroups_path: &CgroupsPath,
         client: &dyn SystemdClient,
-    ) -> Result<(PathBuf, PathBuf)> {
+    ) -> Result<(PathBuf, PathBuf), SystemdManagerError> {
         // if the user provided a '.slice' (as in a branch of a tree)
         // we need to convert it to a filesystem path.
 
@@ -187,24 +230,20 @@ impl Manager {
         let systemd_root = client.control_cgroup_root()?;
         let unit_name = Self::get_unit_name(cgroups_path);
 
-        let cgroups_path = systemd_root
-            .join_safely(&parent)
-            .with_context(|| format!("failed to join {:?} with {:?}", systemd_root, parent))?
-            .join_safely(&unit_name)
-            .with_context(|| format!("failed to join {:?} with {:?}", parent, unit_name))?;
+        let cgroups_path = systemd_root.join_safely(parent)?.join_safely(unit_name)?;
         Ok((cgroups_path, systemd_root))
     }
 
     // systemd represents slice hierarchy using `-`, so we need to follow suit when
     // generating the path of slice. For example, 'test-a-b.slice' becomes
     // '/test.slice/test-a.slice/test-a-b.slice'.
-    fn expand_slice(slice: &str) -> Result<PathBuf> {
+    fn expand_slice(slice: &str) -> Result<PathBuf, SystemdManagerError> {
         let suffix = ".slice";
         if slice.len() <= suffix.len() || !slice.ends_with(suffix) {
-            bail!("invalid slice name: {}", slice);
+            return Err(SystemdManagerError::InvalidSliceName(slice.into()));
         }
         if slice.contains('/') {
-            bail!("invalid slice name: {}", slice);
+            return Err(SystemdManagerError::InvalidSliceName(slice.into()));
         }
         let mut path = "".to_owned();
         let mut prefix = "".to_owned();
@@ -215,18 +254,18 @@ impl Manager {
         }
         for component in slice_name.split('-') {
             if component.is_empty() {
-                bail!("invalid slice name: {}", slice);
+                return Err(SystemdManagerError::InvalidSliceName(slice.into()));
             }
             // Append the component to the path and to the prefix.
-            path = format!("{}/{}{}{}", path, prefix, component, suffix);
-            prefix = format!("{}{}-", prefix, component);
+            path = format!("{path}/{prefix}{component}{suffix}");
+            prefix = format!("{prefix}{component}-");
         }
         Ok(Path::new(&path).to_path_buf())
     }
 
     /// ensures that each level in the downward path from the delegation boundary down to
     /// the scope or slice of the transient unit has all available controllers enabled
-    fn ensure_controllers_attached(&self) -> Result<()> {
+    fn ensure_controllers_attached(&self) -> Result<(), SystemdManagerError> {
         let full_boundary_path = self.root_path.join_safely(&self.delegation_boundary)?;
 
         let controllers: Vec<String> = self
@@ -240,7 +279,11 @@ impl Manager {
         let mut current_path = full_boundary_path;
         let mut components = self
             .cgroups_path
-            .strip_prefix(&self.delegation_boundary)?
+            .strip_prefix(&self.delegation_boundary)
+            .map_err(|_| SystemdManagerError::BadDelegationBoundary {
+                boundary: self.delegation_boundary.clone(),
+                cgroup: self.cgroups_path.clone(),
+            })?
             .components()
             .filter(|c| c.ne(&RootDir))
             .peekable();
@@ -250,7 +293,7 @@ impl Manager {
         while let Some(component) = components.next() {
             current_path = current_path.join(component);
             if !current_path.exists() {
-                log::warn!(
+                tracing::warn!(
                     "{:?} does not exist. Resource restrictions might not work correctly",
                     current_path
                 );
@@ -270,17 +313,17 @@ impl Manager {
     fn get_available_controllers<P: AsRef<Path>>(
         &self,
         cgroups_path: P,
-    ) -> Result<Vec<ControllerType>> {
+    ) -> Result<Vec<ControllerType>, SystemdManagerError> {
         let controllers_path = self.root_path.join(cgroups_path).join(CGROUP_CONTROLLERS);
         if !controllers_path.exists() {
-            bail!(
-                "cannot get available controllers. {:?} does not exist",
-                controllers_path
-            )
+            return Err(SystemdManagerError::FileNotFound(controllers_path));
         }
 
         let mut controllers = Vec::new();
-        for controller in fs::read_to_string(controllers_path)?.split_whitespace() {
+        for controller in fs::read_to_string(&controllers_path)
+            .wrap_read(controllers_path)?
+            .split_whitespace()
+        {
             match controller {
                 "cpu" => controllers.push(ControllerType::Cpu),
                 "memory" => controllers.push(ControllerType::Memory),
@@ -292,110 +335,103 @@ impl Manager {
         Ok(controllers)
     }
 
-    fn write_controllers(path: &Path, controllers: &[String]) -> Result<()> {
+    fn write_controllers(path: &Path, controllers: &[String]) -> Result<(), SystemdManagerError> {
         for controller in controllers {
             common::write_cgroup_file_str(path.join(CGROUP_SUBTREE_CONTROL), controller)?;
         }
 
         Ok(())
     }
+
+    pub fn any(self) -> AnyCgroupManager {
+        AnyCgroupManager::Systemd(self)
+    }
 }
 
 impl CgroupManager for Manager {
-    fn add_task(&self, pid: Pid) -> Result<()> {
+    type Error = SystemdManagerError;
+
+    fn add_task(&self, pid: Pid) -> Result<(), Self::Error> {
         // Dont attach any pid to the cgroup if -1 is specified as a pid
         if pid.as_raw() == -1 {
             return Ok(());
         }
 
-        log::debug!("Starting {:?}", self.unit_name);
-        self.client
-            .start_transient_unit(
-                &self.container_name,
-                pid.as_raw() as u32,
-                &self.destructured_path.parent,
-                &self.unit_name,
-            )
-            .with_context(|| {
-                format!(
-                    "failed to create unit {} for container {}",
-                    self.unit_name, self.container_name
-                )
-            })?;
+        tracing::debug!("Starting {:?}", self.unit_name);
+        self.client.start_transient_unit(
+            &self.container_name,
+            pid.as_raw() as u32,
+            &self.destructured_path.parent,
+            &self.unit_name,
+        )?;
 
         Ok(())
     }
 
-    fn apply(&self, controller_opt: &ControllerOpt) -> Result<()> {
+    fn apply(&self, controller_opt: &ControllerOpt) -> Result<(), Self::Error> {
         let mut properties: HashMap<&str, Box<dyn RefArg>> = HashMap::new();
-        let systemd_version = self
-            .client
-            .systemd_version()
-            .context("could not retrieve systemd version")?;
+        let systemd_version = self.client.systemd_version()?;
 
         for controller in CONTROLLER_TYPES {
             match controller {
                 ControllerType::Cpu => {
-                    Cpu::apply(controller_opt, systemd_version, &mut properties)?
+                    Cpu::apply(controller_opt, systemd_version, &mut properties)?;
                 }
 
                 ControllerType::CpuSet => {
-                    CpuSet::apply(controller_opt, systemd_version, &mut properties)?
+                    CpuSet::apply(controller_opt, systemd_version, &mut properties)?;
                 }
 
                 ControllerType::Pids => {
-                    Pids::apply(controller_opt, systemd_version, &mut properties)?
+                    Pids::apply(controller_opt, systemd_version, &mut properties)
+                        .map_err(SystemdManagerError::Pids)?;
                 }
                 ControllerType::Memory => {
-                    Memory::apply(controller_opt, systemd_version, &mut properties)?
+                    Memory::apply(controller_opt, systemd_version, &mut properties)?;
                 }
                 _ => {}
             };
         }
 
         Unified::apply(controller_opt, systemd_version, &mut properties)?;
-        log::debug!("{:?}", properties);
+        tracing::debug!("{:?}", properties);
 
         if !properties.is_empty() {
-            self.ensure_controllers_attached()
-                .context("failed to attach controllers")?;
+            self.ensure_controllers_attached()?;
 
             self.client
-                .set_unit_properties(&self.unit_name, &properties)
-                .context("could not apply resource restrictions")?;
+                .set_unit_properties(&self.unit_name, &properties)?;
         }
 
         Ok(())
     }
 
-    fn remove(&self) -> Result<()> {
-        log::debug!("remove {}", self.unit_name);
+    fn remove(&self) -> Result<(), Self::Error> {
+        tracing::debug!("remove {}", self.unit_name);
         if self.client.transient_unit_exists(&self.unit_name) {
-            self.client
-                .stop_transient_unit(&self.unit_name)
-                .with_context(|| {
-                    format!("could not remove control group {}", self.destructured_path)
-                })?;
+            self.client.stop_transient_unit(&self.unit_name)?;
         }
 
         Ok(())
     }
 
-    fn freeze(&self, state: FreezerState) -> Result<()> {
-        self.fs_manager.freeze(state)
+    fn freeze(&self, state: FreezerState) -> Result<(), Self::Error> {
+        Ok(self.fs_manager.freeze(state)?)
     }
 
-    fn stats(&self) -> Result<Stats> {
-        self.fs_manager.stats()
+    fn stats(&self) -> Result<Stats, Self::Error> {
+        Ok(self.fs_manager.stats()?)
     }
 
-    fn get_all_pids(&self) -> Result<Vec<Pid>> {
-        common::get_all_pids(&self.full_path)
+    fn get_all_pids(&self) -> Result<Vec<Pid>, Self::Error> {
+        Ok(common::get_all_pids(&self.full_path)?)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use anyhow::{Context, Result};
+
     use crate::systemd::dbus::client::SystemdClient;
 
     use super::*;
@@ -417,11 +453,11 @@ mod tests {
             _pid: u32,
             _parent: &str,
             _unit_name: &str,
-        ) -> Result<()> {
+        ) -> Result<(), SystemdClientError> {
             Ok(())
         }
 
-        fn stop_transient_unit(&self, _unit_name: &str) -> Result<()> {
+        fn stop_transient_unit(&self, _unit_name: &str) -> Result<(), SystemdClientError> {
             Ok(())
         }
 
@@ -429,15 +465,15 @@ mod tests {
             &self,
             _unit_name: &str,
             _properties: &HashMap<&str, Box<dyn RefArg>>,
-        ) -> Result<()> {
+        ) -> Result<(), SystemdClientError> {
             Ok(())
         }
 
-        fn systemd_version(&self) -> Result<u32> {
+        fn systemd_version(&self) -> Result<u32, SystemdClientError> {
             Ok(245)
         }
 
-        fn control_cgroup_root(&self) -> Result<PathBuf> {
+        fn control_cgroup_root(&self) -> Result<PathBuf, SystemdClientError> {
             Ok(PathBuf::from("/"))
         }
     }

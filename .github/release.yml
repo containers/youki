@@ -1,0 +1,21 @@
+changelog:
+  exclude:
+    authors:
+      - dependabot
+  categories:
+    - title: 💪 Improvements
+      labels:
+        - kind/feature
+    - title: 🐛 Bug Fixes
+      labels:
+        - kind/bug
+    - title: 📖 Documentation improvements
+      labels:
+        - kind/documentation
+    - title: 🧪 Test improvements and Misc Fixes
+      labels:
+        - kind/test
+        - kind/cleanup
+    - title: Other Changes
+      labels:
+        - "*"

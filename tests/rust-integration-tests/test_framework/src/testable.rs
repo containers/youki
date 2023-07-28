@@ -1,6 +1,6 @@
+//! Contains Basic setup for testing, testable trait and its result type
 use std::fmt::Debug;
 
-///! Contains Basic setup for testing, testable trait and its result type
 use anyhow::{bail, Error, Result};
 
 #[derive(Debug)]

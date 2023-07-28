@@ -1,39 +1,55 @@
 //! Utility functionality
 
-use anyhow::Context;
-use anyhow::{bail, Result};
-use nix::sys::stat::Mode;
-use nix::sys::statfs;
-use nix::unistd;
-use nix::unistd::{Uid, User};
 use std::collections::HashMap;
-use std::ffi::CString;
 use std::fs::{self, DirBuilder, File};
-use std::io::ErrorKind;
-use std::ops::Deref;
 use std::os::linux::fs::MetadataExt;
 use std::os::unix::fs::DirBuilderExt;
-use std::os::unix::prelude::{AsRawFd, OsStrExt};
+use std::os::unix::prelude::AsRawFd;
 use std::path::{Component, Path, PathBuf};
 
+use nix::sys::stat::Mode;
+use nix::sys::statfs;
+use nix::unistd::{Uid, User};
+
+#[derive(Debug, thiserror::Error)]
+pub enum PathBufExtError {
+    #[error("relative path cannot be converted to the path in the container")]
+    RelativePath,
+    #[error("failed to strip prefix from {path:?}")]
+    StripPrefix {
+        path: PathBuf,
+        source: std::path::StripPrefixError,
+    },
+    #[error("failed to canonicalize path {path:?}")]
+    Canonicalize {
+        path: PathBuf,
+        source: std::io::Error,
+    },
+    #[error("failed to get current directory")]
+    CurrentDir { source: std::io::Error },
+}
+
 pub trait PathBufExt {
-    fn as_relative(&self) -> Result<&Path>;
-    fn join_safely<P: AsRef<Path>>(&self, p: P) -> Result<PathBuf>;
-    fn canonicalize_safely(&self) -> Result<PathBuf>;
+    fn as_relative(&self) -> Result<&Path, PathBufExtError>;
+    fn join_safely<P: AsRef<Path>>(&self, p: P) -> Result<PathBuf, PathBufExtError>;
+    fn canonicalize_safely(&self) -> Result<PathBuf, PathBufExtError>;
     fn normalize(&self) -> PathBuf;
 }
 
 impl PathBufExt for Path {
-    fn as_relative(&self) -> Result<&Path> {
-        if self.is_relative() {
-            bail!("relative path cannot be converted to the path in the container.")
-        } else {
-            self.strip_prefix("/")
-                .with_context(|| format!("failed to strip prefix from {:?}", self))
+    fn as_relative(&self) -> Result<&Path, PathBufExtError> {
+        match self.is_relative() {
+            true => Err(PathBufExtError::RelativePath),
+            false => Ok(self
+                .strip_prefix("/")
+                .map_err(|e| PathBufExtError::StripPrefix {
+                    path: self.to_path_buf(),
+                    source: e,
+                })?),
         }
     }
 
-    fn join_safely<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf> {
+    fn join_safely<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf, PathBufExtError> {
         let path = path.as_ref();
         if path.is_relative() {
             return Ok(self.join(path));
@@ -41,19 +57,25 @@ impl PathBufExt for Path {
 
         let stripped = path
             .strip_prefix("/")
-            .with_context(|| format!("failed to strip prefix from {}", path.display()))?;
+            .map_err(|e| PathBufExtError::StripPrefix {
+                path: self.to_path_buf(),
+                source: e,
+            })?;
         Ok(self.join(stripped))
     }
 
     /// Canonicalizes existing and not existing paths
-    fn canonicalize_safely(&self) -> Result<PathBuf> {
+    fn canonicalize_safely(&self) -> Result<PathBuf, PathBufExtError> {
         if self.exists() {
             self.canonicalize()
-                .with_context(|| format!("failed to canonicalize path {:?}", self))
+                .map_err(|e| PathBufExtError::Canonicalize {
+                    path: self.to_path_buf(),
+                    source: e,
+                })
         } else {
             if self.is_relative() {
                 let p = std::env::current_dir()
-                    .context("could not get current directory")?
+                    .map_err(|e| PathBufExtError::CurrentDir { source: e })?
                     .join(self);
                 return Ok(p.normalize());
             }
@@ -121,17 +143,6 @@ pub fn get_user_home(uid: u32) -> Option<PathBuf> {
     }
 }
 
-pub fn do_exec(path: impl AsRef<Path>, args: &[String]) -> Result<()> {
-    let p = CString::new(path.as_ref().as_os_str().as_bytes())
-        .with_context(|| format!("failed to convert path {:?} to cstring", path.as_ref()))?;
-    let a: Vec<CString> = args
-        .iter()
-        .map(|s| CString::new(s.as_bytes()).unwrap_or_default())
-        .collect();
-    unistd::execvp(&p, &a)?;
-    Ok(())
-}
-
 /// If None, it will generate a default path for cgroups.
 pub fn get_cgroup_path(
     cgroups_path: &Option<PathBuf>,
@@ -142,25 +153,44 @@ pub fn get_cgroup_path(
         Some(cpath) => cpath.clone(),
         None => match rootless {
             false => PathBuf::from(container_id),
-            true => PathBuf::from(format!(":youki:{}", container_id)),
+            true => PathBuf::from(format!(":youki:{container_id}")),
         },
     }
 }
 
-pub fn write_file<P: AsRef<Path>, C: AsRef<[u8]>>(path: P, contents: C) -> Result<()> {
-    let path = path.as_ref();
-    fs::write(path, contents).with_context(|| format!("failed to write to {:?}", path))?;
+pub fn write_file<P: AsRef<Path>, C: AsRef<[u8]>>(
+    path: P,
+    contents: C,
+) -> Result<(), std::io::Error> {
+    fs::write(path.as_ref(), contents).map_err(|err| {
+        tracing::error!(path = ?path.as_ref(), ?err, "failed to write file");
+        err
+    })?;
+
     Ok(())
 }
 
-pub fn create_dir_all<P: AsRef<Path>>(path: P) -> Result<()> {
-    let path = path.as_ref();
-    fs::create_dir_all(path).with_context(|| format!("failed to create directory {:?}", path))
+pub fn create_dir_all<P: AsRef<Path>>(path: P) -> Result<(), std::io::Error> {
+    fs::create_dir_all(path.as_ref()).map_err(|err| {
+        tracing::error!(path = ?path.as_ref(), ?err, "failed to create directory");
+        err
+    })?;
+    Ok(())
 }
 
-pub fn open<P: AsRef<Path>>(path: P) -> Result<File> {
-    let path = path.as_ref();
-    File::open(path).with_context(|| format!("failed to open {:?}", path))
+pub fn open<P: AsRef<Path>>(path: P) -> Result<File, std::io::Error> {
+    File::open(path.as_ref()).map_err(|err| {
+        tracing::error!(path = ?path.as_ref(), ?err, "failed to open file");
+        err
+    })
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum MkdirWithModeError {
+    #[error("IO error")]
+    Io(#[from] std::io::Error),
+    #[error("metadata doesn't match the expected attributes")]
+    MetadataMismatch,
 }
 
 /// Creates the specified directory and all parent directories with the specified mode. Ensures
@@ -176,241 +206,62 @@ pub fn open<P: AsRef<Path>>(path: P) -> Result<File> {
 /// create_dir_all_with_mode(&path, 1000, Mode::S_IRWXU).unwrap();
 /// assert!(path.exists())
 /// ```
-pub fn create_dir_all_with_mode<P: AsRef<Path>>(path: P, owner: u32, mode: Mode) -> Result<()> {
+pub fn create_dir_all_with_mode<P: AsRef<Path>>(
+    path: P,
+    owner: u32,
+    mode: Mode,
+) -> Result<(), MkdirWithModeError> {
     let path = path.as_ref();
     if !path.exists() {
         DirBuilder::new()
             .recursive(true)
             .mode(mode.bits())
-            .create(path)
-            .with_context(|| format!("failed to create directory {}", path.display()))?;
+            .create(path)?;
     }
 
-    let metadata = path
-        .metadata()
-        .with_context(|| format!("failed to get metadata for {}", path.display()))?;
-
+    let metadata = path.metadata()?;
     if metadata.is_dir()
         && metadata.st_uid() == owner
         && metadata.st_mode() & mode.bits() == mode.bits()
     {
         Ok(())
     } else {
-        bail!(
-            "metadata for {} does not possess the expected attributes",
-            path.display()
-        );
+        Err(MkdirWithModeError::MetadataMismatch)
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum EnsureProcfsError {
+    #[error(transparent)]
+    Nix(#[from] nix::Error),
+    #[error(transparent)]
+    IO(#[from] std::io::Error),
 }
 
 // Make sure a given path is on procfs. This is to avoid the security risk that
 // /proc path is mounted over. Ref: CVE-2019-16884
-pub fn ensure_procfs(path: &Path) -> Result<()> {
-    let procfs_fd = fs::File::open(path)?;
-    let fstat_info = statfs::fstatfs(&procfs_fd.as_raw_fd())?;
+pub fn ensure_procfs(path: &Path) -> Result<(), EnsureProcfsError> {
+    let procfs_fd = fs::File::open(path).map_err(|err| {
+        tracing::error!(?err, ?path, "failed to open procfs file");
+        err
+    })?;
+    let fstat_info = statfs::fstatfs(&procfs_fd.as_raw_fd()).map_err(|err| {
+        tracing::error!(?err, ?path, "failed to fstatfs the procfs");
+        err
+    })?;
 
     if fstat_info.filesystem_type() != statfs::PROC_SUPER_MAGIC {
-        bail!(format!("{:?} is not on the procfs", path));
+        tracing::error!(?path, "given path is not on the procfs");
+        Err(nix::Error::EINVAL)?;
     }
 
     Ok(())
 }
 
-pub fn secure_join<P: Into<PathBuf>>(rootfs: P, unsafe_path: P) -> Result<PathBuf> {
-    let mut rootfs = rootfs.into();
-    let mut path = unsafe_path.into();
-    let mut clean_path = PathBuf::new();
-
-    let mut part = path.iter();
-    let mut i = 0;
-
-    loop {
-        if i > 255 {
-            bail!("dereference too many symlinks, may be infinite loop");
-        }
-
-        let part_path = match part.next() {
-            None => break,
-            Some(part) => PathBuf::from(part),
-        };
-
-        if !part_path.is_absolute() {
-            if part_path.starts_with("..") {
-                clean_path.pop();
-            } else {
-                // check if symlink then dereference
-                let curr_path = PathBuf::from(&rootfs).join(&clean_path).join(&part_path);
-                let metadata = match curr_path.symlink_metadata() {
-                    Ok(metadata) => Some(metadata),
-                    Err(error) => match error.kind() {
-                        // if file does not exists, treat it as normal path
-                        ErrorKind::NotFound => None,
-                        other_error => {
-                            bail!(
-                                "unable to obtain symlink metadata for file {:?}: {:?}",
-                                curr_path,
-                                other_error
-                            );
-                        }
-                    },
-                };
-
-                if let Some(metadata) = metadata {
-                    if metadata.file_type().is_symlink() {
-                        let link_path = fs::read_link(curr_path)?;
-                        path = link_path.join(part.as_path());
-                        part = path.iter();
-
-                        // increase after dereference symlink
-                        i += 1;
-                        continue;
-                    }
-                }
-
-                clean_path.push(&part_path);
-            }
-        }
-    }
-
-    rootfs.push(clean_path);
-    Ok(rootfs)
-}
-
-pub struct TempDir {
-    path: Option<PathBuf>,
-}
-
-impl TempDir {
-    pub fn new<P: Into<PathBuf>>(path: P) -> Result<Self> {
-        let p = path.into();
-        std::fs::create_dir_all(&p)
-            .with_context(|| format!("failed to create directory {}", p.display()))?;
-        Ok(Self { path: Some(p) })
-    }
-
-    pub fn path(&self) -> &Path {
-        self.path
-            .as_ref()
-            .expect("temp dir has already been removed")
-    }
-
-    pub fn remove(&mut self) {
-        if let Some(p) = &self.path {
-            let _ = fs::remove_dir_all(p);
-            self.path = None;
-        }
-    }
-}
-
-impl Drop for TempDir {
-    fn drop(&mut self) {
-        self.remove();
-    }
-}
-
-impl AsRef<Path> for TempDir {
-    fn as_ref(&self) -> &Path {
-        self.path()
-    }
-}
-
-impl Deref for TempDir {
-    type Target = Path;
-
-    fn deref(&self) -> &Self::Target {
-        self.path()
-    }
-}
-
-pub fn create_temp_dir(test_name: &str) -> Result<TempDir> {
-    let dir = TempDir::new(get_temp_dir_path(test_name))?;
-    Ok(dir)
-}
-
-pub fn get_temp_dir_path(test_name: &str) -> PathBuf {
-    std::env::temp_dir().join(test_name)
-}
-
-pub fn get_executable_path(name: &str, path_var: &str) -> Option<PathBuf> {
-    let paths = path_var.trim_start_matches("PATH=");
-    // if path has / in it, we have to assume absolute path, as per runc impl
-    if name.contains('/') && PathBuf::from(name).exists() {
-        return Some(PathBuf::from(name));
-    }
-    for path in paths.split(':') {
-        let potential_path = PathBuf::from(path).join(name);
-        if potential_path.exists() {
-            return Some(potential_path);
-        }
-    }
-    None
-}
-
-pub fn is_executable(path: &Path) -> Result<bool> {
-    use std::os::unix::fs::PermissionsExt;
-    let metadata = path.metadata()?;
-    let permissions = metadata.permissions();
-    // we have to check if the path is file and the execute bit
-    // is set. In case of directories, the execute bit is also set,
-    // so have to check if this is a file or not
-    Ok(metadata.is_file() && permissions.mode() & 0o001 != 0)
-}
-
-#[cfg(test)]
-pub(crate) mod test_utils {
-    use crate::process::channel;
-    use anyhow::Context;
-    use anyhow::{bail, Result};
-    use nix::sys::wait;
-    use rand::Rng;
-    use serde::{Deserialize, Serialize};
-
-    #[derive(Debug, Serialize, Deserialize)]
-    struct TestResult {
-        success: bool,
-        message: String,
-    }
-
-    pub fn test_in_child_process<F: FnOnce() -> Result<()>>(cb: F) -> Result<()> {
-        let (mut sender, mut receiver) = channel::channel::<TestResult>()?;
-        match unsafe { nix::unistd::fork()? } {
-            nix::unistd::ForkResult::Parent { child } => {
-                let res = receiver.recv()?;
-                wait::waitpid(child, None)?;
-
-                if !res.success {
-                    bail!("child process failed: {}", res.message);
-                }
-            }
-            nix::unistd::ForkResult::Child => {
-                let test_result = match cb() {
-                    Ok(_) => TestResult {
-                        success: true,
-                        message: String::new(),
-                    },
-                    Err(err) => TestResult {
-                        success: false,
-                        message: err.to_string(),
-                    },
-                };
-                sender
-                    .send(test_result)
-                    .context("failed to send from the child process")?;
-                std::process::exit(0);
-            }
-        };
-
-        Ok(())
-    }
-
-    pub fn gen_u32() -> u32 {
-        rand::thread_rng().gen()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::{bail, Result};
 
     #[test]
     pub fn test_get_unix_user() {
@@ -444,11 +295,12 @@ mod tests {
             PathBuf::from("/youki")
         );
     }
+
     #[test]
     fn test_parse_env() -> Result<()> {
         let key = "key".to_string();
         let value = "value".to_string();
-        let env_input = vec![format!("{}={}", key, value)];
+        let env_input = vec![format!("{key}={value}")];
         let env_output = parse_env(&env_input);
         assert_eq!(
             env_output.len(),
@@ -459,111 +311,57 @@ mod tests {
 
         Ok(())
     }
+
     #[test]
-    fn test_secure_join() {
-        assert_eq!(
-            secure_join(Path::new("/tmp/rootfs"), Path::new("path")).unwrap(),
-            PathBuf::from("/tmp/rootfs/path")
-        );
-        assert_eq!(
-            secure_join(Path::new("/tmp/rootfs"), Path::new("more/path")).unwrap(),
-            PathBuf::from("/tmp/rootfs/more/path")
-        );
-        assert_eq!(
-            secure_join(Path::new("/tmp/rootfs"), Path::new("/absolute/path")).unwrap(),
-            PathBuf::from("/tmp/rootfs/absolute/path")
-        );
-        assert_eq!(
-            secure_join(
-                Path::new("/tmp/rootfs"),
-                Path::new("/path/with/../parent/./sample")
-            )
-            .unwrap(),
-            PathBuf::from("/tmp/rootfs/path/parent/sample")
-        );
-        assert_eq!(
-            secure_join(Path::new("/tmp/rootfs"), Path::new("/../../../../tmp")).unwrap(),
-            PathBuf::from("/tmp/rootfs/tmp")
-        );
-        assert_eq!(
-            secure_join(Path::new("/tmp/rootfs"), Path::new("./../../../../var/log")).unwrap(),
-            PathBuf::from("/tmp/rootfs/var/log")
-        );
-        assert_eq!(
-            secure_join(
-                Path::new("/tmp/rootfs"),
-                Path::new("../../../../etc/passwd")
-            )
-            .unwrap(),
-            PathBuf::from("/tmp/rootfs/etc/passwd")
-        );
-    }
-    #[test]
-    fn test_secure_join_symlink() {
-        use std::os::unix::fs::symlink;
-
-        let tmp = create_temp_dir("root").unwrap();
-        let test_root_dir = tmp.path();
-
-        symlink("somepath", PathBuf::from(&test_root_dir).join("etc")).unwrap();
-        symlink(
-            "../../../../../../../../../../../../../etc",
-            PathBuf::from(&test_root_dir).join("longbacklink"),
-        )
-        .unwrap();
-        symlink(
-            "/../../../../../../../../../../../../../etc/passwd",
-            PathBuf::from(&test_root_dir).join("absolutelink"),
-        )
-        .unwrap();
-
-        assert_eq!(
-            secure_join(test_root_dir, PathBuf::from("etc").as_path()).unwrap(),
-            PathBuf::from(&test_root_dir).join("somepath")
-        );
-        assert_eq!(
-            secure_join(test_root_dir, PathBuf::from("longbacklink").as_path()).unwrap(),
-            PathBuf::from(&test_root_dir).join("somepath")
-        );
-        assert_eq!(
-            secure_join(test_root_dir, PathBuf::from("absolutelink").as_path()).unwrap(),
-            PathBuf::from(&test_root_dir).join("somepath/passwd")
-        );
+    fn test_create_dir_all_with_mode() -> Result<()> {
+        {
+            let temdir = tempfile::tempdir()?;
+            let path = temdir.path().join("test");
+            let uid = nix::unistd::getuid().as_raw();
+            let mode = Mode::S_IRWXU;
+            create_dir_all_with_mode(&path, uid, mode)?;
+            let metadata = path.metadata()?;
+            assert!(path.is_dir());
+            assert_eq!(metadata.st_uid(), uid);
+            assert_eq!(metadata.st_mode() & mode.bits(), mode.bits());
+        }
+        {
+            let temdir = tempfile::tempdir()?;
+            let path = temdir.path().join("test");
+            let mode = Mode::S_IRWXU;
+            std::fs::create_dir(&path)?;
+            assert!(path.is_dir());
+            match create_dir_all_with_mode(&path, 8899, mode) {
+                Err(MkdirWithModeError::MetadataMismatch) => {}
+                _ => bail!("should return MetadataMismatch"),
+            }
+        }
+        Ok(())
     }
 
     #[test]
-    fn test_get_executable_path() {
-        let non_existing_abs_path = "/some/non/existent/absolute/path";
-        let existing_abs_path = "/usr/bin/sh";
-        let existing_binary = "sh";
-        let non_existing_binary = "non-existent";
-        let path_value = "PATH=/usr/bin:/bin";
+    fn test_io() -> Result<()> {
+        {
+            let tempdir = tempfile::tempdir()?;
+            let path = tempdir.path().join("test");
+            write_file(&path, "test".as_bytes())?;
+            open(&path)?;
+            assert!(create_dir_all(path).is_err());
+        }
+        {
+            let tempdir = tempfile::tempdir()?;
+            let path = tempdir.path().join("test");
+            create_dir_all(&path)?;
+            assert!(write_file(&path, "test".as_bytes()).is_err());
+        }
+        {
+            let tempdir = tempfile::tempdir()?;
+            let path = tempdir.path().join("test");
+            assert!(open(&path).is_err());
+            create_dir_all(&path)?;
+            assert!(path.is_dir())
+        }
 
-        assert_eq!(
-            get_executable_path(existing_abs_path, path_value),
-            Some(PathBuf::from(existing_abs_path))
-        );
-        assert_eq!(get_executable_path(non_existing_abs_path, path_value), None);
-
-        assert_eq!(
-            get_executable_path(existing_binary, path_value),
-            Some(PathBuf::from("/usr/bin/sh"))
-        );
-
-        assert_eq!(get_executable_path(non_existing_binary, path_value), None);
-    }
-
-    #[test]
-    fn test_is_executable() {
-        let executable_path = PathBuf::from("/bin/sh");
-        let directory_path = PathBuf::from("/tmp");
-        // a file guaranteed to be on linux and not executable
-        let non_executable_path = PathBuf::from("/boot/initrd.img");
-        let non_existent_path = PathBuf::from("/some/non/existent/path");
-
-        assert!(is_executable(&non_existent_path).is_err());
-        assert!(is_executable(&executable_path).unwrap());
-        assert!(!is_executable(&non_executable_path).unwrap());
-        assert!(!is_executable(&directory_path).unwrap());
+        Ok(())
     }
 }

@@ -6,7 +6,7 @@ This section has the general information and resources needed to work with any p
 
 Youki is a low level container runtime, which deals with the creation and management of Linux containers. Some of other such low-level runtimes are [runc](https://github.com/opencontainers/runc) and [crun](https://github.com/containers/crun). These are usually used by a higher-level runtime such as Docker or Podman to actually create and manage containers, where the higher level runtime provides a much easier interface for users.
 
-Before you start working on developing youki, you should go through [the User documentation](../user/introduction) as it specifies the requirements and setup for running youki. For developing youki, you will need to install the dependencies and clone the repo, as specified in the [Basic Setup](../user/basic_setup.md) and [Basic Usage](../user/basic_usage.md) sections.
+Before you start working on developing youki, you should go through [the User documentation](../user/introduction.md) as it specifies the requirements and setup for running youki. For developing youki, you will need to install the dependencies and clone the repo, as specified in the [Basic Setup](../user/basic_setup.md) and [Basic Usage](../user/basic_usage.md) sections.
 
 ## Testing while developing
 

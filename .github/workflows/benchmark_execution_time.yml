@@ -14,20 +14,17 @@ jobs:
       - name: Checkout to PR branch
         uses: actions/checkout@v3
 
-      - name: Setup Linux env
-        run: |
-          sudo apt -y update
-          sudo apt install libsystemd-dev librust-libdbus-sys-dev libseccomp-dev
+      - name: Install requirements
+        run: sudo ./.github/scripts/dependency.sh
 
-      - name: Setting rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-          profile: minimal
+      - name: Setup Rust toolchain and cache
+        uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
+
+      - name: Install Just
+        uses: taiki-e/install-action@just
 
       - name: Building PR branch
-        run: make youki-release
+        run: just youki-release
 
       - name: Uploading PR build to artifact
         uses: actions/upload-artifact@v2
@@ -46,20 +43,16 @@ jobs:
         with:
           ref: main
 
-      - name: Setup Linux env
-        run: |
-          sudo apt -y update
-          sudo apt install libsystemd-dev librust-libdbus-sys-dev libseccomp-dev
+      - name: Install requirements
+        run: sudo ./.github/scripts/dependency.sh
 
-      - name: Setting rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-          profile: minimal
+      - name: Setup Rust toolchain and cache
+        uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
+      - name: Install just
+        uses: taiki-e/install-action@just
 
       - name: Building main branch
-        run: make youki-release
+        run: just youki-release
 
       - name: Uploading main build to artifact
         uses: actions/upload-artifact@v2

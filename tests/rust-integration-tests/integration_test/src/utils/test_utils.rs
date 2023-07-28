@@ -1,5 +1,5 @@
-///! Contains utility functions for testing
-///! Similar to https://github.com/opencontainers/runtime-tools/blob/master/validation/util/test.go
+//! Contains utility functions for testing
+//! Similar to https://github.com/opencontainers/runtime-tools/blob/master/validation/util/test.go
 use super::{generate_uuid, prepare_bundle, set_config};
 use super::{get_runtime_path, get_runtimetest_path};
 use anyhow::{anyhow, bail, Context, Result};
@@ -48,9 +48,6 @@ pub fn create_container<P: AsRef<Path>>(id: &str, dir: P) -> Result<Child> {
         // in test_inside_container function
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        // set log level to error only, otherwise
-        // we get warnings in stderr
-        .env("YOUKI_LOG_LEVEL", "error")
         .arg("--root")
         .arg(dir.as_ref().join("runtime"))
         .arg("create")
@@ -121,7 +118,7 @@ pub fn test_outside_container(
 ) -> TestResult {
     let id = generate_uuid();
     let id_str = id.to_string();
-    let bundle = prepare_bundle(&id).unwrap();
+    let bundle = prepare_bundle().unwrap();
     set_config(&bundle, &spec).unwrap();
     let create_result = create_container(&id_str, &bundle).unwrap().wait();
     let (out, err) = get_state(&id_str, &bundle).unwrap();
@@ -148,7 +145,7 @@ pub fn test_inside_container(
 ) -> TestResult {
     let id = generate_uuid();
     let id_str = id.to_string();
-    let bundle = prepare_bundle(&id).unwrap();
+    let bundle = prepare_bundle().unwrap();
 
     // This will do the required setup for the test
     test_result!(setup_for_test(
@@ -199,6 +196,13 @@ pub fn test_inside_container(
         .context("getting output after starting the container failed")
         .unwrap();
 
+    let stdout = String::from_utf8_lossy(&create_output.stdout);
+    if !stdout.is_empty() {
+        println!(
+            "{:?}",
+            anyhow!("container stdout was not empty, found : {}", stdout)
+        )
+    }
     let stderr = String::from_utf8_lossy(&create_output.stderr);
     if !stderr.is_empty() {
         return TestResult::Failed(anyhow!(

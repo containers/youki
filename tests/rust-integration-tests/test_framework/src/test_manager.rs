@@ -1,4 +1,4 @@
-///! This exposes the main control wrapper to control the tests
+//! This exposes the main control wrapper to control the tests
 use crate::testable::{TestResult, TestableGroup};
 use anyhow::Result;
 use crossbeam::thread;
@@ -39,7 +39,7 @@ impl TestManager {
     /// Prints the given test results, usually used to print
     /// results of a test group
     fn print_test_result(&self, name: &str, res: &[(&'static str, TestResult)]) {
-        println!("# Start group {}", name);
+        println!("# Start group {name}");
         let len = res.len();
         for (idx, (name, res)) in res.iter().enumerate() {
             print!("{} / {} : {} : ", idx + 1, len, name);
@@ -51,11 +51,11 @@ impl TestManager {
                     println!("skipped");
                 }
                 TestResult::Failed(e) => {
-                    println!("not ok\n\t{}", e);
+                    println!("not ok\n\t{e}");
                 }
             }
         }
-        println!("# End group {}\n", name);
+        println!("# End group {name}\n");
     }
     /// Run all tests from all tests group
     pub fn run_all(&self) {
@@ -72,7 +72,7 @@ impl TestManager {
         .unwrap();
         for cleaner in &self.cleanup {
             if let Err(e) = cleaner() {
-                print!("Failed to cleanup: {}", e);
+                print!("Failed to cleanup: {e}");
             }
         }
     }
@@ -89,7 +89,7 @@ impl TestManager {
                     };
                     collector.push((test_group_name, r));
                 } else {
-                    eprintln!("Error : Test Group {} not found, skipping", test_group_name);
+                    eprintln!("Error : Test Group {test_group_name} not found, skipping");
                 }
             }
             for (name, handle) in collector {
@@ -100,7 +100,7 @@ impl TestManager {
 
         for cleaner in &self.cleanup {
             if let Err(e) = cleaner() {
-                print!("Failed to cleanup: {}", e);
+                print!("Failed to cleanup: {e}");
             }
         }
     }

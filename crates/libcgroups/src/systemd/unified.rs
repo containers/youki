@@ -1,27 +1,51 @@
-use anyhow::{bail, Context, Result};
 use dbus::arg::RefArg;
-use std::collections::HashMap;
+use std::{collections::HashMap, num::ParseIntError};
 
 use super::{
     controller::Controller,
     cpu::{self, convert_shares_to_cgroup2},
-    cpuset::{self, to_bitmask},
+    cpuset::{self, to_bitmask, BitmaskError},
     memory, pids,
 };
 use crate::common::ControllerOpt;
 
+#[derive(thiserror::Error, Debug)]
+pub enum SystemdUnifiedError {
+    #[error("failed to parse cpu weight {value}: {err}")]
+    CpuWeight { err: ParseIntError, value: String },
+    #[error("invalid format for cpu.max: {0}")]
+    CpuMax(String),
+    #[error("failed to to parse cpu quota {value}: {err}")]
+    CpuQuota { err: ParseIntError, value: String },
+    #[error("failed to to parse cpu period {value}: {err}")]
+    CpuPeriod { err: ParseIntError, value: String },
+    #[error("setting {0} requires systemd version greater than 243")]
+    OldSystemd(String),
+    #[error("invalid value for cpuset.cpus {0}")]
+    CpuSetCpu(BitmaskError),
+    #[error("failed to parse {name} {value}: {err}")]
+    Memory {
+        err: ParseIntError,
+        name: String,
+        value: String,
+    },
+    #[error("failed to to parse pids.max {value}: {err}")]
+    PidsMax { err: ParseIntError, value: String },
+}
+
 pub struct Unified {}
 
 impl Controller for Unified {
+    type Error = SystemdUnifiedError;
+
     fn apply(
         options: &ControllerOpt,
         systemd_version: u32,
         properties: &mut HashMap<&str, Box<dyn RefArg>>,
-    ) -> Result<()> {
+    ) -> Result<(), Self::Error> {
         if let Some(unified) = options.resources.unified() {
-            log::debug!("applying unified resource restrictions");
-            Self::apply(unified, systemd_version, properties)
-                .context("failed to apply unified resource restrictions")?;
+            tracing::debug!("applying unified resource restrictions");
+            Self::apply(unified, systemd_version, properties)?;
         }
 
         Ok(())
@@ -33,43 +57,50 @@ impl Unified {
         unified: &HashMap<String, String>,
         systemd_version: u32,
         properties: &mut HashMap<&str, Box<dyn RefArg>>,
-    ) -> Result<()> {
+    ) -> Result<(), SystemdUnifiedError> {
         for (key, value) in unified {
             match key.as_str() {
                 "cpu.weight" => {
-                    let shares = value
-                        .parse::<u64>()
-                        .with_context(|| format!("failed to parse cpu weight: {}", value))?;
+                    let shares =
+                        value
+                            .parse::<u64>()
+                            .map_err(|err| SystemdUnifiedError::CpuWeight {
+                                err,
+                                value: value.into(),
+                            })?;
                     properties.insert(cpu::CPU_WEIGHT, Box::new(convert_shares_to_cgroup2(shares)));
                 }
                 "cpu.max" => {
                     let parts: Vec<&str> = value.split_whitespace().collect();
                     if parts.is_empty() || parts.len() > 2 {
-                        bail!("invalid format for cpu.max: {}", value);
+                        return Err(SystemdUnifiedError::CpuMax(value.into()));
                     }
 
-                    let quota = parts[0]
-                        .parse::<u64>()
-                        .with_context(|| format!("failed to parse cpu quota: {}", parts[0]))?;
+                    let quota =
+                        parts[0]
+                            .parse::<u64>()
+                            .map_err(|err| SystemdUnifiedError::CpuQuota {
+                                err,
+                                value: parts[0].into(),
+                            })?;
                     properties.insert(cpu::CPU_QUOTA, Box::new(quota));
 
                     if parts.len() == 2 {
-                        let period = parts[1].parse::<u64>().with_context(|| {
-                            format!("failed to to parse cpu period: {}", parts[1])
+                        let period = parts[1].parse::<u64>().map_err(|err| {
+                            SystemdUnifiedError::CpuPeriod {
+                                err,
+                                value: parts[1].into(),
+                            }
                         })?;
                         properties.insert(cpu::CPU_PERIOD, Box::new(period));
                     }
                 }
                 cpuset @ ("cpuset.cpus" | "cpuset.mems") => {
                     if systemd_version <= 243 {
-                        bail!(
-                            "setting {} requires systemd version greater than 243",
-                            cpuset
-                        );
+                        return Err(SystemdUnifiedError::OldSystemd(cpuset.into()));
                     }
 
-                    let bitmask = to_bitmask(value)
-                        .with_context(|| format!("invalid value for cpuset.cpus: {}", value))?;
+                    let bitmask = to_bitmask(value).map_err(SystemdUnifiedError::CpuSetCpu)?;
 
                     let systemd_cpuset = match cpuset {
                         "cpuset.cpus" => cpuset::ALLOWED_CPUS,
@@ -80,9 +111,14 @@ impl Unified {
                     properties.insert(systemd_cpuset, Box::new(bitmask));
                 }
                 memory @ ("memory.min" | "memory.low" | "memory.high" | "memory.max") => {
-                    let value = value
-                        .parse::<u64>()
-                        .with_context(|| format!("failed to parse {}: {}", memory, value))?;
+                    let value =
+                        value
+                            .parse::<u64>()
+                            .map_err(|err| SystemdUnifiedError::Memory {
+                                err,
+                                name: memory.into(),
+                                value: value.into(),
+                            })?;
                     let systemd_memory = match memory {
                         "memory.min" => memory::MEMORY_MIN,
                         "memory.low" => memory::MEMORY_LOW,
@@ -93,11 +129,16 @@ impl Unified {
                     properties.insert(systemd_memory, Box::new(value));
                 }
                 "pids.max" => {
-                    let pids = value.trim().parse::<i64>()?;
+                    let pids = value.trim().parse::<i64>().map_err(|err| {
+                        SystemdUnifiedError::PidsMax {
+                            err,
+                            value: value.into(),
+                        }
+                    })?;
                     properties.insert(pids::TASKS_MAX, Box::new(pids as u64));
                 }
 
-                unknown => log::warn!("could not apply {}. Unknown property.", unknown),
+                unknown => tracing::warn!("could not apply {}. Unknown property.", unknown),
             }
         }
 
@@ -107,6 +148,7 @@ impl Unified {
 
 #[cfg(test)]
 mod tests {
+    use anyhow::{bail, Context, Result};
     use dbus::arg::ArgType;
 
     use super::*;
@@ -145,10 +187,10 @@ mod tests {
         // assert
         for (setting, value) in expected {
             assert!(actual.contains_key(setting));
-            assert_eq!(value.arg_type(), actual[setting].arg_type(), "{}", setting);
+            assert_eq!(value.arg_type(), actual[setting].arg_type(), "{setting}");
             match value.arg_type() {
                 ArgType::UInt64 => {
-                    assert_eq!(value.as_u64(), actual[setting].as_u64(), "{}", setting)
+                    assert_eq!(value.as_u64(), actual[setting].as_u64(), "{setting}")
                 }
                 ArgType::Array => assert_eq!(
                     value.as_iter().unwrap().next().unwrap().as_u64(),

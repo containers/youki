@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use libcgroups::common::CgroupManager;
+use libcgroups::common::AnyCgroupManager;
 use libcontainer::container::Container;
 
 pub mod checkpoint;
@@ -13,6 +13,7 @@ pub mod create;
 pub mod delete;
 pub mod events;
 pub mod exec;
+pub mod features;
 pub mod info;
 pub mod kill;
 pub mod list;
@@ -45,7 +46,7 @@ fn load_container<P: AsRef<Path>>(root_path: P, container_id: &str) -> Result<Co
     }
 
     Container::load(container_root)
-        .with_context(|| format!("could not load state for container {}", container_id))
+        .with_context(|| format!("could not load state for container {container_id}"))
 }
 
 fn container_exists<P: AsRef<Path>>(root_path: P, container_id: &str) -> Result<bool> {
@@ -56,12 +57,13 @@ fn container_exists<P: AsRef<Path>>(root_path: P, container_id: &str) -> Result<
 fn create_cgroup_manager<P: AsRef<Path>>(
     root_path: P,
     container_id: &str,
-) -> Result<Box<dyn CgroupManager>> {
+) -> Result<AnyCgroupManager> {
     let container = load_container(root_path, container_id)?;
-    let cgroups_path = container.spec()?.cgroup_path;
-    let systemd_cgroup = container
-        .systemd()
-        .context("could not determine cgroup manager")?;
-
-    libcgroups::common::create_cgroup_manager(cgroups_path, systemd_cgroup, container.id())
+    Ok(libcgroups::common::create_cgroup_manager(
+        libcgroups::common::CgroupConfig {
+            cgroup_path: container.spec()?.cgroup_path,
+            systemd_cgroup: container.systemd(),
+            container_name: container.id().to_string(),
+        },
+    )?)
 }

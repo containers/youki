@@ -5,46 +5,48 @@ on:
   pull_request:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   changes:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     timeout-minutes: 15
     outputs:
-      dirs: ${{ steps.filter.outputs.changes }}
+      any_modified: ${{ steps.filter.outputs.any_modified }}
     steps:
       - uses: actions/checkout@v3
-      - uses: dorny/paths-filter@v2
+      - uses: tj-actions/changed-files@v36
         id: filter
         with:
-          filters: |
-            ./integration_test: ./tests/rust-integration-tests/**
+          files: |
+            .github/workflows/integration_tests_validation.yaml
+            tests/rust-integration-tests/**
+          files_ignore: |
+            **.md
+      - name: List all changed files
+        run: |
+          for file in ${{ steps.filter.outputs.all_modified_files }}; do
+            echo "$file was changed"
+          done
   validate:
     needs: [changes]
-    if: ${{ !contains(needs.changes.outputs.dirs, '[]') }}
+    if: needs.changes.outputs.any_modified == 'true'
     runs-on: ubuntu-20.04
-    timeout-minutes: 15
-    strategy:
-      matrix:
-        rust: [1.66.0, 1.67.0]
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: ${{ matrix.rust }}
-          override: true
-      - name: Cache youki
-        uses: Swatinem/rust-cache@v1
-      - run: sudo apt-get -y update
-      - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev libseccomp-dev
+      - name: Setup Rust toolchain and cache
+        uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
+      - name: Install just
+        uses: taiki-e/install-action@just
+      - name: Install requirements
+        run: sudo env PATH=$PATH just ci-prepare
       - name: Install runc 1.1.0
         run: |
           wget -q https://github.com/opencontainers/runc/releases/download/v1.1.0/runc.amd64
           sudo mv runc.amd64 /usr/bin/runc
           sudo chmod 755 /usr/bin/runc
       - name: Build
-        run: make youki-release runtimetest rust-oci-tests-bin
+        run: just runtimetest rust-oci-tests-bin
       - name: Validate tests on runc
-        run: make validate-rust-oci-runc
-      - name: Validate tests on youki
-        run: make rust-oci-tests
+        run: just validate-rust-oci-runc

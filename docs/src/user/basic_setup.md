@@ -6,7 +6,7 @@ Youki currently only supports Linux Platform, and to use it on other platform yo
 
 Also note that Youki currently only supports and expects systemd as init system, and would not work on other systems. There is currently work on-going to put systemd dependent features behind a feature flag, but till then you will need a systemd enabled system to work with Youki.
 
-### Requirements
+## Requirements
 
 As Youki is written in Rust, you will need to install and setup Rust toolchain to compile it. The instructions for that can be found on Rust's official site [here](https://www.rust-lang.org/tools/install).
 
@@ -14,61 +14,76 @@ You can use Youki by itself to start and run containers, but it can be a little 
 
 To compile and run, Youki itself depends on some underlying libraries being installed. You can install them using your respective package manager as shown below.
 
-#### Debian, Ubuntu and related distributions
+### Debian, Ubuntu and related distributions
 
 ```console
-$ sudo apt-get install   \
-      pkg-config         \
-      libsystemd-dev     \
-      libdbus-glib-1-dev \
-      build-essential    \
-      libelf-dev \
-      libseccomp-dev \
-      libclang-dev
+$ sudo apt-get install    \
+      pkg-config          \
+      libsystemd-dev      \
+      libdbus-glib-1-dev  \
+      build-essential     \
+      libelf-dev          \
+      libseccomp-dev      \
+      libclang-dev        \
+      libssl-dev
 ```
 
-#### Fedora, Centos, RHEL and related distributions
+### Fedora, CentOS, RHEL and related distributions
 
 ```console
-$ sudo dnf install   \
-      pkg-config     \
-      systemd-devel  \
-      dbus-devel     \
+$ sudo dnf install          \
+      pkg-config            \
+      systemd-devel         \
+      dbus-devel            \
       elfutils-libelf-devel \
-      libseccomp-devel \
-      libclang-dev
+      libseccomp-devel      \
+      clang-devel           \
+      openssl-devel
 ```
 
 ---
 
-### Getting the source
+## Quick install
+
+Install from the GitHub release.
+Note that this way also requires the aforementioned installation.
+
+```console
+$ wget https://github.com/containers/youki/releases/download/v0.1.0/youki_0_1_0_linux.tar.gz
+$ tar -zxvf youki_0_1_0_linux.tar.gz youki_0_1_0_linux/youki-0.1.0/youki
+# Maybe you need root privileges.
+$ mv youki_0_1_0_linux/youki-0.1.0/youki /usr/local/bin/youki
+$ rm -rf youki_0_1_0_linux.tar.gz youki_0_1_0_linux
+```
+
+## Getting the source
 
 Currently Youki can only be installed from the source code itself, so you will need to clone the Youki GitHub repository to get the source code for using it as a runtime. If you are using any crates of Youki as dependency you need to do this step, as Cargo will automatically clone the repository for you.
 
 To clone the repository, run
 
 ```console
-git clone https://github.com/containers/youki.git
+$ git clone https://github.com/containers/youki.git
 ```
 
 This will create a directory named youki in the directory you ran the command in. This youki directory will be referred to as root directory throughout the documentation.
 
-### Installing the source
+## Installing the source
 
 Once you have cloned the source, you can build it using
 
 ```console
 # go into the cloned directory
-cd youki
-make youki-dev # or youki-release
-./youki -h # get information about youki command
+$ cd youki
+$ make youki-dev # or youki-release
+$ ./youki -h # get information about youki command
 ```
 
 This will build the Youki binary, and put it at the root level of the cloned directory, that is in the youki/ .
 
 ---
 
-### Using sub-crates as dependency
+## Using sub-crates as dependency
 
 To use any of the sub-crate as a dependency in your own project, you can specify the dependency as follows,
 
@@ -89,7 +104,7 @@ use liboci_cli::{...}
 
 ---
 
-### Using Vagrant to run Youki on non-Linux Platform
+## Using Vagrant to run Youki on non-Linux Platform
 
 As explained before, Youki only support Linux, and to build/use it on non-Linux Platforms, you will need to use some kind of virtualization. The repo provides a Vagrantfile to do the required VM setup using Vagrant, which can be installed from [here](https://www.vagrantup.com/docs/installation).
 
@@ -99,12 +114,12 @@ Once installed and setup, you can run vagrant commands in the cloned directory t
 # in the youki directory
 
 # for rootless mode, which is default
-vagrant up
-vagrant ssh
+$ vagrant up
+$ vagrant ssh
 
 # or if you want to develop in rootful mode
-VAGRANT_VAGRANTFILE=Vagrantfile.root vagrant up
-VAGRANT_VAGRANTFILE=Vagrantfile.root vagrant ssh
+$ VAGRANT_VAGRANTFILE=Vagrantfile.root vagrant up
+$ VAGRANT_VAGRANTFILE=Vagrantfile.root vagrant ssh
 
 # in virtual machine
 $ cd youki

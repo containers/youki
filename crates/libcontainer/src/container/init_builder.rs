@@ -1,15 +1,19 @@
-use anyhow::{bail, Context, Result};
 use nix::unistd;
 use oci_spec::runtime::Spec;
 use rootless::Rootless;
 use std::{
     fs,
     path::{Path, PathBuf},
+    rc::Rc,
 };
 
 use crate::{
-    apparmor, config::YoukiConfig, notify_socket::NOTIFY_FILE, process::args::ContainerType,
-    rootless, tty, utils,
+    apparmor,
+    config::YoukiConfig,
+    error::{ErrInvalidSpec, LibcontainerError, MissingSpecError},
+    notify_socket::NOTIFY_FILE,
+    process::args::ContainerType,
+    rootless, tty,
 };
 
 use super::{
@@ -17,20 +21,22 @@ use super::{
 };
 
 // Builder that can be used to configure the properties of a new container
-pub struct InitContainerBuilder<'a> {
-    base: ContainerBuilder<'a>,
+pub struct InitContainerBuilder {
+    base: ContainerBuilder,
     bundle: PathBuf,
     use_systemd: bool,
+    detached: bool,
 }
 
-impl<'a> InitContainerBuilder<'a> {
+impl InitContainerBuilder {
     /// Generates the base configuration for a new container from which
     /// configuration methods can be chained
-    pub(super) fn new(builder: ContainerBuilder<'a>, bundle: PathBuf) -> Self {
+    pub(super) fn new(builder: ContainerBuilder, bundle: PathBuf) -> Self {
         Self {
             base: builder,
             bundle,
             use_systemd: true,
+            detached: true,
         }
     }
 
@@ -40,24 +46,33 @@ impl<'a> InitContainerBuilder<'a> {
         self
     }
 
-    /// Creates a new container
-    pub fn build(self) -> Result<Container> {
-        let spec = self.load_spec().context("failed to load spec")?;
-        let container_dir = self
-            .create_container_dir()
-            .context("failed to create container dir")?;
+    pub fn with_detach(mut self, detached: bool) -> Self {
+        self.detached = detached;
+        self
+    }
 
-        let mut container = self
-            .create_container_state(&container_dir)
-            .context("failed to create container state")?;
+    /// Creates a new container
+    pub fn build(self) -> Result<Container, LibcontainerError> {
+        let spec = self.load_spec()?;
+        let container_dir = self.create_container_dir()?;
+
+        let mut container = self.create_container_state(&container_dir)?;
         container
             .set_systemd(self.use_systemd)
             .set_annotations(spec.annotations().clone());
 
-        unistd::chdir(&container_dir)?;
+        unistd::chdir(&container_dir).map_err(|err| {
+            tracing::error!(
+                ?container_dir,
+                ?err,
+                "failed to chdir into the container directory"
+            );
+            LibcontainerError::OtherSyscall(err)
+        })?;
         let notify_path = container_dir.join(NOTIFY_FILE);
         // convert path of root file system of the container to absolute path
-        let rootfs = fs::canonicalize(spec.root().as_ref().context("no root in spec")?.path())?;
+        let rootfs = fs::canonicalize(spec.root().as_ref().ok_or(MissingSpecError::Root)?.path())
+            .map_err(LibcontainerError::OtherIO)?;
 
         // if socket file path is given in commandline options,
         // get file descriptors of console socket
@@ -73,9 +88,10 @@ impl<'a> InitContainerBuilder<'a> {
 
         let rootless = Rootless::new(&spec)?;
         let config = YoukiConfig::from_spec(&spec, container.id(), rootless.is_some())?;
-        config
-            .save(&container_dir)
-            .context("failed to save config")?;
+        config.save(&container_dir).map_err(|err| {
+            tracing::error!(?container_dir, "failed to save config: {}", err);
+            err
+        })?;
 
         let mut builder_impl = ContainerBuilderImpl {
             container_type: ContainerType::InitContainer,
@@ -84,60 +100,94 @@ impl<'a> InitContainerBuilder<'a> {
             pid_file: self.base.pid_file,
             console_socket: csocketfd,
             use_systemd: self.use_systemd,
-            spec: &spec,
+            spec: Rc::new(spec),
             rootfs,
             rootless,
             notify_path,
             container: Some(container.clone()),
             preserve_fds: self.base.preserve_fds,
-            detached: false, // TODO this should be set properly based on how the command is given
+            detached: self.detached,
+            executor: self.base.executor,
         };
 
         builder_impl.create()?;
+
         container.refresh_state()?;
 
         Ok(container)
     }
 
-    fn create_container_dir(&self) -> Result<PathBuf> {
+    fn create_container_dir(&self) -> Result<PathBuf, LibcontainerError> {
         let container_dir = self.base.root_path.join(&self.base.container_id);
-        log::debug!("container directory will be {:?}", container_dir);
+        tracing::debug!("container directory will be {:?}", container_dir);
 
         if container_dir.exists() {
-            bail!("container {} already exists", self.base.container_id);
+            tracing::error!(id = self.base.container_id, dir = ?container_dir, "container already exists");
+            return Err(LibcontainerError::Exist);
         }
 
-        utils::create_dir_all(&container_dir).context("failed to create container dir")?;
+        std::fs::create_dir_all(&container_dir).map_err(|err| {
+            tracing::error!(
+                ?container_dir,
+                "failed to create container directory: {}",
+                err
+            );
+            LibcontainerError::OtherIO(err)
+        })?;
 
         Ok(container_dir)
     }
 
-    fn load_spec(&self) -> Result<Spec> {
+    fn load_spec(&self) -> Result<Spec, LibcontainerError> {
         let source_spec_path = self.bundle.join("config.json");
         let mut spec = Spec::load(source_spec_path)?;
-        Self::validate_spec(&spec).context("failed to validate runtime spec")?;
+        Self::validate_spec(&spec)?;
 
-        spec.canonicalize_rootfs(&self.bundle)
-            .context("failed to canonicalize rootfs")?;
+        spec.canonicalize_rootfs(&self.bundle).map_err(|err| {
+            tracing::error!(bundle = ?self.bundle, "failed to canonicalize rootfs: {}", err);
+            err
+        })?;
+
         Ok(spec)
     }
 
-    fn validate_spec(spec: &Spec) -> Result<()> {
-        if !spec.version().starts_with("1.0") {
-            bail!(
-                "runtime spec has incompatible version '{}'. Only 1.0.X is supported",
+    fn validate_spec(spec: &Spec) -> Result<(), LibcontainerError> {
+        let version = spec.version();
+        if !version.starts_with("1.") {
+            tracing::error!(
+                "runtime spec has incompatible version '{}'. Only 1.X.Y is supported",
                 spec.version()
             );
+            Err(ErrInvalidSpec::UnsupportedVersion)?;
         }
 
         if let Some(process) = spec.process() {
             if let Some(profile) = process.apparmor_profile() {
-                if !apparmor::is_enabled()? {
-                    bail!(
-                        "apparmor profile {} is specified in runtime spec, \
-                    but apparmor is not activated on this system",
-                        profile
-                    );
+                let apparmor_is_enabled = apparmor::is_enabled().map_err(|err| {
+                    tracing::error!(?err, "failed to check if apparmor is enabled");
+                    LibcontainerError::OtherIO(err)
+                })?;
+                if !apparmor_is_enabled {
+                    tracing::error!(?profile,
+                        "apparmor profile exists in the spec, but apparmor is not activated on this system");
+                    Err(ErrInvalidSpec::AppArmorNotEnabled)?;
+                }
+            }
+
+            if let Some(io_priority) = process.io_priority() {
+                let priority = io_priority.priority();
+                let iop_class_res = serde_json::to_string(&io_priority.class());
+                match iop_class_res {
+                    Ok(iop_class) => {
+                        if !(0..=7).contains(&priority) {
+                            tracing::error!(?priority, "io priority '{}' not between 0 and 7 (inclusive), class '{}' not in (IO_PRIO_CLASS_RT,IO_PRIO_CLASS_BE,IO_PRIO_CLASS_IDLE)",priority, iop_class);
+                            Err(ErrInvalidSpec::IoPriority)?;
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!(?priority, ?e, "failed to parse io priority class");
+                        Err(ErrInvalidSpec::IoPriority)?;
+                    }
                 }
             }
         }
@@ -145,7 +195,7 @@ impl<'a> InitContainerBuilder<'a> {
         Ok(())
     }
 
-    fn create_container_state(&self, container_dir: &Path) -> Result<Container> {
+    fn create_container_state(&self, container_dir: &Path) -> Result<Container, LibcontainerError> {
         let container = Container::new(
             &self.base.container_id,
             ContainerStatus::Creating,

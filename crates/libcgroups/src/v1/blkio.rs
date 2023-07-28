@@ -1,13 +1,16 @@
-use std::path::Path;
-
-use crate::{
-    common::{self, ControllerOpt},
-    stats::{self, BlkioDeviceStat, BlkioStats, StatsProvider},
-    v1::Controller,
+use std::{
+    num::ParseIntError,
+    path::{Path, PathBuf},
 };
 
-use anyhow::{Context, Result};
+use crate::{
+    common::{self, ControllerOpt, WrappedIoError},
+    stats::{self, BlkioDeviceStat, BlkioStats, ParseDeviceNumberError, StatsProvider},
+};
+
 use oci_spec::runtime::LinuxBlockIo;
+
+use super::controller::Controller;
 
 // Throttling/upper limit policy
 // ---------------------------------------
@@ -76,10 +79,11 @@ const BLKIO_MERGED: &str = "blkio.io_merged_recursive";
 pub struct Blkio {}
 
 impl Controller for Blkio {
+    type Error = WrappedIoError;
     type Resource = LinuxBlockIo;
 
-    fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()> {
-        log::debug!("Apply blkio cgroup config");
+    fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<(), Self::Error> {
+        tracing::debug!("Apply blkio cgroup config");
 
         if let Some(blkio) = Self::needs_to_handle(controller_opt) {
             Self::apply(cgroup_root, blkio)?;
@@ -93,10 +97,25 @@ impl Controller for Blkio {
     }
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum V1BlkioStatsError {
+    #[error("io error: {0}")]
+    WrappedIo(#[from] WrappedIoError),
+    #[error("failed to parse device value {value} in {path}: {err}")]
+    FailedParseValue {
+        value: String,
+        path: PathBuf,
+        err: ParseIntError,
+    },
+    #[error("failed to parse device number: {0}")]
+    FailedParseNumber(#[from] ParseDeviceNumberError),
+}
+
 impl StatsProvider for Blkio {
+    type Error = V1BlkioStatsError;
     type Stats = BlkioStats;
 
-    fn stats(cgroup_path: &Path) -> Result<Self::Stats> {
+    fn stats(cgroup_path: &Path) -> Result<Self::Stats, Self::Error> {
         if cgroup_path.join(BLKIO_WEIGHT).exists() {
             return Self::get_weight_division_policy_stats(cgroup_path);
         }
@@ -106,7 +125,7 @@ impl StatsProvider for Blkio {
 }
 
 impl Blkio {
-    fn apply(root_path: &Path, blkio: &LinuxBlockIo) -> Result<()> {
+    fn apply(root_path: &Path, blkio: &LinuxBlockIo) -> Result<(), WrappedIoError> {
         if let Some(blkio_weight) = blkio.weight() {
             // be aligned with what runc does
             // See also: https://github.com/opencontainers/runc/blob/81044ad7c902f3fc153cb8ffadaf4da62855193f/libcontainer/cgroups/fs/blkio.go#L28-L33
@@ -159,7 +178,7 @@ impl Blkio {
         Ok(())
     }
 
-    fn get_throttling_policy_stats(cgroup_path: &Path) -> Result<BlkioStats> {
+    fn get_throttling_policy_stats(cgroup_path: &Path) -> Result<BlkioStats, V1BlkioStatsError> {
         let stats = BlkioStats {
             service_bytes: Self::parse_blkio_file(
                 &cgroup_path.join(BLKIO_THROTTLE_IO_SERVICE_BYTES),
@@ -171,7 +190,9 @@ impl Blkio {
         Ok(stats)
     }
 
-    fn get_weight_division_policy_stats(cgroup_path: &Path) -> Result<BlkioStats> {
+    fn get_weight_division_policy_stats(
+        cgroup_path: &Path,
+    ) -> Result<BlkioStats, V1BlkioStatsError> {
         let stats = BlkioStats {
             time: Self::parse_blkio_file(&cgroup_path.join(BLKIO_TIME))?,
             sectors: Self::parse_blkio_file(&cgroup_path.join(BLKIO_SECTORS))?,
@@ -187,7 +208,7 @@ impl Blkio {
         Ok(stats)
     }
 
-    fn parse_blkio_file(blkio_file: &Path) -> Result<Vec<BlkioDeviceStat>> {
+    fn parse_blkio_file(blkio_file: &Path) -> Result<Vec<BlkioDeviceStat>, V1BlkioStatsError> {
         let content = common::read_cgroup_file(blkio_file)?;
         let mut stats = Vec::new();
         for entry in content.lines() {
@@ -203,21 +224,21 @@ impl Blkio {
                 None
             };
             let value = if entry_fields.len() == 3 {
-                entry_fields[2].parse().with_context(|| {
-                    format!(
-                        "failed to parse device value {} in {}",
-                        entry_fields[2],
-                        blkio_file.display()
-                    )
-                })?
+                entry_fields[2]
+                    .parse()
+                    .map_err(|err| V1BlkioStatsError::FailedParseValue {
+                        value: entry_fields[2].into(),
+                        path: blkio_file.to_path_buf(),
+                        err,
+                    })?
             } else {
-                entry_fields[1].parse().with_context(|| {
-                    format!(
-                        "failed to parse device value {} in {}",
-                        entry_fields[1],
-                        blkio_file.display()
-                    )
-                })?
+                entry_fields[1]
+                    .parse()
+                    .map_err(|err| V1BlkioStatsError::FailedParseValue {
+                        value: entry_fields[1].into(),
+                        path: blkio_file.to_path_buf(),
+                        err,
+                    })?
             };
 
             let stat = BlkioDeviceStat {
@@ -239,21 +260,20 @@ mod tests {
     use std::fs;
 
     use super::*;
-    use crate::test::{create_temp_dir, set_fixture, setup};
+    use crate::test::{set_fixture, setup};
 
-    use anyhow::Result;
     use oci_spec::runtime::{LinuxBlockIoBuilder, LinuxThrottleDeviceBuilder};
 
     #[test]
     fn test_set_blkio_weight() {
         for cgroup_file in &[BLKIO_WEIGHT, BLKIO_BFQ_WEIGHT] {
-            let (tmp, weight_file) = setup("test_set_blkio_weight", cgroup_file);
+            let (tmp, weight_file) = setup(cgroup_file);
             let blkio = LinuxBlockIoBuilder::default()
                 .weight(200_u16)
                 .build()
                 .unwrap();
 
-            Blkio::apply(&tmp, &blkio).expect("apply blkio");
+            Blkio::apply(tmp.path(), &blkio).expect("apply blkio");
             let content = fs::read_to_string(weight_file).expect("read blkio weight");
             assert_eq!("200", content);
         }
@@ -261,7 +281,7 @@ mod tests {
 
     #[test]
     fn test_set_blkio_read_bps() {
-        let (tmp, throttle) = setup("test_set_blkio_read_bps", BLKIO_THROTTLE_READ_BPS);
+        let (tmp, throttle) = setup(BLKIO_THROTTLE_READ_BPS);
 
         let blkio = LinuxBlockIoBuilder::default()
             .throttle_read_bps_device(vec![LinuxThrottleDeviceBuilder::default()
@@ -273,16 +293,16 @@ mod tests {
             .build()
             .unwrap();
 
-        Blkio::apply(&tmp, &blkio).expect("apply blkio");
+        Blkio::apply(tmp.path(), &blkio).expect("apply blkio");
         let content = fs::read_to_string(throttle)
-            .unwrap_or_else(|_| panic!("read {} content", BLKIO_THROTTLE_READ_BPS));
+            .unwrap_or_else(|_| panic!("read {BLKIO_THROTTLE_READ_BPS} content"));
 
         assert_eq!("8:0 102400", content);
     }
 
     #[test]
     fn test_set_blkio_write_bps() {
-        let (tmp, throttle) = setup("test_set_blkio_write_bps", BLKIO_THROTTLE_WRITE_BPS);
+        let (tmp, throttle) = setup(BLKIO_THROTTLE_WRITE_BPS);
 
         let blkio = LinuxBlockIoBuilder::default()
             .throttle_write_bps_device(vec![LinuxThrottleDeviceBuilder::default()
@@ -294,16 +314,16 @@ mod tests {
             .build()
             .unwrap();
 
-        Blkio::apply(&tmp, &blkio).expect("apply blkio");
+        Blkio::apply(tmp.path(), &blkio).expect("apply blkio");
         let content = fs::read_to_string(throttle)
-            .unwrap_or_else(|_| panic!("read {} content", BLKIO_THROTTLE_WRITE_BPS));
+            .unwrap_or_else(|_| panic!("read {BLKIO_THROTTLE_WRITE_BPS} content"));
 
         assert_eq!("8:0 102400", content);
     }
 
     #[test]
     fn test_set_blkio_read_iops() {
-        let (tmp, throttle) = setup("test_set_blkio_read_iops", BLKIO_THROTTLE_READ_IOPS);
+        let (tmp, throttle) = setup(BLKIO_THROTTLE_READ_IOPS);
 
         let blkio = LinuxBlockIoBuilder::default()
             .throttle_read_iops_device(vec![LinuxThrottleDeviceBuilder::default()
@@ -315,16 +335,16 @@ mod tests {
             .build()
             .unwrap();
 
-        Blkio::apply(&tmp, &blkio).expect("apply blkio");
+        Blkio::apply(tmp.path(), &blkio).expect("apply blkio");
         let content = fs::read_to_string(throttle)
-            .unwrap_or_else(|_| panic!("read {} content", BLKIO_THROTTLE_READ_IOPS));
+            .unwrap_or_else(|_| panic!("read {BLKIO_THROTTLE_READ_IOPS} content"));
 
         assert_eq!("8:0 102400", content);
     }
 
     #[test]
     fn test_set_blkio_write_iops() {
-        let (tmp, throttle) = setup("test_set_blkio_write_iops", BLKIO_THROTTLE_WRITE_IOPS);
+        let (tmp, throttle) = setup(BLKIO_THROTTLE_WRITE_IOPS);
 
         let blkio = LinuxBlockIoBuilder::default()
             .throttle_write_iops_device(vec![LinuxThrottleDeviceBuilder::default()
@@ -336,16 +356,16 @@ mod tests {
             .build()
             .unwrap();
 
-        Blkio::apply(&tmp, &blkio).expect("apply blkio");
+        Blkio::apply(tmp.path(), &blkio).expect("apply blkio");
         let content = fs::read_to_string(throttle)
-            .unwrap_or_else(|_| panic!("read {} content", BLKIO_THROTTLE_WRITE_IOPS));
+            .unwrap_or_else(|_| panic!("read {BLKIO_THROTTLE_WRITE_IOPS} content"));
 
         assert_eq!("8:0 102400", content);
     }
 
     #[test]
-    fn test_stat_throttling_policy() -> Result<()> {
-        let tmp = create_temp_dir("test_stat_throttling_policy").expect("create test directory");
+    fn test_stat_throttling_policy() -> Result<(), Box<dyn std::error::Error>> {
+        let tmp = tempfile::tempdir().unwrap();
         let content = &[
             "8:0 Read 20",
             "8:0 Write 20",
@@ -356,10 +376,10 @@ mod tests {
             "Total 0",
         ]
         .join("\n");
-        set_fixture(&tmp, BLKIO_THROTTLE_IO_SERVICE_BYTES, content).unwrap();
-        set_fixture(&tmp, BLKIO_THROTTLE_IO_SERVICED, content).unwrap();
+        set_fixture(tmp.path(), BLKIO_THROTTLE_IO_SERVICE_BYTES, content).unwrap();
+        set_fixture(tmp.path(), BLKIO_THROTTLE_IO_SERVICED, content).unwrap();
 
-        let actual = Blkio::stats(&tmp).expect("get cgroup stats");
+        let actual = Blkio::stats(tmp.path()).expect("get cgroup stats");
         let mut expected = BlkioStats::default();
         let devices: Vec<BlkioDeviceStat> = ["Read", "Write", "Sync", "Async", "Discard", "Total"]
             .iter()

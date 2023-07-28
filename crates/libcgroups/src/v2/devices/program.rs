@@ -1,4 +1,3 @@
-use anyhow::{bail, Result};
 use oci_spec::runtime::*;
 
 use rbpf::disassembler::disassemble;
@@ -9,8 +8,23 @@ pub struct Program {
     prog: BpfCode,
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum ProgramError {
+    #[error("io error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("invalid access: {0}")]
+    InvalidAccess(char),
+    #[error("{0} device not supported")]
+    DeviceNotSupported(&'static str),
+    #[error("wildcard device type should be removed when cleaning rules")]
+    WildcardDevice,
+}
+
 impl Program {
-    pub fn from_rules(rules: &[LinuxDeviceCgroup], default_allow: bool) -> Result<Self> {
+    pub fn from_rules(
+        rules: &[LinuxDeviceCgroup],
+        default_allow: bool,
+    ) -> Result<Self, ProgramError> {
         let mut prog = Program {
             prog: BpfCode::new(),
         };
@@ -89,7 +103,7 @@ impl Program {
             .push();
     }
 
-    fn add_rule(&mut self, rule: &LinuxDeviceCgroup) -> Result<()> {
+    fn add_rule(&mut self, rule: &LinuxDeviceCgroup) -> Result<(), ProgramError> {
         let dev_type = bpf_dev_type(rule.typ().unwrap_or_default())?;
         let access = bpf_access(rule.access().clone().unwrap_or_default())?;
         let has_access = access
@@ -188,7 +202,7 @@ impl Program {
         major: u32,
         minor: u32,
         access: String,
-    ) -> Result<u64> {
+    ) -> Result<u64, ProgramError> {
         let mut mem = bpf_cgroup_dev_ctx(typ, major, minor, access)?;
         let vm = rbpf::EbpfVmRaw::new(Some(self.prog.into_bytes()))?;
         let result = vm.execute_program(&mut mem[..])?;
@@ -196,27 +210,25 @@ impl Program {
     }
 }
 
-fn bpf_dev_type(typ: LinuxDeviceType) -> Result<u32> {
+fn bpf_dev_type(typ: LinuxDeviceType) -> Result<u32, ProgramError> {
     let dev_type: u32 = match typ {
         LinuxDeviceType::C => libbpf_sys::BPF_DEVCG_DEV_CHAR,
-        LinuxDeviceType::U => bail!("unbuffered char device not supported"),
+        LinuxDeviceType::U => return Err(ProgramError::DeviceNotSupported("unbuffered char")),
         LinuxDeviceType::B => libbpf_sys::BPF_DEVCG_DEV_BLOCK,
-        LinuxDeviceType::P => bail!("pipe device not supported"),
-        LinuxDeviceType::A => {
-            bail!("wildcard device type should be removed when cleaning rules")
-        }
+        LinuxDeviceType::P => return Err(ProgramError::DeviceNotSupported("pipe device")),
+        LinuxDeviceType::A => return Err(ProgramError::WildcardDevice),
     };
     Ok(dev_type)
 }
 
-fn bpf_access(access: String) -> Result<u32> {
+fn bpf_access(access: String) -> Result<u32, ProgramError> {
     let mut v = 0_u32;
     for c in access.chars() {
         let cur_access = match c {
             'r' => libbpf_sys::BPF_DEVCG_ACC_READ,
             'w' => libbpf_sys::BPF_DEVCG_ACC_WRITE,
             'm' => libbpf_sys::BPF_DEVCG_ACC_MKNOD,
-            _ => bail!("invalid access: {}", c),
+            _ => return Err(ProgramError::InvalidAccess(c)),
         };
         v |= cur_access;
     }
@@ -228,7 +240,7 @@ fn bpf_cgroup_dev_ctx(
     major: u32,
     minor: u32,
     access: String,
-) -> Result<Vec<u8>> {
+) -> Result<Vec<u8>, ProgramError> {
     let mut mem = Vec::with_capacity(12);
 
     let mut type_access = 0_u32;
@@ -248,15 +260,16 @@ fn bpf_cgroup_dev_ctx(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::Result;
     use oci_spec::runtime::LinuxDeviceCgroupBuilder;
 
     fn build_bpf_program(rules: &Option<Vec<LinuxDeviceCgroup>>) -> Result<Program> {
         let mut em = crate::v2::devices::emulator::Emulator::with_default_allow(false);
         if let Some(rules) = rules {
-            em.add_rules(rules)?;
+            em.add_rules(rules);
         }
 
-        Program::from_rules(&em.rules, em.default_allow)
+        Ok(Program::from_rules(&em.rules, em.default_allow)?)
     }
 
     #[test]
@@ -287,10 +300,7 @@ mod tests {
                         let ret = prog.execute(*ty, *major, *minor, access.to_string());
                         assert!(ret.is_ok());
 
-                        println!(
-                            "execute {:?} {} {} {} -> {:?}",
-                            ty, major, minor, access, ret
-                        );
+                        println!("execute {ty:?} {major} {minor} {access} -> {ret:?}");
                         if *ty == LinuxDeviceType::C  // only this is allowed
                             && *major == 10
                                 && *minor == 20
@@ -358,10 +368,7 @@ mod tests {
                         let ret = prog.execute(*ty, *major, *minor, access.to_string());
                         assert!(ret.is_ok());
 
-                        println!(
-                            "execute {:?} {} {} {} -> {:?}",
-                            ty, major, minor, access, ret
-                        );
+                        println!("execute {ty:?} {major} {minor} {access} -> {ret:?}");
                         assert_eq!(ret.unwrap(), 1);
                     }
                 }
@@ -396,10 +403,7 @@ mod tests {
                         let ret = prog.execute(*ty, *major, *minor, access.to_string());
                         assert!(ret.is_ok());
 
-                        println!(
-                            "execute {:?} {} {} {} -> {:?}",
-                            ty, major, minor, access, ret
-                        );
+                        println!("execute {ty:?} {major} {minor} {access} -> {ret:?}");
                         if *ty == LinuxDeviceType::C && *minor == 20 && access.eq(&"r") {
                             assert_eq!(ret.unwrap(), 1);
                         } else {
@@ -447,10 +451,7 @@ mod tests {
                         let ret = prog.execute(*ty, *major, *minor, access.to_string());
                         assert!(ret.is_ok());
 
-                        println!(
-                            "execute {:?} {} {} {} -> {:?}",
-                            ty, major, minor, access, ret
-                        );
+                        println!("execute {ty:?} {major} {minor} {access} -> {ret:?}");
                         if *ty == LinuxDeviceType::C && *major == 10 && access.eq(&"r") {
                             assert_eq!(ret.unwrap(), 0);
                         } else if *ty == LinuxDeviceType::C

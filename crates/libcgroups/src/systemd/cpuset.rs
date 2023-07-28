@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use anyhow::{bail, Context, Result};
 use dbus::arg::RefArg;
 use fixedbitset::FixedBitSet;
 use oci_spec::runtime::LinuxCpu;
@@ -12,18 +11,29 @@ use super::controller::Controller;
 pub const ALLOWED_CPUS: &str = "AllowedCPUs";
 pub const ALLOWED_NODES: &str = "AllowedMemoryNodes";
 
+#[derive(thiserror::Error, Debug)]
+pub enum SystemdCpuSetError {
+    #[error("setting cpuset restrictions requires systemd version greater than 243")]
+    OldSystemd,
+    #[error("could not create bitmask for cpus: {0}")]
+    CpusBitmask(BitmaskError),
+    #[error("could not create bitmask for memory nodes: {0}")]
+    MemoryNodesBitmask(BitmaskError),
+}
+
 pub struct CpuSet {}
 
 impl Controller for CpuSet {
+    type Error = SystemdCpuSetError;
+
     fn apply(
         options: &ControllerOpt,
         systemd_version: u32,
         properties: &mut HashMap<&str, Box<dyn RefArg>>,
-    ) -> Result<()> {
+    ) -> Result<(), Self::Error> {
         if let Some(cpu) = options.resources.cpu() {
-            log::debug!("Applying cpuset resource restrictions");
-            return Self::apply(cpu, systemd_version, properties)
-                .context("could not apply cpuset resource restrictions");
+            tracing::debug!("Applying cpuset resource restrictions");
+            return Self::apply(cpu, systemd_version, properties);
         }
 
         Ok(())
@@ -35,19 +45,18 @@ impl CpuSet {
         cpu: &LinuxCpu,
         systemd_version: u32,
         properties: &mut HashMap<&str, Box<dyn RefArg>>,
-    ) -> Result<()> {
+    ) -> Result<(), SystemdCpuSetError> {
         if systemd_version <= 243 {
-            bail!("setting cpuset restrictions requires systemd version greather than 243");
+            return Err(SystemdCpuSetError::OldSystemd);
         }
 
         if let Some(cpus) = cpu.cpus() {
-            let cpu_mask = to_bitmask(cpus).context("could not create bitmask for cpus")?;
+            let cpu_mask = to_bitmask(cpus).map_err(SystemdCpuSetError::CpusBitmask)?;
             properties.insert(ALLOWED_CPUS, Box::new(cpu_mask));
         }
 
         if let Some(mems) = cpu.mems() {
-            let mems_mask =
-                to_bitmask(mems).context("could not create bitmask for memory nodes")?;
+            let mems_mask = to_bitmask(mems).map_err(SystemdCpuSetError::MemoryNodesBitmask)?;
             properties.insert(ALLOWED_NODES, Box::new(mems_mask));
         }
 
@@ -55,7 +64,18 @@ impl CpuSet {
     }
 }
 
-pub fn to_bitmask(range: &str) -> Result<Vec<u8>> {
+#[derive(thiserror::Error, Debug)]
+pub enum BitmaskError {
+    #[error("invalid index {index}: {err}")]
+    InvalidIndex {
+        err: std::num::ParseIntError,
+        index: String,
+    },
+    #[error("invalid cpu range {0}")]
+    InvalidRange(String),
+}
+
+pub fn to_bitmask(range: &str) -> Result<Vec<u8>, BitmaskError> {
     let mut bitset = FixedBitSet::with_capacity(8);
 
     for cpu_set in range.split_terminator(',') {
@@ -66,16 +86,25 @@ pub fn to_bitmask(range: &str) -> Result<Vec<u8>> {
 
         let cpus: Vec<&str> = cpu_set.split('-').map(|s| s.trim()).collect();
         if cpus.len() == 1 {
-            let cpu_index: usize = cpus[0].parse()?;
+            let cpu_index: usize = cpus[0].parse().map_err(|err| BitmaskError::InvalidIndex {
+                err,
+                index: cpus[0].into(),
+            })?;
             if cpu_index >= bitset.len() {
                 bitset.grow(bitset.len() + 8);
             }
             bitset.set(cpu_index, true);
         } else {
-            let start_index = cpus[0].parse()?;
-            let end_index = cpus[1].parse()?;
+            let start_index = cpus[0].parse().map_err(|err| BitmaskError::InvalidIndex {
+                err,
+                index: cpus[0].into(),
+            })?;
+            let end_index = cpus[1].parse().map_err(|err| BitmaskError::InvalidIndex {
+                err,
+                index: cpus[1].into(),
+            })?;
             if start_index > end_index {
-                bail!("invalid cpu range {}", cpu_set);
+                return Err(BitmaskError::InvalidRange(cpu_set.into()));
             }
 
             if end_index >= bitset.len() {
@@ -98,6 +127,7 @@ pub fn to_bitmask(range: &str) -> Result<Vec<u8>> {
 
 #[cfg(test)]
 mod tests {
+    use anyhow::{Context, Result};
     use dbus::arg::{ArgType, RefArg};
     use oci_spec::runtime::LinuxCpuBuilder;
 

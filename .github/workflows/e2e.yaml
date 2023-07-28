@@ -1,0 +1,129 @@
+name: 🧪 e2e test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  youki-build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Rust toolchain and cache
+        uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
+      - name: Install just
+        uses: taiki-e/install-action@just
+      - name: Install requirements
+        run: sudo env PATH=$PATH just ci-prepare
+      - name: Build youki
+        run: just youki-release
+      - name: Upload youki binary
+        uses: actions/upload-artifact@v3
+        with:
+          name: youki
+          path: youki
+
+  containerd-integration-tests:
+    runs-on: ubuntu-22.04
+    needs: [youki-build]
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          repository: containerd/containerd
+          ref: v1.6.20
+      - uses: actions/setup-go@v3
+        with:
+          go-version: '1.19.9'
+          cache: true
+      - run: sudo apt-get -y update
+      - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev libseccomp-dev btrfs-progs libbtrfs-dev
+      - name: Build containerd
+        run: |
+          make build
+          make binaries
+      - name: Download youki binary
+        uses: actions/download-artifact@v3
+        with:
+          name: youki
+      - name: Replace runc to youki
+        run: |
+          sudo rm -f /usr/bin/runc /usr/local/bin/runc /usr/sbin/runc
+          sudo chmod 755 youki
+          sudo cp youki /usr/bin/runc
+          runc --version
+      - name: Integration Test
+        run: sudo make TEST_RUNTIME=io.containerd.runc.v2 TESTFLAGS="-timeout 40m" integration
+
+  k8s-tests:
+    runs-on: ubuntu-22.04
+    needs: [youki-build]
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v3
+      - name: Download youki binary
+        uses: actions/download-artifact@v3
+        with:
+          name: youki
+      - name: Add the permission to run
+        run: chmod +x ./youki
+      - name: Install just
+        uses: taiki-e/install-action@just
+      - name: test/k8s/deploy
+        run: just test-kind
+
+  oci-validation-go:
+    runs-on: ubuntu-22.04
+    needs: [youki-build]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - name: Setup Rust toolchain and cache
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Install just
+        uses: taiki-e/install-action@just
+      - uses: actions/setup-go@v3
+        with:
+          go-version: '1.19.9'
+          cache: true
+          cache-dependency-path: tests/oci-runtime-tests/src/github.com/opencontainers/runtime-tools/go.sum
+      - name: Download youki binary
+        uses: actions/download-artifact@v3
+        with:
+          name: youki
+      - name: Add the permission to run
+        run: chmod +x ./youki
+      - name: Run integration tests
+        run: just oci-tests
+
+  oci-validation-rust:
+    runs-on: ubuntu-22.04
+    needs: [youki-build]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - name: Setup Rust toolchain and cache
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Install just
+        uses: taiki-e/install-action@just
+      - name: Install requirements
+        run: sudo env PATH=$PATH just ci-prepare
+      - name: Download youki binary
+        uses: actions/download-artifact@v3
+        with:
+          name: youki
+      - name: Add the permission to run
+        run: chmod +x ./youki
+      - name: Build
+        run: just runtimetest rust-oci-tests-bin
+      - name: Validate tests on youki
+        run: just rust-oci-tests

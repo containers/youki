@@ -1,29 +1,38 @@
-use anyhow::{bail, Context, Result};
 use nix::{sys::signal, unistd::Pid};
 use oci_spec::runtime::Hook;
 use std::{
-    collections::HashMap, fmt, io::ErrorKind, io::Write, os::unix::prelude::CommandExt, process,
+    collections::HashMap,
+    io::ErrorKind,
+    io::Write,
+    os::unix::prelude::CommandExt,
+    process::{self},
     thread, time,
 };
 
 use crate::{container::Container, utils};
-// A special error used to signal a timeout. We want to differentiate between a
-// timeout vs. other error.
-#[derive(Debug)]
-pub struct HookTimeoutError;
-impl std::error::Error for HookTimeoutError {}
-impl fmt::Display for HookTimeoutError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        "hook command timeout".fmt(f)
-    }
+
+#[derive(Debug, thiserror::Error)]
+pub enum HookError {
+    #[error("failed to execute hook command")]
+    CommandExecute(#[source] std::io::Error),
+    #[error("failed to encode container state")]
+    EncodeContainerState(#[source] serde_json::Error),
+    #[error("hook command exited with non-zero exit code: {0}")]
+    NonZeroExitCode(i32),
+    #[error("hook command was killed by a signal")]
+    Killed,
+    #[error("failed to execute hook command due to a timeout")]
+    Timeout,
+    #[error("container state is required to run hook")]
+    MissingContainerState,
+    #[error("failed to write container state to stdin")]
+    WriteContainerState(#[source] std::io::Error),
 }
 
-pub fn run_hooks(hooks: Option<&Vec<Hook>>, container: Option<&Container>) -> Result<()> {
-    if container.is_none() {
-        bail!("container state is required to run hook");
-    }
+type Result<T> = std::result::Result<T, HookError>;
 
-    let state = &container.unwrap().state;
+pub fn run_hooks(hooks: Option<&Vec<Hook>>, container: Option<&Container>) -> Result<()> {
+    let state = &(container.ok_or(HookError::MissingContainerState)?.state);
 
     if let Some(hooks) = hooks {
         for hook in hooks {
@@ -31,11 +40,11 @@ pub fn run_hooks(hooks: Option<&Vec<Hook>>, container: Option<&Container>) -> Re
             // Based on OCI spec, the first argument of the args vector is the
             // arg0, which can be different from the path.  For example, path
             // may be "/usr/bin/true" and arg0 is set to "true". However, rust
-            // command differenciates arg0 from args, where rust command arg
+            // command differentiates arg0 from args, where rust command arg
             // doesn't include arg0. So we have to make the split arg0 from the
             // rest of args.
             if let Some((arg0, args)) = hook.args().as_ref().and_then(|a| a.split_first()) {
-                log::debug!("run_hooks arg0: {:?}, args: {:?}", arg0, args);
+                tracing::debug!("run_hooks arg0: {:?}, args: {:?}", arg0, args);
                 hook_command.arg0(arg0).args(args)
             } else {
                 hook_command.arg0(&hook.path().display().to_string())
@@ -46,14 +55,14 @@ pub fn run_hooks(hooks: Option<&Vec<Hook>>, container: Option<&Container>) -> Re
             } else {
                 HashMap::new()
             };
-            log::debug!("run_hooks envs: {:?}", envs);
+            tracing::debug!("run_hooks envs: {:?}", envs);
 
             let mut hook_process = hook_command
                 .env_clear()
                 .envs(envs)
                 .stdin(process::Stdio::piped())
                 .spawn()
-                .with_context(|| "Failed to execute hook")?;
+                .map_err(HookError::CommandExecute)?;
             let hook_process_pid = Pid::from_raw(hook_process.id() as i32);
             // Based on the OCI spec, we need to pipe the container state into
             // the hook command through stdin.
@@ -67,13 +76,13 @@ pub fn run_hooks(hooks: Option<&Vec<Hook>>, container: Option<&Container>) -> Re
                 // error, in the case that the hook command is waiting for us to
                 // write to stdin.
                 let encoded_state =
-                    serde_json::to_string(state).context("failed to encode container state")?;
+                    serde_json::to_string(state).map_err(HookError::EncodeContainerState)?;
                 if let Err(e) = stdin.write_all(encoded_state.as_bytes()) {
                     if e.kind() != ErrorKind::BrokenPipe {
                         // Not a broken pipe. The hook command may be waiting
                         // for us.
                         let _ = signal::kill(hook_process_pid, signal::Signal::SIGKILL);
-                        bail!("failed to write container state to stdin: {:?}", e);
+                        return Err(HookError::WriteContainerState(e));
                     }
                 }
             }
@@ -89,18 +98,18 @@ pub fn run_hooks(hooks: Option<&Vec<Hook>>, container: Option<&Container>) -> Re
                 // use pid to identify the process and send a kill signal. This
                 // is what the Command.kill() does under the hood anyway. When
                 // timeout, we have to kill the process and clean up properly.
-                let (s, r) = crossbeam_channel::unbounded();
+                let (s, r) = std::sync::mpsc::channel();
                 thread::spawn(move || {
                     let res = hook_process.wait();
                     let _ = s.send(res);
                 });
                 match r.recv_timeout(time::Duration::from_secs(timeout_sec as u64)) {
                     Ok(res) => res,
-                    Err(crossbeam_channel::RecvTimeoutError::Timeout) => {
+                    Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
                         // Kill the process. There is no need to further clean
                         // up because we will be error out.
                         let _ = signal::kill(hook_process_pid, signal::Signal::SIGKILL);
-                        return Err(HookTimeoutError.into());
+                        return Err(HookError::Timeout);
                     }
                     Err(_) => {
                         unreachable!();
@@ -112,21 +121,12 @@ pub fn run_hooks(hooks: Option<&Vec<Hook>>, container: Option<&Container>) -> Re
 
             match res {
                 Ok(exit_status) => match exit_status.code() {
-                    Some(0) => {}
-                    Some(exit_code) => {
-                        bail!(
-                            "Failed to execute hook command. Non-zero return code. {:?}",
-                            exit_code
-                        );
-                    }
-                    None => {
-                        bail!("Process is killed by signal");
-                    }
+                    Some(0) => Ok(()),
+                    Some(exit_code) => Err(HookError::NonZeroExitCode(exit_code)),
+                    None => Err(HookError::Killed),
                 },
-                Err(e) => {
-                    bail!("Failed to execute hook command: {:?}", e);
-                }
-            }
+                Err(e) => Err(HookError::CommandExecute(e)),
+            }?;
         }
     }
 
@@ -136,7 +136,7 @@ pub fn run_hooks(hooks: Option<&Vec<Hook>>, container: Option<&Container>) -> Re
 #[cfg(test)]
 mod test {
     use super::*;
-    use anyhow::{bail, Result};
+    use anyhow::{bail, Context, Result};
     use oci_spec::runtime::HookBuilder;
     use serial_test::serial;
     use std::{env, fs};
@@ -144,7 +144,7 @@ mod test {
     fn is_command_in_path(program: &str) -> bool {
         if let Ok(path) = env::var("PATH") {
             for p in path.split(':') {
-                let p_str = format!("{}/{}", p, program);
+                let p_str = format!("{p}/{program}");
                 if fs::metadata(p_str).is_ok() {
                     return true;
                 }
@@ -221,14 +221,14 @@ mod test {
             Ok(_) => {
                 bail!("The test expects the hook to error out with timeout. Should not execute cleanly");
             }
+            Err(HookError::Timeout) => {}
             Err(err) => {
-                // We want to make sure the error returned is indeed timeout
-                // error. All other errors are considered failure.
-                if !err.is::<HookTimeoutError>() {
-                    bail!("Failed to execute hook: {:?}", err);
-                }
+                bail!(
+                    "The test expects the hook to error out with timeout. Got error: {}",
+                    err
+                );
             }
-        }
+        };
 
         Ok(())
     }

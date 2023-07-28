@@ -1,4 +1,16 @@
 //! Implements Command trait for Linux systems
+use caps::{CapSet, CapsHashSet};
+use libc::{c_char, setdomainname, uid_t};
+use nix::fcntl;
+use nix::{
+    fcntl::{open, OFlag},
+    mount::{mount, umount2, MntFlags, MsFlags},
+    sched::{unshare, CloneFlags},
+    sys::stat::{mknod, Mode, SFlag},
+    unistd,
+    unistd::{chown, fchdir, pivot_root, setgroups, sethostname, Gid, Uid},
+};
+use oci_spec::runtime::LinuxRlimit;
 use std::ffi::{CStr, CString, OsStr};
 use std::fs;
 use std::os::unix::ffi::OsStrExt;
@@ -8,25 +20,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::{any::Any, mem, path::Path, ptr};
 
-use anyhow::{anyhow, bail, Context, Error, Result};
-use caps::{CapSet, CapsHashSet};
-use libc::{c_char, setdomainname, uid_t};
-use nix::fcntl;
-use nix::{
-    errno::Errno,
-    fcntl::{open, OFlag},
-    mount::{mount, umount2, MntFlags, MsFlags},
-    sched::{unshare, CloneFlags},
-    sys::stat::{mknod, Mode, SFlag},
-    unistd,
-    unistd::{chown, fchdir, pivot_root, setgroups, sethostname, Gid, Uid},
-};
-use syscalls::{syscall, Sysno, Sysno::close_range};
-
-use oci_spec::runtime::LinuxRlimit;
-
-use super::Syscall;
-use crate::syscall::syscall::CloseRange;
+use super::{Result, Syscall, SyscallError};
 use crate::{capabilities, utils};
 
 // Flags used in mount_setattr(2).
@@ -77,9 +71,9 @@ pub enum MountAttrOption {
 }
 
 impl FromStr for MountAttrOption {
-    type Err = Error;
+    type Err = SyscallError;
 
-    fn from_str(option: &str) -> Result<Self, Self::Err> {
+    fn from_str(option: &str) -> std::result::Result<Self, Self::Err> {
         match option {
             "rro" => Ok(MountAttrOption::MountArrtRdonly(false, MOUNT_ATTR_RDONLY)),
             "rrw" => Ok(MountAttrOption::MountArrtRdonly(true, MOUNT_ATTR_RDONLY)),
@@ -124,7 +118,7 @@ impl FromStr for MountAttrOption {
                 MOUNT_ATTR_NOSYMFOLLOW,
             )),
             // No support for MOUNT_ATTR_IDMAP yet (needs UserNS FD)
-            _ => Err(anyhow!("Unexpected option.")),
+            _ => Err(SyscallError::UnexpectedMountAttrOption(option.to_string())),
         }
     }
 }
@@ -195,7 +189,7 @@ impl LinuxSyscall {
     }
 
     fn emulate_close_range(preserve_fds: i32) -> Result<()> {
-        let open_fds = Self::get_open_fds().with_context(|| "failed to obtain opened fds")?;
+        let open_fds = Self::get_open_fds()?;
         // Include stdin, stdout, and stderr for fd 0, 1, and 2 respectively.
         let min_fd = preserve_fds + 3;
         let to_be_cleaned_up_fds: Vec<i32> = open_fds
@@ -215,10 +209,19 @@ impl LinuxSyscall {
     // Get a list of open fds for the calling process.
     fn get_open_fds() -> Result<Vec<i32>> {
         const PROCFS_FD_PATH: &str = "/proc/self/fd";
-        utils::ensure_procfs(Path::new(PROCFS_FD_PATH))
-            .with_context(|| format!("{} is not the actual procfs", PROCFS_FD_PATH))?;
+        utils::ensure_procfs(Path::new(PROCFS_FD_PATH)).map_err(|err| {
+            tracing::error!(?err, "failed to ensure /proc is mounted");
+            match err {
+                utils::EnsureProcfsError::Nix(err) => SyscallError::Nix(err),
+                utils::EnsureProcfsError::IO(err) => SyscallError::IO(err),
+            }
+        })?;
 
-        let fds: Vec<i32> = fs::read_dir(PROCFS_FD_PATH)?
+        let fds: Vec<i32> = fs::read_dir(PROCFS_FD_PATH)
+            .map_err(|err| {
+                tracing::error!(?err, "failed to read /proc/self/fd");
+                err
+            })?
             .filter_map(|entry| match entry {
                 Ok(entry) => Some(entry.path()),
                 Err(_) => None,
@@ -250,7 +253,11 @@ impl Syscall for LinuxSyscall {
     /// Function to set given path as root path inside process
     fn pivot_rootfs(&self, path: &Path) -> Result<()> {
         // open the path as directory and read only
-        let newroot = open(path, OFlag::O_DIRECTORY | OFlag::O_RDONLY, Mode::empty())?;
+        let newroot =
+            open(path, OFlag::O_DIRECTORY | OFlag::O_RDONLY, Mode::empty()).map_err(|errno| {
+                tracing::error!(?errno, ?path, "failed to open the new root for pivot root");
+                errno
+            })?;
 
         // make the given path as the root directory for the container
         // see https://man7.org/linux/man-pages/man2/pivot_root.2.html, specially the notes
@@ -260,7 +267,10 @@ impl Syscall for LinuxSyscall {
         // this path. This is done, as otherwise, we will need to create a separate temporary directory under the new root path
         // so we can move the original root there, and then unmount that. This way saves the creation of the temporary
         // directory to put original root directory.
-        pivot_root(path, path)?;
+        pivot_root(path, path).map_err(|errno| {
+            tracing::error!(?errno, ?path, "failed to pivot root to");
+            errno
+        })?;
 
         // Make the original root directory rslave to avoid propagating unmount event to the host mount namespace.
         // We should use MS_SLAVE not MS_PRIVATE according to https://github.com/opencontainers/runc/pull/1500.
@@ -270,15 +280,26 @@ impl Syscall for LinuxSyscall {
             None::<&str>,
             MsFlags::MS_SLAVE | MsFlags::MS_REC,
             None::<&str>,
-        )?;
+        )
+        .map_err(|errno| {
+            tracing::error!(?errno, "failed to make original root directory rslave");
+            errno
+        })?;
 
         // Unmount the original root directory which was stacked on top of new root directory
         // MNT_DETACH makes the mount point unavailable to new accesses, but waits till the original mount point
         // to be free of activity to actually unmount
         // see https://man7.org/linux/man-pages/man2/umount2.2.html for more information
-        umount2("/", MntFlags::MNT_DETACH)?;
-        // Change directory to root
-        fchdir(newroot)?;
+        umount2("/", MntFlags::MNT_DETACH).map_err(|errno| {
+            tracing::error!(?errno, "failed to unmount old root directory");
+            errno
+        })?;
+        // Change directory to the new root
+        fchdir(newroot).map_err(|errno| {
+            tracing::error!(?errno, ?newroot, "failed to change directory to new root");
+            errno
+        })?;
+
         Ok(())
     }
 
@@ -290,12 +311,27 @@ impl Syscall for LinuxSyscall {
 
     /// set uid and gid for process
     fn set_id(&self, uid: Uid, gid: Gid) -> Result<()> {
-        if let Err(e) = prctl::set_keep_capabilities(true) {
-            bail!("set keep capabilities returned {}", e);
-        };
+        prctl::set_keep_capabilities(true).map_err(|errno| {
+            tracing::error!(?errno, "failed to set keep capabilities to true");
+            nix::errno::from_i32(errno)
+        })?;
         // args : real *id, effective *id, saved set *id respectively
-        unistd::setresgid(gid, gid, gid)?;
-        unistd::setresuid(uid, uid, uid)?;
+        unistd::setresgid(gid, gid, gid).map_err(|err| {
+            tracing::error!(
+                ?err,
+                ?gid,
+                "failed to set real, effective and saved set gid"
+            );
+            err
+        })?;
+        unistd::setresuid(uid, uid, uid).map_err(|err| {
+            tracing::error!(
+                ?err,
+                ?uid,
+                "failed to set real, effective and saved set uid"
+            );
+            err
+        })?;
 
         // if not the root user, reset capabilities to effective capabilities,
         // which are used by kernel to perform checks
@@ -303,9 +339,10 @@ impl Syscall for LinuxSyscall {
         if uid != Uid::from_raw(0) {
             capabilities::reset_effective(self)?;
         }
-        if let Err(e) = prctl::set_keep_capabilities(false) {
-            bail!("set keep capabilities returned {}", e);
-        };
+        prctl::set_keep_capabilities(false).map_err(|errno| {
+            tracing::error!(?errno, "failed to set keep capabilities to false");
+            nix::errno::from_i32(errno)
+        })?;
         Ok(())
     }
 
@@ -313,9 +350,9 @@ impl Syscall for LinuxSyscall {
     // see https://man7.org/linux/man-pages/man2/unshare.2.html for more information
     fn unshare(&self, flags: CloneFlags) -> Result<()> {
         unshare(flags)?;
+
         Ok(())
     }
-
     /// Set capabilities for container process
     fn set_capability(&self, cset: CapSet, value: &CapsHashSet) -> Result<()> {
         match cset {
@@ -341,9 +378,7 @@ impl Syscall for LinuxSyscall {
 
     /// Sets hostname for process
     fn set_hostname(&self, hostname: &str) -> Result<()> {
-        if let Err(e) = sethostname(hostname) {
-            bail!("Failed to set {} as hostname. {:?}", hostname, e)
-        }
+        sethostname(hostname)?;
         Ok(())
     }
 
@@ -352,20 +387,14 @@ impl Syscall for LinuxSyscall {
     fn set_domainname(&self, domainname: &str) -> Result<()> {
         let ptr = domainname.as_bytes().as_ptr() as *const c_char;
         let len = domainname.len();
-        let res = unsafe { setdomainname(ptr, len) };
-
-        match res {
+        match unsafe { setdomainname(ptr, len) } {
             0 => Ok(()),
-            -1 => bail!(
-                "Failed to set {} as domainname. {}",
-                domainname,
-                std::io::Error::last_os_error()
-            ),
-            _ => bail!(
-                "Failed to set {} as domainname. unexpected error occor.",
-                domainname
-            ),
-        }
+            -1 => Err(nix::Error::last()),
+
+            _ => Err(nix::Error::UnknownErrno),
+        }?;
+
+        Ok(())
     }
 
     /// Sets resource limit for process
@@ -374,10 +403,19 @@ impl Syscall for LinuxSyscall {
             rlim_cur: rlimit.soft(),
             rlim_max: rlimit.hard(),
         };
+
+        // Change for musl libc based on seccomp needs
+        #[cfg(not(target_env = "musl"))]
         let res = unsafe { libc::setrlimit(rlimit.typ() as u32, rlim) };
-        if let Err(e) = Errno::result(res).map(drop) {
-            bail!("Failed to set {:?}. {:?}", rlimit.typ(), e)
-        }
+        #[cfg(target_env = "musl")]
+        let res = unsafe { libc::setrlimit(rlimit.typ() as i32, rlim) };
+
+        match res {
+            0 => Ok(()),
+            -1 => Err(SyscallError::Nix(nix::Error::last())),
+            _ => Err(SyscallError::Nix(nix::Error::UnknownErrno)),
+        }?;
+
         Ok(())
     }
 
@@ -429,59 +467,59 @@ impl Syscall for LinuxSyscall {
         flags: MsFlags,
         data: Option<&str>,
     ) -> Result<()> {
-        match mount(source, target, fstype, flags, data) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(anyhow!(e)),
-        }
+        mount(source, target, fstype, flags, data)?;
+        Ok(())
     }
 
     fn symlink(&self, original: &Path, link: &Path) -> Result<()> {
-        match symlink(original, link) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(anyhow!(e)),
-        }
+        symlink(original, link)?;
+
+        Ok(())
     }
 
     fn mknod(&self, path: &Path, kind: SFlag, perm: Mode, dev: u64) -> Result<()> {
-        match mknod(path, kind, perm, dev) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(anyhow!(e)),
-        }
+        mknod(path, kind, perm, dev)?;
+
+        Ok(())
     }
 
     fn chown(&self, path: &Path, owner: Option<Uid>, group: Option<Gid>) -> Result<()> {
-        match chown(path, owner, group) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(anyhow!(e)),
-        }
+        chown(path, owner, group)?;
+
+        Ok(())
     }
 
     fn set_groups(&self, groups: &[Gid]) -> Result<()> {
-        match setgroups(groups) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(anyhow!(e)),
-        }
+        setgroups(groups)?;
+
+        Ok(())
     }
 
+    #[tracing::instrument(skip(self))]
     fn close_range(&self, preserve_fds: i32) -> Result<()> {
-        let result = unsafe {
-            syscall!(
-                close_range,
-                3 + preserve_fds as usize,
-                usize::MAX,
-                CloseRange::CLOEXEC.bits()
+        match unsafe {
+            libc::syscall(
+                libc::SYS_close_range,
+                3 + preserve_fds,
+                libc::c_int::MAX,
+                libc::CLOSE_RANGE_CLOEXEC,
             )
-        };
-
-        match result {
-            Ok(_) => Ok(()),
-            Err(e) if e == syscalls::Errno::ENOSYS || e == syscalls::Errno::EINVAL => {
-                // close_range was introduced in kernel 5.9 and CLOSEEXEC was introduced in
-                // kernel 5.11. If the kernel is older we emulate close_range in userspace.
-                Self::emulate_close_range(preserve_fds)
+        } {
+            0 => Ok(()),
+            -1 => {
+                match nix::errno::Errno::last() {
+                    nix::errno::Errno::ENOSYS | nix::errno::Errno::EINVAL => {
+                        // close_range was introduced in kernel 5.9 and CLOSEEXEC was introduced in
+                        // kernel 5.11. If the kernel is older we emulate close_range in userspace.
+                        Self::emulate_close_range(preserve_fds)
+                    }
+                    e => Err(SyscallError::Nix(e)),
+                }
             }
-            Err(e) => bail!(e),
-        }
+            _ => Err(SyscallError::Nix(nix::errno::Errno::UnknownErrno)),
+        }?;
+
+        Ok(())
     }
 
     fn mount_setattr(
@@ -492,28 +530,53 @@ impl Syscall for LinuxSyscall {
         mount_attr: &MountAttr,
         size: libc::size_t,
     ) -> Result<()> {
-        let path_pathbuf = pathname.to_path_buf();
-        let path_str = path_pathbuf.to_str();
-        let path_c_string = match path_str {
-            Some(path_str) => CString::new(path_str)?,
-            None => bail!("Invalid filename"),
-        };
-        let result = unsafe {
-            // TODO: nix/libc crate hasn't supported mount_setattr system call yet.
-            syscall!(
-                Sysno::mount_setattr,
+        let path_c_string = pathname
+            .to_path_buf()
+            .to_str()
+            .map(CString::new)
+            .ok_or_else(|| {
+                tracing::error!(path = ?pathname, "failed to convert path to string");
+                nix::Error::EINVAL
+            })?
+            .map_err(|err| {
+                tracing::error!(path = ?pathname, ?err, "failed to convert path to string");
+                nix::Error::EINVAL
+            })?;
+
+        match unsafe {
+            libc::syscall(
+                libc::SYS_mount_setattr,
                 dirfd,
                 path_c_string.as_ptr(),
                 flags,
                 mount_attr as *const MountAttr,
-                size
+                size,
             )
-        };
+        } {
+            0 => Ok(()),
+            -1 => Err(nix::Error::last()),
+            _ => Err(nix::Error::UnknownErrno),
+        }?;
+        Ok(())
+    }
 
-        match result {
-            Ok(_) => Ok(()),
-            Err(e) => bail!(e),
-        }
+    fn set_io_priority(&self, class: i64, priority: i64) -> Result<()> {
+        let ioprio_who_progress: libc::c_int = 1;
+        let ioprio_who_pid = 0;
+        let iop = (class << 13) | priority;
+        match unsafe {
+            libc::syscall(
+                libc::SYS_ioprio_set,
+                ioprio_who_progress,
+                ioprio_who_pid,
+                iop as libc::c_ulong,
+            )
+        } {
+            0 => Ok(()),
+            -1 => Err(nix::Error::last()),
+            _ => Err(nix::Error::UnknownErrno),
+        }?;
+        Ok(())
     }
 }
 

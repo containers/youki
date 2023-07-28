@@ -34,7 +34,7 @@ This will start the daemon and hang up the console. You can either start this as
 
 In case you don't stop the original daemon, you can get an error message after previous command
 
-```
+```console
 failed to start daemon: pid file found, ensure docker is not running or delete /var/run/docker.pid
 ```
 
@@ -63,19 +63,29 @@ let docker know youki
 ([source](https://docs.docker.com/engine/reference/commandline/dockerd/#on-linux)).
 You may need to create this file, if it does not yet exist. A sample content of it:
 
-```
+```json
 {
   "default-runtime": "runc",
   "runtimes": {
     "youki": {
-      "path": "/path/to/youki/youki"
+      "path": "/path/to/youki/youki",
+      "runtimeArgs": [
+          "--debug",
+          "--systemd-log"
+      ]
     }
   }
 }
 ```
 
 After this (need to restart docker at the first time), you can use youki
-with docker: `docker run --runtime youki ...`.
+with docker: `docker run --runtime youki ...`. You can verify the runtime includes `youki`:
+
+```console
+$ docker info|grep -i runtime
+ Runtimes: youki runc
+ Default Runtime: runc
+```
 
 #### Using Youki Standalone
 
@@ -143,7 +153,7 @@ sudo ./youki list
 sudo ./youki delete tutorial_container
 ```
 
-The example above shows how to run Youki in a 'rootful' way. To run it without root permissions, that is, in rootless mode, few chagnes are required.
+The example above shows how to run Youki in a 'rootful' way. To run it without root permissions, that is, in rootless mode, few changes are required.
 
 First, after exporting the rootfs from docker, while generating the config, you will need to pass the rootless flag. This will generate the config withe the options needed for rootless operation of the container.
 
@@ -161,3 +171,13 @@ cd ..
 ./youki list
 ./youki delete rootless_container
 ```
+
+#### Log level
+
+`youki` defaults the log level to `error` in the release build. In the debug
+build, the log level defaults to `debug`. The `--log-level` flag can be used to
+set the log-level. For least amount of log, we recommend using the `error` log
+level. For the most spammy logging, we have a `trace` level.
+
+For compatibility with `runc` and `crun`, we have a `--debug` flag to set the
+log level to `debug`. This flag is ignored if `--log-level` is also set.

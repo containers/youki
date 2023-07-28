@@ -1,14 +1,35 @@
+use crate::error::MissingSpecError;
 use crate::{namespaces::Namespaces, process::channel, process::fork};
-use anyhow::{Context, Error, Result};
 use libcgroups::common::CgroupManager;
 use nix::unistd::{close, write};
 use nix::unistd::{Gid, Pid, Uid};
 use oci_spec::runtime::{LinuxNamespaceType, LinuxResources};
 use procfs::process::Process;
-use std::convert::From;
 
 use super::args::{ContainerArgs, ContainerType};
 use super::container_init_process::container_init_process;
+
+#[derive(Debug, thiserror::Error)]
+pub enum IntermediateProcessError {
+    #[error(transparent)]
+    Channel(#[from] channel::ChannelError),
+    #[error(transparent)]
+    Namespace(#[from] crate::namespaces::NamespaceError),
+    #[error(transparent)]
+    Syscall(#[from] crate::syscall::SyscallError),
+    #[error("failed to launch init process")]
+    InitProcess(#[source] fork::CloneError),
+    #[error("cgroup error: {0}")]
+    Cgroup(String),
+    #[error(transparent)]
+    Procfs(#[from] procfs::ProcError),
+    #[error("exec notify failed")]
+    ExecNotify(#[source] nix::Error),
+    #[error(transparent)]
+    MissingSpec(#[from] crate::error::MissingSpecError),
+}
+
+type Result<T> = std::result::Result<T, IntermediateProcessError>;
 
 pub fn container_intermediate_process(
     args: &ContainerArgs,
@@ -18,10 +39,12 @@ pub fn container_intermediate_process(
 ) -> Result<Pid> {
     let (inter_sender, inter_receiver) = intermediate_chan;
     let (init_sender, init_receiver) = init_chan;
-    let command = &args.syscall;
+    let command = args.syscall.create_syscall();
     let spec = &args.spec;
-    let linux = spec.linux().as_ref().context("no linux in spec")?;
-    let namespaces = Namespaces::from(linux.namespaces().as_ref());
+    let linux = spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
+    let namespaces = Namespaces::try_from(linux.namespaces().as_ref())?;
+    let cgroup_manager =
+        libcgroups::common::create_cgroup_manager(args.cgroup_config.to_owned()).unwrap();
 
     // this needs to be done before we create the init process, so that the init
     // process will already be captured by the cgroup. It also needs to be done
@@ -34,27 +57,30 @@ pub fn container_intermediate_process(
     // the cgroup of the process will form the root of the cgroup hierarchy in
     // the cgroup namespace.
     apply_cgroups(
-        args.cgroup_manager.as_ref(),
+        &cgroup_manager,
         linux.resources().as_ref(),
         matches!(args.container_type, ContainerType::InitContainer),
-    )
-    .context("failed to apply cgroups")?;
+    )?;
 
     // if new user is specified in specification, this will be true and new
     // namespace will be created, check
     // https://man7.org/linux/man-pages/man7/user_namespaces.7.html for more
     // information
-    if let Some(user_namespace) = namespaces.get(LinuxNamespaceType::User) {
-        namespaces
-            .unshare_or_setns(user_namespace)
-            .with_context(|| format!("failed to enter user namespace: {:?}", user_namespace))?;
+    if let Some(user_namespace) = namespaces.get(LinuxNamespaceType::User)? {
+        namespaces.unshare_or_setns(user_namespace)?;
         if user_namespace.path().is_none() {
-            log::debug!("creating new user namespace");
+            tracing::debug!("creating new user namespace");
             // child needs to be dumpable, otherwise the non root parent is not
             // allowed to write the uid/gid maps
             prctl::set_dumpable(true).unwrap();
-            main_sender.identifier_mapping_request()?;
-            inter_receiver.wait_for_mapping_ack()?;
+            main_sender.identifier_mapping_request().map_err(|err| {
+                tracing::error!("failed to send id mapping request: {}", err);
+                err
+            })?;
+            inter_receiver.wait_for_mapping_ack().map_err(|err| {
+                tracing::error!("failed to receive id mapping ack: {}", err);
+                err
+            })?;
             prctl::set_dumpable(false).unwrap();
         }
 
@@ -64,82 +90,117 @@ pub fn container_intermediate_process(
         // configuring the container process will require root, even though the
         // root in the user namespace likely is mapped to an non-privileged user
         // on the parent user namespace.
-        command.set_id(Uid::from_raw(0), Gid::from_raw(0)).context(
-            "failed to configure uid and gid root in the beginning of a new user namespace",
-        )?;
+        command.set_id(Uid::from_raw(0), Gid::from_raw(0))?;
     }
 
     // set limits and namespaces to the process
-    let proc = spec.process().as_ref().context("no process in spec")?;
+    let proc = spec.process().as_ref().ok_or(MissingSpecError::Process)?;
     if let Some(rlimits) = proc.rlimits() {
         for rlimit in rlimits {
-            command.set_rlimit(rlimit).context("failed to set rlimit")?;
+            command.set_rlimit(rlimit).map_err(|err| {
+                tracing::error!(?err, ?rlimit, "failed to set rlimit");
+                err
+            })?;
         }
     }
 
     // Pid namespace requires an extra fork to enter, so we enter pid namespace now.
-    if let Some(pid_namespace) = namespaces.get(LinuxNamespaceType::Pid) {
-        namespaces
-            .unshare_or_setns(pid_namespace)
-            .with_context(|| format!("failed to enter pid namespace: {:?}", pid_namespace))?;
+    if let Some(pid_namespace) = namespaces.get(LinuxNamespaceType::Pid)? {
+        namespaces.unshare_or_setns(pid_namespace)?;
     }
 
-    // We have to record the pid of the child (container init process), since
-    // the child will be inside the pid namespace. We can't rely on child_ready
-    // to send us the correct pid.
-    let pid = fork::container_fork(|| {
-        // We are inside the forked process here. The first thing we have to do is to close
-        // any unused senders, since fork will make a dup for all the socket.
-        init_sender
-            .close()
-            .context("failed to close receiver in init process")?;
-        inter_sender
-            .close()
-            .context("failed to close sender in the intermediate process")?;
+    // We have to record the pid of the init process. The init process will be
+    // inside the pid namespace, so we can't rely on the init process to send us
+    // the correct pid. We also want to clone the init process as a sibling
+    // process to the intermediate process. The intermediate process is only
+    // used as a jumping board to set the init process to the correct
+    // configuration. The youki main process can decide what to do with the init
+    // process and the intermediate process can just exit safely after the job
+    // is done.
+    let pid = fork::container_clone_sibling("youki:[2:INIT]", || {
+        // We are inside the forked process here. The first thing we have to do
+        // is to close any unused senders, since fork will make a dup for all
+        // the socket.
+        init_sender.close().map_err(|err| {
+            tracing::error!("failed to close receiver in init process: {}", err);
+            IntermediateProcessError::Channel(err)
+        })?;
+        inter_sender.close().map_err(|err| {
+            tracing::error!(
+                "failed to close sender in the intermediate process: {}",
+                err
+            );
+            IntermediateProcessError::Channel(err)
+        })?;
         match container_init_process(args, main_sender, init_receiver) {
             Ok(_) => Ok(0),
             Err(e) => {
                 if let ContainerType::TenantContainer { exec_notify_fd } = args.container_type {
-                    let buf = format!("{}", e);
-                    write(exec_notify_fd, buf.as_bytes())?;
-                    close(exec_notify_fd)?;
+                    let buf = format!("{e}");
+                    write(exec_notify_fd, buf.as_bytes()).map_err(|err| {
+                        tracing::error!("failed to write to exec notify fd: {}", err);
+                        IntermediateProcessError::ExecNotify(err)
+                    })?;
+                    close(exec_notify_fd).map_err(|err| {
+                        tracing::error!("failed to close exec notify fd: {}", err);
+                        IntermediateProcessError::ExecNotify(err)
+                    })?;
                 }
-                Err(e)
+                tracing::error!("failed to initialize container process: {e}");
+                Err(e.into())
             }
         }
+    })
+    .map_err(|err| {
+        tracing::error!("failed to fork init process: {}", err);
+        IntermediateProcessError::InitProcess(err)
     })?;
 
-    // close the  exec_notify_fd in this process
+    // Close the exec_notify_fd in this process
     if let ContainerType::TenantContainer { exec_notify_fd } = args.container_type {
-        close(exec_notify_fd)?;
+        close(exec_notify_fd).map_err(|err| {
+            tracing::error!("failed to close exec notify fd: {}", err);
+            IntermediateProcessError::ExecNotify(err)
+        })?;
     }
 
-    main_sender
-        .intermediate_ready(pid)
-        .context("failed to send child ready from intermediate process")?;
+    main_sender.intermediate_ready(pid).map_err(|err| {
+        tracing::error!("failed to wait on intermediate process: {}", err);
+        err
+    })?;
 
     // Close unused senders here so we don't have lingering socket around.
-    main_sender
-        .close()
-        .context("failed to close unused main sender")?;
-    inter_sender
-        .close()
-        .context("failed to close sender in the intermediate process")?;
-    init_sender
-        .close()
-        .context("failed to close unused init sender")?;
+    main_sender.close().map_err(|err| {
+        tracing::error!("failed to close unused main sender: {}", err);
+        err
+    })?;
+    inter_sender.close().map_err(|err| {
+        tracing::error!(
+            "failed to close sender in the intermediate process: {}",
+            err
+        );
+        err
+    })?;
+    init_sender.close().map_err(|err| {
+        tracing::error!("failed to close unused init sender: {}", err);
+        err
+    })?;
     Ok(pid)
 }
 
-fn apply_cgroups<C: CgroupManager + ?Sized>(
+fn apply_cgroups<
+    C: CgroupManager<Error = E> + ?Sized,
+    E: std::error::Error + Send + Sync + 'static,
+>(
     cmanager: &C,
     resources: Option<&LinuxResources>,
     init: bool,
-) -> Result<(), Error> {
+) -> Result<()> {
     let pid = Pid::from_raw(Process::myself()?.pid());
-    cmanager
-        .add_task(pid)
-        .with_context(|| format!("failed to add task {} to cgroup manager", pid))?;
+    cmanager.add_task(pid).map_err(|err| {
+        tracing::error!(?pid, ?err, ?init, "failed to add task to cgroup");
+        IntermediateProcessError::Cgroup(err.to_string())
+    })?;
 
     if let Some(resources) = resources {
         if init {
@@ -150,9 +211,10 @@ fn apply_cgroups<C: CgroupManager + ?Sized>(
                 disable_oom_killer: false,
             };
 
-            cmanager
-                .apply(&controller_opt)
-                .context("failed to apply resource limits to cgroup")?;
+            cmanager.apply(&controller_opt).map_err(|err| {
+                tracing::error!(?pid, ?err, ?init, "failed to apply cgroup");
+                IntermediateProcessError::Cgroup(err.to_string())
+            })?;
         }
     }
 

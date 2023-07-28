@@ -1,7 +1,6 @@
 use super::get_result_from_output;
 use crate::utils::get_runtime_path;
 use crate::utils::test_utils::State;
-use crate::utils::{create_temp_dir, generate_uuid};
 use anyhow::anyhow;
 use std::path::Path;
 use std::process::{Command, Stdio};
@@ -62,7 +61,7 @@ fn setup_network_namespace(project_path: &Path, id: &str) -> Result<(), TestResu
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .arg("-t")
-        .arg(format!("{}", pid))
+        .arg(format!("{pid}"))
         .arg("-a")
         .args(vec!["/bin/ip", "link", "set", "up", "dev", "lo"])
         .spawn()
@@ -88,7 +87,7 @@ fn checkpoint(
         return e;
     }
 
-    let temp_dir = match create_temp_dir(&generate_uuid()) {
+    let temp_dir = match tempfile::tempdir() {
         Ok(td) => td,
         Err(e) => {
             return TestResult::Failed(anyhow::anyhow!(
@@ -131,9 +130,8 @@ fn checkpoint(
         .expect("failed to execute checkpoint command")
         .wait_with_output();
 
-    let result = get_result_from_output(checkpoint);
-    if let TestResult::Failed(_) = result {
-        return result;
+    if let Err(e) = get_result_from_output(checkpoint) {
+        return TestResult::Failed(anyhow::anyhow!("failed to execute checkpoint command: {e}"));
     }
 
     // Check for complete checkpoint

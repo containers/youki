@@ -1,3 +1,5 @@
+name: Test for podman
+
 on:
   schedule:
   - cron: "0 0 * * *"
@@ -7,15 +9,19 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
-      - run: sudo apt-get -y update
-      - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev libseccomp-dev libgpgme-dev bats
-      - run: make youki-dev
+      - name: Install just
+        uses: taiki-e/install-action@just
+      - name: Install requirements
+        run: sudo env PATH=$PATH just ci-prepare
+      - run: just youki-dev
       - run: sudo cp youki /usr/local/bin
+      - name: Install requirements for Podman
+        run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev libseccomp-dev libgpgme-dev bats
       - name: Clone podman repository
         uses: actions/checkout@v3
         with:
           repository: containers/podman
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v4
         with:
           go-version: '1.18'
       - name: Build podman
@@ -26,4 +32,4 @@ jobs:
         run: sudo OCI_RUNTIME=/usr/local/bin/youki ./hack/bats 2>&1 | tee build.log 
       - name: Adding Summary
         run: |
-          echo "Total tests: 360 Failed tests: $(cat build.log | grep " ok " | wc -l)" >> $GITHUB_STEP_SUMMARY
+          echo "Total tests: 577 Failed tests: $(cat build.log | grep " ok " | wc -l)" >> $GITHUB_STEP_SUMMARY

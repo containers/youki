@@ -17,6 +17,7 @@ pub use {create::Create, delete::Delete, kill::Kill, start::Start, state::State}
 mod checkpoint;
 mod events;
 mod exec;
+mod features;
 mod list;
 mod pause;
 mod ps;
@@ -26,8 +27,8 @@ mod spec;
 mod update;
 
 pub use {
-    checkpoint::Checkpoint, events::Events, exec::Exec, list::List, pause::Pause, ps::Ps,
-    resume::Resume, run::Run, spec::Spec, update::Update,
+    checkpoint::Checkpoint, events::Events, exec::Exec, features::Features, list::List,
+    pause::Pause, ps::Ps, resume::Resume, run::Run, spec::Spec, update::Update,
 };
 
 // Subcommands parsed by liboci-cli, based on the [OCI
@@ -52,6 +53,7 @@ pub enum CommonCmd {
     Checkpointt(Checkpoint),
     Events(Events),
     Exec(Exec),
+    Features(Features),
     List(List),
     Pause(Pause),
     #[clap(allow_hyphen_values = true)]
@@ -66,12 +68,13 @@ pub enum CommonCmd {
 // flags, but these are commonly accepted by runtimes
 #[derive(Parser, Debug)]
 pub struct GlobalOpts {
-    /// change log level to debug.
-    // Example in future : '--debug     change log level to debug. (default: "warn")'
+    /// set the log file to write youki logs to (default is '/dev/stderr')
+    #[clap(short, long, overrides_with("log"))]
+    pub log: Option<PathBuf>,
+    /// change log level to debug, but the `log-level` flag takes precedence
     #[clap(long)]
     pub debug: bool,
-    #[clap(short, long)]
-    pub log: Option<PathBuf>,
+    /// set the log format ('text' (default), or 'json') (default: "text")
     #[clap(long)]
     pub log_format: Option<String>,
     /// root directory to store container state

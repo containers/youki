@@ -1,7 +1,6 @@
 use super::{Container, ContainerStatus};
-use crate::signal::Signal;
-use anyhow::{bail, Context, Result};
-use libcgroups::common::{create_cgroup_manager, get_cgroup_setup};
+use crate::{error::LibcontainerError, signal::Signal};
+use libcgroups::common::{get_cgroup_setup, CgroupManager};
 use nix::sys::signal::{self};
 
 impl Container {
@@ -11,11 +10,14 @@ impl Container {
     ///
     /// ```no_run
     /// use libcontainer::container::builder::ContainerBuilder;
-    /// use libcontainer::syscall::syscall::create_syscall;
+    /// use libcontainer::syscall::syscall::SyscallType;
     /// use nix::sys::signal::Signal;
     ///
     /// # fn main() -> anyhow::Result<()> {
-    /// let mut container = ContainerBuilder::new("74f1a4cb3801".to_owned(), create_syscall().as_ref())
+    /// let mut container = ContainerBuilder::new(
+    ///     "74f1a4cb3801".to_owned(),
+    ///     SyscallType::default(),
+    /// )
     /// .as_init("/var/run/docker/bundle")
     /// .build()?;
     ///
@@ -23,28 +25,29 @@ impl Container {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn kill<S: Into<Signal>>(&mut self, signal: S, all: bool) -> Result<()> {
-        self.refresh_status()
-            .context("failed to refresh container status")?;
-        if self.can_kill() {
-            self.do_kill(signal, all)?;
-        } else {
-            // just like runc, allow kill --all even if the container is stopped
-            if all && self.status() == ContainerStatus::Stopped {
+    pub fn kill<S: Into<Signal>>(&mut self, signal: S, all: bool) -> Result<(), LibcontainerError> {
+        self.refresh_status()?;
+        match self.can_kill() {
+            true => {
                 self.do_kill(signal, all)?;
-            } else {
-                bail!(
-                    "{} could not be killed because it was {:?}",
-                    self.id(),
-                    self.status()
-                )
+            }
+            false if all && self.status() == ContainerStatus::Stopped => {
+                self.do_kill(signal, all)?;
+            }
+            false => {
+                tracing::error!(id = ?self.id(), status = ?self.status(), "cannot kill container due to incorrect state");
+                return Err(LibcontainerError::IncorrectStatus);
             }
         }
         self.set_status(ContainerStatus::Stopped).save()?;
         Ok(())
     }
 
-    pub(crate) fn do_kill<S: Into<Signal>>(&self, signal: S, all: bool) -> Result<()> {
+    pub(crate) fn do_kill<S: Into<Signal>>(
+        &self,
+        signal: S,
+        all: bool,
+    ) -> Result<(), LibcontainerError> {
         if all {
             self.kill_all_processes(signal)
         } else {
@@ -52,18 +55,21 @@ impl Container {
         }
     }
 
-    fn kill_one_process<S: Into<Signal>>(&self, signal: S) -> Result<()> {
+    fn kill_one_process<S: Into<Signal>>(&self, signal: S) -> Result<(), LibcontainerError> {
         let signal = signal.into().into_raw();
         let pid = self.pid().unwrap();
 
-        log::debug!("kill signal {} to {}", signal, pid);
-        let res = signal::kill(pid, signal);
+        tracing::debug!("kill signal {} to {}", signal, pid);
 
-        match res {
+        match signal::kill(pid, signal) {
+            Ok(_) => {}
             Err(nix::errno::Errno::ESRCH) => {
-                /* the process does not exist, which is what we want */
+                // the process does not exist, which is what we want
             }
-            _ => res?,
+            Err(err) => {
+                tracing::error!(id = ?self.id(), err = ?err, ?pid, ?signal, "failed to kill process");
+                return Err(LibcontainerError::OtherSyscall(err));
+            }
         }
 
         // For cgroup V1, a frozon process cannot respond to signals,
@@ -72,12 +78,14 @@ impl Container {
             match get_cgroup_setup()? {
                 libcgroups::common::CgroupSetup::Legacy
                 | libcgroups::common::CgroupSetup::Hybrid => {
-                    let cgroups_path = self.spec()?.cgroup_path;
-                    let use_systemd = self
-                        .systemd()
-                        .context("container state does not contain cgroup manager")?;
-                    let cmanger = create_cgroup_manager(&cgroups_path, use_systemd, self.id())?;
-                    cmanger.freeze(libcgroups::common::FreezerState::Thawed)?;
+                    let cmanager = libcgroups::common::create_cgroup_manager(
+                        libcgroups::common::CgroupConfig {
+                            cgroup_path: self.spec()?.cgroup_path,
+                            systemd_cgroup: self.systemd(),
+                            container_name: self.id().to_string(),
+                        },
+                    )?;
+                    cmanager.freeze(libcgroups::common::FreezerState::Thawed)?;
                 }
                 libcgroups::common::CgroupSetup::Unified => {}
             }
@@ -85,41 +93,45 @@ impl Container {
         Ok(())
     }
 
-    fn kill_all_processes<S: Into<Signal>>(&self, signal: S) -> Result<()> {
+    fn kill_all_processes<S: Into<Signal>>(&self, signal: S) -> Result<(), LibcontainerError> {
         let signal = signal.into().into_raw();
-        let cgroups_path = self.spec()?.cgroup_path;
-        let use_systemd = self
-            .systemd()
-            .context("container state does not contain cgroup manager")?;
-        let cmanger = create_cgroup_manager(&cgroups_path, use_systemd, self.id())?;
-        let ret = cmanger.freeze(libcgroups::common::FreezerState::Frozen);
-        if ret.is_err() {
-            log::warn!(
-                "failed to freeze container {}, error: {}",
-                self.id(),
-                ret.unwrap_err()
+        let cmanager =
+            libcgroups::common::create_cgroup_manager(libcgroups::common::CgroupConfig {
+                cgroup_path: self.spec()?.cgroup_path,
+                systemd_cgroup: self.systemd(),
+                container_name: self.id().to_string(),
+            })?;
+
+        if let Err(e) = cmanager.freeze(libcgroups::common::FreezerState::Frozen) {
+            tracing::warn!(
+                err = ?e,
+                id = ?self.id(),
+                "failed to freeze container",
             );
         }
-        let pids = cmanger.get_all_pids()?;
-        pids.iter().try_for_each(|&pid| {
-            log::debug!("kill signal {} to {}", signal, pid);
-            let res = signal::kill(pid, signal);
-            match res {
-                Err(nix::errno::Errno::ESRCH) => {
-                    /* the process does not exist, which is what we want */
-                    Ok(())
+
+        let pids = cmanager.get_all_pids()?;
+        pids.iter()
+            .try_for_each(|&pid| {
+                tracing::debug!("kill signal {} to {}", signal, pid);
+                let res = signal::kill(pid, signal);
+                match res {
+                    Err(nix::errno::Errno::ESRCH) => {
+                        // the process does not exist, which is what we want
+                        Ok(())
+                    }
+                    _ => res,
                 }
-                _ => res,
-            }
-        })?;
-        let ret = cmanger.freeze(libcgroups::common::FreezerState::Thawed);
-        if ret.is_err() {
-            log::warn!(
-                "failed to thaw container {}, error: {}",
-                self.id(),
-                ret.unwrap_err()
+            })
+            .map_err(LibcontainerError::OtherSyscall)?;
+        if let Err(err) = cmanager.freeze(libcgroups::common::FreezerState::Thawed) {
+            tracing::warn!(
+                err = ?err,
+                id = ?self.id(),
+                "failed to thaw container",
             );
         }
+
         Ok(())
     }
 }

@@ -1,18 +1,17 @@
 use std::path::Path;
 
-use anyhow::Result;
-
 use super::controller::Controller;
-use crate::common::{self, default_allow_devices, default_devices, ControllerOpt};
+use crate::common::{self, default_allow_devices, default_devices, ControllerOpt, WrappedIoError};
 use oci_spec::runtime::LinuxDeviceCgroup;
 
 pub struct Devices {}
 
 impl Controller for Devices {
+    type Error = WrappedIoError;
     type Resource = ();
 
-    fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()> {
-        log::debug!("Apply Devices cgroup config");
+    fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<(), Self::Error> {
+        tracing::debug!("Apply Devices cgroup config");
 
         if let Some(devices) = controller_opt.resources.devices().as_ref() {
             for d in devices {
@@ -39,7 +38,7 @@ impl Controller for Devices {
 }
 
 impl Devices {
-    fn apply_device(device: &LinuxDeviceCgroup, cgroup_root: &Path) -> Result<()> {
+    fn apply_device(device: &LinuxDeviceCgroup, cgroup_root: &Path) -> Result<(), WrappedIoError> {
         let path = if device.allow() {
             cgroup_root.join("devices.allow")
         } else {
@@ -54,33 +53,31 @@ impl Devices {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test::create_temp_dir;
     use crate::test::set_fixture;
     use oci_spec::runtime::{LinuxDeviceCgroupBuilder, LinuxDeviceType};
     use std::fs::read_to_string;
 
     #[test]
     fn test_set_default_devices() {
-        let tmp =
-            create_temp_dir("test_set_default_devices").expect("create temp directory for test");
+        let tmp = tempfile::tempdir().unwrap();
 
         default_allow_devices().iter().for_each(|d| {
             // NOTE: We reset the fixtures every iteration because files aren't appended
             // so what happens in the tests is you get strange overwrites which can contain
             // remaining bytes from the last iteration. Resetting the files more appropriately
             // mocks the behavior of cgroup files.
-            set_fixture(&tmp, "devices.allow", "").expect("create allowed devices list");
-            set_fixture(&tmp, "devices.deny", "").expect("create denied devices list");
+            set_fixture(tmp.path(), "devices.allow", "").expect("create allowed devices list");
+            set_fixture(tmp.path(), "devices.deny", "").expect("create denied devices list");
 
-            Devices::apply_device(d, &tmp).expect("Apply default device");
+            Devices::apply_device(d, tmp.path()).expect("Apply default device");
             println!("Device: {}", d.to_string());
             if d.allow() {
                 let allowed_content =
-                    read_to_string(tmp.join("devices.allow")).expect("read to string");
+                    read_to_string(tmp.path().join("devices.allow")).expect("read to string");
                 assert_eq!(allowed_content, d.to_string());
             } else {
                 let denied_content =
-                    read_to_string(tmp.join("devices.deny")).expect("read to string");
+                    read_to_string(tmp.path().join("devices.deny")).expect("read to string");
                 assert_eq!(denied_content, d.to_string());
             }
         });
@@ -88,7 +85,7 @@ mod tests {
 
     #[test]
     fn test_set_mock_devices() {
-        let tmp = create_temp_dir("test_set_mock_devices").expect("create temp directory for test");
+        let tmp = tempfile::tempdir().unwrap();
         [
             LinuxDeviceCgroupBuilder::default()
                 .allow(true)
@@ -121,18 +118,18 @@ mod tests {
         ]
         .iter()
         .for_each(|d| {
-            set_fixture(&tmp, "devices.allow", "").expect("create allowed devices list");
-            set_fixture(&tmp, "devices.deny", "").expect("create denied devices list");
+            set_fixture(tmp.path(), "devices.allow", "").expect("create allowed devices list");
+            set_fixture(tmp.path(), "devices.deny", "").expect("create denied devices list");
 
-            Devices::apply_device(d, &tmp).expect("Apply default device");
+            Devices::apply_device(d, tmp.path()).expect("Apply default device");
             println!("Device: {}", d.to_string());
             if d.allow() {
                 let allowed_content =
-                    read_to_string(tmp.join("devices.allow")).expect("read to string");
+                    read_to_string(tmp.path().join("devices.allow")).expect("read to string");
                 assert_eq!(allowed_content, d.to_string());
             } else {
                 let denied_content =
-                    read_to_string(tmp.join("devices.deny")).expect("read to string");
+                    read_to_string(tmp.path().join("devices.deny")).expect("read to string");
                 assert_eq!(denied_content, d.to_string());
             }
         });
@@ -140,35 +137,35 @@ mod tests {
 
     quickcheck! {
         fn property_test_apply_device(device: LinuxDeviceCgroup) -> bool {
-            let tmp = create_temp_dir("property_test_apply_device").expect("create temp directory for test");
-            set_fixture(&tmp, "devices.allow", "").expect("create allowed devices list");
-            set_fixture(&tmp, "devices.deny", "").expect("create denied devices list");
-            Devices::apply_device(&device, &tmp).expect("Apply default device");
+            let tmp = tempfile::tempdir().unwrap();
+            set_fixture(tmp.path(), "devices.allow", "").expect("create allowed devices list");
+            set_fixture(tmp.path(), "devices.deny", "").expect("create denied devices list");
+            Devices::apply_device(&device, tmp.path()).expect("Apply default device");
             if device.allow() {
                 let allowed_content =
-                    read_to_string(tmp.join("devices.allow")).expect("read to string");
+                    read_to_string(tmp.path().join("devices.allow")).expect("read to string");
                 allowed_content == device.to_string()
             } else {
                 let denied_content =
-                    read_to_string(tmp.join("devices.deny")).expect("read to string");
+                    read_to_string(tmp.path().join("devices.deny")).expect("read to string");
                 denied_content == device.to_string()
             }
         }
 
         fn property_test_apply_multiple_devices(devices: Vec<LinuxDeviceCgroup>) -> bool {
-            let tmp = create_temp_dir("property_test_apply_multiple_devices").expect("create temp directory for test");
+            let tmp = tempfile::tempdir().unwrap();
             devices.iter()
                 .map(|device| {
-                    set_fixture(&tmp, "devices.allow", "").expect("create allowed devices list");
-                    set_fixture(&tmp, "devices.deny", "").expect("create denied devices list");
-                    Devices::apply_device(device, &tmp).expect("Apply default device");
+                    set_fixture(tmp.path(), "devices.allow", "").expect("create allowed devices list");
+                    set_fixture(tmp.path(), "devices.deny", "").expect("create denied devices list");
+                    Devices::apply_device(device, tmp.path()).expect("Apply default device");
                     if device.allow() {
                         let allowed_content =
-                            read_to_string(tmp.join("devices.allow")).expect("read to string");
+                            read_to_string(tmp.path().join("devices.allow")).expect("read to string");
                         allowed_content == device.to_string()
                     } else {
                         let denied_content =
-                            read_to_string(tmp.join("devices.deny")).expect("read to string");
+                            read_to_string(tmp.path().join("devices.deny")).expect("read to string");
                         denied_content == device.to_string()
                     }
                 })

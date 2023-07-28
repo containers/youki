@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use anyhow::{bail, Context, Result};
 use dbus::arg::RefArg;
 use oci_spec::runtime::LinuxCpu;
 
@@ -12,18 +11,25 @@ pub const CPU_QUOTA: &str = "CPUQuotaPerSecUSec";
 pub const CPU_PERIOD: &str = "CPUQuotaPeriodUSec";
 const MICROSECS_PER_SEC: u64 = 1_000_000;
 
+#[derive(thiserror::Error, Debug)]
+pub enum SystemdCpuError {
+    #[error("realtime is not supported on systemd v2 yet")]
+    RealtimeSystemd,
+}
+
 pub(crate) struct Cpu {}
 
 impl Controller for Cpu {
+    type Error = SystemdCpuError;
+
     fn apply(
         options: &ControllerOpt,
         _: u32,
         properties: &mut HashMap<&str, Box<dyn RefArg>>,
-    ) -> Result<()> {
+    ) -> Result<(), Self::Error> {
         if let Some(cpu) = options.resources.cpu() {
-            log::debug!("Applying cpu resource restrictions");
-            return Self::apply(cpu, properties)
-                .context("could not apply cpu resource restrictions");
+            tracing::debug!("Applying cpu resource restrictions");
+            Self::apply(cpu, properties)?;
         }
 
         Ok(())
@@ -31,9 +37,12 @@ impl Controller for Cpu {
 }
 
 impl Cpu {
-    fn apply(cpu: &LinuxCpu, properties: &mut HashMap<&str, Box<dyn RefArg>>) -> Result<()> {
+    fn apply(
+        cpu: &LinuxCpu,
+        properties: &mut HashMap<&str, Box<dyn RefArg>>,
+    ) -> Result<(), SystemdCpuError> {
         if Self::is_realtime_requested(cpu) {
-            bail!("realtime is not supported on systemd v2 yet");
+            return Err(SystemdCpuError::RealtimeSystemd);
         }
 
         if let Some(mut shares) = cpu.shares() {
@@ -77,11 +86,12 @@ pub fn convert_shares_to_cgroup2(shares: u64) -> u64 {
         return 0;
     }
 
-    1 + ((shares - 2) * 9999) / 262142
+    1 + ((shares.saturating_sub(2)) * 9999) / 262142
 }
 
 #[cfg(test)]
 mod tests {
+    use anyhow::{Context, Result};
     use dbus::arg::ArgType;
     use oci_spec::runtime::LinuxCpuBuilder;
 
@@ -97,7 +107,7 @@ mod tests {
         let mut properties: HashMap<&str, Box<dyn RefArg>> = HashMap::new();
 
         // act
-        Cpu::apply(&cpu, &mut properties).context("apply cpu")?;
+        Cpu::apply(&cpu, &mut properties)?;
 
         // assert
         assert!(properties.contains_key(CPU_WEIGHT));
@@ -119,7 +129,7 @@ mod tests {
             let mut properties: HashMap<&str, Box<dyn RefArg>> = HashMap::new();
 
             // act
-            Cpu::apply(&cpu, &mut properties).context("apply cpu")?;
+            Cpu::apply(&cpu, &mut properties)?;
 
             // assert
             assert!(properties.contains_key(CPU_QUOTA));
@@ -143,7 +153,7 @@ mod tests {
             let mut properties: HashMap<&str, Box<dyn RefArg>> = HashMap::new();
 
             // act
-            Cpu::apply(&cpu, &mut properties).context("apply cpu")?;
+            Cpu::apply(&cpu, &mut properties)?;
 
             // assert
             assert!(properties.contains_key(CPU_PERIOD));

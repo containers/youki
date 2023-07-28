@@ -16,7 +16,7 @@ pub mod libc {
 pub mod libbpf_sys {
     pub fn bpf_prog_load(
         _type_: libbpf_sys::bpf_prog_type,
-        _name: *const i8,
+        _name: *const ::std::os::raw::c_char,
         _license: *const ::std::os::raw::c_char,
         _insns: *const libbpf_sys::bpf_insn,
         _insns_cnt: libbpf_sys::size_t,

@@ -16,6 +16,7 @@ Interface](https://github.com/opencontainers/runtime-tools/blob/master/docs/comm
 | checkpoint |            |                   | ✅   | ✅   |       |
 | events     | ✅         |                   | ✅   |      | ✅    |
 | exec       | ✅         |                   | ✅   | ✅   | ✅    |
+| features   | ✅         |                   | ✅   |      |       |
 | list       | ✅         |                   | ✅   | ✅   | ✅    |
 | pause      | ✅         |                   | ✅   | ✅   | ✅    |
 | ps         | ✅         |                   | ✅   | ✅   | ✅    |

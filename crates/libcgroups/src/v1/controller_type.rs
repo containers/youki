@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-#[derive(Hash, PartialEq, Eq, Debug, Clone)]
+#[derive(Hash, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum ControllerType {
     Cpu,
     CpuAcct,
@@ -33,7 +33,7 @@ impl Display for ControllerType {
             Self::Freezer => "freezer",
         };
 
-        write!(f, "{}", print)
+        write!(f, "{print}")
     }
 }
 

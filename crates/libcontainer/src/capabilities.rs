@@ -1,9 +1,8 @@
 //! Handles Management of Capabilities
-use crate::syscall::Syscall;
+use crate::syscall::{Syscall, SyscallError};
 use caps::Capability as CapsCapability;
 use caps::*;
 
-use anyhow::Result;
 use oci_spec::runtime::{Capabilities, Capability as SpecCapability, LinuxCapabilities};
 
 /// Converts a list of capability types to capabilities has set
@@ -124,15 +123,20 @@ impl CapabilityExt for SpecCapability {
 /// reset capabilities of process calling this to effective capabilities
 /// effective capability set is set of capabilities used by kernel to perform checks
 /// see <https://man7.org/linux/man-pages/man7/capabilities.7.html> for more information
-pub fn reset_effective<S: Syscall + ?Sized>(syscall: &S) -> Result<()> {
-    log::debug!("reset all caps");
-    syscall.set_capability(CapSet::Effective, &caps::all())?;
+pub fn reset_effective<S: Syscall + ?Sized>(syscall: &S) -> Result<(), SyscallError> {
+    tracing::debug!("reset all caps");
+    // permitted capabilities are all the capabilities that we are allowed to acquire
+    let permitted = caps::read(None, CapSet::Permitted)?;
+    syscall.set_capability(CapSet::Effective, &permitted)?;
     Ok(())
 }
 
 /// Drop any extra granted capabilities, and reset to defaults which are in oci specification
-pub fn drop_privileges<S: Syscall + ?Sized>(cs: &LinuxCapabilities, syscall: &S) -> Result<()> {
-    log::debug!("dropping bounding capabilities to {:?}", cs.bounding());
+pub fn drop_privileges<S: Syscall + ?Sized>(
+    cs: &LinuxCapabilities,
+    syscall: &S,
+) -> Result<(), SyscallError> {
+    tracing::debug!("dropping bounding capabilities to {:?}", cs.bounding());
     if let Some(bounding) = cs.bounding() {
         syscall.set_capability(CapSet::Bounding, &to_set(bounding))?;
     }
@@ -152,7 +156,7 @@ pub fn drop_privileges<S: Syscall + ?Sized>(cs: &LinuxCapabilities, syscall: &S)
     if let Some(ambient) = cs.ambient() {
         // check specifically for ambient, as those might not always be available
         if let Err(e) = syscall.set_capability(CapSet::Ambient, &to_set(ambient)) {
-            log::error!("failed to set ambient capabilities: {}", e);
+            tracing::error!("failed to set ambient capabilities: {}", e);
         }
     }
 
@@ -170,13 +174,14 @@ mod tests {
     #[test]
     fn test_reset_effective() {
         let test_command = TestHelperSyscall::default();
+        let permitted_caps = caps::read(None, CapSet::Permitted).unwrap();
         assert!(reset_effective(&test_command).is_ok());
         let set_capability_args: Vec<_> = test_command
             .get_set_capability_args()
             .into_iter()
             .map(|(_capset, caps)| caps)
             .collect();
-        assert_eq!(set_capability_args, vec![caps::all()]);
+        assert_eq!(set_capability_args, vec![permitted_caps]);
     }
 
     #[test]
@@ -557,7 +562,7 @@ mod tests {
 
         let tests = vec![
             Testcase {
-                name: format!("all LinuxCapabilities fields with caps: {:?}", cps),
+                name: format!("all LinuxCapabilities fields with caps: {cps:?}"),
                 input: LinuxCapabilitiesBuilder::default()
                     .bounding(cps.clone().into_iter().collect::<Capabilities>())
                     .effective(cps.clone().into_iter().collect::<Capabilities>())
@@ -575,7 +580,7 @@ mod tests {
                 ],
             },
             Testcase {
-                name: format!("partial LinuxCapabilities fields with caps: {:?}", cps),
+                name: format!("partial LinuxCapabilities fields with caps: {cps:?}"),
                 input: LinuxCapabilitiesBuilder::default()
                     .bounding(cps.clone().into_iter().collect::<Capabilities>())
                     .effective(cps.clone().into_iter().collect::<Capabilities>())
@@ -591,7 +596,7 @@ mod tests {
                 ],
             },
             Testcase {
-                name: format!("empty LinuxCapabilities fields with caps: {:?}", cps),
+                name: format!("empty LinuxCapabilities fields with caps: {cps:?}"),
                 input: LinuxCapabilitiesBuilder::default()
                     .bounding(HashSet::new())
                     .effective(HashSet::new())

@@ -1,6 +1,5 @@
 //! Returns *nix signal enum value from passed string
 
-use anyhow::{bail, Context, Result};
 use nix::sys::signal::Signal as NixSignal;
 use std::convert::TryFrom;
 
@@ -8,11 +7,18 @@ use std::convert::TryFrom;
 #[derive(Debug)]
 pub struct Signal(NixSignal);
 
+#[derive(Debug, thiserror::Error)]
+pub enum SignalError<T> {
+    #[error("invalid signal: {0}")]
+    InvalidSignal(T),
+}
+
 impl TryFrom<&str> for Signal {
-    type Error = anyhow::Error;
+    type Error = SignalError<String>;
 
     fn try_from(s: &str) -> Result<Self, Self::Error> {
         use NixSignal::*;
+
         Ok(match s.to_ascii_uppercase().as_str() {
             "1" | "HUP" | "SIGHUP" => SIGHUP,
             "2" | "INT" | "SIGINT" => SIGINT,
@@ -45,18 +51,18 @@ impl TryFrom<&str> for Signal {
             "29" | "IO" | "SIGIO" => SIGIO,
             "30" | "PWR" | "SIGPWR" => SIGPWR,
             "31" | "SYS" | "SIGSYS" => SIGSYS,
-            _ => bail! {"{} is not a valid signal", s},
+            _ => return Err(SignalError::InvalidSignal(s.to_string())),
         })
         .map(Signal)
     }
 }
 
 impl TryFrom<i32> for Signal {
-    type Error = anyhow::Error;
+    type Error = SignalError<i32>;
 
     fn try_from(value: i32) -> Result<Self, Self::Error> {
         NixSignal::try_from(value)
-            .with_context(|| format!("{} is not a valid signal", value))
+            .map_err(|_| SignalError::InvalidSignal(value))
             .map(Signal)
     }
 }

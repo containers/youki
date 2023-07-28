@@ -1,22 +1,21 @@
 use std::path::Path;
 
-use anyhow::{Context, Result};
-
-use super::Controller;
-use crate::common::{self, ControllerOpt};
+use crate::common::{self, ControllerOpt, WrappedIoError};
 use oci_spec::runtime::LinuxNetwork;
+
+use super::controller::Controller;
 
 pub struct NetworkPriority {}
 
 impl Controller for NetworkPriority {
+    type Error = WrappedIoError;
     type Resource = LinuxNetwork;
 
-    fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<()> {
-        log::debug!("Apply NetworkPriority cgroup config");
+    fn apply(controller_opt: &ControllerOpt, cgroup_root: &Path) -> Result<(), Self::Error> {
+        tracing::debug!("Apply NetworkPriority cgroup config");
 
         if let Some(network) = Self::needs_to_handle(controller_opt) {
-            Self::apply(cgroup_root, network)
-                .context("failed to apply network priority resource restrictions")?;
+            Self::apply(cgroup_root, network)?;
         }
 
         Ok(())
@@ -28,7 +27,7 @@ impl Controller for NetworkPriority {
 }
 
 impl NetworkPriority {
-    fn apply(root_path: &Path, network: &LinuxNetwork) -> Result<()> {
+    fn apply(root_path: &Path, network: &LinuxNetwork) -> Result<(), WrappedIoError> {
         if let Some(ni_priorities) = network.priorities() {
             let priorities: String = ni_priorities.iter().map(|p| p.to_string()).collect();
             common::write_cgroup_file_str(root_path.join("net_prio.ifpriomap"), priorities.trim())?;
@@ -41,14 +40,13 @@ impl NetworkPriority {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test::{create_temp_dir, set_fixture};
+    use crate::test::set_fixture;
     use oci_spec::runtime::{LinuxInterfacePriorityBuilder, LinuxNetworkBuilder};
 
     #[test]
     fn test_apply_network_priorites() {
-        let tmp = create_temp_dir("test_apply_network_priorites")
-            .expect("create temp directory for test");
-        set_fixture(&tmp, "net_prio.ifpriomap", "").expect("set fixture for priority map");
+        let tmp = tempfile::tempdir().unwrap();
+        set_fixture(tmp.path(), "net_prio.ifpriomap", "").expect("set fixture for priority map");
         let priorities = vec![
             LinuxInterfacePriorityBuilder::default()
                 .name("a")
@@ -67,10 +65,10 @@ mod tests {
             .build()
             .unwrap();
 
-        NetworkPriority::apply(&tmp, &network).expect("apply network priorities");
+        NetworkPriority::apply(tmp.path(), &network).expect("apply network priorities");
 
-        let content =
-            std::fs::read_to_string(tmp.join("net_prio.ifpriomap")).expect("Read classID contents");
+        let content = std::fs::read_to_string(tmp.path().join("net_prio.ifpriomap"))
+            .expect("Read classID contents");
         assert_eq!(priorities_string.trim(), content);
     }
 }

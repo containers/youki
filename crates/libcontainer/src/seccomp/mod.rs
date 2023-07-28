@@ -1,6 +1,3 @@
-use anyhow::bail;
-use anyhow::Context;
-use anyhow::Result;
 use libseccomp::ScmpAction;
 use libseccomp::ScmpArch;
 use libseccomp::ScmpArgCompare;
@@ -12,7 +9,51 @@ use oci_spec::runtime::LinuxSeccomp;
 use oci_spec::runtime::LinuxSeccompAction;
 use oci_spec::runtime::LinuxSeccompFilterFlag;
 use oci_spec::runtime::LinuxSeccompOperator;
+use std::num::TryFromIntError;
 use std::os::unix::io;
+
+#[derive(Debug, thiserror::Error)]
+pub enum SeccompError {
+    #[error("failed to translate trace action due to failed to convert errno {errno} into i16")]
+    TraceAction { source: TryFromIntError, errno: i32 },
+    #[error("SCMP_ACT_NOTIFY cannot be used as default action")]
+    NotifyAsDefaultAction,
+    #[error("SCMP_ACT_NOTIFY cannot be used for the write syscall")]
+    NotifyWriteSyscall,
+    #[error("failed to add arch to seccomp")]
+    AddArch {
+        source: libseccomp::error::SeccompError,
+        arch: Arch,
+    },
+    #[error("failed to load seccomp context")]
+    LoadContext {
+        source: libseccomp::error::SeccompError,
+    },
+    #[error("failed to get seccomp notify id")]
+    GetNotifyId {
+        source: libseccomp::error::SeccompError,
+    },
+    #[error("failed to add rule to seccomp")]
+    AddRule {
+        source: libseccomp::error::SeccompError,
+    },
+    #[error("failed to create new seccomp filter")]
+    NewFilter {
+        source: libseccomp::error::SeccompError,
+        default: LinuxSeccompAction,
+    },
+    #[error("failed to set filter flag")]
+    SetFilterFlag {
+        source: libseccomp::error::SeccompError,
+        flag: LinuxSeccompFilterFlag,
+    },
+    #[error("failed to set SCMP_FLTATR_CTL_NNP")]
+    SetCtlNnp {
+        source: libseccomp::error::SeccompError,
+    },
+}
+
+type Result<T> = std::result::Result<T, SeccompError>;
 
 fn translate_arch(arch: Arch) -> ScmpArch {
     match arch {
@@ -37,18 +78,24 @@ fn translate_arch(arch: Arch) -> ScmpArch {
 }
 
 fn translate_action(action: LinuxSeccompAction, errno: Option<u32>) -> Result<ScmpAction> {
+    tracing::trace!(?action, ?errno, "translating action");
     let errno = errno.map(|e| e as i32).unwrap_or(libc::EPERM);
     let action = match action {
         LinuxSeccompAction::ScmpActKill => ScmpAction::KillThread,
         LinuxSeccompAction::ScmpActTrap => ScmpAction::Trap,
         LinuxSeccompAction::ScmpActErrno => ScmpAction::Errno(errno),
-        LinuxSeccompAction::ScmpActTrace => ScmpAction::Trace(errno.try_into()?),
+        LinuxSeccompAction::ScmpActTrace => ScmpAction::Trace(
+            errno
+                .try_into()
+                .map_err(|err| SeccompError::TraceAction { source: err, errno })?,
+        ),
         LinuxSeccompAction::ScmpActAllow => ScmpAction::Allow,
         LinuxSeccompAction::ScmpActKillProcess => ScmpAction::KillProcess,
         LinuxSeccompAction::ScmpActNotify => ScmpAction::Notify,
         LinuxSeccompAction::ScmpActLog => ScmpAction::Log,
     };
 
+    tracing::trace!(?action, "translated action");
     Ok(action)
 }
 
@@ -76,7 +123,7 @@ fn check_seccomp(seccomp: &LinuxSeccomp) -> Result<()> {
     // handle read/close syscall and allow read and close to proceed as
     // expected.
     if seccomp.default_action() == LinuxSeccompAction::ScmpActNotify {
-        bail!("SCMP_ACT_NOTIFY cannot be used as default action");
+        return Err(SeccompError::NotifyAsDefaultAction);
     }
 
     if let Some(syscalls) = seccomp.syscalls() {
@@ -84,7 +131,7 @@ fn check_seccomp(seccomp: &LinuxSeccomp) -> Result<()> {
             if syscall.action() == LinuxSeccompAction::ScmpActNotify {
                 for name in syscall.names() {
                     if name == "write" {
-                        bail!("SCMP_ACT_NOTIFY cannot be used for the write syscall");
+                        return Err(SeccompError::NotifyWriteSyscall);
                     }
                 }
             }
@@ -94,29 +141,37 @@ fn check_seccomp(seccomp: &LinuxSeccomp) -> Result<()> {
     Ok(())
 }
 
+#[tracing::instrument(level = "trace", skip(seccomp))]
 pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
     check_seccomp(seccomp)?;
 
+    tracing::trace!(default_action = ?seccomp.default_action(), errno = ?seccomp.default_errno_ret(), "initializing seccomp");
     let default_action = translate_action(seccomp.default_action(), seccomp.default_errno_ret())?;
-    let mut ctx = ScmpFilterContext::new_filter(translate_action(
-        seccomp.default_action(),
-        seccomp.default_errno_ret(),
-    )?)?;
+    let mut ctx =
+        ScmpFilterContext::new_filter(default_action).map_err(|err| SeccompError::NewFilter {
+            source: err,
+            default: seccomp.default_action(),
+        })?;
 
     if let Some(flags) = seccomp.flags() {
         for flag in flags {
             match flag {
-                LinuxSeccompFilterFlag::SeccompFilterFlagLog => ctx.set_ctl_log(true)?,
-                LinuxSeccompFilterFlag::SeccompFilterFlagTsync => ctx.set_ctl_tsync(true)?,
-                LinuxSeccompFilterFlag::SeccompFilterFlagSpecAllow => ctx.set_ctl_ssb(true)?,
+                LinuxSeccompFilterFlag::SeccompFilterFlagLog => ctx.set_ctl_log(true),
+                LinuxSeccompFilterFlag::SeccompFilterFlagTsync => ctx.set_ctl_tsync(true),
+                LinuxSeccompFilterFlag::SeccompFilterFlagSpecAllow => ctx.set_ctl_ssb(true),
             }
+            .map_err(|err| SeccompError::SetFilterFlag {
+                source: err,
+                flag: *flag,
+            })?;
         }
     }
 
     if let Some(architectures) = seccomp.architectures() {
         for &arch in architectures {
+            tracing::trace!(?arch, "adding architecture");
             ctx.add_arch(translate_arch(arch))
-                .context("failed to add arch to seccomp")?;
+                .map_err(|err| SeccompError::AddArch { source: err, arch })?;
         }
     }
 
@@ -127,7 +182,8 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
     // set it here.  If the seccomp load operation fails without enough
     // privilege, so be it. To prevent this automatic behavior, we unset the
     // value here.
-    ctx.set_ctl_nnp(false)?;
+    ctx.set_ctl_nnp(false)
+        .map_err(|err| SeccompError::SetCtlNnp { source: err })?;
 
     if let Some(syscalls) = seccomp.syscalls() {
         for syscall in syscalls {
@@ -135,8 +191,8 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
             if action == default_action {
                 // When the action is the same as the default action, the rule is redundant. We can
                 // skip this here to avoid failing when we add the rules.
-                log::warn!(
-                    "Detect a seccomp action that is the same as the default action: {:?}",
+                tracing::warn!(
+                    "detect a seccomp action that is the same as the default action: {:?}",
                     syscall
                 );
                 continue;
@@ -148,7 +204,7 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
                     Err(_) => {
                         // If we failed to resolve the syscall by name, likely the kernel
                         // doeesn't support this syscall. So it is safe to skip...
-                        log::warn!(
+                        tracing::warn!(
                             "failed to resolve syscall, likely kernel doesn't support this. {:?}",
                             name
                         );
@@ -175,18 +231,26 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
                                 translate_op(arg.op(), arg.value_two()),
                                 arg.value(),
                             );
+                            tracing::trace!(?name, ?action, ?arg, "add seccomp conditional rule");
                             ctx.add_rule_conditional(action, sc, &[cmp])
-                                .with_context(|| {
-                                    format!(
-                                        "failed to add seccomp action: {:?}. Cmp: {:?} Syscall: {name}",
-                                        &action, cmp,
-                                    )
+                                .map_err(|err| {
+                                    tracing::error!(
+                                        "failed to add seccomp action: {:?}. Cmp: {:?} Syscall: {name}", &action, cmp,
+                                    );
+                                    SeccompError::AddRule {
+                                        source: err,
+                                    }
                                 })?;
                         }
                     }
                     None => {
-                        ctx.add_rule(action, sc).with_context(|| {
-                            format!("failed to add seccomp rule: {:?}. Syscall: {name}", &sc)
+                        tracing::trace!(?name, ?action, "add seccomp rule");
+                        ctx.add_rule(action, sc).map_err(|err| {
+                            tracing::error!(
+                                "failed to add seccomp rule: {:?}. Syscall: {name}",
+                                &sc
+                            );
+                            SeccompError::AddRule { source: err }
                         })?;
                     }
                 }
@@ -198,12 +262,13 @@ pub fn initialize_seccomp(seccomp: &LinuxSeccomp) -> Result<Option<io::RawFd>> {
     // thread must have the CAP_SYS_ADMIN capability in its user namespace, or
     // the thread must already have the no_new_privs bit set.
     // Ref: https://man7.org/linux/man-pages/man2/seccomp.2.html
-    ctx.load().context("failed to load seccomp context")?;
+    ctx.load()
+        .map_err(|err| SeccompError::LoadContext { source: err })?;
 
     let fd = if is_notify(seccomp) {
         Some(
             ctx.get_notify_fd()
-                .context("failed to get seccomp notify fd")?,
+                .map_err(|err| SeccompError::GetNotifyId { source: err })?,
         )
     } else {
         None
@@ -223,8 +288,8 @@ pub fn is_notify(seccomp: &LinuxSeccomp) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::test_utils;
-    use anyhow::Result;
+    use crate::test_utils::{self, TestCallbackError};
+    use anyhow::{Context, Result};
     use oci_spec::runtime::Arch;
     use oci_spec::runtime::{LinuxSeccompBuilder, LinuxSyscallBuilder};
     use serial_test::serial;
@@ -258,17 +323,20 @@ mod tests {
 
         test_utils::test_in_child_process(|| {
             let _ = prctl::set_no_new_privileges(true);
-            initialize_seccomp(&seccomp_profile)?;
+            initialize_seccomp(&seccomp_profile).expect("failed to initialize seccomp");
             let ret = nix::unistd::getcwd();
             if ret.is_ok() {
-                bail!("getcwd didn't error out as seccomp profile specified");
+                Err(TestCallbackError::Custom(
+                    "getcwd didn't error out as seccomp profile specified".to_string(),
+                ))?;
             }
 
             if let Some(errno) = ret.err() {
                 if errno != nix::errno::from_i32(expect_error) {
-                    bail!(
-                        "getcwd failed but we didn't get the expected error from seccomp profile: {}", errno
-                    );
+                    Err(TestCallbackError::Custom(format!(
+                        "getcwd failed but we didn't get the expected error from seccomp profile: {}",
+                        errno
+                    )))?;
                 }
             }
 
@@ -290,7 +358,7 @@ mod tests {
         let seccomp_profile = spec.linux().as_ref().unwrap().seccomp().as_ref().unwrap();
         test_utils::test_in_child_process(|| {
             let _ = prctl::set_no_new_privileges(true);
-            initialize_seccomp(seccomp_profile)?;
+            initialize_seccomp(seccomp_profile).expect("failed to initialize seccomp");
 
             Ok(())
         })?;
@@ -312,9 +380,12 @@ mod tests {
             .build()?;
         test_utils::test_in_child_process(|| {
             let _ = prctl::set_no_new_privileges(true);
-            let fd = initialize_seccomp(&seccomp_profile)?;
+            let fd =
+                initialize_seccomp(&seccomp_profile).expect("failed to initialize seccomp profile");
             if fd.is_none() {
-                bail!("failed to get a seccomp notify fd with notify seccomp profile");
+                Err(TestCallbackError::Custom(
+                    "failed to get a seccomp notify fd with notify seccomp profile".to_string(),
+                ))?;
             }
 
             Ok(())

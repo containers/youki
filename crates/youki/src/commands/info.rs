@@ -29,7 +29,7 @@ pub fn info(_: Info) -> Result<()> {
 /// print Version of Youki
 pub fn print_youki() {
     println!("{:<18}{}", "Version", env!("CARGO_PKG_VERSION"));
-    println!("{:<18}{}", "Commit", env!("VERGEN_GIT_SHA_SHORT"));
+    println!("{:<18}{}", "Commit", env!("VERGEN_GIT_SHA"));
 }
 
 /// Print Kernel Release, Version and Architecture
@@ -140,7 +140,7 @@ pub fn print_cgroup_mounts() {
 
         v1_mounts.sort();
         for cgroup_mount in v1_mounts {
-            println!("{}", cgroup_mount);
+            println!("{cgroup_mount}");
         }
     }
 

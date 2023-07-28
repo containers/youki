@@ -13,7 +13,7 @@ use liboci_cli::Resume;
 // https://man7.org/linux/man-pages/man7/cgroups.7.html
 // https://www.kernel.org/doc/Documentation/cgroup-v1/freezer-subsystem.txt
 pub fn resume(args: Resume, root_path: PathBuf) -> Result<()> {
-    log::debug!("start resuming container {}", args.container_id);
+    tracing::debug!("start resuming container {}", args.container_id);
     let mut container = load_container(root_path, &args.container_id)?;
     container
         .resume()

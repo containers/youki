@@ -1,7 +1,6 @@
-use anyhow::{Context, Result};
 use std::path::Path;
 
-use crate::common::{self, ControllerOpt};
+use crate::common::{self, ControllerOpt, WrappedIoError};
 use oci_spec::runtime::LinuxCpu;
 
 use super::controller::Controller;
@@ -12,10 +11,11 @@ const CGROUP_CPUSET_MEMS: &str = "cpuset.mems";
 pub struct CpuSet {}
 
 impl Controller for CpuSet {
-    fn apply(controller_opt: &ControllerOpt, cgroup_path: &Path) -> Result<()> {
+    type Error = WrappedIoError;
+
+    fn apply(controller_opt: &ControllerOpt, cgroup_path: &Path) -> Result<(), Self::Error> {
         if let Some(cpuset) = &controller_opt.resources.cpu() {
-            Self::apply(cgroup_path, cpuset)
-                .context("failed to apply cpuset resource restrictions")?;
+            Self::apply(cgroup_path, cpuset)?;
         }
 
         Ok(())
@@ -23,7 +23,7 @@ impl Controller for CpuSet {
 }
 
 impl CpuSet {
-    fn apply(path: &Path, cpuset: &LinuxCpu) -> Result<()> {
+    fn apply(path: &Path, cpuset: &LinuxCpu) -> Result<(), WrappedIoError> {
         if let Some(cpus) = &cpuset.cpus() {
             common::write_cgroup_file_str(path.join(CGROUP_CPUSET_CPUS), cpus)?;
         }
@@ -47,36 +47,36 @@ mod tests {
     #[test]
     fn test_set_cpus() {
         // arrange
-        let (tmp, cpus) = setup("test_set_cpus", CGROUP_CPUSET_CPUS);
+        let (tmp, cpus) = setup(CGROUP_CPUSET_CPUS);
         let cpuset = LinuxCpuBuilder::default()
             .cpus("1-3".to_owned())
             .build()
             .unwrap();
 
         // act
-        CpuSet::apply(&tmp, &cpuset).expect("apply cpuset");
+        CpuSet::apply(tmp.path(), &cpuset).expect("apply cpuset");
 
         // assert
         let content = fs::read_to_string(cpus)
-            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPUSET_CPUS));
+            .unwrap_or_else(|_| panic!("read {CGROUP_CPUSET_CPUS} file content"));
         assert_eq!(content, "1-3");
     }
 
     #[test]
     fn test_set_mems() {
         // arrange
-        let (tmp, mems) = setup("test_set_mems", CGROUP_CPUSET_MEMS);
+        let (tmp, mems) = setup(CGROUP_CPUSET_MEMS);
         let cpuset = LinuxCpuBuilder::default()
             .mems("1-3".to_owned())
             .build()
             .unwrap();
 
         // act
-        CpuSet::apply(&tmp, &cpuset).expect("apply cpuset");
+        CpuSet::apply(tmp.path(), &cpuset).expect("apply cpuset");
 
         // assert
         let content = fs::read_to_string(mems)
-            .unwrap_or_else(|_| panic!("read {} file content", CGROUP_CPUSET_MEMS));
+            .unwrap_or_else(|_| panic!("read {CGROUP_CPUSET_MEMS} file content"));
         assert_eq!(content, "1-3");
     }
 }

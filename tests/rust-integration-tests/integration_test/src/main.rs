@@ -4,6 +4,7 @@ mod utils;
 use crate::tests::domainname::get_domainname_tests;
 use crate::tests::hooks::get_hooks_tests;
 use crate::tests::hostname::get_hostname_test;
+use crate::tests::intel_rdt::get_intel_rdt_test;
 use crate::tests::lifecycle::{ContainerCreate, ContainerLifecycle};
 use crate::tests::linux_ns_itype::get_ns_itype_tests;
 use crate::tests::mounts_recursive::get_mounts_recursive_test;
@@ -72,7 +73,7 @@ fn main() -> Result<()> {
     let opts: Opts = Opts::parse();
 
     if let Err(e) = logger::init(opts.debug) {
-        eprintln!("logger could not be initialized: {:?}", e);
+        eprintln!("logger could not be initialized: {e:?}");
     }
 
     let mut tm = TestManager::new();
@@ -94,6 +95,7 @@ fn main() -> Result<()> {
     let hostname = get_hostname_test();
     let mounts_recursive = get_mounts_recursive_test();
     let domainname = get_domainname_tests();
+    let intel_rdt = get_intel_rdt_test();
 
     tm.add_test_group(Box::new(cl));
     tm.add_test_group(Box::new(cc));
@@ -112,6 +114,7 @@ fn main() -> Result<()> {
     tm.add_test_group(Box::new(hostname));
     tm.add_test_group(Box::new(mounts_recursive));
     tm.add_test_group(Box::new(domainname));
+    tm.add_test_group(Box::new(intel_rdt));
 
     tm.add_cleanup(Box::new(cgroups::cleanup_v1));
     tm.add_cleanup(Box::new(cgroups::cleanup_v2));
@@ -132,7 +135,7 @@ fn get_abs_path(rel_path: &Path) -> PathBuf {
         Err(_) => match which::which(rel_path) {
             Ok(path) => path,
             Err(e) => {
-                eprintln!("Error in finding path {:?} : {}\nexiting.", rel_path, e);
+                eprintln!("Error in finding path {rel_path:?} : {e}\nexiting.");
                 std::process::exit(66);
             }
         },
@@ -158,7 +161,7 @@ fn run(opts: Run, test_manager: &TestManager) -> Result<()> {
 
 fn list(test_manager: &TestManager) -> Result<()> {
     for test_group in test_manager.tests_groups() {
-        println!("{}", test_group);
+        println!("{test_group}");
     }
 
     Ok(())

@@ -1,10 +1,6 @@
 //! An interface trait so that rest of Youki can call
 //! necessary functions without having to worry about their
 //! implementation details
-use std::{any::Any, ffi::OsStr, path::Path, sync::Arc};
-
-use anyhow::Result;
-use bitflags::bitflags;
 use caps::{CapSet, CapsHashSet};
 use libc;
 use nix::{
@@ -13,12 +9,14 @@ use nix::{
     sys::stat::{Mode, SFlag},
     unistd::{Gid, Uid},
 };
+use std::{any::Any, ffi::OsStr, path::Path, sync::Arc};
 
 use oci_spec::runtime::LinuxRlimit;
 
 use crate::syscall::{
     linux::{LinuxSyscall, MountAttr},
     test::TestHelperSyscall,
+    Result,
 };
 
 /// This specifies various kernel/other functionalities required for
@@ -56,19 +54,34 @@ pub trait Syscall {
         mount_attr: &MountAttr,
         size: libc::size_t,
     ) -> Result<()>;
+    fn set_io_priority(&self, class: i64, priority: i64) -> Result<()>;
 }
 
-pub fn create_syscall() -> Box<dyn Syscall> {
-    if cfg!(test) {
-        Box::<TestHelperSyscall>::default()
-    } else {
-        Box::new(LinuxSyscall)
+#[derive(Clone, Copy)]
+pub enum SyscallType {
+    Linux,
+    Test,
+}
+
+impl Default for SyscallType {
+    fn default() -> Self {
+        if cfg!(test) {
+            SyscallType::Test
+        } else {
+            SyscallType::Linux
+        }
     }
 }
 
-bitflags! {
-pub struct CloseRange : usize {
-    const NONE = 0b00000000;
-    const UNSHARE = 0b00000010;
-    const CLOEXEC = 0b00000100;
-}}
+impl SyscallType {
+    pub fn create_syscall(&self) -> Box<dyn Syscall> {
+        match self {
+            SyscallType::Linux => Box::new(LinuxSyscall),
+            SyscallType::Test => Box::<TestHelperSyscall>::default(),
+        }
+    }
+}
+
+pub fn create_syscall() -> Box<dyn Syscall> {
+    SyscallType::default().create_syscall()
+}

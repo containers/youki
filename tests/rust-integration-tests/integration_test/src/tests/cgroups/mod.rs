@@ -14,7 +14,7 @@ pub fn cleanup_v1() -> Result<()> {
         let runtime_test = subsystem.join("runtime-test");
         if runtime_test.exists() {
             fs::remove_dir(&runtime_test)
-                .with_context(|| format!("failed to delete {:?}", runtime_test))?;
+                .with_context(|| format!("failed to delete {runtime_test:?}"))?;
         }
     }
 
@@ -25,7 +25,7 @@ pub fn cleanup_v2() -> Result<()> {
     let runtime_test = Path::new("/sys/fs/cgroup/runtime-test");
     if runtime_test.exists() {
         let _: Result<Vec<_>, _> = fs::read_dir(runtime_test)
-            .with_context(|| format!("failed to read {:?}", runtime_test))?
+            .with_context(|| format!("failed to read {runtime_test:?}"))?
             .filter_map(|e| e.ok())
             .map(|e| e.path())
             .filter(|e| e.is_dir())
@@ -33,7 +33,7 @@ pub fn cleanup_v2() -> Result<()> {
             .collect();
 
         fs::remove_dir(runtime_test)
-            .with_context(|| format!("failed to delete {:?}", runtime_test))?;
+            .with_context(|| format!("failed to delete {runtime_test:?}"))?;
     }
 
     Ok(())
@@ -60,7 +60,6 @@ pub fn attach_controller(cgroup_root: &Path, cgroup_path: &Path, controller: &st
 
     let mut components = cgroup_path
         .components()
-        .into_iter()
         .filter(|c| c.ne(&RootDir))
         .peekable();
 
@@ -77,10 +76,6 @@ pub fn attach_controller(cgroup_root: &Path, cgroup_path: &Path, controller: &st
 
 fn write_controller(cgroup_path: &Path, controller: &str) -> Result<()> {
     let controller_file = cgroup_path.join("cgroup.subtree_control");
-    fs::write(controller_file, format!("+{}", controller)).with_context(|| {
-        format!(
-            "failed to attach {} controller to {:?}",
-            controller, cgroup_path
-        )
-    })
+    fs::write(controller_file, format!("+{controller}"))
+        .with_context(|| format!("failed to attach {controller} controller to {cgroup_path:?}"))
 }

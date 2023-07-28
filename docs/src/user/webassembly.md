@@ -10,15 +10,19 @@ There are 3 things you need to do to run a WebAssembly module with youki.
 
 - Run `build.sh` with `-f wasm-wasmedge` option.
 
-    ```console
+    ```bash
     ./scripts/build.sh -o . -r -f wasm-wasmedge
     ```
-    > The `wasm-wasmedge` feature will install WasmEdge Runtime library in the `$HOME/.wasmedge` directory. 
-    > To make the library avaible in your system, run the following command:
+
+    > The `wasm-wasmedge` feature will install WasmEdge Runtime library in the `$HOME/.wasmedge` directory.
+    > To make the library available in your system, run the following command:
+    >
     > ```bash
     > export LD_LIBRARY_PATH=$HOME/.wasmedge/lib
     > ```
+    >
     > or
+    >
     > ```bash
     > source $HOME/.wasmedge/env
     > ```
@@ -26,34 +30,35 @@ There are 3 things you need to do to run a WebAssembly module with youki.
 
 - Run `build.sh` with `-f wasm-wasmer` option.
 
-    ```console
+    ```bash
     ./scripts/build.sh -o . -r -f wasm-wasmer
     ```
 
 ## Build a container image with the WebAssembly module
 
-If you want to run a webassembly module with youki, your config.json has to include either **runc.oci.handler** or **module.wasm.image/variant=compat"**. 
+If you want to run a webassembly module with youki, your config.json has to include either **runc.oci.handler** or **module.wasm.image/variant=compat"**.
 
-It also needs to specifiy a valid .wasm (webassembly binary) or .wat (webassembly test) module as entrypoint for the container. If a wat module is specified it will be compiled to a wasm module by youki before it is executed. The module also needs to be available in the root filesystem of the container obviously.
-
+It also needs to specify a valid .wasm (webassembly binary) or .wat (webassembly test) module as entrypoint for the container. If a wat module is specified it will be compiled to a wasm module by youki before it is executed. The module also needs to be available in the root filesystem of the container obviously.
 
 ```json
 "ociVersion": "1.0.2-dev",
 "annotations": {
-	"run.oci.handler": "wasm"
+    "run.oci.handler": "wasm"
 },
 "process": {
     "args": [
-		"hello.wasm",
-		"hello",
+        "hello.wasm",
+        "hello",
         "world"
-		],
+    ],
+...
+}
 ...
 ```
 
 ### Compile a sample wasm module
 
-A simple wasm module can be created by running 
+A simple wasm module can be created by running
 
 ```console
 rustup target add wasm32-wasi
@@ -75,7 +80,9 @@ fn main() {
     }  
 }
 ```
+
 Then compile the program to WASI.
+
 ```console
 cargo build --target wasm32-wasi
 ```
@@ -104,7 +111,7 @@ sudo buildah build --annotation "module.wasm.image/variant=compat" -t wasm-modul
 
 Run podman with youki as runtime. [^1]
 
-```console
+```bash
 sudo podman --runtime /PATH/WHARE/YOU/BUILT/WITH/WASM-WASMER/youki run localhost/wasm-module 1 2 3
 ```
 

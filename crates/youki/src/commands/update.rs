@@ -4,9 +4,10 @@ use std::path::PathBuf;
 
 use crate::commands::create_cgroup_manager;
 use anyhow::Result;
+use libcgroups::common::CgroupManager;
 use libcgroups::{self, common::ControllerOpt};
+use libcontainer::oci_spec::runtime::{LinuxPidsBuilder, LinuxResources, LinuxResourcesBuilder};
 use liboci_cli::Update;
-use oci_spec::runtime::{LinuxPidsBuilder, LinuxResources, LinuxResourcesBuilder};
 
 pub fn update(args: Update, root_path: PathBuf) -> Result<()> {
     let cmanager = create_cgroup_manager(root_path, &args.container_id)?;
@@ -16,7 +17,9 @@ pub fn update(args: Update, root_path: PathBuf) -> Result<()> {
         linux_res = if resources_path.to_string_lossy() == "-" {
             serde_json::from_reader(io::stdin())?
         } else {
-            serde_json::from_reader(fs::File::open(resources_path)?)?
+            let file = fs::File::open(resources_path)?;
+            let reader = io::BufReader::new(file);
+            serde_json::from_reader(reader)?
         };
     } else {
         let mut builder = LinuxResourcesBuilder::default();

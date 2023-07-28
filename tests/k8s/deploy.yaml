@@ -1,0 +1,26 @@
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: youki
+handler: youki
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  selector:
+    matchLabels:
+      app: nginx
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      runtimeClassName: youki
+      containers:
+      - name: nginx
+        image: nginx:alpine
+        ports:
+        - containerPort: 80

@@ -2,13 +2,13 @@
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::fs;
-use std::io::BufReader;
+use std::io::{BufReader, BufWriter, Write};
 use std::path::PathBuf;
 use std::{fs::File, path::Path};
 
-use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use tracing::instrument;
 
 /// Indicates status of the container
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]
@@ -68,9 +68,30 @@ impl Display for ContainerStatus {
             Self::Paused => "Paused",
         };
 
-        write!(f, "{}", print)
+        write!(f, "{print}")
     }
 }
+
+#[derive(Debug, thiserror::Error)]
+pub enum StateError {
+    #[error("failed to open container state file {state_file_path:?}")]
+    OpenStateFile {
+        state_file_path: PathBuf,
+        source: std::io::Error,
+    },
+    #[error("failed to parse container state file {state_file_path:?}")]
+    ParseStateFile {
+        state_file_path: PathBuf,
+        source: serde_json::Error,
+    },
+    #[error("failed to write container state file {state_file_path:?}")]
+    WriteStateFile {
+        state_file_path: PathBuf,
+        source: std::io::Error,
+    },
+}
+
+type Result<T> = std::result::Result<T, StateError>;
 
 /// Stores the state information of the container
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
@@ -97,7 +118,9 @@ pub struct State {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub creator: Option<u32>,
     // Specifies if systemd should be used to manage cgroups
-    pub use_systemd: Option<bool>,
+    pub use_systemd: bool,
+    // Specifies if the Intel RDT subdirectory needs be cleaned up.
+    pub clean_up_intel_rdt_subdirectory: Option<bool>,
 }
 
 impl State {
@@ -118,10 +141,12 @@ impl State {
             annotations: Some(HashMap::default()),
             created: None,
             creator: None,
-            use_systemd: None,
+            use_systemd: false,
+            clean_up_intel_rdt_subdirectory: None,
         }
     }
 
+    #[instrument(level = "trace")]
     pub fn save(&self, container_root: &Path) -> Result<()> {
         let state_file_path = Self::file_path(container_root);
         let file = fs::OpenOptions::new()
@@ -131,18 +156,70 @@ impl State {
             .create(true)
             .truncate(true)
             .open(&state_file_path)
-            .with_context(|| format!("failed to open {}", state_file_path.display()))?;
-        serde_json::to_writer(&file, self)?;
+            .map_err(|err| {
+                tracing::error!(
+                    state_file_path = ?state_file_path,
+                    err = %err,
+                    "failed to open container state file",
+                );
+                StateError::OpenStateFile {
+                    state_file_path: state_file_path.to_owned(),
+                    source: err,
+                }
+            })?;
+        let mut writer = BufWriter::new(file);
+        serde_json::to_writer(&mut writer, self).map_err(|err| {
+            tracing::error!(
+                ?state_file_path,
+                %err,
+                "failed to parse container state file",
+            );
+            StateError::ParseStateFile {
+                state_file_path: state_file_path.to_owned(),
+                source: err,
+            }
+        })?;
+        writer.flush().map_err(|err| {
+            tracing::error!(
+                ?state_file_path,
+                %err,
+                "failed to write container state file",
+            );
+            StateError::WriteStateFile {
+                state_file_path: state_file_path.to_owned(),
+                source: err,
+            }
+        })?;
+
         Ok(())
     }
 
     pub fn load(container_root: &Path) -> Result<Self> {
         let state_file_path = Self::file_path(container_root);
-        let state_file = File::open(&state_file_path).with_context(|| {
-            format!("failed to open container state file {:?}", state_file_path)
+        let state_file = File::open(&state_file_path).map_err(|err| {
+            tracing::error!(
+                ?state_file_path,
+                %err,
+                "failed to open container state file",
+            );
+            StateError::OpenStateFile {
+                state_file_path: state_file_path.to_owned(),
+                source: err,
+            }
         })?;
 
-        let state: Self = serde_json::from_reader(BufReader::new(state_file))?;
+        let state: Self = serde_json::from_reader(BufReader::new(state_file)).map_err(|err| {
+            tracing::error!(
+                ?state_file_path,
+                %err,
+                "failed to parse container state file",
+            );
+            StateError::ParseStateFile {
+                state_file_path: state_file_path.to_owned(),
+                source: err,
+            }
+        })?;
+
         Ok(state)
     }
 

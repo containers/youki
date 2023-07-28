@@ -1,19 +1,17 @@
+use crate::config::YoukiConfig;
+use crate::container::{ContainerStatus, State};
+use crate::error::LibcontainerError;
+use crate::syscall::syscall::create_syscall;
+
+use chrono::DateTime;
+use chrono::Utc;
+use nix::unistd::Pid;
+use procfs::process::Process;
+
 use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
-
-use anyhow::Result;
-use chrono::DateTime;
-use nix::unistd::Pid;
-
-use chrono::Utc;
-use procfs::process::Process;
-
-use crate::config::YoukiConfig;
-use crate::syscall::syscall::create_syscall;
-
-use crate::container::{ContainerStatus, State};
 
 /// Structure representing the container data
 #[derive(Debug, Clone)]
@@ -40,10 +38,17 @@ impl Container {
         pid: Option<i32>,
         bundle: &Path,
         container_root: &Path,
-    ) -> Result<Self> {
-        let container_root = fs::canonicalize(container_root)?;
+    ) -> Result<Self, LibcontainerError> {
+        let container_root = fs::canonicalize(container_root).map_err(|err| {
+            LibcontainerError::InvalidInput(format!(
+                "invalid container root {container_root:?}: {err:?}"
+            ))
+        })?;
+        let bundle = fs::canonicalize(bundle).map_err(|err| {
+            LibcontainerError::InvalidInput(format!("invalid bundle {bundle:?}: {err:?}"))
+        })?;
+        let state = State::new(container_id, status, pid, bundle);
 
-        let state = State::new(container_id, status, pid, fs::canonicalize(bundle)?);
         Ok(Self {
             state,
             root: container_root,
@@ -117,13 +122,22 @@ impl Container {
         self
     }
 
-    pub fn systemd(&self) -> Option<bool> {
+    pub fn systemd(&self) -> bool {
         self.state.use_systemd
     }
 
     pub fn set_systemd(&mut self, should_use: bool) -> &mut Self {
-        self.state.use_systemd = Some(should_use);
+        self.state.use_systemd = should_use;
         self
+    }
+
+    pub fn set_clean_up_intel_rdt_directory(&mut self, clean_up: bool) -> &mut Self {
+        self.state.clean_up_intel_rdt_subdirectory = Some(clean_up);
+        self
+    }
+
+    pub fn clean_up_intel_rdt_subdirectory(&self) -> Option<bool> {
+        self.state.clean_up_intel_rdt_subdirectory
     }
 
     pub fn status(&self) -> ContainerStatus {
@@ -142,7 +156,7 @@ impl Container {
         self
     }
 
-    pub fn refresh_status(&mut self) -> Result<()> {
+    pub fn refresh_status(&mut self) -> Result<(), LibcontainerError> {
         let new_status = match self.pid() {
             Some(pid) => {
                 // Note that Process::new does not spawn a new process
@@ -171,14 +185,14 @@ impl Container {
         Ok(())
     }
 
-    pub fn refresh_state(&mut self) -> Result<&mut Self> {
+    pub fn refresh_state(&mut self) -> Result<&mut Self, LibcontainerError> {
         let state = State::load(&self.root)?;
         self.state = state;
 
         Ok(self)
     }
 
-    pub fn load(container_root: PathBuf) -> Result<Self> {
+    pub fn load(container_root: PathBuf) -> Result<Self, LibcontainerError> {
         let state = State::load(&container_root)?;
         let mut container = Self {
             state,
@@ -188,12 +202,14 @@ impl Container {
         Ok(container)
     }
 
-    pub fn save(&self) -> Result<()> {
-        log::debug!("Save container status: {:?} in {:?}", self, self.root);
-        self.state.save(&self.root)
+    pub fn save(&self) -> Result<(), LibcontainerError> {
+        tracing::debug!("Save container status: {:?} in {:?}", self, self.root);
+        self.state.save(&self.root)?;
+
+        Ok(())
     }
 
-    pub fn spec(&self) -> Result<YoukiConfig> {
+    pub fn spec(&self) -> Result<YoukiConfig, LibcontainerError> {
         let spec = YoukiConfig::load(&self.root)?;
         Ok(spec)
     }
@@ -213,8 +229,8 @@ pub struct CheckpointOptions {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::create_temp_dir;
     use anyhow::Context;
+    use anyhow::Result;
     use serial_test::serial;
 
     #[test]
@@ -270,11 +286,11 @@ mod tests {
     #[test]
     fn test_get_set_systemd() {
         let mut container = Container::default();
-        assert_eq!(container.systemd(), None);
+        assert!(!container.systemd());
         container.set_systemd(true);
-        assert_eq!(container.systemd(), Some(true));
+        assert!(container.systemd());
         container.set_systemd(false);
-        assert_eq!(container.systemd(), Some(false));
+        assert!(!container.systemd());
     }
 
     #[test]
@@ -288,7 +304,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_refresh_load_save_state() -> Result<()> {
-        let tmp_dir = create_temp_dir("test_refresh_load_save_state")?;
+        let tmp_dir = tempfile::tempdir().unwrap();
         let mut container_1 = Container::new(
             "container_id_1",
             ContainerStatus::Created,
@@ -313,7 +329,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_get_spec() -> Result<()> {
-        let tmp_dir = create_temp_dir("test_get_spec")?;
+        let tmp_dir = tempfile::tempdir().unwrap();
         use oci_spec::runtime::Spec;
         let spec = Spec::default();
         let config =

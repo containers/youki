@@ -1,12 +1,13 @@
 use anyhow::Result;
-use nix;
-use oci_spec::runtime::Mount;
-use oci_spec::runtime::{
+use libcontainer::oci_spec::runtime::Mount;
+use libcontainer::oci_spec::runtime::{
     LinuxBuilder, LinuxIdMappingBuilder, LinuxNamespace, LinuxNamespaceBuilder, LinuxNamespaceType,
     Spec,
 };
+use nix;
 use serde_json::to_writer_pretty;
 use std::fs::File;
+use std::io::{BufWriter, Write};
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -16,12 +17,13 @@ pub fn get_default() -> Result<Spec> {
 
 pub fn get_rootless() -> Result<Spec> {
     // Remove network and user namespace from the default spec
-    let mut namespaces: Vec<LinuxNamespace> = oci_spec::runtime::get_default_namespaces()
-        .into_iter()
-        .filter(|ns| {
-            ns.typ() != LinuxNamespaceType::Network && ns.typ() != LinuxNamespaceType::User
-        })
-        .collect();
+    let mut namespaces: Vec<LinuxNamespace> =
+        libcontainer::oci_spec::runtime::get_default_namespaces()
+            .into_iter()
+            .filter(|ns| {
+                ns.typ() != LinuxNamespaceType::Network && ns.typ() != LinuxNamespaceType::User
+            })
+            .collect();
 
     // Add user namespace
     namespaces.push(
@@ -49,7 +51,7 @@ pub fn get_rootless() -> Result<Spec> {
 
     // Prepare the mounts
 
-    let mut mounts: Vec<Mount> = oci_spec::runtime::get_default_mounts();
+    let mut mounts: Vec<Mount> = libcontainer::oci_spec::runtime::get_default_mounts();
     for mount in &mut mounts {
         if mount.destination().eq(Path::new("/sys")) {
             mount
@@ -89,7 +91,10 @@ pub fn spec(args: liboci_cli::Spec) -> Result<()> {
     };
 
     // write data to config.json
-    to_writer_pretty(&File::create("config.json")?, &spec)?;
+    let file = File::create("config.json")?;
+    let mut writer = BufWriter::new(file);
+    to_writer_pretty(&mut writer, &spec)?;
+    writer.flush()?;
     Ok(())
 }
 
@@ -97,16 +102,18 @@ pub fn spec(args: liboci_cli::Spec) -> Result<()> {
 // Tests become unstable if not serial. The cause is not known.
 mod tests {
     use super::*;
-    use libcontainer::utils::create_temp_dir;
     use serial_test::serial;
 
     #[test]
     #[serial]
     fn test_spec_json() -> Result<()> {
         let spec = get_rootless()?;
-        let tmpdir = create_temp_dir("test_spec_json").expect("failed to create temp dir");
+        let tmpdir = tempfile::tempdir().expect("failed to create temp dir");
         let path = tmpdir.path().join("config.json");
-        to_writer_pretty(&File::create(path)?, &spec)?;
+        let file = File::create(path)?;
+        let mut writer = BufWriter::new(file);
+        to_writer_pretty(&mut writer, &spec)?;
+        writer.flush()?;
         Ok(())
     }
 }

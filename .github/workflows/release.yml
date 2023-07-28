@@ -12,17 +12,18 @@ jobs:
       - uses: actions/checkout@v3
         with:
           submodules: recursive
-      - run: sudo apt-get -y update
-      - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev libseccomp-dev libclang-dev
-      - name: Set up cargo
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
+      - name: Setup Rust toolchain and cache
+        uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
+      - name: Install just
+        uses: taiki-e/install-action@just
+      - name: Install requirements
+        run: sudo env PATH=$PATH just ci-prepare
       - name: Build
-        run: make youki-release
+        run: just youki-release
       - name: test
-        run: make unittest featuretest oci-tests
+        # TODO(utam0k): The feature test needs nightly
+        # run: just unittest featuretest oci-tests
+        run: just unittest oci-tests
 
   upload:
     name: Upload
@@ -30,15 +31,13 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
-      - run: sudo apt-get -y update
-      - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev libseccomp-dev
-      - name: Set up cargo
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
+      - name: Setup Rust toolchain and cache
+        uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
+      - uses: taiki-e/install-action@just
+      - name: Install requirements
+        run: sudo env PATH=$PATH just ci-prepare
       - name: Release build
-        run: make youki-release
+        run: just youki-release
       - name: Create output directory
         run: mkdir output
       - name: Copy files to output
@@ -104,11 +103,8 @@ jobs:
       CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
     steps:
       - uses: actions/checkout@v3
-      - name: Set up cargo
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
+      - name: Setup Rust toolchain and cache
+        uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
       - name: Publish libcgroups
         run: cargo publish -p libcgroups --no-verify
       - name: Publish libcontainer

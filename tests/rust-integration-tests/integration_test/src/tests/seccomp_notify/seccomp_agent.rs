@@ -82,8 +82,9 @@ pub fn recv_seccomp_listener(seccomp_listener: &Path) -> SeccompAgentResult {
     if msg.bytes >= DEFAULT_BUFFER_SIZE {
         bail!("received more than the DEFAULT_BUFFER_SIZE");
     }
+    let msg_bytes = msg.bytes;
 
-    buf.truncate(msg.bytes);
+    buf.truncate(msg_bytes);
 
     let container_process_state: libcontainer::container::ContainerProcessState =
         serde_json::from_slice(&buf[..])

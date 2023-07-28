@@ -95,7 +95,7 @@ fn get_tlb_sizes() -> Vec<String> {
 
 fn validate_tlb(id: &str, size: &str, limit: i64) -> TestResult {
     let root = "/sys/fs/cgroup/hugetlb";
-    let path = format!("{}/{}/hugetlb.{}.limit_in_bytes", root, id, size);
+    let path = format!("{root}/{id}/hugetlb.{size}.limit_in_bytes");
     let val_str = std::fs::read_to_string(path).unwrap();
     let val: i64 = val_str.trim().parse().unwrap();
     if val == limit {

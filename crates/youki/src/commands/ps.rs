@@ -1,5 +1,6 @@
 use crate::commands::create_cgroup_manager;
 use anyhow::{bail, Result};
+use libcgroups::common::CgroupManager;
 use liboci_cli::Ps;
 use std::{path::PathBuf, process::Command};
 
@@ -36,7 +37,7 @@ pub fn ps(args: Ps, root_path: PathBuf) -> Result<()> {
                 let fields: Vec<&str> = line.split_whitespace().collect();
                 let pid: i32 = fields[pid_index].parse()?;
                 if pids.contains(&pid) {
-                    println!("{}", line);
+                    println!("{line}");
                 }
             }
         }

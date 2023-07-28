@@ -1,27 +1,50 @@
 #[cfg(feature = "v1")]
 use super::symlink::Symlink;
-use super::utils::{find_parent_mount, parse_mount, MountOptionConfig};
+use super::{
+    symlink::SymlinkError,
+    utils::{parse_mount, MountOptionConfig},
+};
 use crate::{
-    syscall::{linux, syscall::create_syscall, Syscall},
-    utils,
+    syscall::{linux, syscall::create_syscall, Syscall, SyscallError},
     utils::PathBufExt,
 };
-#[cfg(feature = "v2")]
-use anyhow::anyhow;
-use anyhow::{bail, Context, Result};
 use libcgroups::common::CgroupSetup::{Hybrid, Legacy, Unified};
 #[cfg(feature = "v1")]
 use libcgroups::common::DEFAULT_CGROUP_ROOT;
-use nix::{dir::Dir, errno::Errno, fcntl::OFlag, mount::MsFlags, sys::stat::Mode};
+use nix::{dir::Dir, errno::Errno, fcntl::OFlag, mount::MsFlags, sys::stat::Mode, NixPath};
 use oci_spec::runtime::{Mount as SpecMount, MountBuilder as SpecMountBuilder};
 use procfs::process::{MountInfo, MountOptFields, Process};
+use safe_path;
 use std::fs::{canonicalize, create_dir_all, OpenOptions};
 use std::mem;
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
-
 #[cfg(feature = "v1")]
 use std::{borrow::Cow, collections::HashMap};
+
+#[derive(Debug, thiserror::Error)]
+pub enum MountError {
+    #[error("no source in mount spec")]
+    NoSource,
+    #[error("io error")]
+    Io(#[from] std::io::Error),
+    #[error("syscall")]
+    Syscall(#[from] crate::syscall::SyscallError),
+    #[error("nix error")]
+    Nix(#[from] nix::Error),
+    #[error("failed to build oci spec")]
+    SpecBuild(#[from] oci_spec::OciSpecError),
+    #[error(transparent)]
+    Other(Box<dyn std::error::Error + Send + Sync>),
+    #[error("{0}")]
+    Custom(String),
+    #[error("symlink")]
+    Symlink(#[from] SymlinkError),
+    #[error("procfs failed")]
+    Procfs(#[from] procfs::ProcError),
+}
+
+type Result<T> = std::result::Result<T, MountError>;
 
 #[derive(Debug)]
 pub struct MountOptions<'a> {
@@ -48,27 +71,33 @@ impl Mount {
     }
 
     pub fn setup_mount(&self, mount: &SpecMount, options: &MountOptions) -> Result<()> {
-        log::debug!("Mounting {:?}", mount);
+        tracing::debug!("mounting {:?}", mount);
         let mut mount_option_config = parse_mount(mount);
 
         match mount.typ().as_deref() {
             Some("cgroup") => {
-                match libcgroups::common::get_cgroup_setup()
-                    .context("failed to determine cgroup setup")?
-                {
+                match libcgroups::common::get_cgroup_setup().map_err(|err| {
+                    tracing::error!("failed to determine cgroup setup: {}", err);
+                    MountError::Other(err.into())
+                })? {
                     Legacy | Hybrid => {
                         #[cfg(not(feature = "v1"))]
                         panic!("libcontainer can't run in a Legacy or Hybrid cgroup setup without the v1 feature");
                         #[cfg(feature = "v1")]
-                        self.mount_cgroup_v1(mount, options)
-                            .context("failed to mount cgroup v1")?
+                        self.mount_cgroup_v1(mount, options).map_err(|err| {
+                            tracing::error!("failed to mount cgroup v2: {}", err);
+                            err
+                        })?
                     }
                     Unified => {
                         #[cfg(not(feature = "v2"))]
                         panic!("libcontainer can't run in a Unified cgroup setup without the v2 feature");
                         #[cfg(feature = "v2")]
                         self.mount_cgroup_v2(mount, options, &mount_option_config)
-                            .context("failed to mount cgroup v2")?
+                            .map_err(|err| {
+                                tracing::error!("failed to mount cgroup v2: {}", err);
+                                err
+                            })?
                     }
                 }
             }
@@ -81,7 +110,10 @@ impl Mount {
                         &mount_option_config,
                         options.label,
                     )
-                    .with_context(|| format!("failed to mount /dev: {:?}", mount))?;
+                    .map_err(|err| {
+                        tracing::error!("failed to mount /dev: {}", err);
+                        err
+                    })?;
                 } else {
                     self.mount_into_container(
                         mount,
@@ -89,7 +121,10 @@ impl Mount {
                         &mount_option_config,
                         options.label,
                     )
-                    .with_context(|| format!("failed to mount: {:?}", mount))?;
+                    .map_err(|err| {
+                        tracing::error!("failed to mount {:?}: {}", mount, err);
+                        err
+                    })?;
                 }
             }
         }
@@ -99,7 +134,7 @@ impl Mount {
 
     #[cfg(feature = "v1")]
     fn mount_cgroup_v1(&self, cgroup_mount: &SpecMount, options: &MountOptions) -> Result<()> {
-        log::debug!("Mounting cgroup v1 filesystem");
+        tracing::debug!("mounting cgroup v1 filesystem");
         // create tmpfs into which the cgroup subsystems will be mounted
         let tmpfs = SpecMountBuilder::default()
             .source("tmpfs")
@@ -112,33 +147,46 @@ impl Mount {
                     .collect::<Vec<String>>(),
             )
             .build()
-            .context("failed to build tmpfs for cgroup")?;
+            .map_err(|err| {
+                tracing::error!("failed to build tmpfs for cgroup: {}", err);
+                err
+            })?;
 
-        self.setup_mount(&tmpfs, options)
-            .context("failed to mount tmpfs for cgroup")?;
+        self.setup_mount(&tmpfs, options).map_err(|err| {
+            tracing::error!("failed to mount tmpfs for cgroup: {}", err);
+            err
+        })?;
 
         // get all cgroup mounts on the host system
         let host_mounts: Vec<PathBuf> = libcgroups::v1::util::list_subsystem_mount_points()
-            .context("failed to get subsystem mount points")?
+            .map_err(|err| {
+                tracing::error!("failed to get subsystem mount points: {}", err);
+                MountError::Other(err.into())
+            })?
             .into_iter()
             .filter(|p| p.as_path().starts_with(DEFAULT_CGROUP_ROOT))
             .collect();
-        log::debug!("cgroup mounts: {:?}", host_mounts);
+        tracing::debug!("cgroup mounts: {:?}", host_mounts);
 
         // get process cgroups
         let process_cgroups: HashMap<String, String> = Process::myself()?
-            .cgroups()
-            .context("failed to get process cgroups")?
+            .cgroups()?
             .into_iter()
             .map(|c| (c.controllers.join(","), c.pathname))
             .collect();
-        log::debug!("Process cgroups: {:?}", process_cgroups);
+        tracing::debug!("Process cgroups: {:?}", process_cgroups);
 
         let cgroup_root = options
             .root
             .join_safely(cgroup_mount.destination())
-            .context("could not join rootfs path with cgroup mount destination")?;
-        log::debug!("cgroup root: {:?}", cgroup_root);
+            .map_err(|err| {
+                tracing::error!(
+                    "could not join rootfs path with cgroup mount destination: {}",
+                    err
+                );
+                MountError::Other(err.into())
+            })?;
+        tracing::debug!("cgroup root: {:?}", cgroup_root);
 
         let symlink = Symlink::new();
 
@@ -165,7 +213,7 @@ impl Mount {
 
                 symlink.setup_comount_symlinks(&cgroup_root, subsystem_name)?;
             } else {
-                log::warn!("could not get subsystem name from {:?}", host_mount);
+                tracing::warn!("could not get subsystem name from {:?}", host_mount);
             }
         }
 
@@ -182,7 +230,7 @@ impl Mount {
         subsystem_name: &str,
         named: bool,
     ) -> Result<()> {
-        log::debug!(
+        tracing::debug!(
             "Mounting (namespaced) {:?} cgroup subsystem",
             subsystem_name
         );
@@ -197,10 +245,13 @@ impl Mount {
                     .collect::<Vec<String>>(),
             )
             .build()
-            .with_context(|| format!("failed to build {}", subsystem_name))?;
+            .map_err(|err| {
+                tracing::error!("failed to build {subsystem_name} mount: {err}");
+                err
+            })?;
 
         let data: Cow<str> = if named {
-            format!("name={}", subsystem_name).into()
+            format!("name={subsystem_name}").into()
         } else {
             subsystem_name.into()
         };
@@ -217,7 +268,10 @@ impl Mount {
             &mount_options_config,
             options.label,
         )
-        .with_context(|| format!("failed to mount {:?}", subsystem_mount))
+        .map_err(|err| {
+            tracing::error!("failed to mount {subsystem_mount:?}: {err}");
+            err
+        })
     }
 
     #[cfg(feature = "v1")]
@@ -230,9 +284,9 @@ impl Mount {
         host_mount: &Path,
         process_cgroups: &HashMap<String, String>,
     ) -> Result<()> {
-        log::debug!("Mounting (emulated) {:?} cgroup subsystem", subsystem_name);
+        tracing::debug!("Mounting (emulated) {:?} cgroup subsystem", subsystem_name);
         let named_hierarchy: Cow<str> = if named {
-            format!("name={}", subsystem_name).into()
+            format!("name={subsystem_name}").into()
         } else {
             subsystem_name.into()
         };
@@ -242,22 +296,24 @@ impl Mount {
                 .source(
                     host_mount
                         .join_safely(proc_path.as_str())
-                        .with_context(|| {
-                            format!(
-                                "failed to join mount source for {} subsystem",
-                                subsystem_name
-                            )
+                        .map_err(|err| {
+                            tracing::error!(
+                                "failed to join mount source for {subsystem_name} subsystem: {}",
+                                err
+                            );
+                            MountError::Other(err.into())
                         })?,
                 )
                 .destination(
                     cgroup_mount
                         .destination()
                         .join_safely(subsystem_name)
-                        .with_context(|| {
-                            format!(
-                                "failed to join mount destination for {} subsystem",
-                                subsystem_name
-                            )
+                        .map_err(|err| {
+                            tracing::error!(
+                                "failed to join mount destination for {subsystem_name} subsystem: {}",
+                                err
+                            );
+                            MountError::Other(err.into())
                         })?,
                 )
                 .typ("bind")
@@ -268,12 +324,14 @@ impl Mount {
                         .collect::<Vec<String>>(),
                 )
                 .build()?;
-            log::debug!("Mounting emulated cgroup subsystem: {:?}", emulated);
+            tracing::debug!("Mounting emulated cgroup subsystem: {:?}", emulated);
 
-            self.setup_mount(&emulated, options)
-                .with_context(|| format!("failed to mount {} cgroup hierarchy", subsystem_name))?;
+            self.setup_mount(&emulated, options).map_err(|err| {
+                tracing::error!("failed to mount {subsystem_name} cgroup hierarchy: {}", err);
+                err
+            })?;
         } else {
-            log::warn!("Could not mount {:?} cgroup subsystem", subsystem_name);
+            tracing::warn!("Could not mount {:?} cgroup subsystem", subsystem_name);
         }
 
         Ok(())
@@ -286,7 +344,7 @@ impl Mount {
         options: &MountOptions,
         mount_option_config: &MountOptionConfig,
     ) -> Result<()> {
-        log::debug!("Mounting cgroup v2 filesystem");
+        tracing::debug!("Mounting cgroup v2 filesystem");
 
         let cgroup_mount = SpecMountBuilder::default()
             .typ("cgroup2")
@@ -294,7 +352,7 @@ impl Mount {
             .destination(cgroup_mount.destination())
             .options(Vec::new())
             .build()?;
-        log::debug!("{:?}", cgroup_mount);
+        tracing::debug!("{:?}", cgroup_mount);
 
         if self
             .mount_into_container(
@@ -303,28 +361,43 @@ impl Mount {
                 mount_option_config,
                 options.label,
             )
-            .context("failed to mount into container")
             .is_err()
         {
-            let host_mount = libcgroups::v2::util::get_unified_mount_point()
-                .context("failed to get unified mount point")?;
+            let host_mount = libcgroups::v2::util::get_unified_mount_point().map_err(|err| {
+                tracing::error!("failed to get unified mount point: {}", err);
+                MountError::Other(err.into())
+            })?;
 
-            let process_cgroup = Process::myself()?
+            let process_cgroup = Process::myself()
+                .map_err(|err| {
+                    tracing::error!("failed to get /proc/self: {}", err);
+                    MountError::Other(err.into())
+                })?
                 .cgroups()
-                .context("failed to get process cgroups")?
+                .map_err(|err| {
+                    tracing::error!("failed to get process cgroups: {}", err);
+                    MountError::Other(err.into())
+                })?
                 .into_iter()
                 .find(|c| c.hierarchy == 0)
                 .map(|c| PathBuf::from(c.pathname))
-                .ok_or_else(|| anyhow!("failed to find unified process cgroup"))?;
-
+                .ok_or_else(|| {
+                    MountError::Custom("failed to find unified process cgroup".into())
+                })?;
             let bind_mount = SpecMountBuilder::default()
                 .typ("bind")
-                .source(host_mount.join_safely(process_cgroup)?)
+                .source(host_mount.join_safely(process_cgroup).map_err(|err| {
+                    tracing::error!("failed to join host mount for cgroup hierarchy: {}", err);
+                    MountError::Other(err.into())
+                })?)
                 .destination(cgroup_mount.destination())
                 .options(Vec::new())
                 .build()
-                .context("failed to build cgroup bind mount")?;
-            log::debug!("{:?}", bind_mount);
+                .map_err(|err| {
+                    tracing::error!("failed to build cgroup bind mount: {}", err);
+                    err
+                })?;
+            tracing::debug!("{:?}", bind_mount);
 
             let mut mount_option_config = (*mount_option_config).clone();
             mount_option_config.flags |= MsFlags::MS_BIND;
@@ -334,7 +407,10 @@ impl Mount {
                 &mount_option_config,
                 options.label,
             )
-            .context("failed to bind mount cgroup hierarchy")?;
+            .map_err(|err| {
+                tracing::error!("failed to bind mount cgroup hierarchy: {}", err);
+                err
+            })?;
         }
 
         Ok(())
@@ -343,7 +419,16 @@ impl Mount {
     /// Make parent mount of rootfs private if it was shared, which is required by pivot_root.
     /// It also makes sure following bind mount does not propagate in other namespaces.
     pub fn make_parent_mount_private(&self, rootfs: &Path) -> Result<Option<MountInfo>> {
-        let mount_infos = Process::myself()?.mountinfo()?;
+        let mount_infos = Process::myself()
+            .map_err(|err| {
+                tracing::error!("failed to get /proc/self: {}", err);
+                MountError::Other(err.into())
+            })?
+            .mountinfo()
+            .map_err(|err| {
+                tracing::error!("failed to get mount info: {}", err);
+                MountError::Other(err.into())
+            })?;
         let parent_mount = find_parent_mount(rootfs, mount_infos)?;
 
         // check parent mount has 'shared' propagation type
@@ -378,43 +463,57 @@ impl Mount {
         if let Some(l) = label {
             if typ != Some("proc") && typ != Some("sysfs") {
                 match mount_option_config.data.is_empty() {
-                    true => d = format!("context=\"{}\"", l),
+                    true => d = format!("context=\"{l}\""),
                     false => d = format!("{},context=\"{}\"", mount_option_config.data, l),
                 }
             }
         }
 
-        let dest_for_host = utils::secure_join(rootfs, m.destination())
-            .with_context(|| format!("failed to join {:?} with {:?}", rootfs, m.destination()))?;
+        let dest_for_host = safe_path::scoped_join(rootfs, m.destination()).map_err(|err| {
+            tracing::error!(
+                "failed to join rootfs {:?} with mount destination {:?}: {}",
+                rootfs,
+                m.destination(),
+                err
+            );
+            MountError::Other(err.into())
+        })?;
 
         let dest = Path::new(&dest_for_host);
-        let source = m
-            .source()
-            .as_ref()
-            .with_context(|| "no source in mount spec".to_string())?;
+        let source = m.source().as_ref().ok_or(MountError::NoSource)?;
         let src = if typ == Some("bind") {
-            let src = canonicalize(source)
-                .with_context(|| format!("failed to canonicalize: {:?}", source))?;
+            let src = canonicalize(source).map_err(|err| {
+                tracing::error!("failed to canonicalize {:?}: {}", source, err);
+                err
+            })?;
             let dir = if src.is_file() {
                 Path::new(&dest).parent().unwrap()
             } else {
                 Path::new(&dest)
             };
 
-            create_dir_all(dir)
-                .with_context(|| format!("failed to create dir for bind mount: {:?}", dir))?;
+            create_dir_all(dir).map_err(|err| {
+                tracing::error!("failed to create dir for bind mount {:?}: {}", dir, err);
+                err
+            })?;
 
-            if src.is_file() {
+            if src.is_file() && !dest.exists() {
                 OpenOptions::new()
                     .create(true)
                     .write(true)
                     .open(dest)
-                    .with_context(|| format!("failed to create file for bind mount: {:?}", src))?;
+                    .map_err(|err| {
+                        tracing::error!("failed to create file for bind mount {:?}: {}", src, err);
+                        err
+                    })?;
             }
 
             src
         } else {
-            create_dir_all(dest).with_context(|| format!("Failed to create device: {:?}", dest))?;
+            create_dir_all(dest).map_err(|err| {
+                tracing::error!("failed to create device: {:?}", dest);
+                err
+            })?;
 
             PathBuf::from(source)
         };
@@ -423,9 +522,10 @@ impl Mount {
             self.syscall
                 .mount(Some(&*src), dest, typ, mount_option_config.flags, Some(&*d))
         {
-            if let Some(errno) = err.downcast_ref() {
+            if let SyscallError::Nix(errno) = err {
                 if !matches!(errno, Errno::EINVAL) {
-                    bail!("mount of {:?} failed. {}", m.destination(), errno);
+                    tracing::error!("mount of {:?} failed. {}", m.destination(), errno);
+                    return Err(err.into());
                 }
             }
 
@@ -437,7 +537,10 @@ impl Mount {
                     mount_option_config.flags,
                     Some(&mount_option_config.data),
                 )
-                .with_context(|| format!("failed to mount {:?} to {:?}", src, dest))?;
+                .map_err(|err| {
+                    tracing::error!("failed to mount {src:?} to {dest:?}");
+                    err
+                })?;
         }
 
         if typ == Some("bind")
@@ -458,7 +561,10 @@ impl Mount {
                     mount_option_config.flags | MsFlags::MS_REMOUNT,
                     None,
                 )
-                .with_context(|| format!("Failed to remount: {:?}", dest))?;
+                .map_err(|err| {
+                    tracing::error!("failed to remount {:?}: {}", dest, err);
+                    err
+                })?;
         }
 
         if let Some(mount_attr) = &mount_option_config.rec_attr {
@@ -477,19 +583,33 @@ impl Mount {
     }
 }
 
+/// Find parent mount of rootfs in given mount infos
+pub fn find_parent_mount(
+    rootfs: &Path,
+    mount_infos: Vec<MountInfo>,
+) -> std::result::Result<MountInfo, MountError> {
+    // find the longest mount point
+    let parent_mount_info = mount_infos
+        .into_iter()
+        .filter(|mi| rootfs.starts_with(&mi.mount_point))
+        .max_by(|mi1, mi2| mi1.mount_point.len().cmp(&mi2.mount_point.len()))
+        .ok_or_else(|| {
+            MountError::Custom(format!("can't find the parent mount of {:?}", rootfs))
+        })?;
+    Ok(parent_mount_info)
+}
+
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::syscall::test::{MountArgs, TestHelperSyscall};
+    use anyhow::{Context, Result};
     #[cfg(feature = "v1")]
     use std::fs;
 
-    use super::*;
-    use crate::syscall::test::{MountArgs, TestHelperSyscall};
-    use crate::utils::create_temp_dir;
-    use anyhow::Result;
-
     #[test]
     fn test_mount_to_container() {
-        let tmp_dir = create_temp_dir("test_mount_to_container").unwrap();
+        let tmp_dir = tempfile::tempdir().unwrap();
         {
             let m = Mount::new();
             let mount = &SpecMountBuilder::default()
@@ -585,7 +705,7 @@ mod tests {
 
     #[test]
     fn test_make_parent_mount_private() {
-        let tmp_dir = create_temp_dir("test_make_parent_mount_private").unwrap();
+        let tmp_dir = tempfile::tempdir().unwrap();
         let m = Mount::new();
         let result = m.make_parent_mount_private(tmp_dir.path());
         assert!(result.is_ok());
@@ -615,7 +735,7 @@ mod tests {
     #[test]
     #[cfg(feature = "v1")]
     fn test_namespaced_subsystem_success() -> Result<()> {
-        let tmp = create_temp_dir("test_namespaced_subsystem_success")?;
+        let tmp = tempfile::tempdir().unwrap();
         let container_cgroup = Path::new("/container_cgroup");
 
         let mounter = Mount::new();
@@ -641,7 +761,10 @@ mod tests {
 
         let expected = MountArgs {
             source: Some(PathBuf::from("cgroup")),
-            target: tmp.join_safely(container_cgroup)?.join(subsystem_name),
+            target: tmp
+                .path()
+                .join_safely(container_cgroup)?
+                .join(subsystem_name),
             fstype: Some("cgroup".to_owned()),
             flags: MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
             data: Some("cpu".to_owned()),
@@ -664,8 +787,8 @@ mod tests {
     #[cfg(feature = "v1")]
     fn test_emulated_subsystem_success() -> Result<()> {
         // arrange
-        let tmp = create_temp_dir("test_emulated_subsystem")?;
-        let host_cgroup_mount = tmp.join("host_cgroup");
+        let tmp = tempfile::tempdir().unwrap();
+        let host_cgroup_mount = tmp.path().join("host_cgroup");
         let host_cgroup = host_cgroup_mount.join("cpu/container1");
         fs::create_dir_all(&host_cgroup)?;
 
@@ -704,7 +827,10 @@ mod tests {
         // assert
         let expected = MountArgs {
             source: Some(host_cgroup),
-            target: tmp.join_safely(container_cgroup)?.join(subsystem_name),
+            target: tmp
+                .path()
+                .join_safely(container_cgroup)?
+                .join(subsystem_name),
             fstype: Some("bind".to_owned()),
             flags: MsFlags::MS_BIND | MsFlags::MS_REC,
             data: Some("".to_owned()),
@@ -727,7 +853,7 @@ mod tests {
     #[cfg(feature = "v1")]
     fn test_mount_cgroup_v1() -> Result<()> {
         // arrange
-        let tmp = create_temp_dir("test_mount_cgroup_v1")?;
+        let tmp = tempfile::tempdir().unwrap();
         let container_cgroup = PathBuf::from("/sys/fs/cgroup");
 
         let spec_cgroup_mount = SpecMountBuilder::default()
@@ -764,7 +890,7 @@ mod tests {
 
         let expected = MountArgs {
             source: Some(PathBuf::from("tmpfs".to_owned())),
-            target: tmp.join_safely(&container_cgroup)?,
+            target: tmp.path().join_safely(&container_cgroup)?,
             fstype: Some("tmpfs".to_owned()),
             flags: MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
             data: Some("mode=755".to_owned()),
@@ -775,12 +901,15 @@ mod tests {
             let subsystem_name = host_mount.file_name().and_then(|f| f.to_str()).unwrap();
             let expected = MountArgs {
                 source: Some(PathBuf::from("cgroup".to_owned())),
-                target: tmp.join_safely(&container_cgroup)?.join(subsystem_name),
+                target: tmp
+                    .path()
+                    .join_safely(&container_cgroup)?
+                    .join(subsystem_name),
                 fstype: Some("cgroup".to_owned()),
                 flags: MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
                 data: Some(
                     if subsystem_name == "systemd" {
-                        format!("name={}", subsystem_name)
+                        format!("name={subsystem_name}")
                     } else {
                         subsystem_name.to_string()
                     }
@@ -797,7 +926,7 @@ mod tests {
     #[cfg(feature = "v2")]
     fn test_mount_cgroup_v2() -> Result<()> {
         // arrange
-        let tmp = create_temp_dir("test_mount_cgroup_v2")?;
+        let tmp = tempfile::tempdir().unwrap();
         let container_cgroup = PathBuf::from("/sys/fs/cgroup");
 
         let spec_cgroup_mount = SpecMountBuilder::default()
@@ -829,7 +958,7 @@ mod tests {
         // assert
         let expected = MountArgs {
             source: Some(PathBuf::from("cgroup".to_owned())),
-            target: tmp.join_safely(container_cgroup)?,
+            target: tmp.path().join_safely(container_cgroup)?,
             fstype: Some("cgroup2".to_owned()),
             flags: MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
             data: Some("".to_owned()),
@@ -846,5 +975,47 @@ mod tests {
         assert_eq!(expected, got[0]);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_find_parent_mount() -> anyhow::Result<()> {
+        let mount_infos = vec![
+            MountInfo {
+                mnt_id: 11,
+                pid: 10,
+                majmin: "".to_string(),
+                root: "/".to_string(),
+                mount_point: PathBuf::from("/"),
+                mount_options: Default::default(),
+                opt_fields: vec![],
+                fs_type: "ext4".to_string(),
+                mount_source: Some("/dev/sda1".to_string()),
+                super_options: Default::default(),
+            },
+            MountInfo {
+                mnt_id: 12,
+                pid: 11,
+                majmin: "".to_string(),
+                root: "/".to_string(),
+                mount_point: PathBuf::from("/proc"),
+                mount_options: Default::default(),
+                opt_fields: vec![],
+                fs_type: "proc".to_string(),
+                mount_source: Some("proc".to_string()),
+                super_options: Default::default(),
+            },
+        ];
+
+        let res = find_parent_mount(Path::new("/path/to/rootfs"), mount_infos)
+            .context("failed to get parent mount")?;
+        assert_eq!(res.mnt_id, 11);
+        Ok(())
+    }
+
+    #[test]
+    fn test_find_parent_mount_with_empty_mount_infos() {
+        let mount_infos = vec![];
+        let res = find_parent_mount(Path::new("/path/to/rootfs"), mount_infos);
+        assert!(res.is_err());
     }
 }
