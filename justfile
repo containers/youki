@@ -99,6 +99,17 @@ clean-test-kind:
 hack-bpftrace:
     BPFTRACE_STRLEN=120 ./hack/debug.bt
 
+# a hacky benchmark method we have been using casually to compare performance
+hack-benchmark:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    hyperfine \
+        --prepare 'sudo sync; echo 3 | sudo tee /proc/sys/vm/drop_caches' \
+        --warmup 10 \
+        --min-runs 100 \
+        'sudo {{ cwd }}/youki create -b tutorial a && sudo {{ cwd }}/youki start a && sudo {{ cwd }}/youki delete -f a'
+
 # run linting on project
 lint:
     cargo fmt --all -- --check

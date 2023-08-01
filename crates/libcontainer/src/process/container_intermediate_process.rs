@@ -8,6 +8,7 @@ use procfs::process::Process;
 
 use super::args::{ContainerArgs, ContainerType};
 use super::container_init_process::container_init_process;
+use super::fork::CloneCb;
 
 #[derive(Debug, thiserror::Error)]
 pub enum IntermediateProcessError {
@@ -36,7 +37,7 @@ pub fn container_intermediate_process(
     intermediate_chan: &mut (channel::IntermediateSender, channel::IntermediateReceiver),
     init_chan: &mut (channel::InitSender, channel::InitReceiver),
     main_sender: &mut channel::MainSender,
-) -> Result<Pid> {
+) -> Result<()> {
     let (inter_sender, inter_receiver) = intermediate_chan;
     let (init_sender, init_receiver) = init_chan;
     let command = args.syscall.create_syscall();
@@ -109,6 +110,51 @@ pub fn container_intermediate_process(
         namespaces.unshare_or_setns(pid_namespace)?;
     }
 
+    let cb: CloneCb = {
+        let args = args.clone();
+        let init_sender = init_sender.clone();
+        let inter_sender = inter_sender.clone();
+        let mut main_sender = main_sender.clone();
+        let mut init_receiver = init_receiver.clone();
+        Box::new(move || {
+            if let Err(ret) = prctl::set_name("youki:[2:INIT]") {
+                tracing::error!(?ret, "failed to set name for child process");
+                return ret;
+            }
+
+            // We are inside the forked process here. The first thing we have to do
+            // is to close any unused senders, since fork will make a dup for all
+            // the socket.
+            if let Err(err) = init_sender.close() {
+                tracing::error!(?err, "failed to close receiver in init process");
+                return -1;
+            }
+            if let Err(err) = inter_sender.close() {
+                tracing::error!(?err, "failed to close sender in the intermediate process");
+                return -1;
+            }
+            match container_init_process(&args, &mut main_sender, &mut init_receiver) {
+                Ok(_) => 0,
+                Err(e) => {
+                    if let ContainerType::TenantContainer { exec_notify_fd } = args.container_type {
+                        let buf = format!("{e}");
+                        if let Err(err) = write(exec_notify_fd, buf.as_bytes()) {
+                            tracing::error!(?err, "failed to write to exec notify fd");
+                            return -1;
+                        }
+                        if let Err(err) = close(exec_notify_fd) {
+                            tracing::error!(?err, "failed to close exec notify fd");
+                            return -1;
+                        }
+                    }
+
+                    tracing::error!("failed to initialize container process: {e}");
+                    -1
+                }
+            }
+        })
+    };
+
     // We have to record the pid of the init process. The init process will be
     // inside the pid namespace, so we can't rely on the init process to send us
     // the correct pid. We also want to clone the init process as a sibling
@@ -117,41 +163,7 @@ pub fn container_intermediate_process(
     // configuration. The youki main process can decide what to do with the init
     // process and the intermediate process can just exit safely after the job
     // is done.
-    let pid = fork::container_clone_sibling("youki:[2:INIT]", || {
-        // We are inside the forked process here. The first thing we have to do
-        // is to close any unused senders, since fork will make a dup for all
-        // the socket.
-        init_sender.close().map_err(|err| {
-            tracing::error!("failed to close receiver in init process: {}", err);
-            IntermediateProcessError::Channel(err)
-        })?;
-        inter_sender.close().map_err(|err| {
-            tracing::error!(
-                "failed to close sender in the intermediate process: {}",
-                err
-            );
-            IntermediateProcessError::Channel(err)
-        })?;
-        match container_init_process(args, main_sender, init_receiver) {
-            Ok(_) => Ok(0),
-            Err(e) => {
-                if let ContainerType::TenantContainer { exec_notify_fd } = args.container_type {
-                    let buf = format!("{e}");
-                    write(exec_notify_fd, buf.as_bytes()).map_err(|err| {
-                        tracing::error!("failed to write to exec notify fd: {}", err);
-                        IntermediateProcessError::ExecNotify(err)
-                    })?;
-                    close(exec_notify_fd).map_err(|err| {
-                        tracing::error!("failed to close exec notify fd: {}", err);
-                        IntermediateProcessError::ExecNotify(err)
-                    })?;
-                }
-                tracing::error!("failed to initialize container process: {e}");
-                Err(e.into())
-            }
-        }
-    })
-    .map_err(|err| {
+    let pid = fork::container_clone_sibling(cb).map_err(|err| {
         tracing::error!("failed to fork init process: {}", err);
         IntermediateProcessError::InitProcess(err)
     })?;
@@ -185,7 +197,8 @@ pub fn container_intermediate_process(
         tracing::error!("failed to close unused init sender: {}", err);
         err
     })?;
-    Ok(pid)
+
+    Ok(())
 }
 
 fn apply_cgroups<
