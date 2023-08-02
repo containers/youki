@@ -4658,9 +4658,9 @@ dependencies = [
 
 [[package]]
 name = "wasmedge-types"
-version = "0.4.2"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b447f1a187fc86d866f388d7f29382b61896ee33627b727d678a994a0cbbd9e"
+checksum = "805d19a94fc0f380a0d034095b629442dec8951cde05044ebafa811cb98ee7a4"
 dependencies = [
  "thiserror",
  "wat",
