@@ -34,10 +34,9 @@ test-oci: oci-tests rust-oci-tests
 # run all tests except rust-oci 
 test-all: unittest test-features oci-tests containerd-test # currently not doing rust-oci here
 
-# run cargo unittests
-unittest:
-    cd ./crates
-    LD_LIBRARY_PATH=${HOME}/.wasmedge/lib cargo test --all --all-targets --all-features
+# run cargo doc tests
+test-doc:
+    cargo test --doc
 
 # run permutated feature compilation tests
 test-features:
