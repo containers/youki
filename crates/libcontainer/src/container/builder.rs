@@ -244,13 +244,13 @@ impl ContainerBuilder {
     /// ```no_run
     /// # use libcontainer::container::builder::ContainerBuilder;
     /// # use libcontainer::syscall::syscall::SyscallType;
-    /// # use libcontainer::workload::default::get_executor;
+    /// # use libcontainer::workload::default::DefaultExecutor;
     ///
     /// ContainerBuilder::new(
     ///     "74f1a4cb3801".to_owned(),
     ///     SyscallType::default(),
     /// )
-    /// .with_executor(get_executor());
+    /// .with_executor(DefaultExecutor{});
     /// ```
     pub fn with_executor(mut self, executor: impl Executor + 'static) -> Self {
         self.executor = Box::new(executor);
