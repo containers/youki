@@ -22,8 +22,8 @@ jobs:
         run: just youki-release
       - name: test
         # TODO(utam0k): The feature test needs nightly
-        # run: just unittest featuretest oci-tests
-        run: just unittest oci-tests
+        # run: just test-basic featuretest test-oci
+        run: just test-basic test-oci
 
   upload:
     name: Upload

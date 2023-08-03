@@ -292,7 +292,7 @@ Go and node-tap are required to run integration tests. See the [opencontainers/r
 
 ```bash
 git submodule update --init --recursive
-just oci-tests
+just test-oci
 ```
 
 ### Setting up Vagrant

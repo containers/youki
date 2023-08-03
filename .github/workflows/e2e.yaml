@@ -101,7 +101,7 @@ jobs:
       - name: Add the permission to run
         run: chmod +x ./youki
       - name: Run integration tests
-        run: just oci-tests
+        run: just test-oci
 
   oci-validation-rust:
     runs-on: ubuntu-22.04
