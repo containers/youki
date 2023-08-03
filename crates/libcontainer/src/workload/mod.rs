@@ -16,7 +16,7 @@ pub enum ExecutorError {
     CantHandle(&'static str),
 }
 
-// Here is an explaination about the complexity below regarding to
+// Here is an explanation about the complexity below regarding to
 // CloneBoxExecutor and Executor traits. This is one of the places rust actually
 // makes our life harder. The usecase for the executor is to allow users of
 // `libcontainer` to pass in a closure like function where the actual execution
@@ -26,7 +26,7 @@ pub enum ExecutorError {
 // structure. This is similar to the Fn family of traits that rust std lib has.
 // However, our usecase has a little bit more complexity than the Fn family of
 // traits. We require the struct implementing this Executor traits to be
-// cloneable, so we can pass the struct across fork/clone process boundry with
+// cloneable, so we can pass the struct across fork/clone process boundary with
 // memory safety. We can't make the Executor trait to require Clone trait
 // because doing so will make the Executor trait not object safe. Part of the
 // reason is that without the CloneBoxExecutor trait, the default clone
