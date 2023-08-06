@@ -5,10 +5,11 @@ use oci_spec::runtime::Spec;
 
 use super::{Executor, ExecutorError, EMPTY};
 
-/// Return the default executor. The default executor will execute the command
-/// specified in the oci spec.
-pub fn get_executor() -> Executor {
-    Box::new(|spec: &Spec| -> Result<(), ExecutorError> {
+#[derive(Clone)]
+pub struct DefaultExecutor {}
+
+impl Executor for DefaultExecutor {
+    fn exec(&self, spec: &Spec) -> Result<(), ExecutorError> {
         tracing::debug!("executing workload with default handler");
         let args = spec
             .process()
@@ -38,5 +39,9 @@ pub fn get_executor() -> Executor {
         // After execvp is called, the process is replaced with the container
         // payload through execvp, so it should never reach here.
         unreachable!();
-    })
+    }
+}
+
+pub fn get_executor() -> Box<dyn Executor> {
+    Box::new(DefaultExecutor {})
 }

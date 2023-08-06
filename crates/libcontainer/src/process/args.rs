@@ -40,5 +40,5 @@ pub struct ContainerArgs {
     /// If the container is to be run in detached mode
     pub detached: bool,
     /// Manage the functions that actually run on the container
-    pub executor: Executor,
+    pub executor: Box<dyn Executor>,
 }
