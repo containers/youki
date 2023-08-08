@@ -4605,9 +4605,9 @@ version = "0.1.0"
 
 [[package]]
 name = "wasmedge-macro"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d37333e0a349cf98888d98fd8f227efd2cb751ee58d1df0507a1d8230431bd60"
+checksum = "dbe80d95a88e9ac87b6aaf7bc9acd1fdfcd92045db2bf41a2262f623e2406a92"
 dependencies = [
  "proc-macro2",
  "quote",
