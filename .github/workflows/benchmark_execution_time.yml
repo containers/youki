@@ -1,4 +1,4 @@
-name: Benchmark execution time comparison with the main branch
+name: ⏱️ Benchmark execution time comparison with the main branch
 
 on:
   issue_comment:

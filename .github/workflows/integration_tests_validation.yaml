@@ -1,3 +1,5 @@
+name: ✔️ Verification of integration
+
 on:
   push:
     branches:
