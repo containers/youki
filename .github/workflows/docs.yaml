@@ -1,3 +1,5 @@
+name: 📓 Deploy the documentation
+
 on:
   push:
     branches:

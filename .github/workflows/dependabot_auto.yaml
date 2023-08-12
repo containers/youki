@@ -1,4 +1,4 @@
-name: Dependabot automation
+name: 🤖 Dependabot automation
 
 on:
   pull_request:

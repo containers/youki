@@ -1,3 +1,5 @@
+name: 🔍 Basic Checks
+
 on:
   push:
     branches:
