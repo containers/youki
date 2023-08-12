@@ -11,11 +11,11 @@ use std::{env, path::PathBuf};
 // allows us to mock the id mapping logic in unit tests by using a different
 // base path other than `/proc`.
 #[derive(Debug, Clone)]
-pub struct RootlessIDMapper {
+pub struct UserNamespaceIDMapper {
     base_path: PathBuf,
 }
 
-impl Default for RootlessIDMapper {
+impl Default for UserNamespaceIDMapper {
     fn default() -> Self {
         Self {
             // By default, the `uid_map` and `gid_map` files are located in the
@@ -26,8 +26,8 @@ impl Default for RootlessIDMapper {
     }
 }
 
-impl RootlessIDMapper {
-    // In production code, we can direclt use the `new` function without the
+impl UserNamespaceIDMapper {
+    // In production code, we can direct use the `new` function without the
     // need to worry about the default.
     pub fn new() -> Self {
         Default::default()
@@ -62,12 +62,12 @@ impl RootlessIDMapper {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum RootlessError {
+pub enum UserNamespaceError {
     #[error(transparent)]
     MissingSpec(#[from] crate::error::MissingSpecError),
-    #[error("rootless container requires valid user namespace definition")]
+    #[error("user namespace definition is invalid")]
     NoUserNamespace,
-    #[error("invalid spec for rootless container")]
+    #[error("invalid spec for new user namespace container")]
     InvalidSpec(#[from] ValidateSpecError),
     #[error("failed to read unprivileged userns clone")]
     ReadUnprivilegedUsernsClone(#[source] std::io::Error),
@@ -79,17 +79,17 @@ pub enum RootlessError {
     IDMapping(#[from] MappingError),
 }
 
-type Result<T> = std::result::Result<T, RootlessError>;
+type Result<T> = std::result::Result<T, UserNamespaceError>;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ValidateSpecError {
     #[error(transparent)]
     MissingSpec(#[from] crate::error::MissingSpecError),
     #[error("rootless container requires valid user namespace definition")]
-    NoUserNamespace,
-    #[error("rootless container requires valid uid mappings")]
+    NoUserNamespace, // TODO fix this while fixing podman
+    #[error("new user namespace requires valid uid mappings")]
     NoUIDMappings,
-    #[error("rootless container requires valid gid mappings")]
+    #[error("new user namespace requires valid gid mappings")]
     NoGIDMapping,
     #[error("no mount in spec")]
     NoMountSpec,
@@ -99,9 +99,13 @@ pub enum ValidateSpecError {
     GidNotMapped(u32),
     #[error("failed to parse ID")]
     ParseID(#[source] std::num::ParseIntError),
-    #[error("mount options require mapping uid inside the rootless container")]
+    #[error(
+        "mount options require mapping valid uid inside the container with new user namespace"
+    )]
     MountGidMapping(u32),
-    #[error("mount options require mapping gid inside the rootless container")]
+    #[error(
+        "mount options require mapping valid gid inside the container with new user namespace"
+    )]
     MountUidMapping(u32),
     #[error(transparent)]
     Namespaces(#[from] NamespaceError),
@@ -122,7 +126,7 @@ pub enum MappingError {
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct Rootless {
+pub struct UserNamespaceConfig {
     /// Location of the newuidmap binary
     pub newuidmap: Option<PathBuf>,
     /// Location of the newgidmap binary
@@ -133,14 +137,14 @@ pub struct Rootless {
     pub(crate) gid_mappings: Option<Vec<LinuxIdMapping>>,
     /// Info on the user namespaces
     pub user_namespace: Option<LinuxNamespace>,
-    /// Is rootless container requested by a privileged user
+    /// Is the container requested by a privileged user
     pub privileged: bool,
     /// Path to the id mappings
-    pub rootless_id_mapper: RootlessIDMapper,
+    pub id_mapper: UserNamespaceIDMapper,
 }
 
-impl Rootless {
-    pub fn new(spec: &Spec) -> Result<Option<Rootless>> {
+impl UserNamespaceConfig {
+    pub fn new(spec: &Spec) -> Result<Option<Self>> {
         let linux = spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
         let namespaces = Namespaces::try_from(linux.namespaces().as_ref())
             .map_err(ValidateSpecError::Namespaces)?;
@@ -150,26 +154,27 @@ impl Rootless {
 
         // If conditions requires us to use rootless, we must either create a new
         // user namespace or enter an existing.
+        // TODO FIX THIS FOR ROOTLESS
         if rootless_required() && user_namespace.is_none() {
-            return Err(RootlessError::NoUserNamespace);
+            return Err(UserNamespaceError::NoUserNamespace);
         }
 
         if user_namespace.is_some() && user_namespace.unwrap().path().is_none() {
-            tracing::debug!("rootless container should be created");
+            tracing::debug!("container with new user namespace should be created");
 
-            validate_spec_for_rootless(spec).map_err(|err| {
-                tracing::error!("failed to validate spec for rootless container: {}", err);
+            validate_spec_for_new_user_ns(spec).map_err(|err| {
+                tracing::error!("failed to validate spec for new user namespace: {}", err);
                 err
             })?;
-            let mut rootless = Rootless::try_from(linux)?;
+            let mut user_ns_config = UserNamespaceConfig::try_from(linux)?;
             if let Some((uid_binary, gid_binary)) = lookup_map_binaries(linux)? {
-                rootless.newuidmap = Some(uid_binary);
-                rootless.newgidmap = Some(gid_binary);
+                user_ns_config.newuidmap = Some(uid_binary);
+                user_ns_config.newgidmap = Some(gid_binary);
             }
 
-            Ok(Some(rootless))
+            Ok(Some(user_ns_config))
         } else {
-            tracing::debug!("this is NOT a rootless container");
+            tracing::debug!("this is container does NOT create a new user namespace");
             Ok(None)
         }
     }
@@ -179,7 +184,7 @@ impl Rootless {
         if let Some(uid_mappings) = self.uid_mappings.as_ref() {
             write_id_mapping(
                 target_pid,
-                self.rootless_id_mapper.get_uid_path(&target_pid).as_path(),
+                self.id_mapper.get_uid_path(&target_pid).as_path(),
                 uid_mappings,
                 self.newuidmap.as_deref(),
             )?;
@@ -192,7 +197,7 @@ impl Rootless {
         if let Some(gid_mappings) = self.gid_mappings.as_ref() {
             write_id_mapping(
                 target_pid,
-                self.rootless_id_mapper.get_gid_path(&target_pid).as_path(),
+                self.id_mapper.get_gid_path(&target_pid).as_path(),
                 gid_mappings,
                 self.newgidmap.as_deref(),
             )?;
@@ -200,13 +205,13 @@ impl Rootless {
         Ok(())
     }
 
-    pub fn with_id_mapper(&mut self, mapper: RootlessIDMapper) {
-        self.rootless_id_mapper = mapper
+    pub fn with_id_mapper(&mut self, mapper: UserNamespaceIDMapper) {
+        self.id_mapper = mapper
     }
 }
 
-impl TryFrom<&Linux> for Rootless {
-    type Error = RootlessError;
+impl TryFrom<&Linux> for UserNamespaceConfig {
+    type Error = UserNamespaceError;
 
     fn try_from(linux: &Linux) -> Result<Self> {
         let namespaces = Namespaces::try_from(linux.namespaces().as_ref())
@@ -221,12 +226,13 @@ impl TryFrom<&Linux> for Rootless {
             gid_mappings: linux.gid_mappings().to_owned(),
             user_namespace: user_namespace.cloned(),
             privileged: nix::unistd::geteuid().is_root(),
-            rootless_id_mapper: RootlessIDMapper::new(),
+            id_mapper: UserNamespaceIDMapper::new(),
         })
     }
 }
 
 /// Checks if rootless mode should be used
+// TODO fix this along with podman
 pub fn rootless_required() -> bool {
     if !nix::unistd::geteuid().is_root() {
         return true;
@@ -241,24 +247,27 @@ pub fn unprivileged_user_ns_enabled() -> Result<bool> {
         return Ok(true);
     }
 
-    let content =
-        fs::read_to_string(user_ns_sysctl).map_err(RootlessError::ReadUnprivilegedUsernsClone)?;
+    let content = fs::read_to_string(user_ns_sysctl)
+        .map_err(UserNamespaceError::ReadUnprivilegedUsernsClone)?;
 
     match content
         .trim()
         .parse::<u8>()
-        .map_err(RootlessError::ParseUnprivilegedUsernsClone)?
+        .map_err(UserNamespaceError::ParseUnprivilegedUsernsClone)?
     {
         0 => Ok(false),
         1 => Ok(true),
-        v => Err(RootlessError::UnknownUnprivilegedUsernsClone(v)),
+        v => Err(UserNamespaceError::UnknownUnprivilegedUsernsClone(v)),
     }
 }
 
 /// Validates that the spec contains the required information for
-/// running in rootless mode
-fn validate_spec_for_rootless(spec: &Spec) -> std::result::Result<(), ValidateSpecError> {
-    tracing::debug!(?spec, "validating spec for rootless container");
+/// creating a new user namespace
+fn validate_spec_for_new_user_ns(spec: &Spec) -> std::result::Result<(), ValidateSpecError> {
+    tracing::debug!(
+        ?spec,
+        "validating spec for container with new user namespace"
+    );
     let linux = spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
     let namespaces = Namespaces::try_from(linux.namespaces().as_ref())?;
     if namespaces.get(LinuxNamespaceType::User)?.is_none() {
@@ -281,7 +290,7 @@ fn validate_spec_for_rootless(spec: &Spec) -> std::result::Result<(), ValidateSp
         return Err(ValidateSpecError::NoGIDMapping);
     }
 
-    validate_mounts_for_rootless(
+    validate_mounts_for_new_user_ns(
         spec.mounts()
             .as_ref()
             .ok_or(ValidateSpecError::NoMountSpec)?,
@@ -296,6 +305,7 @@ fn validate_spec_for_rootless(spec: &Spec) -> std::result::Result<(), ValidateSp
     {
         let privileged = nix::unistd::geteuid().is_root();
 
+        // TODO fix this along with fixes for podman
         match (privileged, additional_gids.is_empty()) {
             (true, false) => {
                 for gid in additional_gids {
@@ -320,7 +330,7 @@ fn validate_spec_for_rootless(spec: &Spec) -> std::result::Result<(), ValidateSp
     Ok(())
 }
 
-fn validate_mounts_for_rootless(
+fn validate_mounts_for_new_user_ns(
     mounts: &[Mount],
     uid_mappings: &[LinuxIdMapping],
     gid_mappings: &[LinuxIdMapping],
@@ -337,7 +347,7 @@ fn validate_mounts_for_rootless(
                     tracing::error!(
                         ?mount,
                         ?opt,
-                        "mount specifies option which is not mapped inside the rootless container"
+                        "mount specifies option which is not mapped inside the container with new user namespace"
                     );
                     return Err(ValidateSpecError::MountUidMapping(
                         opt[4..].parse().map_err(ValidateSpecError::ParseID)?,
@@ -353,7 +363,7 @@ fn validate_mounts_for_rootless(
                     tracing::error!(
                         ?mount,
                         ?opt,
-                        "mount specifies option which is not mapped inside the rootless container"
+                        "mount specifies option which is not mapped inside the container with new user namespace"
                     );
                     return Err(ValidateSpecError::MountGidMapping(
                         opt[4..].parse().map_err(ValidateSpecError::ParseID)?,
@@ -486,7 +496,7 @@ mod tests {
             .gid_mappings(gid_mappings)
             .build()?;
         let spec = SpecBuilder::default().linux(linux).build()?;
-        assert!(validate_spec_for_rootless(&spec).is_ok());
+        assert!(validate_spec_for_new_user_ns(&spec).is_ok());
         Ok(())
     }
 
@@ -511,7 +521,7 @@ mod tests {
             .uid_mappings(uid_mappings.clone())
             .gid_mappings(gid_mappings.clone())
             .build()?;
-        assert!(validate_spec_for_rootless(
+        assert!(validate_spec_for_new_user_ns(
             &SpecBuilder::default()
                 .linux(linux_no_userns)
                 .build()
@@ -524,7 +534,7 @@ mod tests {
             .uid_mappings(vec![])
             .gid_mappings(gid_mappings.clone())
             .build()?;
-        assert!(validate_spec_for_rootless(
+        assert!(validate_spec_for_new_user_ns(
             &SpecBuilder::default()
                 .linux(linux_uid_empty)
                 .build()
@@ -537,7 +547,7 @@ mod tests {
             .uid_mappings(uid_mappings.clone())
             .gid_mappings(vec![])
             .build()?;
-        assert!(validate_spec_for_rootless(
+        assert!(validate_spec_for_new_user_ns(
             &SpecBuilder::default()
                 .linux(linux_gid_empty)
                 .build()
@@ -549,7 +559,7 @@ mod tests {
             .namespaces(vec![userns.clone()])
             .gid_mappings(gid_mappings)
             .build()?;
-        assert!(validate_spec_for_rootless(
+        assert!(validate_spec_for_new_user_ns(
             &SpecBuilder::default()
                 .linux(linux_uid_none)
                 .build()
@@ -561,7 +571,7 @@ mod tests {
             .namespaces(vec![userns])
             .uid_mappings(uid_mappings)
             .build()?;
-        assert!(validate_spec_for_rootless(
+        assert!(validate_spec_for_new_user_ns(
             &SpecBuilder::default()
                 .linux(linux_gid_none)
                 .build()
@@ -601,19 +611,19 @@ mod tests {
 
         let pid = getpid();
         let tmp = tempfile::tempdir()?;
-        let id_mapper = RootlessIDMapper {
+        let id_mapper = UserNamespaceIDMapper {
             base_path: tmp.path().to_path_buf(),
         };
         id_mapper.ensure_uid_path(&pid)?;
 
-        let mut rootless = Rootless::new(&spec)?.unwrap();
-        rootless.with_id_mapper(id_mapper.clone());
-        rootless.write_uid_mapping(pid)?;
+        let mut config = UserNamespaceConfig::new(&spec)?.unwrap();
+        config.with_id_mapper(id_mapper.clone());
+        config.write_uid_mapping(pid)?;
         assert_eq!(
             format!("{container_id} {host_uid} {size}"),
             fs::read_to_string(id_mapper.get_uid_path(&pid))?
         );
-        rootless.write_gid_mapping(pid)?;
+        config.write_gid_mapping(pid)?;
         Ok(())
     }
 
@@ -646,14 +656,14 @@ mod tests {
 
         let pid = getpid();
         let tmp = tempfile::tempdir()?;
-        let id_mapper = RootlessIDMapper {
+        let id_mapper = UserNamespaceIDMapper {
             base_path: tmp.path().to_path_buf(),
         };
         id_mapper.ensure_gid_path(&pid)?;
 
-        let mut rootless = Rootless::new(&spec)?.unwrap();
-        rootless.with_id_mapper(id_mapper.clone());
-        rootless.write_gid_mapping(pid)?;
+        let mut config = UserNamespaceConfig::new(&spec)?.unwrap();
+        config.with_id_mapper(id_mapper.clone());
+        config.write_gid_mapping(pid)?;
         assert_eq!(
             format!("{container_id} {host_gid} {size}"),
             fs::read_to_string(id_mapper.get_gid_path(&pid))?

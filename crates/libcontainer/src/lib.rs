@@ -9,13 +9,13 @@ pub mod namespaces;
 pub mod notify_socket;
 pub mod process;
 pub mod rootfs;
-pub mod rootless;
 #[cfg(feature = "libseccomp")]
 pub mod seccomp;
 pub mod signal;
 pub mod syscall;
 pub mod test_utils;
 pub mod tty;
+pub mod user_ns;
 pub mod utils;
 pub mod workload;
 

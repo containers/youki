@@ -5,7 +5,7 @@ use std::{fs, path::Path};
 
 use anyhow::Result;
 use clap::Parser;
-use libcontainer::rootless;
+use libcontainer::user_ns;
 use procfs::{CpuInfo, Meminfo};
 
 #[cfg(feature = "v2")]
@@ -211,7 +211,7 @@ pub fn print_namespaces() {
         print_feature_status(&content, "CONFIG_UTS_NS", FeatureDisplay::new("uts"));
         print_feature_status(&content, "CONFIG_IPC_NS", FeatureDisplay::new("ipc"));
 
-        let user_display = match rootless::unprivileged_user_ns_enabled() {
+        let user_display = match user_ns::unprivileged_user_ns_enabled() {
             Ok(false) => FeatureDisplay::with_status("user", "enabled (root only)", "disabled"),
             _ => FeatureDisplay::new("user"),
         };
