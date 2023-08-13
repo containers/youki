@@ -46,6 +46,8 @@ pub trait CloneBoxExecutor {
 pub trait Executor: CloneBoxExecutor {
     /// Executes the workload
     fn exec(&self, spec: &Spec) -> Result<(), ExecutorError>;
+
+    fn validate(&self, spec: &Spec) -> Result<(), ExecutorError>;
 }
 
 impl<T> CloneBoxExecutor for T

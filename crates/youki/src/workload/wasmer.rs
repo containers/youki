@@ -80,6 +80,14 @@ impl Executor for WasmerExecutor {
 
         Ok(())
     }
+
+    fn validate(&self, spec: &Spec) -> Result<(), ExecutorError> {
+        if !can_handle(spec) {
+            return Err(ExecutorError::CantHandle(EXECUTOR_NAME));
+        }
+
+        Ok(())
+    }
 }
 
 pub fn get_executor() -> WasmerExecutor {

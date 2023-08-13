@@ -1,9 +1,12 @@
-use std::ffi::CString;
+use std::{
+    ffi::CString,
+    path::{Path, PathBuf},
+};
 
 use nix::unistd;
 use oci_spec::runtime::Spec;
 
-use super::{Executor, ExecutorError, EMPTY};
+use super::{Executor, ExecutorError};
 
 #[derive(Clone)]
 pub struct DefaultExecutor {}
@@ -15,12 +18,10 @@ impl Executor for DefaultExecutor {
             .process()
             .as_ref()
             .and_then(|p| p.args().as_ref())
-            .unwrap_or(&EMPTY);
-
-        if args.is_empty() {
-            tracing::error!("no arguments provided to execute");
-            Err(ExecutorError::InvalidArg)?;
-        }
+            .ok_or_else(|| {
+                tracing::error!("no arguments provided to execute");
+                ExecutorError::InvalidArg
+            })?;
 
         let executable = args[0].as_str();
         let cstring_path = CString::new(executable.as_bytes()).map_err(|err| {
@@ -40,8 +41,123 @@ impl Executor for DefaultExecutor {
         // payload through execvp, so it should never reach here.
         unreachable!();
     }
+
+    fn validate(&self, spec: &Spec) -> Result<(), ExecutorError> {
+        let proc = spec
+            .process()
+            .as_ref()
+            .ok_or_else(|| ExecutorError::InvalidArg)?;
+
+        if let Some(args) = proc.args() {
+            let envs: Vec<String> = proc.env().as_ref().unwrap_or(&vec![]).clone();
+            let path_vars: Vec<&String> = envs.iter().filter(|&e| e.starts_with("PATH=")).collect();
+            if path_vars.is_empty() {
+                tracing::error!("PATH environment variable is not set");
+                Err(ExecutorError::InvalidArg)?;
+            }
+            let path_var = path_vars[0].trim_start_matches("PATH=");
+            match get_executable_path(&args[0], path_var) {
+                None => {
+                    tracing::error!(
+                        "executable {} for container process not found in PATH",
+                        args[0]
+                    );
+                    Err(ExecutorError::InvalidArg)?;
+                }
+                Some(path) => match is_executable(&path) {
+                    Ok(true) => {
+                        tracing::debug!("found executable {:?}", path);
+                    }
+                    Ok(false) => {
+                        tracing::error!(
+                            "executable {:?} does not have the correct permission set",
+                            path
+                        );
+                        Err(ExecutorError::InvalidArg)?;
+                    }
+                    Err(err) => {
+                        tracing::error!(
+                            "failed to check permissions for executable {:?}: {}",
+                            path,
+                            err
+                        );
+                        Err(ExecutorError::InvalidArg)?;
+                    }
+                },
+            }
+        }
+
+        Ok(())
+    }
 }
 
 pub fn get_executor() -> Box<dyn Executor> {
     Box::new(DefaultExecutor {})
+}
+
+fn get_executable_path(name: &str, path_var: &str) -> Option<PathBuf> {
+    // if path has / in it, we have to assume absolute path, as per runc impl
+    if name.contains('/') && PathBuf::from(name).exists() {
+        return Some(PathBuf::from(name));
+    }
+    for path in path_var.split(':') {
+        let potential_path = PathBuf::from(path).join(name);
+        if potential_path.exists() {
+            return Some(potential_path);
+        }
+    }
+    None
+}
+
+fn is_executable(path: &Path) -> std::result::Result<bool, std::io::Error> {
+    use std::os::unix::fs::PermissionsExt;
+    let metadata = path.metadata()?;
+    let permissions = metadata.permissions();
+    // we have to check if the path is file and the execute bit
+    // is set. In case of directories, the execute bit is also set,
+    // so have to check if this is a file or not
+    Ok(metadata.is_file() && permissions.mode() & 0o001 != 0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_executable_path() {
+        let non_existing_abs_path = "/some/non/existent/absolute/path";
+        let existing_abs_path = "/usr/bin/sh";
+        let existing_binary = "sh";
+        let non_existing_binary = "non-existent";
+        let path_value = "/usr/bin:/bin";
+
+        assert_eq!(
+            get_executable_path(existing_abs_path, path_value),
+            Some(PathBuf::from(existing_abs_path))
+        );
+        assert_eq!(get_executable_path(non_existing_abs_path, path_value), None);
+
+        assert_eq!(
+            get_executable_path(existing_binary, path_value),
+            Some(PathBuf::from("/usr/bin/sh"))
+        );
+
+        assert_eq!(get_executable_path(non_existing_binary, path_value), None);
+    }
+
+    #[test]
+    fn test_is_executable() {
+        let tmp = tempfile::tempdir().expect("create temp directory for test");
+        let executable_path = PathBuf::from("/bin/sh");
+        let directory_path = tmp.path();
+        let non_executable_path = directory_path.join("non_executable_file");
+        let non_existent_path = PathBuf::from("/some/non/existent/path");
+
+        std::fs::File::create(non_executable_path.as_path()).unwrap();
+
+        assert!(is_executable(&non_existent_path).is_err());
+        assert!(is_executable(&executable_path).unwrap());
+        assert!(!is_executable(&non_executable_path).unwrap());
+        assert!(!is_executable(directory_path).unwrap());
+    }
 }

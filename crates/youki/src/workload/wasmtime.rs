@@ -90,6 +90,14 @@ impl Executor for WasmtimeExecutor {
             .call(&mut store, &[], &mut [])
             .map_err(|err| ExecutorError::Execution(err.into()))
     }
+
+    fn validate(&self, spec: &Spec) -> Result<(), ExecutorError> {
+        if !can_handle(spec) {
+            return Err(ExecutorError::CantHandle(EXECUTOR_NAME));
+        }
+
+        Ok(())
+    }
 }
 
 pub fn get_executor() -> WasmtimeExecutor {

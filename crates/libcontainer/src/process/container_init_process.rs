@@ -76,72 +76,6 @@ pub enum InitProcessError {
 
 type Result<T> = std::result::Result<T, InitProcessError>;
 
-fn get_executable_path(name: &str, path_var: &str) -> Option<PathBuf> {
-    // if path has / in it, we have to assume absolute path, as per runc impl
-    if name.contains('/') && PathBuf::from(name).exists() {
-        return Some(PathBuf::from(name));
-    }
-    for path in path_var.split(':') {
-        let potential_path = PathBuf::from(path).join(name);
-        if potential_path.exists() {
-            return Some(potential_path);
-        }
-    }
-    None
-}
-
-fn is_executable(path: &Path) -> std::result::Result<bool, std::io::Error> {
-    use std::os::unix::fs::PermissionsExt;
-    let metadata = path.metadata()?;
-    let permissions = metadata.permissions();
-    // we have to check if the path is file and the execute bit
-    // is set. In case of directories, the execute bit is also set,
-    // so have to check if this is a file or not
-    Ok(metadata.is_file() && permissions.mode() & 0o001 != 0)
-}
-
-// this checks if the binary to run actually exists and if we have
-// permissions to run it.  Taken from
-// https://github.com/opencontainers/runc/blob/25c9e888686773e7e06429133578038a9abc091d/libcontainer/standard_init_linux.go#L195-L206
-fn verify_binary(args: &[String], envs: &[String]) -> Result<()> {
-    let path_vars: Vec<&String> = envs.iter().filter(|&e| e.starts_with("PATH=")).collect();
-    if path_vars.is_empty() {
-        tracing::error!("PATH environment variable is not set");
-        return Err(InitProcessError::InvalidExecutable(args[0].clone()));
-    }
-    let path_var = path_vars[0].trim_start_matches("PATH=");
-    match get_executable_path(&args[0], path_var) {
-        None => {
-            tracing::error!(
-                "executable {} for container process not found in PATH",
-                args[0]
-            );
-            return Err(InitProcessError::InvalidExecutable(args[0].clone()));
-        }
-        Some(path) => match is_executable(&path) {
-            Ok(true) => {
-                tracing::debug!("found executable {:?}", path);
-            }
-            Ok(false) => {
-                tracing::error!(
-                    "executable {:?} does not have the correct permission set",
-                    path
-                );
-                return Err(InitProcessError::InvalidExecutable(args[0].clone()));
-            }
-            Err(err) => {
-                tracing::error!(
-                    "failed to check permissions for executable {:?}: {}",
-                    path,
-                    err
-                );
-                return Err(InitProcessError::Io(err));
-            }
-        },
-    }
-    Ok(())
-}
-
 fn sysctl(kernel_params: &HashMap<String, String>) -> Result<()> {
     let sys = PathBuf::from("/proc/sys");
     for (kernel_param, value) in kernel_params {
@@ -637,9 +571,7 @@ pub fn container_init_process(
         tracing::warn!("seccomp not available, unable to set seccomp privileges!")
     }
 
-    if let Some(args) = proc.args() {
-        verify_binary(args, &envs)?;
-    }
+    args.executor.validate(spec)?;
 
     // Notify main process that the init process is ready to execute the
     // payload.  Note, because we are already inside the pid namespace, the pid
@@ -1089,44 +1021,6 @@ mod tests {
         assert!(masked_path(Path::new("/proc/self"), &None, syscall.as_ref()).is_err());
         let got = mocks.get_mount_args();
         assert_eq!(0, got.len());
-    }
-
-    #[test]
-    fn test_get_executable_path() {
-        let non_existing_abs_path = "/some/non/existent/absolute/path";
-        let existing_abs_path = "/usr/bin/sh";
-        let existing_binary = "sh";
-        let non_existing_binary = "non-existent";
-        let path_value = "/usr/bin:/bin";
-
-        assert_eq!(
-            get_executable_path(existing_abs_path, path_value),
-            Some(PathBuf::from(existing_abs_path))
-        );
-        assert_eq!(get_executable_path(non_existing_abs_path, path_value), None);
-
-        assert_eq!(
-            get_executable_path(existing_binary, path_value),
-            Some(PathBuf::from("/usr/bin/sh"))
-        );
-
-        assert_eq!(get_executable_path(non_existing_binary, path_value), None);
-    }
-
-    #[test]
-    fn test_is_executable() {
-        let tmp = tempfile::tempdir().expect("create temp directory for test");
-        let executable_path = PathBuf::from("/bin/sh");
-        let directory_path = tmp.path();
-        let non_executable_path = directory_path.join("non_executable_file");
-        let non_existent_path = PathBuf::from("/some/non/existent/path");
-
-        std::fs::File::create(non_executable_path.as_path()).unwrap();
-
-        assert!(is_executable(&non_existent_path).is_err());
-        assert!(is_executable(&executable_path).unwrap());
-        assert!(!is_executable(&non_executable_path).unwrap());
-        assert!(!is_executable(directory_path).unwrap());
     }
 
     #[test]
