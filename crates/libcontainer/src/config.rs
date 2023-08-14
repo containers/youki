@@ -47,7 +47,7 @@ pub struct YoukiConfig {
 }
 
 impl<'a> YoukiConfig {
-    pub fn from_spec(spec: &'a Spec, container_id: &str, rootless: bool) -> Result<Self> {
+    pub fn from_spec(spec: &'a Spec, container_id: &str, new_user_ns: bool) -> Result<Self> {
         Ok(YoukiConfig {
             hooks: spec.hooks().clone(),
             cgroup_path: utils::get_cgroup_path(
@@ -56,7 +56,7 @@ impl<'a> YoukiConfig {
                     .ok_or(ConfigError::MissingLinux)?
                     .cgroups_path(),
                 container_id,
-                rootless,
+                new_user_ns,
             ),
         })
     }

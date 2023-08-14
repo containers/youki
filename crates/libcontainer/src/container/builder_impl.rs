@@ -8,8 +8,8 @@ use crate::{
         args::{ContainerArgs, ContainerType},
         intel_rdt::delete_resctrl_subdirectory,
     },
-    rootless::Rootless,
     syscall::syscall::SyscallType,
+    user_ns::UserNamespaceConfig,
     utils,
     workload::Executor,
 };
@@ -36,8 +36,8 @@ pub(super) struct ContainerBuilderImpl {
     pub pid_file: Option<PathBuf>,
     /// Socket to communicate the file descriptor of the ptty
     pub console_socket: Option<RawFd>,
-    /// Options for rootless containers
-    pub rootless: Option<Rootless>,
+    /// Options for new user namespace
+    pub user_ns_config: Option<UserNamespaceConfig>,
     /// Path to the Unix Domain Socket to communicate container start
     pub notify_path: PathBuf,
     /// Container state
@@ -71,11 +71,11 @@ impl ContainerBuilderImpl {
         let cgroups_path = utils::get_cgroup_path(
             linux.cgroups_path(),
             &self.container_id,
-            self.rootless.is_some(),
+            self.user_ns_config.is_some(),
         );
         let cgroup_config = libcgroups::common::CgroupConfig {
             cgroup_path: cgroups_path,
-            systemd_cgroup: self.use_systemd || self.rootless.is_some(),
+            systemd_cgroup: self.use_systemd || self.user_ns_config.is_some(),
             container_name: self.container_id.to_owned(),
         };
         let process = self
@@ -144,7 +144,7 @@ impl ContainerBuilderImpl {
             notify_listener,
             preserve_fds: self.preserve_fds,
             container: self.container.to_owned(),
-            rootless: self.rootless.to_owned(),
+            user_ns_config: self.user_ns_config.to_owned(),
             cgroup_config,
             detached: self.detached,
             executor: self.executor.clone(),
@@ -184,12 +184,12 @@ impl ContainerBuilderImpl {
         let cgroups_path = utils::get_cgroup_path(
             linux.cgroups_path(),
             &self.container_id,
-            self.rootless.is_some(),
+            self.user_ns_config.is_some(),
         );
         let cmanager =
             libcgroups::common::create_cgroup_manager(libcgroups::common::CgroupConfig {
                 cgroup_path: cgroups_path,
-                systemd_cgroup: self.use_systemd || self.rootless.is_some(),
+                systemd_cgroup: self.use_systemd || self.user_ns_config.is_some(),
                 container_name: self.container_id.to_string(),
             })?;
 

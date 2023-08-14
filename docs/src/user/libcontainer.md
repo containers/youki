@@ -22,7 +22,7 @@ This exposes several modules, each dealing with a specific aspect of working wit
 
 - `rootfs` : this contains modules which deal with rootfs, which is minimal filesystem that is provided to the container.
 
-- `rootless` : this deals with running containers in a rootless configuration, that is running containers without needing root permissions.
+- `user_ns` : this deals with running containers in with new user namespace, usually rootless containers will use this, that is running containers without needing root permissions.
 
 - `seccomp` : this deals with setting up seccomp for container process. It uses libseccomp crate in order to do that.
 

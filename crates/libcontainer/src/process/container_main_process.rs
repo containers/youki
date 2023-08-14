@@ -5,7 +5,7 @@ use crate::{
         fork::{self, CloneCb},
         intel_rdt::setup_intel_rdt,
     },
-    rootless::Rootless,
+    user_ns::UserNamespaceConfig,
 };
 use nix::sys::wait::{waitpid, WaitStatus};
 use nix::unistd::Pid;
@@ -17,7 +17,7 @@ pub enum ProcessError {
     #[error("failed to write deny to setgroups")]
     SetGroupsDeny(#[source] std::io::Error),
     #[error(transparent)]
-    Rootless(#[from] crate::rootless::RootlessError),
+    UserNamespace(#[from] crate::user_ns::UserNamespaceError),
     #[error("container state is required")]
     ContainerStateRequired,
     #[error("failed to wait for intermediate process")]
@@ -87,12 +87,12 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, bo
     #[cfg(not(feature = "libseccomp"))]
     let (init_sender, init_receiver) = init_chan;
 
-    // If creating a rootless container, the intermediate process will ask
+    // If creating a container with new user namespace, the intermediate process will ask
     // the main process to set up uid and gid mapping, once the intermediate
     // process enters into a new user namespace.
-    if let Some(rootless) = &container_args.rootless {
+    if let Some(config) = &container_args.user_ns_config {
         main_receiver.wait_for_mapping_request()?;
-        setup_mapping(rootless, intermediate_pid)?;
+        setup_mapping(config, intermediate_pid)?;
         inter_sender.mapping_written()?;
     }
 
@@ -197,20 +197,20 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, bo
     Ok((init_pid, need_to_clean_up_intel_rdt_subdirectory))
 }
 
-fn setup_mapping(rootless: &Rootless, pid: Pid) -> Result<()> {
+fn setup_mapping(config: &UserNamespaceConfig, pid: Pid) -> Result<()> {
     tracing::debug!("write mapping for pid {:?}", pid);
-    if !rootless.privileged {
+    if !config.privileged {
         // The main process is running as an unprivileged user and cannot write the mapping
         // until "deny" has been written to setgroups. See CVE-2014-8989.
         std::fs::write(format!("/proc/{pid}/setgroups"), "deny")
             .map_err(ProcessError::SetGroupsDeny)?;
     }
 
-    rootless.write_uid_mapping(pid).map_err(|err| {
+    config.write_uid_mapping(pid).map_err(|err| {
         tracing::error!("failed to write uid mapping for pid {:?}: {}", pid, err);
         err
     })?;
-    rootless.write_gid_mapping(pid).map_err(|err| {
+    config.write_gid_mapping(pid).map_err(|err| {
         tracing::error!("failed to write gid mapping for pid {:?}: {}", pid, err);
         err
     })?;
@@ -221,7 +221,7 @@ fn setup_mapping(rootless: &Rootless, pid: Pid) -> Result<()> {
 mod tests {
     use super::*;
     use crate::process::channel::{intermediate_channel, main_channel};
-    use crate::rootless::RootlessIDMapper;
+    use crate::user_ns::UserNamespaceIDMapper;
     use anyhow::Result;
     use nix::{
         sched::{unshare, CloneFlags},
@@ -241,11 +241,11 @@ mod tests {
             .build()?;
         let uid_mappings = vec![uid_mapping];
         let tmp = tempfile::tempdir()?;
-        let id_mapper = RootlessIDMapper::new_test(tmp.path().to_path_buf());
-        let rootless = Rootless {
+        let id_mapper = UserNamespaceIDMapper::new_test(tmp.path().to_path_buf());
+        let ns_config = UserNamespaceConfig {
             uid_mappings: Some(uid_mappings),
             privileged: true,
-            rootless_id_mapper: id_mapper.clone(),
+            id_mapper: id_mapper.clone(),
             ..Default::default()
         };
         let (mut parent_sender, mut parent_receiver) = main_channel()?;
@@ -260,7 +260,7 @@ mod tests {
                 // The path requires the pid we use, so we can only do do after
                 // obtaining the child pid here.
                 id_mapper.ensure_uid_path(&child)?;
-                setup_mapping(&rootless, child)?;
+                setup_mapping(&ns_config, child)?;
                 let line = fs::read_to_string(id_mapper.get_uid_path(&child))?;
                 let line_splited = line.split_whitespace();
                 for (act, expect) in line_splited.zip([
@@ -296,10 +296,10 @@ mod tests {
             .build()?;
         let gid_mappings = vec![gid_mapping];
         let tmp = tempfile::tempdir()?;
-        let id_mapper = RootlessIDMapper::new_test(tmp.path().to_path_buf());
-        let rootless = Rootless {
+        let id_mapper = UserNamespaceIDMapper::new_test(tmp.path().to_path_buf());
+        let ns_config = UserNamespaceConfig {
             gid_mappings: Some(gid_mappings),
-            rootless_id_mapper: id_mapper.clone(),
+            id_mapper: id_mapper.clone(),
             ..Default::default()
         };
         let (mut parent_sender, mut parent_receiver) = main_channel()?;
@@ -314,7 +314,7 @@ mod tests {
                 // The path requires the pid we use, so we can only do do after
                 // obtaining the child pid here.
                 id_mapper.ensure_gid_path(&child)?;
-                setup_mapping(&rootless, child)?;
+                setup_mapping(&ns_config, child)?;
                 let line = fs::read_to_string(id_mapper.get_gid_path(&child))?;
                 let line_splited = line.split_whitespace();
                 for (act, expect) in line_splited.zip([

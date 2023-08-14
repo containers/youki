@@ -1,5 +1,5 @@
 use anyhow::{bail, Result};
-use libcontainer::rootless::rootless_required;
+use libcontainer::user_ns::rootless_required;
 use libcontainer::utils::create_dir_all_with_mode;
 use nix::libc;
 use nix::sys::stat::Mode;

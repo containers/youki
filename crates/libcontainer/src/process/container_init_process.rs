@@ -4,8 +4,8 @@ use crate::namespaces::NamespaceError;
 use crate::syscall::{Syscall, SyscallError};
 use crate::{apparmor, notify_socket, rootfs, workload};
 use crate::{
-    capabilities, hooks, namespaces::Namespaces, process::channel, rootfs::RootFS,
-    rootless::Rootless, tty, utils,
+    capabilities, hooks, namespaces::Namespaces, process::channel, rootfs::RootFS, tty,
+    user_ns::UserNamespaceConfig, utils,
 };
 use nix::mount::MsFlags;
 use nix::sched::CloneFlags;
@@ -492,7 +492,7 @@ pub fn container_init_process(
         }
     };
 
-    set_supplementary_gids(proc.user(), &args.rootless, syscall.as_ref()).map_err(|err| {
+    set_supplementary_gids(proc.user(), &args.user_ns_config, syscall.as_ref()).map_err(|err| {
         tracing::error!(?err, "failed to set supplementary gids");
         err
     })?;
@@ -720,7 +720,7 @@ pub fn container_init_process(
 //
 fn set_supplementary_gids(
     user: &User,
-    rootless: &Option<Rootless>,
+    user_ns_config: &Option<UserNamespaceConfig>,
     syscall: &dyn Syscall,
 ) -> Result<()> {
     if let Some(additional_gids) = user.additional_gids() {
@@ -742,7 +742,7 @@ fn set_supplementary_gids(
             .map(|gid| Gid::from_raw(*gid))
             .collect();
 
-        match rootless {
+        match user_ns_config {
             Some(r) if r.privileged => {
                 syscall.set_groups(&gids).map_err(|err| {
                     tracing::error!(?err, ?gids, "failed to set privileged supplementary gids");
@@ -757,7 +757,7 @@ fn set_supplementary_gids(
             }
             // this should have been detected during validation
             _ => unreachable!(
-                "unprivileged users cannot set supplementary gids in rootless container"
+                "unprivileged users cannot set supplementary gids in containers with new user namespace"
             ),
         }
     }
@@ -931,20 +931,20 @@ mod tests {
                 UserBuilder::default()
                     .additional_gids(vec![33, 34])
                     .build()?,
-                None::<Rootless>,
+                None::<UserNamespaceConfig>,
                 vec![vec![Gid::from_raw(33), Gid::from_raw(34)]],
             ),
             // unreachable case
             (
                 UserBuilder::default().build()?,
-                Some(Rootless::default()),
+                Some(UserNamespaceConfig::default()),
                 vec![],
             ),
             (
                 UserBuilder::default()
                     .additional_gids(vec![37, 38])
                     .build()?,
-                Some(Rootless {
+                Some(UserNamespaceConfig {
                     privileged: true,
                     gid_mappings: None,
                     newgidmap: None,
@@ -956,9 +956,9 @@ mod tests {
                 vec![vec![Gid::from_raw(37), Gid::from_raw(38)]],
             ),
         ];
-        for (user, rootless, want) in tests.into_iter() {
+        for (user, ns_config, want) in tests.into_iter() {
             let syscall = create_syscall();
-            let result = set_supplementary_gids(&user, &rootless, syscall.as_ref());
+            let result = set_supplementary_gids(&user, &ns_config, syscall.as_ref());
             match fs::read_to_string("/proc/self/setgroups")?.trim() {
                 "deny" => {
                     assert!(result.is_err());
