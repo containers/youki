@@ -556,7 +556,7 @@ log level to <code>debug</code>. This flag is ignored if <code>--log-level</code
 <p><code>rootfs</code> : this contains modules which deal with rootfs, which is minimal filesystem that is provided to the container.</p>
 </li>
 <li>
-<p><code>rootless</code> : this deals with running containers in a rootless configuration, that is running containers without needing root permissions.</p>
+<p><code>user_ns</code> : this deals with running containers in with new user namespace, usually rootless containers will use this, that is running containers without needing root permissions.</p>
 </li>
 <li>
 <p><code>seccomp</code> : this deals with setting up seccomp for container process. It uses libseccomp crate in order to do that.</p>
