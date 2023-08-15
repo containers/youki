@@ -6,6 +6,9 @@ changelog:
     - title: 💪 Improvements
       labels:
         - kind/feature
+    - title: 💥 Breaking Changes
+      labels:
+        - breaking change
     - title: 🐛 Bug Fixes
       labels:
         - kind/bug
