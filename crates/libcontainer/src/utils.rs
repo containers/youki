@@ -258,6 +258,21 @@ pub fn ensure_procfs(path: &Path) -> Result<(), EnsureProcfsError> {
     Ok(())
 }
 
+pub fn is_in_new_userns() -> bool {
+    let uid_map_path = "/proc/self/uid_map";
+    let content = std::fs::read_to_string(uid_map_path)
+        .unwrap_or_else(|_| panic!("failed to read {}", uid_map_path));
+    !content.contains("4294967295")
+}
+
+/// Checks if rootless mode needs to be used
+pub fn rootless_required() -> bool {
+    if !nix::unistd::geteuid().is_root() {
+        return true;
+    }
+    is_in_new_userns()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

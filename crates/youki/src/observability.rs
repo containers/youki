@@ -73,7 +73,13 @@ where
     let log_level_filter = tracing_subscriber::filter::LevelFilter::from(level);
     let log_format = detect_log_format(config.log_format.as_deref())
         .with_context(|| "failed to detect log format")?;
-    let systemd_journald = if config.systemd_log {
+
+    #[cfg(debug_assertions)]
+    let journald = true;
+    #[cfg(not(debug_assertions))]
+    let journald = config.systemd_log;
+
+    let systemd_journald = if journald {
         Some(tracing_journald::layer()?.with_syslog_identifier("youki".to_string()))
     } else {
         None

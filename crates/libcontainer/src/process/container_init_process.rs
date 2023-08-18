@@ -376,7 +376,8 @@ pub fn container_init_process(
             })?;
         }
 
-        let bind_service = namespaces.get(LinuxNamespaceType::User)?.is_some();
+        let bind_service =
+            namespaces.get(LinuxNamespaceType::User)?.is_some() || utils::is_in_new_userns();
         let rootfs = RootFS::new();
         rootfs
             .prepare_rootfs(

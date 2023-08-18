@@ -25,6 +25,17 @@ use super::stats::Stats;
 pub const CGROUP_PROCS: &str = "cgroup.procs";
 pub const DEFAULT_CGROUP_ROOT: &str = "/sys/fs/cgroup";
 
+#[cfg(feature = "systemd")]
+#[inline]
+fn is_true_root() -> bool {
+    if !nix::unistd::geteuid().is_root() {
+        return false;
+    }
+    let uid_map_path = "/proc/self/uid_map";
+    let content = std::fs::read_to_string(uid_map_path)
+        .unwrap_or_else(|_| panic!("failed to read {}", uid_map_path));
+    content.contains("4294967295")
+}
 pub trait CgroupManager {
     type Error;
 
@@ -388,7 +399,7 @@ fn create_systemd_cgroup_manager(
         );
     }
 
-    let use_system = nix::unistd::geteuid().is_root();
+    let use_system = is_true_root();
 
     tracing::info!(
         "systemd cgroup manager with system bus {} will be used",

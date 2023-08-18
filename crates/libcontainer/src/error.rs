@@ -22,6 +22,8 @@ pub enum LibcontainerError {
     InvalidInput(String),
     #[error("requires at least one executors")]
     NoExecutors,
+    #[error("rootless container requires valid user namespace definition")]
+    NoUserNamespace,
 
     // Invalid inputs
     #[error(transparent)]
