@@ -32,11 +32,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Automerge
         id: automerge
-        uses: pascalgn/automerge-action@v0.15.5
+        uses: pascalgn/automerge-action@v0.15.6
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MERGE_LABELS: dependencies
           MERGE_REQUIRED_APPROVALS: 1
-          MERGE_RETRY_SLEEP: 120000
+          MERGE_RETRY_SLEEP: 300000
           MERGE_DELETE_BRANCH: true
           MERGE_FILTER_AUTHOR: dependabot[bot]
