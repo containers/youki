@@ -47,6 +47,10 @@ pub trait Executor: CloneBoxExecutor {
     /// Executes the workload
     fn exec(&self, spec: &Spec) -> Result<(), ExecutorError>;
 
+    /// Validate if the spec can be executed by the executor. This step runs
+    /// after the container init process is created, entered into the correct
+    /// namespace and cgroups, and pivot_root into the rootfs. But this step
+    /// runs before waiting for the container start signal.
     fn validate(&self, spec: &Spec) -> Result<(), ExecutorError>;
 }
 
