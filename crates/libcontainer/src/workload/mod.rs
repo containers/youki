@@ -16,6 +16,14 @@ pub enum ExecutorError {
     CantHandle(&'static str),
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum ExecutorValidationError {
+    #[error("{0} executor can't handle spec")]
+    CantHandle(&'static str),
+    #[error("invalid argument")]
+    InvalidArg,
+}
+
 // Here is an explanation about the complexity below regarding to
 // CloneBoxExecutor and Executor traits. This is one of the places rust actually
 // makes our life harder. The usecase for the executor is to allow users of
@@ -51,7 +59,7 @@ pub trait Executor: CloneBoxExecutor {
     /// after the container init process is created, entered into the correct
     /// namespace and cgroups, and pivot_root into the rootfs. But this step
     /// runs before waiting for the container start signal.
-    fn validate(&self, spec: &Spec) -> Result<(), ExecutorError>;
+    fn validate(&self, spec: &Spec) -> Result<(), ExecutorValidationError>;
 }
 
 impl<T> CloneBoxExecutor for T

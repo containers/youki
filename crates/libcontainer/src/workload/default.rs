@@ -6,7 +6,7 @@ use std::{
 use nix::unistd;
 use oci_spec::runtime::Spec;
 
-use super::{Executor, ExecutorError};
+use super::{Executor, ExecutorError, ExecutorValidationError};
 
 #[derive(Clone)]
 pub struct DefaultExecutor {}
@@ -42,46 +42,46 @@ impl Executor for DefaultExecutor {
         unreachable!();
     }
 
-    fn validate(&self, spec: &Spec) -> Result<(), ExecutorError> {
+    fn validate(&self, spec: &Spec) -> Result<(), ExecutorValidationError> {
         let proc = spec
             .process()
             .as_ref()
-            .ok_or_else(|| ExecutorError::InvalidArg)?;
+            .ok_or(ExecutorValidationError::InvalidArg)?;
 
         if let Some(args) = proc.args() {
             let envs: Vec<String> = proc.env().as_ref().unwrap_or(&vec![]).clone();
             let path_vars: Vec<&String> = envs.iter().filter(|&e| e.starts_with("PATH=")).collect();
             if path_vars.is_empty() {
                 tracing::error!("PATH environment variable is not set");
-                Err(ExecutorError::InvalidArg)?;
+                Err(ExecutorValidationError::InvalidArg)?;
             }
             let path_var = path_vars[0].trim_start_matches("PATH=");
             match get_executable_path(&args[0], path_var) {
                 None => {
                     tracing::error!(
-                        "executable {} for container process not found in PATH",
-                        args[0]
+                        executable = ?args[0],
+                        "executable for container process not found in PATH",
                     );
-                    Err(ExecutorError::InvalidArg)?;
+                    Err(ExecutorValidationError::InvalidArg)?;
                 }
                 Some(path) => match is_executable(&path) {
                     Ok(true) => {
-                        tracing::debug!("found executable {:?}", path);
+                        tracing::debug!(executable = ?path, "found executable in executor");
                     }
                     Ok(false) => {
                         tracing::error!(
-                            "executable {:?} does not have the correct permission set",
-                            path
+                            executable = ?path,
+                            "executable does not have the correct permission set",
                         );
-                        Err(ExecutorError::InvalidArg)?;
+                        Err(ExecutorValidationError::InvalidArg)?;
                     }
                     Err(err) => {
                         tracing::error!(
-                            "failed to check permissions for executable {:?}: {}",
-                            path,
-                            err
+                            executable = ?path,
+                            ?err,
+                            "failed to check permissions for executable",
                         );
-                        Err(ExecutorError::InvalidArg)?;
+                        Err(ExecutorValidationError::InvalidArg)?;
                     }
                 },
             }

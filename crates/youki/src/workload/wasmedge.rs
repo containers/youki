@@ -4,7 +4,7 @@ use wasmedge_sdk::{
     params, VmBuilder,
 };
 
-use libcontainer::workload::{Executor, ExecutorError};
+use libcontainer::workload::{Executor, ExecutorError, ExecutorValidationError};
 
 const EXECUTOR_NAME: &str = "wasmedge";
 
@@ -63,9 +63,9 @@ impl Executor for WasmedgeExecutor {
         Ok(())
     }
 
-    fn validate(&self, spec: &Spec) -> Result<(), ExecutorError> {
+    fn validate(&self, spec: &Spec) -> Result<(), ExecutorValidationError> {
         if !can_handle(spec) {
-            return Err(ExecutorError::CantHandle(EXECUTOR_NAME));
+            return Err(ExecutorValidationError::CantHandle(EXECUTOR_NAME));
         }
 
         Ok(())

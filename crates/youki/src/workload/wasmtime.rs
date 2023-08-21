@@ -2,7 +2,7 @@ use libcontainer::oci_spec::runtime::Spec;
 use wasmtime::*;
 use wasmtime_wasi::WasiCtxBuilder;
 
-use libcontainer::workload::{Executor, ExecutorError, EMPTY};
+use libcontainer::workload::{Executor, ExecutorError, ExecutorValidationError, EMPTY};
 
 const EXECUTOR_NAME: &str = "wasmtime";
 
@@ -91,9 +91,9 @@ impl Executor for WasmtimeExecutor {
             .map_err(|err| ExecutorError::Execution(err.into()))
     }
 
-    fn validate(&self, spec: &Spec) -> Result<(), ExecutorError> {
+    fn validate(&self, spec: &Spec) -> Result<(), ExecutorValidationError> {
         if !can_handle(spec) {
-            return Err(ExecutorError::CantHandle(EXECUTOR_NAME));
+            return Err(ExecutorValidationError::CantHandle(EXECUTOR_NAME));
         }
 
         Ok(())

@@ -70,6 +70,8 @@ pub enum InitProcessError {
     NotifyListener(#[from] notify_socket::NotifyListenerError),
     #[error(transparent)]
     Workload(#[from] workload::ExecutorError),
+    #[error(transparent)]
+    WorkloadValidation(#[from] workload::ExecutorValidationError),
     #[error("invalid io priority class: {0}")]
     IoPriorityClass(String),
 }
