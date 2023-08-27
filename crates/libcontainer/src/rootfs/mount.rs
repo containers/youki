@@ -42,6 +42,8 @@ pub enum MountError {
     Symlink(#[from] SymlinkError),
     #[error("procfs failed")]
     Procfs(#[from] procfs::ProcError),
+    #[error("unknown mount option: {0}")]
+    UnsupportedMountOption(String),
 }
 
 type Result<T> = std::result::Result<T, MountError>;
@@ -72,7 +74,7 @@ impl Mount {
 
     pub fn setup_mount(&self, mount: &SpecMount, options: &MountOptions) -> Result<()> {
         tracing::debug!("mounting {:?}", mount);
-        let mut mount_option_config = parse_mount(mount);
+        let mut mount_option_config = parse_mount(mount)?;
 
         match mount.typ().as_deref() {
             Some("cgroup") => {
@@ -603,13 +605,13 @@ pub fn find_parent_mount(
 mod tests {
     use super::*;
     use crate::syscall::test::{MountArgs, TestHelperSyscall};
-    use anyhow::{Context, Result};
+    use anyhow::{Context, Ok, Result};
     #[cfg(feature = "v1")]
     use std::fs;
 
     #[test]
-    fn test_mount_to_container() {
-        let tmp_dir = tempfile::tempdir().unwrap();
+    fn test_mount_to_container() -> Result<()> {
+        let tmp_dir = tempfile::tempdir()?;
         {
             let m = Mount::new();
             let mount = &SpecMountBuilder::default()
@@ -624,9 +626,8 @@ mod tests {
                     "mode=0620".to_string(),
                     "gid=5".to_string(),
                 ])
-                .build()
-                .unwrap();
-            let mount_option_config = parse_mount(mount);
+                .build()?;
+            let mount_option_config = parse_mount(mount)?;
 
             assert!(m
                 .mount_into_container(
@@ -662,14 +663,12 @@ mod tests {
                 .typ("bind")
                 .source(tmp_dir.path().join("null"))
                 .options(vec!["ro".to_string()])
-                .build()
-                .unwrap();
-            let mount_option_config = parse_mount(mount);
+                .build()?;
+            let mount_option_config = parse_mount(mount)?;
             OpenOptions::new()
                 .create(true)
                 .write(true)
-                .open(tmp_dir.path().join("null"))
-                .unwrap();
+                .open(tmp_dir.path().join("null"))?;
 
             assert!(m
                 .mount_into_container(mount, tmp_dir.path(), &mount_option_config, None)
@@ -701,16 +700,18 @@ mod tests {
             assert_eq!(want, *got);
             assert_eq!(got.len(), 2);
         }
+
+        Ok(())
     }
 
     #[test]
-    fn test_make_parent_mount_private() {
-        let tmp_dir = tempfile::tempdir().unwrap();
+    fn test_make_parent_mount_private() -> Result<()> {
+        let tmp_dir = tempfile::tempdir()?;
         let m = Mount::new();
-        let result = m.make_parent_mount_private(tmp_dir.path());
-        assert!(result.is_ok());
+        let result = m.make_parent_mount_private(tmp_dir.path())?;
+        assert!(result.is_some());
 
-        if let Ok(Some(_)) = result {
+        if result.is_some() {
             let set = m
                 .syscall
                 .as_any()
@@ -730,6 +731,8 @@ mod tests {
             // a plain directory. See https://github.com/containers/youki/issues/471
             assert!(got.target == PathBuf::from("/") || got.target == PathBuf::from("/tmp"));
         }
+
+        Ok(())
     }
 
     #[test]
@@ -853,7 +856,7 @@ mod tests {
     #[cfg(feature = "v1")]
     fn test_mount_cgroup_v1() -> Result<()> {
         // arrange
-        let tmp = tempfile::tempdir().unwrap();
+        let tmp = tempfile::tempdir()?;
         let container_cgroup = PathBuf::from("/sys/fs/cgroup");
 
         let spec_cgroup_mount = SpecMountBuilder::default()
