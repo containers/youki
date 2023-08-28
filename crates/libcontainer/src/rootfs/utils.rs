@@ -190,6 +190,7 @@ mod tests {
 
     use super::*;
 
+    use anyhow::Result;
     use oci_spec::runtime::MountBuilder;
 
     #[test]
@@ -205,7 +206,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_mount() -> anyhow::Result<()> {
+    fn test_parse_mount() -> Result<()> {
         let mount_option_config = parse_mount(
             &MountBuilder::default()
                 .destination(PathBuf::from("/proc"))
