@@ -36,7 +36,7 @@ libseccomp = { version = "0.3.0", optional=true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 rust-criu = "0.4.0"
-regex = "1.9.3"
+regex = "1.9.4"
 thiserror = "1.0.47"
 tracing = { version = "0.1.37", features = ["attributes"]}
 safe-path = "0.1.0"
