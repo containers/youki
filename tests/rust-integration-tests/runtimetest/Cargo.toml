@@ -5,6 +5,6 @@ edition = "2021"
 
 [dependencies]
 oci-spec = { version = "0.6.1", features = ["runtime"] }
-nix = "0.26.2"
+nix = "0.27.0"
 anyhow = "1.0"
 

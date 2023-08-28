@@ -1752,7 +1752,7 @@ dependencies = [
  "flate2",
  "libcgroups",
  "libcontainer",
- "nix",
+ "nix 0.27.0",
  "num_cpus",
  "oci-spec",
  "once_cell",
@@ -1911,7 +1911,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "75adb4021282a72ca63ebbc0e4247750ad74ede68ff062d247691072d709ad8b"
 dependencies = [
  "cc",
- "nix",
+ "nix 0.26.3",
  "num_cpus",
  "pkg-config",
 ]
@@ -1935,7 +1935,7 @@ dependencies = [
  "libbpf-sys",
  "libc",
  "mockall",
- "nix",
+ "nix 0.27.0",
  "oci-spec",
  "procfs",
  "quickcheck",
@@ -1961,7 +1961,7 @@ dependencies = [
  "libc",
  "libcgroups",
  "libseccomp",
- "nix",
+ "nix 0.27.0",
  "oci-spec",
  "once_cell",
  "prctl",
@@ -2241,16 +2241,26 @@ dependencies = [
 
 [[package]]
 name = "nix"
-version = "0.26.2"
+version = "0.26.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bfdda3d196821d6af13126e40375cdf7da646a96114af134d5f417a9a1dc8e1a"
+checksum = "abbbc55ad7b13aac85f9401c796dcda1b864e07fcad40ad47792eaa8932ea502"
 dependencies = [
- "bitflags 1.3.2",
+ "bitflags 2.4.0",
  "cfg-if",
  "libc",
  "memoffset 0.7.1",
  "pin-utils",
- "static_assertions",
+]
+
+[[package]]
+name = "nix"
+version = "0.27.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "896d4664b919f48478f3ce02c502adfe9bffeb61563d2a12ddf1aad8f6cd926f"
+dependencies = [
+ "bitflags 2.4.0",
+ "cfg-if",
+ "libc",
 ]
 
 [[package]]
@@ -2628,7 +2638,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "059a34f111a9dee2ce1ac2826a68b24601c4298cfeb1a587c3cb493d5ab46f52"
 dependencies = [
  "libc",
- "nix",
+ "nix 0.27.0",
 ]
 
 [[package]]
@@ -3132,7 +3142,7 @@ name = "runtimetest"
 version = "0.0.1"
 dependencies = [
  "anyhow",
- "nix",
+ "nix 0.27.0",
  "oci-spec",
 ]
 
@@ -3659,12 +3669,6 @@ checksum = "e113fb6f3de07a243d434a56ec6f186dfd51cb08448239fe7bcae73f87ff28ff"
 dependencies = [
  "version_check",
 ]
-
-[[package]]
-name = "static_assertions"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "stdweb"
@@ -5721,7 +5725,7 @@ dependencies = [
  "libcgroups",
  "libcontainer",
  "liboci-cli",
- "nix",
+ "nix 0.27.0",
  "once_cell",
  "pentacle",
  "procfs",
