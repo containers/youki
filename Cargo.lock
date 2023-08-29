@@ -3761,9 +3761,9 @@ dependencies = [
 
 [[package]]
 name = "tabwriter"
-version = "1.2.1"
+version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "36205cfc997faadcc4b0b87aaef3fbedafe20d38d4959a7ca6ff803564051111"
+checksum = "08e1173ee641651a3095fe95d86ae314cd1f959888097debce3e0f9ca532eef1"
 dependencies = [
  "unicode-width",
 ]
