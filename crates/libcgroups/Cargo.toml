@@ -20,7 +20,7 @@ systemd = ["v2", "dep:dbus"]
 cgroupsv2_devices = ["rbpf", "libbpf-sys", "errno", "libc"]
 
 [dependencies]
-nix = "0.26.2"
+nix = "0.27.1"
 procfs = "0.15.1"
 oci-spec = { version = "~0.6.2", features = ["runtime"] }
 dbus = { version = "0.9.7", optional = true }
