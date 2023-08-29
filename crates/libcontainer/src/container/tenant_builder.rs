@@ -165,7 +165,7 @@ impl TenantContainerBuilder {
                     }
                 }
                 _ => {
-                    err_str_buf.extend(buf.into_iter());
+                    err_str_buf.extend(buf);
                 }
             }
         }

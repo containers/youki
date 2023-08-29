@@ -612,7 +612,7 @@ mod tests {
         drop(file);
 
         // The stdio fds should also be contained in the list of opened fds.
-        if !vec![0, 1, 2]
+        if ![0, 1, 2]
             .iter()
             .all(|&stdio_fd| open_fds.iter().any(|&open_fd| open_fd == stdio_fd))
         {
