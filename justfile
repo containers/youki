@@ -32,7 +32,7 @@ rust-oci-tests-bin:
 test-integration: test-oci rust-oci-tests
 
 # run all tests except rust-oci 
-test-all: test-basic test-features oci-tests containerd-test # currently not doing rust-oci here
+test-all: test-basic test-features test-oci containerd-test # currently not doing rust-oci here
 
 # run basic tests
 test-basic: test-unit test-doc
