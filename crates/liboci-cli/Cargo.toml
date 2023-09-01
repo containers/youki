@@ -1,6 +1,6 @@
 [package]
 name = "liboci-cli"
-version = "0.1.0"
+version = "0.2.0"
 description = "Parse command line arguments for OCI container runtimes"
 license-file = "../../LICENSE"
 repository = "https://github.com/containers/youki"

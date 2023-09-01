@@ -49,11 +49,11 @@ Install from the GitHub release.
 Note that this way also requires the aforementioned installation.
 
 ```console
-$ wget https://github.com/containers/youki/releases/download/v0.1.0/youki_0_1_0_linux.tar.gz
-$ tar -zxvf youki_0_1_0_linux.tar.gz youki_0_1_0_linux/youki-0.1.0/youki
+$ wget https://github.com/containers/youki/releases/download/v0.2.0/youki_0_2_0_linux.tar.gz
+$ tar -zxvf youki_0_2_0_linux.tar.gz youki_0_2_0_linux/youki-0.2.0/youki
 # Maybe you need root privileges.
-$ mv youki_0_1_0_linux/youki-0.1.0/youki /usr/local/bin/youki
-$ rm -rf youki_0_1_0_linux.tar.gz youki_0_1_0_linux
+$ mv youki_0_2_0_linux/youki-0.2.0/youki /usr/local/bin/youki
+$ rm -rf youki_0_2_0_linux.tar.gz youki_0_2_0_linux
 ```
 
 ## Getting the source
