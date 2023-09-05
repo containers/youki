@@ -224,6 +224,8 @@ impl TenantContainerBuilder {
             }
         }
 
+        utils::validate_spec_for_new_user_ns(spec)?;
+
         Ok(())
     }
 

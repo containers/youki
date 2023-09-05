@@ -1,5 +1,6 @@
 use crate::error::MissingSpecError;
 use crate::namespaces::{NamespaceError, Namespaces};
+use crate::utils;
 use nix::unistd::Pid;
 use oci_spec::runtime::{Linux, LinuxIdMapping, LinuxNamespace, LinuxNamespaceType, Mount, Spec};
 use std::fs;
@@ -85,8 +86,6 @@ type Result<T> = std::result::Result<T, UserNamespaceError>;
 pub enum ValidateSpecError {
     #[error(transparent)]
     MissingSpec(#[from] crate::error::MissingSpecError),
-    #[error("rootless container requires valid user namespace definition")]
-    NoUserNamespace, // TODO fix this while fixing podman
     #[error("new user namespace requires valid uid mappings")]
     NoUIDMappings,
     #[error("new user namespace requires valid gid mappings")]
@@ -151,13 +150,6 @@ impl UserNamespaceConfig {
         let user_namespace = namespaces
             .get(LinuxNamespaceType::User)
             .map_err(ValidateSpecError::Namespaces)?;
-
-        // If conditions requires us to use rootless, we must either create a new
-        // user namespace or enter an existing.
-        // TODO FIX THIS FOR ROOTLESS
-        if rootless_required() && user_namespace.is_none() {
-            return Err(UserNamespaceError::NoUserNamespace);
-        }
 
         if user_namespace.is_some() && user_namespace.unwrap().path().is_none() {
             tracing::debug!("container with new user namespace should be created");
@@ -225,20 +217,10 @@ impl TryFrom<&Linux> for UserNamespaceConfig {
             uid_mappings: linux.uid_mappings().to_owned(),
             gid_mappings: linux.gid_mappings().to_owned(),
             user_namespace: user_namespace.cloned(),
-            privileged: nix::unistd::geteuid().is_root(),
+            privileged: !utils::rootless_required(),
             id_mapper: UserNamespaceIDMapper::new(),
         })
     }
-}
-
-/// Checks if rootless mode should be used
-// TODO fix this along with podman
-pub fn rootless_required() -> bool {
-    if !nix::unistd::geteuid().is_root() {
-        return true;
-    }
-
-    matches!(std::env::var("YOUKI_USE_ROOTLESS").as_deref(), Ok("true"))
 }
 
 pub fn unprivileged_user_ns_enabled() -> Result<bool> {
@@ -269,10 +251,6 @@ fn validate_spec_for_new_user_ns(spec: &Spec) -> std::result::Result<(), Validat
         "validating spec for container with new user namespace"
     );
     let linux = spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
-    let namespaces = Namespaces::try_from(linux.namespaces().as_ref())?;
-    if namespaces.get(LinuxNamespaceType::User)?.is_none() {
-        return Err(ValidateSpecError::NoUserNamespace);
-    }
 
     let gid_mappings = linux
         .gid_mappings()
@@ -303,9 +281,8 @@ fn validate_spec_for_new_user_ns(spec: &Spec) -> std::result::Result<(), Validat
         .as_ref()
         .and_then(|process| process.user().additional_gids().as_ref())
     {
-        let privileged = nix::unistd::geteuid().is_root();
+        let privileged = !utils::rootless_required();
 
-        // TODO fix this along with fixes for podman
         match (privileged, additional_gids.is_empty()) {
             (true, false) => {
                 for gid in additional_gids {
@@ -515,19 +492,6 @@ mod tests {
             .container_id(0_u32)
             .size(10_u32)
             .build()?];
-
-        let linux_no_userns = LinuxBuilder::default()
-            .namespaces(vec![])
-            .uid_mappings(uid_mappings.clone())
-            .gid_mappings(gid_mappings.clone())
-            .build()?;
-        assert!(validate_spec_for_new_user_ns(
-            &SpecBuilder::default()
-                .linux(linux_no_userns)
-                .build()
-                .unwrap()
-        )
-        .is_err());
 
         let linux_uid_empty = LinuxBuilder::default()
             .namespaces(vec![userns.clone()])

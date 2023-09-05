@@ -13,7 +13,7 @@ use crate::{
     error::{ErrInvalidSpec, LibcontainerError, MissingSpecError},
     notify_socket::NOTIFY_FILE,
     process::args::ContainerType,
-    tty, user_ns,
+    tty, user_ns, utils,
 };
 
 use super::{
@@ -87,6 +87,7 @@ impl InitContainerBuilder {
         };
 
         let user_ns_config = UserNamespaceConfig::new(&spec)?;
+
         let config = YoukiConfig::from_spec(&spec, container.id(), user_ns_config.is_some())?;
         config.save(&container_dir).map_err(|err| {
             tracing::error!(?container_dir, "failed to save config: {}", err);
@@ -191,6 +192,8 @@ impl InitContainerBuilder {
                 }
             }
         }
+
+        utils::validate_spec_for_new_user_ns(spec)?;
 
         Ok(())
     }
