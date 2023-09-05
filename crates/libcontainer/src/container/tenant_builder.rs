@@ -121,10 +121,6 @@ impl TenantContainerBuilder {
         let use_systemd = self.should_use_systemd(&container);
         let user_ns_config = UserNamespaceConfig::new(&spec)?;
 
-        if utils::rootless_required() && !utils::is_in_new_userns() && user_ns_config.is_none() {
-            return Err(LibcontainerError::NoUserNamespace);
-        }
-
         let (read_end, write_end) =
             pipe2(OFlag::O_CLOEXEC).map_err(LibcontainerError::OtherSyscall)?;
 
@@ -227,6 +223,8 @@ impl TenantContainerBuilder {
                 }
             }
         }
+
+        utils::validate_spec_for_new_user_ns(spec)?;
 
         Ok(())
     }

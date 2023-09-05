@@ -88,10 +88,6 @@ impl InitContainerBuilder {
 
         let user_ns_config = UserNamespaceConfig::new(&spec)?;
 
-        if utils::rootless_required() && !utils::is_in_new_userns() && user_ns_config.is_none() {
-            return Err(LibcontainerError::NoUserNamespace);
-        }
-
         let config = YoukiConfig::from_spec(&spec, container.id(), user_ns_config.is_some())?;
         config.save(&container_dir).map_err(|err| {
             tracing::error!(?container_dir, "failed to save config: {}", err);
@@ -196,6 +192,8 @@ impl InitContainerBuilder {
                 }
             }
         }
+
+        utils::validate_spec_for_new_user_ns(spec)?;
 
         Ok(())
     }
