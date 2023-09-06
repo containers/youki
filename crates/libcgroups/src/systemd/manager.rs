@@ -6,7 +6,7 @@ use std::{
     path::Component::RootDir,
 };
 
-use dbus::arg::RefArg;
+use super::dbus_native::serialize::DbusSerialize;
 use nix::{unistd::Pid, NixPath};
 use std::path::{Path, PathBuf};
 
@@ -369,7 +369,7 @@ impl CgroupManager for Manager {
     }
 
     fn apply(&self, controller_opt: &ControllerOpt) -> Result<(), Self::Error> {
-        let mut properties: HashMap<&str, Box<dyn RefArg>> = HashMap::new();
+        let mut properties: HashMap<&str, Box<dyn DbusSerialize>> = HashMap::new();
         let systemd_version = self.client.systemd_version()?;
 
         for controller in CONTROLLER_TYPES {
@@ -393,8 +393,8 @@ impl CgroupManager for Manager {
             };
         }
 
+        tracing::debug!("applying properties {:?}", properties);
         Unified::apply(controller_opt, systemd_version, &mut properties)?;
-        tracing::debug!("{:?}", properties);
 
         if !properties.is_empty() {
             self.ensure_controllers_attached()?;
@@ -464,7 +464,7 @@ mod tests {
         fn set_unit_properties(
             &self,
             _unit_name: &str,
-            _properties: &HashMap<&str, Box<dyn RefArg>>,
+            _properties: &HashMap<&str, Box<dyn DbusSerialize>>,
         ) -> Result<(), SystemdClientError> {
             Ok(())
         }
