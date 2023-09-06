@@ -2,7 +2,7 @@ use super::utils::{adjust_padding, align_counter, Result, SystemdClientError};
 
 /// This indicates that given type can be serialized as dbus
 /// message body, and has methods needed for that
-pub trait DbusSerialize {
+pub trait DbusSerialize: std::fmt::Debug {
     /// Provide signature for the given type in the dbus signature format
     fn get_signature() -> String
     where
@@ -24,6 +24,7 @@ pub trait DbusSerialize {
 #[derive(Debug)]
 pub struct Variant<T>(pub T);
 
+#[derive(Debug)]
 pub struct Structure {
     key: String,
     val: Box<dyn DbusSerialize>,
@@ -110,6 +111,28 @@ impl DbusSerialize for bool {
         let ret = u32::from_le_bytes(buf[*counter..*counter + 4].try_into().unwrap());
         *counter += 4;
         Ok(ret != 0)
+    }
+}
+
+impl DbusSerialize for u8 {
+    fn get_signature() -> String {
+        "y".to_string()
+    }
+
+    fn serialize(&self, buf: &mut Vec<u8>) {
+        adjust_padding(buf, 1);
+        buf.extend_from_slice(&self.to_le_bytes());
+    }
+    fn deserialize(buf: &[u8], counter: &mut usize) -> Result<Self> {
+        align_counter(counter, 1);
+        if buf.len() < *counter + 1 {
+            return Err(SystemdClientError::DeserializationError(
+                "incomplete u8 response : partial response".into(),
+            ));
+        }
+        let ret = u8::from_le_bytes(buf[*counter..*counter + 1].try_into().unwrap());
+        *counter += 1;
+        Ok(ret)
     }
 }
 

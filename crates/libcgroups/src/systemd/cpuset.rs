@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use dbus::arg::RefArg;
+use super::dbus_native::serialize::DbusSerialize;
 use fixedbitset::FixedBitSet;
 use oci_spec::runtime::LinuxCpu;
 
@@ -29,7 +29,7 @@ impl Controller for CpuSet {
     fn apply(
         options: &ControllerOpt,
         systemd_version: u32,
-        properties: &mut HashMap<&str, Box<dyn RefArg>>,
+        properties: &mut HashMap<&str, Box<dyn DbusSerialize>>,
     ) -> Result<(), Self::Error> {
         if let Some(cpu) = options.resources.cpu() {
             tracing::debug!("Applying cpuset resource restrictions");
@@ -44,7 +44,7 @@ impl CpuSet {
     fn apply(
         cpu: &LinuxCpu,
         systemd_version: u32,
-        properties: &mut HashMap<&str, Box<dyn RefArg>>,
+        properties: &mut HashMap<&str, Box<dyn DbusSerialize>>,
     ) -> Result<(), SystemdCpuSetError> {
         if systemd_version <= 243 {
             return Err(SystemdCpuSetError::OldSystemd);
@@ -130,6 +130,8 @@ mod tests {
     use anyhow::{Context, Result};
     use dbus::arg::{ArgType, RefArg};
     use oci_spec::runtime::LinuxCpuBuilder;
+
+    use crate::recast;
 
     use super::*;
 
@@ -217,7 +219,7 @@ mod tests {
         let cpu = LinuxCpuBuilder::default()
             .build()
             .context("build cpu spec")?;
-        let mut properties: HashMap<&str, Box<dyn RefArg>> = HashMap::new();
+        let mut properties: HashMap<&str, Box<dyn DbusSerialize>> = HashMap::new();
 
         let result = CpuSet::apply(&cpu, systemd_version, &mut properties);
 
@@ -233,18 +235,18 @@ mod tests {
             .mems("0-3")
             .build()
             .context("build cpu spec")?;
-        let mut properties: HashMap<&str, Box<dyn RefArg>> = HashMap::new();
+        let mut properties: HashMap<&str, Box<dyn DbusSerialize>> = HashMap::new();
 
         CpuSet::apply(&cpu, systemd_version, &mut properties).context("apply cpuset")?;
 
         assert_eq!(properties.len(), 2);
         assert!(properties.contains_key(ALLOWED_CPUS));
         let cpus = properties.get(ALLOWED_CPUS).unwrap();
-        assert_eq!(cpus.arg_type(), ArgType::Array);
+        recast!(cpus, Vec<u8>)?;
 
         assert!(properties.contains_key(ALLOWED_NODES));
         let mems = properties.get(ALLOWED_NODES).unwrap();
-        assert_eq!(mems.arg_type(), ArgType::Array);
+        recast!(mems, Vec<u8>)?;
 
         Ok(())
     }

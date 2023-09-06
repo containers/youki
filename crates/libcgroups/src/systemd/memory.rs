@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use dbus::arg::RefArg;
+use super::dbus_native::serialize::DbusSerialize;
 use oci_spec::runtime::LinuxMemory;
 
 use crate::common::ControllerOpt;
@@ -31,7 +31,7 @@ impl Controller for Memory {
     fn apply(
         options: &ControllerOpt,
         _: u32,
-        properties: &mut HashMap<&str, Box<dyn RefArg>>,
+        properties: &mut HashMap<&str, Box<dyn DbusSerialize>>,
     ) -> Result<(), Self::Error> {
         if let Some(memory) = options.resources.memory() {
             tracing::debug!("applying memory resource restrictions");
@@ -45,7 +45,7 @@ impl Controller for Memory {
 impl Memory {
     fn apply(
         memory: &LinuxMemory,
-        properties: &mut HashMap<&str, Box<dyn RefArg>>,
+        properties: &mut HashMap<&str, Box<dyn DbusSerialize>>,
     ) -> Result<(), SystemdMemoryError> {
         if let Some(reservation) = memory.reservation() {
             match reservation {
@@ -83,9 +83,9 @@ impl Memory {
     fn apply_swap(
         swap: Option<i64>,
         limit: Option<i64>,
-        properties: &mut HashMap<&str, Box<dyn RefArg>>,
+        properties: &mut HashMap<&str, Box<dyn DbusSerialize>>,
     ) -> Result<(), SystemdMemoryError> {
-        let value: Box<dyn RefArg> = match (limit, swap) {
+        let value: Box<dyn DbusSerialize> = match (limit, swap) {
             // memory is unlimited and swap not specified -> assume swap unlimited
             (Some(-1), None) => Box::new(u64::MAX),
             // if swap is unlimited it can be set to unlimited regardless of memory limit value
@@ -115,8 +115,9 @@ impl Memory {
 #[cfg(test)]
 mod tests {
     use anyhow::{Context, Result};
-    use dbus::arg::ArgType;
     use oci_spec::runtime::LinuxMemoryBuilder;
+
+    use crate::recast;
 
     use super::*;
 
@@ -130,7 +131,7 @@ mod tests {
                 .reservation(reservation)
                 .build()
                 .context("build memory spec")?;
-            let mut properties: HashMap<&str, Box<dyn RefArg>> = HashMap::new();
+            let mut properties: HashMap<&str, Box<dyn DbusSerialize>> = HashMap::new();
 
             // act
             Memory::apply(&memory, &mut properties).context("apply memory")?;
@@ -139,8 +140,8 @@ mod tests {
             assert_eq!(properties.len(), 1);
             assert!(properties.contains_key(MEMORY_LOW));
             let memory_low = &properties[MEMORY_LOW];
-            assert_eq!(memory_low.arg_type(), ArgType::UInt64);
-            assert_eq!(memory_low.as_u64().unwrap(), expected);
+            let val = recast!(memory_low, u64)?;
+            assert_eq!(val, expected);
         }
 
         Ok(())
@@ -156,7 +157,7 @@ mod tests {
                 .limit(reservation)
                 .build()
                 .context("build memory spec")?;
-            let mut properties: HashMap<&str, Box<dyn RefArg>> = HashMap::new();
+            let mut properties: HashMap<&str, Box<dyn DbusSerialize>> = HashMap::new();
 
             // act
             Memory::apply(&memory, &mut properties).context("apply memory")?;
@@ -165,8 +166,8 @@ mod tests {
             assert_eq!(properties.len(), prop_count);
             assert!(properties.contains_key(MEMORY_MAX));
             let memory_low = &properties[MEMORY_MAX];
-            assert_eq!(memory_low.arg_type(), ArgType::UInt64);
-            assert_eq!(memory_low.as_u64().unwrap(), mem_low);
+            let val = recast!(mem_low, u64)?;
+            assert_eq!(val, mem_low);
         }
 
         Ok(())
