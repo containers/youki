@@ -100,7 +100,11 @@ impl Unified {
                         return Err(SystemdUnifiedError::OldSystemd(cpuset.into()));
                     }
 
-                    let bitmask = to_bitmask(value).map_err(SystemdUnifiedError::CpuSetCpu)?;
+                    let bitmask: Vec<u64> = to_bitmask(value)
+                        .map_err(SystemdUnifiedError::CpuSetCpu)?
+                        .into_iter()
+                        .map(|v| v as u64)
+                        .collect();
 
                     let systemd_cpuset = match cpuset {
                         "cpuset.cpus" => cpuset::ALLOWED_CPUS,
@@ -214,8 +218,8 @@ mod tests {
         assert!(actual.contains_key(cpu::CPU_PERIOD));
         assert!(actual.contains_key(cpu::CPU_QUOTA));
 
-        let cpu_period = actual[cpu::CPU_PERIOD];
-        let cpu_quota = actual[cpu::CPU_QUOTA];
+        let cpu_period = &actual[cpu::CPU_PERIOD];
+        let cpu_quota = &actual[cpu::CPU_QUOTA];
         assert_eq!(recast!(cpu_period, u64)?, 250000);
         assert_eq!(recast!(cpu_quota, u64)?, 500000);
 
@@ -238,7 +242,7 @@ mod tests {
         assert!(!actual.contains_key(cpu::CPU_PERIOD));
         assert!(actual.contains_key(cpu::CPU_QUOTA));
 
-        let cpu_quota = actual[cpu::CPU_QUOTA];
+        let cpu_quota = &actual[cpu::CPU_QUOTA];
         assert_eq!(recast!(cpu_quota, u64)?, 500000);
 
         Ok(())

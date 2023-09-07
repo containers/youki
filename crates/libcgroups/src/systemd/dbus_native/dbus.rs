@@ -1,10 +1,13 @@
-use std::io::{IoSlice, IoSliceMut};
-
-use nix::sys::socket;
-
+use super::client::SystemdClient;
 use super::message::*;
 use super::proxy::Proxy;
+use super::serialize::{DbusSerialize, Variant};
 use super::utils::{Result, SystemdClientError};
+use nix::sys::socket;
+use std::collections::HashMap;
+use std::io::{IoSlice, IoSliceMut};
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 const REPLY_BUF_SIZE: usize = 128; // seems good enough tradeoff between extra size and repeated calls
 
@@ -12,9 +15,17 @@ const REPLY_BUF_SIZE: usize = 128; // seems good enough tradeoff between extra s
 /// usage can cause errors, primarily because then the message received over
 /// socket can be out of order and we need to manager buffer and check with message counter
 /// which message is for which request etc etc
+// Client is a wrapper providing higher level API and abatraction around dbus.
+// For more information see https://www.freedesktop.org/wiki/Software/systemd/dbus/
 pub struct DbusConnection {
+    /// Is the socket system level or session specific
+    system: bool,
+    /// socket fd
     socket: i32,
-    msg_ctr: u32,
+    /// counter for messages
+    // This must be atomic, so that we can take non-mutable reference to self
+    // and still increment this
+    msg_ctr: AtomicU32,
 }
 
 #[inline(always)]
@@ -30,7 +41,7 @@ fn uid_to_hex_str(uid: u32) -> String {
 impl DbusConnection {
     /// Open a new dbus connection to given address
     /// authenticating as user with given uid
-    pub fn new(addr: &str, uid: u32) -> Result<Self> {
+    pub fn new(addr: &str, uid: u32, system: bool) -> Result<Self> {
         let socket = socket::socket(
             socket::AddressFamily::Unix,
             socket::SockType::Stream,
@@ -40,14 +51,26 @@ impl DbusConnection {
 
         let addr = socket::UnixAddr::new(addr)?;
         socket::connect(socket, &addr)?;
-        let mut dbus = Self { socket, msg_ctr: 0 };
+        let dbus = Self {
+            socket,
+            msg_ctr: AtomicU32::new(0),
+            system,
+        };
         dbus.authenticate(uid)?;
         Ok(dbus)
     }
 
+    pub fn new_system() -> Result<Self> {
+        todo!()
+    }
+
+    pub fn new_session() -> Result<Self> {
+        todo!();
+    }
+
     /// Authenticates with dbus using given uid via external strategy
     /// Must be called on any connection before doing any other communication
-    fn authenticate(&mut self, uid: u32) -> Result<()> {
+    fn authenticate(&self, uid: u32) -> Result<()> {
         let mut buf = [0; 64];
 
         // dbus connection always start with a 0 byte sent as first thing
@@ -114,7 +137,7 @@ impl DbusConnection {
     /// Helper function to get complete message in chunks
     /// over the socket. This will loop and collect all of the message
     /// chunks into a single vector
-    fn receive_complete_response(&mut self) -> Result<Vec<u8>> {
+    fn receive_complete_response(&self) -> Result<Vec<u8>> {
         let mut ret = Vec::with_capacity(512);
         loop {
             let mut reply: [u8; REPLY_BUF_SIZE] = [0_u8; REPLY_BUF_SIZE];
@@ -146,7 +169,7 @@ impl DbusConnection {
     /// message was returned or not, this will not check that, the returned Err
     /// indicates error in sending/receiving message
     pub fn send_message(
-        &mut self,
+        &self,
         mtype: MessageType,
         headers: Vec<Header>,
         body: Vec<u8>,
@@ -181,14 +204,137 @@ impl DbusConnection {
     }
 
     /// function to manage the message counter
-    fn get_msg_id(&mut self) -> u32 {
-        self.msg_ctr += 1;
-        self.msg_ctr
+    fn get_msg_id(&self) -> u32 {
+        let old_ctr = self.msg_ctr.fetch_add(1, Ordering::SeqCst);
+        old_ctr + 1
     }
 
     /// Create a proxy for given destination and path
-    pub fn proxy(&mut self, destination: String, path: String) -> Proxy {
+    pub fn proxy(&self, destination: &str, path: &str) -> Proxy {
         Proxy::new(self, destination, path)
+    }
+
+    fn create_proxy(&self) -> Proxy {
+        self.proxy("org.freedesktop.systemd1", "/org/freedesktop/systemd1")
+    }
+}
+
+impl SystemdClient for DbusConnection {
+    fn is_system(&self) -> bool {
+        self.system
+    }
+
+    fn transient_unit_exists(&self, unit_name: &str) -> bool {
+        let mut proxy = self.create_proxy();
+        proxy.get_unit(unit_name).is_ok()
+    }
+
+    /// start_transient_unit is a higher level API for starting a unit
+    /// for a specific container under systemd.
+    /// See https://www.freedesktop.org/wiki/Software/systemd/dbus for more details.
+    fn start_transient_unit(
+        &self,
+        container_name: &str,
+        pid: u32,
+        parent: &str,
+        unit_name: &str,
+    ) -> Result<()> {
+        // To view and introspect the methods under the 'org.freedesktop.systemd1' destination
+        // and object path under it use the following command:
+        // `gdbus introspect --system --dest org.freedesktop.systemd1 --object-path /org/freedesktop/systemd1`
+        let proxy = self.create_proxy();
+
+        // To align with runc, youki will always add the following properties to its container units:
+        // - CPUAccounting=true
+        // - IOAccounting=true (BlockIOAccounting for cgroup v1)
+        // - MemoryAccounting=true
+        // - TasksAccounting=true
+        // see https://github.com/opencontainers/runc/blob/6023d635d725a74c6eaa11ab7f3c870c073badd2/docs/systemd.md#systemd-cgroup-driver
+        // for more details.
+        let mut properties: Vec<(&str, Variant<Box<dyn DbusSerialize>>)> = Vec::with_capacity(6);
+        properties.push((
+            "Description",
+            Variant(Box::new(format!("youki container {container_name}"))),
+        ));
+
+        // if we create a slice, the parent is defined via a Wants=
+        // otherwise, we use Slice=
+        if unit_name.ends_with("slice") {
+            properties.push(("Wants", Variant(Box::new(parent.to_owned()))));
+        } else {
+            properties.push(("Slice", Variant(Box::new(parent.to_owned()))));
+            properties.push(("Delegate", Variant(Box::new(true))));
+        }
+
+        properties.push(("MemoryAccounting", Variant(Box::new(true))));
+        properties.push(("CPUAccounting", Variant(Box::new(true))));
+        properties.push(("IOAccounting", Variant(Box::new(true))));
+        properties.push(("TasksAccounting", Variant(Box::new(true))));
+
+        properties.push(("DefaultDependencies", Variant(Box::new(false))));
+        properties.push(("PIDs", Variant(Box::new(vec![pid]))));
+
+        tracing::debug!("Starting transient unit: {:?}", properties);
+        proxy
+            .start_transient_unit(unit_name, "replace", properties, vec![])
+            .map_err(|err| SystemdClientError::FailedTransient {
+                err: Box::new(err),
+                unit_name: unit_name.into(),
+                parent: parent.into(),
+            })?;
+        Ok(())
+    }
+
+    fn stop_transient_unit(&self, unit_name: &str) -> Result<()> {
+        let proxy = self.create_proxy();
+
+        proxy
+            .stop_unit(unit_name, "replace")
+            .map_err(|err| SystemdClientError::FailedStop {
+                err: Box::new(err),
+                unit_name: unit_name.into(),
+            })?;
+        Ok(())
+    }
+
+    fn set_unit_properties(
+        &self,
+        unit_name: &str,
+        properties: &HashMap<&str, Box<dyn DbusSerialize>>,
+    ) -> Result<()> {
+        let proxy = self.create_proxy();
+
+        let props: Vec<(_, _)> = properties.iter().map(|(k, v)| (*k, v.clone())).collect();
+
+        proxy
+            .set_unit_properties(unit_name, true, props)
+            .map_err(|err| SystemdClientError::FailedProperties {
+                err: Box::new(err),
+                unit_name: unit_name.into(),
+            })?;
+        Ok(())
+    }
+
+    fn systemd_version(&self) -> std::result::Result<u32, SystemdClientError> {
+        let proxy = self.create_proxy();
+
+        let version = proxy
+            .version()?
+            .chars()
+            .skip_while(|c| c.is_alphabetic())
+            .take_while(|c| c.is_numeric())
+            .collect::<String>()
+            .parse::<u32>()
+            .map_err(SystemdClientError::SystemdVersion)?;
+
+        Ok(version)
+    }
+
+    fn control_cgroup_root(&self) -> std::result::Result<PathBuf, SystemdClientError> {
+        let proxy = self.create_proxy();
+
+        let cgroup_root = proxy.control_group()?;
+        Ok(PathBuf::from(&cgroup_root))
     }
 }
 
@@ -214,10 +360,10 @@ mod tests {
 
         let dbus_pipe_path = format!("/run/user/{}/bus", uid);
 
-        let conn = DbusConnection::new(&dbus_pipe_path, uid);
+        let conn = DbusConnection::new(&dbus_pipe_path, uid, false);
         assert!(conn.is_ok());
 
-        let invalid_conn = DbusConnection::new(&dbus_pipe_path, uid.wrapping_add(1));
+        let invalid_conn = DbusConnection::new(&dbus_pipe_path, uid.wrapping_add(1), false);
         assert!(invalid_conn.is_err());
     }
 
@@ -228,12 +374,9 @@ mod tests {
 
         let dbus_pipe_path = format!("/run/user/{}/bus", uid);
 
-        let mut conn = DbusConnection::new(&dbus_pipe_path, uid)?;
+        let conn = DbusConnection::new(&dbus_pipe_path, uid, false)?;
 
-        let mut proxy = conn.proxy(
-            "org.freedesktop.systemd1".to_string(),
-            "/org/freedesktop/systemd1".to_string(),
-        );
+        let proxy = conn.proxy("org.freedesktop.systemd1", "/org/freedesktop/systemd1");
 
         let body = (
             "org.freedesktop.systemd1.Manager".to_string(),
@@ -265,12 +408,9 @@ mod tests {
 
         let dbus_pipe_path = format!("/run/user/{}/bus", uid);
 
-        let mut conn = DbusConnection::new(&dbus_pipe_path, uid).unwrap();
+        let conn = DbusConnection::new(&dbus_pipe_path, uid, false).unwrap();
 
-        let mut proxy = conn.proxy(
-            "org.freedesktop.systemd1".to_string(),
-            "/org/freedesktop/systemd1".to_string(),
-        );
+        let proxy = conn.proxy("org.freedesktop.systemd1", "/org/freedesktop/systemd1");
         let body = (
             "org.freedesktop.systemd1.Manager".to_string(),
             "ControlGroup".to_string(),

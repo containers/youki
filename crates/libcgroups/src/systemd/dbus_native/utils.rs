@@ -6,14 +6,20 @@ pub enum SystemdClientError {
     DBus(#[from] dbus::Error),
     #[error("failed to start transient unit {unit_name}, parent is {parent}: {err}")]
     FailedTransient {
-        err: dbus::Error,
+        err: Box<SystemdClientError>,
         unit_name: String,
         parent: String,
     },
     #[error("failed to stop unit {unit_name}: {err}")]
-    FailedStop { err: dbus::Error, unit_name: String },
+    FailedStop {
+        err: Box<SystemdClientError>,
+        unit_name: String,
+    },
     #[error("failed to set properties for unit {unit_name}: {err}")]
-    FailedProperties { err: dbus::Error, unit_name: String },
+    FailedProperties {
+        err: Box<SystemdClientError>,
+        unit_name: String,
+    },
     #[error("could not parse systemd version: {0}")]
     SystemdVersion(ParseIntError),
     #[error("dbus authentication error: {0}")]

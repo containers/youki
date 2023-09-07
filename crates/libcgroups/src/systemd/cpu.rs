@@ -92,7 +92,6 @@ pub fn convert_shares_to_cgroup2(shares: u64) -> u64 {
 #[cfg(test)]
 mod tests {
     use anyhow::{Context, Result};
-    use dbus::arg::ArgType;
     use oci_spec::runtime::LinuxCpuBuilder;
 
     use crate::recast;

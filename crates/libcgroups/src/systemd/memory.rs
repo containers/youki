@@ -165,8 +165,8 @@ mod tests {
             // assert
             assert_eq!(properties.len(), prop_count);
             assert!(properties.contains_key(MEMORY_MAX));
-            let memory_low = &properties[MEMORY_MAX];
-            let val = recast!(mem_low, u64)?;
+            let actual = &properties[MEMORY_MAX];
+            let val = recast!(actual, u64)?;
             assert_eq!(val, mem_low);
         }
 

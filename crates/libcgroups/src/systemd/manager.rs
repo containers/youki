@@ -15,7 +15,7 @@ use super::{
     controller_type::{ControllerType, CONTROLLER_TYPES},
     cpu::Cpu,
     cpuset::CpuSet,
-    dbus::client::{Client, SystemdClient, SystemdClientError},
+    dbus_native::{client::SystemdClient, dbus::DbusConnection, utils::SystemdClientError},
     memory::Memory,
     pids::Pids,
 };
@@ -47,7 +47,7 @@ pub struct Manager {
     /// Name of the systemd unit e.g. youki-569d5ce3afe1074769f67.scope
     unit_name: String,
     /// Client for communicating with systemd
-    client: Client,
+    client: DbusConnection,
     /// Cgroup manager for the created transient unit
     fs_manager: FsManager,
     /// Last control group which is managed by systemd, e.g. /user.slice/user-1000/user@1000.service
@@ -183,13 +183,13 @@ impl Manager {
         let mut destructured_path: CgroupsPath = cgroups_path.as_path().try_into()?;
         ensure_parent_unit(&mut destructured_path, use_system);
 
-        let client = match use_system {
-            true => Client::new_system()?,
-            false => Client::new_session()?,
+        let mut client = match use_system {
+            true => DbusConnection::new_system()?,
+            false => DbusConnection::new_session()?,
         };
 
         let (cgroups_path, delegation_boundary) =
-            Self::construct_cgroups_path(&destructured_path, &client)?;
+            Self::construct_cgroups_path(&destructured_path, &mut client)?;
         let full_path = root_path.join_safely(&cgroups_path)?;
         let fs_manager = FsManager::new(root_path.clone(), cgroups_path.clone())?;
 
@@ -432,9 +432,8 @@ impl CgroupManager for Manager {
 mod tests {
     use anyhow::{Context, Result};
 
-    use crate::systemd::dbus::client::SystemdClient;
-
     use super::*;
+    use crate::systemd::dbus_native::{client::SystemdClient, utils::SystemdClientError};
 
     struct TestSystemdClient {}
 
