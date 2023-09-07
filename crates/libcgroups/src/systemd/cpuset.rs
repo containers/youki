@@ -128,7 +128,6 @@ pub fn to_bitmask(range: &str) -> Result<Vec<u8>, BitmaskError> {
 #[cfg(test)]
 mod tests {
     use anyhow::{Context, Result};
-    use dbus::arg::{ArgType, RefArg};
     use oci_spec::runtime::LinuxCpuBuilder;
 
     use crate::recast;

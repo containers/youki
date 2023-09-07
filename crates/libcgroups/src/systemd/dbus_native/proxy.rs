@@ -1,26 +1,30 @@
 use super::dbus::DbusConnection;
 use super::message::*;
-use super::serialize::DbusSerialize;
+use super::serialize::{DbusSerialize, Variant};
 use super::utils::{Result, SystemdClientError};
 
 /// Structure to conveniently communicate with
 /// given destination and path for method calls
 pub struct Proxy<'conn> {
-    conn: &'conn mut DbusConnection,
+    conn: &'conn DbusConnection,
     dest: String,
     path: String,
 }
 
 impl<'conn> Proxy<'conn> {
     /// create a new proxy for given destination and path over given connection
-    pub fn new(conn: &'conn mut DbusConnection, dest: String, path: String) -> Self {
-        Self { conn, dest, path }
+    pub fn new(conn: &'conn DbusConnection, dest: &str, path: &str) -> Self {
+        Self {
+            conn,
+            dest: dest.into(),
+            path: path.into(),
+        }
     }
 
     /// Do a method call for given interface and member by sending given body
     /// If no body is to be sent, set it as `None`
     pub fn method_call<Body: DbusSerialize, Output: DbusSerialize>(
-        &mut self,
+        &self,
         interface: &str,
         member: &str,
         body: Option<Body>,
@@ -140,5 +144,39 @@ impl<'conn> Proxy<'conn> {
 
         let mut ctr = 0;
         Output::deserialize(&reply.body, &mut ctr)
+    }
+
+    pub fn get_unit(&mut self, name: &str) -> Result<String> {
+        todo!();
+    }
+
+    pub fn start_transient_unit(
+        &self,
+        name: &str,
+        mode: &str,
+        properties: Vec<(&str, Variant<Box<dyn DbusSerialize>>)>,
+        aux: Vec<(&str, Vec<(&str, Variant<Box<dyn DbusSerialize>>)>)>,
+    ) -> Result<String> {
+        todo!();
+    }
+
+    pub fn stop_unit(&self, name: &str, mode: &str) -> Result<String> {
+        todo!();
+    }
+
+    pub fn set_unit_properties(
+        &self,
+        name: &str,
+        runtime: bool,
+        properties: Vec<(&str, &Box<dyn DbusSerialize>)>,
+    ) -> Result<()> {
+        todo!();
+    }
+
+    pub fn version(&self) -> Result<String> {
+        todo!()
+    }
+    pub fn control_group(&self) -> Result<String> {
+        todo!();
     }
 }

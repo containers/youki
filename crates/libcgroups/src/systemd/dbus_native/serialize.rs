@@ -292,3 +292,15 @@ impl DbusSerialize for Structure {
         ))
     }
 }
+
+impl<T: DbusSerialize> DbusSerialize for Box<T> {
+    fn get_signature() -> String {
+        T::get_signature()
+    }
+    fn serialize(&self, buf: &mut Vec<u8>) {
+        self.as_ref().serialize(buf);
+    }
+    fn deserialize(buf: &[u8], ctr: &mut usize) -> Result<Self> {
+        Ok(Box::new(T::deserialize(buf, ctr)?))
+    }
+}
