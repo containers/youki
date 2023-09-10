@@ -6,7 +6,6 @@ use std::{
     path::Component::RootDir,
 };
 
-use super::dbus_native::serialize::DbusSerialize;
 use nix::{unistd::Pid, NixPath};
 use std::path::{Path, PathBuf};
 
@@ -24,7 +23,7 @@ use crate::{
         self, AnyCgroupManager, CgroupManager, ControllerOpt, FreezerState, JoinSafelyError,
         PathBufExt, WrapIoResult, WrappedIoError,
     },
-    systemd::unified::Unified,
+    systemd::{dbus_native::serialize::Variant, unified::Unified},
     v2::manager::V2ManagerError,
 };
 use crate::{stats::Stats, v2::manager::Manager as FsManager};
@@ -369,7 +368,7 @@ impl CgroupManager for Manager {
     }
 
     fn apply(&self, controller_opt: &ControllerOpt) -> Result<(), Self::Error> {
-        let mut properties: HashMap<&str, Box<dyn DbusSerialize>> = HashMap::new();
+        let mut properties: HashMap<&str, Variant> = HashMap::new();
         let systemd_version = self.client.systemd_version()?;
 
         for controller in CONTROLLER_TYPES {
@@ -433,7 +432,9 @@ mod tests {
     use anyhow::{Context, Result};
 
     use super::*;
-    use crate::systemd::dbus_native::{client::SystemdClient, utils::SystemdClientError};
+    use crate::systemd::dbus_native::{
+        client::SystemdClient, serialize::Variant, utils::SystemdClientError,
+    };
 
     struct TestSystemdClient {}
 
@@ -463,7 +464,7 @@ mod tests {
         fn set_unit_properties(
             &self,
             _unit_name: &str,
-            _properties: &HashMap<&str, Box<dyn DbusSerialize>>,
+            _properties: &HashMap<&str, Variant>,
         ) -> Result<(), SystemdClientError> {
             Ok(())
         }

@@ -1,7 +1,8 @@
+use crate::systemd::dbus_native::serialize::{DbusSerialize, Structure, Variant};
+
 use super::client::SystemdClient;
 use super::message::*;
 use super::proxy::Proxy;
-use super::serialize::{DbusSerialize, Variant};
 use super::utils::{Result, SystemdClientError};
 use nix::sys::socket;
 use std::collections::HashMap;
@@ -251,32 +252,36 @@ impl SystemdClient for DbusConnection {
         // - TasksAccounting=true
         // see https://github.com/opencontainers/runc/blob/6023d635d725a74c6eaa11ab7f3c870c073badd2/docs/systemd.md#systemd-cgroup-driver
         // for more details.
-        let mut properties: Vec<(&str, Variant<Box<dyn DbusSerialize>>)> = Vec::with_capacity(6);
+        let mut properties: Vec<(&str, Variant)> = Vec::with_capacity(6);
         properties.push((
             "Description",
-            Variant(Box::new(format!("youki container {container_name}"))),
+            Variant::String(format!("youki container {container_name}")),
         ));
 
         // if we create a slice, the parent is defined via a Wants=
         // otherwise, we use Slice=
         if unit_name.ends_with("slice") {
-            properties.push(("Wants", Variant(Box::new(parent.to_owned()))));
+            properties.push(("Wants", Variant::String(parent.to_owned())));
         } else {
-            properties.push(("Slice", Variant(Box::new(parent.to_owned()))));
-            properties.push(("Delegate", Variant(Box::new(true))));
+            properties.push(("Slice", Variant::String(parent.to_owned())));
+            properties.push(("Delegate", Variant::Bool(true)));
         }
 
-        properties.push(("MemoryAccounting", Variant(Box::new(true))));
-        properties.push(("CPUAccounting", Variant(Box::new(true))));
-        properties.push(("IOAccounting", Variant(Box::new(true))));
-        properties.push(("TasksAccounting", Variant(Box::new(true))));
+        properties.push(("MemoryAccounting", Variant::Bool(true)));
+        properties.push(("CPUAccounting", Variant::Bool(true)));
+        properties.push(("IOAccounting", Variant::Bool(true)));
+        properties.push(("TasksAccounting", Variant::Bool(true)));
 
-        properties.push(("DefaultDependencies", Variant(Box::new(false))));
-        properties.push(("PIDs", Variant(Box::new(vec![pid]))));
+        properties.push(("DefaultDependencies", Variant::Bool(false)));
+        properties.push(("PIDs", Variant::ArrayU32(vec![pid])));
 
         tracing::debug!("Starting transient unit: {:?}", properties);
+        let props = properties
+            .into_iter()
+            .map(|(k, v)| Structure::new(k.into(), v))
+            .collect();
         proxy
-            .start_transient_unit(unit_name, "replace", properties, vec![])
+            .start_transient_unit(unit_name, "replace", props, vec![])
             .map_err(|err| SystemdClientError::FailedTransient {
                 err: Box::new(err),
                 unit_name: unit_name.into(),
@@ -300,11 +305,14 @@ impl SystemdClient for DbusConnection {
     fn set_unit_properties(
         &self,
         unit_name: &str,
-        properties: &HashMap<&str, Box<dyn DbusSerialize>>,
+        properties: &HashMap<&str, Variant>,
     ) -> Result<()> {
         let proxy = self.create_proxy();
 
-        let props: Vec<(_, _)> = properties.iter().map(|(k, v)| (*k, v.clone())).collect();
+        let props: Vec<Structure<Variant>> = properties
+            .iter()
+            .map(|(k, v)| Structure::new(k.to_string(), v.clone()))
+            .collect();
 
         proxy
             .set_unit_properties(unit_name, true, props)
@@ -340,7 +348,6 @@ impl SystemdClient for DbusConnection {
 
 #[cfg(test)]
 mod tests {
-    use super::super::serialize::Variant;
     use super::super::utils::Result;
     use super::{uid_to_hex_str, DbusConnection, SystemdClientError};
     use nix::unistd::getuid;
@@ -370,6 +377,8 @@ mod tests {
     #[test]
     #[cfg(feature = "systemd")]
     fn test_dbus_function_calls() -> Result<()> {
+        use crate::systemd::dbus_native::serialize::Variant;
+
         let uid: u32 = getuid().into();
 
         let dbus_pipe_path = format!("/run/user/{}/bus", uid);
@@ -382,21 +391,23 @@ mod tests {
             "org.freedesktop.systemd1.Manager".to_string(),
             "Version".to_string(),
         );
-        proxy.method_call::<_, Variant<String>>(
+        let t = proxy.method_call::<_, Variant>(
             "org.freedesktop.DBus.Properties",
             "Get",
             Some(body),
         )?;
+        assert!(matches!(t, Variant::String(_)));
 
         let body = (
             "org.freedesktop.systemd1.Manager".to_string(),
             "ControlGroup".to_string(),
         );
-        proxy.method_call::<_, Variant<String>>(
+        let t = proxy.method_call::<_, Variant>(
             "org.freedesktop.DBus.Properties",
             "Get",
             Some(body),
         )?;
+        assert!(matches!(t, Variant::String(_)));
 
         Ok(())
     }

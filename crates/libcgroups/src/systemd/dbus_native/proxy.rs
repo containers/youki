@@ -1,6 +1,6 @@
 use super::dbus::DbusConnection;
 use super::message::*;
-use super::serialize::{DbusSerialize, Variant};
+use super::serialize::{DbusSerialize, Structure, Variant};
 use super::utils::{Result, SystemdClientError};
 
 /// Structure to conveniently communicate with
@@ -154,8 +154,8 @@ impl<'conn> Proxy<'conn> {
         &self,
         name: &str,
         mode: &str,
-        properties: Vec<(&str, Variant<Box<dyn DbusSerialize>>)>,
-        aux: Vec<(&str, Vec<(&str, Variant<Box<dyn DbusSerialize>>)>)>,
+        properties: Vec<Structure<Variant>>,
+        aux: Vec<Structure<Vec<Structure<Variant>>>>,
     ) -> Result<String> {
         todo!();
     }
@@ -168,7 +168,7 @@ impl<'conn> Proxy<'conn> {
         &self,
         name: &str,
         runtime: bool,
-        properties: Vec<(&str, &Box<dyn DbusSerialize>)>,
+        properties: Vec<Structure<Variant>>,
     ) -> Result<()> {
         todo!();
     }

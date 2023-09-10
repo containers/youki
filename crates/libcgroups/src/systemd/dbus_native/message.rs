@@ -477,6 +477,8 @@ impl Message {
 
 #[cfg(test)]
 mod tests {
+    use crate::systemd::dbus_native::serialize::{Structure, Variant};
+
     use super::super::serialize::DbusSerialize;
     use super::{Header, HeaderKind, HeaderValue, MessageType};
     use super::{Message, Result};
