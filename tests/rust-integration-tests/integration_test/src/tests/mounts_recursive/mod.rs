@@ -117,7 +117,7 @@ fn check_recursive_readonly() -> TestResult {
 
     clean_mount(&rro_dir_path, &rro_subdir_path);
 
-    result
+    result.into()
 }
 
 fn check_recursive_nosuid() -> TestResult {
@@ -203,7 +203,7 @@ fn check_recursive_nosuid() -> TestResult {
 
     clean_mount(&rnosuid_dir_path, &rnosuid_subdir_path);
 
-    result
+    result.into()
 }
 
 fn check_recursive_rsuid() -> TestResult {
@@ -234,6 +234,7 @@ fn check_recursive_rsuid() -> TestResult {
 
         Ok(())
     })
+    .into()
 }
 
 fn check_recursive_noexec() -> TestResult {
@@ -274,7 +275,7 @@ fn check_recursive_noexec() -> TestResult {
 
     clean_mount(&rnoexec_dir_path, &rnoexec_subdir_path);
 
-    result
+    result.into()
 }
 
 fn check_recursive_rexec() -> TestResult {
@@ -315,7 +316,7 @@ fn check_recursive_rexec() -> TestResult {
 
     clean_mount(&rnoexec_dir_path, &rnoexec_subdir_path);
 
-    result
+    result.into()
 }
 
 /// rdiratime If set in attr_clr, removes the restriction that prevented updating access time for directories.
@@ -339,7 +340,7 @@ fn check_recursive_rdiratime() -> TestResult {
     let result = test_inside_container(spec, &|_| Ok(()));
 
     fs::remove_dir(rdiratime_base_dir).unwrap();
-    result
+    result.into()
 }
 
 /// If set in attr_set, prevents updating access time for directories on this mount
@@ -362,7 +363,7 @@ fn check_recursive_rnodiratime() -> TestResult {
 
     let result = test_inside_container(spec, &|_| Ok(()));
     fs::remove_dir(rnodiratime_base_dir).unwrap();
-    result
+    result.into()
 }
 
 fn check_recursive_rdev() -> TestResult {
@@ -381,7 +382,7 @@ fn check_recursive_rdev() -> TestResult {
         vec!["runtimetest".to_string(), "mounts_recursive".to_string()],
     );
 
-    test_inside_container(spec, &|_| Ok(()))
+    test_inside_container(spec, &|_| Ok(())).into()
 }
 
 fn check_recursive_rnodev() -> TestResult {
@@ -400,7 +401,7 @@ fn check_recursive_rnodev() -> TestResult {
         vec!["runtimetest".to_string(), "mounts_recursive".to_string()],
     );
 
-    test_inside_container(spec, &|_| Ok(()))
+    test_inside_container(spec, &|_| Ok(())).into()
 }
 
 fn check_recursive_readwrite() -> TestResult {
@@ -428,7 +429,7 @@ fn check_recursive_readwrite() -> TestResult {
 
     clean_mount(&rrw_dir_path, &rrw_subdir_path);
 
-    result
+    result.into()
 }
 
 fn check_recursive_rrelatime() -> TestResult {
@@ -452,7 +453,7 @@ fn check_recursive_rrelatime() -> TestResult {
     let result = test_inside_container(spec, &|_| Ok(()));
 
     fs::remove_dir_all(rrelatime_dir_path).unwrap();
-    result
+    result.into()
 }
 
 fn check_recursive_rnorelatime() -> TestResult {
@@ -476,7 +477,7 @@ fn check_recursive_rnorelatime() -> TestResult {
     let result = test_inside_container(spec, &|_| Ok(()));
 
     fs::remove_dir_all(rnorelatime_dir_path).unwrap();
-    result
+    result.into()
 }
 
 fn check_recursive_rnoatime() -> TestResult {
@@ -500,7 +501,7 @@ fn check_recursive_rnoatime() -> TestResult {
     let result = test_inside_container(spec, &|_| Ok(()));
 
     fs::remove_dir_all(rnoatime_dir_path).unwrap();
-    result
+    result.into()
 }
 
 fn check_recursive_rstrictatime() -> TestResult {
@@ -523,7 +524,7 @@ fn check_recursive_rstrictatime() -> TestResult {
     let result = test_inside_container(spec, &|_| Ok(()));
 
     fs::remove_dir_all(rstrictatime_dir_path).unwrap();
-    result
+    result.into()
 }
 
 fn check_recursive_rnosymfollow() -> TestResult {
@@ -562,7 +563,7 @@ fn check_recursive_rnosymfollow() -> TestResult {
     });
 
     fs::remove_dir_all(rnosymfollow_dir_path).unwrap();
-    result
+    result.into()
 }
 
 fn check_recursive_rsymfollow() -> TestResult {
@@ -600,7 +601,7 @@ fn check_recursive_rsymfollow() -> TestResult {
     });
 
     fs::remove_dir_all(rsymfollow_dir_path).unwrap();
-    result
+    result.into()
 }
 
 /// this mount test how to work?

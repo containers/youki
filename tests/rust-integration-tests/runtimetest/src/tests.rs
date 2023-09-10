@@ -58,22 +58,6 @@ pub fn validate_readonly_paths(spec: &Spec) {
     }
 }
 
-pub fn validate_hostname(spec: &Spec) {
-    if let Some(expected_hostname) = spec.hostname() {
-        if expected_hostname.is_empty() {
-            // Skipping empty hostname
-            return;
-        }
-        let actual_hostname = nix::unistd::gethostname().expect("failed to get current hostname");
-        let actual_hostname = actual_hostname.to_str().unwrap();
-        if actual_hostname != expected_hostname {
-            eprintln!(
-                "Unexpected hostname, expected: {expected_hostname:?} found: {actual_hostname:?}"
-            );
-        }
-    }
-}
-
 // Run argument test recursively for files after base_dir
 fn do_test_mounts_recursive(base_dir: &Path, test_fn: &dyn Fn(&Path) -> Result<()>) -> Result<()> {
     let dirs = read_dir(base_dir).unwrap();

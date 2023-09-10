@@ -1,5 +1,5 @@
 use oci_spec::runtime::{LinuxBuilder, ProcessBuilder, Spec, SpecBuilder};
-use test_framework::{Test, TestGroup, TestResult};
+use test_framework::{assert_result_eq, Test, TestGroup, TestResult};
 
 use crate::utils::test_inside_container;
 
@@ -15,7 +15,7 @@ fn create_spec(hostname: &str) -> Spec {
         )
         .process(
             ProcessBuilder::default()
-                .args(vec!["runtimetest".to_string(), "set_host_name".to_string()])
+                .args(vec!["hostname".to_string()])
                 .build()
                 .expect("error in creating process config"),
         )
@@ -24,21 +24,24 @@ fn create_spec(hostname: &str) -> Spec {
 }
 
 fn hostname_test() -> TestResult {
-    let spec = create_spec("hostname-specific");
-    test_inside_container(spec, &|_| {
-        // As long as the container is created, we expect the hostname to be determined
-        // by the spec, so nothing to prepare prior.
-        Ok(())
-    })
+    let hostname = "hostname-specific";
+    let spec = create_spec(hostname);
+    match test_inside_container(spec, &|_| Ok(())) {
+        Err(e) => TestResult::Failed(e),
+        Ok(output) => {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let mut expected = hostname.to_string();
+            expected.push('\n');
+            assert_result_eq!(expected, stdout, "hostname should be set").into()
+        }
+    }
 }
 
 fn empty_hostname() -> TestResult {
     let spec = create_spec("");
-    test_inside_container(spec, &|_| {
-        // As long as the container is created, we expect the hostname to be determined
-        // by the spec, so nothing to prepare prior.
-        Ok(())
-    })
+    // As long as the container is created, we expect the hostname to be determined
+    // by the spec, so nothing to prepare prior.
+    test_inside_container(spec, &|_| Ok(())).into()
 }
 
 pub fn get_hostname_test() -> TestGroup {

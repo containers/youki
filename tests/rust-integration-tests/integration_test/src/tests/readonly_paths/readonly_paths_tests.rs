@@ -103,6 +103,7 @@ fn check_readonly_paths() -> TestResult {
 
         Ok(())
     })
+    .into()
 }
 
 fn check_readonly_rel_path() -> TestResult {
@@ -132,6 +133,7 @@ fn check_readonly_rel_path() -> TestResult {
             }
         }
     })
+    .into()
 }
 
 fn check_readonly_symlinks() -> TestResult {
@@ -176,7 +178,7 @@ fn check_readonly_symlinks() -> TestResult {
             }
         }
     });
-    if let TestResult::Passed = res {
+    if res.is_ok() {
         TestResult::Failed(anyhow!(
             "expected error in container creation with invalid symlink, found no error"
         ))
@@ -221,6 +223,7 @@ fn test_node(mode: u32) -> TestResult {
             }
         }
     })
+    .into()
 }
 
 fn check_readonly_device_nodes() -> TestResult {

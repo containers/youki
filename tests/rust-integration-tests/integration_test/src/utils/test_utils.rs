@@ -7,10 +7,10 @@ use oci_spec::runtime::Spec;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, ExitStatus, Stdio};
+use std::process::{Child, Command, ExitStatus, Output, Stdio};
 use std::thread::sleep;
 use std::time::Duration;
-use test_framework::{test_result, TestResult};
+use test_framework::TestResult;
 
 const SLEEP_TIME: Duration = Duration::from_millis(150);
 pub const CGROUP_ROOT: &str = "/sys/fs/cgroup";
@@ -142,15 +142,13 @@ pub fn test_outside_container(
 pub fn test_inside_container(
     spec: Spec,
     setup_for_test: &dyn Fn(&Path) -> Result<()>,
-) -> TestResult {
+) -> Result<Output> {
     let id = generate_uuid();
     let id_str = id.to_string();
     let bundle = prepare_bundle().unwrap();
 
     // This will do the required setup for the test
-    test_result!(setup_for_test(
-        &bundle.as_ref().join("bundle").join("rootfs")
-    ));
+    setup_for_test(&bundle.as_ref().join("bundle").join("rootfs"))?;
 
     set_config(&bundle, &spec).unwrap();
     // as we have to run runtimetest inside the container, and is expects
@@ -188,7 +186,7 @@ pub fn test_inside_container(
         .wait_with_output()
     {
         Ok(c) => c,
-        Err(e) => return TestResult::Failed(anyhow!("container start failed : {:?}", e)),
+        Err(e) => bail!("container start failed : {:?}", e),
     };
 
     let create_output = create_process
@@ -196,39 +194,30 @@ pub fn test_inside_container(
         .context("getting output after starting the container failed")
         .unwrap();
 
-    let stdout = String::from_utf8_lossy(&create_output.stdout);
-    if !stdout.is_empty() {
-        println!(
-            "{:?}",
-            anyhow!("container stdout was not empty, found : {}", stdout)
-        )
-    }
     let stderr = String::from_utf8_lossy(&create_output.stderr);
     if !stderr.is_empty() {
-        return TestResult::Failed(anyhow!(
-            "container stderr was not empty, found : {}",
-            stderr
-        ));
+        bail!("container stderr was not empty, found : {}", stderr);
     }
 
     let (out, err) = get_state(&id_str, &bundle).unwrap();
     if !err.is_empty() {
-        return TestResult::Failed(anyhow!(
+        bail!(
             "error in getting state after starting the container : {}",
             err
-        ));
+        );
     }
 
     let state: State = match serde_json::from_str(&out) {
         Ok(v) => v,
-        Err(e) => return TestResult::Failed(anyhow!("error in parsing state of container after start in test_inside_container : stdout : {}, parse error : {}",out,e)),
+        Err(e) => bail!("error in parsing state of container after start in test_inside_container : stdout : {}, parse error : {}",out,e),
     };
     if state.status != "stopped" {
-        return TestResult::Failed(anyhow!("error : unexpected container status in test_inside_runtime : expected stopped, got {}, container state : {:?}",state.status,state));
+        bail!("error : unexpected container status in test_inside_runtime : expected stopped, got {}, container state : {:?}",state.status,state);
     }
     kill_container(&id_str, &bundle).unwrap().wait().unwrap();
     delete_container(&id_str, &bundle).unwrap().wait().unwrap();
-    TestResult::Passed
+
+    Ok(create_output)
 }
 
 pub fn check_container_created(data: &ContainerData) -> Result<()> {
