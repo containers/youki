@@ -7,6 +7,8 @@ pub trait DbusSerialize: std::fmt::Debug {
     fn get_signature() -> String
     where
         Self: Sized;
+
+    fn get_alignment() -> usize;
     /// Serialize the given type into given buffer
     /// This needs to adjust padding before starting serialization, but must not
     /// pad after last byte of serialized value
@@ -46,6 +48,9 @@ impl DbusSerialize for () {
     fn get_signature() -> String {
         String::new()
     }
+    fn get_alignment() -> usize {
+        1
+    }
     fn serialize(&self, _: &mut Vec<u8>) {}
     // for (), we have to ignore body , so we simply clear it out
     fn deserialize(buf: &[u8], counter: &mut usize) -> Result<Self> {
@@ -57,6 +62,9 @@ impl DbusSerialize for () {
 impl<T1: DbusSerialize, T2: DbusSerialize> DbusSerialize for (T1, T2) {
     fn get_signature() -> String {
         format!("{}{}", T1::get_signature(), T2::get_signature())
+    }
+    fn get_alignment() -> usize {
+        T1::get_alignment()
     }
     fn serialize(&self, buf: &mut Vec<u8>) {
         self.0.serialize(buf);
@@ -72,6 +80,9 @@ impl<T1: DbusSerialize, T2: DbusSerialize> DbusSerialize for (T1, T2) {
 impl DbusSerialize for String {
     fn get_signature() -> String {
         "s".to_string()
+    }
+    fn get_alignment() -> usize {
+        4 // string length is u32
     }
     fn serialize(&self, buf: &mut Vec<u8>) {
         adjust_padding(buf, 4);
@@ -105,6 +116,9 @@ impl DbusSerialize for bool {
     fn get_signature() -> String {
         "b".to_string()
     }
+    fn get_alignment() -> usize {
+        4
+    }
     fn serialize(&self, buf: &mut Vec<u8>) {
         adjust_padding(buf, 4);
         let val: u32 = match self {
@@ -130,7 +144,9 @@ impl DbusSerialize for u8 {
     fn get_signature() -> String {
         "y".to_string()
     }
-
+    fn get_alignment() -> usize {
+        1
+    }
     fn serialize(&self, buf: &mut Vec<u8>) {
         adjust_padding(buf, 1);
         buf.extend_from_slice(&self.to_le_bytes());
@@ -152,7 +168,9 @@ impl DbusSerialize for u16 {
     fn get_signature() -> String {
         "q".to_string()
     }
-
+    fn get_alignment() -> usize {
+        2
+    }
     fn serialize(&self, buf: &mut Vec<u8>) {
         adjust_padding(buf, 2);
         buf.extend_from_slice(&self.to_le_bytes());
@@ -174,7 +192,9 @@ impl DbusSerialize for u32 {
     fn get_signature() -> String {
         "u".to_string()
     }
-
+    fn get_alignment() -> usize {
+        4
+    }
     fn serialize(&self, buf: &mut Vec<u8>) {
         adjust_padding(buf, 4);
         buf.extend_from_slice(&self.to_le_bytes());
@@ -196,7 +216,9 @@ impl DbusSerialize for u64 {
     fn get_signature() -> String {
         "t".to_string()
     }
-
+    fn get_alignment() -> usize {
+        8
+    }
     fn serialize(&self, buf: &mut Vec<u8>) {
         adjust_padding(buf, 8);
         buf.extend_from_slice(&self.to_le_bytes());
@@ -219,13 +241,21 @@ impl<T: DbusSerialize> DbusSerialize for Vec<T> {
         let sub_type = T::get_signature();
         format!("a{}", sub_type)
     }
+    fn get_alignment() -> usize {
+        4 // for the length u32
+    }
     fn serialize(&self, buf: &mut Vec<u8>) {
         adjust_padding(buf, 4);
-        let len = self.len() as u32;
-        buf.extend_from_slice(&len.to_le_bytes());
+
+        let mut temp_buf = Vec::new();
         for elem in self.iter() {
-            elem.serialize(buf);
+            elem.serialize(&mut temp_buf);
         }
+        let len = temp_buf.len() as u32;
+        buf.extend_from_slice(&len.to_le_bytes());
+        let align = T::get_alignment();
+        adjust_padding(buf, align);
+        buf.extend_from_slice(&temp_buf);
     }
     fn deserialize(buf: &[u8], counter: &mut usize) -> Result<Self> {
         align_counter(counter, 4);
@@ -236,10 +266,21 @@ impl<T: DbusSerialize> DbusSerialize for Vec<T> {
             ));
         }
 
-        let length = u32::from_le_bytes(buf[*counter..*counter + 4].try_into().unwrap()) as usize;
+        let length_in_bytes =
+            u32::from_le_bytes(buf[*counter..*counter + 4].try_into().unwrap()) as usize;
         *counter += 4;
-        let mut ret = Vec::with_capacity(length);
-        for _ in 0..length {
+
+        let end = *counter + length_in_bytes;
+
+        if buf.len() < end {
+            return Err(SystemdClientError::DeserializationError(
+                "incomplete array response : partial elements".into(),
+            ));
+        }
+
+        let mut ret = Vec::new();
+
+        while *counter < end {
             let elem = T::deserialize(buf, counter)?;
             ret.push(elem);
         }
@@ -251,6 +292,9 @@ impl<T: DbusSerialize> DbusSerialize for Structure<T> {
     fn get_signature() -> String {
         let val_sign = T::get_signature();
         format!("(s{})", val_sign)
+    }
+    fn get_alignment() -> usize {
+        8
     }
     fn serialize(&self, buf: &mut Vec<u8>) {
         adjust_padding(buf, 8);
@@ -268,6 +312,9 @@ impl<T: DbusSerialize> DbusSerialize for Structure<T> {
 impl DbusSerialize for Variant {
     fn get_signature() -> String {
         "v".to_string()
+    }
+    fn get_alignment() -> usize {
+        1 // the signature comes first, which is 1 aligned
     }
     fn serialize(&self, buf: &mut Vec<u8>) {
         // no alignment needed, as variant is 1-align
