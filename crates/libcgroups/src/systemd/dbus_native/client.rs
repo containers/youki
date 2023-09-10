@@ -1,4 +1,4 @@
-use super::{serialize::DbusSerialize, utils::SystemdClientError};
+use super::{serialize::Variant, utils::SystemdClientError};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -20,7 +20,7 @@ pub trait SystemdClient {
     fn set_unit_properties(
         &self,
         unit_name: &str,
-        properties: &HashMap<&str, Box<dyn DbusSerialize>>,
+        properties: &HashMap<&str, Variant>,
     ) -> Result<(), SystemdClientError>;
 
     fn systemd_version(&self) -> Result<u32, SystemdClientError>;

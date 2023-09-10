@@ -1,6 +1,6 @@
 use std::{collections::HashMap, convert::Infallible};
 
-use super::dbus_native::serialize::DbusSerialize;
+use super::dbus_native::serialize::Variant;
 use oci_spec::runtime::LinuxPids;
 
 use crate::common::ControllerOpt;
@@ -17,7 +17,7 @@ impl Controller for Pids {
     fn apply(
         options: &ControllerOpt,
         _: u32,
-        properties: &mut HashMap<&str, Box<dyn DbusSerialize>>,
+        properties: &mut HashMap<&str, Variant>,
     ) -> Result<(), Self::Error> {
         if let Some(pids) = options.resources.pids() {
             tracing::debug!("Applying pids resource restrictions");
@@ -29,27 +29,28 @@ impl Controller for Pids {
 }
 
 impl Pids {
-    fn apply(pids: &LinuxPids, properties: &mut HashMap<&str, Box<dyn DbusSerialize>>) {
+    fn apply(pids: &LinuxPids, properties: &mut HashMap<&str, Variant>) {
         let limit = if pids.limit() > 0 {
             pids.limit() as u64
         } else {
             u64::MAX
         };
 
-        properties.insert(TASKS_MAX, Box::new(limit));
+        properties.insert(TASKS_MAX, Variant::U64(limit));
     }
 }
 
 #[cfg(test)]
 mod tests {
 
+    use super::super::dbus_native::serialize::DbusSerialize;
     use crate::recast;
 
     use super::*;
     use anyhow::{anyhow, Context, Result};
     use oci_spec::runtime::{LinuxPidsBuilder, LinuxResources, LinuxResourcesBuilder};
 
-    fn setup(resources: &LinuxResources) -> (ControllerOpt, HashMap<&str, Box<dyn DbusSerialize>>) {
+    fn setup(resources: &LinuxResources) -> (ControllerOpt, HashMap<&str, Variant>) {
         let properties = HashMap::new();
         let options = ControllerOpt {
             resources,
@@ -76,8 +77,8 @@ mod tests {
         assert!(properties.contains_key(TASKS_MAX));
 
         let task_max = properties.get(TASKS_MAX).unwrap();
-        let val = recast!(task_max, u64)?;
-        assert_eq!(val, 10);
+        let val = recast!(task_max, Variant)?;
+        assert_eq!(val, Variant::U64(10));
 
         Ok(())
     }
@@ -97,8 +98,8 @@ mod tests {
         assert!(properties.contains_key(TASKS_MAX));
 
         let task_max = properties.get(TASKS_MAX).unwrap();
-        let val = recast!(task_max, u64)?;
-        assert_eq!(val, u64::MAX);
+        let val = recast!(task_max, Variant)?;
+        assert_eq!(val, Variant::U64(u64::MAX));
 
         Ok(())
     }
@@ -118,8 +119,8 @@ mod tests {
         assert!(properties.contains_key(TASKS_MAX));
 
         let task_max = properties.get(TASKS_MAX).unwrap();
-        let val = recast!(task_max, u64)?;
-        assert_eq!(val, u64::MAX);
+        let val = recast!(task_max, Variant)?;
+        assert_eq!(val, Variant::U64(u64::MAX));
 
         Ok(())
     }

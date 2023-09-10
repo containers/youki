@@ -21,13 +21,25 @@ pub trait DbusSerialize: std::fmt::Debug {
         Self: Sized;
 }
 
-#[derive(Debug)]
-pub struct Variant<T>(pub T);
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Variant {
+    String(String),
+    Bool(bool),
+    U64(u64),
+    ArrayU32(Vec<u32>),
+    ArrayU64(Vec<u64>),
+}
 
-#[derive(Debug)]
-pub struct Structure {
+#[derive(Debug, PartialEq, Eq)]
+pub struct Structure<T: DbusSerialize> {
     key: String,
-    val: Box<dyn DbusSerialize>,
+    val: T,
+}
+
+impl<T: DbusSerialize> Structure<T> {
+    pub fn new(key: String, val: T) -> Self {
+        Self { key, val }
+    }
 }
 
 impl DbusSerialize for () {
@@ -235,18 +247,72 @@ impl<T: DbusSerialize> DbusSerialize for Vec<T> {
     }
 }
 
-impl<T: DbusSerialize> DbusSerialize for Variant<T> {
+impl<T: DbusSerialize> DbusSerialize for Structure<T> {
+    fn get_signature() -> String {
+        let val_sign = T::get_signature();
+        format!("(s{})", val_sign)
+    }
+    fn serialize(&self, buf: &mut Vec<u8>) {
+        adjust_padding(buf, 8);
+        self.key.serialize(buf);
+        self.val.serialize(buf);
+    }
+    fn deserialize(buf: &[u8], counter: &mut usize) -> Result<Self> {
+        align_counter(counter, 8);
+        let key = String::deserialize(buf, counter)?;
+        let val = T::deserialize(buf, counter)?;
+        Ok(Self { key, val })
+    }
+}
+
+impl DbusSerialize for Variant {
     fn get_signature() -> String {
         "v".to_string()
     }
     fn serialize(&self, buf: &mut Vec<u8>) {
         // no alignment needed, as variant is 1-align
-        let sub_type = T::get_signature();
-        let signature_length = sub_type.len() as u8; // signature length must be < 256
-        buf.push(signature_length);
-        buf.extend_from_slice(sub_type.as_bytes());
-        buf.push(0);
-        self.0.serialize(buf);
+        match self {
+            Self::String(s) => {
+                let sub_type = String::get_signature();
+                let signature_length = sub_type.len() as u8; // signature length must be < 256
+                buf.push(signature_length);
+                buf.extend_from_slice(sub_type.as_bytes());
+                buf.push(0);
+                s.serialize(buf);
+            }
+            Self::ArrayU32(v) => {
+                let sub_type = <Vec<u32>>::get_signature();
+                let signature_length = sub_type.len() as u8; // signature length must be < 256
+                buf.push(signature_length);
+                buf.extend_from_slice(sub_type.as_bytes());
+                buf.push(0);
+                v.serialize(buf);
+            }
+            Self::ArrayU64(v) => {
+                let sub_type = <Vec<u64>>::get_signature();
+                let signature_length = sub_type.len() as u8; // signature length must be < 256
+                buf.push(signature_length);
+                buf.extend_from_slice(sub_type.as_bytes());
+                buf.push(0);
+                v.serialize(buf);
+            }
+            Self::Bool(b) => {
+                let sub_type = bool::get_signature();
+                let signature_length = sub_type.len() as u8; // signature length must be < 256
+                buf.push(signature_length);
+                buf.extend_from_slice(sub_type.as_bytes());
+                buf.push(0);
+                b.serialize(buf);
+            }
+            Self::U64(v) => {
+                let sub_type = u64::get_signature();
+                let signature_length = sub_type.len() as u8; // signature length must be < 256
+                buf.push(signature_length);
+                buf.extend_from_slice(sub_type.as_bytes());
+                buf.push(0);
+                v.serialize(buf);
+            }
+        }
     }
     fn deserialize(buf: &[u8], counter: &mut usize) -> Result<Self> {
         align_counter(counter, 1);
@@ -259,48 +325,32 @@ impl<T: DbusSerialize> DbusSerialize for Variant<T> {
                 "incomplete variant response : partial signature".into(),
             ));
         }
-        let actual_signature =
+        let signature =
             String::from_utf8(buf[*counter..*counter + signature_length].into()).unwrap();
 
         *counter += signature_length + 1; // +1 for null byte
 
-        // the T itself will take care of padding
-        let expected_signature = T::get_signature();
-        if expected_signature != actual_signature {
-            return Err(SystemdClientError::DeserializationError(format!(
-                "expected signature {}, found {} instead",
-                expected_signature, actual_signature
+        let string_signature = String::get_signature();
+        let bool_signature = bool::get_signature();
+        let vec32_signature = <Vec<u32>>::get_signature();
+        let vec64_signature = <Vec<u64>>::get_signature();
+        let u64_signature = u64::get_signature();
+
+        if signature == string_signature {
+            Ok(Self::String(String::deserialize(buf, counter)?))
+        } else if signature == bool_signature {
+            Ok(Self::Bool(bool::deserialize(buf, counter)?))
+        } else if signature == vec32_signature {
+            Ok(Self::ArrayU32(<Vec<u32>>::deserialize(buf, counter)?))
+        } else if signature == vec64_signature {
+            Ok(Self::ArrayU64(<Vec<u64>>::deserialize(buf, counter)?))
+        } else if signature == u64_signature {
+            Ok(Self::U64(u64::deserialize(buf, counter)?))
+        } else {
+            return Err(SystemdClientError::IncompleteImplementation(format!(
+                "unsupported value signature {}",
+                signature
             )));
         }
-        let elem: T = T::deserialize(buf, counter)?;
-
-        Ok(Self(elem))
-    }
-}
-impl DbusSerialize for Structure {
-    fn get_signature() -> String {
-        "(sv)".to_string()
-    }
-    fn serialize(&self, buf: &mut Vec<u8>) {
-        adjust_padding(buf, 8);
-        self.key.serialize(buf);
-        self.val.serialize(buf);
-    }
-    fn deserialize(_: &[u8], _: &mut usize) -> Result<Self> {
-        Err(SystemdClientError::IncompleteImplementation(
-            "structure with dyn type members not supported for deserialization".into(),
-        ))
-    }
-}
-
-impl<T: DbusSerialize> DbusSerialize for Box<T> {
-    fn get_signature() -> String {
-        T::get_signature()
-    }
-    fn serialize(&self, buf: &mut Vec<u8>) {
-        self.as_ref().serialize(buf);
-    }
-    fn deserialize(buf: &[u8], ctr: &mut usize) -> Result<Self> {
-        Ok(Box::new(T::deserialize(buf, ctr)?))
     }
 }
