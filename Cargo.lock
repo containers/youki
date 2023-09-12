@@ -3490,6 +3490,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "setjmp"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57a4a1d465f5de0833aed8a7c76b1c01606bc8160c5a7d2c0108867dfffdfef3"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "sha1"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4631,9 +4640,9 @@ dependencies = [
 
 [[package]]
 name = "wasmedge-sdk"
-version = "0.11.2"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "21dd469c97571a49a836041dca83b28e44246bd54c108dfeae2475fcc7f2f267"
+checksum = "df3a26bf9ac9a4bff496930f82e6c6a04be6d663a894497eed868ab8418af088"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -4647,9 +4656,9 @@ dependencies = [
 
 [[package]]
 name = "wasmedge-sys"
-version = "0.16.2"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "080c608ca53ff7d76613d9918c62d9f5a411c7f568ccb7ca067de06eb64bdc88"
+checksum = "637c5d32bf39df4e53c51408f035312f044108d1d86c95be215a2a13a2fee87b"
 dependencies = [
  "bindgen",
  "cfg-if",
@@ -4663,6 +4672,7 @@ dependencies = [
  "rand",
  "reqwest",
  "scoped-tls",
+ "setjmp",
  "sha256",
  "tar",
  "thiserror",
