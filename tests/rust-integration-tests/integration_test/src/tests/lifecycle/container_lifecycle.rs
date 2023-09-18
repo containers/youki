@@ -3,7 +3,7 @@ use std::thread::sleep;
 use std::time::Duration;
 use test_framework::{TestResult, TestableGroup};
 
-use super::{checkpoint, create, delete, exec, kill, start, state};
+use super::{checkpoint, create, delete, exec, kill, start, state, util::criu_installed};
 
 // By experimenting, somewhere around 50 is enough for youki process
 // to get the kill signal and shut down
@@ -67,10 +67,18 @@ impl ContainerLifecycle {
     }
 
     pub fn checkpoint_leave_running(&self) -> TestResult {
+        if !criu_installed() {
+            return TestResult::Skipped;
+        }
+
         checkpoint::checkpoint_leave_running(self.project_path.path(), &self.container_id)
     }
 
     pub fn checkpoint_leave_running_work_path_tmp(&self) -> TestResult {
+        if !criu_installed() {
+            return TestResult::Skipped;
+        }
+
         checkpoint::checkpoint_leave_running_work_path_tmp(
             self.project_path.path(),
             &self.container_id,
