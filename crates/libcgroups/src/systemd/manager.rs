@@ -182,13 +182,13 @@ impl Manager {
         let mut destructured_path: CgroupsPath = cgroups_path.as_path().try_into()?;
         ensure_parent_unit(&mut destructured_path, use_system);
 
-        let mut client = match use_system {
+        let client = match use_system {
             true => DbusConnection::new_system()?,
             false => DbusConnection::new_session()?,
         };
 
         let (cgroups_path, delegation_boundary) =
-            Self::construct_cgroups_path(&destructured_path, &mut client)?;
+            Self::construct_cgroups_path(&destructured_path, &client)?;
         let full_path = root_path.join_safely(&cgroups_path)?;
         let fs_manager = FsManager::new(root_path.clone(), cgroups_path.clone())?;
 
@@ -343,7 +343,7 @@ impl Manager {
     }
 
     pub fn any(self) -> AnyCgroupManager {
-        AnyCgroupManager::Systemd(self)
+        AnyCgroupManager::Systemd(Box::new(self))
     }
 }
 
