@@ -539,7 +539,7 @@ mod tests {
         let actual_serialized = msg.serialize();
 
         assert_eq!(
-            Vec::from_iter(serialized.iter().map(|v| *v)),
+            Vec::from_iter(serialized.iter().copied()),
             actual_serialized
         );
 
@@ -586,7 +586,7 @@ mod tests {
         let actual_serialized = msg.serialize();
 
         assert_eq!(
-            Vec::from_iter(serialized.iter().map(|v| *v)),
+            Vec::from_iter(serialized.iter().copied()),
             actual_serialized
         );
 
@@ -642,7 +642,7 @@ mod tests {
         let actual_serialized = msg.serialize();
 
         assert_eq!(
-            Vec::from_iter(serialized.iter().map(|v| *v)),
+            Vec::from_iter(serialized.iter().copied()),
             actual_serialized
         );
 
@@ -684,7 +684,7 @@ mod tests {
         let actual_serialized = msg.serialize();
 
         assert_eq!(
-            Vec::from_iter(serialized.iter().map(|v| *v)),
+            Vec::from_iter(serialized.iter().copied()),
             actual_serialized
         );
 

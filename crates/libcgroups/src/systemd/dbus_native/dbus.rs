@@ -23,6 +23,8 @@ pub struct DbusConnection {
     system: bool,
     /// socket fd
     socket: i32,
+    /// name id assigned by dbus for the connection
+    id: Option<String>,
     /// counter for messages
     // This must be atomic, so that we can take non-mutable reference to self
     // and still increment this
@@ -52,9 +54,10 @@ impl DbusConnection {
 
         let addr = socket::UnixAddr::new(addr)?;
         socket::connect(socket, &addr)?;
-        let dbus = Self {
+        let mut dbus = Self {
             socket,
             msg_ctr: AtomicU32::new(0),
+            id: None,
             system,
         };
         dbus.authenticate(uid)?;
@@ -71,7 +74,7 @@ impl DbusConnection {
 
     /// Authenticates with dbus using given uid via external strategy
     /// Must be called on any connection before doing any other communication
-    fn authenticate(&self, uid: u32) -> Result<()> {
+    fn authenticate(&mut self, uid: u32) -> Result<()> {
         let mut buf = [0; 64];
 
         // dbus connection always start with a 0 byte sent as first thing
@@ -130,7 +133,19 @@ impl DbusConnection {
             },
         ];
 
-        self.send_message(MessageType::MethodCall, headers, vec![])?;
+        let res = self.send_message(MessageType::MethodCall, headers, vec![])?;
+
+        let res: Vec<_> = res
+            .into_iter()
+            .filter(|m| m.preamble.mtype == MessageType::MethodReturn)
+            .collect();
+
+        let res = res.get(0).ok_or(SystemdClientError::MethodCallErr(
+            "expected method call to have reply, found no reply message".into(),
+        ))?;
+        let mut ctr = 0;
+        let id = String::deserialize(&res.body, &mut ctr)?;
+        self.id = Some(id);
 
         Ok(())
     }
@@ -172,9 +187,16 @@ impl DbusConnection {
     pub fn send_message(
         &self,
         mtype: MessageType,
-        headers: Vec<Header>,
+        mut headers: Vec<Header>,
         body: Vec<u8>,
     ) -> Result<Vec<Message>> {
+        if let Some(s) = &self.id {
+            headers.push(Header {
+                kind: HeaderKind::Sender,
+                value: HeaderValue::String(s.clone()),
+            });
+        }
+
         let message = Message::new(mtype, self.get_msg_id(), headers, body);
         let serialized = message.serialize();
 
