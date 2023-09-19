@@ -319,7 +319,7 @@ fn serialize_headers(headers: &[Header]) -> Vec<u8> {
                 ret.push(header_value_length as u8);
             }
             HeaderKind::ReplySerial | HeaderKind::UnixFd => {
-                /* do nothing as u32 does not need length appeneded*/
+                /* do nothing as u32 does not need length appended*/
             }
             _ => {
                 ret.extend_from_slice(&header_value_length.to_le_bytes());

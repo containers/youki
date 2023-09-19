@@ -58,7 +58,7 @@ fn parse_dbus_address(env_value: String) -> Result<String> {
             return Ok(s.to_owned());
         }
     }
-    // we do not support unix:runtime= 
+    // we do not support unix:runtime=
     Err(DbusError::BusAddressError(format!("no valid bus path found in list {}", env_value)).into())
 }
 
@@ -545,7 +545,7 @@ mod tests {
         );
 
         // invalid interface
-        let res = proxy.method_call::<_, u16>("org.freedesktop.DBus.Propertie_", "Get", Some(body));
+        let res = proxy.method_call::<_, u16>("org.freedesktop.DBus.Property_", "Get", Some(body));
         assert!(res.is_err());
         assert!(matches!(
             res,
