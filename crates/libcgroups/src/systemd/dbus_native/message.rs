@@ -1,4 +1,4 @@
-use super::utils::{adjust_padding, align_counter, Result, SystemdClientError};
+use super::utils::{adjust_padding, align_counter, DbusError, Result};
 
 #[derive(Debug)]
 /// Indicates the endian of message
@@ -138,10 +138,11 @@ impl Header {
             9 => HeaderKind::UnixFd,
             v => {
                 // should not occur unless we mess up parsing somewhere else
-                return Err(SystemdClientError::DeserializationError(format!(
+                return Err(DbusError::DeserializationError(format!(
                     "found invalid header kind value : {}",
                     v
-                )));
+                ))
+                .into());
             }
         };
 
@@ -155,9 +156,10 @@ impl Header {
         // we only support string, u32 signature and object,
         // all of which have signature length of 1 byte
         if signature_length != 1 {
-            return Err(SystemdClientError::IncompleteImplementation(
+            return Err(DbusError::IncompleteImplementation(
                 "complex header type not supported".into(),
-            ));
+            )
+            .into());
         }
 
         let actual_signature = HeaderSignature::from_byte(buf[*ctr]);
@@ -168,10 +170,11 @@ impl Header {
         let expected_signature = header_kind.signature();
 
         if actual_signature != expected_signature {
-            return Err(SystemdClientError::DeserializationError(format!(
+            return Err(DbusError::DeserializationError(format!(
                 "header signature mismatch, expected {:?}, found {:?}",
                 expected_signature, actual_signature
-            )));
+            ))
+            .into());
         }
 
         *ctr += 1; // accounting for extra null byte that is always there
@@ -179,9 +182,10 @@ impl Header {
         let value = match expected_signature {
             HeaderSignature::U32 => {
                 if buf.len() < *ctr + 4 {
-                    return Err(SystemdClientError::DeserializationError(
+                    return Err(DbusError::DeserializationError(
                         "incomplete response : partial header value".into(),
-                    ));
+                    )
+                    .into());
                 }
                 let ret = HeaderValue::U32(u32::from_le_bytes(
                     buf[*ctr..*ctr + 4].try_into().unwrap(), // we ca unwrap here as we know 4 byte buffer will satisfy [u8;4]
@@ -192,16 +196,18 @@ impl Header {
             // both are encoded as string
             HeaderSignature::Object | HeaderSignature::String => {
                 if buf.len() < *ctr + 4 {
-                    return Err(SystemdClientError::DeserializationError(
+                    return Err(DbusError::DeserializationError(
                         "incomplete response : partial header value length".into(),
-                    ));
+                    )
+                    .into());
                 }
                 let len = u32::from_le_bytes(buf[*ctr..*ctr + 4].try_into().unwrap()) as usize;
                 *ctr += 4;
                 if buf.len() < *ctr + len {
-                    return Err(SystemdClientError::DeserializationError(
+                    return Err(DbusError::DeserializationError(
                         "incomplete response : partial header value".into(),
-                    ));
+                    )
+                    .into());
                 }
                 let string = String::from_utf8(buf[*ctr..*ctr + len].into()).unwrap();
                 *ctr += len + 1; // +1 to account for null
@@ -212,9 +218,10 @@ impl Header {
                 let len = buf[*ctr] as usize;
                 *ctr += 1;
                 if buf.len() < *ctr + len {
-                    return Err(SystemdClientError::DeserializationError(
+                    return Err(DbusError::DeserializationError(
                         "incomplete response : partial header value".into(),
-                    ));
+                    )
+                    .into());
                 }
                 let signature = String::from_utf8(buf[*ctr..*ctr + len].into()).unwrap();
                 *ctr += len + 1; //+1 to account for null byte
@@ -388,9 +395,9 @@ impl Message {
         let endian = Endian::from_byte(buf[*counter]);
 
         if !matches!(endian, Endian::Little) {
-            return Err(SystemdClientError::IncompleteImplementation(
-                "big endian not supported".into(),
-            ));
+            return Err(
+                DbusError::IncompleteImplementation("big endian not supported".into()).into(),
+            );
         }
 
         let mtype = match buf[*counter + 1] {
@@ -399,10 +406,9 @@ impl Message {
             3 => MessageType::Error,
             4 => MessageType::Signal,
             v => {
-                return Err(SystemdClientError::DeserializationError(format!(
-                    "invalid message type {}",
-                    v
-                )));
+                return Err(
+                    DbusError::DeserializationError(format!("invalid message type {}", v)).into(),
+                );
             }
         };
 
@@ -410,9 +416,10 @@ impl Message {
         let version = buf[*counter + 3];
 
         if version != 1 {
-            return Err(SystemdClientError::IncompleteImplementation(
+            return Err(DbusError::IncompleteImplementation(
                 "only dbus protocol v1 is supported".into(),
-            ));
+            )
+            .into());
         }
 
         *counter += 4; // account for preamble bytes
@@ -420,45 +427,50 @@ impl Message {
         let preamble = Preamble::new(mtype);
 
         if buf.len() < *counter + 4 {
-            return Err(SystemdClientError::DeserializationError(
+            return Err(DbusError::DeserializationError(
                 "incomplete response : partial body length".into(),
-            ));
+            )
+            .into());
         }
         let body_length =
             u32::from_le_bytes(buf[*counter..*counter + 4].try_into().unwrap()) as usize;
         *counter += 4;
 
         if buf.len() < *counter + 4 {
-            return Err(SystemdClientError::DeserializationError(
+            return Err(DbusError::DeserializationError(
                 "incomplete response : partial header serial".into(),
-            ));
+            )
+            .into());
         }
 
         let serial = u32::from_le_bytes(buf[*counter..*counter + 4].try_into().unwrap());
         *counter += 4;
 
         if buf.len() < *counter + 4 {
-            return Err(SystemdClientError::DeserializationError(
+            return Err(DbusError::DeserializationError(
                 "incomplete response : partial header header array length".into(),
-            ));
+            )
+            .into());
         }
         let header_array_length =
             u32::from_le_bytes(buf[*counter..*counter + 4].try_into().unwrap()) as usize;
         *counter += 4;
 
         if buf.len() < *counter + header_array_length {
-            return Err(SystemdClientError::DeserializationError(
+            return Err(DbusError::DeserializationError(
                 "incomplete response : partial header array".into(),
-            ));
+            )
+            .into());
         }
         let headers = deserialize_headers(&buf[*counter..*counter + header_array_length])?;
         *counter += header_array_length;
         align_counter(counter, 8);
 
         if buf.len() < *counter + body_length {
-            return Err(SystemdClientError::DeserializationError(
+            return Err(DbusError::DeserializationError(
                 "incomplete response : partial body value".into(),
-            ));
+            )
+            .into());
         }
 
         // we do not deserialize body here, and instead let the caller do it as needed

@@ -1,4 +1,4 @@
-use super::utils::{adjust_padding, align_counter, Result, SystemdClientError};
+use super::utils::{adjust_padding, align_counter, DbusError, Result};
 
 /// This indicates that given type can be serialized as dbus
 /// message body, and has methods needed for that
@@ -148,9 +148,10 @@ impl DbusSerialize for &str {
         buf.push(0); // needs to be null terminated
     }
     fn deserialize(_: &[u8], _: &mut usize) -> Result<Self> {
-        Err(SystemdClientError::IncompleteImplementation(
-            "&str does not support deserialization".into(),
-        ))
+        Err(
+            DbusError::IncompleteImplementation("&str does not support deserialization".into())
+                .into(),
+        )
     }
 }
 
@@ -172,16 +173,18 @@ impl DbusSerialize for String {
     fn deserialize(buf: &[u8], counter: &mut usize) -> Result<Self> {
         align_counter(counter, 4);
         if buf.len() < *counter + 4 {
-            return Err(SystemdClientError::DeserializationError(
+            return Err(DbusError::DeserializationError(
                 "incomplete string response : missing length".into(),
-            ));
+            )
+            .into());
         }
         let length = u32::from_le_bytes(buf[*counter..*counter + 4].try_into().unwrap()) as usize;
         *counter += 4;
         if buf.len() < *counter + length {
-            return Err(SystemdClientError::DeserializationError(
+            return Err(DbusError::DeserializationError(
                 "incomplete string response : missing partial string".into(),
-            ));
+            )
+            .into());
         }
         let ret = String::from_utf8((&buf[*counter..*counter + length]).into()).unwrap();
         *counter += length + 1; // +1 accounting for null
@@ -207,9 +210,10 @@ impl DbusSerialize for bool {
     fn deserialize(buf: &[u8], counter: &mut usize) -> Result<Self> {
         align_counter(counter, 4);
         if buf.len() < *counter + 4 {
-            return Err(SystemdClientError::DeserializationError(
+            return Err(DbusError::DeserializationError(
                 "incomplete bool response : partial response".into(),
-            ));
+            )
+            .into());
         }
         let ret = u32::from_le_bytes(buf[*counter..*counter + 4].try_into().unwrap());
         *counter += 4;
@@ -231,9 +235,10 @@ impl DbusSerialize for u8 {
     fn deserialize(buf: &[u8], counter: &mut usize) -> Result<Self> {
         align_counter(counter, 1);
         if buf.len() < *counter + 1 {
-            return Err(SystemdClientError::DeserializationError(
+            return Err(DbusError::DeserializationError(
                 "incomplete u8 response : partial response".into(),
-            ));
+            )
+            .into());
         }
         let ret = u8::from_le_bytes(buf[*counter..*counter + 1].try_into().unwrap());
         *counter += 1;
@@ -255,9 +260,10 @@ impl DbusSerialize for u16 {
     fn deserialize(buf: &[u8], counter: &mut usize) -> Result<Self> {
         align_counter(counter, 2);
         if buf.len() < *counter + 2 {
-            return Err(SystemdClientError::DeserializationError(
+            return Err(DbusError::DeserializationError(
                 "incomplete u16 response : partial response".into(),
-            ));
+            )
+            .into());
         }
         let ret = u16::from_le_bytes(buf[*counter..*counter + 2].try_into().unwrap());
         *counter += 2;
@@ -279,9 +285,10 @@ impl DbusSerialize for u32 {
     fn deserialize(buf: &[u8], counter: &mut usize) -> Result<Self> {
         align_counter(counter, 4);
         if buf.len() < *counter + 4 {
-            return Err(SystemdClientError::DeserializationError(
+            return Err(DbusError::DeserializationError(
                 "incomplete u32 response : partial response".into(),
-            ));
+            )
+            .into());
         }
         let ret = u32::from_le_bytes(buf[*counter..*counter + 4].try_into().unwrap());
         *counter += 4;
@@ -303,9 +310,10 @@ impl DbusSerialize for u64 {
     fn deserialize(buf: &[u8], counter: &mut usize) -> Result<Self> {
         align_counter(counter, 8);
         if buf.len() < *counter + 8 {
-            return Err(SystemdClientError::DeserializationError(
+            return Err(DbusError::DeserializationError(
                 "incomplete u64 response : partial response".into(),
-            ));
+            )
+            .into());
         }
         let ret = u64::from_le_bytes(buf[*counter..*counter + 8].try_into().unwrap());
         *counter += 8;
@@ -338,9 +346,10 @@ impl<T: DbusSerialize> DbusSerialize for Vec<T> {
         align_counter(counter, 4);
 
         if buf.len() < *counter + 4 {
-            return Err(SystemdClientError::DeserializationError(
+            return Err(DbusError::DeserializationError(
                 "incomplete array response : partial length".into(),
-            ));
+            )
+            .into());
         }
 
         let length_in_bytes =
@@ -350,9 +359,10 @@ impl<T: DbusSerialize> DbusSerialize for Vec<T> {
         let end = *counter + length_in_bytes;
 
         if buf.len() < end {
-            return Err(SystemdClientError::DeserializationError(
+            return Err(DbusError::DeserializationError(
                 "incomplete array response : partial elements".into(),
-            ));
+            )
+            .into());
         }
 
         let mut ret = Vec::new();
@@ -445,9 +455,10 @@ impl DbusSerialize for Variant {
         *counter += 1;
 
         if buf.len() < *counter + signature_length {
-            return Err(SystemdClientError::DeserializationError(
+            return Err(DbusError::DeserializationError(
                 "incomplete variant response : partial signature".into(),
-            ));
+            )
+            .into());
         }
         let signature =
             String::from_utf8(buf[*counter..*counter + signature_length].into()).unwrap();
@@ -471,10 +482,11 @@ impl DbusSerialize for Variant {
         } else if signature == u64_signature {
             Ok(Self::U64(u64::deserialize(buf, counter)?))
         } else {
-            return Err(SystemdClientError::IncompleteImplementation(format!(
+            return Err(DbusError::IncompleteImplementation(format!(
                 "unsupported value signature {}",
                 signature
-            )));
+            ))
+            .into());
         }
     }
 }

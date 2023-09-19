@@ -3,7 +3,7 @@ use std::num::ParseIntError;
 #[derive(thiserror::Error, Debug)]
 pub enum SystemdClientError {
     #[error("dbus error: {0}")]
-    DBus(#[from] dbus::Error),
+    DBus(#[from] DbusError),
     #[error("failed to start transient unit {unit_name}, parent is {parent}: {err}")]
     FailedTransient {
         err: Box<SystemdClientError>,
@@ -22,6 +22,10 @@ pub enum SystemdClientError {
     },
     #[error("could not parse systemd version: {0}")]
     SystemdVersion(ParseIntError),
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum DbusError {
     #[error("dbus authentication error: {0}")]
     AuthenticationErr(String),
     #[error("dbus implementation is incomplete: {0}")]
@@ -40,7 +44,7 @@ pub type Result<T> = std::result::Result<T, SystemdClientError>;
 
 impl From<nix::Error> for SystemdClientError {
     fn from(err: nix::Error) -> SystemdClientError {
-        SystemdClientError::ConnectionError(err.to_string())
+        DbusError::ConnectionError(err.to_string()).into()
     }
 }
 

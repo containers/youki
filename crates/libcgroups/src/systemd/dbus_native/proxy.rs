@@ -1,7 +1,7 @@
 use super::dbus::DbusConnection;
 use super::message::*;
 use super::serialize::{DbusSerialize, Structure, Variant};
-use super::utils::{Result, SystemdClientError};
+use super::utils::{DbusError, Result};
 
 /// Structure to conveniently communicate with
 /// given destination and path for method calls
@@ -95,16 +95,13 @@ impl<'conn> Proxy<'conn> {
             let msg = error_message[0];
             if msg.body.is_empty() {
                 // this should rarely be the case
-                return Err(SystemdClientError::MethodCallErr(
-                    "Unknown Dbus Error".into(),
-                ));
+                return Err(DbusError::MethodCallErr("Unknown Dbus Error".into()).into());
             } else {
                 // in error message, first item of the body (if present) is always a string
                 // indicating the error
                 let mut ctr = 0;
-                return Err(SystemdClientError::MethodCallErr(String::deserialize(
-                    &msg.body, &mut ctr,
-                )?));
+                let msg = String::deserialize(&msg.body, &mut ctr)?;
+                return Err(DbusError::MethodCallErr(msg).into());
             }
         }
 
@@ -117,7 +114,7 @@ impl<'conn> Proxy<'conn> {
         // we are only going to consider first reply, cause... so.
         // realistically there should only be at most one method return type of message
         // for a method call
-        let reply = reply.get(0).ok_or(SystemdClientError::MethodCallErr(
+        let reply = reply.get(0).ok_or(DbusError::MethodCallErr(
             "expected to get a reply for method call, didn't get any".into(),
         ))?;
 
@@ -133,9 +130,10 @@ impl<'conn> Proxy<'conn> {
         // This is also something that should never happen
         // we just check this defensively
         if signature_header.is_empty() && !reply.body.is_empty() {
-            return Err(SystemdClientError::MethodCallErr(
+            return Err(DbusError::MethodCallErr(
                 "Body non empty, but body signature header missing".to_string(),
-            ));
+            )
+            .into());
         }
 
         if expected_signature == *"" {
@@ -155,11 +153,12 @@ impl<'conn> Proxy<'conn> {
 
         // check that signature returned and type we are trying to deserialize
         // match as expected
-        if !check_signature_compatibility(&actual_signature, &expected_signature) {
-            return Err(SystemdClientError::DeserializationError(format!(
+        if !check_signature_compatibility(actual_signature, &expected_signature) {
+            return Err(DbusError::DeserializationError(format!(
                 "reply signature mismatch : expected {}, found {} : \n{:?}",
                 expected_signature, actual_signature, reply.body
-            )));
+            ))
+            .into());
         }
 
         let mut ctr = 0;
@@ -174,6 +173,11 @@ impl<'conn> Proxy<'conn> {
         )
     }
 
+    // Note that because we do not listen to the jobRemoved signal
+    // similar to runc, it is possible that when this method returns
+    // the unit is not yet started, however, because we do expect a reply
+    // (according to message flags we send), it is possible that dbus only returns
+    // after unit is started. Need to investigate more
     pub fn start_transient_unit(
         &self,
         name: &str,
