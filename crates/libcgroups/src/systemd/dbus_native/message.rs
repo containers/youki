@@ -735,7 +735,98 @@ mod tests {
         let actual_serialized = msg.serialize();
 
         assert_eq!(
-            Vec::from_iter(serialized.iter().map(|v| *v)),
+            Vec::from_iter(serialized.iter().copied()),
+            actual_serialized
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_vector_payload_deserialize() -> Result<()> {
+        let serialized = b"l\x01\x00\x01\xc8\x01\x00\x00\x03\x00\x00\x00\xc6\x00\x00\x00\x01\x01o\x00\x19\x00\x00\x00\x2forg\x2ffreedesktop\x2fsystemd1\x00\x00\x00\x00\x00\x00\x00\x03\x01s\x00\x12\x00\x00\x00StartTransientUnit\x00\x00\x00\x00\x00\x00\x07\x01s\x00\x07\x00\x00\x00\x3a1\x2e1021\x00\x06\x01s\x00\x18\x00\x00\x00org\x2efreedesktop\x2esystemd1\x00\x00\x00\x00\x00\x00\x00\x00\x02\x01s\x00\x20\x00\x00\x00org\x2efreedesktop\x2esystemd1\x2eManager\x00\x00\x00\x00\x00\x00\x00\x00\x08\x01g\x00\x10ssa\x28sv\x29a\x28sa\x28sv\x29\x29\x00\x00\x00M\x00\x00\x00libpod\x2d57f5869eaf80cee986095eebd1e0fbbbd148527f67d94f1fbe958f5bab8112f7\x2escope\x00\x00\x00\x07\x00\x00\x00replace\x00X\x01\x00\x00\x00\x00\x00\x00\x0b\x00\x00\x00Description\x00\x01s\x00\x00P\x00\x00\x00youki\x20container\x2057f5869eaf80cee986095eebd1e0fbbbd148527f67d94f1fbe958f5bab8112f7\x00\x00\x00\x00\x00\x00\x00\x00\x05\x00\x00\x00Slice\x00\x01s\x00\x00\x00\x00\x0a\x00\x00\x00user\x2eslice\x00\x00\x08\x00\x00\x00Delegate\x00\x01b\x00\x01\x00\x00\x00\x00\x00\x00\x00\x10\x00\x00\x00MemoryAccounting\x00\x01b\x00\x01\x00\x00\x00\x00\x00\x00\x00\x0d\x00\x00\x00CPUAccounting\x00\x01b\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x0c\x00\x00\x00IOAccounting\x00\x01b\x00\x01\x00\x00\x00\x0f\x00\x00\x00TasksAccounting\x00\x01b\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x13\x00\x00\x00DefaultDependencies\x00\x01b\x00\x00\x00\x00\x00\x00\x04\x00\x00\x00PIDs\x00\x02au\x00\x00\x00\x00\x04\x00\x00\x007g\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
+
+        let mut counter = 0;
+
+        let res = Message::deserialize(serialized, &mut counter)?;
+        assert_eq!(res.preamble.mtype, MessageType::MethodCall);
+
+        let expected_headers = vec![
+            Header {
+                kind: HeaderKind::Path,
+                value: HeaderValue::String("/org/freedesktop/systemd1".into()),
+            },
+            Header {
+                kind: HeaderKind::Member,
+                value: HeaderValue::String("StartTransientUnit".into()),
+            },
+            Header {
+                kind: HeaderKind::Sender,
+                value: HeaderValue::String(":1.1021".into()),
+            },
+            Header {
+                kind: HeaderKind::Destination,
+                value: HeaderValue::String("org.freedesktop.systemd1".into()),
+            },
+            Header {
+                kind: HeaderKind::Interface,
+                value: HeaderValue::String("org.freedesktop.systemd1.Manager".into()),
+            },
+            Header {
+                kind: HeaderKind::BodySignature,
+                value: HeaderValue::String("ssa(sv)a(sa(sv))".into()),
+            },
+        ];
+        assert_eq!(res.headers, expected_headers);
+
+        let mut counter = 0;
+
+        let (name, mode, props, aux) = <(
+            String,
+            String,
+            Vec<Structure<Variant>>,
+            Vec<Structure<Vec<Structure<Variant>>>>,
+        )>::deserialize(&res.body, &mut counter)?;
+
+        let expected_name =
+            "libpod-57f5869eaf80cee986095eebd1e0fbbbd148527f67d94f1fbe958f5bab8112f7.scope"
+                .to_string();
+
+        assert_eq!(name, expected_name);
+
+        let expected_mode = "replace".to_string();
+        assert_eq!(mode, expected_mode);
+
+        let expected_aux = vec![];
+        assert_eq!(aux, expected_aux);
+
+        let expected_props = vec![Structure::new(
+            "Description".into(),
+            Variant::String(
+                "youki container 57f5869eaf80cee986095eebd1e0fbbbd148527f67d94f1fbe958f5bab8112f7"
+                    .into(),
+            ),
+        ),
+        Structure::new("Slice".into(), Variant::String("user.slice".into())),
+        Structure::new("Delegate".into(), Variant::Bool(true)),
+        Structure::new("MemoryAccounting".into(), Variant::Bool(true)),
+        Structure::new("CPUAccounting".into(), Variant::Bool(true)),
+        Structure::new("IOAccounting".into(), Variant::Bool(true)),
+        Structure::new("TasksAccounting".into(), Variant::Bool(true)),
+        Structure::new("DefaultDependencies".into(), Variant::Bool(false)),
+        Structure::new("PIDs".into(),Variant::ArrayU32(vec![26423]))
+        ];
+
+        assert_eq!(props, expected_props);
+
+        let mut body = vec![];
+        (expected_name, expected_mode, expected_props, expected_aux).serialize(&mut body);
+
+        let msg = Message::new(MessageType::MethodCall, 3, expected_headers, body);
+        let actual_serialized = msg.serialize();
+
+        assert_eq!(
+            Vec::from_iter(serialized.iter().copied()),
             actual_serialized
         );
 
