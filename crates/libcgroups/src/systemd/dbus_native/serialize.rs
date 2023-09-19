@@ -77,6 +77,83 @@ impl<T1: DbusSerialize, T2: DbusSerialize> DbusSerialize for (T1, T2) {
     }
 }
 
+impl<T1: DbusSerialize, T2: DbusSerialize, T3: DbusSerialize, T4: DbusSerialize> DbusSerialize
+    for (T1, T2, T3, T4)
+{
+    fn get_signature() -> String {
+        format!(
+            "{}{}{}{}",
+            T1::get_signature(),
+            T2::get_signature(),
+            T3::get_signature(),
+            T4::get_signature()
+        )
+    }
+    fn get_alignment() -> usize {
+        T1::get_alignment()
+    }
+    fn serialize(&self, buf: &mut Vec<u8>) {
+        self.0.serialize(buf);
+        self.1.serialize(buf);
+        self.2.serialize(buf);
+        self.3.serialize(buf);
+    }
+    fn deserialize(buf: &[u8], counter: &mut usize) -> Result<Self> {
+        let t1 = T1::deserialize(buf, counter)?;
+        let t2 = T2::deserialize(buf, counter)?;
+        let t3 = T3::deserialize(buf, counter)?;
+        let t4 = T4::deserialize(buf, counter)?;
+        Ok((t1, t2, t3, t4))
+    }
+}
+
+impl<T1: DbusSerialize, T2: DbusSerialize, T3: DbusSerialize> DbusSerialize for (T1, T2, T3) {
+    fn get_signature() -> String {
+        format!(
+            "{}{}{}",
+            T1::get_signature(),
+            T2::get_signature(),
+            T3::get_signature(),
+        )
+    }
+    fn get_alignment() -> usize {
+        T1::get_alignment()
+    }
+    fn serialize(&self, buf: &mut Vec<u8>) {
+        self.0.serialize(buf);
+        self.1.serialize(buf);
+        self.2.serialize(buf);
+    }
+    fn deserialize(buf: &[u8], counter: &mut usize) -> Result<Self> {
+        let t1 = T1::deserialize(buf, counter)?;
+        let t2 = T2::deserialize(buf, counter)?;
+        let t3 = T3::deserialize(buf, counter)?;
+        Ok((t1, t2, t3))
+    }
+}
+
+impl DbusSerialize for &str {
+    fn get_signature() -> String {
+        "s".to_string()
+    }
+    fn get_alignment() -> usize {
+        String::get_alignment()
+    }
+    fn serialize(&self, buf: &mut Vec<u8>) {
+        adjust_padding(buf, 4);
+        let length = self.len() as u32;
+        buf.extend_from_slice(&length.to_le_bytes());
+
+        buf.extend_from_slice(self.as_bytes());
+        buf.push(0); // needs to be null terminated
+    }
+    fn deserialize(_: &[u8], _: &mut usize) -> Result<Self> {
+        Err(SystemdClientError::IncompleteImplementation(
+            "&str does not support deserialization".into(),
+        ))
+    }
+}
+
 impl DbusSerialize for String {
     fn get_signature() -> String {
         "s".to_string()

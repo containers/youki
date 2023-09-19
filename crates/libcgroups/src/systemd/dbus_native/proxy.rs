@@ -11,6 +11,24 @@ pub struct Proxy<'conn> {
     path: String,
 }
 
+// helper method to check compatibility between
+// actual signature of received reply and expected signature
+// we have to do this, as we don't have dedicated type
+// for object path
+fn check_signature_compatibility(actual: &str, expected: &str) -> bool {
+    if actual == expected {
+        return true;
+    }
+    // we don't consider signature (g) here as :
+    // 1. length encoding is different than string, so cannot be deserialized by String::deserialize
+    // 2. currently we don't expect any method to return signature, so we can get away with this
+    if expected == "s" && matches!(actual, "s" | "o") {
+        return true;
+    }
+
+    false
+}
+
 impl<'conn> Proxy<'conn> {
     /// create a new proxy for given destination and path over given connection
     pub fn new(conn: &'conn DbusConnection, dest: &str, path: &str) -> Self {
@@ -99,7 +117,9 @@ impl<'conn> Proxy<'conn> {
         // we are only going to consider first reply, cause... so.
         // realistically there should only be at most one method return type of message
         // for a method call
-        let reply = reply[0];
+        let reply = reply.get(0).ok_or(SystemdClientError::MethodCallErr(
+            "expected to get a reply for method call, didn't get any".into(),
+        ))?;
 
         let headers = &reply.headers;
         let expected_signature = Output::get_signature();
@@ -135,10 +155,10 @@ impl<'conn> Proxy<'conn> {
 
         // check that signature returned and type we are trying to deserialize
         // match as expected
-        if *actual_signature != expected_signature {
+        if !check_signature_compatibility(&actual_signature, &expected_signature) {
             return Err(SystemdClientError::DeserializationError(format!(
-                "reply signature mismatch : expected {}, found {}",
-                expected_signature, actual_signature
+                "reply signature mismatch : expected {}, found {} : \n{:?}",
+                expected_signature, actual_signature, reply.body
             )));
         }
 
@@ -147,7 +167,11 @@ impl<'conn> Proxy<'conn> {
     }
 
     pub fn get_unit(&mut self, name: &str) -> Result<String> {
-        todo!();
+        self.method_call(
+            "org.freedesktop.systemd1.Manager",
+            "GetUnit",
+            Some(name.to_string()),
+        )
     }
 
     pub fn start_transient_unit(
@@ -157,11 +181,19 @@ impl<'conn> Proxy<'conn> {
         properties: Vec<Structure<Variant>>,
         aux: Vec<Structure<Vec<Structure<Variant>>>>,
     ) -> Result<String> {
-        todo!();
+        self.method_call(
+            "org.freedesktop.systemd1.Manager",
+            "StartTransientUnit",
+            Some((name, mode, properties, aux)),
+        )
     }
 
     pub fn stop_unit(&self, name: &str, mode: &str) -> Result<String> {
-        todo!();
+        self.method_call(
+            "org.freedesktop.systemd1.Manager",
+            "StopUnit",
+            Some((name, mode)),
+        )
     }
 
     pub fn set_unit_properties(
@@ -170,13 +202,37 @@ impl<'conn> Proxy<'conn> {
         runtime: bool,
         properties: Vec<Structure<Variant>>,
     ) -> Result<()> {
-        todo!();
+        self.method_call(
+            "org.freedesktop.systemd1.Manager",
+            "SetUnitProperties",
+            Some((name, runtime, properties)),
+        )
     }
 
     pub fn version(&self) -> Result<String> {
-        todo!()
+        let t = self.method_call::<_, Variant>(
+            "org.freedesktop.DBus.Properties",
+            "Get",
+            Some(("org.freedesktop.systemd1.Manager", "Version")),
+        )?;
+        match t {
+            Variant::String(s) => Ok(s),
+            v => panic!("version expected string variant, got {:?} instead", v),
+        }
     }
+
     pub fn control_group(&self) -> Result<String> {
-        todo!();
+        let t = self.method_call::<_, Variant>(
+            "org.freedesktop.DBus.Properties",
+            "Get",
+            Some((
+                "org.freedesktop.systemd1.Manager".to_string(),
+                "ControlGroup".to_string(),
+            )),
+        )?;
+        match t {
+            Variant::String(s) => Ok(s),
+            v => panic!("control group expected string variant, got {:?} instead", v),
+        }
     }
 }
