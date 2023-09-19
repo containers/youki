@@ -3,7 +3,7 @@ use crate::systemd::dbus_native::serialize::{DbusSerialize, Structure, Variant};
 use super::client::SystemdClient;
 use super::message::*;
 use super::proxy::Proxy;
-use super::utils::{Result, SystemdClientError};
+use super::utils::{DbusError, Result, SystemdClientError};
 use nix::sys::socket;
 use std::collections::HashMap;
 use std::io::{IoSlice, IoSliceMut};
@@ -95,10 +95,11 @@ impl DbusConnection {
 
         // successful auth reply starts with 'ok'
         if !reply.starts_with("OK") {
-            return Err(SystemdClientError::AuthenticationErr(format!(
+            return Err(DbusError::AuthenticationErr(format!(
                 "Authentication failed, got message : {}",
                 reply
-            )));
+            ))
+            .into());
         }
 
         // we must send the BEGIN before starting any actual communication
@@ -140,7 +141,7 @@ impl DbusConnection {
             .filter(|m| m.preamble.mtype == MessageType::MethodReturn)
             .collect();
 
-        let res = res.get(0).ok_or(SystemdClientError::MethodCallErr(
+        let res = res.get(0).ok_or(DbusError::MethodCallErr(
             "expected method call to have reply, found no reply message".into(),
         ))?;
         let mut ctr = 0;
@@ -437,6 +438,8 @@ mod tests {
     #[test]
     #[cfg(feature = "systemd")]
     fn test_dbus_function_calls_errors() {
+        use crate::systemd::dbus_native::utils::DbusError;
+
         let uid: u32 = getuid().into();
 
         let dbus_pipe_path = format!("/run/user/{}/bus", uid);
@@ -454,7 +457,7 @@ mod tests {
         assert!(res.is_err());
         assert!(matches!(
             res,
-            Err(SystemdClientError::DeserializationError(_))
+            Err(SystemdClientError::DBus(DbusError::DeserializationError(_)))
         ));
 
         let body = (
@@ -465,6 +468,9 @@ mod tests {
         // invalid interface
         let res = proxy.method_call::<_, u16>("org.freedesktop.DBus.Propertie_", "Get", Some(body));
         assert!(res.is_err());
-        assert!(matches!(res, Err(SystemdClientError::MethodCallErr(_))))
+        assert!(matches!(
+            res,
+            Err(SystemdClientError::DBus(DbusError::MethodCallErr(_)))
+        ))
     }
 }
