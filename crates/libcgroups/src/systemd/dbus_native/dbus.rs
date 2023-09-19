@@ -41,6 +41,82 @@ fn uid_to_hex_str(uid: u32) -> String {
     temp.join("")
 }
 
+fn parse_dbus_address(env_value: String) -> Result<String> {
+    // as per spec, the env var can have multiple addresses separated by ;
+    let addr_list: Vec<_> = env_value.split(';').collect();
+    for addr in addr_list {
+        if addr.starts_with("unix:path=") {
+            let s = addr.strip_prefix("unix:path=").unwrap();
+            if !std::path::PathBuf::from(s).exists() {
+                continue;
+            }
+            return Ok(s.to_owned());
+        }
+
+        if addr.starts_with("unix:abstract=") {
+            let s = addr.strip_prefix("unix:abstract=").unwrap();
+            return Ok(s.to_owned());
+        }
+    }
+    // we do not support unix:runtime= 
+    Err(DbusError::BusAddressError(format!("no valid bus path found in list {}", env_value)).into())
+}
+
+fn get_session_bus_address() -> Result<String> {
+    if let Ok(s) = std::env::var("DBUS_SESSION_BUS_ADDRESS") {
+        return parse_dbus_address(s);
+    }
+
+    if let Ok(mut s) = std::env::var("XDG_RUNTIME_DIR") {
+        s.push_str("/bus");
+        if !std::path::PathBuf::from(&s).exists() {
+            return Err(DbusError::BusAddressError(format!(
+                "session bus address {} does not exist",
+                s
+            ))
+            .into());
+        }
+        return Ok(s);
+    }
+
+    Err(
+        DbusError::BusAddressError("could not find dbus session bus address from env".into())
+            .into(),
+    )
+}
+
+fn get_system_bus_address() -> Result<String> {
+    if let Ok(s) = std::env::var("DBUS_SYSTEM_BUS_ADDRESS") {
+        return parse_dbus_address(s);
+    }
+    // as per dbus spec https://dbus.freedesktop.org/doc/dbus-specification.html#message-bus-types-system
+    // there are multiple service files which we should try searching and finding bus address from
+    // but we will instead just support the following, which is supposed to be
+    // well known anyways according to spec
+    Ok("/var/run/dbus/system_bus_socket".into())
+}
+
+fn get_actual_uid() -> Result<u32> {
+    let output = std::process::Command::new("busctl")
+        .arg("--user")
+        .arg("--no-pager")
+        .arg("status")
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| DbusError::BusAddressError(format!("error in running busctl {:?}", e)))?
+        .wait_with_output()
+        .map_err(|e| DbusError::BusAddressError(format!("error in busctl {:?}", e)))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let found = stdout.lines().find(|s| s.starts_with("OwnerUID=")).unwrap();
+    let uid = found
+        .trim_start_matches("OwnerUID=")
+        .parse::<u32>()
+        .map_err(DbusError::UidError)?;
+    Ok(uid)
+}
+
 impl DbusConnection {
     /// Open a new dbus connection to given address
     /// authenticating as user with given uid
@@ -65,11 +141,14 @@ impl DbusConnection {
     }
 
     pub fn new_system() -> Result<Self> {
-        todo!()
+        let addr = get_system_bus_address()?;
+        Self::new(&addr, 0, true)
     }
 
     pub fn new_session() -> Result<Self> {
-        todo!();
+        let addr = get_session_bus_address()?;
+        let uid = get_actual_uid()?;
+        Self::new(&addr, uid, false)
     }
 
     /// Authenticates with dbus using given uid via external strategy

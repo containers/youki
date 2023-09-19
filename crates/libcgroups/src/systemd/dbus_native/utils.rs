@@ -38,6 +38,10 @@ pub enum DbusError {
     DeserializationError(String),
     #[error("dbus function call error: {0}")]
     MethodCallErr(String),
+    #[error("dbus bus address error: {0}")]
+    BusAddressError(String),
+    #[error("could not parse uid from busctl: {0}")]
+    UidError(ParseIntError),
 }
 
 pub type Result<T> = std::result::Result<T, SystemdClientError>;
