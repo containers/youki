@@ -158,7 +158,6 @@ To install `just`, follow the instruction [here](https://github.com/casey/just#i
 $ sudo apt-get install    \
       pkg-config          \
       libsystemd-dev      \
-      libdbus-glib-1-dev  \
       build-essential     \
       libelf-dev          \
       libseccomp-dev      \
@@ -173,7 +172,6 @@ $ sudo apt-get install    \
 $ sudo dnf install          \
       pkg-config            \
       systemd-devel         \
-      dbus-devel            \
       elfutils-libelf-devel \
       libseccomp-devel      \
       clang-devel           \

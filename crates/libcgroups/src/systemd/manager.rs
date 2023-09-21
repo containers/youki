@@ -145,8 +145,6 @@ pub enum SystemdManagerError {
     WrappedIo(#[from] WrappedIoError),
     #[error("failed to destructure cgroups path: {0}")]
     CgroupsPath(#[from] CgroupsPathError),
-    #[error("dbus error: {0}")]
-    DBus(#[from] dbus::Error),
     #[error("invalid slice name: {0}")]
     InvalidSliceName(String),
     #[error(transparent)]
