@@ -18,6 +18,7 @@ fn get_spec() -> Spec {
     }
 }
 
+////////// ANCHOR: example_runtimetest_main
 fn main() {
     let spec = get_spec();
     let args: Vec<String> = env::args().collect();
@@ -27,6 +28,8 @@ fn main() {
     };
 
     match &*execute_test {
+        "hello_world" => tests::hello_world(&spec),
+        ////////// ANCHOR_END: example_runtimetest_main
         "readonly_paths" => tests::validate_readonly_paths(&spec),
         "set_host_name" => tests::validate_hostname(&spec),
         "mounts_recursive" => tests::validate_mounts_recursive(&spec),

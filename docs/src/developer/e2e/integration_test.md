@@ -1,6 +1,6 @@
 # integration_test
 
-**Note** that these tests resides in /tests/rust-integration-tests/integration_test at the time of writing.
+**Note** that these tests resides in `/tests/rust-integration-tests/integration_test/` at the time of writing.
 
 This crate contains the Rust port of OCI-runtime tools integration tests, which are used to test if the runtime works as per the OCI spec or not. Initially youki used the original implementation of these test provided in the OCI repository [here](https://github.com/opencontainers/runtime-tools/tree/master/validation). But those tests are written in Go, which made the developers depend on two language environments Rust and Go to compile youki and test it. The Validation tests themselves also have an optional dependency on node js to parse their output, which can make it a third language dependency.
 

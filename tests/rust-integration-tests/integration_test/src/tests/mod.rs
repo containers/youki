@@ -1,4 +1,5 @@
 pub mod cgroups;
+pub mod example;
 pub mod hooks;
 pub mod hostname;
 pub mod intel_rdt;
