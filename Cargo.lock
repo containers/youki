@@ -4645,9 +4645,9 @@ dependencies = [
 
 [[package]]
 name = "wasmedge-sdk"
-version = "0.12.1"
+version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2069fe61f5dbbfbb3f518e473f301983f275cadb801fb9256737ce7b993804b7"
+checksum = "11bb38d73f5ce871a7a4c6da62b72ef80a948cbe66bc98051e303614abf6700f"
 dependencies = [
  "anyhow",
  "cfg-if",
