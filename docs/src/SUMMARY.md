@@ -22,6 +22,7 @@
   - [Good places to start](./developer/good_places_to_start.md)
   - [This Documentation](./developer/documentation_mdbook.md)
   - [Repository Structure](./developer/repo_structure.md)
+  - [Debugging](./developer/debugging.md)
   - [Crate Specific Information](./developer/crate_specific_information.md)
     - [libcgroups](./developer/libcgroups.md)
     - [libcontainer](./developer/libcontainer.md)
