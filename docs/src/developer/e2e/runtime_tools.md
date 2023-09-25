@@ -3,5 +3,5 @@
 ## local
 
 ```console
-just oci-tests
+just test-oci
 ```
