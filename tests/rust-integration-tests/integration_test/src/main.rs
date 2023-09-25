@@ -1,6 +1,7 @@
 mod tests;
 mod utils;
 
+use crate::tests::example::get_example_test;
 use crate::tests::hooks::get_hooks_tests;
 use crate::tests::hostname::get_hostname_test;
 use crate::tests::intel_rdt::get_intel_rdt_test;
@@ -75,7 +76,11 @@ fn main() -> Result<()> {
         eprintln!("logger could not be initialized: {e:?}");
     }
 
+    ////////// ANCHOR: register_example_test
     let mut tm = TestManager::new();
+    let example = get_example_test();
+    tm.add_test_group(Box::new(example));
+    ////////// ANCHOR_END: register_example_test
 
     let cl = ContainerLifecycle::new();
     let cc = ContainerCreate::new();

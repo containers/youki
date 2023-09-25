@@ -5,6 +5,12 @@ use oci_spec::runtime::Spec;
 use std::fs::read_dir;
 use std::path::Path;
 
+////////// ANCHOR: example_hello_world
+pub fn hello_world(_spec: &Spec) {
+    println!("Hello world");
+}
+////////// ANCHOR_END: example_hello_world
+
 pub fn validate_readonly_paths(spec: &Spec) {
     let linux = spec.linux().as_ref().unwrap();
     let ro_paths = match linux.readonly_paths() {
