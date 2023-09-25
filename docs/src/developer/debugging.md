@@ -15,7 +15,7 @@ For example, if you catch write system calls, you can see the log output until t
 It allows you to do something similar to print debugging.
 
 _How to debug_
-1. You need to install bpftrace, please refere to [the official documentation](https://github.com/iovisor/bpftrace/blob/master/INSTALL.md) to know how to install it.
+1. You need to install bpftrace, please refer to [the official documentation](https://github.com/iovisor/bpftrace/blob/master/INSTALL.md) to know how to install it.
 2. Before running the process or comannd you want to debug, run the following command in another terminal.
 
     You need the root privilege to run it.
