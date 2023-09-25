@@ -39,7 +39,7 @@ test-basic: test-unit test-doc
 
 # run cargo unit tests
 test-unit:
-    cargo test --lib --bins --all --all-targets --all-features
+    LD_LIBRARY_PATH=${HOME}/.wasmedge/lib cargo test --lib --bins --all --all-targets --all-features --no-fail-fast
 
 # run cargo doc tests
 test-doc:
@@ -96,7 +96,7 @@ bin-kind:
 # Clean
 
 # Clean kind test env
-test-kind-clean:
+clean-test-kind:
 	kind delete cluster --name {{ KIND_CLUSTER_NAME }}
 
 # misc

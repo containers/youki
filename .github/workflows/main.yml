@@ -66,9 +66,7 @@ jobs:
       - name: Install requirements
         run: sudo env PATH=$PATH just ci-prepare
       - name: Run tests
-        run: |
-          export LD_LIBRARY_PATH=$HOME/.wasmedge/lib
-          cd ./crates && cargo test --all --all-features --no-fail-fast
+        run: just test-basic
       - name: Run feature tests
         run: just test-features
 
