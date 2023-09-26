@@ -23,7 +23,7 @@ cgroupsv2_devices = ["libcgroups/cgroupsv2_devices"]
 bitflags = "2.4.0"
 caps = "0.5.5"
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
-fastrand = "^2.0.0"
+fastrand = "^2.0.1"
 futures = { version = "0.3", features = ["thread-pool"] }
 libc = "0.2.148"
 nix = "0.26.2"
