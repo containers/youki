@@ -68,8 +68,9 @@ pub enum AnyManagerError {
     V2(#[from] v2::manager::V2ManagerError),
 }
 
+// systemd is boxed due to size lint https://rust-lang.github.io/rust-clippy/master/index.html#/large_enum_variant
 pub enum AnyCgroupManager {
-    Systemd(systemd::manager::Manager),
+    Systemd(Box<systemd::manager::Manager>),
     V1(v1::manager::Manager),
     V2(v2::manager::Manager),
 }

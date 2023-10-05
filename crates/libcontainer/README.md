@@ -2,7 +2,7 @@
 
 ### Building with musl
 
-In order to build with musl you must first remove the libseccomp dependency as it will reference shared libraries (`libdbus` and `libseccomp`) which cannot be built with musl.
+In order to build with musl you must first remove the libseccomp dependency as it will reference shared libraries (`libseccomp`) which cannot be built with musl.
 
 Do this by using adding flags to Cargo. Use the `--no-default-features` flag followed by `-F` and whatever features you intend to build with such as `v2` as defined in Cargo.toml under features section.
 

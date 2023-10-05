@@ -20,7 +20,6 @@ To compile and run, Youki itself depends on some underlying libraries being inst
 $ sudo apt-get install    \
       pkg-config          \
       libsystemd-dev      \
-      libdbus-glib-1-dev  \
       build-essential     \
       libelf-dev          \
       libseccomp-dev      \
@@ -34,7 +33,6 @@ $ sudo apt-get install    \
 $ sudo dnf install          \
       pkg-config            \
       systemd-devel         \
-      dbus-devel            \
       elfutils-libelf-devel \
       libseccomp-devel      \
       clang-devel           \

@@ -262,8 +262,8 @@ mod tests {
                 id_mapper.ensure_uid_path(&child)?;
                 setup_mapping(&ns_config, child)?;
                 let line = fs::read_to_string(id_mapper.get_uid_path(&child))?;
-                let line_splited = line.split_whitespace();
-                for (act, expect) in line_splited.zip([
+                let split_lines = line.split_whitespace();
+                for (act, expect) in split_lines.zip([
                     uid_mapping.container_id().to_string(),
                     uid_mapping.host_id().to_string(),
                     uid_mapping.size().to_string(),
@@ -316,8 +316,8 @@ mod tests {
                 id_mapper.ensure_gid_path(&child)?;
                 setup_mapping(&ns_config, child)?;
                 let line = fs::read_to_string(id_mapper.get_gid_path(&child))?;
-                let line_splited = line.split_whitespace();
-                for (act, expect) in line_splited.zip([
+                let split_lines = line.split_whitespace();
+                for (act, expect) in split_lines.zip([
                     gid_mapping.container_id().to_string(),
                     gid_mapping.host_id().to_string(),
                     gid_mapping.size().to_string(),

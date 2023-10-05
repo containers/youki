@@ -121,7 +121,7 @@ jobs:
         run: |
           cargo llvm-cov clean --workspace
           cargo llvm-cov --no-report
-          cargo llvm-cov --no-run --lcov --ignore-filename-regex "libcgroups/src/systemd/dbus/systemd_api.rs" --output-path ./coverage.lcov
+          cargo llvm-cov --no-run --lcov --output-path ./coverage.lcov
       - name: Upload Youki Code Coverage Results
         uses: codecov/codecov-action@v3
         with:

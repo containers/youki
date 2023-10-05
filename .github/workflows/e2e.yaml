@@ -42,7 +42,7 @@ jobs:
           go-version: '1.20'
           cache: true
       - run: sudo apt-get -y update
-      - run: sudo apt-get install -y pkg-config libsystemd-dev libdbus-glib-1-dev libelf-dev libseccomp-dev btrfs-progs libbtrfs-dev
+      - run: sudo apt-get install -y pkg-config libsystemd-dev libelf-dev libseccomp-dev btrfs-progs libbtrfs-dev
       - name: Build containerd
         run: |
           make build

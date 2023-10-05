@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use dbus::arg::RefArg;
+use super::dbus_native::serialize::Variant;
 use oci_spec::runtime::LinuxCpu;
 
 use super::controller::Controller;
@@ -25,7 +25,7 @@ impl Controller for Cpu {
     fn apply(
         options: &ControllerOpt,
         _: u32,
-        properties: &mut HashMap<&str, Box<dyn RefArg>>,
+        properties: &mut HashMap<&str, Variant>,
     ) -> Result<(), Self::Error> {
         if let Some(cpu) = options.resources.cpu() {
             tracing::debug!("Applying cpu resource restrictions");
@@ -39,7 +39,7 @@ impl Controller for Cpu {
 impl Cpu {
     fn apply(
         cpu: &LinuxCpu,
-        properties: &mut HashMap<&str, Box<dyn RefArg>>,
+        properties: &mut HashMap<&str, Variant>,
     ) -> Result<(), SystemdCpuError> {
         if Self::is_realtime_requested(cpu) {
             return Err(SystemdCpuError::RealtimeSystemd);
@@ -48,7 +48,7 @@ impl Cpu {
         if let Some(mut shares) = cpu.shares() {
             shares = convert_shares_to_cgroup2(shares);
             if shares != 0 {
-                properties.insert(CPU_WEIGHT, Box::new(shares));
+                properties.insert(CPU_WEIGHT, Variant::U64(shares));
             }
         }
 
@@ -63,7 +63,7 @@ impl Cpu {
                 quota = specified_quota as u64 * MICROSECS_PER_SEC / period;
             }
         }
-        properties.insert(CPU_QUOTA, Box::new(quota));
+        properties.insert(CPU_QUOTA, Variant::U64(quota));
 
         let mut period: u64 = 100_000;
         if let Some(specified_period) = cpu.period() {
@@ -71,7 +71,7 @@ impl Cpu {
                 period = specified_period;
             }
         }
-        properties.insert(CPU_PERIOD, Box::new(period));
+        properties.insert(CPU_PERIOD, Variant::U64(period));
 
         Ok(())
     }
@@ -92,8 +92,10 @@ pub fn convert_shares_to_cgroup2(shares: u64) -> u64 {
 #[cfg(test)]
 mod tests {
     use anyhow::{Context, Result};
-    use dbus::arg::ArgType;
     use oci_spec::runtime::LinuxCpuBuilder;
+
+    use super::super::dbus_native::serialize::DbusSerialize;
+    use crate::recast;
 
     use super::*;
 
@@ -104,7 +106,7 @@ mod tests {
             .shares(22000u64)
             .build()
             .context("build cpu spec")?;
-        let mut properties: HashMap<&str, Box<dyn RefArg>> = HashMap::new();
+        let mut properties: HashMap<&str, Variant> = HashMap::new();
 
         // act
         Cpu::apply(&cpu, &mut properties)?;
@@ -113,8 +115,8 @@ mod tests {
         assert!(properties.contains_key(CPU_WEIGHT));
 
         let cpu_weight = &properties[CPU_WEIGHT];
-        assert_eq!(cpu_weight.arg_type(), ArgType::UInt64);
-        assert_eq!(cpu_weight.as_u64().unwrap(), 840u64);
+        let val = recast!(cpu_weight, Variant)?;
+        assert_eq!(val, Variant::U64(840));
 
         Ok(())
     }
@@ -126,7 +128,7 @@ mod tests {
         for quota in quotas {
             // arrange
             let cpu = LinuxCpuBuilder::default().quota(quota.0).build().unwrap();
-            let mut properties: HashMap<&str, Box<dyn RefArg>> = HashMap::new();
+            let mut properties: HashMap<&str, Variant> = HashMap::new();
 
             // act
             Cpu::apply(&cpu, &mut properties)?;
@@ -134,8 +136,8 @@ mod tests {
             // assert
             assert!(properties.contains_key(CPU_QUOTA));
             let cpu_quota = &properties[CPU_QUOTA];
-            assert_eq!(cpu_quota.arg_type(), ArgType::UInt64);
-            assert_eq!(cpu_quota.as_u64().unwrap(), quota.1);
+            let val = recast!(cpu_quota, Variant)?;
+            assert_eq!(val, Variant::U64(quota.1));
         }
 
         Ok(())
@@ -150,7 +152,7 @@ mod tests {
                 .period(period.0)
                 .build()
                 .context("build cpu spec")?;
-            let mut properties: HashMap<&str, Box<dyn RefArg>> = HashMap::new();
+            let mut properties: HashMap<&str, Variant> = HashMap::new();
 
             // act
             Cpu::apply(&cpu, &mut properties)?;
@@ -158,8 +160,8 @@ mod tests {
             // assert
             assert!(properties.contains_key(CPU_PERIOD));
             let cpu_quota = &properties[CPU_PERIOD];
-            assert_eq!(cpu_quota.arg_type(), ArgType::UInt64);
-            assert_eq!(cpu_quota.as_u64().unwrap(), period.1);
+            let val = recast!(cpu_quota, Variant)?;
+            assert_eq!(val, Variant::U64(period.1));
         }
 
         Ok(())

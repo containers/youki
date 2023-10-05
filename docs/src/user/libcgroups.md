@@ -70,6 +70,8 @@ This is the module used by youki to interact with systemd, and it exposes severa
 
 - module `manager`, which contains `Manager` struct, which is the cgroup manager, and contain information such as the root cgroups path, path for the specific cgroups, client to communicate with systemd etc. This also implements `CgroupManager` trait, and thus can be used for cgroups related operations.
 
+- module `dbus-native` is the native implementation for dbus connection, which is used to interact with systemd in rootless mode.
+
 ### test_manager
 
 This exposes a `TestManager` struct which can be used as dummy for cgroup testing purposes, which also implements `CgroupManager`.

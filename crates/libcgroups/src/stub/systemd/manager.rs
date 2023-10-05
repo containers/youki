@@ -10,7 +10,7 @@ pub struct Manager {}
 
 impl Manager {
     pub fn any(self) -> AnyCgroupManager {
-        AnyCgroupManager::Systemd(self)
+        AnyCgroupManager::Systemd(Box::new(self))
     }
 }
 
