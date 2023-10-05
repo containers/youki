@@ -1,17 +1,17 @@
 <!DOCTYPE HTML>
-<html lang="en" class="sidebar-visible no-js light">
+<html lang="en" class="light" dir="ltr">
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
         <title>Youki User and Developer Documentation</title>
-        <meta name="robots" content="noindex" />
+        <meta name="robots" content="noindex">
 
 
         <!-- Custom HTML head -->
         
         <meta name="description" content="">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="theme-color" content="#ffffff" />
+        <meta name="theme-color" content="#ffffff">
 
         <link rel="icon" href="favicon.svg">
         <link rel="shortcut icon" href="favicon.png">
@@ -32,7 +32,7 @@
         <!-- Custom theme stylesheets -->
 
     </head>
-    <body>
+    <body class="sidebar-visible no-js">
     <div id="body-container">
         <!-- Provide site root to javascript -->
         <script>
@@ -62,24 +62,29 @@
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
             var html = document.querySelector('html');
-            html.classList.remove('no-js')
             html.classList.remove('light')
             html.classList.add(theme);
-            html.classList.add('js');
+            var body = document.querySelector('body');
+            body.classList.remove('no-js')
+            body.classList.add('js');
         </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
 
         <!-- Hide / unhide sidebar before it is displayed -->
         <script>
-            var html = document.querySelector('html');
+            var body = document.querySelector('body');
             var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
             if (document.body.clientWidth >= 1080) {
                 try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
                 sidebar = sidebar || 'visible';
             } else {
                 sidebar = 'hidden';
             }
-            html.classList.remove('sidebar-visible');
-            html.classList.add("sidebar-" + sidebar);
+            sidebar_toggle.checked = sidebar === 'visible';
+            body.classList.remove('sidebar-visible');
+            body.classList.add("sidebar-" + sidebar);
         </script>
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
@@ -117,9 +122,9 @@
                                 <div id="menu-bar-hover-placeholder"></div>
                 <div id="menu-bar" class="menu-bar sticky">
                     <div class="left-buttons">
-                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
                             <i class="fa fa-bars"></i>
-                        </button>
+                        </label>
                         <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
                             <i class="fa fa-paint-brush"></i>
                         </button>
@@ -235,7 +240,6 @@ youki is named after the Japanese word 'youki', which means 'a container'. In Ja
 <pre><code class="language-console">$ sudo apt-get install    \
       pkg-config          \
       libsystemd-dev      \
-      libdbus-glib-1-dev  \
       build-essential     \
       libelf-dev          \
       libseccomp-dev      \
@@ -246,7 +250,6 @@ youki is named after the Japanese word 'youki', which means 'a container'. In Ja
 <pre><code class="language-console">$ sudo dnf install          \
       pkg-config            \
       systemd-devel         \
-      dbus-devel            \
       elfutils-libelf-devel \
       libseccomp-devel      \
       clang-devel           \
@@ -517,6 +520,9 @@ log level to <code>debug</code>. This flag is ignored if <code>--log-level</code
 </li>
 <li>
 <p>module <code>manager</code>, which contains <code>Manager</code> struct, which is the cgroup manager, and contain information such as the root cgroups path, path for the specific cgroups, client to communicate with systemd etc. This also implements <code>CgroupManager</code> trait, and thus can be used for cgroups related operations.</p>
+</li>
+<li>
+<p>module <code>dbus-native</code> is the native implementation for dbus connection, which is used to interact with systemd in rootless mode.</p>
 </li>
 </ul>
 <h3 id="test_manager"><a class="header" href="#test_manager">test_manager</a></h3>
@@ -906,6 +912,18 @@ TIME                 COMMAND PID      EVENT     CONTENT
 </li>
 </ul>
 <p>As youki currently depends on systemd as an init system, this crate also exposes module systemd, which provides interface for working with systemd related operations. <a href="https://www.freedesktop.org/software/systemd/man/systemd.resource-control.html">systemd resource control</a> is a good place to read more about systemd and its involvement in resource control.</p>
+<h2 id="dbus-native"><a class="header" href="#dbus-native">Dbus Native</a></h2>
+<p>This module is the native implementation of dbus connection functionality used for connecting with systemd via dbus. Refer to <a href="https://github.com/containers/youki/issues/2208">this issue discussion</a> following for the discussion regarding moving away from existing dbus-interfacing library.</p>
+<p>Note that this implements the minimal required functionality for youki to use dbus, and thus does not have all the dbus features.</p>
+<ul>
+<li>
+<p>Refer to see <a href="https://dbus.freedesktop.org/doc/dbus-specification.html">dbus specification</a> and <a href="https://dbus.freedesktop.org/doc/api/html/structDBusHeader.html">header format</a> for the individual specifications.</p>
+</li>
+<li>
+<p>For systemd interface and types, you can generate the following file and take help from the auto-generated functions
+<code>dbus-codegen-rust -s -g -m None -d org.freedesktop.systemd1 -p /org/freedesktop/systemd1</code>, see https://github.com/diwic/dbus-rs</p>
+</li>
+</ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="libcontainer-1"><a class="header" href="#libcontainer-1">libcontainer</a></h1>
 <p>This crate is one of the core crates of the youki workspace, and has functions and structs that deal with the actual craetion and management of the container processes.</p>
 <p>Remember, in the end, a container is just another process in Linux, which has control groups, namespaces, pivot_root and other mechanisms applied to it. The program executing has the impression that is is running on a complete system, but from the host system's perspective, it is just another process, and has attributes such as pid, file descriptors, etc. associated with it like any other process.</p>
