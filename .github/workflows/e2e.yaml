@@ -127,3 +127,26 @@ jobs:
         run: just runtimetest rust-oci-tests-bin
       - name: Validate tests on youki
         run: just rust-oci-tests
+
+  rootless-podman-test:
+    runs-on: ubuntu-22.04
+    needs: [youki-build]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - name: Setup Rust toolchain and cache
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Install just
+        uses: taiki-e/install-action@just
+      - name: Install requirements
+        run: sudo env PATH=$PATH just ci-prepare
+      - name: Download youki binary
+        uses: actions/download-artifact@v3
+        with:
+          name: youki
+      - name: Add the permission to run
+        run: chmod +x ./youki
+      - name: Run tests
+        run: just test-rootless-podman
