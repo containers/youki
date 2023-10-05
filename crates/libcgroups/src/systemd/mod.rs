@@ -4,7 +4,7 @@ mod controller;
 pub mod controller_type;
 mod cpu;
 mod cpuset;
-pub mod dbus_native;
+mod dbus_native;
 pub mod manager;
 mod memory;
 mod pids;
