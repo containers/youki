@@ -4,7 +4,6 @@ use std::collections::HashMap;
 use std::fs::{self, DirBuilder, File};
 use std::os::linux::fs::MetadataExt;
 use std::os::unix::fs::DirBuilderExt;
-use std::os::unix::prelude::AsRawFd;
 use std::path::{Component, Path, PathBuf};
 
 use nix::sys::stat::Mode;
@@ -249,7 +248,7 @@ pub fn ensure_procfs(path: &Path) -> Result<(), EnsureProcfsError> {
         tracing::error!(?err, ?path, "failed to open procfs file");
         err
     })?;
-    let fstat_info = statfs::fstatfs(&procfs_fd.as_raw_fd()).map_err(|err| {
+    let fstat_info = statfs::fstatfs(&procfs_fd).map_err(|err| {
         tracing::error!(?err, ?path, "failed to fstatfs the procfs");
         err
     })?;

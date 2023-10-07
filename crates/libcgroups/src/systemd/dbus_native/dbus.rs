@@ -7,6 +7,8 @@ use super::utils::{DbusError, Result, SystemdClientError};
 use nix::sys::socket;
 use std::collections::HashMap;
 use std::io::{IoSlice, IoSliceMut};
+use std::mem::ManuallyDrop;
+use std::os::fd::AsRawFd;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
 
@@ -121,17 +123,17 @@ impl DbusConnection {
     /// Open a new dbus connection to given address
     /// authenticating as user with given uid
     pub fn new(addr: &str, uid: u32, system: bool) -> Result<Self> {
-        let socket = socket::socket(
+        let socket = ManuallyDrop::new(socket::socket(
             socket::AddressFamily::Unix,
             socket::SockType::Stream,
             socket::SockFlag::empty(),
             None,
-        )?;
+        )?);
 
         let addr = socket::UnixAddr::new(addr)?;
-        socket::connect(socket, &addr)?;
+        socket::connect(socket.as_raw_fd(), &addr)?;
         let mut dbus = Self {
-            socket,
+            socket: socket.as_raw_fd(),
             msg_ctr: AtomicU32::new(0),
             id: None,
             system,
@@ -237,11 +239,11 @@ impl DbusConnection {
         let mut ret = Vec::with_capacity(512);
         loop {
             let mut reply: [u8; REPLY_BUF_SIZE] = [0_u8; REPLY_BUF_SIZE];
-            let reply_buffer = IoSliceMut::new(&mut reply[0..]);
+            let mut reply_buffer = [IoSliceMut::new(&mut reply[0..])];
 
             let reply_rcvd = socket::recvmsg::<()>(
                 self.socket,
-                &mut [reply_buffer],
+                &mut reply_buffer,
                 None,
                 socket::MsgFlags::empty(),
             )?;

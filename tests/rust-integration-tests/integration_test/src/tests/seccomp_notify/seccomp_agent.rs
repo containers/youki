@@ -4,7 +4,14 @@ use nix::{
     sys::socket::{self, UnixAddr},
     unistd,
 };
-use std::{io::IoSliceMut, os::unix::prelude::RawFd, path::Path};
+use std::{
+    io::IoSliceMut,
+    os::{
+        fd::{AsFd, AsRawFd},
+        unix::prelude::RawFd,
+    },
+    path::Path,
+};
 
 const DEFAULT_BUFFER_SIZE: usize = 4096;
 
@@ -24,14 +31,14 @@ pub fn recv_seccomp_listener(seccomp_listener: &Path) -> SeccompAgentResult {
         None,
     )
     .context("failed to create seccomp listener socket")?;
-    socket::bind(socket, &addr).context("failed to bind to seccomp listener socket")?;
+    let socket = socket;
+    socket::bind(socket.as_raw_fd(), &addr).context("failed to bind to seccomp listener socket")?;
     // Force the backlog to be 1 so in the case of an error, only one connection
     // from clients will be waiting.
-    socket::listen(socket, 1).context("failed to listen on seccomp listener")?;
-    let conn = match socket::accept(socket) {
+    socket::listen(&socket.as_fd(), 1).context("failed to listen on seccomp listener")?;
+    let conn = match socket::accept(socket.as_raw_fd()) {
         Ok(conn) => conn,
         Err(e) => {
-            let _ = unistd::close(socket);
             bail!("failed to accept connection: {}", e);
         }
     };
@@ -47,15 +54,13 @@ pub fn recv_seccomp_listener(seccomp_listener: &Path) -> SeccompAgentResult {
         Ok(msg) => msg,
         Err(e) => {
             let _ = unistd::close(conn);
-            let _ = unistd::close(socket);
             bail!("failed to receive message: {}", e);
         }
     };
 
     // We received the message correctly here, so we can now safely close the socket and connection.
     let _ = unistd::close(conn);
-    let _ = unistd::close(socket);
-
+    drop(socket);
     // We are expecting 1 SCM_RIGHTS message with 1 fd.
     let cmsg = msg
         .cmsgs()

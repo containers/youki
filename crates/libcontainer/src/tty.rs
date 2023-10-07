@@ -82,15 +82,17 @@ pub fn setup_console_socket(
         console_socket_path: console_socket_path.to_path_buf().into(),
     })?;
 
-    let mut csocketfd = socket::socket(
-        socket::AddressFamily::Unix,
-        socket::SockType::Stream,
-        socket::SockFlag::empty(),
-        None,
-    )
-    .map_err(|err| TTYError::CreateConsoleSocketFd { source: err })?;
-    csocketfd = match socket::connect(
-        csocketfd,
+    let csocketfd = std::mem::ManuallyDrop::new(
+        socket::socket(
+            socket::AddressFamily::Unix,
+            socket::SockType::Stream,
+            socket::SockFlag::empty(),
+            None,
+        )
+        .map_err(|err| TTYError::CreateConsoleSocketFd { source: err })?,
+    );
+    let csocketfd = match socket::connect(
+        csocketfd.as_raw_fd(),
         &socket::UnixAddr::new(socket_name).map_err(|err| TTYError::InvalidSocketName {
             source: err,
             socket_name: socket_name.to_string(),
@@ -101,7 +103,7 @@ pub fn setup_console_socket(
             source: errno,
             socket_name: socket_name.to_string(),
         })?,
-        Ok(()) => csocketfd,
+        Ok(()) => csocketfd.as_raw_fd(),
     };
     Ok(csocketfd)
 }
@@ -113,7 +115,12 @@ pub fn setup_console(console_fd: &RawFd) -> Result<()> {
         .map_err(|err| TTYError::CreatePseudoTerminal { source: err })?;
     let pty_name: &[u8] = b"/dev/ptmx";
     let iov = [IoSlice::new(pty_name)];
-    let fds = [openpty_result.master];
+
+    let [master, slave] = [openpty_result.master, openpty_result.slave];
+    let master = std::mem::ManuallyDrop::new(master);
+    let slave = std::mem::ManuallyDrop::new(slave);
+
+    let fds = [master.as_raw_fd()];
     let cmsg = socket::ControlMessage::ScmRights(&fds);
     socket::sendmsg::<UnixAddr>(
         console_fd.as_raw_fd(),
@@ -124,10 +131,10 @@ pub fn setup_console(console_fd: &RawFd) -> Result<()> {
     )
     .map_err(|err| TTYError::SendPtyMaster { source: err })?;
 
-    if unsafe { libc::ioctl(openpty_result.slave, libc::TIOCSCTTY) } < 0 {
+    if unsafe { libc::ioctl(slave.as_raw_fd(), libc::TIOCSCTTY) } < 0 {
         tracing::warn!("could not TIOCSCTTY");
     };
-    let slave = openpty_result.slave;
+    let slave = slave.as_raw_fd();
     connect_stdio(&slave, &slave, &slave)?;
     close(console_fd.as_raw_fd()).map_err(|err| TTYError::CloseConsoleSocket { source: err })?;
 

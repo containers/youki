@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     io::{IoSlice, IoSliceMut},
     marker::PhantomData,
-    os::unix::prelude::RawFd,
+    os::{fd::AsRawFd, unix::prelude::RawFd},
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -210,10 +210,14 @@ where
 
 // Use socketpair as the underlying pipe.
 fn unix_channel() -> Result<(RawFd, RawFd), ChannelError> {
-    Ok(socket::socketpair(
+    let (f1, f2) = socket::socketpair(
         socket::AddressFamily::Unix,
         socket::SockType::SeqPacket,
         None,
         socket::SockFlag::SOCK_CLOEXEC,
-    )?)
+    )?;
+    let f1 = std::mem::ManuallyDrop::new(f1);
+    let f2 = std::mem::ManuallyDrop::new(f2);
+
+    Ok((f1.as_raw_fd(), f2.as_raw_fd()))
 }

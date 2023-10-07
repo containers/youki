@@ -13,6 +13,7 @@ use nix::{
 use oci_spec::runtime::LinuxRlimit;
 use std::ffi::{CStr, CString, OsStr};
 use std::fs;
+use std::os::fd::BorrowedFd;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::symlink;
 use std::os::unix::io::RawFd;
@@ -305,7 +306,8 @@ impl Syscall for LinuxSyscall {
 
     /// Set namespace for process
     fn set_ns(&self, rawfd: i32, nstype: CloneFlags) -> Result<()> {
-        nix::sched::setns(rawfd, nstype)?;
+        let fd = unsafe { BorrowedFd::borrow_raw(rawfd) };
+        nix::sched::setns(fd, nstype)?;
         Ok(())
     }
 
