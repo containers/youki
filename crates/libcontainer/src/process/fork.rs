@@ -25,15 +25,13 @@ pub enum CloneError {
 }
 
 /// The callback function used in clone system call. The return value is i32
-/// which is consistent with C functions return code. The trait has to be
-/// `FnMut` because we need to be able to call the closure multiple times, once
-/// in clone3 and once in clone if fallback is required. The closure is boxed
+/// which is consistent with C functions return code. The closure is boxed
 /// because we need to store the closure on heap, not stack in the case of
 /// `clone`. Unlike `fork` or `clone3`, the `clone` glibc wrapper requires us to
 /// pass in a child stack, which is empty. By storing the closure in heap, we
 /// can then in the new process to re-box the heap memory back to a closure
 /// correctly.
-pub type CloneCb = Box<dyn FnMut() -> i32>;
+pub type CloneCb = Box<dyn FnOnce() -> i32>;
 
 // Clone a sibling process that shares the same parent as the calling
 // process. This is used to launch the container init process so the parent
@@ -56,31 +54,18 @@ pub fn container_clone(cb: CloneCb) -> Result<Pid, CloneError> {
     clone_internal(cb, 0, Some(SIGCHLD as u64))
 }
 
-// An internal wrapper to manage the clone3 vs clone fallback logic.
-fn clone_internal(
-    mut cb: CloneCb,
-    flags: u64,
-    exit_signal: Option<u64>,
-) -> Result<Pid, CloneError> {
-    match clone3(&mut cb, flags, exit_signal) {
-        Ok(pid) => Ok(pid),
-        // For now, we decide to only fallback on ENOSYS
-        Err(CloneError::Clone(nix::Error::ENOSYS)) => {
-            tracing::debug!("clone3 is not supported, fallback to clone");
-            let pid = clone(cb, flags, exit_signal)?;
-
-            Ok(pid)
-        }
-        Err(err) => Err(err),
-    }
+#[cfg(feature = "no-clone3")]
+// We should not use clone3 as required by the no-clone3 feature. Call clone directly.
+fn clone_internal(cb: CloneCb, flags: u64, exit_signal: Option<u64>) -> Result<Pid, CloneError> {
+    clone(cb, flags, exit_signal)
 }
 
-// Unlike the clone call, clone3 is currently using the kernel syscall, mimicking
-// the interface of fork. There is not need to explicitly manage the memory, so
-// we can safely passing the callback closure as reference.
-fn clone3(cb: &mut CloneCb, flags: u64, exit_signal: Option<u64>) -> Result<Pid, CloneError> {
+#[cfg(not(feature = "no-clone3"))]
+// Try to use clone3, and fallback to clone in case of ENOSYS.
+// Unlike the clone call, clone3 is currently using the kernel syscall.
+fn clone_internal(cb: CloneCb, flags: u64, exit_signal: Option<u64>) -> Result<Pid, CloneError> {
     #[repr(C)]
-    struct clone3_args {
+    struct Clone3Args {
         flags: u64,
         pidfd: u64,
         child_tid: u64,
@@ -93,7 +78,7 @@ fn clone3(cb: &mut CloneCb, flags: u64, exit_signal: Option<u64>) -> Result<Pid,
         set_tid_size: u64,
         cgroup: u64,
     }
-    let mut args = clone3_args {
+    let mut args = Clone3Args {
         flags,
         pidfd: 0,
         child_tid: 0,
@@ -106,15 +91,17 @@ fn clone3(cb: &mut CloneCb, flags: u64, exit_signal: Option<u64>) -> Result<Pid,
         set_tid_size: 0,
         cgroup: 0,
     };
-    let args_ptr = &mut args as *mut clone3_args;
-    let args_size = std::mem::size_of::<clone3_args>();
+    let args_ptr = &mut args as *mut Clone3Args;
+    let args_size = std::mem::size_of::<Clone3Args>();
     // For now, we can only use clone3 as a kernel syscall. Libc wrapper is not
     // available yet. This can have undefined behavior because libc authors do
     // not like people calling kernel syscall to directly create processes. Libc
-    // does perform additional bookkeeping when calling clone or fork. So far,
-    // we have not observed any issues with calling clone3 directly, but we
-    // should keep an eye on it.
+    // does perform additional bookkeeping when calling clone or fork.
+    // So far we've observed issues when the main process uses threads. In such
+    // cases enable the `no-clone3` feature.
+    // See https://github.com/containerd/runwasi/issues/347
     match unsafe { libc::syscall(libc::SYS_clone3, args_ptr, args_size) } {
+        -1 if nix::Error::last() == nix::Error::ENOSYS => clone(cb, flags, exit_signal),
         -1 => Err(CloneError::Clone(nix::Error::last())),
         0 => {
             // Inside the cloned process, we execute the callback and exit with
@@ -140,35 +127,30 @@ fn clone(cb: CloneCb, flags: u64, exit_signal: Option<u64>) -> Result<Pid, Clone
     // Find out the default stack max size through getrlimit.
     let (rlim_cur, _) =
         resource::getrlimit(resource::Resource::RLIMIT_STACK).map_err(CloneError::ResourceLimit)?;
-    // mmap will return ENOMEM if stack size is unlimited when we create the
-    // child stack, so we need to set a reasonable default stack size.
-    let default_stack_size = if rlim_cur != u64::MAX {
-        rlim_cur as usize
-    } else {
-        tracing::debug!(
-            "stack size returned by getrlimit() is unlimited, use DEFAULT_STACK_SIZE(8MB)"
-        );
-        DEFAULT_STACK_SIZE
-    };
+
+    // RLIMIT_STACK is an upper bound but it might be set unreasonably high or
+    // even unlimited, which may cause mmap to error with ENOMEM.
+    // Most linux system today use a stack size of 8MB.
+    // Use the most constraining between RLIMIT_STACK or 8MB for the stack size.
+    let stack_size = rlim_cur.min(DEFAULT_STACK_SIZE as u64) as usize;
 
     // Using the clone syscall requires us to create the stack space for the
     // child process instead of taken cared for us like fork call. We use mmap
     // here to create the stack.  Instead of guessing how much space the child
-    // process needs, we allocate through mmap to the system default limit,
-    // which is 8MB on most of the linux system today. This is OK since mmap
-    // will only reserve the address space upfront, instead of allocating
-    // physical memory upfront.  The stack will grow as needed, up to the size
-    // reserved, so no wasted memory here. Lastly, the child stack only needs
-    // to support the container init process set up code in Youki. When Youki
-    // calls exec into the container payload, exec will reset the stack.  Note,
-    // do not use MAP_GROWSDOWN since it is not well supported.
+    // process needs, we allocate through mmap. This is OK since mmap will only
+    // reserve the address space upfront, instead of allocating physical memory
+    // upfront.  The stack will grow as needed, up to the size reserved, so no
+    // wasted memory here. Lastly, the child stack only needs to support the
+    // container init process set up code in Youki. When Youki calls exec into
+    // the container payload, exec will reset the stack.
+    // Note: do not use MAP_GROWSDOWN since it is not well supported.
     // Ref: https://man7.org/linux/man-pages/man2/mmap.2.html
     let child_stack = unsafe {
         // Since nix = "0.27.1", `mmap()` requires a generic type `F: AsFd`.
         // `::<File>` doesn't have any meaning because we won't use it.
         mman::mmap::<File>(
             None,
-            NonZeroUsize::new(default_stack_size).ok_or(CloneError::ZeroStackSize)?,
+            NonZeroUsize::new(stack_size).ok_or(CloneError::ZeroStackSize)?,
             mman::ProtFlags::PROT_READ | mman::ProtFlags::PROT_WRITE,
             mman::MapFlags::MAP_PRIVATE | mman::MapFlags::MAP_ANONYMOUS | mman::MapFlags::MAP_STACK,
             None,
@@ -187,7 +169,7 @@ fn clone(cb: CloneCb, flags: u64, exit_signal: Option<u64>) -> Result<Pid, Clone
 
     // Since the child stack for clone grows downward, we need to pass in
     // the top of the stack address.
-    let child_stack_top = unsafe { child_stack.add(default_stack_size) };
+    let child_stack_top = unsafe { child_stack.add(stack_size) };
 
     // Combine the clone flags with exit signals.
     let combined_flags = (flags | exit_signal.unwrap_or(0)) as c_int;
@@ -204,7 +186,7 @@ fn clone(cb: CloneCb, flags: u64, exit_signal: Option<u64>) -> Result<Pid, Clone
     // arg is actually a raw pointer to the Box closure. so here, we re-box the
     // pointer back into a box closure so the main takes ownership of the
     // memory. Then we can call the closure.
-    extern "C" fn main(data: *mut libc::c_void) -> libc::c_int {
+    extern "C" fn main(data: *mut libc::c_void) -> c_int {
         unsafe { Box::from_raw(data as *mut CloneCb)() }
     }
 
