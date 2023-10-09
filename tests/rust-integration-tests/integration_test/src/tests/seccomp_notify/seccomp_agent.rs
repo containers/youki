@@ -31,7 +31,7 @@ pub fn recv_seccomp_listener(seccomp_listener: &Path) -> SeccompAgentResult {
         None,
     )
     .context("failed to create seccomp listener socket")?;
-    let socket = socket;
+
     socket::bind(socket.as_raw_fd(), &addr).context("failed to bind to seccomp listener socket")?;
     // Force the backlog to be 1 so in the case of an error, only one connection
     // from clients will be waiting.
