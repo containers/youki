@@ -605,9 +605,9 @@ fn check_recursive_rsymfollow() -> TestResult {
 
 /// this mount test how to work?
 /// 1. Create mount_options based on the mount properties of the test
-/// 2. Create OCI.Spec content, container one process is runtimetest,(runtimetest is cargo model, file path `tests/rust-integration-tests/runtimetest/`)
+/// 2. Create OCI.Spec content, container one process is runtimetest,(runtimetest is cargo model, file path `tests/runtimetest/`)
 /// 3. inside container to check if the actual mount matches the spec, (spec https://man7.org/linux/man-pages/man2/mount_setattr.2.html),
-///  eg. tests/rust-integration-tests/runtimetest/src/tests.rs
+///  eg. tests/runtimetest/src/tests.rs
 pub fn get_mounts_recursive_test() -> TestGroup {
     let rro_test = Test::new("rro_test", Box::new(check_recursive_readonly));
     let rnosuid_test = Test::new("rnosuid_test", Box::new(check_recursive_nosuid));

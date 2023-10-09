@@ -22,7 +22,9 @@ jobs:
         with:
           files: |
             .github/workflows/integration_tests_validation.yaml
-            tests/rust-integration-tests/**
+            tests/runtimetest/**
+            tests/test_framework/**
+            tests/integration_test/**
           files_ignore: |
             **.md
       - name: List all changed files

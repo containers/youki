@@ -1,6 +1,6 @@
 # test_framework
 
-**Note** that these tests resides in /tests/rust-integration-tests/test_framework at the time of writing.
+**Note** that these tests resides in /tests/test_framework at the time of writing.
 
 This crate contains the testing framework specifically developed for porting the OCI integration test to rust. This contains structs to represent the individual tests, group of tests and a test manager that has responsibility to run tests. This Also exposes traits which can be used to implement custom test structs or test group structs if needed.
 

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["tests/rust-integration-tests/*", "crates/*", "tools/*"]
+members = ["tests/runtimetest/","tests/integration_test/","tests/test_framework/","crates/*", "tools/*"]
 
 [profile.release]
 lto = true
