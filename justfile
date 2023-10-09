@@ -39,7 +39,7 @@ test-basic: test-unit test-doc
 
 # run cargo unit tests
 test-unit:
-    LD_LIBRARY_PATH=${HOME}/.wasmedge/lib cargo test --lib --bins --all --all-targets --all-features --no-fail-fast
+    cargo test --lib --bins --all --all-targets --all-features --no-fail-fast
 
 # run cargo doc tests
 test-doc:

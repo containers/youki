@@ -16,8 +16,9 @@ systemd = ["libcgroups/systemd", "libcontainer/systemd", "v2"]
 v2 = ["libcgroups/v2", "libcontainer/v2"]
 v1 = ["libcgroups/v1", "libcontainer/v1"]
 cgroupsv2_devices = ["libcgroups/cgroupsv2_devices", "libcontainer/cgroupsv2_devices"]
+
 wasm-wasmer = ["wasmer", "wasmer-wasix"]
-wasm-wasmedge = ["wasmedge-sdk/standalone"]
+wasm-wasmedge = ["wasmedge-sdk/standalone", "wasmedge-sdk/static"]
 wasm-wasmtime = ["wasmtime", "wasmtime-wasi"]
 
 [dependencies.clap]
