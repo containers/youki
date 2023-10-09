@@ -122,7 +122,7 @@ impl DbusConnection {
     /// Open a new dbus connection to given address
     /// authenticating as user with given uid
     pub fn new(addr: &str, uid: u32, system: bool) -> Result<Self> {
-        // Use ManuallyDrop to keep the socket open. 
+        // Use ManuallyDrop to keep the socket open.
         let socket = std::mem::ManuallyDrop::new(socket::socket(
             socket::AddressFamily::Unix,
             socket::SockType::Stream,

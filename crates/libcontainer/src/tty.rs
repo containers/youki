@@ -117,7 +117,7 @@ pub fn setup_console(console_fd: &RawFd) -> Result<()> {
     let iov = [IoSlice::new(pty_name)];
 
     let [master, slave] = [openpty_result.master, openpty_result.slave];
-    // Use ManuallyDrop to keep FDs open. 
+    // Use ManuallyDrop to keep FDs open.
     let master = std::mem::ManuallyDrop::new(master);
     let slave = std::mem::ManuallyDrop::new(slave);
 
