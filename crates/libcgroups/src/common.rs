@@ -9,7 +9,6 @@ use std::{
 use nix::{
     sys::statfs::{statfs, CGROUP2_SUPER_MAGIC, TMPFS_MAGIC},
     unistd::Pid,
-    NixPath,
 };
 use oci_spec::runtime::LinuxResources;
 #[cfg(any(feature = "cgroupsv2_devices", feature = "v1"))]
@@ -340,13 +339,12 @@ pub struct CgroupConfig {
 }
 
 pub fn create_cgroup_manager_with_root(
-    root_path: &Path,
+    root_path: Option<&Path>,
     config: CgroupConfig,
 ) -> Result<AnyCgroupManager, CreateCgroupSetupError> {
-    let root = if root_path.is_empty() {
-        Path::new(DEFAULT_CGROUP_ROOT)
-    } else {
-        root_path
+    let root = match root_path {
+        Some(p) => p,
+        None => Path::new(DEFAULT_CGROUP_ROOT),
     };
 
     let cgroup_setup = get_cgroup_setup_with_root(root).map_err(|err| match err {
@@ -376,7 +374,7 @@ pub fn create_cgroup_manager_with_root(
 pub fn create_cgroup_manager(
     config: CgroupConfig,
 ) -> Result<AnyCgroupManager, CreateCgroupSetupError> {
-    create_cgroup_manager_with_root(Path::new(DEFAULT_CGROUP_ROOT), config)
+    create_cgroup_manager_with_root(Some(Path::new(DEFAULT_CGROUP_ROOT)), config)
 }
 
 #[cfg(feature = "v1")]
