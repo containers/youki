@@ -65,6 +65,11 @@ rust-oci-tests: youki-release runtimetest rust-oci-tests-bin
 validate-rust-oci-runc: runtimetest rust-oci-tests-bin
     {{ cwd }}/scripts/rust_integration_tests.sh runc
 
+# test podman rootless works with youki
+test-rootless-podman:
+    {{ cwd }}/tests/rootless-tests/run.sh {{ cwd }}/youki
+
+
 # run containerd integration tests
 containerd-test: youki-dev
     VAGRANT_VAGRANTFILE=Vagrantfile.containerd2youki vagrant up
