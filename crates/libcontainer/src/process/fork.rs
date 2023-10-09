@@ -1,10 +1,5 @@
-use std::{ffi::c_int, num::NonZeroUsize};
-
 use libc::SIGCHLD;
-use nix::{
-    sys::{mman, resource},
-    unistd::Pid,
-};
+use nix::unistd::Pid;
 
 #[derive(Debug, thiserror::Error)]
 pub enum CloneError {
@@ -57,27 +52,25 @@ pub fn container_clone(cb: CloneCb) -> Result<Pid, CloneError> {
 }
 
 // An internal wrapper to manage the clone3 vs clone fallback logic.
+#[allow(unused_mut)]
 fn clone_internal(
     mut cb: CloneCb,
     flags: u64,
     exit_signal: Option<u64>,
 ) -> Result<Pid, CloneError> {
-    match clone3(&mut cb, flags, exit_signal) {
-        Ok(pid) => Ok(pid),
-        // For now, we decide to only fallback on ENOSYS
-        Err(CloneError::Clone(nix::Error::ENOSYS)) => {
-            tracing::debug!("clone3 is not supported, fallback to clone");
-            let pid = clone(cb, flags, exit_signal)?;
+    #[cfg(feature = "clone3")]
+    let res = clone3(&mut cb, flags, exit_signal);
 
-            Ok(pid)
-        }
-        Err(err) => Err(err),
-    }
+    #[cfg(not(feature = "clone3"))]
+    let res = clone(cb, flags, exit_signal);
+
+    res
 }
 
 // Unlike the clone call, clone3 is currently using the kernel syscall, mimicking
 // the interface of fork. There is not need to explicitly manage the memory, so
 // we can safely passing the callback closure as reference.
+#[cfg(feature = "clone3")]
 fn clone3(cb: &mut CloneCb, flags: u64, exit_signal: Option<u64>) -> Result<Pid, CloneError> {
     #[repr(C)]
     struct clone3_args {
@@ -126,7 +119,11 @@ fn clone3(cb: &mut CloneCb, flags: u64, exit_signal: Option<u64>) -> Result<Pid,
     }
 }
 
+#[cfg(not(feature = "clone3"))]
 fn clone(cb: CloneCb, flags: u64, exit_signal: Option<u64>) -> Result<Pid, CloneError> {
+    use nix::sys::{mman, resource};
+    use std::{ffi::c_int, num::NonZeroUsize};
+
     const DEFAULT_STACK_SIZE: usize = 8 * 1024 * 1024; // 8M
     const DEFAULT_PAGE_SIZE: usize = 4 * 1024; // 4K
 

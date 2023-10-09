@@ -18,6 +18,7 @@ systemd = ["libcgroups/systemd", "v2"]
 v2 = ["libcgroups/v2"]
 v1 = ["libcgroups/v1"]
 cgroupsv2_devices = ["libcgroups/cgroupsv2_devices"]
+clone3 = []
 
 [dependencies]
 bitflags = "2.4.0"
