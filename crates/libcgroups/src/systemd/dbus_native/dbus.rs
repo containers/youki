@@ -7,7 +7,6 @@ use super::utils::{DbusError, Result, SystemdClientError};
 use nix::sys::socket;
 use std::collections::HashMap;
 use std::io::{IoSlice, IoSliceMut};
-use std::mem::ManuallyDrop;
 use std::os::fd::AsRawFd;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -123,7 +122,8 @@ impl DbusConnection {
     /// Open a new dbus connection to given address
     /// authenticating as user with given uid
     pub fn new(addr: &str, uid: u32, system: bool) -> Result<Self> {
-        let socket = ManuallyDrop::new(socket::socket(
+        // Use ManuallyDrop to keep the socket open. 
+        let socket = std::mem::ManuallyDrop::new(socket::socket(
             socket::AddressFamily::Unix,
             socket::SockType::Stream,
             socket::SockFlag::empty(),

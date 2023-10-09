@@ -81,7 +81,7 @@ pub fn setup_console_socket(
         linked: linked.to_path_buf().into(),
         console_socket_path: console_socket_path.to_path_buf().into(),
     })?;
-
+    // Using ManuallyDrop to keep the socket open.
     let csocketfd = std::mem::ManuallyDrop::new(
         socket::socket(
             socket::AddressFamily::Unix,
@@ -117,6 +117,7 @@ pub fn setup_console(console_fd: &RawFd) -> Result<()> {
     let iov = [IoSlice::new(pty_name)];
 
     let [master, slave] = [openpty_result.master, openpty_result.slave];
+    // Use ManuallyDrop to keep FDs open. 
     let master = std::mem::ManuallyDrop::new(master);
     let slave = std::mem::ManuallyDrop::new(slave);
 
