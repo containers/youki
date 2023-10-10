@@ -178,25 +178,21 @@
 <li>Build a container image with the WebAssembly module</li>
 <li>Run the container with youki</li>
 </ol>
-<h2 id="build-youki-with-wasm-wasmedge-or-wasm-wasmer-feature-flag-enabled"><a class="header" href="#build-youki-with-wasm-wasmedge-or-wasm-wasmer-feature-flag-enabled">Build youki with <code>wasm-wasmedge</code> or <code>wasm-wasmer</code> feature flag enabled</a></h2>
+<h2 id="build-youki-with-wasm-wasmedge-wasm-wasmer-or-wasm-wasmtime-feature-flag-enabled"><a class="header" href="#build-youki-with-wasm-wasmedge-wasm-wasmer-or-wasm-wasmtime-feature-flag-enabled">Build youki with <code>wasm-wasmedge</code>, <code>wasm-wasmer</code>, or <code>wasm-wasmtime</code> feature flag enabled</a></h2>
 <ul>
 <li>
 <p>Run <code>build.sh</code> with <code>-f wasm-wasmedge</code> option.</p>
 <pre><code class="language-bash">./scripts/build.sh -o . -r -f wasm-wasmedge
 </code></pre>
-<blockquote>
-<p>The <code>wasm-wasmedge</code> feature will install WasmEdge Runtime library in the <code>$HOME/.wasmedge</code> directory.
-To make the library available in your system, run the following command:</p>
-<pre><code class="language-bash">export LD_LIBRARY_PATH=$HOME/.wasmedge/lib
-</code></pre>
-<p>or</p>
-<pre><code class="language-bash">source $HOME/.wasmedge/env
-</code></pre>
-</blockquote>
 </li>
 <li>
 <p>Run <code>build.sh</code> with <code>-f wasm-wasmer</code> option.</p>
 <pre><code class="language-bash">./scripts/build.sh -o . -r -f wasm-wasmer
+</code></pre>
+</li>
+<li>
+<p>Run <code>build.sh</code> with <code>-f wasm-wasmtime</code> option.</p>
+<pre><code class="language-bash">./scripts/build.sh -o . -r -f wasm-wasmtime
 </code></pre>
 </li>
 </ul>
