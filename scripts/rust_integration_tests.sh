@@ -20,7 +20,7 @@ ROOT=${2-$(git rev-parse --show-toplevel)}
 LOGFILE="${ROOT}/test.log"
 
 if [ ! -f ${ROOT}/bundle.tar.gz ]; then
-    cp ${ROOT}/tests/rust-integration-tests/integration_test/bundle.tar.gz ${ROOT}/bundle.tar.gz
+    cp ${ROOT}/tests/integration_test/bundle.tar.gz ${ROOT}/bundle.tar.gz
 fi
 touch ${LOGFILE}
 
