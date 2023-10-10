@@ -172,7 +172,7 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="runtime-test"><a class="header" href="#runtime-test">Runtime Test</a></h1>
-<p><strong>Note</strong> that these tests resides in /tests/rust-integration-tests/runtimetest at the time of writing.</p>
+<p><strong>Note</strong> that these tests resides in /tests/runtimetest at the time of writing.</p>
 <p>This crate provides a binary which is used by integration tests to verify that the restrictions and constraints applied to the container are upheld by the container process, from inside the container process. This runs the tests one-by-one, and the failing test prints the error to the stderr.</p>
 <h2 id="notes"><a class="header" href="#notes">Notes</a></h2>
 <p>This binary must be compiled with the option of static linking to crt0 given to the rustc. If compiled without it, it will add a linking to /lib64/ld-linux-x86-64.so . The binary compiled this way cannot be run inside the container process, as they do not have access to /lib64/... Thus the runtime test must be statically linked to crt0.</p>
