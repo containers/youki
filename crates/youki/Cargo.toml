@@ -58,3 +58,7 @@ scopeguard = "1.2.0"
 [build-dependencies]
 anyhow = "1.0.75"
 vergen = {version ="8.2.5", features =["git","gitcl"]}
+
+[[bin]]
+name = "youki"
+path = "src/main.rs"

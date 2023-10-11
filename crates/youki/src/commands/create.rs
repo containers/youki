@@ -2,19 +2,24 @@
 use anyhow::Result;
 use std::path::PathBuf;
 
-use libcontainer::{container::builder::ContainerBuilder, syscall::syscall::SyscallType};
+use libcontainer::{
+    container::builder::ContainerBuilder, syscall::syscall::SyscallType, workload::Executor,
+};
 use liboci_cli::Create;
-
-use crate::workload::executor::default_executor;
 
 // One thing to note is that in the end, container is just another process in Linux
 // it has specific/different control group, namespace, using which program executing in it
 // can be given impression that is is running on a complete system, but on the system which
 // it is running, it is just another process, and has attributes such as pid, file descriptors, etc.
 // associated with it like any other process.
-pub fn create(args: Create, root_path: PathBuf, systemd_cgroup: bool) -> Result<()> {
+pub fn create(
+    args: Create,
+    root_path: PathBuf,
+    systemd_cgroup: bool,
+    executor: impl Executor + 'static,
+) -> Result<()> {
     ContainerBuilder::new(args.container_id.clone(), SyscallType::default())
-        .with_executor(default_executor())
+        .with_executor(executor)
         .with_pid_file(args.pid_file.as_ref())?
         .with_console_socket(args.console_socket.as_ref())
         .with_root_path(root_path)?
