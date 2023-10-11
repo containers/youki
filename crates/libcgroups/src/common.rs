@@ -338,6 +338,8 @@ pub struct CgroupConfig {
     pub container_name: String,
 }
 
+// Create any cgroup manager with customize root path. If root_path provided
+// is None, then it defaults to /sys/fs/cgroup.
 pub fn create_cgroup_manager_with_root(
     root_path: Option<&Path>,
     config: CgroupConfig,
