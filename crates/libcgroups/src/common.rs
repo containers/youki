@@ -277,23 +277,22 @@ pub enum GetCgroupSetupError {
 ///   an additional unified hierarchy which doesn't have any
 ///   controllers attached. Resource control can purely be achieved
 ///   through the cgroup v1 hierarchy, not through the cgroup v2 hierarchy.
-pub fn get_cgroup_setup() -> Result<CgroupSetup, GetCgroupSetupError> {
-    let default_root = Path::new(DEFAULT_CGROUP_ROOT);
-    match default_root.exists() {
+pub fn get_cgroup_setup_with_root(root_path: &Path) -> Result<CgroupSetup, GetCgroupSetupError> {
+    match root_path.exists() {
         true => {
             // If the filesystem is of type cgroup2, the system is in unified mode.
             // If the filesystem is tmpfs instead the system is either in legacy or
             // hybrid mode. If a cgroup2 filesystem has been mounted under the "unified"
             // folder we are in hybrid mode, otherwise we are in legacy mode.
-            let stat = statfs(default_root)
+            let stat = statfs(root_path)
                 .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err))
-                .wrap_other(default_root)?;
+                .wrap_other(root_path)?;
             if stat.filesystem_type() == CGROUP2_SUPER_MAGIC {
                 return Ok(CgroupSetup::Unified);
             }
 
             if stat.filesystem_type() == TMPFS_MAGIC {
-                let unified = Path::new("/sys/fs/cgroup/unified");
+                let unified = &Path::new(root_path).join("unified");
                 if Path::new(unified).exists() {
                     let stat = statfs(unified)
                         .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err))
@@ -310,6 +309,10 @@ pub fn get_cgroup_setup() -> Result<CgroupSetup, GetCgroupSetupError> {
     }
 
     Err(GetCgroupSetupError::FailedToDetect)
+}
+
+pub fn get_cgroup_setup() -> Result<CgroupSetup, GetCgroupSetupError> {
+    get_cgroup_setup_with_root(Path::new(DEFAULT_CGROUP_ROOT))
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -335,10 +338,18 @@ pub struct CgroupConfig {
     pub container_name: String,
 }
 
-pub fn create_cgroup_manager(
+// Create any cgroup manager with customize root path. If root_path provided
+// is None, then it defaults to /sys/fs/cgroup.
+pub fn create_cgroup_manager_with_root(
+    root_path: Option<&Path>,
     config: CgroupConfig,
 ) -> Result<AnyCgroupManager, CreateCgroupSetupError> {
-    let cgroup_setup = get_cgroup_setup().map_err(|err| match err {
+    let root = match root_path {
+        Some(p) => p,
+        None => Path::new(DEFAULT_CGROUP_ROOT),
+    };
+
+    let cgroup_setup = get_cgroup_setup_with_root(root).map_err(|err| match err {
         GetCgroupSetupError::WrappedIo(err) => CreateCgroupSetupError::WrappedIo(err),
         GetCgroupSetupError::NonDefault => CreateCgroupSetupError::NonDefault,
         GetCgroupSetupError::FailedToDetect => CreateCgroupSetupError::FailedToDetect,
@@ -352,11 +363,20 @@ pub fn create_cgroup_manager(
         CgroupSetup::Unified => {
             // ref https://github.com/opencontainers/runtime-spec/blob/main/config-linux.md#cgroups-path
             if cgroup_path.is_absolute() || !config.systemd_cgroup {
-                return Ok(create_v2_cgroup_manager(cgroup_path)?.any());
+                return Ok(create_v2_cgroup_manager(root, cgroup_path)?.any());
             }
-            Ok(create_systemd_cgroup_manager(cgroup_path, config.container_name.as_str())?.any())
+            Ok(
+                create_systemd_cgroup_manager(root, cgroup_path, config.container_name.as_str())?
+                    .any(),
+            )
         }
     }
+}
+
+pub fn create_cgroup_manager(
+    config: CgroupConfig,
+) -> Result<AnyCgroupManager, CreateCgroupSetupError> {
+    create_cgroup_manager_with_root(Some(Path::new(DEFAULT_CGROUP_ROOT)), config)
 }
 
 #[cfg(feature = "v1")]
@@ -376,14 +396,16 @@ fn create_v1_cgroup_manager(
 
 #[cfg(feature = "v2")]
 fn create_v2_cgroup_manager(
+    root_path: &Path,
     cgroup_path: &Path,
 ) -> Result<v2::manager::Manager, v2::manager::V2ManagerError> {
     tracing::info!("cgroup manager V2 will be used");
-    v2::manager::Manager::new(DEFAULT_CGROUP_ROOT.into(), cgroup_path.to_owned())
+    v2::manager::Manager::new(root_path.to_path_buf(), cgroup_path.to_owned())
 }
 
 #[cfg(not(feature = "v2"))]
 fn create_v2_cgroup_manager(
+    _root_path: &Path,
     _cgroup_path: &Path,
 ) -> Result<v2::manager::Manager, v2::manager::V2ManagerError> {
     Err(v2::manager::V2ManagerError::NotEnabled)
@@ -391,6 +413,7 @@ fn create_v2_cgroup_manager(
 
 #[cfg(feature = "systemd")]
 fn create_systemd_cgroup_manager(
+    root_path: &Path,
     cgroup_path: &Path,
     container_name: &str,
 ) -> Result<systemd::manager::Manager, systemd::manager::SystemdManagerError> {
@@ -407,7 +430,7 @@ fn create_systemd_cgroup_manager(
         use_system
     );
     systemd::manager::Manager::new(
-        DEFAULT_CGROUP_ROOT.into(),
+        root_path.into(),
         cgroup_path.to_owned(),
         container_name.into(),
         use_system,
@@ -416,6 +439,7 @@ fn create_systemd_cgroup_manager(
 
 #[cfg(not(feature = "systemd"))]
 fn create_systemd_cgroup_manager(
+    _root_path: &Path,
     _cgroup_path: &Path,
     _container_name: &str,
 ) -> Result<systemd::manager::Manager, systemd::manager::SystemdManagerError> {
