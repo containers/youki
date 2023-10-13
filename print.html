@@ -461,7 +461,16 @@ log level to <code>debug</code>. This flag is ignored if <code>--log-level</code
 <p>function <code>read_cgroup_file</code> which reads data from given cgroup file</p>
 </li>
 <li>
-<p>function <code>get_cgroup_setup</code> which returns setup of cgroups (v1,v2, hybrid) on the system</p>
+<p>function <code>get_cgroup_setup_with_root</code> which returns setup of cgroups (v1,v2, hybrid) on the system with specified cgroup root path</p>
+</li>
+<li>
+<p>function <code>get_cgroup_setup</code> which returns setup of cgroups (v1,v2, hybrid) on the system with default cgroup root path <code>/sys/fs/cgroup</code></p>
+</li>
+<li>
+<p>function <code>create_cgroup_manager_with_root</code> which returns corresponding cgroup manager on the system with specified cgroup root path, if the passed <code>root_path</code> argument is <code>None</code>, then it's same as function <code>create_cgroup_manager</code></p>
+</li>
+<li>
+<p>function <code>create_cgroup_manager</code> which returns corresponding cgroup manager on the system with default cgroup root path <code>/sys/fs/cgroup</code></p>
 </li>
 </ul>
 <h3 id="stats"><a class="header" href="#stats">stats</a></h3>
@@ -883,7 +892,7 @@ TIME                 COMMAND PID      EVENT     CONTENT
 <ul>
 <li>Trait <code>CgroupManager</code>, this abstracts over the underlying implementation of interacting with specific version of cgroups, and gives functions to add certain process to a certain cgroup, apply resource restrictions, get statistics of a cgroups, freeze a cgroup, remove a cgroup or get list of all processes belonging to a cgroup. v1 and v2 modules both contain a version specific cgroup manager which implements this trait, and thus either can be given to functions or structs which expects a cgroup manager, depending on which cgroups the host system uses.</li>
 <li>Apart from the trait, this also contains functions which help with reading cgroups files, and write data to a cgroup file, which are used throughout this crate.</li>
-<li>A function to detect which cgroup setup (v1, v2 or hybrid) is on the host system, as well as a function to get the corresponding cgroups manager.</li>
+<li>Functions to detect which cgroup setup (v1, v2 or hybrid) is on the host system with/without specified mounted cgroup root path, as well as functions to get the corresponding cgroups manager w/o cgroup root path.</li>
 </ul>
 </li>
 <li>
