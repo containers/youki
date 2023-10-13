@@ -10,7 +10,7 @@ This crates exposes several functions and modules that can be used to work with 
 
   - Trait `CgroupManager`, this abstracts over the underlying implementation of interacting with specific version of cgroups, and gives functions to add certain process to a certain cgroup, apply resource restrictions, get statistics of a cgroups, freeze a cgroup, remove a cgroup or get list of all processes belonging to a cgroup. v1 and v2 modules both contain a version specific cgroup manager which implements this trait, and thus either can be given to functions or structs which expects a cgroup manager, depending on which cgroups the host system uses.
   - Apart from the trait, this also contains functions which help with reading cgroups files, and write data to a cgroup file, which are used throughout this crate.
-  - A function to detect which cgroup setup (v1, v2 or hybrid) is on the host system, as well as a function to get the corresponding cgroups manager.
+  - Functions to detect which cgroup setup (v1, v2 or hybrid) is on the host system with/without specified mounted cgroup root path, as well as functions to get the corresponding cgroups manager w/o cgroup root path.
 
 - Functions and structs to get and store the statistics of a cgroups such as
 
