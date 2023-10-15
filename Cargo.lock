@@ -1908,7 +1908,7 @@ checksum = "a08173bc88b7955d1b3145aa561539096c421ac8debde8cbc3612ec635fee29b"
 
 [[package]]
 name = "libcgroups"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -1933,7 +1933,7 @@ dependencies = [
 
 [[package]]
 name = "libcontainer"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "bitflags 2.4.0",
@@ -1974,7 +1974,7 @@ dependencies = [
 
 [[package]]
 name = "liboci-cli"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "clap",
 ]
@@ -5728,7 +5728,7 @@ dependencies = [
 
 [[package]]
 name = "youki"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "caps",
