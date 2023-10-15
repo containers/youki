@@ -11,7 +11,7 @@ use crate::{
 };
 use nix::mount::MsFlags;
 use oci_spec::runtime::{Linux, Spec};
-use std::path::Path;
+use std::{collections::HashSet, path::Path};
 
 /// Holds information about rootfs
 pub struct RootFS {
@@ -99,11 +99,13 @@ impl RootFS {
 
         let devicer = Device::new();
         if let Some(added_devices) = linux.devices() {
-            devicer.create_devices(
-                rootfs,
-                default_devices().iter().chain(added_devices),
-                bind_devices,
-            )
+            let mut path_set = HashSet::new();
+            let devices = default_devices();
+            added_devices.iter().for_each(|d| {
+                path_set.insert(d.path());
+            });
+            let default = devices.iter().filter(|d| !path_set.contains(d.path()));
+            devicer.create_devices(rootfs, added_devices.iter().chain(default), bind_devices)
         } else {
             devicer.create_devices(rootfs, &default_devices(), bind_devices)
         }?;
