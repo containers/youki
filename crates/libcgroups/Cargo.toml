@@ -30,7 +30,7 @@ libbpf-sys = { version = "1.2.1", optional = true }
 errno = { version = "0.3.5", optional = true }
 libc = { version = "0.2.149", optional = true }
 thiserror = "1.0.49"
-tracing = { version = "0.1.37", features = ["attributes"] }
+tracing = { version = "0.1.39", features = ["attributes"] }
 
 [dev-dependencies]
 anyhow = "1.0"
