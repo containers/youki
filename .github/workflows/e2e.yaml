@@ -133,10 +133,8 @@ jobs:
           name: youki
       - name: Add the permission to run
         run: chmod +x ./youki
-      - name: Build
-        run: just runtimetest rust-oci-tests-bin
       - name: Validate tests on youki
-        run: just rust-oci-tests
+        run: just run-contest
 
   rootless-podman-test:
     runs-on: ubuntu-22.04

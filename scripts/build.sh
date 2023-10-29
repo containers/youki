@@ -10,7 +10,6 @@ usage_exit() {
 
 VERSION=debug
 CRATE="youki"
-RUNTIMETEST_TARGET="$ROOT/runtimetest-target"
 features=""
 ARCH=$(uname -m)
 while getopts f:ro:c:ha: OPT; do
@@ -64,16 +63,13 @@ if [ "$CRATE" == "youki" ]; then
     mv ${ROOT}/target/${TARGET}/${VERSION}/youki ${OUTPUT}/
 fi
 
-if [ "$CRATE" == "integration-test" ]; then
-    rm -f ${OUTPUT}/integration_test
-    cargo build --target ${TARGET} ${OPTION} ${FEATURES} --bin integration_test
-    mv ${ROOT}/target/${TARGET}/${VERSION}/integration_test ${OUTPUT}/
-fi
+if [ "$CRATE" == "contest" ]; then
+    find ${OUTPUT} -maxdepth 1 -type f -name "contest" -exec rm -ifv {} \;
+    cargo build --target ${TARGET} ${OPTION} ${FEATURES} --bin contest
+    mv ${ROOT}/target/${TARGET}/${VERSION}/contest ${OUTPUT}/
 
-if [ "$CRATE" == "runtimetest" ]; then
-    rm -f ${OUTPUT}/runtimetest
-    CARGO_TARGET_DIR=${RUNTIMETEST_TARGET} RUSTFLAGS="-Ctarget-feature=+crt-static" cargo build --target ${TARGET} ${OPTION} ${FEATURES} --bin runtimetest
-    mv ${RUNTIMETEST_TARGET}/${TARGET}/${VERSION}/runtimetest ${OUTPUT}/
+    find ${OUTPUT} -maxdepth 1 -type f -name "runtimetest" -exec rm -ifv {} \;
+    CONTEST_TARGET="$ROOT/contest-target"
+    CARGO_TARGET_DIR=${CONTEST_TARGET} RUSTFLAGS="-Ctarget-feature=+crt-static" cargo build --target ${TARGET} ${OPTION} ${FEATURES} --bin runtimetest
+    mv ${CONTEST_TARGET}/${TARGET}/${VERSION}/runtimetest ${OUTPUT}/
 fi
-
-exit 0
