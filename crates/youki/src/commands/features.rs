@@ -5,7 +5,7 @@ use liboci_cli::Features;
 
 /// lists all existing containers
 pub fn features(_: Features) -> Result<()> {
-    let features = Features {
+    let features = HardFeatures {
         oci_version_min: Some(String::from("1.0.0")),
         oci_version_max: Some(String::from("1.0.2-dev")),
         hooks: Some(vec![
@@ -212,7 +212,7 @@ pub const ANNOTATION_RUNC_CHECKPOINT_ENABLED: &str = "org.opencontainers.runc.ch
 pub const ANNOTATION_LIBSECCOMP_VERSION: &str = "io.github.seccomp.libseccomp.version";
 
 #[derive(Debug)]
-pub struct Features {
+pub struct HardFeatures {
     // Minimum OCI Runtime Spec version recognized by the runtime, e.g., "1.0.0".
     oci_version_min: Option<String>,
     // Maximum OCI Runtime Spec version recognized by the runtime, e.g., "1.0.2-dev".
