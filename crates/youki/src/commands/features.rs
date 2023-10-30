@@ -186,10 +186,10 @@ pub fn features(_: Features) -> Result<()> {
         }),
         annotations: {
             let mut annotations_map = HashMap::new();
-            annotations_map.insert(String::from("io.github.seccomp.libseccomp.version"), String::from("2.5.3"));
-            annotations_map.insert(String::from("org.opencontainers.runc.checkpoint.enabled"), String::from("true"));
-            annotations_map.insert(String::from("org.opencontainers.runc.commit"), String::from("v1.1.9-0-gccaecfc"));
-            annotations_map.insert(String::from("org.opencontainers.runc.version"), String::from("1.1.9"));
+            annotations_map.insert(ANNOTATION_RUNC_VERSION, String::from("2.5.3"));
+            annotations_map.insert(ANNOTATION_RUNC_COMMIT, String::from("true"));
+            annotations_map.insert(ANNOTATION_RUNC_CHECKPOINT_ENABLED, String::from("v1.1.9-0-gccaecfc"));
+            annotations_map.insert(ANNOTATION_LIBSECCOMP_VERSION, String::from("1.1.9"));
             Some(annotations_map)
         },
     };
@@ -206,10 +206,10 @@ pub fn features(_: Features) -> Result<()> {
 // It is documented here:
 // https://github.com/opencontainers/runtime-spec/blob/main/features-linux.md
 
-pub const ANNOTATION_RUNC_VERSION: &str = "org.opencontainers.runc.version";
-pub const ANNOTATION_RUNC_COMMIT: &str = "org.opencontainers.runc.commit";
-pub const ANNOTATION_RUNC_CHECKPOINT_ENABLED: &str = "org.opencontainers.runc.checkpoint.enabled";
-pub const ANNOTATION_LIBSECCOMP_VERSION: &str = "io.github.seccomp.libseccomp.version";
+pub const ANNOTATION_RUNC_VERSION: String = String::from("org.opencontainers.runc.version");
+pub const ANNOTATION_RUNC_COMMIT: String = String::from("org.opencontainers.runc.commit");
+pub const ANNOTATION_RUNC_CHECKPOINT_ENABLED: String = String::from("org.opencontainers.runc.checkpoint.enabled");
+pub const ANNOTATION_LIBSECCOMP_VERSION: String = String::from("io.github.seccomp.libseccomp.version");
 
 #[derive(Debug)]
 pub struct HardFeatures {
