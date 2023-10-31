@@ -2,6 +2,7 @@
 use anyhow::Result;
 use std::collections::HashMap;
 use liboci_cli::Features;
+use serde::{Serialize, Deserialize};
 
 /// lists all existing containers
 pub fn features(_: Features) -> Result<()> {
@@ -195,7 +196,8 @@ pub fn features(_: Features) -> Result<()> {
     };
 
     // Print out the created struct to verify
-    println!("{:?}", features);
+    let json_str = serde_json::to_string(&features)?;
+    println!("JSON: {}", json_str);
 
     Ok(())
 }
@@ -211,7 +213,7 @@ pub const ANNOTATION_RUNC_COMMIT: &str = "org.opencontainers.runc.commit";
 pub const ANNOTATION_RUNC_CHECKPOINT_ENABLED: &str = "org.opencontainers.runc.checkpoint.enabled";
 pub const ANNOTATION_LIBSECCOMP_VERSION: &str = "io.github.seccomp.libseccomp.version";
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct HardFeatures {
     // Minimum OCI Runtime Spec version recognized by the runtime, e.g., "1.0.0".
     oci_version_min: Option<String>,
@@ -228,7 +230,7 @@ pub struct HardFeatures {
 }
 
 // Specific to Linux.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Linux {
     // List of the recognized namespaces, e.g., "mount".
     namespaces: Option<Vec<String>>,
@@ -240,7 +242,7 @@ pub struct Linux {
     selinux: Option<Selinux>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 struct Seccomp {
     enabled: Option<bool>,
     actions: Option<Vec<String>>,
@@ -248,17 +250,17 @@ struct Seccomp {
     archs: Option<Vec<String>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 struct Apparmor {
     enabled: Option<bool>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 struct Selinux {
     enabled: Option<bool>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 struct Cgroup {
     v1: Option<bool>,
     v2: Option<bool>,
