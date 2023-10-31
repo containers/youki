@@ -196,8 +196,8 @@ pub fn features(_: Features) -> Result<()> {
     };
 
     // Print out the created struct to verify
-    let json_str = serde_json::to_string(&features)?;
-    println!("JSON: {}", json_str);
+    let pretty_json_str = serde_json::to_string_pretty(&features)?;
+    println!("{}", pretty_json_str);
 
     Ok(())
 }
