@@ -35,6 +35,8 @@ fn main() {
         "mounts_recursive" => tests::validate_mounts_recursive(&spec),
         "seccomp" => tests::validate_seccomp(&spec),
         "sysctl" => tests::validate_sysctl(&spec),
+        "scheduler_policy_other" => tests::validate_scheduler_policy(&spec),
+        "scheduler_policy_batch" => tests::validate_scheduler_policy(&spec),
         _ => eprintln!("error due to unexpected execute test name: {execute_test}"),
     }
 }

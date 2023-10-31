@@ -92,4 +92,6 @@ pub enum ErrInvalidSpec {
     AppArmorNotEnabled,
     #[error("invalid io priority or class.")]
     IoPriority,
+    #[error("invalid scheduler config for process")]
+    Scheduler,
 }

@@ -53,6 +53,7 @@ regex = "1.10.2"
 thiserror = "1.0.56"
 tracing = { version = "0.1.40", features = ["attributes"] }
 safe-path = "0.1.0"
+nc = "0.8.18"
 
 [dev-dependencies]
 oci-spec = { version = "~0.6.4", features = ["proptests", "runtime"] }

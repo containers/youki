@@ -8,6 +8,7 @@ pub mod linux_ns_itype;
 pub mod mounts_recursive;
 pub mod pidfile;
 pub mod readonly_paths;
+pub mod scheduler;
 pub mod seccomp;
 pub mod seccomp_notify;
 pub mod sysctl;
