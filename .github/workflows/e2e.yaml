@@ -12,17 +12,29 @@ jobs:
   youki-build:
     runs-on: ubuntu-22.04
     timeout-minutes: 15
+    strategy:
+      matrix:
+        arch: [ "x86_64", "aarch64" ]
     steps:
       - uses: actions/checkout@v3
-      - name: Setup Rust toolchain and cache
-        uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        env:
+          RUST_CACHE_KEY_OS: rust-cache-${{ matrix.arch }}
+        with:
+          rustflags: '' #Disable.  By default this action sets environment variable is set to -D warnings.  We manage this in the Makefile
       - name: Install just
         uses: taiki-e/install-action@just
       - name: Install requirements
-        run: sudo env PATH=$PATH just ci-prepare
+        if: ${{ matrix.arch == 'x86_64' }}
+        run: |
+          sudo env PATH=$PATH arch=${{ matrix.arch }} just ci-prepare
+      - name: Install requirements for aarch64
+        if: ${{ matrix.arch == 'aarch64' }}
+        run: cargo install cross --git https://github.com/cross-rs/cross
       - name: Build youki
-        run: just youki-release
+        run: arch=${{ matrix.arch }} just youki-release
       - name: Upload youki binary
+        if: ${{ matrix.arch == 'x86_64' }}
         uses: actions/upload-artifact@v3
         with:
           name: youki

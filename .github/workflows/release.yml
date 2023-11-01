@@ -5,39 +5,36 @@ on:
     tags: ["v[0-9]+.[0-9]+.[0-9]+*"]
 
 jobs:
-  check:
-    name: Check
+  build:
+    name: Build
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        arch: [ "x86_64", "aarch64" ]
     steps:
       - uses: actions/checkout@v3
         with:
           submodules: recursive
-      - name: Setup Rust toolchain and cache
-        uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
-      - name: Install just
-        uses: taiki-e/install-action@just
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        env:
+          RUST_CACHE_KEY_OS: rust-cache-${{ matrix.arch }}
+        with:
+          rustflags: '' #Disable.  By default this action sets environment variable is set to -D warnings.  We manage this in the Makefile
+      - uses: taiki-e/install-action@just
       - name: Install requirements
-        run: sudo env PATH=$PATH just ci-prepare
-      - name: Build
-        run: just youki-release
+        if: ${{ matrix.arch == 'x86_64' }}
+        run: | 
+          sudo env PATH=$PATH arch=${{ matrix.arch }} just ci-prepare
+      - name: Install requirements for aarch64
+        if: ${{ matrix.arch == 'aarch64' }}
+        run: cargo install cross --git https://github.com/cross-rs/cross
+      - name: Release build
+        run: arch=${{ matrix.arch }} just youki-release
       - name: test
         # TODO(utam0k): The feature test needs nightly
         # run: just test-basic featuretest test-oci
+        if: ${{ matrix.arch == 'x86_64' }}
         run: just test-basic test-oci
-
-  upload:
-    name: Upload
-    needs: check
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v3
-      - name: Setup Rust toolchain and cache
-        uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
-      - uses: taiki-e/install-action@just
-      - name: Install requirements
-        run: sudo env PATH=$PATH just ci-prepare
-      - name: Release build
-        run: just youki-release
       - name: Create output directory
         run: mkdir output
       - name: Copy files to output
@@ -48,14 +45,13 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: output
+          name: output-${{ matrix.arch }}
           path: output/*
-
   release:
     name: Create Draft Release
     runs-on: ubuntu-20.04
     needs:
-      - upload
+      - build
     steps:
       - uses: actions/checkout@v3
 
@@ -74,30 +70,41 @@ jobs:
           echo "INNERDIR=youki-${VERSION}" >> $GITHUB_ENV
 
       - name: Create Output Directory
-        run: mkdir -p ${{ env.OUTPUTDIR }}/${{ env.INNERDIR }}
+        run: |
+          mkdir -p ${{ env.OUTPUTDIR }}-x86_64/${{ env.INNERDIR }}
+          mkdir -p ${{ env.OUTPUTDIR }}-aarch64/${{ env.INNERDIR }}
 
-      - name: Download Linux Artifacts
+      - name: Download Linux Artifacts for x86_64
         uses: actions/download-artifact@v3
         with:
-          name: output
-          path: ${{ env.OUTPUTDIR }}/${{ env.INNERDIR }}
-
+          name: output-x86_64
+          path: ${{ env.OUTPUTDIR }}-x86_64/${{ env.INNERDIR }}
+      - name: Download Linux Artifacts for aarch64
+        uses: actions/download-artifact@v3
+        with:
+          name: output-aarch64
+          path: ${{ env.OUTPUTDIR }}-aarch64/${{ env.INNERDIR }}
       - name: Restore File Modes
         run: |
-          chmod 755 ${{ env.OUTPUTDIR }}/${{ env.INNERDIR }}/youki
+          chmod 755 ${{ env.OUTPUTDIR }}-x86_64/${{ env.INNERDIR }}/youki
+          chmod 755 ${{ env.OUTPUTDIR }}-aarch64/${{ env.INNERDIR }}/youki
       - name: Create tarball
-        run: tar -zcvf ${{ env.OUTPUTDIR }}.tar.gz ${{ env.OUTPUTDIR }}
+        run: |
+          tar -zcvf ${{ env.OUTPUTDIR }}-x86_64.tar.gz ${{ env.OUTPUTDIR }}-x86_64
+          tar -zcvf ${{ env.OUTPUTDIR }}-aarch64.tar.gz ${{ env.OUTPUTDIR }}-aarch64
       - name: Create Release Draft
         uses: softprops/action-gh-release@v1
         with:
           name: ${{ env.VERSION }} Release
           draft: true
           token: ${{ secrets.GITHUB_TOKEN }}
-          files: ./${{ env.OUTPUTDIR }}.tar.gz
+          files: |
+            ./${{ env.OUTPUTDIR }}-x86_64.tar.gz
+            ./${{ env.OUTPUTDIR }}-aarch64.tar.gz
 
   publish:
     name: Publish Packages
-    needs: check
+    needs: build
     runs-on: ubuntu-20.04
     env:
       CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}

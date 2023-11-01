@@ -12,19 +12,19 @@ build-all: youki-release rust-oci-tests-bin runtimetest
 
 # build youki in dev mode
 youki-dev:
-    {{ cwd }}/scripts/build.sh -o {{ cwd }} -c youki
+    {{ cwd }}/scripts/build.sh -o {{ cwd }} -c youki -a ${arch:-x86_64}
 
 # build youki in release mode
 youki-release:
-    {{ cwd }}/scripts/build.sh -o {{ cwd }} -r -c youki
+    {{ cwd }}/scripts/build.sh -o {{ cwd }} -r -c youki -a ${arch:-x86_64}
 
 # build runtimetest binary
 runtimetest:
-    {{ cwd }}/scripts/build.sh -o {{ cwd }} -r -c runtimetest
+    {{ cwd }}/scripts/build.sh -o {{ cwd }} -r -c runtimetest -a ${arch:-x86_64}
 
 # build rust oci tests binary
 rust-oci-tests-bin:
-    {{ cwd }}/scripts/build.sh -o {{ cwd }} -r -c integration-test
+    {{ cwd }}/scripts/build.sh -o {{ cwd }} -r -c integration-test -a ${arch:-x86_64}
 
 # Tests
 
