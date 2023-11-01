@@ -1958,6 +1958,7 @@ dependencies = [
  "once_cell",
  "prctl",
  "procfs",
+ "protobuf",
  "quickcheck",
  "rand",
  "regex",
