@@ -10,4 +10,5 @@ updates:
       - dependency-type: indirect
     groups:
       patch:
-        update-types: patch
+        update-types: 
+        - patch
