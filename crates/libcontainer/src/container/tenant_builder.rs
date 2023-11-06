@@ -272,7 +272,7 @@ impl TenantContainerBuilder {
         }
 
         let init_process = procfs::process::Process::new(container.pid().unwrap().as_raw())?;
-        let ns = self.get_namespaces(init_process.namespaces()?)?;
+        let ns = self.get_namespaces(init_process.namespaces()?.0)?;
         let linux = LinuxBuilder::default().namespaces(ns).build()?;
 
         spec.set_process(Some(process)).set_linux(Some(linux));

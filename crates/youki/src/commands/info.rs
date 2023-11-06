@@ -6,7 +6,7 @@ use std::{fs, path::Path};
 use anyhow::Result;
 use clap::Parser;
 use libcontainer::user_ns;
-use procfs::{CpuInfo, Meminfo};
+use procfs::{CpuInfo, Current, Meminfo};
 
 #[cfg(feature = "v2")]
 use libcgroups::{common::CgroupSetup, v2::controller_type::ControllerType};
@@ -101,11 +101,11 @@ fn find_parameter<'a>(content: &'a str, param_name: &str) -> Option<&'a str> {
 
 /// Print Hardware information of system
 pub fn print_hardware() {
-    if let Ok(cpu_info) = CpuInfo::new() {
+    if let Ok(cpu_info) = CpuInfo::current() {
         println!("{:<18}{}", "Cores", cpu_info.num_cores());
     }
 
-    if let Ok(mem_info) = Meminfo::new() {
+    if let Ok(mem_info) = Meminfo::current() {
         println!(
             "{:<18}{}",
             "Total Memory",

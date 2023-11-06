@@ -95,7 +95,7 @@ pub fn find_resctrl_mount_point() -> Result<PathBuf> {
     let process = Process::myself()?;
     let mount_infos = process.mountinfo()?;
 
-    for mount_info in mount_infos.iter() {
+    for mount_info in mount_infos.0.iter() {
         // "resctrl" type fs can be mounted only once.
         if mount_info.fs_type == "resctrl" {
             let path = mount_info.mount_point.clone().canonicalize().map_err(|err| {

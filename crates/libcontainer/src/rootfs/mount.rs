@@ -431,7 +431,7 @@ impl Mount {
                 tracing::error!("failed to get mount info: {}", err);
                 MountError::Other(err.into())
             })?;
-        let parent_mount = find_parent_mount(rootfs, mount_infos)?;
+        let parent_mount = find_parent_mount(rootfs, mount_infos.0)?;
 
         // check parent mount has 'shared' propagation type
         if parent_mount
