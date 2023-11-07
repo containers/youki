@@ -1,0 +1,2 @@
+[profile.release]
+strip = "symbols"
