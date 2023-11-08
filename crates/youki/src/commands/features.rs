@@ -5,9 +5,9 @@ pub const ANNOTATION_RUNC_CHECKPOINT_ENABLED: &str = "org.opencontainers.runc.ch
 pub const ANNOTATION_LIBSECCOMP_VERSION: &str = "io.github.seccomp.libseccomp.version";
 
 use anyhow::Result;
-use std::collections::HashMap;
 use liboci_cli::Features;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct HardFeatures {
@@ -242,14 +242,27 @@ pub fn features(_: Features) -> Result<()> {
                     String::from("SCMP_ARCH_X86_64"),
                 ]),
             }),
-            apparmor: Some(Apparmor { enabled: Some(true) }),
-            selinux: Some(Selinux { enabled: Some(true) }),
+            apparmor: Some(Apparmor {
+                enabled: Some(true),
+            }),
+            selinux: Some(Selinux {
+                enabled: Some(true),
+            }),
         }),
         annotations: {
             let mut annotations_map = HashMap::new();
-            annotations_map.insert(ANNOTATION_LIBSECCOMP_VERSION.to_string(), String::from("2.5.3"));
-            annotations_map.insert(ANNOTATION_RUNC_CHECKPOINT_ENABLED.to_string(), String::from("true"));
-            annotations_map.insert(ANNOTATION_RUNC_COMMIT.to_string(), String::from("v1.1.9-0-gccaecfc"));
+            annotations_map.insert(
+                ANNOTATION_LIBSECCOMP_VERSION.to_string(),
+                String::from("2.5.3"),
+            );
+            annotations_map.insert(
+                ANNOTATION_RUNC_CHECKPOINT_ENABLED.to_string(),
+                String::from("true"),
+            );
+            annotations_map.insert(
+                ANNOTATION_RUNC_COMMIT.to_string(),
+                String::from("v1.1.9-0-gccaecfc"),
+            );
             annotations_map.insert(ANNOTATION_RUNC_VERSION.to_string(), String::from("1.1.9"));
             Some(annotations_map)
         },
@@ -261,5 +274,3 @@ pub fn features(_: Features) -> Result<()> {
 
     Ok(())
 }
-
-
