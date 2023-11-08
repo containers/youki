@@ -1,8 +1,68 @@
 //! Contains Functionality of `features` container command
+pub const ANNOTATION_RUNC_VERSION: &str = "org.opencontainers.runc.version";
+pub const ANNOTATION_RUNC_COMMIT: &str = "org.opencontainers.runc.commit";
+pub const ANNOTATION_RUNC_CHECKPOINT_ENABLED: &str = "org.opencontainers.runc.checkpoint.enabled";
+pub const ANNOTATION_LIBSECCOMP_VERSION: &str = "io.github.seccomp.libseccomp.version";
+
 use anyhow::Result;
 use std::collections::HashMap;
 use liboci_cli::Features;
 use serde::{Serialize, Deserialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct HardFeatures {
+    // Minimum OCI Runtime Spec version recognized by the runtime, e.g., "1.0.0".
+    ociVersionMin: Option<String>,
+    // Maximum OCI Runtime Spec version recognized by the runtime, e.g., "1.0.2-dev".
+    ociVersionMax: Option<String>,
+    // List of the recognized hook names, e.g., "createRuntime".
+    hooks: Option<Vec<String>>,
+    // List of the recognized mount options, e.g., "ro".
+    mountOptions: Option<Vec<String>>,
+    // Specific to Linux.
+    linux: Option<Linux>,
+    // Contains implementation-specific annotation strings.
+    annotations: Option<std::collections::HashMap<String, String>>,
+}
+
+// Specific to Linux.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Linux {
+    // List of the recognized namespaces, e.g., "mount".
+    namespaces: Option<Vec<String>>,
+    // List of the recognized capabilities, e.g., "CAP_SYS_ADMIN".
+    capabilities: Option<Vec<String>>,
+    cgroup: Option<Cgroup>,
+    seccomp: Option<Seccomp>,
+    apparmor: Option<Apparmor>,
+    selinux: Option<Selinux>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Seccomp {
+    enabled: Option<bool>,
+    actions: Option<Vec<String>>,
+    operators: Option<Vec<String>>,
+    archs: Option<Vec<String>>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Apparmor {
+    enabled: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Selinux {
+    enabled: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Cgroup {
+    v1: Option<bool>,
+    v2: Option<bool>,
+    systemd: Option<bool>,
+    systemdUser: Option<bool>,
+}
 
 /// lists all existing containers
 pub fn features(_: Features) -> Result<()> {
@@ -202,69 +262,4 @@ pub fn features(_: Features) -> Result<()> {
     Ok(())
 }
 
-// Return the features list for a container
-// This subcommand was introduced in runc by
-// https://github.com/opencontainers/runc/pull/3296
-// It is documented here:
-// https://github.com/opencontainers/runtime-spec/blob/main/features-linux.md
-
-pub const ANNOTATION_RUNC_VERSION: &str = "org.opencontainers.runc.version";
-pub const ANNOTATION_RUNC_COMMIT: &str = "org.opencontainers.runc.commit";
-pub const ANNOTATION_RUNC_CHECKPOINT_ENABLED: &str = "org.opencontainers.runc.checkpoint.enabled";
-pub const ANNOTATION_LIBSECCOMP_VERSION: &str = "io.github.seccomp.libseccomp.version";
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct HardFeatures {
-    // Minimum OCI Runtime Spec version recognized by the runtime, e.g., "1.0.0".
-    ociVersionMin: Option<String>,
-    // Maximum OCI Runtime Spec version recognized by the runtime, e.g., "1.0.2-dev".
-    ociVersionMax: Option<String>,
-    // List of the recognized hook names, e.g., "createRuntime".
-    hooks: Option<Vec<String>>,
-    // List of the recognized mount options, e.g., "ro".
-    mountOptions: Option<Vec<String>>,
-    // Specific to Linux.
-    linux: Option<Linux>,
-    // Contains implementation-specific annotation strings.
-    annotations: Option<std::collections::HashMap<String, String>>,
-}
-
-// Specific to Linux.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Linux {
-    // List of the recognized namespaces, e.g., "mount".
-    namespaces: Option<Vec<String>>,
-    // List of the recognized capabilities, e.g., "CAP_SYS_ADMIN".
-    capabilities: Option<Vec<String>>,
-    cgroup: Option<Cgroup>,
-    seccomp: Option<Seccomp>,
-    apparmor: Option<Apparmor>,
-    selinux: Option<Selinux>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Seccomp {
-    enabled: Option<bool>,
-    actions: Option<Vec<String>>,
-    operators: Option<Vec<String>>,
-    archs: Option<Vec<String>>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Apparmor {
-    enabled: Option<bool>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Selinux {
-    enabled: Option<bool>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Cgroup {
-    v1: Option<bool>,
-    v2: Option<bool>,
-    systemd: Option<bool>,
-    systemdUser: Option<bool>,
-}
 
