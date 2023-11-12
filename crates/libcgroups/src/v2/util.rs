@@ -21,6 +21,7 @@ pub enum V2UtilError {
     DoesNotExist(PathBuf),
 }
 
+// Reads the `/proc/self/mountinfo` to get the mount point of this cgroup
 pub fn get_unified_mount_point() -> Result<PathBuf, V2UtilError> {
     Process::myself()?
         .mountinfo()?
@@ -30,6 +31,8 @@ pub fn get_unified_mount_point() -> Result<PathBuf, V2UtilError> {
         .ok_or(V2UtilError::CouldNotFind)
 }
 
+/// Reads the `{root_path}/cgroup.controllers` file to get the list of the controllers that are
+/// available in this cgroup
 pub fn get_available_controllers<P: AsRef<Path>>(
     root_path: P,
 ) -> Result<Vec<ControllerType>, V2UtilError> {
