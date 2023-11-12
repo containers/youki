@@ -85,6 +85,9 @@ impl StatsProvider for Cpu {
                 "usage_usec" => stats.usage.usage_total = value,
                 "user_usec" => stats.usage.usage_user = value,
                 "system_usec" => stats.usage.usage_kernel = value,
+                "nr_periods" => stats.throttling.periods = value,
+                "nr_throttled" => stats.throttling.throttled_periods = value,
+                "throttled_usec" => stats.throttling.throttled_time = value,
                 _ => continue,
             }
         }
@@ -176,7 +179,7 @@ impl Cpu {
 mod tests {
     use super::*;
     use crate::{
-        stats::CpuUsage,
+        stats::{CpuThrottling, CpuUsage},
         test::{set_fixture, setup},
     };
     use oci_spec::runtime::LinuxCpuBuilder;
@@ -337,19 +340,36 @@ mod tests {
     #[test]
     fn test_stat_usage() {
         let tmp = tempfile::tempdir().unwrap();
-        let content = ["usage_usec 7730", "user_usec 4387", "system_usec 3498"].join("\n");
+        let content = [
+            "usage_usec 7730",
+            "user_usec 4387",
+            "system_usec 3498",
+            "nr_periods 400",
+            "nr_throttled 20",
+            "throttled_usec 5000",
+        ]
+        .join("\n");
         set_fixture(tmp.path(), CPU_STAT, &content).expect("create stat file");
         set_fixture(tmp.path(), CPU_PSI, "").expect("create psi file");
 
         let actual = Cpu::stats(tmp.path()).expect("get cgroup stats");
-        let expected = CpuUsage {
-            usage_total: 7730,
-            usage_user: 4387,
-            usage_kernel: 3498,
+        let expected = CpuStats {
+            usage: CpuUsage {
+                usage_total: 7730,
+                usage_user: 4387,
+                usage_kernel: 3498,
+                ..Default::default()
+            },
+            throttling: CpuThrottling {
+                periods: 400,
+                throttled_periods: 20,
+                throttled_time: 5000,
+            },
             ..Default::default()
         };
 
-        assert_eq!(actual.usage, expected);
+        assert_eq!(actual.usage, expected.usage);
+        assert_eq!(actual.throttling, expected.throttling);
     }
 
     #[test]
