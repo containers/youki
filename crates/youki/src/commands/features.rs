@@ -5,6 +5,7 @@ pub const ANNOTATION_RUNC_CHECKPOINT_ENABLED: &str = "org.opencontainers.runc.ch
 pub const ANNOTATION_LIBSECCOMP_VERSION: &str = "io.github.seccomp.libseccomp.version";
 
 use anyhow::Result;
+use caps::{all, CapSet, Capability};
 use liboci_cli::Features;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -64,8 +65,24 @@ struct Cgroup {
     systemdUser: Option<bool>,
 }
 
+// Function to query and return capabilities
+fn query_caps() -> Vec<String> {
+    let all_caps = all();
+    let mut local_caps = Vec::new();
+
+    for cap in all_caps {
+        if caps::has_cap(None, CapSet::Permitted, cap).unwrap_or(false) {
+            local_caps.push(format!("{:?}", cap));
+        }
+    }
+
+    local_caps
+}
+
 /// lists all existing containers
 pub fn features(_: Features) -> Result<()> {
+    let capabilities = query_caps();
+
     let features = HardFeatures {
         ociVersionMin: Some(String::from("1.0.0")),
         ociVersionMax: Some(String::from("1.0.2-dev")),
@@ -151,49 +168,50 @@ pub fn features(_: Features) -> Result<()> {
                 String::from("user"),
                 String::from("uts"),
             ]),
-            capabilities: Some(vec![
-                String::from("CAP_CHOWN"),
-                String::from("CAP_DAC_OVERRIDE"),
-                String::from("CAP_DAC_READ_SEARCH"),
-                String::from("CAP_FOWNER"),
-                String::from("CAP_FSETID"),
-                String::from("CAP_KILL"),
-                String::from("CAP_SETGID"),
-                String::from("CAP_SETUID"),
-                String::from("CAP_SETPCAP"),
-                String::from("CAP_LINUX_IMMUTABLE"),
-                String::from("CAP_NET_BIND_SERVICE"),
-                String::from("CAP_NET_BROADCAST"),
-                String::from("CAP_NET_ADMIN"),
-                String::from("CAP_NET_RAW"),
-                String::from("CAP_IPC_LOCK"),
-                String::from("CAP_IPC_OWNER"),
-                String::from("CAP_SYS_MODULE"),
-                String::from("CAP_SYS_RAWIO"),
-                String::from("CAP_SYS_CHROOT"),
-                String::from("CAP_SYS_PTRACE"),
-                String::from("CAP_SYS_PACCT"),
-                String::from("CAP_SYS_ADMIN"),
-                String::from("CAP_SYS_BOOT"),
-                String::from("CAP_SYS_NICE"),
-                String::from("CAP_SYS_RESOURCE"),
-                String::from("CAP_SYS_TIME"),
-                String::from("CAP_SYS_TTY_CONFIG"),
-                String::from("CAP_MKNOD"),
-                String::from("CAP_LEASE"),
-                String::from("CAP_AUDIT_WRITE"),
-                String::from("CAP_AUDIT_CONTROL"),
-                String::from("CAP_SETFCAP"),
-                String::from("CAP_MAC_OVERRIDE"),
-                String::from("CAP_MAC_ADMIN"),
-                String::from("CAP_SYSLOG"),
-                String::from("CAP_WAKE_ALARM"),
-                String::from("CAP_BLOCK_SUSPEND"),
-                String::from("CAP_AUDIT_READ"),
-                String::from("CAP_PERFMON"),
-                String::from("CAP_BPF"),
-                String::from("CAP_CHECKPOINT_RESTORE"),
-            ]),
+            capabilities: Some(capabilities),
+            // capabilities: Some(vec![
+            //     String::from("CAP_CHOWN"),
+            //     String::from("CAP_DAC_OVERRIDE"),
+            //     String::from("CAP_DAC_READ_SEARCH"),
+            //     String::from("CAP_FOWNER"),
+            //     String::from("CAP_FSETID"),
+            //     String::from("CAP_KILL"),
+            //     String::from("CAP_SETGID"),
+            //     String::from("CAP_SETUID"),
+            //     String::from("CAP_SETPCAP"),
+            //     String::from("CAP_LINUX_IMMUTABLE"),
+            //     String::from("CAP_NET_BIND_SERVICE"),
+            //     String::from("CAP_NET_BROADCAST"),
+            //     String::from("CAP_NET_ADMIN"),
+            //     String::from("CAP_NET_RAW"),
+            //     String::from("CAP_IPC_LOCK"),
+            //     String::from("CAP_IPC_OWNER"),
+            //     String::from("CAP_SYS_MODULE"),
+            //     String::from("CAP_SYS_RAWIO"),
+            //     String::from("CAP_SYS_CHROOT"),
+            //     String::from("CAP_SYS_PTRACE"),
+            //     String::from("CAP_SYS_PACCT"),
+            //     String::from("CAP_SYS_ADMIN"),
+            //     String::from("CAP_SYS_BOOT"),
+            //     String::from("CAP_SYS_NICE"),
+            //     String::from("CAP_SYS_RESOURCE"),
+            //     String::from("CAP_SYS_TIME"),
+            //     String::from("CAP_SYS_TTY_CONFIG"),
+            //     String::from("CAP_MKNOD"),
+            //     String::from("CAP_LEASE"),
+            //     String::from("CAP_AUDIT_WRITE"),
+            //     String::from("CAP_AUDIT_CONTROL"),
+            //     String::from("CAP_SETFCAP"),
+            //     String::from("CAP_MAC_OVERRIDE"),
+            //     String::from("CAP_MAC_ADMIN"),
+            //     String::from("CAP_SYSLOG"),
+            //     String::from("CAP_WAKE_ALARM"),
+            //     String::from("CAP_BLOCK_SUSPEND"),
+            //     String::from("CAP_AUDIT_READ"),
+            //     String::from("CAP_PERFMON"),
+            //     String::from("CAP_BPF"),
+            //     String::from("CAP_CHECKPOINT_RESTORE"),
+            // ]),
             cgroup: Some(Cgroup {
                 v1: Some(true),
                 v2: Some(true),
