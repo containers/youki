@@ -2,7 +2,6 @@
 use anyhow::{Context, Result};
 use caps::{all, CapSet, Capability};
 use liboci_cli::Features;
-use procfs::process::Process;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
@@ -104,6 +103,7 @@ pub fn features(_: Features) -> Result<()> {
         Ok(ns) => ns,
         Err(e) => {
             eprintln!("Error querying supported namespaces: {}", e);
+            Vec::new()
         }
     };
 
@@ -112,8 +112,10 @@ pub fn features(_: Features) -> Result<()> {
         Ok(caps) => caps,
         Err(e) => {
             eprintln!("Error querying available capabilities: {}", e);
+            Vec::new()
         }
     };
+
 
     let features = HardFeatures {
         ociVersionMin: Some(String::from("1.0.0")),
