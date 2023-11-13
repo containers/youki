@@ -1,6 +1,6 @@
 //! Contains Functionality of `features` container command
 use anyhow::{Context, Result};
-use caps::{CapSet, Capability};
+use caps::{all, CapSet, Capability};
 use liboci_cli::Features;
 use procfs::process::Process;
 use serde::{Deserialize, Serialize};
@@ -69,13 +69,16 @@ struct Cgroup {
 
 // Function to query and return capabilities
 fn query_caps() -> Result<Vec<String>> {
-    let mut capabilities = Vec::new();
-    for cap in Capability::iter_variants() {
-        if caps::has_cap(None, CapSet::Effective, cap).context("Failed to check capability")? {
-            capabilities.push(format!("{:?}", cap));
+    let mut available_caps = Vec::new();
+
+    for cap in all() {
+        // Check if the capability is in the permitted set
+        if caps::has_cap(None, CapSet::Permitted, cap).unwrap_or(false) {
+            available_caps.push(format!("{:?}", cap));
         }
     }
-    Ok(capabilities)
+
+    Ok(available_caps)
 }
 
 // Function to query and return namespaces
@@ -111,6 +114,7 @@ pub fn features(_: Features) -> Result<()> {
             eprintln!("Error querying available capabilities: {}", e);
         }
     };
+
     let features = HardFeatures {
         ociVersionMin: Some(String::from("1.0.0")),
         ociVersionMax: Some(String::from("1.0.2-dev")),
