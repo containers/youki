@@ -11,6 +11,7 @@ use crate::tests::mounts_recursive::get_mounts_recursive_test;
 use crate::tests::pidfile::get_pidfile_test;
 use crate::tests::readonly_paths::get_ro_paths_test;
 use crate::tests::seccomp_notify::get_seccomp_notify_test;
+use crate::tests::sysctl::get_sysctl_test;
 use crate::tests::tlb::get_tlb_test;
 use crate::utils::support::{set_runtime_path, set_runtimetest_path};
 use anyhow::{Context, Result};
@@ -99,6 +100,7 @@ fn main() -> Result<()> {
     let hostname = get_hostname_test();
     let mounts_recursive = get_mounts_recursive_test();
     let intel_rdt = get_intel_rdt_test();
+    let sysctl = get_sysctl_test();
 
     tm.add_test_group(Box::new(cl));
     tm.add_test_group(Box::new(cc));
@@ -117,6 +119,7 @@ fn main() -> Result<()> {
     tm.add_test_group(Box::new(hostname));
     tm.add_test_group(Box::new(mounts_recursive));
     tm.add_test_group(Box::new(intel_rdt));
+    tm.add_test_group(Box::new(sysctl));
 
     tm.add_cleanup(Box::new(cgroups::cleanup_v1));
     tm.add_cleanup(Box::new(cgroups::cleanup_v2));

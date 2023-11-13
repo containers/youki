@@ -9,4 +9,5 @@ pub mod mounts_recursive;
 pub mod pidfile;
 pub mod readonly_paths;
 pub mod seccomp_notify;
+pub mod sysctl;
 pub mod tlb;
