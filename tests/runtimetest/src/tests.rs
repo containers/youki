@@ -2,7 +2,7 @@ use crate::utils::{self, test_read_access, test_write_access};
 use anyhow::{bail, Result};
 use nix::errno::Errno;
 use oci_spec::runtime::Spec;
-use std::fs::read_dir;
+use std::fs::{self, read_dir};
 use std::path::Path;
 
 ////////// ANCHOR: example_hello_world
@@ -263,6 +263,28 @@ pub fn validate_mounts_recursive(spec: &Spec) {
                         _ => {}
                     }
                 }
+            }
+        }
+    }
+}
+
+pub fn validate_sysctl(spec: &Spec) {
+    let linux = spec.linux().as_ref().unwrap();
+    if let Some(expected_linux_sysctl) = linux.sysctl() {
+        for (key, expected_value) in expected_linux_sysctl {
+            let key_path = Path::new("/proc/sys").join(key.replace('.', "/"));
+            let actual_value = match fs::read(&key_path) {
+                Ok(actual_value_bytes) => String::from_utf8_lossy(&actual_value_bytes)
+                    .trim()
+                    .to_string(),
+                Err(e) => {
+                    return eprintln!("error due to fail to read the file {key_path:?}, error: {e}")
+                }
+            };
+            if &actual_value != expected_value {
+                eprintln!(
+                    "Unexpected kernel parameter, expected: {expected_value} found: {actual_value}"
+                );
             }
         }
     }
