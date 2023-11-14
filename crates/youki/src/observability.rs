@@ -80,7 +80,15 @@ where
     let journald = config.systemd_log;
 
     let systemd_journald = if journald {
-        Some(tracing_journald::layer()?.with_syslog_identifier("youki".to_string()))
+        match tracing_journald::layer() {
+            Ok(layer) => Some(layer.with_syslog_identifier("youki".to_string())),
+            Err(err) => {
+                // Do not fail if we can't open syslog, just print a warning.
+                // This is the case in, e.g., docker-in-docker.
+                eprintln!("failed to initialize syslog logging: {:?}", err);
+                None
+            }
+        }
     } else {
         None
     };
