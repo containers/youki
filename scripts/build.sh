@@ -41,7 +41,7 @@ fi
 
 TARGET="${ARCH}-unknown-linux-gnu"
 CARGO="cargo"
-if [ "$ARCH" == "aarch64" ]; then
+if [ "$ARCH" != "$(uname -m)" ]; then
   # shellcheck disable=SC2034
   CARGO="cross"
 fi
