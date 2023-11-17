@@ -1,12 +1,11 @@
 use std::{
     borrow::Cow,
-    num::ParseIntError,
     path::{Path, PathBuf},
 };
 
 use crate::{
     common::{self, ControllerOpt, WrappedIoError},
-    stats::{self, CpuStats, StatsProvider},
+    stats::{self, CpuStats, ParseFlatKeyedDataError, StatsProvider},
 };
 
 use oci_spec::runtime::LinuxCpu;
@@ -49,13 +48,10 @@ impl Controller for Cpu {
 pub enum V2CpuStatsError {
     #[error("io error: {0}")]
     WrappedIo(#[from] WrappedIoError),
-    #[error("failed parsing value {value} for field {field} in {path}: {err}")]
-    ParseField {
-        value: String,
-        field: String,
-        path: PathBuf,
-        err: ParseIntError,
-    },
+    #[error("while parsing stat table: {0}")]
+    ParseNestedKeyedData(#[from] ParseFlatKeyedDataError),
+    #[error("missing field {field} from {path}")]
+    MissingField { field: &'static str, path: PathBuf },
 }
 
 impl StatsProvider for Cpu {
@@ -66,28 +62,26 @@ impl StatsProvider for Cpu {
         let mut stats = CpuStats::default();
         let stats_path = cgroup_path.join(CPU_STAT);
 
-        let stat_content = common::read_cgroup_file(&stats_path)?;
-        for entry in stat_content.lines() {
-            let parts: Vec<&str> = entry.split_ascii_whitespace().collect();
-            if parts.len() != 2 {
-                continue;
-            }
+        let stats_table = stats::parse_flat_keyed_data(&stats_path)?;
 
-            let value = parts[1]
-                .parse()
-                .map_err(|err| V2CpuStatsError::ParseField {
-                    value: parts[1].into(),
-                    field: parts[0].into(),
-                    path: stats_path.clone(),
-                    err,
-                })?;
-            match parts[0] {
-                "usage_usec" => stats.usage.usage_total = value,
-                "user_usec" => stats.usage.usage_user = value,
-                "system_usec" => stats.usage.usage_kernel = value,
-                _ => continue,
-            }
+        macro_rules! get {
+            ($name: expr => $field1:ident.$field2:ident) => {
+                stats.$field1.$field2 =
+                    *stats_table
+                        .get($name)
+                        .ok_or_else(|| V2CpuStatsError::MissingField {
+                            field: $name,
+                            path: stats_path.clone(),
+                        })?;
+            };
         }
+
+        get!("usage_usec" => usage.usage_total);
+        get!("user_usec" => usage.usage_user);
+        get!("system_usec" => usage.usage_kernel);
+        get!("nr_periods" => throttling.periods);
+        get!("nr_throttled" => throttling.throttled_periods);
+        get!("throttled_usec" => throttling.throttled_time);
 
         stats.psi = stats::psi_stats(&cgroup_path.join(CPU_PSI))?;
         Ok(stats)
@@ -176,7 +170,7 @@ impl Cpu {
 mod tests {
     use super::*;
     use crate::{
-        stats::CpuUsage,
+        stats::{CpuThrottling, CpuUsage},
         test::{set_fixture, setup},
     };
     use oci_spec::runtime::LinuxCpuBuilder;
@@ -337,19 +331,36 @@ mod tests {
     #[test]
     fn test_stat_usage() {
         let tmp = tempfile::tempdir().unwrap();
-        let content = ["usage_usec 7730", "user_usec 4387", "system_usec 3498"].join("\n");
+        let content = [
+            "usage_usec 7730",
+            "user_usec 4387",
+            "system_usec 3498",
+            "nr_periods 400",
+            "nr_throttled 20",
+            "throttled_usec 5000",
+        ]
+        .join("\n");
         set_fixture(tmp.path(), CPU_STAT, &content).expect("create stat file");
         set_fixture(tmp.path(), CPU_PSI, "").expect("create psi file");
 
         let actual = Cpu::stats(tmp.path()).expect("get cgroup stats");
-        let expected = CpuUsage {
-            usage_total: 7730,
-            usage_user: 4387,
-            usage_kernel: 3498,
+        let expected = CpuStats {
+            usage: CpuUsage {
+                usage_total: 7730,
+                usage_user: 4387,
+                usage_kernel: 3498,
+                ..Default::default()
+            },
+            throttling: CpuThrottling {
+                periods: 400,
+                throttled_periods: 20,
+                throttled_time: 5000,
+            },
             ..Default::default()
         };
 
-        assert_eq!(actual.usage, expected);
+        assert_eq!(actual.usage, expected.usage);
+        assert_eq!(actual.throttling, expected.throttling);
     }
 
     #[test]
