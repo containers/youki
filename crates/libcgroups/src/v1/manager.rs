@@ -28,7 +28,6 @@ use crate::common::{
     PathBufExt, WrapIoResult, WrappedIoError, CGROUP_PROCS,
 };
 use crate::stats::{PidStatsError, Stats, StatsProvider};
-use crate::v1::ControllerType;
 
 pub struct Manager {
     subsystems: HashMap<CtrlType, PathBuf>,
@@ -45,7 +44,7 @@ pub enum V1ManagerError {
     #[error("while joining paths: {0}")]
     JoinSafely(#[from] JoinSafelyError),
     #[error("cgroup {0} is required to fulfill the request, but is not supported by this system")]
-    CGroupRequired(ControllerType),
+    CGroupRequired(CtrlType),
     #[error("subsystem does not exist")]
     SubsystemDoesNotExist,
 
@@ -73,7 +72,7 @@ pub enum V1ManagerError {
     #[error(transparent)]
     CpuAcctStats(#[from] V1CpuAcctStatsError),
     #[error(transparent)]
-    PidsStats(PidStatsError),
+    PidsStats(#[from] PidStatsError),
     #[error(transparent)]
     HugeTlbStats(#[from] V1HugeTlbStatsError),
     #[error(transparent)]
@@ -83,7 +82,7 @@ pub enum V1ManagerError {
 impl Manager {
     /// Constructs a new cgroup manager with cgroups_path being relative to the root of the subsystem
     pub fn new(cgroup_path: &Path) -> Result<Self, V1ManagerError> {
-        let mut subsystems = HashMap::<CtrlType, PathBuf>::new();
+        let mut subsystems = HashMap::new();
         for subsystem in CONTROLLERS {
             if let Ok(subsystem_path) = Self::get_subsystem_path(cgroup_path, subsystem) {
                 subsystems.insert(*subsystem, subsystem_path);
@@ -171,23 +170,22 @@ impl CgroupManager for Manager {
             Err(V1ManagerError::SubsystemDoesNotExist)
         }
     }
+
     fn add_task(&self, pid: Pid) -> Result<(), Self::Error> {
-        for subsys in &self.subsystems {
-            match subsys.0 {
-                CtrlType::Cpu => Cpu::add_task(pid, subsys.1)?,
-                CtrlType::CpuAcct => CpuAcct::add_task(pid, subsys.1)?,
-                CtrlType::CpuSet => CpuSet::add_task(pid, subsys.1)?,
-                CtrlType::Devices => Devices::add_task(pid, subsys.1)?,
-                CtrlType::HugeTlb => HugeTlb::add_task(pid, subsys.1)?,
-                CtrlType::Memory => Memory::add_task(pid, subsys.1)?,
-                CtrlType::Pids => Pids::add_task(pid, subsys.1)?,
-                CtrlType::PerfEvent => PerfEvent::add_task(pid, subsys.1)?,
-                CtrlType::Blkio => {
-                    Blkio::add_task(pid, subsys.1).map_err(V1ManagerError::BlkioController)?
-                }
-                CtrlType::NetworkPriority => NetworkPriority::add_task(pid, subsys.1)?,
-                CtrlType::NetworkClassifier => NetworkClassifier::add_task(pid, subsys.1)?,
-                CtrlType::Freezer => Freezer::add_task(pid, subsys.1)?,
+        for (ctrl_type, cgroup_path) in &self.subsystems {
+            match ctrl_type {
+                CtrlType::Cpu => Cpu::add_task(pid, cgroup_path)?,
+                CtrlType::CpuAcct => CpuAcct::add_task(pid, cgroup_path)?,
+                CtrlType::CpuSet => CpuSet::add_task(pid, cgroup_path)?,
+                CtrlType::Devices => Devices::add_task(pid, cgroup_path)?,
+                CtrlType::HugeTlb => HugeTlb::add_task(pid, cgroup_path)?,
+                CtrlType::Memory => Memory::add_task(pid, cgroup_path)?,
+                CtrlType::Pids => Pids::add_task(pid, cgroup_path)?,
+                CtrlType::PerfEvent => PerfEvent::add_task(pid, cgroup_path)?,
+                CtrlType::Blkio => Blkio::add_task(pid, cgroup_path)?,
+                CtrlType::NetworkPriority => NetworkPriority::add_task(pid, cgroup_path)?,
+                CtrlType::NetworkClassifier => NetworkClassifier::add_task(pid, cgroup_path)?,
+                CtrlType::Freezer => Freezer::add_task(pid, cgroup_path)?,
             }
         }
 
@@ -195,21 +193,22 @@ impl CgroupManager for Manager {
     }
 
     fn apply(&self, controller_opt: &ControllerOpt) -> Result<(), Self::Error> {
-        for subsys in self.get_required_controllers(controller_opt)? {
-            match subsys.0 {
-                CtrlType::Cpu => Cpu::apply(controller_opt, subsys.1)?,
-                CtrlType::CpuAcct => CpuAcct::apply(controller_opt, subsys.1)?,
-                CtrlType::CpuSet => CpuSet::apply(controller_opt, subsys.1)?,
-                CtrlType::Devices => Devices::apply(controller_opt, subsys.1)?,
-                CtrlType::HugeTlb => HugeTlb::apply(controller_opt, subsys.1)?,
-                CtrlType::Memory => Memory::apply(controller_opt, subsys.1)?,
-                CtrlType::Pids => Pids::apply(controller_opt, subsys.1)?,
-                CtrlType::PerfEvent => PerfEvent::apply(controller_opt, subsys.1)?,
-                CtrlType::Blkio => Blkio::apply(controller_opt, subsys.1)
-                    .map_err(V1ManagerError::BlkioController)?,
-                CtrlType::NetworkPriority => NetworkPriority::apply(controller_opt, subsys.1)?,
-                CtrlType::NetworkClassifier => NetworkClassifier::apply(controller_opt, subsys.1)?,
-                CtrlType::Freezer => Freezer::apply(controller_opt, subsys.1)?,
+        for (ctrl_type, cgroup_path) in self.get_required_controllers(controller_opt)? {
+            match ctrl_type {
+                CtrlType::Cpu => Cpu::apply(controller_opt, cgroup_path)?,
+                CtrlType::CpuAcct => CpuAcct::apply(controller_opt, cgroup_path)?,
+                CtrlType::CpuSet => CpuSet::apply(controller_opt, cgroup_path)?,
+                CtrlType::Devices => Devices::apply(controller_opt, cgroup_path)?,
+                CtrlType::HugeTlb => HugeTlb::apply(controller_opt, cgroup_path)?,
+                CtrlType::Memory => Memory::apply(controller_opt, cgroup_path)?,
+                CtrlType::Pids => Pids::apply(controller_opt, cgroup_path)?,
+                CtrlType::PerfEvent => PerfEvent::apply(controller_opt, cgroup_path)?,
+                CtrlType::Blkio => Blkio::apply(controller_opt, cgroup_path)?,
+                CtrlType::NetworkPriority => NetworkPriority::apply(controller_opt, cgroup_path)?,
+                CtrlType::NetworkClassifier => {
+                    NetworkClassifier::apply(controller_opt, cgroup_path)?
+                }
+                CtrlType::Freezer => Freezer::apply(controller_opt, cgroup_path)?,
             }
         }
 
@@ -217,10 +216,10 @@ impl CgroupManager for Manager {
     }
 
     fn remove(&self) -> Result<(), Self::Error> {
-        for cgroup_path in &self.subsystems {
-            if cgroup_path.1.exists() {
-                tracing::debug!("remove cgroup {:?}", cgroup_path.1);
-                let procs_path = cgroup_path.1.join(CGROUP_PROCS);
+        for cgroup_path in self.subsystems.values() {
+            if cgroup_path.exists() {
+                tracing::debug!("remove cgroup {:?}", cgroup_path);
+                let procs_path = cgroup_path.join(CGROUP_PROCS);
                 let procs = fs::read_to_string(&procs_path).wrap_read(&procs_path)?;
 
                 for line in procs.lines() {
@@ -231,7 +230,7 @@ impl CgroupManager for Manager {
                     let _ = nix::sys::signal::kill(Pid::from_raw(pid), nix::sys::signal::SIGKILL);
                 }
 
-                common::delete_with_retry(cgroup_path.1, 4, Duration::from_millis(100))?;
+                common::delete_with_retry(cgroup_path, 4, Duration::from_millis(100))?;
             }
         }
 
@@ -254,16 +253,14 @@ impl CgroupManager for Manager {
     fn stats(&self) -> Result<Stats, Self::Error> {
         let mut stats = Stats::default();
 
-        for subsystem in &self.subsystems {
-            match subsystem.0 {
-                CtrlType::Cpu => stats.cpu.throttling = Cpu::stats(subsystem.1)?,
-                CtrlType::CpuAcct => stats.cpu.usage = CpuAcct::stats(subsystem.1)?,
-                CtrlType::Pids => {
-                    stats.pids = Pids::stats(subsystem.1).map_err(V1ManagerError::PidsStats)?
-                }
-                CtrlType::HugeTlb => stats.hugetlb = HugeTlb::stats(subsystem.1)?,
-                CtrlType::Blkio => stats.blkio = Blkio::stats(subsystem.1)?,
-                CtrlType::Memory => stats.memory = Memory::stats(subsystem.1)?,
+        for (ctrl_type, cgroup_path) in &self.subsystems {
+            match ctrl_type {
+                CtrlType::Cpu => stats.cpu.throttling = Cpu::stats(cgroup_path)?,
+                CtrlType::CpuAcct => stats.cpu.usage = CpuAcct::stats(cgroup_path)?,
+                CtrlType::Pids => stats.pids = Pids::stats(cgroup_path)?,
+                CtrlType::HugeTlb => stats.hugetlb = HugeTlb::stats(cgroup_path)?,
+                CtrlType::Blkio => stats.blkio = Blkio::stats(cgroup_path)?,
+                CtrlType::Memory => stats.memory = Memory::stats(cgroup_path)?,
                 _ => continue,
             }
         }
