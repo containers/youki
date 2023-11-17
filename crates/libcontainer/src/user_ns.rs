@@ -166,7 +166,7 @@ impl UserNamespaceConfig {
 
             Ok(Some(user_ns_config))
         } else {
-            tracing::debug!("this is container does NOT create a new user namespace");
+            tracing::debug!("this container does NOT create a new user namespace");
             Ok(None)
         }
     }
