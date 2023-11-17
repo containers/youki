@@ -28,7 +28,6 @@ fn seccomp_test() -> TestResult {
     let spec = create_spec(
         LinuxSeccompBuilder::default()
             .default_action(LinuxSeccompAction::ScmpActAllow)
-            .architectures(vec![Arch::ScmpArchX86_64])
             .syscalls(vec![LinuxSyscallBuilder::default()
                 .names(vec![String::from("getcwd")])
                 .action(LinuxSeccompAction::ScmpActErrno)
