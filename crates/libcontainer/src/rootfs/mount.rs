@@ -172,6 +172,7 @@ impl Mount {
 
         // get process cgroups
         let ppid = std::os::unix::process::parent_id();
+        // The non-zero ppid means that the PID Namespace is not separated.
         let ppid = if ppid == 0 { std::process::id() } else { ppid };
         let root_cgroups = Process::new(ppid as i32)?.cgroups()?.0;
         let process_cgroups: HashMap<String, String> = Process::myself()?
