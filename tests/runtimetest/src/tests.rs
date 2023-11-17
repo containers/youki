@@ -1,6 +1,7 @@
 use crate::utils::{self, test_read_access, test_write_access};
 use anyhow::{bail, Result};
 use nix::errno::Errno;
+use nix::unistd::getcwd;
 use oci_spec::runtime::Spec;
 use std::fs::{self, read_dir};
 use std::path::Path;
@@ -264,6 +265,23 @@ pub fn validate_mounts_recursive(spec: &Spec) {
                     }
                 }
             }
+        }
+    }
+}
+
+pub fn validate_seccomp(spec: &Spec) {
+    let linux = spec.linux().as_ref().unwrap();
+    if linux.seccomp().is_some() {
+        if let Err(errno) = getcwd() {
+            if errno != Errno::EPERM {
+                eprintln!(
+                    "'getcwd()' failed with unexpected error code '{errno}', expected  'EPERM'"
+                );
+            }
+        } else {
+            eprintln!(
+                "'getcwd()' syscall succeeded. It was expected to fail due to seccomp policies."
+            );
         }
     }
 }
