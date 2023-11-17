@@ -1,5 +1,5 @@
 use oci_spec::runtime::{
-    Arch, LinuxBuilder, LinuxSeccomp, LinuxSeccompAction, LinuxSeccompBuilder, LinuxSyscallBuilder,
+    LinuxBuilder, LinuxSeccomp, LinuxSeccompAction, LinuxSeccompBuilder, LinuxSyscallBuilder,
     ProcessBuilder, Spec, SpecBuilder,
 };
 use test_framework::{Test, TestGroup, TestResult};
