@@ -101,42 +101,6 @@ jobs:
           files: |
             ./${{ env.OUTPUTDIR }}-x86_64.tar.gz
             ./${{ env.OUTPUTDIR }}-aarch64.tar.gz
-
-  docs-pull-request:
-    name: Create Docs Pull Request
-    runs-on: ubuntu-22.04
-    needs:
-      - release
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Determine Release Info
-        id: info
-        env:
-          GITHUB_REF: ${{ github.ref }}
-        run: |
-          VERSION=${GITHUB_REF##*v}
-          MAJOR=${VERSION%%.*}
-          MINOR=${VERSION%.*}
-          MINOR=${MINOR#*.}
-          PATCH=${VERSION##*.}
-          echo "VERSION=${VERSION}" >> $GITHUB_ENV
-          echo "OUTPUTDIR=youki_${MAJOR}_${MINOR}_${PATCH}_linux" >> $GITHUB_ENV
-          echo "INNERDIR=youki-${VERSION}" >> $GITHUB_ENV
-      - name: Generator docs
-        run: ./scripts/release_tag.sh ${{ env.VERSION }}
-      - uses: peter-evans/create-pull-request@v5
-        with:
-          title: 'docs: Automated docs Update for ${{ env.VERSION }}'
-          body: |
-            
-            Automated changes by [create-pull-request](https://github.com/peter-evans/create-pull-request) GitHub action
-          commit-message: |
-            🤖 Automatically updates the version numbers in download links within the documentation.
-          branch: docs-${{ env.VERSION }}
-          base: main
-          signoff: true
-          delete-branch: true
   publish:
     name: Publish Packages
     needs: build

@@ -190,6 +190,4 @@ ci-musl-prepare: ci-prepare
     exit 1
 
 version-up version:
-    git grep -l "^version = .* # MARK: Version" | xargs sed -i 's/version = "[0-9]\.[0-9]\.[0-9]" # MARK: Version/version = "{{version}}" # MARK: Version/g'
-    sed -i s/_[0-9]_[0-9]_[0-9]_/_{{ replace(version, '.', '_') }}_/g  docs/src/user/basic_setup.md
-    sed -i 's/[0-9]\.[0-9]\.[0-9]/{{version}}/g'  docs/src/user/basic_setup.md
+    {{ cwd }}/scripts/release_tag.sh {{version}}

@@ -1,6 +1,11 @@
 #!/bin/bash
 
-TAG=${1:-0.3.1}
+TAG=${1}
+
+if [ -z "$TAG" ]; then
+    echo "Error: No version number provided."
+    exit 1
+fi
 
 START_MARKER="<!--youki release begin-->"
 END_MARKER="<!--youki release end-->"
