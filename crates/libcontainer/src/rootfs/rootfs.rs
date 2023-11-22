@@ -45,7 +45,7 @@ impl RootFS {
         match linux.rootfs_propagation().as_deref() {
             Some("shared") => flags |= MsFlags::MS_SHARED,
             Some("private") => flags |= MsFlags::MS_PRIVATE,
-            Some("slave" | "unbindable") | None => flags |= MsFlags::MS_SLAVE,
+            Some("slave" | "unbindable" | "") | None => flags |= MsFlags::MS_SLAVE,
             Some(unknown) => {
                 return Err(RootfsError::UnknownRootfsPropagation(unknown.to_string()));
             }

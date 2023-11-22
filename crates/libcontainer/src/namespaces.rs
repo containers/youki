@@ -8,7 +8,7 @@
 //! Cgroup (Resource limits, execution priority etc.)
 
 use crate::syscall::{syscall::create_syscall, Syscall};
-use nix::{fcntl, sched::CloneFlags, sys::stat, unistd};
+use nix::{fcntl, sched::CloneFlags, sys::stat, unistd, NixPath};
 use oci_spec::runtime::{LinuxNamespace, LinuxNamespaceType};
 use std::collections;
 
@@ -97,7 +97,7 @@ impl Namespaces {
     pub fn unshare_or_setns(&self, namespace: &LinuxNamespace) -> Result<()> {
         tracing::debug!("unshare or setns: {:?}", namespace);
         match namespace.path() {
-            Some(path) => {
+            Some(path) if !path.is_empty() => {
                 let fd = fcntl::open(path, fcntl::OFlag::empty(), stat::Mode::empty()).map_err(
                     |err| {
                         tracing::error!(?err, ?namespace, "failed to open namespace file");
@@ -115,7 +115,7 @@ impl Namespaces {
                     err
                 })?;
             }
-            None => {
+            _ => {
                 self.command
                     .unshare(get_clone_flag(namespace.typ())?)
                     .map_err(|err| {
