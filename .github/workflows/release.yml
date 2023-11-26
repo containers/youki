@@ -101,7 +101,6 @@ jobs:
           files: |
             ./${{ env.OUTPUTDIR }}-x86_64.tar.gz
             ./${{ env.OUTPUTDIR }}-aarch64.tar.gz
-
   publish:
     name: Publish Packages
     needs: build

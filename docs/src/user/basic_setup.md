@@ -46,13 +46,15 @@ $ sudo dnf install          \
 Install from the GitHub release.
 Note that this way also requires the aforementioned installation.
 
+<!--youki release begin-->
 ```console
-$ wget https://github.com/containers/youki/releases/download/v0.3.0/youki_0_3_0_linux.tar.gz
-$ tar -zxvf youki_0_3_0_linux.tar.gz youki_0_3_0_linux/youki-0.3.0/youki
+$ wget -qO youki_0_3_0_linux.tar.gz https://github.com/containers/youki/releases/download/v0.3.0/youki_0_3_0_linux.tar.gz
+$ tar -zxvf youki_0_3_0_linux.tar.gz --strip-components=1
 # Maybe you need root privileges.
-$ mv youki_0_3_0_linux/youki-0.3.0/youki /usr/local/bin/youki
-$ rm -rf youki_0_3_0_linux.tar.gz youki_0_3_0_linux
+$ mv youki-0.3.0/youki /usr/local/bin/youki
+$ rm -rf youki_0_3_0_linux.tar.gz youki-0_3_0
 ```
+<!--youki release end-->
 
 ## Getting the source
 
