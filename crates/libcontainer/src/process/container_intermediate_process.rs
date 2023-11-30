@@ -211,7 +211,7 @@ fn setup_userns(
         err
     })?;
     prctl::set_dumpable(false).unwrap();
-    return Ok(());
+    Ok(())
 }
 
 fn apply_cgroups<
@@ -249,11 +249,13 @@ fn apply_cgroups<
 
 #[cfg(test)]
 mod tests {
-    use super::apply_cgroups;
+    use super::*;
+    use crate::process::channel;
     use anyhow::Result;
     use libcgroups::test_manager::TestManager;
     use nix::unistd::Pid;
     use oci_spec::runtime::LinuxResources;
+    use oci_spec::runtime::{LinuxNamespaceBuilder, LinuxNamespaceType};
     use procfs::process::Process;
 
     #[test]
@@ -306,6 +308,22 @@ mod tests {
             Pid::from_raw(Process::myself()?.pid())
         );
         assert!(!cmanager.apply_called());
+        Ok(())
+    }
+
+    #[test]
+    fn test_setup_userns() -> Result<()> {
+        let (mut sender, _) = channel::main_channel()?;
+        let (_, mut receiver) = channel::intermediate_channel()?;
+        let user_namespace = LinuxNamespaceBuilder::default()
+            .typ(LinuxNamespaceType::User)
+            .build()
+            .unwrap();
+        let namespaces =
+            crate::namespaces::Namespaces::try_from(Some(&vec![user_namespace.clone()]))?;
+
+        setup_userns(&namespaces, &user_namespace, &mut sender, &mut receiver)?;
+
         Ok(())
     }
 }
