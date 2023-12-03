@@ -194,7 +194,7 @@ fn setup_userns(
     receiver: &mut IntermediateReceiver,
 ) -> Result<()> {
     namespaces.unshare_or_setns(user_namespace)?;
-    if user_namespace.path().is_some() {
+    if !user_namespace.path().is_some() {
         return Ok(());
     }
 
