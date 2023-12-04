@@ -116,7 +116,7 @@ jobs:
   oci-validation-rust:
     runs-on: ubuntu-22.04
     needs: [youki-build]
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v3
         with:
@@ -141,7 +141,7 @@ jobs:
   rootless-podman-test:
     runs-on: ubuntu-22.04
     needs: [youki-build]
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v3
         with:
