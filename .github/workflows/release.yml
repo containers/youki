@@ -5,9 +5,21 @@ on:
     tags: ["v[0-9]+.[0-9]+.[0-9]+*"]
 
 jobs:
+  parse:
+    runs-on: ubuntu-latest
+    name: Parse ref
+    outputs:
+      version: ${{ steps.parse.outputs.version }}
+    steps:
+      - id: parse
+        name: Parse ref
+        run: echo "version=${GITHUB_REF##refs/tags/v}" >> ${GITHUB_OUTPUT}
+
   build:
     name: Build
     runs-on: ubuntu-20.04
+    needs:
+        - parse
     strategy:
       matrix:
         arch: [ "x86_64", "aarch64" ]
@@ -37,74 +49,45 @@ jobs:
         run: just test-basic test-oci
       - name: Create output directory
         run: mkdir output
-      - name: Copy files to output
-        run: |
-          cp youki output/
-          cp README.md output/README.md
-          cp LICENSE output/LICENSE
+      - name: Create artifact
+        run: tar -zcvf youki-${{ needs.parse.outputs.version }}-${{ matrix.arch }}.tar.gz youki README.md LICENSE
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: output-${{ matrix.arch }}
-          path: output/*
+          name: youki-${{ matrix.arch }}
+          path: youki-${{ needs.parse.outputs.version }}-${{ matrix.arch }}.tar.gz
+
   release:
     name: Create Draft Release
     runs-on: ubuntu-20.04
+    permissions:
+      contents: write
     needs:
+      - parse
       - build
     steps:
       - uses: actions/checkout@v3
-
-      - name: Determine Release Info
-        id: info
+      - name: Create artifacts directory
+        run: mkdir -p artifacts
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+      - name: Create release draft
+        shell: bash
+        run: |
+          set -x
+          gh release create "${{ github.ref }}" --generate-notes --draft
+          gh release upload "${{ github.ref }}" artifacts/*/*
         env:
-          GITHUB_REF: ${{ github.ref }}
-        run: |
-          VERSION=${GITHUB_REF##*v}
-          MAJOR=${VERSION%%.*}
-          MINOR=${VERSION%.*}
-          MINOR=${MINOR#*.}
-          PATCH=${VERSION##*.}
-          echo "VERSION=${VERSION}" >> $GITHUB_ENV
-          echo "OUTPUTDIR=youki_${MAJOR}_${MINOR}_${PATCH}_linux" >> $GITHUB_ENV
-          echo "INNERDIR=youki-${VERSION}" >> $GITHUB_ENV
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_NAME: "${{ needs.parse.outputs.version }} Release"
 
-      - name: Create Output Directory
-        run: |
-          mkdir -p ${{ env.OUTPUTDIR }}-x86_64/${{ env.INNERDIR }}
-          mkdir -p ${{ env.OUTPUTDIR }}-aarch64/${{ env.INNERDIR }}
-
-      - name: Download Linux Artifacts for x86_64
-        uses: actions/download-artifact@v3
-        with:
-          name: output-x86_64
-          path: ${{ env.OUTPUTDIR }}-x86_64/${{ env.INNERDIR }}
-      - name: Download Linux Artifacts for aarch64
-        uses: actions/download-artifact@v3
-        with:
-          name: output-aarch64
-          path: ${{ env.OUTPUTDIR }}-aarch64/${{ env.INNERDIR }}
-      - name: Restore File Modes
-        run: |
-          chmod 755 ${{ env.OUTPUTDIR }}-x86_64/${{ env.INNERDIR }}/youki
-          chmod 755 ${{ env.OUTPUTDIR }}-aarch64/${{ env.INNERDIR }}/youki
-      - name: Create tarball
-        run: |
-          tar -zcvf ${{ env.OUTPUTDIR }}-x86_64.tar.gz ${{ env.OUTPUTDIR }}-x86_64
-          tar -zcvf ${{ env.OUTPUTDIR }}-aarch64.tar.gz ${{ env.OUTPUTDIR }}-aarch64
-      - name: Create Release Draft
-        uses: softprops/action-gh-release@v1
-        with:
-          name: ${{ env.VERSION }} Release
-          draft: true
-          token: ${{ secrets.GITHUB_TOKEN }}
-          files: |
-            ./${{ env.OUTPUTDIR }}-x86_64.tar.gz
-            ./${{ env.OUTPUTDIR }}-aarch64.tar.gz
   publish:
     name: Publish Packages
     needs: build
     runs-on: ubuntu-20.04
+    if: ${{ github.repository == 'containers/youki' }}
     env:
       CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
     steps:
