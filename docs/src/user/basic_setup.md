@@ -48,11 +48,11 @@ Note that this way also requires the aforementioned installation.
 
 <!--youki release begin-->
 ```console
-$ wget -qO youki_0_3_0_linux.tar.gz https://github.com/containers/youki/releases/download/v0.3.0/youki_0_3_0_linux.tar.gz
-$ tar -zxvf youki_0_3_0_linux.tar.gz --strip-components=1
+$ wget -qO youki-0.3.1.tar.gz https://github.com/containers/youki/releases/download/v0.3.1/youki-0.3.1-$(uname -m).tar.gz
+$ tar -zxvf youki-0.3.1.tar.gz youki
 # Maybe you need root privileges.
-$ mv youki-0.3.0/youki /usr/local/bin/youki
-$ rm -rf youki_0_3_0_linux.tar.gz youki-0_3_0
+$ mv youki /usr/local/bin/youki
+$ rm youki-0.3.1.tar.gz
 ```
 <!--youki release end-->
 
