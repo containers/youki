@@ -29,7 +29,7 @@ rbpf = { version = "0.2.0", optional = true }
 libbpf-sys = { version = "1.2.1", optional = true }
 errno = { version = "0.3.8", optional = true }
 libc = { version = "0.2.151", optional = true }
-thiserror = "1.0.50"
+thiserror = "1.0.51"
 tracing = { version = "0.1.40", features = ["attributes"] }
 
 [dev-dependencies]
