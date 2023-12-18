@@ -1899,7 +1899,7 @@ checksum = "302d7ab3130588088d277783b1e2d2e10c9e9e4a16dd9050e6ec93fb3e7048f4"
 
 [[package]]
 name = "libcgroups"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -1924,7 +1924,7 @@ dependencies = [
 
 [[package]]
 name = "libcontainer"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "anyhow",
  "bitflags 2.4.1",
@@ -1966,7 +1966,7 @@ dependencies = [
 
 [[package]]
 name = "liboci-cli"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "clap",
 ]
@@ -3082,9 +3082,9 @@ dependencies = [
 
 [[package]]
 name = "rkyv_derive"
-version = "0.7.42"
+version = "0.7.43"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2e06b915b5c230a17d7a736d1e2e63ee753c256a8614ef3f5147b13a4f5541d"
+checksum = "b5c462a1328c8e67e4d6dbad1eb0355dd43e8ab432c6e227a43657f16ade5033"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -5700,7 +5700,7 @@ dependencies = [
 
 [[package]]
 name = "youki"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "anyhow",
  "caps",
