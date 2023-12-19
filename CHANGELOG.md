@@ -1,5 +1,31 @@
 # Changelog
 
+## [v0.3.1](https://github.com/containers/youki/compare/v0.3.0...v0.3.1) - 2023-12-19
+### 💪 Improvements
+- fix(libcgroups): report CPU throttling stats in 'libcgroups::v2' by @xiaoyang-sde in https://github.com/containers/youki/pull/2524
+- fix(main): support arm64 release youki by @cuisongliu in https://github.com/containers/youki/pull/2498
+### 🐛 Bug Fixes
+- Specify the protobuf crate because of the rust-criu crate by @utam0k in https://github.com/containers/youki/pull/2497
+### 📖 Documentation improvements
+- docs(main): support arm64 release docs by @cuisongliu in https://github.com/containers/youki/pull/2510
+- fix docs by @lengrongfu in https://github.com/containers/youki/pull/2550
+- docs(main): auto release node using just by @cuisongliu in https://github.com/containers/youki/pull/2537
+### 🧪 Test improvements and Misc Fixes
+- Grouping patch updates in dependabot. by @utam0k in https://github.com/containers/youki/pull/2496
+- Fix the config of the dependenda bot by @utam0k in https://github.com/containers/youki/pull/2502
+- feature(main): add release  strip by @cuisongliu in https://github.com/containers/youki/pull/2503
+- test(integration_test): port 'runtime-tools/validation/linux_sysctl' by @xiaoyang-sde in https://github.com/containers/youki/pull/2527
+- docs(libcgroup): add docs for several items in 'libcgroup::v2' by @xiaoyang-sde in https://github.com/containers/youki/pull/2525
+- test(integration_test): port 'runtime-tools/validation/linux_seccomp' by @xiaoyang-sde in https://github.com/containers/youki/pull/2531
+- fix(libcgroups): clean up 'libcgroups::v1::manager' by @xiaoyang-sde in https://github.com/containers/youki/pull/2530
+- small typo in trace message by @Pvlerick in https://github.com/containers/youki/pull/2535
+- Set up userns in a straightforward way by @utam0k in https://github.com/containers/youki/pull/2548
+- Rust 1.74.1 by @utam0k in https://github.com/containers/youki/pull/2557
+- Simplify release workflow by @jprendes in https://github.com/containers/youki/pull/2541
+- config: Automated Tagpr Update for 0.3.1 by @github-actions in https://github.com/containers/youki/pull/2571
+- Release for v0.3.1 by @github-actions in https://github.com/containers/youki/pull/2570
+- Ignore CHANGELOG.md in typos by @utam0k in https://github.com/containers/youki/pull/2572
+
 ## [v0.3.1](https://github.com/containers/youki/compare/v0.3.0...v0.3.1) - 2023-12-17
 ### 💪 Improvements
 - fix(libcgroups): report CPU throttling stats in 'libcgroups::v2' by @xiaoyang-sde in https://github.com/containers/youki/pull/2524
