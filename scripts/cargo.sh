@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
 # Usage:
 #   CARGO_BUILD_TARGET=<target> cargo.sh <args>...
@@ -31,7 +32,7 @@
 #    CLI argument, or a configuration file like `.cargo/config.toml`.
 #
 
-ROOT=$(cargo metadata --format-version=1 | jq -r .workspace_root)
+ROOT=$(git rev-parse --show-toplevel)
 HOST_TARGET=$(rustc -Vv | grep ^host: | cut -d' ' -f2)
 
 export CARGO_BUILD_TARGET="${CARGO_BUILD_TARGET:-$HOST_TARGET}"
