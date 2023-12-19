@@ -4,7 +4,8 @@
 [files]
 extend-exclude = [
     "**/*.svg",
-    "tests/oci-runtime-tests/**"
+    "tests/oci-runtime-tests/**",
+    "CHANGELOG.md"
 ]
 
 [default.extend-identifiers]
