@@ -60,6 +60,8 @@ jobs:
 
   release:
     name: Create Draft Release
+    environment:
+      name: release
     runs-on: ubuntu-20.04
     permissions:
       contents: write
@@ -89,6 +91,8 @@ jobs:
   publish:
     name: Publish Packages
     needs: build
+    environment:
+      name: release
     runs-on: ubuntu-20.04
     if: ${{ github.repository == 'containers/youki' }}
     env:
