@@ -1,5 +1,5 @@
 [build]
-default-target = "x86_64-unknown-linux-musl"
+default-target = "x86_64-unknown-linux-gnu"
 
 [target.aarch64-unknown-linux-gnu]
 dockerfile = "cross/Dockerfile.gnu"
