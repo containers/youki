@@ -24,6 +24,7 @@ jobs:
     strategy:
       matrix:
         arch: [ "x86_64", "aarch64" ]
+        libc: [ "gnu", "musl" ]
     steps:
       - uses: actions/checkout@v3
         with:
@@ -31,18 +32,17 @@ jobs:
       - name: Setup Rust toolchain and cache
         uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
         env:
-          RUST_CACHE_KEY_OS: rust-cache-${{ matrix.arch }}
+          RUST_CACHE_KEY_OS: rust-cache-${{ matrix.arch }}-${{ matrix.libc }}
       - name: Install just
         uses: taiki-e/install-action@just
-      - name: Install requirements
-        if: ${{ matrix.arch == 'x86_64' }}
-        run: | 
-          sudo env PATH=$PATH arch=${{ matrix.arch }} just ci-prepare
-      - name: Install requirements for aarch64
-        if: ${{ matrix.arch == 'aarch64' }}
+      - name: Install cross-rs
         run: cargo install cross --git https://github.com/cross-rs/cross
+      - name: Setup target
+        run: |
+          echo "CARGO=cross" >> ${GITHUB_ENV}
+          echo "TARGET=${{ matrix.arch }}-unknown-linux-${{ matrix.libc }}" >> ${GITHUB_ENV}
       - name: Release build
-        run: arch=${{ matrix.arch }} just youki-release
+        run: just youki-release
       - name: test
         # TODO(utam0k): The feature test needs nightly
         # run: just test-basic featuretest test-oci
@@ -51,12 +51,12 @@ jobs:
       - name: Create output directory
         run: mkdir output
       - name: Create artifact
-        run: tar -zcvf youki-${{ needs.parse.outputs.version }}-${{ matrix.arch }}.tar.gz youki README.md LICENSE
+        run: tar -zcvf youki-${{ needs.parse.outputs.version }}-${{ matrix.arch }}-${{ matrix.libc }}.tar.gz youki README.md LICENSE
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
-          name: youki-${{ matrix.arch }}
-          path: youki-${{ needs.parse.outputs.version }}-${{ matrix.arch }}.tar.gz
+          name: youki-${{ matrix.arch }}-${{ matrix.libc }}
+          path: youki-${{ needs.parse.outputs.version }}-${{ matrix.arch }}-${{ matrix.libc }}.tar.gz
 
   release:
     name: Create Draft Release
@@ -74,6 +74,8 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           path: artifacts
+      - name: Show artifacts
+        run: ls -alhR artifacts
       - name: Create release draft
         shell: bash
         run: |
