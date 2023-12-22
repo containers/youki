@@ -70,7 +70,7 @@ This will create a directory named youki in the directory you ran the command in
 
 ## Installing the source
 
-Once you have cloned the source, you can build it by [just](https://github.com/casey/just#installation).
+Once you have cloned the source, you can build it with [just](https://github.com/casey/just#installation) :
 
 ```console
 # go into the cloned directory
