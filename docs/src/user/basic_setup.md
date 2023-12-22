@@ -70,12 +70,12 @@ This will create a directory named youki in the directory you ran the command in
 
 ## Installing the source
 
-Once you have cloned the source, you can build it using
+Once you have cloned the source, you can build it with [just](https://github.com/casey/just#installation) :
 
 ```console
 # go into the cloned directory
 $ cd youki
-$ make youki-dev # or youki-release
+$ just youki-dev # or youki-release
 $ ./youki -h # get information about youki command
 ```
 
@@ -123,5 +123,5 @@ $ VAGRANT_VAGRANTFILE=Vagrantfile.root vagrant ssh
 
 # in virtual machine
 $ cd youki
-$ make youki-dev # or youki-release
+$ just youki-dev # or youki-release
 ```
