@@ -219,10 +219,10 @@ $ rm youki-0.3.1.tar.gz
 </code></pre>
 <p>This will create a directory named youki in the directory you ran the command in. This youki directory will be referred to as root directory throughout the documentation.</p>
 <h2 id="installing-the-source"><a class="header" href="#installing-the-source">Installing the source</a></h2>
-<p>Once you have cloned the source, you can build it using</p>
+<p>Once you have cloned the source, you can build it with <a href="https://github.com/casey/just#installation">just</a> :</p>
 <pre><code class="language-console"># go into the cloned directory
 $ cd youki
-$ make youki-dev # or youki-release
+$ just youki-dev # or youki-release
 $ ./youki -h # get information about youki command
 </code></pre>
 <p>This will build the Youki binary, and put it at the root level of the cloned directory, that is in the youki/ .</p>
@@ -254,7 +254,7 @@ $ VAGRANT_VAGRANTFILE=Vagrantfile.root vagrant ssh
 
 # in virtual machine
 $ cd youki
-$ make youki-dev # or youki-release
+$ just youki-dev # or youki-release
 </code></pre>
 
                     </main>
