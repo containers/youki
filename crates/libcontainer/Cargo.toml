@@ -50,7 +50,7 @@ serde_json = "1.0"
 rust-criu = "0.4.0"
 protobuf = "= 3.2.0" # https://github.com/checkpoint-restore/rust-criu/issues/19
 regex = "1.10.2"
-thiserror = "1.0.51"
+thiserror = "1.0.52"
 tracing = { version = "0.1.40", features = ["attributes"] }
 safe-path = "0.1.0"
 
