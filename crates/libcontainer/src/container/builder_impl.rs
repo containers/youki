@@ -48,6 +48,8 @@ pub(super) struct ContainerBuilderImpl {
     pub detached: bool,
     /// Default executes the specified execution of a generic command
     pub executor: Box<dyn Executor>,
+    /// If do not use pivot root to jail process inside rootfs
+    pub no_pivot: bool,
 }
 
 impl ContainerBuilderImpl {
@@ -148,6 +150,7 @@ impl ContainerBuilderImpl {
             cgroup_config,
             detached: self.detached,
             executor: self.executor.clone(),
+            no_pivot: self.no_pivot,
         };
 
         let (init_pid, need_to_clean_up_intel_rdt_dir) =
