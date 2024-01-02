@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+CARGO_SH="$(dirname "$0")/cargo.sh"
+
 test_package_features() {
-    echo "[feature test] testing $1 with features $2"
-    cargo build --no-default-features --package "$1" --features "$2"
+    echo "[feature test] building $1 with features $2"
+    "$CARGO_SH" build --no-default-features --package "$1" --features "$2"
 }
 
 test_package_features "libcontainer" "v1"
@@ -20,8 +22,8 @@ test_package_features "libcgroups" "systemd cgroupsv2_devices"
 
 test_features() {
     echo "[feature test] testing features $1"
-    cargo build --no-default-features --features "$1"
-    cargo test run --no-default-features --features "$1"
+    "$CARGO_SH" build --no-default-features --features "$1"
+    "$CARGO_SH" test run --no-default-features --features "$1"
 }
 
 test_features "v1"

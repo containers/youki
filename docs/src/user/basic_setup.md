@@ -48,11 +48,11 @@ Note that this way also requires the aforementioned installation.
 
 <!--youki release begin-->
 ```console
-$ wget -qO youki_0_3_0_linux.tar.gz https://github.com/containers/youki/releases/download/v0.3.0/youki_0_3_0_linux.tar.gz
-$ tar -zxvf youki_0_3_0_linux.tar.gz --strip-components=1
+$ wget -qO youki-0.3.1.tar.gz https://github.com/containers/youki/releases/download/v0.3.1/youki-0.3.1-$(uname -m).tar.gz
+$ tar -zxvf youki-0.3.1.tar.gz youki
 # Maybe you need root privileges.
-$ mv youki-0.3.0/youki /usr/local/bin/youki
-$ rm -rf youki_0_3_0_linux.tar.gz youki-0_3_0
+$ mv youki /usr/local/bin/youki
+$ rm youki-0.3.1.tar.gz
 ```
 <!--youki release end-->
 
@@ -70,12 +70,12 @@ This will create a directory named youki in the directory you ran the command in
 
 ## Installing the source
 
-Once you have cloned the source, you can build it using
+Once you have cloned the source, you can build it with [just](https://github.com/casey/just#installation) :
 
 ```console
 # go into the cloned directory
 $ cd youki
-$ make youki-dev # or youki-release
+$ just youki-dev # or youki-release
 $ ./youki -h # get information about youki command
 ```
 
@@ -123,5 +123,5 @@ $ VAGRANT_VAGRANTFILE=Vagrantfile.root vagrant ssh
 
 # in virtual machine
 $ cd youki
-$ make youki-dev # or youki-release
+$ just youki-dev # or youki-release
 ```

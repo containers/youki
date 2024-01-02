@@ -1,0 +1,32 @@
+ARG CROSS_BASE_IMAGE
+FROM $CROSS_BASE_IMAGE
+
+COPY --from=jorgeprendes420/apk-anywhere / /
+ENV MARCH=${CROSS_CMAKE_SYSTEM_PROCESSOR}
+RUN apk-init ${MARCH} ${CROSS_SYSROOT}
+
+RUN apk-${MARCH} add \
+    # dependencies required to build libsecccomp-rs
+    libseccomp-static libseccomp-dev \
+    # dependencies required to build libbpf-sys
+    libelf-static elfutils-dev \
+    zlib-dev zlib-static \
+    # dependencies to build wasmedge-sys
+    g++ zstd-static
+
+# configure libsecccomp-rs to use static linking
+ENV LIBSECCOMP_LINK_TYPE="static"
+ENV LIBSECCOMP_LIB_PATH="${CROSS_SYSROOT}/lib"    
+
+# configure wasmedge-sys to link stdc++ statically
+ENV WASMEDGE_DEP_STDCXX_LINK_TYPE="static"
+ENV WASMEDGE_DEP_STDCXX_LIB_PATH="${CROSS_SYSROOT}/lib"
+
+# wasmedge-sys (through llvm) needs some symbols defined in libgcc
+RUN mkdir /.cargo && cat <<'EOF' > /.cargo/config.toml
+[target.'cfg(target_env = "musl")']
+rustflags = ["-Clink-arg=-lgcc"]
+EOF
+
+RUN apt-get -y update && \
+    apt-get install -y pkg-config

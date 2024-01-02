@@ -1,0 +1,111 @@
+name: 🚀 Release
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+*"]
+  workflow_dispatch:
+
+jobs:
+  parse:
+    runs-on: ubuntu-latest
+    name: Parse ref
+    outputs:
+      version: ${{ steps.parse.outputs.version }}
+    steps:
+      - id: parse
+        name: Parse ref
+        run: echo "version=${GITHUB_REF##refs/tags/v}" >> ${GITHUB_OUTPUT}
+
+  build:
+    name: Build
+    runs-on: ubuntu-20.04
+    needs:
+        - parse
+    strategy:
+      matrix:
+        arch: [ "x86_64", "aarch64" ]
+        libc: [ "gnu", "musl" ]
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - name: Setup Rust toolchain and cache
+        uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
+        env:
+          RUST_CACHE_KEY_OS: rust-cache-${{ matrix.arch }}-${{ matrix.libc }}
+      - name: Install just
+        uses: taiki-e/install-action@just
+      - name: Install cross-rs
+        run: cargo install cross --git https://github.com/cross-rs/cross
+      - name: Setup target
+        run: |
+          echo "CARGO=cross" >> ${GITHUB_ENV}
+          echo "TARGET=${{ matrix.arch }}-unknown-linux-${{ matrix.libc }}" >> ${GITHUB_ENV}
+      - name: Release build
+        run: just youki-release
+      - name: test
+        # TODO(utam0k): The feature test needs nightly
+        # run: just test-basic featuretest test-oci
+        if: ${{ matrix.arch == 'x86_64' }}
+        run: just test-basic test-oci
+      - name: Create output directory
+        run: mkdir output
+      - name: Create artifact
+        run: tar -zcvf youki-${{ needs.parse.outputs.version }}-${{ matrix.arch }}-${{ matrix.libc }}.tar.gz youki README.md LICENSE
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: youki-${{ matrix.arch }}-${{ matrix.libc }}
+          path: youki-${{ needs.parse.outputs.version }}-${{ matrix.arch }}-${{ matrix.libc }}.tar.gz
+
+  release:
+    name: Create Draft Release
+    environment:
+      name: release
+    runs-on: ubuntu-20.04
+    permissions:
+      contents: write
+    needs:
+      - parse
+      - build
+    steps:
+      - uses: actions/checkout@v3
+      - name: Create artifacts directory
+        run: mkdir -p artifacts
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+      - name: Show artifacts
+        run: ls -alhR artifacts
+      - name: Create release draft
+        shell: bash
+        run: |
+          set -x
+          gh release create "${{ github.ref }}" --generate-notes --draft
+          gh release upload "${{ github.ref }}" artifacts/*/*
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_NAME: "${{ needs.parse.outputs.version }} Release"
+
+  publish:
+    name: Publish Packages
+    needs: build
+    environment:
+      name: release
+    runs-on: ubuntu-20.04
+    if: ${{ github.repository == 'containers/youki' }}
+    env:
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Rust toolchain and cache
+        uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
+      - name: Publish libcgroups
+        run: cargo publish -p libcgroups --no-verify
+      - name: Publish libcontainer
+        run: cargo publish -p libcontainer --no-verify
+      - name: Publish liboci-cli
+        run: cargo publish -p liboci-cli --no-verify
+      - name: Publish youki
+        run: cargo publish -p youki --no-verify

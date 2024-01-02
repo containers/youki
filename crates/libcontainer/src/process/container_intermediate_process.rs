@@ -3,10 +3,11 @@ use crate::{namespaces::Namespaces, process::channel, process::fork};
 use libcgroups::common::CgroupManager;
 use nix::unistd::{close, write};
 use nix::unistd::{Gid, Pid, Uid};
-use oci_spec::runtime::{LinuxNamespaceType, LinuxResources};
+use oci_spec::runtime::{LinuxNamespace, LinuxNamespaceType, LinuxResources};
 use procfs::process::Process;
 
 use super::args::{ContainerArgs, ContainerType};
+use super::channel::{IntermediateReceiver, MainSender};
 use super::container_init_process::container_init_process;
 use super::fork::CloneCb;
 
@@ -68,22 +69,7 @@ pub fn container_intermediate_process(
     // https://man7.org/linux/man-pages/man7/user_namespaces.7.html for more
     // information
     if let Some(user_namespace) = namespaces.get(LinuxNamespaceType::User)? {
-        namespaces.unshare_or_setns(user_namespace)?;
-        if user_namespace.path().is_none() {
-            tracing::debug!("creating new user namespace");
-            // child needs to be dumpable, otherwise the non root parent is not
-            // allowed to write the uid/gid maps
-            prctl::set_dumpable(true).unwrap();
-            main_sender.identifier_mapping_request().map_err(|err| {
-                tracing::error!("failed to send id mapping request: {}", err);
-                err
-            })?;
-            inter_receiver.wait_for_mapping_ack().map_err(|err| {
-                tracing::error!("failed to receive id mapping ack: {}", err);
-                err
-            })?;
-            prctl::set_dumpable(false).unwrap();
-        }
+        setup_userns(&namespaces, user_namespace, main_sender, inter_receiver)?;
 
         // After UID and GID mapping is configured correctly in the Youki main
         // process, We want to make sure continue as the root user inside the
@@ -201,6 +187,33 @@ pub fn container_intermediate_process(
     Ok(())
 }
 
+fn setup_userns(
+    namespaces: &Namespaces,
+    user_namespace: &LinuxNamespace,
+    sender: &mut MainSender,
+    receiver: &mut IntermediateReceiver,
+) -> Result<()> {
+    namespaces.unshare_or_setns(user_namespace)?;
+    if user_namespace.path().is_some() {
+        return Ok(());
+    }
+
+    tracing::debug!("creating new user namespace");
+    // child needs to be dumpable, otherwise the non root parent is not
+    // allowed to write the uid/gid maps
+    prctl::set_dumpable(true).unwrap();
+    sender.identifier_mapping_request().map_err(|err| {
+        tracing::error!("failed to send id mapping request: {}", err);
+        err
+    })?;
+    receiver.wait_for_mapping_ack().map_err(|err| {
+        tracing::error!("failed to receive id mapping ack: {}", err);
+        err
+    })?;
+    prctl::set_dumpable(false).unwrap();
+    Ok(())
+}
+
 fn apply_cgroups<
     C: CgroupManager<Error = E> + ?Sized,
     E: std::error::Error + Send + Sync + 'static,
@@ -236,7 +249,7 @@ fn apply_cgroups<
 
 #[cfg(test)]
 mod tests {
-    use super::apply_cgroups;
+    use super::*;
     use anyhow::Result;
     use libcgroups::test_manager::TestManager;
     use nix::unistd::Pid;

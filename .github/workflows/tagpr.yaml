@@ -1,0 +1,29 @@
+name: 🚀 Tagpr for GitHub Actions
+on:
+  push:
+    branches:
+      - main
+jobs:
+  tagpr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install just
+        uses: taiki-e/install-action@just
+      - uses: Songmu/tagpr@v1
+        id: tagpr
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Trigger Release Workflow(only when tagged)
+        uses: actions/github-script@v6
+        if: "steps.tagpr.outputs.tag != ''"
+        with:
+          script: |
+            github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'release.yaml',
+              ref: "refs/tags/${{ steps.tagpr.outputs.tag }}",
+            })

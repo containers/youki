@@ -87,7 +87,7 @@ impl Mount {
                         panic!("libcontainer can't run in a Legacy or Hybrid cgroup setup without the v1 feature");
                         #[cfg(feature = "v1")]
                         self.mount_cgroup_v1(mount, options).map_err(|err| {
-                            tracing::error!("failed to mount cgroup v2: {}", err);
+                            tracing::error!("failed to mount cgroup v1: {}", err);
                             err
                         })?
                     }
@@ -171,10 +171,29 @@ impl Mount {
         tracing::debug!("cgroup mounts: {:?}", host_mounts);
 
         // get process cgroups
+        let ppid = std::os::unix::process::parent_id();
+        // The non-zero ppid means that the PID Namespace is not separated.
+        let ppid = if ppid == 0 { std::process::id() } else { ppid };
+        let root_cgroups = Process::new(ppid as i32)?.cgroups()?.0;
         let process_cgroups: HashMap<String, String> = Process::myself()?
             .cgroups()?
             .into_iter()
-            .map(|c| (c.controllers.join(","), c.pathname))
+            .map(|c| {
+                let hierarchy = c.hierarchy;
+                // When youki itself is running inside a container, the cgroup path
+                // will include the path of pid-1, which needs to be stripped before
+                // mounting.
+                let root_pathname = root_cgroups
+                    .iter()
+                    .find(|c| c.hierarchy == hierarchy)
+                    .map(|c| c.pathname.as_ref())
+                    .unwrap_or("");
+                let path = c
+                    .pathname
+                    .strip_prefix(root_pathname)
+                    .unwrap_or(&c.pathname);
+                (c.controllers.join(","), path.to_owned())
+            })
             .collect();
         tracing::debug!("Process cgroups: {:?}", process_cgroups);
 
