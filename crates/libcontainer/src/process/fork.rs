@@ -204,8 +204,23 @@ fn clone(cb: CloneCb, flags: u64, exit_signal: Option<u64>) -> Result<Pid, Clone
     // arg is actually a raw pointer to the Box closure. so here, we re-box the
     // pointer back into a box closure so the main takes ownership of the
     // memory. Then we can call the closure.
+
+    // The reason for test/non-test split via cfg is that after forking,
+    // the malloc and free call (from Box) can race and hang up. This is seen only in
+    // CI tests due to tests being run in parallel via cargo, so leaking memory by leaking
+    // box to prevent it, only in test config. See https://github.com/containers/youki/issues/2144
+    // and https://github.com/containers/youki/issues/2144#issuecomment-1624844755
+    // for more detailed analysis
+    #[cfg(not(test))]
     extern "C" fn main(data: *mut libc::c_void) -> libc::c_int {
         unsafe { Box::from_raw(data as *mut CloneCb)() }
+    }
+    #[cfg(test)]
+    extern "C" fn main(data: *mut libc::c_void) -> libc::c_int {
+        let mut func = unsafe { Box::from_raw(data as *mut CloneCb) };
+        let ret = func();
+        Box::into_raw(func);
+        ret
     }
 
     // The nix::sched::clone wrapper doesn't provide the right interface.  Using
