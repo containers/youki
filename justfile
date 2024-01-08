@@ -25,11 +25,6 @@ runtimetest:
 # build contest
 contest:
     {{ cwd }}/scripts/build.sh -o {{ cwd }} -r -c contest
-# =======
-# # build rust oci tests binary
-# rust-oci-tests-bin:
-#     {{ cwd }}/scripts/build.sh -o {{ cwd }} -r -c integration-test
-# >>>>>>> 6f3b5f544d6f4c07d17dd6d849aea2923a788ed3
 
 # Tests
 
@@ -59,7 +54,7 @@ test-oci:
     {{ cwd }}/scripts/oci_integration_tests.sh {{ cwd }}
 
 # run rust oci integration tests
-run-contest: youki-release contest
+test-contest: youki-release contest
     {{ cwd }}/scripts/contest.sh {{ cwd }}/youki
 
 # validate rust oci integration tests on runc

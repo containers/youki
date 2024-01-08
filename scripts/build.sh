@@ -65,26 +65,10 @@ fi
 if [ "$CRATE" == "contest" ]; then
     find ${OUTPUT} -maxdepth 1 -type f -name "contest" -exec rm -ifv {} \;
     "$CARGO_SH" build ${OPTION} "${FEATURES[@]}" --bin contest
-    # "$CARGO_SH" build ${OPTION} "${FEATURES[@]}" --bin youki
     mv ${ROOT}/target/${TARGET}/${VERSION}/contest ${OUTPUT}/
 
     find ${OUTPUT} -maxdepth 1 -type f -name "runtimetest" -exec rm -ifv {} \;
     CONTEST_TARGET="$ROOT/contest-target"
-    # CARGO_TARGET_DIR=${CONTEST_TARGET} RUSTFLAGS="-Ctarget-feature=+crt-static" cargo build --target ${TARGET} ${OPTION} ${FEATURES} --bin runtimetest
     CARGO_TARGET_DIR=${CONTEST_TARGET} RUSTFLAGS="-Ctarget-feature=+crt-static" "$CARGO_SH" build ${OPTION} "${FEATURES[@]}" --bin runtimetest
     mv ${CONTEST_TARGET}/${TARGET}/${VERSION}/runtimetest ${OUTPUT}/
 fi
-
-# if [ "$CRATE" == "integration-test" ]; then
-#     rm -f "${OUTPUT}/integration_test"
-#     "$CARGO_SH" build ${OPTION} "${FEATURES[@]}" --bin integration_test
-#     mv "$("$CARGO_SH" --print-target-dir)/${TARGET}/${VERSION}/integration_test" "${OUTPUT}/"
-# fi
-#
-# if [ "$CRATE" == "runtimetest" ]; then
-#     rm -f "${OUTPUT}/runtimetest"
-#     export CARGO_TARGET_DIR="$ROOT/runtimetest-target"
-#     export RUSTFLAGS="-Ctarget-feature=+crt-static"
-#     "$CARGO_SH" build ${OPTION} "${FEATURES[@]}" --bin runtimetest
-#     mv "$("$CARGO_SH" --print-target-dir)/${TARGET}/${VERSION}/runtimetest" "${OUTPUT}/"
-# fi
