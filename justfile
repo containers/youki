@@ -29,7 +29,7 @@ contest:
 # Tests
 
 # run integration tests
-test-integration: test-oci run-contest
+test-integration: test-oci test-contest
 
 # run all tests except rust-oci 
 test-all: test-basic test-features test-oci containerd-test # currently not doing rust-oci here
