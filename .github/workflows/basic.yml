@@ -17,7 +17,7 @@ jobs:
       any_modified: ${{ steps.filter.outputs.any_modified }}
     steps:
       - uses: actions/checkout@v3
-      - uses: tj-actions/changed-files@v36
+      - uses: tj-actions/changed-files@v41
         id: filter
         with:
           files_ignore: |
@@ -35,21 +35,26 @@ jobs:
     if: needs.changes.outputs.any_modified == 'true'
     runs-on: ubuntu-22.04
     timeout-minutes: 15
+    strategy:
+      matrix:
+        arch: [ "x86_64", "aarch64" ]
+        libc: [ "gnu", "musl" ]
     steps:
       - uses: actions/checkout@v3
       - name: Setup Rust toolchain and cache
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: rustfmt, clippy
-
       - name: typos-action
         uses: crate-ci/typos@v1.14.12
-
-      - uses: taiki-e/install-action@just
-
-      - name: Install requirements
-        run: sudo env PATH=$PATH just ci-prepare
-
+      - name: Install just
+        uses: taiki-e/install-action@just
+      - name: Install cross-rs
+        run: cargo install cross --git https://github.com/cross-rs/cross
+      - name: Setup target
+        run: |
+          echo "CARGO=cross" >> ${GITHUB_ENV}
+          echo "TARGET=${{ matrix.arch }}-unknown-linux-${{ matrix.libc }}" >> ${GITHUB_ENV}
       - name: Check formatting and lints
         run: just lint
 
@@ -57,52 +62,33 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.any_modified == 'true'
     runs-on: ubuntu-22.04
-    timeout-minutes: 15
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        arch: [ "x86_64" ]
+        libc: [ "gnu", "musl" ]
     steps:
       - uses: actions/checkout@v3
       - name: Setup Rust toolchain and cache
         uses: actions-rust-lang/setup-rust-toolchain@v1
-      - uses: taiki-e/install-action@just
-      - name: Install requirements
-        run: sudo env PATH=$PATH just ci-prepare
+      - name: Install just
+        uses: taiki-e/install-action@just
+      - name: Install cross-rs
+        run: cargo install cross --git https://github.com/cross-rs/cross
+      - name: Setup target
+        run: |
+          echo "CARGO=cross" >> ${GITHUB_ENV}
+          echo "TARGET=${{ matrix.arch }}-unknown-linux-${{ matrix.libc }}" >> ${GITHUB_ENV}
       - name: Run tests
         run: just test-basic
       - name: Run feature tests
         run: just test-features
 
-  # TODO: musl testing is flaky. Turn it back on when we can resolve it.
-  # # musl target testing is religated to a separate job because our current build
-  # # for musl requires nightly. It is difficult to mix stable and nightly
-  # # toolchains in the same job.
-  # musl:
-  #   needs: [changes]
-  #   if: needs.changes.outputs.any_modified == 'true'
-  #   runs-on: ubuntu-22.04
-  #   timeout-minutes: 20
-  #   steps:
-  #     - uses: actions/checkout@v3
-  #     # We do not use `actions-rust-lang/setup-rust-toolchain` here because we
-  #     # want to override the default toolchain file to use nightly toolchains.
-  #     # The `setup-rust-toolchain` action will always choose toolchain file with
-  #     # no way to override. 
-  #     - name: Setup Rust toolchain and cache
-  #       uses: dtolnay/rust-toolchain@v1
-  #       with:
-  #         toolchain: nightly
-  #         target: x86_64-unknown-linux-musl
-  #         components: rust-src
-  #     - uses: taiki-e/install-action@just
-  #     - name: Install requirements
-  #       run: sudo env PATH=$PATH just ci-musl-prepare
-  #     - name: Run test against musl target
-  #       run: just test-musl
-
-
   coverage:
     needs: [changes]
     if: needs.changes.outputs.any_modified == 'true'
     runs-on: ubuntu-22.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     name: Run test coverage
     steps:
       - uses: actions/checkout@v3

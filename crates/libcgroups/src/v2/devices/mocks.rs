@@ -4,10 +4,15 @@
 
 #[cfg_attr(test, automock())]
 pub mod libc {
-    pub fn setrlimit(
-        _resource: libc::__rlimit_resource_t,
-        _rlim: *const libc::rlimit,
-    ) -> libc::c_int {
+    #[cfg(target_env = "musl")]
+    #[allow(non_camel_case_types)]
+    pub type __rlimit_resource_t = libc::c_int;
+
+    #[cfg(not(target_env = "musl"))]
+    #[allow(non_camel_case_types)]
+    pub type __rlimit_resource_t = libc::__rlimit_resource_t;
+
+    pub fn setrlimit(_resource: __rlimit_resource_t, _rlim: *const libc::rlimit) -> libc::c_int {
         unimplemented!();
     }
 }

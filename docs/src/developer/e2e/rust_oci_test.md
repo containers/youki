@@ -12,7 +12,7 @@ just rust-oci-tests
 
 # How to write
 
-We will not go into detail here, but will explain how to write and add a new test vase based on an example test.
+We will not go into detail here, but will explain how to write and add a new test case based on an example test.
 
 <details>
 <summary>Fully the code of the example test</summary>

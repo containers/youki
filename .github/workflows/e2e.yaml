@@ -15,41 +15,46 @@ jobs:
     strategy:
       matrix:
         arch: [ "x86_64", "aarch64" ]
+        libc: [ "gnu", "musl" ]
     steps:
       - uses: actions/checkout@v3
       - name: Setup Rust toolchain and cache
         uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
         env:
-          RUST_CACHE_KEY_OS: rust-cache-${{ matrix.arch }}
+          RUST_CACHE_KEY_OS: rust-cache-${{ matrix.arch }}-${{ matrix.libc }}
       - name: Install just
         uses: taiki-e/install-action@just
-      - name: Install requirements
-        if: ${{ matrix.arch == 'x86_64' }}
-        run: sudo env PATH=$PATH arch=${{ matrix.arch }} just ci-prepare
-      - name: Install requirements for aarch64
-        if: ${{ matrix.arch == 'aarch64' }}
+      - name: Install cross-rs
         run: cargo install cross --git https://github.com/cross-rs/cross
+      - name: Setup target
+        run: |
+          echo "CARGO=cross" >> ${GITHUB_ENV}
+          echo "TARGET=${{ matrix.arch }}-unknown-linux-${{ matrix.libc }}" >> ${GITHUB_ENV}
       - name: Build youki
-        run: arch=${{ matrix.arch }} just youki-release
+        run: just youki-release
       - name: Upload youki binary
         if: ${{ matrix.arch == 'x86_64' }}
         uses: actions/upload-artifact@v3
         with:
-          name: youki
+          name: youki-${{ matrix.arch }}-${{ matrix.libc }}
           path: youki
 
   containerd-integration-tests:
     runs-on: ubuntu-22.04
     needs: [youki-build]
     timeout-minutes: 40
+    strategy:
+      matrix:
+        arch: [ "x86_64" ]
+        libc: [ "gnu", "musl" ]
     steps:
       - uses: actions/checkout@v3
         with:
           repository: containerd/containerd
-          ref: v1.6.20
+          ref: v1.7.11
       - uses: actions/setup-go@v4
         with:
-          go-version: '1.20'
+          go-version: '1.20.12'
           cache: true
       - run: sudo apt-get -y update
       - run: sudo apt-get install -y pkg-config libsystemd-dev libelf-dev libseccomp-dev btrfs-progs libbtrfs-dev
@@ -57,10 +62,13 @@ jobs:
         run: |
           make build
           make binaries
+          sudo make install
+          ./script/setup/install-cni
+          ./script/setup/install-critools
       - name: Download youki binary
         uses: actions/download-artifact@v3
         with:
-          name: youki
+          name: youki-${{ matrix.arch }}-${{ matrix.libc }}
       - name: Replace runc to youki
         run: |
           sudo rm -f /usr/bin/runc /usr/local/bin/runc /usr/sbin/runc
@@ -68,18 +76,22 @@ jobs:
           sudo cp youki /usr/bin/runc
           runc --version
       - name: Integration Test
-        run: sudo make TEST_RUNTIME=io.containerd.runc.v2 TESTFLAGS="-timeout 40m" integration
+        run: sudo make RUNC_FLAVOR=crun TEST_RUNTIME=io.containerd.runc.v2 TESTFLAGS="-timeout 40m" integration
 
   k8s-tests:
     runs-on: ubuntu-22.04
     needs: [youki-build]
     timeout-minutes: 40
+    strategy:
+      matrix:
+        arch: [ "x86_64" ]
+        libc: [ "gnu", "musl" ]
     steps:
       - uses: actions/checkout@v3
       - name: Download youki binary
         uses: actions/download-artifact@v3
         with:
-          name: youki
+          name: youki-${{ matrix.arch }}-${{ matrix.libc }}
       - name: Add the permission to run
         run: chmod +x ./youki
       - name: Install just
@@ -91,6 +103,10 @@ jobs:
     runs-on: ubuntu-22.04
     needs: [youki-build]
     timeout-minutes: 15
+    strategy:
+      matrix:
+        arch: [ "x86_64" ]
+        libc: [ "gnu", "musl" ]
     steps:
       - uses: actions/checkout@v3
         with:
@@ -107,7 +123,7 @@ jobs:
       - name: Download youki binary
         uses: actions/download-artifact@v3
         with:
-          name: youki
+          name: youki-${{ matrix.arch }}-${{ matrix.libc }}
       - name: Add the permission to run
         run: chmod +x ./youki
       - name: Run integration tests
@@ -116,7 +132,11 @@ jobs:
   oci-validation-rust:
     runs-on: ubuntu-22.04
     needs: [youki-build]
-    timeout-minutes: 15
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        arch: [ "x86_64" ]
+        libc: [ "gnu", "musl" ]
     steps:
       - uses: actions/checkout@v3
         with:
@@ -130,7 +150,7 @@ jobs:
       - name: Download youki binary
         uses: actions/download-artifact@v3
         with:
-          name: youki
+          name: youki-${{ matrix.arch }}-${{ matrix.libc }}
       - name: Add the permission to run
         run: chmod +x ./youki
       - name: Validate tests on youki
@@ -139,7 +159,11 @@ jobs:
   rootless-podman-test:
     runs-on: ubuntu-22.04
     needs: [youki-build]
-    timeout-minutes: 15
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        arch: [ "x86_64" ]
+        libc: [ "gnu", "musl" ]
     steps:
       - uses: actions/checkout@v3
         with:
@@ -153,7 +177,7 @@ jobs:
       - name: Download youki binary
         uses: actions/download-artifact@v3
         with:
-          name: youki
+          name: youki-${{ matrix.arch }}-${{ matrix.libc }}
       - name: Add the permission to run
         run: chmod +x ./youki
       - name: Run tests

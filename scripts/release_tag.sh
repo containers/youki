@@ -7,21 +7,17 @@ if [ -z "$TAG" ]; then
     exit 1
 fi
 VERSION=${TAG##*v}
-MAJOR=${VERSION%%.*}
-MINOR=${VERSION%.*}
-MINOR=${MINOR#*.}
-PATCH=${VERSION##*.}
 
 START_MARKER="<!--youki release begin-->"
 END_MARKER="<!--youki release end-->"
 
 
 echo "\`\`\`console
-\$ wget -qO youki_${VERSION}_linux.tar.gz https://github.com/containers/youki/releases/download/v${VERSION}/youki_${MAJOR}_${MINOR}_${PATCH}_linux-\$(uname -m).tar.gz
-\$ tar -zxvf youki_${VERSION}_linux.tar.gz --strip-components=1
+\$ wget -qO youki-${VERSION}.tar.gz https://github.com/containers/youki/releases/download/v${VERSION}/youki-${VERSION}-\$(uname -m).tar.gz
+\$ tar -zxvf youki-${VERSION}.tar.gz youki
 # Maybe you need root privileges.
-\$ mv youki-${VERSION}/youki /usr/local/bin/youki
-\$ rm -rf youki_${VERSION}_linux.tar.gz youki-${VERSION}
+\$ mv youki /usr/local/bin/youki
+\$ rm youki-${VERSION}.tar.gz
 \`\`\`" > replace_content.txt
 
 awk -v start="$START_MARKER" -v end="$END_MARKER" -v newfile="replace_content.txt" '

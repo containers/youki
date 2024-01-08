@@ -12,19 +12,24 @@ build-all: youki-release contest
 
 # build youki in dev mode
 youki-dev:
-    {{ cwd }}/scripts/build.sh -o {{ cwd }} -c youki -a ${arch:-x86_64}
+    {{ cwd }}/scripts/build.sh -o {{ cwd }} -c youki
 
 # build youki in release mode
 youki-release:
-    {{ cwd }}/scripts/build.sh -o {{ cwd }} -r -c youki -a ${arch:-x86_64}
+    {{ cwd }}/scripts/build.sh -o {{ cwd }} -r -c youki
 
 # build runtimetest binary
 runtimetest:
-    {{ cwd }}/scripts/build.sh -o {{ cwd }} -r -c runtimetest -a ${arch:-x86_64}
+    {{ cwd }}/scripts/build.sh -o {{ cwd }} -r -c runtimetest
 
 # build contest
 contest:
-    {{ cwd }}/scripts/build.sh -o {{ cwd }} -r -c contest -a ${arch:-x86_64}
+    {{ cwd }}/scripts/build.sh -o {{ cwd }} -r -c contest
+# =======
+# # build rust oci tests binary
+# rust-oci-tests-bin:
+#     {{ cwd }}/scripts/build.sh -o {{ cwd }} -r -c integration-test
+# >>>>>>> 6f3b5f544d6f4c07d17dd6d849aea2923a788ed3
 
 # Tests
 
@@ -39,19 +44,15 @@ test-basic: test-unit test-doc
 
 # run cargo unit tests
 test-unit:
-    cargo test --lib --bins --all --all-targets --all-features --no-fail-fast
+    {{ cwd }}/scripts/cargo.sh test --lib --bins --all --all-targets --all-features --no-fail-fast
 
 # run cargo doc tests
 test-doc:
-    cargo test --doc
+    {{ cwd }}/scripts/cargo.sh test --doc
 
 # run permutated feature compilation tests
 test-features:
     {{ cwd }}/scripts/features_test.sh
-
-# run test against musl target
-test-musl:
-    {{ cwd }}/scripts/musl_test.sh
 
 # run oci integration tests through runtime-tools
 test-oci:
@@ -123,8 +124,8 @@ hack-benchmark:
 
 # run linting on project
 lint:
-    cargo fmt --all -- --check
-    cargo clippy --all --all-targets --all-features -- -D warnings
+    {{ cwd }}/scripts/cargo.sh fmt --all -- --check
+    {{ cwd }}/scripts/cargo.sh clippy --all --all-targets --all-features -- -D warnings
 
 # run spellcheck
 spellcheck:
@@ -132,7 +133,7 @@ spellcheck:
 
 # run format on project
 format:
-    cargo fmt --all
+    {{ cwd }}/scripts/cargo.sh fmt --all
 
 # cleans up generated artifacts
 clean:
@@ -140,7 +141,7 @@ clean:
 
 # install tools used in dev
 dev-prepare:
-    cargo install typos-cli
+    {{ cwd }}/scripts/cargo.sh install typos-cli
 
 # setup dependencies in CI
 ci-prepare:
@@ -190,6 +191,8 @@ ci-musl-prepare: ci-prepare
     exit 1
 
 version-up version:
+    #!/usr/bin/bash
+    set -ex
     git grep -l "^version = .* # MARK: Version" | xargs sed -i 's/version = "[0-9]\.[0-9]\.[0-9]" # MARK: Version/version = "{{version}}" # MARK: Version/g'
     git grep -l "} # MARK: Version" | grep -v justfile | xargs sed -i 's/version = "[0-9]\.[0-9]\.[0-9]" } # MARK: Version/version = "{{version}}" } # MARK: Version/g'
     {{ cwd }}/scripts/release_tag.sh {{version}}
