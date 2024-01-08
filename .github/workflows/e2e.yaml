@@ -154,7 +154,7 @@ jobs:
       - name: Add the permission to run
         run: chmod +x ./youki
       - name: Validate tests on youki
-        run: just run-contest
+        run: just test-contest
 
   rootless-podman-test:
     runs-on: ubuntu-22.04
