@@ -57,7 +57,7 @@ safe-path = "0.1.0"
 [dev-dependencies]
 oci-spec = { version = "~0.6.4", features = ["proptests", "runtime"] }
 quickcheck = "1"
-serial_test = "2.0.0"
+serial_test = "3.0.0"
 tempfile = "3"
 anyhow = "1.0"
 rand = { version = "0.8.5" }
