@@ -13,11 +13,7 @@ END_MARKER="<!--youki release end-->"
 
 
 echo "\`\`\`console
-\$ wget -qO youki-${VERSION}.tar.gz https://github.com/containers/youki/releases/download/v${VERSION}/youki-${VERSION}-\$(uname -m).tar.gz
-\$ tar -zxvf youki-${VERSION}.tar.gz youki
-# Maybe you need root privileges.
-\$ mv youki /usr/local/bin/youki
-\$ rm youki-${VERSION}.tar.gz
+# curl -sSfL https://github.com/containers/youki/releases/download/v${VERSION}/youki-${VERSION}-\$(uname -m)-musl.tar.gz | tar -xzvC /usr/bin/ youki
 \`\`\`" > replace_content.txt
 
 awk -v start="$START_MARKER" -v end="$END_MARKER" -v newfile="replace_content.txt" '
