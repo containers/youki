@@ -42,6 +42,22 @@ if [ "${VERSION}" = release ]; then
     OPTION="--release"
 fi
 
+# expand target shortcuts
+case "$TARGET" in
+    musl)
+        TARGET="$(uname -m)-unknown-linux-musl"
+        ;;
+    gnu|glibc)
+        TARGET="$(uname -m)-unknown-linux-gnu"
+        ;;
+    arm64|aarch64)
+        TARGET="aarch64-unknown-linux-musl"
+        ;;
+    amd64|x86_64)
+        TARGET="x86_64-unknown-linux-musl"
+        ;;
+esac
+
 FEATURES=()
 if [ -n "${features}" ]; then
     FEATURES=("--features=${features}")
