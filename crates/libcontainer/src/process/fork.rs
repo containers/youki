@@ -207,7 +207,7 @@ fn clone(cb: CloneCb, flags: u64, exit_signal: Option<u64>) -> Result<Pid, Clone
 
     // The reason for test/non-test split via cfg is that after forking,
     // the malloc and free call (from Box) can race and hang up. This is seen only in
-    // CI tests due to tests being run in parallel via cargo, so leaking memory by leaking
+    // CI tests due to tests being run in parallel(multi threads) via cargo, so leaking memory by leaking
     // box to prevent it, only in test config. See https://github.com/containers/youki/issues/2144
     // and https://github.com/containers/youki/issues/2144#issuecomment-1624844755
     // for more detailed analysis
