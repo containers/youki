@@ -1,5 +1,5 @@
 [package]
-name = "integration_test"
+name = "contest"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,8 +7,8 @@ edition = "2021"
 anyhow = "1.0"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 flate2 = "1.0"
-libcgroups = { path = "../../crates/libcgroups" }
-libcontainer = { path = "../../crates/libcontainer" }
+libcgroups = { path = "../../../crates/libcgroups" }
+libcontainer = { path = "../../../crates/libcontainer" }
 nix = "0.27.1"
 num_cpus = "1.16"
 oci-spec = { version = "0.6.4", features = ["runtime"] }

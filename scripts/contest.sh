@@ -20,11 +20,11 @@ ROOT=${2-$(git rev-parse --show-toplevel)}
 LOGFILE="${ROOT}/test.log"
 
 if [ ! -f ${ROOT}/bundle.tar.gz ]; then
-    cp ${ROOT}/tests/integration_test/bundle.tar.gz ${ROOT}/bundle.tar.gz
+    cp ${ROOT}/tests/contest/contest/bundle.tar.gz ${ROOT}/bundle.tar.gz
 fi
 touch ${LOGFILE}
 
-sudo ${ROOT}/integration_test run --runtime "$RUNTIME" --runtimetest ${ROOT}/runtimetest > $LOGFILE
+sudo ${ROOT}/contest run --runtime "$RUNTIME" --runtimetest ${ROOT}/runtimetest > $LOGFILE
 
 if [ 0 -ne $(grep "not ok" $LOGFILE | wc -l ) ]; then
     cat $LOGFILE

@@ -8,7 +8,7 @@ cwd := justfile_directory()
 # build
 
 # build all binaries
-build-all: youki-release rust-oci-tests-bin runtimetest
+build-all: youki-release contest
 
 # build youki in dev mode
 youki-dev:
@@ -22,14 +22,14 @@ youki-release:
 runtimetest:
     {{ cwd }}/scripts/build.sh -o {{ cwd }} -r -c runtimetest
 
-# build rust oci tests binary
-rust-oci-tests-bin:
-    {{ cwd }}/scripts/build.sh -o {{ cwd }} -r -c integration-test
+# build contest
+contest:
+    {{ cwd }}/scripts/build.sh -o {{ cwd }} -r -c contest
 
 # Tests
 
 # run integration tests
-test-integration: test-oci rust-oci-tests
+test-integration: test-oci test-contest
 
 # run all tests except rust-oci 
 test-all: test-basic test-features test-oci containerd-test # currently not doing rust-oci here
@@ -54,11 +54,11 @@ test-oci:
     {{ cwd }}/scripts/oci_integration_tests.sh {{ cwd }}
 
 # run rust oci integration tests
-rust-oci-tests: youki-release runtimetest rust-oci-tests-bin
-    {{ cwd }}/scripts/rust_integration_tests.sh {{ cwd }}/youki
+test-contest: youki-release contest
+    {{ cwd }}/scripts/contest.sh {{ cwd }}/youki
 
 # validate rust oci integration tests on runc
-validate-rust-oci-runc: runtimetest rust-oci-tests-bin
+validate-contest-runc: contest
     {{ cwd }}/scripts/rust_integration_tests.sh runc
 
 # test podman rootless works with youki

@@ -17,7 +17,7 @@ use crate::tests::tlb::get_tlb_test;
 use crate::utils::support::{set_runtime_path, set_runtimetest_path};
 use anyhow::{Context, Result};
 use clap::Parser;
-use integration_test::logger;
+use contest::logger;
 use std::path::{Path, PathBuf};
 use test_framework::TestManager;
 use tests::cgroups;
