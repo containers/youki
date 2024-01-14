@@ -1,6 +1,6 @@
 //! Contains Functionality of `features` container command
-use anyhow::{Context, Result};
-use caps::{all, CapSet, Capability};
+use anyhow::Result;
+use caps::{all, CapSet};
 use liboci_cli::Features;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -14,13 +14,13 @@ pub const ANNOTATION_LIBSECCOMP_VERSION: &str = "io.github.seccomp.libseccomp.ve
 #[derive(Debug, Serialize, Deserialize)]
 pub struct HardFeatures {
     // Minimum OCI Runtime Spec version recognized by the runtime, e.g., "1.0.0".
-    ociVersionMin: Option<String>,
+    oci_version_min: Option<String>,
     // Maximum OCI Runtime Spec version recognized by the runtime, e.g., "1.0.2-dev".
-    ociVersionMax: Option<String>,
+    oci_version_max: Option<String>,
     // List of the recognized hook names, e.g., "createRuntime".
     hooks: Option<Vec<String>>,
     // List of the recognized mount options, e.g., "ro".
-    mountOptions: Option<Vec<String>>,
+    mount_options: Option<Vec<String>>,
     // Specific to Linux.
     linux: Option<Linux>,
     // Contains implementation-specific annotation strings.
@@ -63,7 +63,7 @@ struct Cgroup {
     v1: Option<bool>,
     v2: Option<bool>,
     systemd: Option<bool>,
-    systemdUser: Option<bool>,
+    systemd_user: Option<bool>,
 }
 
 // Function to query and return capabilities
@@ -118,8 +118,8 @@ pub fn features(_: Features) -> Result<()> {
 
 
     let features = HardFeatures {
-        ociVersionMin: Some(String::from("1.0.0")),
-        ociVersionMax: Some(String::from("1.0.2-dev")),
+        oci_version_min: Some(String::from("1.0.0")),
+        oci_version_max: Some(String::from("1.0.2-dev")),
         hooks: Some(vec![
             String::from("prestart"),
             String::from("createRuntime"),
@@ -128,7 +128,7 @@ pub fn features(_: Features) -> Result<()> {
             String::from("poststart"),
             String::from("poststop"),
         ]),
-        mountOptions: Some(vec![
+        mount_options: Some(vec![
             String::from("acl"),
             String::from("async"),
             String::from("atime"),
@@ -199,7 +199,7 @@ pub fn features(_: Features) -> Result<()> {
                 v1: Some(true),
                 v2: Some(true),
                 systemd: Some(true),
-                systemdUser: Some(true),
+                systemd_user: Some(true),
             }),
             seccomp: Some(Seccomp {
                 enabled: Some(true),
