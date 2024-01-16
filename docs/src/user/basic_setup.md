@@ -6,21 +6,39 @@ Youki currently only supports Linux Platform, and to use it on other platform yo
 
 Also note that Youki currently only supports and expects systemd as init system, and would not work on other systems. There is currently work on-going to put systemd dependent features behind a feature flag, but till then you will need a systemd enabled system to work with Youki.
 
-## Requirements
+## Build Requirements
 
 As Youki is written in Rust, you will need to install and setup Rust toolchain to compile it. The instructions for that can be found on Rust's official site [here](https://www.rust-lang.org/tools/install).
+If you installed it using rustup, the correct compiler version will be setup automatically from `rust-toolchain.toml` in the repo root.
 
-You can use Youki by itself to start and run containers, but it can be a little tedious, as it is a low-level container runtime. You can use a High-level container runtime, with its runtime set to Youki, so that it will be easier to use. Both of these are explained in the [Basic Usage](./basic_usage.md). For using it along with an high-level runtime, you will to install one such as Docker or Podman. This documentation uses Docker in its examples, which can be installed from [here](https://docs.docker.com/engine/install).
+### Build with cross-rs
 
-To compile and run, Youki itself depends on some underlying libraries being installed. You can install them using your respective package manager as shown below.
+You can compile youki using [cross-rs](https://github.com/cross-rs/cross), which provides:
+* Seamless compilation for different architectures (see `Cross.toml` in the repo root for the list of supported targets)
+* No build time dependencies (compilation runs in a container)
+* No runtime dependencies when building static binaries (musl targets)
 
-### Debian, Ubuntu and related distributions
+The only build dependency is [cross-rs](https://github.com/cross-rs/cross?tab=readme-ov-file#installation) and its [dependencies](https://github.com/cross-rs/cross?tab=readme-ov-file#dependencies) (rustup and docker or podman).
 
+
+```console
+$ CARGO=cross TARGET=musl just youki-dev # or youki-release
+```
+
+### Build without cross-rs
+
+Install the build dependencies and then run:
+```console
+$ just youki-dev # or youki-release
+```
+
+Install the build dependencies using your distribution's package manger
+
+#### Debian, Ubuntu and related distributions
 ```console
 $ sudo apt-get install    \
       pkg-config          \
       libsystemd-dev      \
-      libdbus-glib-1-dev  \
       build-essential     \
       libelf-dev          \
       libseccomp-dev      \
@@ -28,33 +46,46 @@ $ sudo apt-get install    \
       libssl-dev
 ```
 
-### Fedora, CentOS, RHEL and related distributions
-
+#### Fedora, CentOS, RHEL and related distributions
 ```console
 $ sudo dnf install          \
       pkg-config            \
       systemd-devel         \
-      dbus-devel            \
       elfutils-libelf-devel \
       libseccomp-devel      \
       clang-devel           \
       openssl-devel
 ```
 
+## Runtime requirements
+
+The static binary (musl) builds of youki have no additional runtime requirements. Otherwise you need to install the runtime requirements using your distribution's package manager:
+
+#### Debian, Ubuntu and related distributions
+```console
+$ sudo apt-get install libseccomp2
+```
+
+#### Fedora, CentOS, RHEL and related distributions
+```console
+$ sudo dnf install libseccomp
+```
+
+## Running youki
+
+You can use Youki by itself to start and run containers, but it can be a little tedious, as it is a low-level container runtime. You can use a High-level container runtime, with its runtime set to Youki, so that it will be easier to use. Both of these are explained in the [Basic Usage](./basic_usage.md). For using it along with an high-level runtime, you will to install one such as Docker or Podman. This documentation uses Docker in its examples, which can be installed from [here](https://docs.docker.com/engine/install).
+
 ---
 
 ## Quick install
 
-Install from the GitHub release.
-Note that this way also requires the aforementioned installation.
+Install from the GitHub release as root:
 
+<!--youki release begin-->
 ```console
-$ wget https://github.com/containers/youki/releases/download/v0.1.0/youki_0_1_0_linux.tar.gz
-$ tar -zxvf youki_0_1_0_linux.tar.gz youki_0_1_0_linux/youki-0.1.0/youki
-# Maybe you need root privileges.
-$ mv youki_0_1_0_linux/youki-0.1.0/youki /usr/local/bin/youki
-$ rm -rf youki_0_1_0_linux.tar.gz youki_0_1_0_linux
+# curl -sSfL https://github.com/containers/youki/releases/download/v0.3.1/youki-0.3.1-$(uname -m)-musl.tar.gz | tar -xzvC /usr/bin/ youki
 ```
+<!--youki release end-->
 
 ## Getting the source
 
@@ -70,12 +101,12 @@ This will create a directory named youki in the directory you ran the command in
 
 ## Installing the source
 
-Once you have cloned the source, you can build it using
+Once you have cloned the source, you can build it with [just](https://github.com/casey/just#installation) :
 
 ```console
 # go into the cloned directory
 $ cd youki
-$ make youki-dev # or youki-release
+$ just youki-dev # or youki-release
 $ ./youki -h # get information about youki command
 ```
 
@@ -123,5 +154,5 @@ $ VAGRANT_VAGRANTFILE=Vagrantfile.root vagrant ssh
 
 # in virtual machine
 $ cd youki
-$ make youki-dev # or youki-release
+$ just youki-dev # or youki-release
 ```

@@ -1,6 +1,6 @@
 use anyhow::{bail, Result};
-use libcontainer::rootless::rootless_required;
 use libcontainer::utils::create_dir_all_with_mode;
+use libcontainer::utils::rootless_required;
 use nix::libc;
 use nix::sys::stat::Mode;
 use nix::unistd::getuid;

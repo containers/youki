@@ -28,7 +28,10 @@ This module contains functionality that is general to any type of cgroup. Some o
 
 - functions `write_cgroup_file_str` and `write_cgroup_file` which write data to a cgroup file
 - function `read_cgroup_file` which reads data from given cgroup file
-- function `get_cgroup_setup` which returns setup of cgroups (v1,v2, hybrid) on the system
+- function `get_cgroup_setup_with_root` which returns setup of cgroups (v1,v2, hybrid) on the system with specified cgroup root path
+- function `get_cgroup_setup` which returns setup of cgroups (v1,v2, hybrid) on the system with default cgroup root path `/sys/fs/cgroup`
+- function `create_cgroup_manager_with_root` which returns corresponding cgroup manager on the system with specified cgroup root path, if the passed `root_path` argument is `None`, then it's same as function `create_cgroup_manager`
+- function `create_cgroup_manager` which returns corresponding cgroup manager on the system with default cgroup root path `/sys/fs/cgroup`
 
 ### stats
 
@@ -69,6 +72,8 @@ This is the module used by youki to interact with systemd, and it exposes severa
 - module `controller_type`, which contains enum `ControllerType` which is used to specify cgroup controllers available on a system
 
 - module `manager`, which contains `Manager` struct, which is the cgroup manager, and contain information such as the root cgroups path, path for the specific cgroups, client to communicate with systemd etc. This also implements `CgroupManager` trait, and thus can be used for cgroups related operations.
+
+- module `dbus-native` is the native implementation for dbus connection, which is used to interact with systemd in rootless mode.
 
 ### test_manager
 

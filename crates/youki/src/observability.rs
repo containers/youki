@@ -73,8 +73,22 @@ where
     let log_level_filter = tracing_subscriber::filter::LevelFilter::from(level);
     let log_format = detect_log_format(config.log_format.as_deref())
         .with_context(|| "failed to detect log format")?;
-    let systemd_journald = if config.systemd_log {
-        Some(tracing_journald::layer()?.with_syslog_identifier("youki".to_string()))
+
+    #[cfg(debug_assertions)]
+    let journald = true;
+    #[cfg(not(debug_assertions))]
+    let journald = config.systemd_log;
+
+    let systemd_journald = if journald {
+        match tracing_journald::layer() {
+            Ok(layer) => Some(layer.with_syslog_identifier("youki".to_string())),
+            Err(err) => {
+                // Do not fail if we can't open syslog, just print a warning.
+                // This is the case in, e.g., docker-in-docker.
+                eprintln!("failed to initialize syslog logging: {:?}", err);
+                None
+            }
+        }
     } else {
         None
     };

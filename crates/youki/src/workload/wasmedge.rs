@@ -4,12 +4,15 @@ use wasmedge_sdk::{
     params, VmBuilder,
 };
 
-use libcontainer::workload::{Executor, ExecutorError};
+use libcontainer::workload::{Executor, ExecutorError, ExecutorValidationError};
 
 const EXECUTOR_NAME: &str = "wasmedge";
 
-pub fn get_executor() -> Executor {
-    Box::new(|spec: &Spec| -> Result<(), ExecutorError> {
+#[derive(Clone)]
+pub struct WasmedgeExecutor {}
+
+impl Executor for WasmedgeExecutor {
+    fn exec(&self, spec: &Spec) -> Result<(), ExecutorError> {
         if !can_handle(spec) {
             return Err(ExecutorError::CantHandle(EXECUTOR_NAME));
         }
@@ -35,7 +38,7 @@ pub fn get_executor() -> Executor {
         // create a vm with the config settings
         let mut vm = VmBuilder::new()
             .with_config(config)
-            .build::<()>()
+            .build()
             .map_err(|err| ExecutorError::Other(format!("failed to create wasmedge vm: {}", err)))?
             .register_module_from_file("main", cmd)
             .map_err(|err| {
@@ -58,7 +61,19 @@ pub fn get_executor() -> Executor {
             .map_err(|err| ExecutorError::Execution(err))?;
 
         Ok(())
-    })
+    }
+
+    fn validate(&self, spec: &Spec) -> Result<(), ExecutorValidationError> {
+        if !can_handle(spec) {
+            return Err(ExecutorValidationError::CantHandle(EXECUTOR_NAME));
+        }
+
+        Ok(())
+    }
+}
+
+pub fn get_executor() -> WasmedgeExecutor {
+    WasmedgeExecutor {}
 }
 
 fn can_handle(spec: &Spec) -> bool {

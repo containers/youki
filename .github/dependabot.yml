@@ -8,3 +8,7 @@ updates:
     allow:
       - dependency-type: direct
       - dependency-type: indirect
+    groups:
+      patch:
+        update-types: 
+        - patch

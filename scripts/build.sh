@@ -2,18 +2,20 @@
 set -euo pipefail
 
 ROOT=$(git rev-parse --show-toplevel)
+HOST_TARGET=$(rustc -Vv | grep ^host: | cut -d' ' -f2)
 
 usage_exit() {
-    echo "Usage: $0 [-r] [-o dir]" 1>&2
+    echo "Usage: $0 [-r] [-o dir] [-c crate] [-f features] [-t target] [-x]" 1>&2
     exit 1
 }
 
 VERSION=debug
-TARGET="$(uname -m)-unknown-linux-gnu"
 CRATE="youki"
-RUNTIMETEST_TARGET="$ROOT/runtimetest-target"
+TARGET=${TARGET:-$HOST_TARGET}
+CARGO=${CARGO:-}
 features=""
-while getopts f:ro:c:h OPT; do
+
+while getopts f:ro:c:t:xh OPT; do
     case $OPT in
         f) features=${OPTARG}
             ;;
@@ -22,6 +24,10 @@ while getopts f:ro:c:h OPT; do
         r) VERSION=release
             ;;
         c) CRATE=${OPTARG}
+            ;;
+        t) TARGET=${OPTARG}
+            ;;
+        x) CARGO=cross
             ;;
         h) usage_exit
             ;;
@@ -33,37 +39,52 @@ done
 shift $((OPTIND - 1))
 
 OPTION=""
-if [ ${VERSION} = release ]; then
-    OPTION="--${VERSION}"
+if [ "${VERSION}" = release ]; then
+    OPTION="--release"
 fi
 
-FEATURES=""
+# expand target shortcuts
+case "$TARGET" in
+    musl)
+        TARGET="$(uname -m)-unknown-linux-musl"
+        ;;
+    gnu|glibc)
+        TARGET="$(uname -m)-unknown-linux-gnu"
+        ;;
+    arm64|aarch64)
+        TARGET="aarch64-unknown-linux-musl"
+        ;;
+    amd64|x86_64)
+        TARGET="x86_64-unknown-linux-musl"
+        ;;
+esac
+
+FEATURES=()
 if [ -n "${features}" ]; then
-    FEATURES="--features ${features}"
+    FEATURES=("--features=${features}")
 fi
-echo "* FEATURES: ${FEATURES}"
-echo "* features: ${features}"
+echo "* FEATURES: ${features:-<default>}"
+echo "* TARGET: ${TARGET}"
 
 OUTPUT=${output:-$ROOT/bin}
-[ ! -d $OUTPUT ] && mkdir -p $OUTPUT
+mkdir -p "$OUTPUT"
 
+CARGO_SH="$(dirname "$0")/cargo.sh"
+export CARGO_BUILD_TARGET="$TARGET"
 
 if [ "$CRATE" == "youki" ]; then
-    rm -f ${OUTPUT}/youki
-    cargo build --target ${TARGET} ${OPTION} ${FEATURES} --bin youki
-    mv ${ROOT}/target/${TARGET}/${VERSION}/youki ${OUTPUT}/
+    rm -f "${OUTPUT}/youki"
+    "$CARGO_SH" build ${OPTION} "${FEATURES[@]}" --bin youki
+    mv "$("$CARGO_SH" --print-target-dir)/${TARGET}/${VERSION}/youki" "${OUTPUT}/"
 fi
 
-if [ "$CRATE" == "integration-test" ]; then
-    rm -f ${OUTPUT}/integration_test
-    cargo build --target ${TARGET} ${OPTION} ${FEATURES} --bin integration_test
-    mv ${ROOT}/target/${TARGET}/${VERSION}/integration_test ${OUTPUT}/
-fi
+if [ "$CRATE" == "contest" ]; then
+    find ${OUTPUT} -maxdepth 1 -type f -name "contest" -exec rm -ifv {} \;
+    "$CARGO_SH" build ${OPTION} "${FEATURES[@]}" --bin contest
+    mv ${ROOT}/target/${TARGET}/${VERSION}/contest ${OUTPUT}/
 
-if [ "$CRATE" == "runtimetest" ]; then
-    rm -f ${OUTPUT}/runtimetest
-    CARGO_TARGET_DIR=${RUNTIMETEST_TARGET} RUSTFLAGS="-Ctarget-feature=+crt-static" cargo build --target ${TARGET} ${OPTION} ${FEATURES} --bin runtimetest
-    mv ${RUNTIMETEST_TARGET}/${TARGET}/${VERSION}/runtimetest ${OUTPUT}/
+    find ${OUTPUT} -maxdepth 1 -type f -name "runtimetest" -exec rm -ifv {} \;
+    CONTEST_TARGET="$ROOT/contest-target"
+    CARGO_TARGET_DIR=${CONTEST_TARGET} RUSTFLAGS="-Ctarget-feature=+crt-static" "$CARGO_SH" build ${OPTION} "${FEATURES[@]}" --bin runtimetest
+    mv ${CONTEST_TARGET}/${TARGET}/${VERSION}/runtimetest ${OUTPUT}/
 fi
-
-exit 0

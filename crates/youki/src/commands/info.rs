@@ -5,8 +5,8 @@ use std::{fs, path::Path};
 
 use anyhow::Result;
 use clap::Parser;
-use libcontainer::rootless;
-use procfs::{CpuInfo, Meminfo};
+use libcontainer::user_ns;
+use procfs::{CpuInfo, Current, Meminfo};
 
 #[cfg(feature = "v2")]
 use libcgroups::{common::CgroupSetup, v2::controller_type::ControllerType};
@@ -101,11 +101,11 @@ fn find_parameter<'a>(content: &'a str, param_name: &str) -> Option<&'a str> {
 
 /// Print Hardware information of system
 pub fn print_hardware() {
-    if let Ok(cpu_info) = CpuInfo::new() {
+    if let Ok(cpu_info) = CpuInfo::current() {
         println!("{:<18}{}", "Cores", cpu_info.num_cores());
     }
 
-    if let Ok(mem_info) = Meminfo::new() {
+    if let Ok(mem_info) = Meminfo::current() {
         println!(
             "{:<18}{}",
             "Total Memory",
@@ -211,7 +211,7 @@ pub fn print_namespaces() {
         print_feature_status(&content, "CONFIG_UTS_NS", FeatureDisplay::new("uts"));
         print_feature_status(&content, "CONFIG_IPC_NS", FeatureDisplay::new("ipc"));
 
-        let user_display = match rootless::unprivileged_user_ns_enabled() {
+        let user_display = match user_ns::unprivileged_user_ns_enabled() {
             Ok(false) => FeatureDisplay::with_status("user", "enabled (root only)", "disabled"),
             _ => FeatureDisplay::new("user"),
         };

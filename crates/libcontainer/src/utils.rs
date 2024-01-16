@@ -4,12 +4,15 @@ use std::collections::HashMap;
 use std::fs::{self, DirBuilder, File};
 use std::os::linux::fs::MetadataExt;
 use std::os::unix::fs::DirBuilderExt;
-use std::os::unix::prelude::AsRawFd;
 use std::path::{Component, Path, PathBuf};
 
 use nix::sys::stat::Mode;
 use nix::sys::statfs;
 use nix::unistd::{Uid, User};
+use oci_spec::runtime::Spec;
+
+use crate::error::LibcontainerError;
+use crate::user_ns::UserNamespaceConfig;
 
 #[derive(Debug, thiserror::Error)]
 pub enum PathBufExtError {
@@ -147,11 +150,11 @@ pub fn get_user_home(uid: u32) -> Option<PathBuf> {
 pub fn get_cgroup_path(
     cgroups_path: &Option<PathBuf>,
     container_id: &str,
-    rootless: bool,
+    new_user_ns: bool,
 ) -> PathBuf {
     match cgroups_path {
         Some(cpath) => cpath.clone(),
-        None => match rootless {
+        None => match new_user_ns {
             false => PathBuf::from(container_id),
             true => PathBuf::from(format!(":youki:{container_id}")),
         },
@@ -245,7 +248,7 @@ pub fn ensure_procfs(path: &Path) -> Result<(), EnsureProcfsError> {
         tracing::error!(?err, ?path, "failed to open procfs file");
         err
     })?;
-    let fstat_info = statfs::fstatfs(&procfs_fd.as_raw_fd()).map_err(|err| {
+    let fstat_info = statfs::fstatfs(&procfs_fd).map_err(|err| {
         tracing::error!(?err, ?path, "failed to fstatfs the procfs");
         err
     })?;
@@ -258,10 +261,43 @@ pub fn ensure_procfs(path: &Path) -> Result<(), EnsureProcfsError> {
     Ok(())
 }
 
+pub fn is_in_new_userns() -> bool {
+    let uid_map_path = "/proc/self/uid_map";
+    let content = std::fs::read_to_string(uid_map_path)
+        .unwrap_or_else(|_| panic!("failed to read {}", uid_map_path));
+    !content.contains("4294967295")
+}
+
+/// Checks if rootless mode needs to be used
+pub fn rootless_required() -> bool {
+    if !nix::unistd::geteuid().is_root() {
+        return true;
+    }
+    is_in_new_userns()
+}
+
+/// checks if given spec is valid for current user namespace setup
+pub fn validate_spec_for_new_user_ns(spec: &Spec) -> Result<(), LibcontainerError> {
+    let config = UserNamespaceConfig::new(spec)?;
+
+    // In case of rootless, there are 2 possible cases :
+    // we have a new user ns specified in the spec
+    // or the youki is launched in a new user ns (this is how podman does it)
+    // So here, we check if rootless is required,
+    // but we are neither in a new user ns nor a new user ns is specified in spec
+    // then it is an error
+    if rootless_required() && !is_in_new_userns() && config.is_none() {
+        return Err(LibcontainerError::NoUserNamespace);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_utils;
     use anyhow::{bail, Result};
+    use serial_test::serial;
 
     #[test]
     pub fn test_get_unix_user() {
@@ -363,5 +399,37 @@ mod tests {
         }
 
         Ok(())
+    }
+
+    // the following test is marked as serial because
+    // we are doing unshare of user ns and fork, so better to run in serial,
+    #[test]
+    #[serial]
+    fn test_userns_spec_validation() -> Result<(), test_utils::TestError> {
+        use nix::sched::{unshare, CloneFlags};
+        // default rootful spec
+        let rootful_spec = Spec::default();
+        // as we are not in a user ns, and spec does not have user ns
+        // we should get error here
+        assert!(validate_spec_for_new_user_ns(&rootful_spec).is_err());
+
+        let rootless_spec = Spec::rootless(1000, 1000);
+        // because the spec contains user ns info, we should not get error
+        assert!(validate_spec_for_new_user_ns(&rootless_spec).is_ok());
+
+        test_utils::test_in_child_process(|| {
+            unshare(CloneFlags::CLONE_NEWUSER).unwrap();
+            // here we are in a new user namespace
+            let rootful_spec = Spec::default();
+            // because we are already in a new user ns, it is fine if spec
+            // does not have user ns, and because the test is running as
+            // non root
+            assert!(validate_spec_for_new_user_ns(&rootful_spec).is_ok());
+
+            let rootless_spec = Spec::rootless(1000, 1000);
+            // following should succeed irrespective if we're in user ns or not
+            assert!(validate_spec_for_new_user_ns(&rootless_spec).is_ok());
+            Ok(())
+        })
     }
 }

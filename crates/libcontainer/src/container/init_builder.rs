@@ -1,11 +1,11 @@
 use nix::unistd;
 use oci_spec::runtime::Spec;
-use rootless::Rootless;
 use std::{
     fs,
     path::{Path, PathBuf},
     rc::Rc,
 };
+use user_ns::UserNamespaceConfig;
 
 use crate::{
     apparmor,
@@ -13,7 +13,7 @@ use crate::{
     error::{ErrInvalidSpec, LibcontainerError, MissingSpecError},
     notify_socket::NOTIFY_FILE,
     process::args::ContainerType,
-    rootless, tty,
+    tty, user_ns, utils,
 };
 
 use super::{
@@ -86,8 +86,9 @@ impl InitContainerBuilder {
             None
         };
 
-        let rootless = Rootless::new(&spec)?;
-        let config = YoukiConfig::from_spec(&spec, container.id(), rootless.is_some())?;
+        let user_ns_config = UserNamespaceConfig::new(&spec)?;
+
+        let config = YoukiConfig::from_spec(&spec, container.id(), user_ns_config.is_some())?;
         config.save(&container_dir).map_err(|err| {
             tracing::error!(?container_dir, "failed to save config: {}", err);
             err
@@ -102,7 +103,7 @@ impl InitContainerBuilder {
             use_systemd: self.use_systemd,
             spec: Rc::new(spec),
             rootfs,
-            rootless,
+            user_ns_config,
             notify_path,
             container: Some(container.clone()),
             preserve_fds: self.base.preserve_fds,
@@ -191,6 +192,8 @@ impl InitContainerBuilder {
                 }
             }
         }
+
+        utils::validate_spec_for_new_user_ns(spec)?;
 
         Ok(())
     }

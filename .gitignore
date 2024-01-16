@@ -2,7 +2,7 @@
 .idea/
 
 **/target
-/runtimetest-target
+/contest-target
 /bin
 .vagrant/
 
@@ -11,8 +11,8 @@ tags.lock
 tags.temp
 
 /youki
-/integration_test
 /runtimetest
+/contest
 
 .vscode
 
@@ -22,3 +22,5 @@ tags.temp
 /test.log
 
 /tests/k8s/_out/
+replace_content.txt
+/e2e/k8s/_out/

@@ -6,7 +6,6 @@ use std::{
     path::Component::RootDir,
 };
 
-use dbus::arg::RefArg;
 use nix::{unistd::Pid, NixPath};
 use std::path::{Path, PathBuf};
 
@@ -15,7 +14,7 @@ use super::{
     controller_type::{ControllerType, CONTROLLER_TYPES},
     cpu::Cpu,
     cpuset::CpuSet,
-    dbus::client::{Client, SystemdClient, SystemdClientError},
+    dbus_native::{client::SystemdClient, dbus::DbusConnection, utils::SystemdClientError},
     memory::Memory,
     pids::Pids,
 };
@@ -24,7 +23,7 @@ use crate::{
         self, AnyCgroupManager, CgroupManager, ControllerOpt, FreezerState, JoinSafelyError,
         PathBufExt, WrapIoResult, WrappedIoError,
     },
-    systemd::unified::Unified,
+    systemd::{dbus_native::serialize::Variant, unified::Unified},
     v2::manager::V2ManagerError,
 };
 use crate::{stats::Stats, v2::manager::Manager as FsManager};
@@ -47,7 +46,7 @@ pub struct Manager {
     /// Name of the systemd unit e.g. youki-569d5ce3afe1074769f67.scope
     unit_name: String,
     /// Client for communicating with systemd
-    client: Client,
+    client: DbusConnection,
     /// Cgroup manager for the created transient unit
     fs_manager: FsManager,
     /// Last control group which is managed by systemd, e.g. /user.slice/user-1000/user@1000.service
@@ -146,8 +145,6 @@ pub enum SystemdManagerError {
     WrappedIo(#[from] WrappedIoError),
     #[error("failed to destructure cgroups path: {0}")]
     CgroupsPath(#[from] CgroupsPathError),
-    #[error("dbus error: {0}")]
-    DBus(#[from] dbus::Error),
     #[error("invalid slice name: {0}")]
     InvalidSliceName(String),
     #[error(transparent)]
@@ -184,8 +181,8 @@ impl Manager {
         ensure_parent_unit(&mut destructured_path, use_system);
 
         let client = match use_system {
-            true => Client::new_system()?,
-            false => Client::new_session()?,
+            true => DbusConnection::new_system()?,
+            false => DbusConnection::new_session()?,
         };
 
         let (cgroups_path, delegation_boundary) =
@@ -344,7 +341,7 @@ impl Manager {
     }
 
     pub fn any(self) -> AnyCgroupManager {
-        AnyCgroupManager::Systemd(self)
+        AnyCgroupManager::Systemd(Box::new(self))
     }
 }
 
@@ -369,7 +366,7 @@ impl CgroupManager for Manager {
     }
 
     fn apply(&self, controller_opt: &ControllerOpt) -> Result<(), Self::Error> {
-        let mut properties: HashMap<&str, Box<dyn RefArg>> = HashMap::new();
+        let mut properties: HashMap<&str, Variant> = HashMap::new();
         let systemd_version = self.client.systemd_version()?;
 
         for controller in CONTROLLER_TYPES {
@@ -393,8 +390,8 @@ impl CgroupManager for Manager {
             };
         }
 
+        tracing::debug!("applying properties {:?}", properties);
         Unified::apply(controller_opt, systemd_version, &mut properties)?;
-        tracing::debug!("{:?}", properties);
 
         if !properties.is_empty() {
             self.ensure_controllers_attached()?;
@@ -432,9 +429,10 @@ impl CgroupManager for Manager {
 mod tests {
     use anyhow::{Context, Result};
 
-    use crate::systemd::dbus::client::SystemdClient;
-
     use super::*;
+    use crate::systemd::dbus_native::{
+        client::SystemdClient, serialize::Variant, utils::SystemdClientError,
+    };
 
     struct TestSystemdClient {}
 
@@ -464,7 +462,7 @@ mod tests {
         fn set_unit_properties(
             &self,
             _unit_name: &str,
-            _properties: &HashMap<&str, Box<dyn RefArg>>,
+            _properties: &HashMap<&str, Variant>,
         ) -> Result<(), SystemdClientError> {
             Ok(())
         }

@@ -1,3 +1,5 @@
+name: ✔️ Verification of integration
+
 on:
   push:
     branches:
@@ -15,12 +17,14 @@ jobs:
       any_modified: ${{ steps.filter.outputs.any_modified }}
     steps:
       - uses: actions/checkout@v3
-      - uses: tj-actions/changed-files@v36
+      - uses: tj-actions/changed-files@v41
         id: filter
         with:
           files: |
             .github/workflows/integration_tests_validation.yaml
-            tests/rust-integration-tests/**
+            tests/runtimetest/**
+            tests/test_framework/**
+            tests/integration_test/**
           files_ignore: |
             **.md
       - name: List all changed files

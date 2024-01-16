@@ -1,0 +1,11 @@
+[package]
+name = "runtimetest"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+oci-spec = { version = "0.6.4", features = ["runtime"] }
+nix = "0.27.1"
+anyhow = "1.0"
+libc = "0.2.139"
+

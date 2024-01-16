@@ -23,7 +23,7 @@ use std::{
 use crate::error::{ErrInvalidSpec, LibcontainerError, MissingSpecError};
 use crate::process::args::ContainerType;
 use crate::{capabilities::CapabilityExt, container::builder_impl::ContainerBuilderImpl};
-use crate::{notify_socket::NotifySocket, rootless::Rootless, tty, utils};
+use crate::{notify_socket::NotifySocket, tty, user_ns::UserNamespaceConfig, utils};
 
 use super::{builder::ContainerBuilder, Container};
 
@@ -119,7 +119,7 @@ impl TenantContainerBuilder {
         let csocketfd = self.setup_tty_socket(&container_dir)?;
 
         let use_systemd = self.should_use_systemd(&container);
-        let rootless = Rootless::new(&spec)?;
+        let user_ns_config = UserNamespaceConfig::new(&spec)?;
 
         let (read_end, write_end) =
             pipe2(OFlag::O_CLOEXEC).map_err(LibcontainerError::OtherSyscall)?;
@@ -135,7 +135,7 @@ impl TenantContainerBuilder {
             use_systemd,
             spec: Rc::new(spec),
             rootfs,
-            rootless,
+            user_ns_config,
             notify_path: notify_path.clone(),
             container: None,
             preserve_fds: self.base.preserve_fds,
@@ -165,7 +165,7 @@ impl TenantContainerBuilder {
                     }
                 }
                 _ => {
-                    err_str_buf.extend(buf.into_iter());
+                    err_str_buf.extend(buf);
                 }
             }
         }
@@ -224,6 +224,8 @@ impl TenantContainerBuilder {
             }
         }
 
+        utils::validate_spec_for_new_user_ns(spec)?;
+
         Ok(())
     }
 
@@ -270,7 +272,7 @@ impl TenantContainerBuilder {
         }
 
         let init_process = procfs::process::Process::new(container.pid().unwrap().as_raw())?;
-        let ns = self.get_namespaces(init_process.namespaces()?)?;
+        let ns = self.get_namespaces(init_process.namespaces()?.0)?;
         let linux = LinuxBuilder::default().namespaces(ns).build()?;
 
         spec.set_process(Some(process)).set_linux(Some(linux));

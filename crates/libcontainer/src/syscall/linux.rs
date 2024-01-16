@@ -7,12 +7,12 @@ use nix::{
     mount::{mount, umount2, MntFlags, MsFlags},
     sched::{unshare, CloneFlags},
     sys::stat::{mknod, Mode, SFlag},
-    unistd,
-    unistd::{chown, fchdir, pivot_root, setgroups, sethostname, Gid, Uid},
+    unistd::{chown, chroot, fchdir, pivot_root, sethostname, Gid, Uid},
 };
 use oci_spec::runtime::LinuxRlimit;
 use std::ffi::{CStr, CString, OsStr};
 use std::fs;
+use std::os::fd::BorrowedFd;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::symlink;
 use std::os::unix::io::RawFd;
@@ -305,7 +305,8 @@ impl Syscall for LinuxSyscall {
 
     /// Set namespace for process
     fn set_ns(&self, rawfd: i32, nstype: CloneFlags) -> Result<()> {
-        nix::sched::setns(rawfd, nstype)?;
+        let fd = unsafe { BorrowedFd::borrow_raw(rawfd) };
+        nix::sched::setns(fd, nstype)?;
         Ok(())
     }
 
@@ -316,22 +317,30 @@ impl Syscall for LinuxSyscall {
             nix::errno::from_i32(errno)
         })?;
         // args : real *id, effective *id, saved set *id respectively
-        unistd::setresgid(gid, gid, gid).map_err(|err| {
+
+        // This is safe because at this point we have only
+        // one thread in the process
+        if unsafe { libc::syscall(libc::SYS_setresgid, gid, gid, gid) } == -1 {
+            let err = nix::errno::Errno::last();
             tracing::error!(
                 ?err,
                 ?gid,
                 "failed to set real, effective and saved set gid"
             );
-            err
-        })?;
-        unistd::setresuid(uid, uid, uid).map_err(|err| {
+            return Err(err.into());
+        }
+
+        // This is safe because at this point we have only
+        // one thread in the process
+        if unsafe { libc::syscall(libc::SYS_setresuid, uid, uid, uid) } == -1 {
+            let err = nix::errno::Errno::last();
             tracing::error!(
                 ?err,
                 ?uid,
                 "failed to set real, effective and saved set uid"
             );
-            err
-        })?;
+            return Err(err.into());
+        }
 
         // if not the root user, reset capabilities to effective capabilities,
         // which are used by kernel to perform checks
@@ -454,7 +463,7 @@ impl Syscall for LinuxSyscall {
     }
 
     fn chroot(&self, path: &Path) -> Result<()> {
-        unistd::chroot(path)?;
+        chroot(path)?;
 
         Ok(())
     }
@@ -490,8 +499,16 @@ impl Syscall for LinuxSyscall {
     }
 
     fn set_groups(&self, groups: &[Gid]) -> Result<()> {
-        setgroups(groups)?;
+        let n_groups = groups.len() as libc::size_t;
+        let groups_ptr = groups.as_ptr() as *const libc::gid_t;
 
+        // This is safe because at this point we have only
+        // one thread in the process
+        if unsafe { libc::syscall(libc::SYS_setgroups, n_groups, groups_ptr) } == -1 {
+            let err = nix::errno::Errno::last();
+            tracing::error!(?err, ?groups, "failed to set groups");
+            return Err(err.into());
+        }
         Ok(())
     }
 
@@ -612,7 +629,7 @@ mod tests {
         drop(file);
 
         // The stdio fds should also be contained in the list of opened fds.
-        if !vec![0, 1, 2]
+        if ![0, 1, 2]
             .iter()
             .all(|&stdio_fd| open_fds.iter().any(|&open_fd| open_fd == stdio_fd))
         {

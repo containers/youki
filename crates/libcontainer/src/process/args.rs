@@ -6,8 +6,8 @@ use std::rc::Rc;
 
 use crate::container::Container;
 use crate::notify_socket::NotifyListener;
-use crate::rootless::Rootless;
 use crate::syscall::syscall::SyscallType;
+use crate::user_ns::UserNamespaceConfig;
 use crate::workload::Executor;
 #[derive(Debug, Copy, Clone)]
 pub enum ContainerType {
@@ -33,12 +33,12 @@ pub struct ContainerArgs {
     pub preserve_fds: i32,
     /// Container state
     pub container: Option<Container>,
-    /// Options for rootless containers
-    pub rootless: Option<Rootless>,
+    /// Options for new namespace creation
+    pub user_ns_config: Option<UserNamespaceConfig>,
     /// Cgroup Manager Config
     pub cgroup_config: CgroupConfig,
     /// If the container is to be run in detached mode
     pub detached: bool,
     /// Manage the functions that actually run on the container
-    pub executor: Executor,
+    pub executor: Box<dyn Executor>,
 }

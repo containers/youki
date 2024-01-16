@@ -64,7 +64,7 @@ const BLKIO_IO_SERVICE_BYTES: &str = "blkio.io_service_bytes_recursive";
 // Format: Major:Minor Type Ops
 const BLKIO_IO_SERVICED: &str = "blkio.io_serviced_recursive";
 // Total time between request dispatch and request completion
-//// Format: Major:Minor Type Time(ns)
+/// Format: Major:Minor Type Time(ns)
 const BLKIO_IO_SERVICE_TIME: &str = "blkio.io_service_time_recursive";
 // Total time spend waiting in the scheduler queues for service
 // Format: Major:Minor Type Time(ns)

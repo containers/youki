@@ -4,8 +4,8 @@ use crate::namespaces::NamespaceError;
 use crate::syscall::{Syscall, SyscallError};
 use crate::{apparmor, notify_socket, rootfs, workload};
 use crate::{
-    capabilities, hooks, namespaces::Namespaces, process::channel, rootfs::RootFS,
-    rootless::Rootless, tty, utils,
+    capabilities, hooks, namespaces::Namespaces, process::channel, rootfs::RootFS, tty,
+    user_ns::UserNamespaceConfig, utils,
 };
 use nix::mount::MsFlags;
 use nix::sched::CloneFlags;
@@ -70,77 +70,13 @@ pub enum InitProcessError {
     NotifyListener(#[from] notify_socket::NotifyListenerError),
     #[error(transparent)]
     Workload(#[from] workload::ExecutorError),
+    #[error(transparent)]
+    WorkloadValidation(#[from] workload::ExecutorValidationError),
     #[error("invalid io priority class: {0}")]
     IoPriorityClass(String),
 }
 
 type Result<T> = std::result::Result<T, InitProcessError>;
-
-fn get_executable_path(name: &str, path_var: &str) -> Option<PathBuf> {
-    // if path has / in it, we have to assume absolute path, as per runc impl
-    if name.contains('/') && PathBuf::from(name).exists() {
-        return Some(PathBuf::from(name));
-    }
-    for path in path_var.split(':') {
-        let potential_path = PathBuf::from(path).join(name);
-        if potential_path.exists() {
-            return Some(potential_path);
-        }
-    }
-    None
-}
-
-fn is_executable(path: &Path) -> std::result::Result<bool, std::io::Error> {
-    use std::os::unix::fs::PermissionsExt;
-    let metadata = path.metadata()?;
-    let permissions = metadata.permissions();
-    // we have to check if the path is file and the execute bit
-    // is set. In case of directories, the execute bit is also set,
-    // so have to check if this is a file or not
-    Ok(metadata.is_file() && permissions.mode() & 0o001 != 0)
-}
-
-// this checks if the binary to run actually exists and if we have
-// permissions to run it.  Taken from
-// https://github.com/opencontainers/runc/blob/25c9e888686773e7e06429133578038a9abc091d/libcontainer/standard_init_linux.go#L195-L206
-fn verify_binary(args: &[String], envs: &[String]) -> Result<()> {
-    let path_vars: Vec<&String> = envs.iter().filter(|&e| e.starts_with("PATH=")).collect();
-    if path_vars.is_empty() {
-        tracing::error!("PATH environment variable is not set");
-        return Err(InitProcessError::InvalidExecutable(args[0].clone()));
-    }
-    let path_var = path_vars[0].trim_start_matches("PATH=");
-    match get_executable_path(&args[0], path_var) {
-        None => {
-            tracing::error!(
-                "executable {} for container process not found in PATH",
-                args[0]
-            );
-            return Err(InitProcessError::InvalidExecutable(args[0].clone()));
-        }
-        Some(path) => match is_executable(&path) {
-            Ok(true) => {
-                tracing::debug!("found executable {:?}", path);
-            }
-            Ok(false) => {
-                tracing::error!(
-                    "executable {:?} does not have the correct permission set",
-                    path
-                );
-                return Err(InitProcessError::InvalidExecutable(args[0].clone()));
-            }
-            Err(err) => {
-                tracing::error!(
-                    "failed to check permissions for executable {:?}: {}",
-                    path,
-                    err
-                );
-                return Err(InitProcessError::Io(err));
-            }
-        },
-    }
-    Ok(())
-}
 
 fn sysctl(kernel_params: &HashMap<String, String>) -> Result<()> {
     let sys = PathBuf::from("/proc/sys");
@@ -376,7 +312,8 @@ pub fn container_init_process(
             })?;
         }
 
-        let bind_service = namespaces.get(LinuxNamespaceType::User)?.is_some();
+        let bind_service =
+            namespaces.get(LinuxNamespaceType::User)?.is_some() || utils::is_in_new_userns();
         let rootfs = RootFS::new();
         rootfs
             .prepare_rootfs(
@@ -492,7 +429,7 @@ pub fn container_init_process(
         }
     };
 
-    set_supplementary_gids(proc.user(), &args.rootless, syscall.as_ref()).map_err(|err| {
+    set_supplementary_gids(proc.user(), &args.user_ns_config, syscall.as_ref()).map_err(|err| {
         tracing::error!(?err, "failed to set supplementary gids");
         err
     })?;
@@ -637,9 +574,7 @@ pub fn container_init_process(
         tracing::warn!("seccomp not available, unable to set seccomp privileges!")
     }
 
-    if let Some(args) = proc.args() {
-        verify_binary(args, &envs)?;
-    }
+    args.executor.validate(spec)?;
 
     // Notify main process that the init process is ready to execute the
     // payload.  Note, because we are already inside the pid namespace, the pid
@@ -678,16 +613,20 @@ pub fn container_init_process(
         }
     }
 
-    if proc.args().is_some() {
-        (args.executor)(spec).map_err(|err| {
-            tracing::error!(?err, "failed to execute payload");
-            err
-        })?;
-        unreachable!("should not be back here");
-    } else {
+    if proc.args().is_none() {
         tracing::error!("on non-Windows, at least one process arg entry is required");
-        Err(MissingSpecError::Args)
-    }?
+        Err(MissingSpecError::Args)?;
+    }
+
+    args.executor.exec(spec).map_err(|err| {
+        tracing::error!(?err, "failed to execute payload");
+        err
+    })?;
+
+    // Once the executor is executed without error, it should not return. For
+    // example, the default executor is expected to call `exec` and replace the
+    // current process.
+    unreachable!("the executor should not return if it is successful.");
 }
 
 // Before 3.19 it was possible for an unprivileged user to enter an user namespace,
@@ -716,7 +655,7 @@ pub fn container_init_process(
 //
 fn set_supplementary_gids(
     user: &User,
-    rootless: &Option<Rootless>,
+    user_ns_config: &Option<UserNamespaceConfig>,
     syscall: &dyn Syscall,
 ) -> Result<()> {
     if let Some(additional_gids) = user.additional_gids() {
@@ -738,7 +677,7 @@ fn set_supplementary_gids(
             .map(|gid| Gid::from_raw(*gid))
             .collect();
 
-        match rootless {
+        match user_ns_config {
             Some(r) if r.privileged => {
                 syscall.set_groups(&gids).map_err(|err| {
                     tracing::error!(?err, ?gids, "failed to set privileged supplementary gids");
@@ -753,7 +692,7 @@ fn set_supplementary_gids(
             }
             // this should have been detected during validation
             _ => unreachable!(
-                "unprivileged users cannot set supplementary gids in rootless container"
+                "unprivileged users cannot set supplementary gids in containers with new user namespace"
             ),
         }
     }
@@ -927,20 +866,20 @@ mod tests {
                 UserBuilder::default()
                     .additional_gids(vec![33, 34])
                     .build()?,
-                None::<Rootless>,
+                None::<UserNamespaceConfig>,
                 vec![vec![Gid::from_raw(33), Gid::from_raw(34)]],
             ),
             // unreachable case
             (
                 UserBuilder::default().build()?,
-                Some(Rootless::default()),
+                Some(UserNamespaceConfig::default()),
                 vec![],
             ),
             (
                 UserBuilder::default()
                     .additional_gids(vec![37, 38])
                     .build()?,
-                Some(Rootless {
+                Some(UserNamespaceConfig {
                     privileged: true,
                     gid_mappings: None,
                     newgidmap: None,
@@ -952,9 +891,9 @@ mod tests {
                 vec![vec![Gid::from_raw(37), Gid::from_raw(38)]],
             ),
         ];
-        for (user, rootless, want) in tests.into_iter() {
+        for (user, ns_config, want) in tests.into_iter() {
             let syscall = create_syscall();
-            let result = set_supplementary_gids(&user, &rootless, syscall.as_ref());
+            let result = set_supplementary_gids(&user, &ns_config, syscall.as_ref());
             match fs::read_to_string("/proc/self/setgroups")?.trim() {
                 "deny" => {
                     assert!(result.is_err());
@@ -1085,44 +1024,6 @@ mod tests {
         assert!(masked_path(Path::new("/proc/self"), &None, syscall.as_ref()).is_err());
         let got = mocks.get_mount_args();
         assert_eq!(0, got.len());
-    }
-
-    #[test]
-    fn test_get_executable_path() {
-        let non_existing_abs_path = "/some/non/existent/absolute/path";
-        let existing_abs_path = "/usr/bin/sh";
-        let existing_binary = "sh";
-        let non_existing_binary = "non-existent";
-        let path_value = "/usr/bin:/bin";
-
-        assert_eq!(
-            get_executable_path(existing_abs_path, path_value),
-            Some(PathBuf::from(existing_abs_path))
-        );
-        assert_eq!(get_executable_path(non_existing_abs_path, path_value), None);
-
-        assert_eq!(
-            get_executable_path(existing_binary, path_value),
-            Some(PathBuf::from("/usr/bin/sh"))
-        );
-
-        assert_eq!(get_executable_path(non_existing_binary, path_value), None);
-    }
-
-    #[test]
-    fn test_is_executable() {
-        let tmp = tempfile::tempdir().expect("create temp directory for test");
-        let executable_path = PathBuf::from("/bin/sh");
-        let directory_path = tmp.path();
-        let non_executable_path = directory_path.join("non_executable_file");
-        let non_existent_path = PathBuf::from("/some/non/existent/path");
-
-        std::fs::File::create(non_executable_path.as_path()).unwrap();
-
-        assert!(is_executable(&non_existent_path).is_err());
-        assert!(is_executable(&executable_path).unwrap());
-        assert!(!is_executable(&non_executable_path).unwrap());
-        assert!(!is_executable(directory_path).unwrap());
     }
 
     #[test]

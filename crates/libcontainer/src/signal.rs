@@ -19,7 +19,7 @@ impl TryFrom<&str> for Signal {
     fn try_from(s: &str) -> Result<Self, Self::Error> {
         use NixSignal::*;
 
-        Ok(match s.to_ascii_uppercase().as_str() {
+        Ok(Signal(match s.to_ascii_uppercase().as_str() {
             "1" | "HUP" | "SIGHUP" => SIGHUP,
             "2" | "INT" | "SIGINT" => SIGINT,
             "3" | "QUIT" | "SIGQUIT" => SIGQUIT,
@@ -52,8 +52,7 @@ impl TryFrom<&str> for Signal {
             "30" | "PWR" | "SIGPWR" => SIGPWR,
             "31" | "SYS" | "SIGSYS" => SIGSYS,
             _ => return Err(SignalError::InvalidSignal(s.to_string())),
-        })
-        .map(Signal)
+        }))
     }
 }
 

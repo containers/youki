@@ -8,7 +8,7 @@ cwd := justfile_directory()
 # build
 
 # build all binaries
-build-all: youki-release rust-oci-tests-bin runtimetest
+build-all: youki-release contest
 
 # build youki in dev mode
 youki-dev:
@@ -22,42 +22,49 @@ youki-release:
 runtimetest:
     {{ cwd }}/scripts/build.sh -o {{ cwd }} -r -c runtimetest
 
-# build rust oci tests binary
-rust-oci-tests-bin:
-    {{ cwd }}/scripts/build.sh -o {{ cwd }} -r -c integration-test
+# build contest
+contest:
+    {{ cwd }}/scripts/build.sh -o {{ cwd }} -r -c contest
 
 # Tests
 
-# run oci tests
-test-oci: oci-tests rust-oci-tests
+# run integration tests
+test-integration: test-oci test-contest
 
 # run all tests except rust-oci 
-test-all: unittest test-features oci-tests containerd-test # currently not doing rust-oci here
+test-all: test-basic test-features test-oci containerd-test # currently not doing rust-oci here
 
-# run cargo unittests
-unittest:
-    cd ./crates
-    LD_LIBRARY_PATH=${HOME}/.wasmedge/lib cargo test --all --all-targets --all-features
+# run basic tests
+test-basic: test-unit test-doc
+
+# run cargo unit tests
+test-unit:
+    {{ cwd }}/scripts/cargo.sh test --lib --bins --all --all-targets --all-features --no-fail-fast
+
+# run cargo doc tests
+test-doc:
+    {{ cwd }}/scripts/cargo.sh test --doc
 
 # run permutated feature compilation tests
 test-features:
     {{ cwd }}/scripts/features_test.sh
 
-# run test against musl target
-test-musl:
-    {{ cwd }}/scripts/musl_test.sh
-
-# run oci integration tests
-oci-tests: 
+# run oci integration tests through runtime-tools
+test-oci:
     {{ cwd }}/scripts/oci_integration_tests.sh {{ cwd }}
 
 # run rust oci integration tests
-rust-oci-tests: youki-release runtimetest rust-oci-tests-bin
-    {{ cwd }}/scripts/rust_integration_tests.sh {{ cwd }}/youki
+test-contest: youki-release contest
+    {{ cwd }}/scripts/contest.sh {{ cwd }}/youki
 
 # validate rust oci integration tests on runc
-validate-rust-oci-runc: runtimetest rust-oci-tests-bin
+validate-contest-runc: contest
     {{ cwd }}/scripts/rust_integration_tests.sh runc
+
+# test podman rootless works with youki
+test-rootless-podman:
+    {{ cwd }}/tests/rootless-tests/run.sh {{ cwd }}/youki
+
 
 # run containerd integration tests
 containerd-test: youki-dev
@@ -99,10 +106,21 @@ clean-test-kind:
 hack-bpftrace:
     BPFTRACE_STRLEN=120 ./hack/debug.bt
 
+# a hacky benchmark method we have been using casually to compare performance
+hack-benchmark:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    hyperfine \
+        --prepare 'sudo sync; echo 3 | sudo tee /proc/sys/vm/drop_caches' \
+        --warmup 10 \
+        --min-runs 100 \
+        'sudo {{ cwd }}/youki create -b tutorial a && sudo {{ cwd }}/youki start a && sudo {{ cwd }}/youki delete -f a'
+
 # run linting on project
 lint:
-    cargo fmt --all -- --check
-    cargo clippy --all --all-targets --all-features -- -D warnings
+    {{ cwd }}/scripts/cargo.sh fmt --all -- --check
+    {{ cwd }}/scripts/cargo.sh clippy --all --all-targets --all-features -- -D warnings
 
 # run spellcheck
 spellcheck:
@@ -110,7 +128,7 @@ spellcheck:
 
 # run format on project
 format:
-    cargo fmt --all
+    {{ cwd }}/scripts/cargo.sh fmt --all
 
 # cleans up generated artifacts
 clean:
@@ -118,7 +136,7 @@ clean:
 
 # install tools used in dev
 dev-prepare:
-    cargo install typos-cli
+    {{ cwd }}/scripts/cargo.sh install typos-cli
 
 # setup dependencies in CI
 ci-prepare:
@@ -134,7 +152,6 @@ ci-prepare:
             apt-get install -y \
                 pkg-config \
                 libsystemd-dev \
-                libdbus-glib-1-dev \
                 build-essential \
                 libelf-dev \
                 libseccomp-dev \
@@ -167,3 +184,10 @@ ci-musl-prepare: ci-prepare
 
     echo "Unknown system. The CI is only configured for Ubuntu. You will need to forge your own path. Good luck!"
     exit 1
+
+version-up version:
+    #!/usr/bin/bash
+    set -ex
+    git grep -l "^version = .* # MARK: Version" | xargs sed -i 's/version = "[0-9]\.[0-9]\.[0-9]" # MARK: Version/version = "{{version}}" # MARK: Version/g'
+    git grep -l "} # MARK: Version" | grep -v justfile | xargs sed -i 's/version = "[0-9]\.[0-9]\.[0-9]" } # MARK: Version/version = "{{version}}" } # MARK: Version/g'
+    {{ cwd }}/scripts/release_tag.sh {{version}}
