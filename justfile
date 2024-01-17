@@ -59,7 +59,7 @@ test-contest: youki-release contest
 
 # validate rust oci integration tests on runc
 validate-contest-runc: contest
-    {{ cwd }}/scripts/rust_integration_tests.sh runc
+    {{ cwd }}/scripts/contest.sh runc
 
 # test podman rootless works with youki
 test-rootless-podman:

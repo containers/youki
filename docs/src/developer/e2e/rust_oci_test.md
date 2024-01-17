@@ -1,4 +1,4 @@
-# rust oci tests
+# Contest
 
 This is youki's original integration to verify the behavior of the low-level container runtime.
 
@@ -7,7 +7,7 @@ This is youki's original integration to verify the behavior of the low-level con
 # How to run
 
 ```console
-just rust-oci-tests
+just test-contest
 ```
 
 # How to write
