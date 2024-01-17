@@ -92,6 +92,7 @@ pub fn validate_domainname(spec: &Spec) {
         const MAX_DOMAINNAME_SIZE: usize = 254;
         let actual_domainname: [i8; MAX_DOMAINNAME_SIZE] = [0; MAX_DOMAINNAME_SIZE];
 
+        // TODO (YJDoc2) : libc now has support for getdomainname, update this to use that
         let ret =
             unsafe { getdomainname(actual_domainname.as_ptr() as *mut i8, MAX_DOMAINNAME_SIZE) };
         if ret == -1 {
