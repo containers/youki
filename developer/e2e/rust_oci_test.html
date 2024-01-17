@@ -173,57 +173,18 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="rust-oci-tests"><a class="header" href="#rust-oci-tests">rust oci tests</a></h1>
+                        <h1 id="contest"><a class="header" href="#contest">Contest</a></h1>
 <p>This is youki's original integration to verify the behavior of the low-level container runtime.</p>
 <p><img src="../../assets/rust_oci_tests.png" alt="Overview" /></p>
 <h1 id="how-to-run"><a class="header" href="#how-to-run">How to run</a></h1>
-<pre><code class="language-console">just rust-oci-tests
+<pre><code class="language-console">just test-contest
 </code></pre>
 <h1 id="how-to-write"><a class="header" href="#how-to-write">How to write</a></h1>
 <p>We will not go into detail here, but will explain how to write and add a new test case based on an example test.</p>
 <details>
 <summary>Fully the code of the example test</summary>
 <p>
-<pre><code class="language-rust no_run noplayground">use anyhow::{Context, Result};
-use oci_spec::runtime::{ProcessBuilder, Spec, SpecBuilder};
-use test_framework::{test_result, Test, TestGroup, TestResult};
-
-use crate::utils::test_inside_container;
-
-////////// ANCHOR: get_example_spec
-fn create_spec() -&gt; Result&lt;Spec&gt; {
-    SpecBuilder::default()
-        .process(
-            ProcessBuilder::default()
-                .args(
-                    [&quot;runtimetest&quot;, &quot;hello_world&quot;]
-                        .iter()
-                        .map(|s| s.to_string())
-                        .collect::&lt;Vec&lt;String&gt;&gt;(),
-                )
-                .build()?,
-        )
-        .build()
-        .context(&quot;failed to create spec&quot;)
-}
-////////// ANCHOR_END: get_example_spec
-
-////////// ANCHOR: example_test
-fn example_test() -&gt; TestResult {
-    let spec = test_result!(create_spec());
-    test_inside_container(spec, &amp;|_| Ok(()))
-}
-////////// ANCHOR_END: example_test
-
-////////// ANCHOR: get_example_test
-pub fn get_example_test() -&gt; TestGroup {
-    let mut test_group = TestGroup::new(&quot;example&quot;);
-    let test1 = Test::new(&quot;hello world&quot;, Box::new(example_test));
-    test_group.add(vec![Box::new(test1)]);
-
-    test_group
-}
-////////// ANCHOR_END: get_example_test</code></pre>
+<pre><code class="language-rust no_run noplayground">{{#include ../../../../tests/integration_test/src/tests/example/hello_world.rs}}</code></pre>
 </p>
 </details>
 <ol>
@@ -234,60 +195,24 @@ In other words, you can test the processes you want to execute within a containe
 Therefore, it is common practice here to write an OCI Runtime Spec that executes <code>runtimetest</code>.</p>
 </li>
 </ol>
-<pre><code class="language-rust no_run noplayground">fn create_spec() -&gt; Result&lt;Spec&gt; {
-    SpecBuilder::default()
-        .process(
-            ProcessBuilder::default()
-                .args(
-                    [&quot;runtimetest&quot;, &quot;hello_world&quot;]
-                        .iter()
-                        .map(|s| s.to_string())
-                        .collect::&lt;Vec&lt;String&gt;&gt;(),
-                )
-                .build()?,
-        )
-        .build()
-        .context(&quot;failed to create spec&quot;)
-}</code></pre>
+<pre><code class="language-rust no_run noplayground">{{#include ../../../../tests/integration_test/src/tests/example/hello_world.rs:get_example_spec}}</code></pre>
 <ol start="2">
 <li>Prepare a function that returns a <code>TestResult</code>, which represents the result of the test.</li>
 </ol>
-<pre><code class="language-rust no_run noplayground">fn example_test() -&gt; TestResult {
-    let spec = test_result!(create_spec());
-    test_inside_container(spec, &amp;|_| Ok(()))
-}</code></pre>
+<pre><code class="language-rust no_run noplayground">{{#include ../../../../tests/integration_test/src/tests/example/hello_world.rs:example_test}}</code></pre>
 <ol start="3">
 <li>Create a <code>TestGroup</code> and register a test case you created</li>
 </ol>
-<pre><code class="language-rust no_run noplayground">pub fn get_example_test() -&gt; TestGroup {
-    let mut test_group = TestGroup::new(&quot;example&quot;);
-    let test1 = Test::new(&quot;hello world&quot;, Box::new(example_test));
-    test_group.add(vec![Box::new(test1)]);
-
-    test_group
-}</code></pre>
+<pre><code class="language-rust no_run noplayground">{{#include ../../../../tests/integration_test/src/tests/example/hello_world.rs:get_example_test}}</code></pre>
 <ol start="4">
 <li>Register the <code>TestGroup</code> you created to a <code>TestManager</code></li>
 </ol>
-<pre><code class="language-rust no_run noplayground">    let mut tm = TestManager::new();
-    let example = get_example_test();
-    tm.add_test_group(Box::new(example));</code></pre>
+<pre><code class="language-rust no_run noplayground">{{#include ../../../../tests/integration_test/src/main.rs:register_example_test}}</code></pre>
 <ol start="5">
 <li>Write the validation you want to run within a test container</li>
 </ol>
-<pre><code class="language-rust no_run noplayground">fn main() {
-    let spec = get_spec();
-    let args: Vec&lt;String&gt; = env::args().collect();
-    let execute_test = match args.get(1) {
-        Some(execute_test) =&gt; execute_test.to_string(),
-        None =&gt; return eprintln!(&quot;error due to execute test name not found&quot;),
-    };
-
-    match &amp;*execute_test {
-        &quot;hello_world&quot; =&gt; tests::hello_world(&amp;spec),</code></pre>
-<pre><code class="language-rust no_run noplayground">pub fn hello_world(_spec: &amp;Spec) {
-    println!(&quot;Hello world&quot;);
-}</code></pre>
+<pre><code class="language-rust no_run noplayground">{{#include ../../../../tests/runtimetest/src/main.rs:example_runtimetest_main}}</code></pre>
+<pre><code class="language-rust no_run noplayground">{{#include ../../../../tests/runtimetest/src/tests.rs:example_hello_world}}</code></pre>
 
                     </main>
 
