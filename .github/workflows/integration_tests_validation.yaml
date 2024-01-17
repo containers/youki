@@ -45,12 +45,12 @@ jobs:
         uses: taiki-e/install-action@just
       - name: Install requirements
         run: sudo env PATH=$PATH just ci-prepare
-      - name: Install runc 1.1.0
+      - name: Install runc 1.1.11
         run: |
-          wget -q https://github.com/opencontainers/runc/releases/download/v1.1.0/runc.amd64
+          wget -q https://github.com/opencontainers/runc/releases/download/v1.1.11/runc.amd64
           sudo mv runc.amd64 /usr/bin/runc
           sudo chmod 755 /usr/bin/runc
       - name: Build
-        run: just runtimetest rust-oci-tests-bin
+        run: just runtimetest contest
       - name: Validate tests on runc
-        run: just validate-rust-oci-runc
+        run: just validate-contest-runc
