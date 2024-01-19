@@ -1,0 +1,7 @@
+{
+  "runtimes": {
+    "youki": {
+      "path": "/usr/bin/youki"
+    }
+  }
+}
