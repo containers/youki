@@ -1,6 +1,7 @@
 mod tests;
 mod utils;
 
+use oci_spec::runtime::IOPriorityClass::{IoprioClassBe, IoprioClassIdle, IoprioClassRt};
 use oci_spec::runtime::Spec;
 use std::env;
 use std::path::PathBuf;
@@ -38,6 +39,9 @@ fn main() {
         "sysctl" => tests::validate_sysctl(&spec),
         "scheduler_policy_other" => tests::validate_scheduler_policy(&spec),
         "scheduler_policy_batch" => tests::validate_scheduler_policy(&spec),
+        "io_priority_class_rt" => tests::test_io_priority_class(&spec, IoprioClassRt),
+        "io_priority_class_be" => tests::test_io_priority_class(&spec, IoprioClassBe),
+        "io_priority_class_idle" => tests::test_io_priority_class(&spec, IoprioClassIdle),
         _ => eprintln!("error due to unexpected execute test name: {execute_test}"),
     }
 }
