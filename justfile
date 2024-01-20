@@ -65,6 +65,9 @@ validate-contest-runc: contest
 test-rootless-podman:
     {{ cwd }}/tests/rootless-tests/run.sh {{ cwd }}/youki
 
+# test docker-in-docker works with youki
+test-dind:
+    {{ cwd }}/tests/dind/run.sh
 
 # run containerd integration tests
 containerd-test: youki-dev
