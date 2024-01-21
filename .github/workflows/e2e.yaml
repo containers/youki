@@ -182,3 +182,27 @@ jobs:
         run: chmod +x ./youki
       - name: Run tests
         run: just test-rootless-podman
+  
+  docker-in-docker:
+    runs-on: ${{ matrix.os }}
+    needs: [youki-build]
+    timeout-minutes: 5
+    strategy:
+      matrix:
+        # ubuntu 20.04 has cgroups-v1
+        # ubuntu 22.04 has cgroups-v2
+        os: [ "ubuntu-22.04", "ubuntu-20.04" ]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install just
+        uses: taiki-e/install-action@just
+      - name: Download youki binary
+        uses: actions/download-artifact@v3
+        with:
+          name: youki-x86_64-musl
+      - name: Add the permission to run
+        run: chmod +x ./youki
+      - name: Run tests
+        run: just test-dind
+
+    

@@ -3,9 +3,10 @@ use anyhow::{bail, Result};
 use libc::getdomainname;
 use nix::errno::Errno;
 use nix::unistd::getcwd;
-use oci_spec::runtime::Spec;
+use oci_spec::runtime::{LinuxSchedulerPolicy, Spec};
 use std::ffi::CStr;
 use std::fs::{self, read_dir};
+use std::mem;
 use std::path::Path;
 
 ////////// ANCHOR: example_hello_world
@@ -326,7 +327,9 @@ pub fn validate_sysctl(spec: &Spec) {
                     .trim()
                     .to_string(),
                 Err(e) => {
-                    return eprintln!("error due to fail to read the file {key_path:?}, error: {e}")
+                    return eprintln!(
+                        "error due to fail to read the file {key_path:?}, error: {e}"
+                    );
                 }
             };
             if &actual_value != expected_value {
@@ -335,5 +338,54 @@ pub fn validate_sysctl(spec: &Spec) {
                 );
             }
         }
+    }
+}
+
+pub fn validate_scheduler_policy(spec: &Spec) {
+    let proc = spec.process().as_ref().unwrap();
+    let sc = proc.scheduler().as_ref().unwrap();
+    println!("schedul is {:?}", spec);
+    let size = mem::size_of::<nc::sched_attr_t>().try_into().unwrap();
+    let mut get_sched_attr = nc::sched_attr_t {
+        size: 0,
+        sched_policy: 0,
+        sched_flags: 0,
+        sched_nice: 0,
+        sched_priority: 0,
+        sched_runtime: 0,
+        sched_deadline: 0,
+        sched_period: 0,
+        sched_util_min: 0,
+        sched_util_max: 0,
+    };
+    unsafe {
+        match nc::sched_getattr(0, &mut get_sched_attr, size, 0) {
+            Ok(_) => {
+                println!("sched_getattr get success");
+            }
+            Err(e) => {
+                return eprintln!("error due to fail to get sched attr error: {e}");
+            }
+        };
+    }
+    println!("get_sched_attr is {:?}", get_sched_attr);
+    let sp = get_sched_attr.sched_policy;
+    let want_sp: u32 = match *sc.policy() {
+        LinuxSchedulerPolicy::SchedOther => 0,
+        LinuxSchedulerPolicy::SchedFifo => 1,
+        LinuxSchedulerPolicy::SchedRr => 2,
+        LinuxSchedulerPolicy::SchedBatch => 3,
+        LinuxSchedulerPolicy::SchedIso => 4,
+        LinuxSchedulerPolicy::SchedIdle => 5,
+        LinuxSchedulerPolicy::SchedDeadline => 6,
+    };
+    println!("want_sp {:?}", want_sp);
+    if sp != want_sp {
+        return eprintln!("error due to sched_policy want {want_sp}, got {sp}");
+    }
+    let sn = get_sched_attr.sched_nice;
+    let want_sn = sc.nice().unwrap();
+    if sn != want_sn {
+        eprintln!("error due to sched_nice want {want_sn}, got {sn}")
     }
 }

@@ -7,13 +7,18 @@ use crate::{
     capabilities, hooks, namespaces::Namespaces, process::channel, rootfs::RootFS, tty,
     user_ns::UserNamespaceConfig, utils,
 };
+use nc;
 use nix::mount::MsFlags;
 use nix::sched::CloneFlags;
 use nix::sys::stat::Mode;
 use nix::unistd::setsid;
 use nix::unistd::{self, Gid, Uid};
-use oci_spec::runtime::{IOPriorityClass, LinuxIOPriority, LinuxNamespaceType, Spec, User};
+use oci_spec::runtime::{
+    IOPriorityClass, LinuxIOPriority, LinuxNamespaceType, LinuxSchedulerFlag, LinuxSchedulerPolicy,
+    Scheduler, Spec, User,
+};
 use std::collections::HashMap;
+use std::mem;
 use std::os::unix::io::AsRawFd;
 use std::{
     env, fs,
@@ -74,6 +79,8 @@ pub enum InitProcessError {
     WorkloadValidation(#[from] workload::ExecutorValidationError),
     #[error("invalid io priority class: {0}")]
     IoPriorityClass(String),
+    #[error("call exec sched_setattr error: {0}")]
+    SchedSetattr(String),
 }
 
 type Result<T> = std::result::Result<T, InitProcessError>;
@@ -287,6 +294,8 @@ pub fn container_init_process(
     })?;
 
     set_io_priority(syscall.as_ref(), proc.io_priority())?;
+
+    setup_scheduler(proc.scheduler())?;
 
     // set up tty if specified
     if let Some(csocketfd) = args.console_socket {
@@ -737,6 +746,59 @@ fn set_io_priority(syscall: &dyn Syscall, io_priority_op: &Option<LinuxIOPriorit
             }
         }
         None => {}
+    }
+    Ok(())
+}
+
+/// Set the RT priority of a thread
+fn setup_scheduler(sc_op: &Option<Scheduler>) -> Result<()> {
+    if let Some(sc) = sc_op {
+        let policy: u32 = match *sc.policy() {
+            LinuxSchedulerPolicy::SchedOther => 0,
+            LinuxSchedulerPolicy::SchedFifo => 1,
+            LinuxSchedulerPolicy::SchedRr => 2,
+            LinuxSchedulerPolicy::SchedBatch => 3,
+            LinuxSchedulerPolicy::SchedIso => 4,
+            LinuxSchedulerPolicy::SchedIdle => 5,
+            LinuxSchedulerPolicy::SchedDeadline => 6,
+        };
+        let mut flags_value: u64 = 0;
+        if let Some(flags) = sc.flags() {
+            for flag in flags {
+                match *flag {
+                    LinuxSchedulerFlag::SchedResetOnFork => flags_value |= 0x01,
+                    LinuxSchedulerFlag::SchedFlagReclaim => flags_value |= 0x02,
+                    LinuxSchedulerFlag::SchedFlagDLOverrun => flags_value |= 0x04,
+                    LinuxSchedulerFlag::SchedFlagKeepPolicy => flags_value |= 0x08,
+                    LinuxSchedulerFlag::SchedFlagKeepParams => flags_value |= 0x10,
+                    LinuxSchedulerFlag::SchedFlagUtilClampMin => flags_value |= 0x20,
+                    LinuxSchedulerFlag::SchedFlagUtilClampMax => flags_value |= 0x40,
+                }
+            }
+        }
+        let mut a = nc::sched_attr_t {
+            size: mem::size_of::<nc::sched_attr_t>().try_into().unwrap(),
+            sched_policy: policy,
+            sched_flags: flags_value,
+            sched_nice: sc.nice().unwrap_or(0),
+            sched_priority: sc.priority().unwrap_or(0) as u32,
+            sched_runtime: sc.runtime().unwrap_or(0),
+            sched_deadline: sc.deadline().unwrap_or(0),
+            sched_period: sc.period().unwrap_or(0),
+            sched_util_min: 0,
+            sched_util_max: 0,
+        };
+        // TODO when nix or libc support this function, replace nx crates.
+        unsafe {
+            let result = nc::sched_setattr(0, &mut a, 0);
+            match result {
+                Ok(_) => {}
+                Err(err) => {
+                    tracing::error!(?err, "error setting scheduler");
+                    Err(InitProcessError::SchedSetattr(err.to_string()))?;
+                }
+            }
+        };
     }
     Ok(())
 }

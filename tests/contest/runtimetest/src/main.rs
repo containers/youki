@@ -36,6 +36,8 @@ fn main() {
         "domainname_test" => tests::validate_domainname(&spec),
         "seccomp" => tests::validate_seccomp(&spec),
         "sysctl" => tests::validate_sysctl(&spec),
+        "scheduler_policy_other" => tests::validate_scheduler_policy(&spec),
+        "scheduler_policy_batch" => tests::validate_scheduler_policy(&spec),
         _ => eprintln!("error due to unexpected execute test name: {execute_test}"),
     }
 }

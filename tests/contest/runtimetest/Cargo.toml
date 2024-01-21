@@ -8,4 +8,5 @@ oci-spec = { version = "0.6.4", features = ["runtime"] }
 nix = "0.27.1"
 anyhow = "1.0"
 libc = "0.2.139" # TODO (YJDoc2) upgrade to latest
+nc = "0.8.18"
 
