@@ -103,11 +103,9 @@ fn main() -> Result<()> {
     let ro_paths = get_ro_paths_test();
     let hostname = get_hostname_test();
     let mounts_recursive = get_mounts_recursive_test();
-    #[allow(unused_variables)]
     let domainname = get_domainname_tests();
     let intel_rdt = get_intel_rdt_test();
     let sysctl = get_sysctl_test();
-    #[allow(unused_variables)]
     let scheduler = get_scheduler_test();
 
     tm.add_test_group(Box::new(cl));
@@ -127,10 +125,10 @@ fn main() -> Result<()> {
     tm.add_test_group(Box::new(ro_paths));
     tm.add_test_group(Box::new(hostname));
     tm.add_test_group(Box::new(mounts_recursive));
-    // tm.add_test_group(Box::new(domainname)); // TODO (YJDoc2) fix in #2616
+    tm.add_test_group(Box::new(domainname));
     tm.add_test_group(Box::new(intel_rdt));
     tm.add_test_group(Box::new(sysctl));
-    // tm.add_test_group(Box::new(scheduler));
+    tm.add_test_group(Box::new(scheduler));
 
     tm.add_cleanup(Box::new(cgroups::cleanup_v1));
     tm.add_cleanup(Box::new(cgroups::cleanup_v2));

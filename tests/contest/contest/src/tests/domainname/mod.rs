@@ -1,6 +1,6 @@
 use crate::utils::test_inside_container;
 use oci_spec::runtime::{ProcessBuilder, Spec, SpecBuilder};
-use test_framework::{Test, TestGroup, TestResult};
+use test_framework::{ConditionalTest, TestGroup, TestResult};
 
 fn get_spec(domainname: &str) -> Spec {
     SpecBuilder::default()
@@ -25,7 +25,14 @@ fn set_domainname_test() -> TestResult {
 
 pub fn get_domainname_tests() -> TestGroup {
     let mut tg = TestGroup::new("domainname_test");
-    let set_domainname_test = Test::new("set_domainname_test", Box::new(set_domainname_test));
+    let set_domainname_test = ConditionalTest::new(
+        "set_domainname_test",
+        Box::new(|| match std::env::var("RUNTIME_KIND") {
+            Err(_) => true,
+            Ok(s) => s != "runc",
+        }),
+        Box::new(set_domainname_test),
+    );
     tg.add(vec![Box::new(set_domainname_test)]);
 
     tg
