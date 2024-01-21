@@ -1915,6 +1915,7 @@ dependencies = [
  "libc",
  "libcgroups",
  "libseccomp",
+ "nc",
  "nix 0.27.1",
  "oci-spec",
  "once_cell",
@@ -2182,6 +2183,15 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "tempfile",
+]
+
+[[package]]
+name = "nc"
+version = "0.8.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "83c88ca23498aaa86177921d95ade67290248f9ef71f7416dc47d07cdc3c72a1"
+dependencies = [
+ "cc",
 ]
 
 [[package]]
@@ -3066,6 +3076,7 @@ name = "runtimetest"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "nc",
  "nix 0.27.1",
  "oci-spec",
 ]

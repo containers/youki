@@ -7,4 +7,5 @@ edition = "2021"
 oci-spec = { version = "0.6.4", features = ["runtime"] }
 nix = "0.27.1"
 anyhow = "1.0"
+nc = "0.8.18"
 
