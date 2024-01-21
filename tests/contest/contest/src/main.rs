@@ -1,6 +1,7 @@
 mod tests;
 mod utils;
 
+use crate::tests::domainname::get_domainname_tests;
 use crate::tests::example::get_example_test;
 use crate::tests::hooks::get_hooks_tests;
 use crate::tests::hostname::get_hostname_test;
@@ -102,6 +103,8 @@ fn main() -> Result<()> {
     let ro_paths = get_ro_paths_test();
     let hostname = get_hostname_test();
     let mounts_recursive = get_mounts_recursive_test();
+    #[allow(unused_variables)]
+    let domainname = get_domainname_tests();
     let intel_rdt = get_intel_rdt_test();
     let sysctl = get_sysctl_test();
     #[allow(unused_variables)]
@@ -124,6 +127,7 @@ fn main() -> Result<()> {
     tm.add_test_group(Box::new(ro_paths));
     tm.add_test_group(Box::new(hostname));
     tm.add_test_group(Box::new(mounts_recursive));
+    // tm.add_test_group(Box::new(domainname)); // TODO (YJDoc2) fix in #2616
     tm.add_test_group(Box::new(intel_rdt));
     tm.add_test_group(Box::new(sysctl));
     // tm.add_test_group(Box::new(scheduler));

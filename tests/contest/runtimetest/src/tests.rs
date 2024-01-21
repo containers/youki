@@ -1,8 +1,10 @@
 use crate::utils::{self, test_read_access, test_write_access};
 use anyhow::{bail, Result};
+use libc::getdomainname;
 use nix::errno::Errno;
 use nix::unistd::getcwd;
 use oci_spec::runtime::{LinuxSchedulerPolicy, Spec};
+use std::ffi::CStr;
 use std::fs::{self, read_dir};
 use std::mem;
 use std::path::Path;
@@ -77,6 +79,34 @@ pub fn validate_hostname(spec: &Spec) {
         if actual_hostname != expected_hostname {
             eprintln!(
                 "Unexpected hostname, expected: {expected_hostname:?} found: {actual_hostname:?}"
+            );
+        }
+    }
+}
+
+pub fn validate_domainname(spec: &Spec) {
+    if let Some(expected_domainname) = spec.domainname() {
+        if expected_domainname.is_empty() {
+            return;
+        }
+
+        const MAX_DOMAINNAME_SIZE: usize = 254;
+        let actual_domainname: [i8; MAX_DOMAINNAME_SIZE] = [0; MAX_DOMAINNAME_SIZE];
+
+        // TODO (YJDoc2) : libc now has support for getdomainname, update this to use that
+        let ret =
+            unsafe { getdomainname(actual_domainname.as_ptr() as *mut i8, MAX_DOMAINNAME_SIZE) };
+        if ret == -1 {
+            eprintln!("Failed to get domainname");
+        }
+
+        let actual_domainname_cstr =
+            unsafe { CStr::from_ptr(actual_domainname.as_ptr() as *mut i8) };
+        if actual_domainname_cstr.to_str().unwrap() != expected_domainname {
+            eprintln!(
+                "Unexpected domainname, expected: {:?} found: {:?}",
+                expected_domainname,
+                actual_domainname_cstr.to_str().unwrap()
             );
         }
     }

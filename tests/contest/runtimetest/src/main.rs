@@ -33,6 +33,7 @@ fn main() {
         "readonly_paths" => tests::validate_readonly_paths(&spec),
         "set_host_name" => tests::validate_hostname(&spec),
         "mounts_recursive" => tests::validate_mounts_recursive(&spec),
+        "domainname_test" => tests::validate_domainname(&spec),
         "seccomp" => tests::validate_seccomp(&spec),
         "sysctl" => tests::validate_sysctl(&spec),
         "scheduler_policy_other" => tests::validate_scheduler_policy(&spec),
