@@ -227,12 +227,15 @@ impl TenantContainerBuilder {
                 let policy = sc.policy();
                 if let Some(nice) = sc.nice() {
                     // https://man7.org/linux/man-pages/man2/sched_setattr.2.html#top_of_page
-                    if (*policy != LinuxSchedulerPolicy::SchedBatch
-                        || *policy != LinuxSchedulerPolicy::SchedOther)
-                        && *nice < -20
-                        && *nice > 19
+                    if (*policy == LinuxSchedulerPolicy::SchedBatch
+                        || *policy == LinuxSchedulerPolicy::SchedOther)
+                        && (*nice < -20 || *nice > 19)
                     {
-                        tracing::error!(?nice, "invalid scheduler.nice: '{}'", nice);
+                        tracing::error!(
+                            ?nice,
+                            "invalid scheduler.nice: '{}', must be within -20 to 19",
+                            nice
+                        );
                         Err(ErrInvalidSpec::Scheduler)?;
                     }
                 }
