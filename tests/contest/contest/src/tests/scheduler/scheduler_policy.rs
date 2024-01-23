@@ -4,7 +4,7 @@ use oci_spec::runtime::{
 };
 use test_framework::{test_result, ConditionalTest, TestGroup, TestResult};
 
-use crate::utils::test_inside_container;
+use crate::utils::{is_runtime_runc, test_inside_container};
 
 fn create_spec(policy: LinuxSchedulerPolicy, execute_test: &str) -> Result<Spec> {
     let sc = SchedulerBuilder::default()
@@ -48,18 +48,12 @@ pub fn get_scheduler_test() -> TestGroup {
     let mut scheduler_policy_group = TestGroup::new("set_scheduler_policy");
     let policy_fifo_test = ConditionalTest::new(
         "policy_other",
-        Box::new(|| match std::env::var("RUNTIME_KIND") {
-            Err(_) => true,
-            Ok(s) => s != "runc",
-        }),
+        Box::new(|| !is_runtime_runc()),
         Box::new(scheduler_policy_other_test),
     );
     let policy_rr_test = ConditionalTest::new(
         "policy_batch",
-        Box::new(|| match std::env::var("RUNTIME_KIND") {
-            Err(_) => true,
-            Ok(s) => s != "runc",
-        }),
+        Box::new(|| !is_runtime_runc()),
         Box::new(scheduler_policy_batch_test),
     );
 
