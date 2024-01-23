@@ -2,9 +2,9 @@ use anyhow::{Context, Result};
 use oci_spec::runtime::{
     LinuxSchedulerPolicy, ProcessBuilder, SchedulerBuilder, Spec, SpecBuilder,
 };
-use test_framework::{test_result, Test, TestGroup, TestResult};
+use test_framework::{test_result, ConditionalTest, TestGroup, TestResult};
 
-use crate::utils::test_inside_container;
+use crate::utils::{is_runtime_runc, test_inside_container};
 
 fn create_spec(policy: LinuxSchedulerPolicy, execute_test: &str) -> Result<Spec> {
     let sc = SchedulerBuilder::default()
@@ -46,11 +46,17 @@ fn scheduler_policy_batch_test() -> TestResult {
 
 pub fn get_scheduler_test() -> TestGroup {
     let mut scheduler_policy_group = TestGroup::new("set_scheduler_policy");
-    let policy_fifo_test = Test::new("policy_other", Box::new(scheduler_policy_other_test));
-    let policy_rr_test = Test::new("policy_batch", Box::new(scheduler_policy_batch_test));
+    let policy_fifo_test = ConditionalTest::new(
+        "policy_other",
+        Box::new(|| !is_runtime_runc()),
+        Box::new(scheduler_policy_other_test),
+    );
+    let policy_rr_test = ConditionalTest::new(
+        "policy_batch",
+        Box::new(|| !is_runtime_runc()),
+        Box::new(scheduler_policy_batch_test),
+    );
 
-    scheduler_policy_group.add(vec![Box::new(policy_fifo_test)]);
-    scheduler_policy_group.add(vec![Box::new(policy_rr_test)]);
-
+    scheduler_policy_group.add(vec![Box::new(policy_fifo_test), Box::new(policy_rr_test)]);
     scheduler_policy_group
 }
