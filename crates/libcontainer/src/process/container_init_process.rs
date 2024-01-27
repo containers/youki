@@ -844,6 +844,8 @@ fn sync_seccomp(
 fn verify_cwd() -> Result<()> {
     let cwd = unistd::getcwd().map_err(|err| {
         if let nix::errno::Errno::ENOENT = err {
+            // https://man7.org/linux/man-pages/man2/getcwd.2.html
+            // ENOENT The current working directory has been unlinked.
             InitProcessError::InvalidCwd(err)
         } else {
             InitProcessError::NixOther(err)
@@ -855,7 +857,7 @@ fn verify_cwd() -> Result<()> {
         return Err(InitProcessError::InvalidCwd(nix::errno::Errno::ENOENT));
     }
 
-    return Ok(());
+    Ok(())
 }
 
 #[cfg(test)]

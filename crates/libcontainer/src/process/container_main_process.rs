@@ -5,6 +5,7 @@ use crate::{
         fork::{self, CloneCb},
         intel_rdt::setup_intel_rdt,
     },
+    syscall::SyscallError,
     user_ns::UserNamespaceConfig,
 };
 use nix::sys::wait::{waitpid, WaitStatus};
@@ -29,6 +30,8 @@ pub enum ProcessError {
     #[error("failed seccomp listener")]
     #[cfg(feature = "libseccomp")]
     SeccompListener(#[from] crate::process::seccomp_listener::SeccompListenerError),
+    #[error("failed syscall")]
+    SyscallOther(#[source] SyscallError),
 }
 
 type Result<T> = std::result::Result<T, ProcessError>;
@@ -68,6 +71,15 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, bo
             }
         })
     };
+
+    // Before starting the intermediate process, mark all non-stdio open files as O_CLOEXEC
+    // to ensure we don't leak any file descriptors to the intermediate process.
+    // Please refer to XXXXXXX(TODO(utam0k): fill in) for more details.
+    let syscall = container_args.syscall.create_syscall();
+    syscall.close_range(0).map_err(|err| {
+        tracing::error!(?err, "failed to cleanup extra fds");
+        ProcessError::SyscallOther(err)
+    })?;
 
     let intermediate_pid = fork::container_clone(cb).map_err(|err| {
         tracing::error!("failed to fork intermediate process: {}", err);
