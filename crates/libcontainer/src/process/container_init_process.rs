@@ -81,6 +81,8 @@ pub enum InitProcessError {
     IoPriorityClass(String),
     #[error("call exec sched_setattr error: {0}")]
     SchedSetattr(String),
+    #[error("failed to verify if current working directory is safe")]
+    InvalidCwd(#[source] nix::Error),
 }
 
 type Result<T> = std::result::Result<T, InitProcessError>;
@@ -548,6 +550,12 @@ pub fn container_init_process(
         })?;
     }
 
+    // Ensure that the current working directory is actually inside the container.
+    verify_cwd().map_err(|err| {
+        tracing::error!(?err, "failed to verify cwd");
+        err
+    })?;
+
     // add HOME into envs if not exists
     let home_in_envs = envs.iter().any(|x| x.starts_with("HOME="));
     if !home_in_envs {
@@ -825,6 +833,28 @@ fn sync_seccomp(
         // it. The fd is now duplicated to the main process and sent to seccomp
         // listener.
         let _ = unistd::close(fd);
+    }
+
+    Ok(())
+}
+
+// verifyCwd ensures that the current directory is actually inside the mount
+// namespace root of the current process.
+// Please refer to XXXXXXX(TODO(utam0k): fill in) for more details.
+fn verify_cwd() -> Result<()> {
+    let cwd = unistd::getcwd().map_err(|err| {
+        if let nix::errno::Errno::ENOENT = err {
+            // https://man7.org/linux/man-pages/man2/getcwd.2.html
+            // ENOENT The current working directory has been unlinked.
+            InitProcessError::InvalidCwd(err)
+        } else {
+            InitProcessError::NixOther(err)
+        }
+    })?;
+
+    if !cwd.is_absolute() {
+        // This should never happen, but just in case.
+        return Err(InitProcessError::InvalidCwd(nix::errno::Errno::ENOENT));
     }
 
     Ok(())
