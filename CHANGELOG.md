@@ -1,5 +1,24 @@
 # Changelog
 
+## [v0.3.2](https://github.com/containers/youki/compare/v0.3.1...v0.3.2) - 2024-01-31
+### 💪 Improvements
+- (feat) add support for `musl` using `cross-rs` by @jprendes in https://github.com/containers/youki/pull/2536
+- add schedule entity by @lengrongfu in https://github.com/containers/youki/pull/2495
+- Address GHSA-xr7r-f8xq-vfvv by @utam0k in https://github.com/containers/youki/pull/2663
+### 📖 Documentation improvements
+- fix: just instead make by @bestgopher in https://github.com/containers/youki/pull/2585
+- [doc] Update doc with `cross-rs` and `musl` builds by @jprendes in https://github.com/containers/youki/pull/2621
+### 🧪 Test improvements and Misc Fixes
+- New Releases needs approval from the maintainer by @utam0k in https://github.com/containers/youki/pull/2583
+- Updaet to Containerd 1.7.11 by @utam0k in https://github.com/containers/youki/pull/2558
+- chore(deps) bump tabwriter, windows-core, tempfile, memchr, clang-sys by @YJDoc2 in https://github.com/containers/youki/pull/2608
+- Name the test tools `contest` by @utam0k in https://github.com/containers/youki/pull/2486
+- Fix the missed naming changes in integration test validation CI by @YJDoc2 in https://github.com/containers/youki/pull/2629
+- Roll up various minor and major version dep upgrade by @YJDoc2 in https://github.com/containers/youki/pull/2638
+- Add docker-in-docker e2e test by @jprendes in https://github.com/containers/youki/pull/2645
+- Add domainname test by @higuruchi in https://github.com/containers/youki/pull/1544
+- Re enable skipped e2e tests by @YJDoc2 in https://github.com/containers/youki/pull/2647
+
 ## [v0.3.1](https://github.com/containers/youki/compare/v0.3.0...v0.3.1) - 2023-12-19
 ### 💪 Improvements
 - fix(libcgroups): report CPU throttling stats in 'libcgroups::v2' by @xiaoyang-sde in https://github.com/containers/youki/pull/2524
