@@ -533,7 +533,7 @@ dependencies = [
  "flate2",
  "libcgroups",
  "libcontainer",
- "nix 0.27.1",
+ "nix",
  "num_cpus",
  "oci-spec",
  "once_cell",
@@ -1860,12 +1860,12 @@ dependencies = [
 
 [[package]]
 name = "libbpf-sys"
-version = "1.2.1+v1.2.0"
+version = "1.3.0+v1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "75adb4021282a72ca63ebbc0e4247750ad74ede68ff062d247691072d709ad8b"
+checksum = "b6e68987fe8f2dd7b76930f800a4e5b958c766171fc3a7c33dd67c06a0f1e801"
 dependencies = [
  "cc",
- "nix 0.26.4",
+ "nix",
  "num_cpus",
  "pkg-config",
 ]
@@ -1888,7 +1888,7 @@ dependencies = [
  "libbpf-sys",
  "libc",
  "mockall",
- "nix 0.27.1",
+ "nix",
  "oci-spec",
  "procfs",
  "quickcheck",
@@ -1915,7 +1915,7 @@ dependencies = [
  "libcgroups",
  "libseccomp",
  "nc",
- "nix 0.27.1",
+ "nix",
  "oci-spec",
  "once_cell",
  "prctl",
@@ -2076,15 +2076,6 @@ dependencies = [
 
 [[package]]
 name = "memoffset"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5de893c32cde5f383baa4c04c5d6dbdd735cfd4a794b0debdb2bb1b421da5ff4"
-dependencies = [
- "autocfg",
-]
-
-[[package]]
-name = "memoffset"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d61c719bcfbcf5d62b3a09efa6088de8c54bc0bfcd3ea7ae39fcc186108b8de1"
@@ -2191,19 +2182,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "83c88ca23498aaa86177921d95ade67290248f9ef71f7416dc47d07cdc3c72a1"
 dependencies = [
  "cc",
-]
-
-[[package]]
-name = "nix"
-version = "0.26.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "598beaf3cc6fdd9a5dfb1630c2800c7acd31df7aaf0f565796fba2b53ca1af1b"
-dependencies = [
- "bitflags 1.3.2",
- "cfg-if",
- "libc",
- "memoffset 0.7.1",
- "pin-utils",
 ]
 
 [[package]]
@@ -2584,7 +2562,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "059a34f111a9dee2ce1ac2826a68b24601c4298cfeb1a587c3cb493d5ab46f52"
 dependencies = [
  "libc",
- "nix 0.27.1",
+ "nix",
 ]
 
 [[package]]
@@ -3078,7 +3056,7 @@ dependencies = [
  "anyhow",
  "libc",
  "nc",
- "nix 0.27.1",
+ "nix",
  "oci-spec",
 ]
 
@@ -5719,7 +5697,7 @@ dependencies = [
  "libcgroups",
  "libcontainer",
  "liboci-cli",
- "nix 0.27.1",
+ "nix",
  "once_cell",
  "pentacle",
  "procfs",
