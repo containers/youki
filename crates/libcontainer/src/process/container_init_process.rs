@@ -840,7 +840,7 @@ fn sync_seccomp(
 
 // verifyCwd ensures that the current directory is actually inside the mount
 // namespace root of the current process.
-// Please refer to XXXXXXX(TODO(utam0k): fill in) for more details.
+// Please refer to https://github.com/opencontainers/runc/security/advisories/GHSA-xr7r-f8xq-vfvv for more details.
 fn verify_cwd() -> Result<()> {
     let cwd = unistd::getcwd().map_err(|err| {
         if let nix::errno::Errno::ENOENT = err {
