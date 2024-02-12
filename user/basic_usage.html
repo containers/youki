@@ -187,7 +187,7 @@
 <pre><code class="language-console">sudo systemctl stop docker
 </code></pre>
 <p>After this you need to manually restart the docker daemon, but with Youki as its runtime. To do this, run following command in the youki/ directory after building youki</p>
-<pre><code class="language-console">dockerd --experimental --add-runtime=&quot;youki=$(pwd)/youki&quot; # run in the youki/scripts directory
+<pre><code class="language-console">dockerd --experimental --add-runtime="youki=$(pwd)/youki" # run in the youki/scripts directory
 </code></pre>
 <p>This will start the daemon and hang up the console. You can either start this as a background process to continue using the same terminal, or use another terminal, which will make it easier to stop the docker daemon later.</p>
 <p>In case you don't stop the original daemon, you can get an error message after previous command</p>
@@ -208,13 +208,13 @@ let docker know youki
 (<a href="https://docs.docker.com/engine/reference/commandline/dockerd/#on-linux">source</a>).
 You may need to create this file, if it does not yet exist. A sample content of it:</p>
 <pre><code class="language-json">{
-  &quot;default-runtime&quot;: &quot;runc&quot;,
-  &quot;runtimes&quot;: {
-    &quot;youki&quot;: {
-      &quot;path&quot;: &quot;/path/to/youki/youki&quot;,
-      &quot;runtimeArgs&quot;: [
-          &quot;--debug&quot;,
-          &quot;--systemd-log&quot;
+  "default-runtime": "runc",
+  "runtimes": {
+    "youki": {
+      "path": "/path/to/youki/youki",
+      "runtimeArgs": [
+          "--debug",
+          "--systemd-log"
       ]
     }
   }
@@ -241,10 +241,10 @@ docker export $(docker create busybox) | tar -C rootfs -xvf -
 <pre><code class="language-console">../youki spec
 </code></pre>
 <p>After this, you can manually edit the file to customize the behavior of the container process. For example, to run the desired program inside the container, you can edit the process.args</p>
-<pre><code class="language-json">&quot;process&quot;: {
+<pre><code class="language-json">"process": {
 ...
-&quot;args&quot;: [
-  &quot;sleep&quot;, &quot;30&quot;
+"args": [
+  "sleep", "30"
 ],
 ...
  }

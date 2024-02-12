@@ -307,7 +307,7 @@ $ ./youki -h # get information about youki command
 <p>To use any of the sub-crate as a dependency in your own project, you can specify the dependency as follows,</p>
 <pre><code class="language-toml">[dependencies]
 ...
-liboci-cli = { git = &quot;https://github.com/containers/Youki.git&quot; }
+liboci-cli = { git = "https://github.com/containers/Youki.git" }
 ...
 </code></pre>
 <p>Here we use <code>liboci-cli</code> as an example, which can be replaced by the sub-crate that you need.</p>
@@ -346,7 +346,7 @@ $ just youki-dev # or youki-release
 <pre><code class="language-console">sudo systemctl stop docker
 </code></pre>
 <p>After this you need to manually restart the docker daemon, but with Youki as its runtime. To do this, run following command in the youki/ directory after building youki</p>
-<pre><code class="language-console">dockerd --experimental --add-runtime=&quot;youki=$(pwd)/youki&quot; # run in the youki/scripts directory
+<pre><code class="language-console">dockerd --experimental --add-runtime="youki=$(pwd)/youki" # run in the youki/scripts directory
 </code></pre>
 <p>This will start the daemon and hang up the console. You can either start this as a background process to continue using the same terminal, or use another terminal, which will make it easier to stop the docker daemon later.</p>
 <p>In case you don't stop the original daemon, you can get an error message after previous command</p>
@@ -367,13 +367,13 @@ let docker know youki
 (<a href="https://docs.docker.com/engine/reference/commandline/dockerd/#on-linux">source</a>).
 You may need to create this file, if it does not yet exist. A sample content of it:</p>
 <pre><code class="language-json">{
-  &quot;default-runtime&quot;: &quot;runc&quot;,
-  &quot;runtimes&quot;: {
-    &quot;youki&quot;: {
-      &quot;path&quot;: &quot;/path/to/youki/youki&quot;,
-      &quot;runtimeArgs&quot;: [
-          &quot;--debug&quot;,
-          &quot;--systemd-log&quot;
+  "default-runtime": "runc",
+  "runtimes": {
+    "youki": {
+      "path": "/path/to/youki/youki",
+      "runtimeArgs": [
+          "--debug",
+          "--systemd-log"
       ]
     }
   }
@@ -400,10 +400,10 @@ docker export $(docker create busybox) | tar -C rootfs -xvf -
 <pre><code class="language-console">../youki spec
 </code></pre>
 <p>After this, you can manually edit the file to customize the behavior of the container process. For example, to run the desired program inside the container, you can edit the process.args</p>
-<pre><code class="language-json">&quot;process&quot;: {
+<pre><code class="language-json">"process": {
 ...
-&quot;args&quot;: [
-  &quot;sleep&quot;, &quot;30&quot;
+"args": [
+  "sleep", "30"
 ],
 ...
  }
@@ -661,17 +661,17 @@ log level to <code>debug</code>. This flag is ignored if <code>--log-level</code
 </li>
 </ul>
 <h2 id="build-a-container-image-with-the-webassembly-module"><a class="header" href="#build-a-container-image-with-the-webassembly-module">Build a container image with the WebAssembly module</a></h2>
-<p>If you want to run a webassembly module with youki, your config.json has to include either <strong>runc.oci.handler</strong> or <strong>module.wasm.image/variant=compat&quot;</strong>.</p>
+<p>If you want to run a webassembly module with youki, your config.json has to include either <strong>runc.oci.handler</strong> or <strong>module.wasm.image/variant=compat"</strong>.</p>
 <p>It also needs to specify a valid .wasm (webassembly binary) or .wat (webassembly test) module as entrypoint for the container. If a wat module is specified it will be compiled to a wasm module by youki before it is executed. The module also needs to be available in the root filesystem of the container obviously.</p>
-<pre><code class="language-json">&quot;ociVersion&quot;: &quot;1.0.2-dev&quot;,
-&quot;annotations&quot;: {
-    &quot;run.oci.handler&quot;: &quot;wasm&quot;
+<pre><code class="language-json">"ociVersion": "1.0.2-dev",
+"annotations": {
+    "run.oci.handler": "wasm"
 },
-&quot;process&quot;: {
-    &quot;args&quot;: [
-        &quot;hello.wasm&quot;,
-        &quot;hello&quot;,
-        &quot;world&quot;
+"process": {
+    "args": [
+        "hello.wasm",
+        "hello",
+        "world"
     ],
 ...
 }
@@ -685,14 +685,14 @@ cd ./wasm-module
 vi src/main.rs
 </code></pre>
 <pre><pre class="playground"><code class="language-rust">fn main() {
-    println!(&quot;Printing args&quot;);
+    println!("Printing args");
     for arg in std::env::args().skip(1) {
-        println!(&quot;{}&quot;, arg);
+        println!("{}", arg);
     }
 
-    println!(&quot;Printing envs&quot;);
+    println!("Printing envs");
     for envs in std::env::vars() {
-        println!(&quot;{:?}&quot;, envs);
+        println!("{:?}", envs);
     }  
 }</code></pre></pre>
 <p>Then compile the program to WASI.</p>
@@ -704,10 +704,10 @@ vi src/main.rs
 </code></pre>
 <pre><code class="language-Dockerfile">FROM scratch
 COPY target/wasm32-wasi/debug/wasm-module.wasm /
-ENTRYPOINT [&quot;wasm-module.wasm&quot;]
+ENTRYPOINT ["wasm-module.wasm"]
 </code></pre>
 <p>Then build a container image with <code>module.wasm.image/variant=compat</code> annotation. <sup class="footnote-reference"><a href="#1">1</a></sup></p>
-<pre><code class="language-console">sudo buildah build --annotation &quot;module.wasm.image/variant=compat&quot; -t wasm-module .
+<pre><code class="language-console">sudo buildah build --annotation "module.wasm.image/variant=compat" -t wasm-module .
 </code></pre>
 <h2 id="run-the-wasm-module-with-youki-and-podman"><a class="header" href="#run-the-wasm-module-with-youki-and-podman">Run the wasm module with youki and podman</a></h2>
 <p>Run podman with youki as runtime. <sup class="footnote-reference"><a href="#1">1</a></sup></p>
@@ -820,7 +820,7 @@ cd -
 <p>This contains all the integration tests for validating youki. Note that these are integration tests for start-to-end testing of youki commands. Unit tests for individual parts are in their respective source files in crates.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="debugging"><a class="header" href="#debugging">Debugging</a></h1>
 <p>Since Youki uses pipe and double-fork in the creating phase, it is hard to debug what happened.
-You might encounter the error message, &quot;Broken pipe ...&quot; Unfortunately, 
+You might encounter the error message, "Broken pipe ..." Unfortunately,
 this error message has only information that a child process exists with an error for some reason.</p>
 <p>This section will give some tips to debug youki to know what happens in the child processes.</p>
 <h1 id="bpftrace"><a class="header" href="#bpftrace">bpftrace</a></h1>
@@ -861,15 +861,15 @@ TIME                 COMMAND PID      EVENT     CONTENT
 $ just test-kind
 docker buildx build --output=bin/ -f tests/k8s/Dockerfile --target kind-bin .
 ...
-Creating cluster &quot;youki&quot; ...
+Creating cluster "youki" ...
 ...
 kubectl --context=kind-youki apply -f tests/k8s/deploy.yaml
 runtimeclass.node.k8s.io/youki created
 deployment.apps/nginx-deployment created
 ...
 kubectl --context=kind-youki delete -f tests/k8s/deploy.yaml
-runtimeclass.node.k8s.io &quot;youki&quot; deleted
-deployment.apps &quot;nginx-deployment&quot; deleted
+runtimeclass.node.k8s.io "youki" deleted
+deployment.apps "nginx-deployment" deleted
 </code></pre>
 </li>
 <li>
@@ -886,18 +886,18 @@ TIME                 COMMAND PID      EVENT     CONTENT
 207066996623               4 13743    open      errno=2, fd=-1, file=/opt/containerd/lib/glibc-hwcaps/x86-64-v3/libc.so.6
 ...
 207070130175               4 13743    clone3
-207070418829 youki:[1:INTER] 13747    write     fd=4, {&quot;timestamp&quot;:&quot;2023-09-24T10:47:07.427846Z&quot;,&quot;level&quot;:&quot;INFO&quot;,&quot;message&quot;:&quot;cgroup manager V2 will be used&quot;,&quot;target&quot;:&quot;libcgrou
+207070418829 youki:[1:INTER] 13747    write     fd=4, {"timestamp":"2023-09-24T10:47:07.427846Z","level":"INFO","message":"cgroup manager V2 will be used","target":"libcgrou
 ...
 207084948440 youki:[1:INTER] 13747    clone3
-207085058811 youki:[1:INTER] 13747    write     fd=4, {&quot;timestamp&quot;:&quot;2023-09-24T10:47:07.442502Z&quot;,&quot;level&quot;:&quot;DEBUG&quot;,&quot;message&quot;:&quot;sending init pid (Pid(1305))&quot;,&quot;target&quot;:&quot;libcontai
-207085343170  youki:[2:INIT] 13750    write     fd=4, {&quot;timestamp&quot;:&quot;2023-09-24T10:47:07.442746Z&quot;,&quot;level&quot;:&quot;DEBUG&quot;,&quot;message&quot;:&quot;unshare or setns: LinuxNamespace { typ: Uts, path
+207085058811 youki:[1:INTER] 13747    write     fd=4, {"timestamp":"2023-09-24T10:47:07.442502Z","level":"DEBUG","message":"sending init pid (Pid(1305))","target":"libcontai
+207085343170  youki:[2:INIT] 13750    write     fd=4, {"timestamp":"2023-09-24T10:47:07.442746Z","level":"DEBUG","message":"unshare or setns: LinuxNamespace { typ: Uts, path
 ...
 207088256843  youki:[2:INIT] 13750    pivt_root new_root=/run/containerd/io.containerd.runtime.v2.task/k8s.io/0fea8cf5f8d1619a35ca67fd6fa73d8d7c8fc70ac2ed43ee2ac2f8610bb938f6/r, put_old=/run/containerd/io.containerd.runtime.v2.task/k8s.io/0fea8cf5f8d1619a35ca67fd6fa73d8d7c8fc70ac2ed43ee2ac2f8610bb938f6/r
 ...
-207097207551  youki:[2:INIT] 13750    write     fd=4, {&quot;timestamp&quot;:&quot;2023-09-24T10:47:07.454645Z&quot;,&quot;level&quot;:&quot;DEBUG&quot;,&quot;message&quot;:&quot;found executable in executor&quot;,&quot;executable&quot;:&quot;\&quot;/pa
+207097207551  youki:[2:INIT] 13750    write     fd=4, {"timestamp":"2023-09-24T10:47:07.454645Z","level":"DEBUG","message":"found executable in executor","executable":"\"/pa
 ...
-207139391811  youki:[2:INIT] 13750    write     fd=4, {&quot;timestamp&quot;:&quot;2023-09-24T10:47:07.496815Z&quot;,&quot;level&quot;:&quot;DEBUG&quot;,&quot;message&quot;:&quot;received: start container&quot;,&quot;target&quot;:&quot;libcontainer
-207139423243  youki:[2:INIT] 13750    write     fd=4, {&quot;timestamp&quot;:&quot;2023-09-24T10:47:07.496868Z&quot;,&quot;level&quot;:&quot;DEBUG&quot;,&quot;message&quot;:&quot;executing workload with default handler&quot;,&quot;target&quot;
+207139391811  youki:[2:INIT] 13750    write     fd=4, {"timestamp":"2023-09-24T10:47:07.496815Z","level":"DEBUG","message":"received: start container","target":"libcontainer
+207139423243  youki:[2:INIT] 13750    write     fd=4, {"timestamp":"2023-09-24T10:47:07.496868Z","level":"DEBUG","message":"executing workload with default handler","target"
 
 </code></pre>
 </li>
@@ -1062,7 +1062,46 @@ when the executor can't handle the workload.</p>
 <details>
 <summary>Fully the code of the example test</summary>
 <p>
-<pre><code class="language-rust no_run noplayground">{{#include ../../../../tests/integration_test/src/tests/example/hello_world.rs}}</code></pre>
+<pre><code class="language-rust no_run noplayground">use anyhow::{Context, Result};
+use oci_spec::runtime::{ProcessBuilder, Spec, SpecBuilder};
+use test_framework::{test_result, Test, TestGroup, TestResult};
+
+use crate::utils::test_inside_container;
+
+////////// ANCHOR: get_example_spec
+fn create_spec() -&gt; Result&lt;Spec&gt; {
+    SpecBuilder::default()
+        .process(
+            ProcessBuilder::default()
+                .args(
+                    ["runtimetest", "hello_world"]
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect::&lt;Vec&lt;String&gt;&gt;(),
+                )
+                .build()?,
+        )
+        .build()
+        .context("failed to create spec")
+}
+////////// ANCHOR_END: get_example_spec
+
+////////// ANCHOR: example_test
+fn example_test() -&gt; TestResult {
+    let spec = test_result!(create_spec());
+    test_inside_container(spec, &amp;|_| Ok(()))
+}
+////////// ANCHOR_END: example_test
+
+////////// ANCHOR: get_example_test
+pub fn get_example_test() -&gt; TestGroup {
+    let mut test_group = TestGroup::new("example");
+    let test1 = Test::new("hello world", Box::new(example_test));
+    test_group.add(vec![Box::new(test1)]);
+
+    test_group
+}
+////////// ANCHOR_END: get_example_test</code></pre>
 </p>
 </details>
 <ol>
@@ -1073,24 +1112,60 @@ In other words, you can test the processes you want to execute within a containe
 Therefore, it is common practice here to write an OCI Runtime Spec that executes <code>runtimetest</code>.</p>
 </li>
 </ol>
-<pre><code class="language-rust no_run noplayground">{{#include ../../../../tests/integration_test/src/tests/example/hello_world.rs:get_example_spec}}</code></pre>
+<pre><code class="language-rust no_run noplayground">fn create_spec() -&gt; Result&lt;Spec&gt; {
+    SpecBuilder::default()
+        .process(
+            ProcessBuilder::default()
+                .args(
+                    ["runtimetest", "hello_world"]
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect::&lt;Vec&lt;String&gt;&gt;(),
+                )
+                .build()?,
+        )
+        .build()
+        .context("failed to create spec")
+}</code></pre>
 <ol start="2">
 <li>Prepare a function that returns a <code>TestResult</code>, which represents the result of the test.</li>
 </ol>
-<pre><code class="language-rust no_run noplayground">{{#include ../../../../tests/integration_test/src/tests/example/hello_world.rs:example_test}}</code></pre>
+<pre><code class="language-rust no_run noplayground">fn example_test() -&gt; TestResult {
+    let spec = test_result!(create_spec());
+    test_inside_container(spec, &amp;|_| Ok(()))
+}</code></pre>
 <ol start="3">
 <li>Create a <code>TestGroup</code> and register a test case you created</li>
 </ol>
-<pre><code class="language-rust no_run noplayground">{{#include ../../../../tests/integration_test/src/tests/example/hello_world.rs:get_example_test}}</code></pre>
+<pre><code class="language-rust no_run noplayground">pub fn get_example_test() -&gt; TestGroup {
+    let mut test_group = TestGroup::new("example");
+    let test1 = Test::new("hello world", Box::new(example_test));
+    test_group.add(vec![Box::new(test1)]);
+
+    test_group
+}</code></pre>
 <ol start="4">
 <li>Register the <code>TestGroup</code> you created to a <code>TestManager</code></li>
 </ol>
-<pre><code class="language-rust no_run noplayground">{{#include ../../../../tests/integration_test/src/main.rs:register_example_test}}</code></pre>
+<pre><code class="language-rust no_run noplayground">    let mut tm = TestManager::new();
+    let example = get_example_test();
+    tm.add_test_group(Box::new(example));</code></pre>
 <ol start="5">
 <li>Write the validation you want to run within a test container</li>
 </ol>
-<pre><code class="language-rust no_run noplayground">{{#include ../../../../tests/runtimetest/src/main.rs:example_runtimetest_main}}</code></pre>
-<pre><code class="language-rust no_run noplayground">{{#include ../../../../tests/runtimetest/src/tests.rs:example_hello_world}}</code></pre>
+<pre><code class="language-rust no_run noplayground">fn main() {
+    let spec = get_spec();
+    let args: Vec&lt;String&gt; = env::args().collect();
+    let execute_test = match args.get(1) {
+        Some(execute_test) =&gt; execute_test.to_string(),
+        None =&gt; return eprintln!("error due to execute test name not found"),
+    };
+
+    match &amp;*execute_test {
+        "hello_world" =&gt; tests::hello_world(&amp;spec),</code></pre>
+<pre><code class="language-rust no_run noplayground">pub fn hello_world(_spec: &amp;Spec) {
+    println!("Hello world");
+}</code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="integration_test"><a class="header" href="#integration_test">integration_test</a></h1>
 <p><strong>Note</strong> that these tests resides in <code>/tests/integration_test/</code> at the time of writing.</p>
 <p>This crate contains the Rust port of OCI-runtime tools integration tests, which are used to test if the runtime works as per the OCI spec or not. Initially youki used the original implementation of these test provided in the OCI repository <a href="https://github.com/opencontainers/runtime-tools/tree/master/validation">here</a>. But those tests are written in Go, which made the developers depend on two language environments Rust and Go to compile youki and test it. The Validation tests themselves also have an optional dependency on node js to parse their output, which can make it a third language dependency.</p>
@@ -1122,7 +1197,7 @@ For that, first whichever integration test needs to use it, must define the runt
 <p>Now runtimetest needs at least <code>oci-spec</code> and <code>nix</code> package for its operations, which are also dependencies of other packages in the workspace. Thus both of these, and recursively their dependencies must be compiled twice, each time, once for dynamic linking and once for static. The took a long time in the compilation stage, especially when developing / adding new tests. Separating runtimetest from the workspace allows it to have a separate target/ directory, where it can store the statically compiled dependencies, and the workspace can have its target/ directory, where it can store its dynamically compiled dependencies. That way only the crates which have changes need to be compiled (runtimetest or integration test), and not their dependencies.</p>
 <p>In case in future this separation is not required, or some other configuration is chosen, make sure the multiple compilation issue does not arise, or the advantages of new method outweigh the time spent in double compilation.</p>
 <p>To see if a binary can be run inside the container process, run</p>
-<pre><code class="language-console">readelf -l path/to/binary |grep &quot;program interpreter&quot;
+<pre><code class="language-console">readelf -l path/to/binary |grep "program interpreter"
 </code></pre>
 <p><code>[Requesting program interpreter: /lib64/ld-linux-x86-64.so.2]</code> means that the binary is not statically linked, and cannot be run inside the container process. If the above command gives no output, that means it does not require any program interpreter and can be run inside the container.</p>
 <p>Another way is to run</p>

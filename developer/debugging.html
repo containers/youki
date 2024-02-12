@@ -175,7 +175,7 @@
                     <main>
                         <h1 id="debugging"><a class="header" href="#debugging">Debugging</a></h1>
 <p>Since Youki uses pipe and double-fork in the creating phase, it is hard to debug what happened.
-You might encounter the error message, &quot;Broken pipe ...&quot; Unfortunately, 
+You might encounter the error message, "Broken pipe ..." Unfortunately,
 this error message has only information that a child process exists with an error for some reason.</p>
 <p>This section will give some tips to debug youki to know what happens in the child processes.</p>
 <h1 id="bpftrace"><a class="header" href="#bpftrace">bpftrace</a></h1>
@@ -216,15 +216,15 @@ TIME                 COMMAND PID      EVENT     CONTENT
 $ just test-kind
 docker buildx build --output=bin/ -f tests/k8s/Dockerfile --target kind-bin .
 ...
-Creating cluster &quot;youki&quot; ...
+Creating cluster "youki" ...
 ...
 kubectl --context=kind-youki apply -f tests/k8s/deploy.yaml
 runtimeclass.node.k8s.io/youki created
 deployment.apps/nginx-deployment created
 ...
 kubectl --context=kind-youki delete -f tests/k8s/deploy.yaml
-runtimeclass.node.k8s.io &quot;youki&quot; deleted
-deployment.apps &quot;nginx-deployment&quot; deleted
+runtimeclass.node.k8s.io "youki" deleted
+deployment.apps "nginx-deployment" deleted
 </code></pre>
 </li>
 <li>
@@ -241,18 +241,18 @@ TIME                 COMMAND PID      EVENT     CONTENT
 207066996623               4 13743    open      errno=2, fd=-1, file=/opt/containerd/lib/glibc-hwcaps/x86-64-v3/libc.so.6
 ...
 207070130175               4 13743    clone3
-207070418829 youki:[1:INTER] 13747    write     fd=4, {&quot;timestamp&quot;:&quot;2023-09-24T10:47:07.427846Z&quot;,&quot;level&quot;:&quot;INFO&quot;,&quot;message&quot;:&quot;cgroup manager V2 will be used&quot;,&quot;target&quot;:&quot;libcgrou
+207070418829 youki:[1:INTER] 13747    write     fd=4, {"timestamp":"2023-09-24T10:47:07.427846Z","level":"INFO","message":"cgroup manager V2 will be used","target":"libcgrou
 ...
 207084948440 youki:[1:INTER] 13747    clone3
-207085058811 youki:[1:INTER] 13747    write     fd=4, {&quot;timestamp&quot;:&quot;2023-09-24T10:47:07.442502Z&quot;,&quot;level&quot;:&quot;DEBUG&quot;,&quot;message&quot;:&quot;sending init pid (Pid(1305))&quot;,&quot;target&quot;:&quot;libcontai
-207085343170  youki:[2:INIT] 13750    write     fd=4, {&quot;timestamp&quot;:&quot;2023-09-24T10:47:07.442746Z&quot;,&quot;level&quot;:&quot;DEBUG&quot;,&quot;message&quot;:&quot;unshare or setns: LinuxNamespace { typ: Uts, path
+207085058811 youki:[1:INTER] 13747    write     fd=4, {"timestamp":"2023-09-24T10:47:07.442502Z","level":"DEBUG","message":"sending init pid (Pid(1305))","target":"libcontai
+207085343170  youki:[2:INIT] 13750    write     fd=4, {"timestamp":"2023-09-24T10:47:07.442746Z","level":"DEBUG","message":"unshare or setns: LinuxNamespace { typ: Uts, path
 ...
 207088256843  youki:[2:INIT] 13750    pivt_root new_root=/run/containerd/io.containerd.runtime.v2.task/k8s.io/0fea8cf5f8d1619a35ca67fd6fa73d8d7c8fc70ac2ed43ee2ac2f8610bb938f6/r, put_old=/run/containerd/io.containerd.runtime.v2.task/k8s.io/0fea8cf5f8d1619a35ca67fd6fa73d8d7c8fc70ac2ed43ee2ac2f8610bb938f6/r
 ...
-207097207551  youki:[2:INIT] 13750    write     fd=4, {&quot;timestamp&quot;:&quot;2023-09-24T10:47:07.454645Z&quot;,&quot;level&quot;:&quot;DEBUG&quot;,&quot;message&quot;:&quot;found executable in executor&quot;,&quot;executable&quot;:&quot;\&quot;/pa
+207097207551  youki:[2:INIT] 13750    write     fd=4, {"timestamp":"2023-09-24T10:47:07.454645Z","level":"DEBUG","message":"found executable in executor","executable":"\"/pa
 ...
-207139391811  youki:[2:INIT] 13750    write     fd=4, {&quot;timestamp&quot;:&quot;2023-09-24T10:47:07.496815Z&quot;,&quot;level&quot;:&quot;DEBUG&quot;,&quot;message&quot;:&quot;received: start container&quot;,&quot;target&quot;:&quot;libcontainer
-207139423243  youki:[2:INIT] 13750    write     fd=4, {&quot;timestamp&quot;:&quot;2023-09-24T10:47:07.496868Z&quot;,&quot;level&quot;:&quot;DEBUG&quot;,&quot;message&quot;:&quot;executing workload with default handler&quot;,&quot;target&quot;
+207139391811  youki:[2:INIT] 13750    write     fd=4, {"timestamp":"2023-09-24T10:47:07.496815Z","level":"DEBUG","message":"received: start container","target":"libcontainer
+207139423243  youki:[2:INIT] 13750    write     fd=4, {"timestamp":"2023-09-24T10:47:07.496868Z","level":"DEBUG","message":"executing workload with default handler","target"
 
 </code></pre>
 </li>

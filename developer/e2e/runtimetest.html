@@ -186,7 +186,7 @@
 <p>Now runtimetest needs at least <code>oci-spec</code> and <code>nix</code> package for its operations, which are also dependencies of other packages in the workspace. Thus both of these, and recursively their dependencies must be compiled twice, each time, once for dynamic linking and once for static. The took a long time in the compilation stage, especially when developing / adding new tests. Separating runtimetest from the workspace allows it to have a separate target/ directory, where it can store the statically compiled dependencies, and the workspace can have its target/ directory, where it can store its dynamically compiled dependencies. That way only the crates which have changes need to be compiled (runtimetest or integration test), and not their dependencies.</p>
 <p>In case in future this separation is not required, or some other configuration is chosen, make sure the multiple compilation issue does not arise, or the advantages of new method outweigh the time spent in double compilation.</p>
 <p>To see if a binary can be run inside the container process, run</p>
-<pre><code class="language-console">readelf -l path/to/binary |grep &quot;program interpreter&quot;
+<pre><code class="language-console">readelf -l path/to/binary |grep "program interpreter"
 </code></pre>
 <p><code>[Requesting program interpreter: /lib64/ld-linux-x86-64.so.2]</code> means that the binary is not statically linked, and cannot be run inside the container process. If the above command gives no output, that means it does not require any program interpreter and can be run inside the container.</p>
 <p>Another way is to run</p>
