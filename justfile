@@ -39,11 +39,11 @@ test-basic: test-unit test-doc
 
 # run cargo unit tests
 test-unit:
-    {{ cwd }}/scripts/cargo.sh test --lib --bins --all --all-targets --all-features --no-fail-fast
+    {{ cwd }}/scripts/cargo.sh test --lib --bins --all --all-targets --all-features --no-fail-fast -- --test-threads=1
 
 # run cargo doc tests
 test-doc:
-    {{ cwd }}/scripts/cargo.sh test --doc
+    {{ cwd }}/scripts/cargo.sh test --doc -- --test-threads=1
 
 # run permutated feature compilation tests
 test-features:
