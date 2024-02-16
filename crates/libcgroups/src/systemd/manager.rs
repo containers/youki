@@ -353,6 +353,10 @@ impl CgroupManager for Manager {
         if pid.as_raw() == -1 {
             return Ok(());
         }
+        if self.client.transient_unit_exists(&self.unit_name) {
+            tracing::debug!("Transient unit {:?} already exists", self.unit_name);
+            return Ok(());
+        }
 
         tracing::debug!("Starting {:?}", self.unit_name);
         self.client.start_transient_unit(
