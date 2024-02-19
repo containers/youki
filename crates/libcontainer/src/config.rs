@@ -109,7 +109,10 @@ mod tests {
         let config = YoukiConfig::from_spec(&spec, container_id, false)?;
         assert_eq!(&config.hooks, spec.hooks());
         dbg!(&config.cgroup_path);
-        assert_eq!(config.cgroup_path, PathBuf::from(container_id));
+        assert_eq!(
+            config.cgroup_path,
+            PathBuf::from(format!(":youki:{container_id}"))
+        );
         Ok(())
     }
 

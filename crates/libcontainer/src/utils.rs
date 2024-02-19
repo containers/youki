@@ -154,10 +154,7 @@ pub fn get_cgroup_path(
 ) -> PathBuf {
     match cgroups_path {
         Some(cpath) => cpath.clone(),
-        None => match new_user_ns {
-            false => PathBuf::from(container_id),
-            true => PathBuf::from(format!(":youki:{container_id}")),
-        },
+        None => PathBuf::from(format!(":youki:{container_id}")),
     }
 }
 
@@ -324,7 +321,7 @@ mod tests {
         let cid = "sample_container_id";
         assert_eq!(
             get_cgroup_path(&None, cid, false),
-            PathBuf::from("sample_container_id")
+            PathBuf::from(":youki:sample_container_id")
         );
         assert_eq!(
             get_cgroup_path(&Some(PathBuf::from("/youki")), cid, false),
