@@ -355,6 +355,12 @@ pub fn container_init_process(
             })?;
         }
 
+        // As we have chagned the root mount, from here on
+        // logs are no longer visible in journalctl
+        // so make sure that you bubble up any errors
+        // and do not call unwrap as any panics would not be correctly logged
+
+
         rootfs.adjust_root_mount_propagation(linux).map_err(|err| {
             tracing::error!(?err, "failed to adjust root mount propagation");
             InitProcessError::RootFS(err)

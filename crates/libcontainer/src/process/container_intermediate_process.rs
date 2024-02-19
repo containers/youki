@@ -122,19 +122,19 @@ pub fn container_intermediate_process(
             match container_init_process(&args, &mut main_sender, &mut init_receiver) {
                 Ok(_) => 0,
                 Err(e) => {
+                    tracing::error!("failed to initialize container process: {e}");
+                    if let Err(err) = main_sender.exec_failed(e.to_string()) {
+                        tracing::error!(?err, "failed sending error to main sender");
+                    }
                     if let ContainerType::TenantContainer { exec_notify_fd } = args.container_type {
                         let buf = format!("{e}");
                         if let Err(err) = write(exec_notify_fd, buf.as_bytes()) {
                             tracing::error!(?err, "failed to write to exec notify fd");
-                            return -1;
                         }
                         if let Err(err) = close(exec_notify_fd) {
                             tracing::error!(?err, "failed to close exec notify fd");
-                            return -1;
                         }
                     }
-
-                    tracing::error!("failed to initialize container process: {e}");
                     -1
                 }
             }
