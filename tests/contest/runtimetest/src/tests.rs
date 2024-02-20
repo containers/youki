@@ -1,7 +1,11 @@
 use crate::utils::{self, test_read_access, test_write_access};
 use anyhow::{bail, Result};
+use nix::libc;
 use nix::{errno::Errno, sys::utsname, unistd::getcwd};
-use oci_spec::runtime::{LinuxSchedulerPolicy, Spec};
+use oci_spec::runtime::{
+    IOPriorityClass::{self, IoprioClassBe, IoprioClassIdle, IoprioClassRt},
+    LinuxSchedulerPolicy, Spec,
+};
 use std::fs::{self, read_dir};
 use std::mem;
 use std::path::Path;
@@ -374,5 +378,57 @@ pub fn validate_scheduler_policy(spec: &Spec) {
     let want_sn = sc.nice().unwrap();
     if sn != want_sn {
         eprintln!("error due to sched_nice want {want_sn}, got {sn}")
+    }
+}
+
+pub fn test_io_priority_class(spec: &Spec, io_priority_class: IOPriorityClass) {
+    let io_priority_spec = spec
+        .process()
+        .as_ref()
+        .unwrap()
+        .io_priority()
+        .as_ref()
+        .unwrap();
+    if io_priority_spec.class() != io_priority_class {
+        let io_class = io_priority_spec.class();
+        return eprintln!("error io_priority class want {io_priority_class:?}, got {io_class:?}");
+    }
+
+    let io_priority_who_progress: libc::c_int = 1;
+    let io_priority_who_pid = 0;
+    let res = unsafe {
+        libc::syscall(
+            libc::SYS_ioprio_get,
+            io_priority_who_progress,
+            io_priority_who_pid,
+        )
+    };
+    if let Err(e) = Errno::result(res) {
+        return eprintln!("error ioprio_get error {e}");
+    }
+
+    // ref: https://docs.kernel.org/block/ioprio.html
+    let class = res as u16 >> 13;
+    let priority = res as u16 & 0xFF;
+
+    let expected_class = match io_priority_class {
+        IoprioClassRt => 1,
+        IoprioClassBe => 2,
+        IoprioClassIdle => 3,
+    };
+    if class != expected_class {
+        return eprintln!(
+            "error ioprio_get class expected {io_priority_class:?} ({expected_class}), got {class}"
+        );
+    }
+
+    // these number mappings are arbitrary, we set the priority in test cases io_priority_test.rs file
+    let expected_priority = match io_priority_class {
+        IoprioClassRt => 1,
+        IoprioClassBe => 2,
+        IoprioClassIdle => 3,
+    };
+    if priority != expected_priority {
+        eprintln!("error ioprio_get expected priority {expected_priority:?}, got {priority}")
     }
 }
