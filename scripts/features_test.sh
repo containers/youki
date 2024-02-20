@@ -23,7 +23,7 @@ test_package_features "libcgroups" "systemd cgroupsv2_devices"
 test_features() {
     echo "[feature test] testing features $1"
     "$CARGO_SH" build --no-default-features --features "$1"
-    "$CARGO_SH" test run --no-default-features --features "$1"
+    "$CARGO_SH" test run --no-default-features --features "$1" -- --test-threads=1
 }
 
 test_features "v1"
