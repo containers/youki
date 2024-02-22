@@ -129,7 +129,12 @@ impl ContainerBuilderImpl {
         // ourselves to be non-dumpable only breaks things (like rootless
         // containers), which is the recommendation from the kernel folks.
         if linux.namespaces().is_some() {
-            prctl::set_dumpable(false).unwrap();
+            prctl::set_dumpable(false).map_err(|e| {
+                LibcontainerError::Other(format!(
+                    "error in setting dumpable to false : {}",
+                    nix::errno::from_i32(e)
+                ))
+            })?;
         }
 
         // This container_args will be passed to the container processes,

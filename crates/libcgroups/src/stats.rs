@@ -216,6 +216,8 @@ pub fn supported_page_sizes() -> Result<Vec<String>, SupportedPageSizesError> {
         }
 
         let dir_name = hugetlb_entry.file_name();
+        // this name should always be valid utf-8,
+        // so can unwrap without any checks
         let dir_name = dir_name.to_str().unwrap();
 
         sizes.push(extract_page_size(dir_name)?);

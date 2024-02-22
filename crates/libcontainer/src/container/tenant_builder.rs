@@ -321,13 +321,11 @@ impl TenantContainerBuilder {
             process_builder.build()?
         };
 
-        if container.pid().is_none() {
-            return Err(LibcontainerError::Other(
-                "could not retrieve container init pid".into(),
-            ));
-        }
+        let container_pid = container.pid().ok_or(LibcontainerError::Other(
+            "could not retrieve container init pid".into(),
+        ))?;
 
-        let init_process = procfs::process::Process::new(container.pid().unwrap().as_raw())?;
+        let init_process = procfs::process::Process::new(container_pid.as_raw())?;
         let ns = self.get_namespaces(init_process.namespaces()?.0)?;
         let linux = LinuxBuilder::default().namespaces(ns).build()?;
 
