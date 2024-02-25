@@ -1,12 +1,12 @@
 use std::path::Path;
 
+use crate::utils::{linux_resource_memory::validate_linux_resource_memory, test_outside_container};
 use anyhow::{Context, Result};
+use libcgroups::common::{get_cgroup_setup, CgroupSetup};
 use oci_spec::runtime::{
     LinuxBuilder, LinuxMemoryBuilder, LinuxResourcesBuilder, Spec, SpecBuilder,
 };
 use test_framework::{test_result, ConditionalTest, TestGroup, TestResult};
-
-use crate::utils::{test_outside_container, test_utils::check_container_created};
 
 const CGROUP_MEMORY_LIMIT: &str = "/sys/fs/cgroup/memory/memory.limit_in_bytes";
 const CGROUP_MEMORY_SWAPPINESS: &str = "/sys/fs/cgroup/memory/memory.swappiness";
@@ -50,8 +50,8 @@ fn test_memory_cgroups() -> TestResult {
     ];
 
     for spec in cases.into_iter() {
-        let test_result = test_outside_container(spec, &|data| {
-            test_result!(check_container_created(&data));
+        let test_result = test_outside_container(spec.clone(), &|data| {
+            test_result!(validate_linux_resource_memory(&spec, data));
 
             TestResult::Passed
         });
@@ -64,7 +64,10 @@ fn test_memory_cgroups() -> TestResult {
 }
 
 fn can_run() -> bool {
-    Path::new(CGROUP_MEMORY_LIMIT).exists() && Path::new(CGROUP_MEMORY_SWAPPINESS).exists()
+    let cgroup_setup = get_cgroup_setup();
+    matches!(cgroup_setup, Ok(CgroupSetup::Legacy))
+        && Path::new(CGROUP_MEMORY_LIMIT).exists()
+        && Path::new(CGROUP_MEMORY_SWAPPINESS).exists()
 }
 
 pub fn get_test_group() -> TestGroup {

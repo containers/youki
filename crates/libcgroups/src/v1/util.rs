@@ -1,4 +1,8 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::HashMap,
+    fs, io,
+    path::{Path, PathBuf},
+};
 
 use procfs::{process::Process, ProcError};
 
@@ -78,4 +82,25 @@ pub fn get_subsystem_mount_point(subsystem: &ControllerType) -> Result<PathBuf, 
         .ok_or(V1MountPointError::NotFound {
             subsystem: *subsystem,
         })
+}
+
+pub fn get_subsystem_path(pid: i32, subsystem: &str) -> Result<PathBuf, io::Error> {
+    let contents = fs::read_to_string(Path::new(&format!("/proc/{}/cgroup", pid)))
+        .unwrap_or_else(|_| panic!("failed to read /proc/{}/cgroup", pid));
+    for line in contents.lines() {
+        let parts: Vec<&str> = line.splitn(3, ':').collect();
+        if parts.len() < 3 {
+            continue;
+        }
+        let subparts: Vec<&str> = parts[1].split(',').collect();
+        for subpart in subparts {
+            if subpart == subsystem {
+                return Ok(PathBuf::from(parts[2].to_string()));
+            }
+        }
+    }
+    Err(io::Error::new(
+        io::ErrorKind::Other,
+        format!("subsystem {} not found", subsystem),
+    ))
 }

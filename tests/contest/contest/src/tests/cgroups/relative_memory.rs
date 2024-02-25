@@ -1,21 +1,22 @@
 use std::path::Path;
 
+use crate::utils::{linux_resource_memory::validate_linux_resource_memory, test_outside_container};
 use anyhow::{Context, Result};
 use oci_spec::runtime::{
     LinuxBuilder, LinuxMemoryBuilder, LinuxResourcesBuilder, Spec, SpecBuilder,
 };
 use test_framework::{test_result, ConditionalTest, TestGroup, TestResult};
 
-use crate::utils::{test_outside_container, test_utils::check_container_created};
-
 const CGROUP_MEMORY_LIMIT: &str = "/sys/fs/cgroup/memory/memory.limit_in_bytes";
 const CGROUP_MEMORY_SWAPPINESS: &str = "/sys/fs/cgroup/memory/memory.swappiness";
+
+const RELATIVE_CGROUPS_PATH: &str = "/testdir/runtime-test/container";
 
 fn create_spec(cgroup_name: &str, limit: i64, swappiness: u64) -> Result<Spec> {
     let spec = SpecBuilder::default()
         .linux(
             LinuxBuilder::default()
-                .cgroups_path(Path::new("/testdir/runtime-test/container").join(cgroup_name))
+                .cgroups_path(Path::new(RELATIVE_CGROUPS_PATH).join(cgroup_name))
                 .resources(
                     LinuxResourcesBuilder::default()
                         .memory(
@@ -42,8 +43,8 @@ fn test_relative_memory_cgroups() -> TestResult {
 
     let spec = test_result!(create_spec(cgroup_name, 50593792, 10));
 
-    test_outside_container(spec, &|data| {
-        test_result!(check_container_created(&data));
+    test_outside_container(spec.clone(), &|data| {
+        test_result!(validate_linux_resource_memory(&spec, data));
 
         TestResult::Passed
     })
