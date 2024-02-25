@@ -1,12 +1,12 @@
 use std::path::Path;
 
+use crate::utils::linux_resource_memory::validate_linux_resource_memory;
+use crate::utils::test_outside_container;
 use anyhow::{Context, Result};
 use oci_spec::runtime::{
     LinuxBuilder, LinuxMemoryBuilder, LinuxResourcesBuilder, Spec, SpecBuilder,
 };
 use test_framework::{test_result, ConditionalTest, TestGroup, TestResult};
-
-use crate::utils::{test_outside_container, test_utils::check_container_created};
 
 const CGROUP_MEMORY_LIMIT: &str = "/sys/fs/cgroup/memory/memory.limit_in_bytes";
 const CGROUP_MEMORY_SWAPPINESS: &str = "/sys/fs/cgroup/memory/memory.swappiness";
@@ -42,8 +42,8 @@ fn test_relative_memory_cgroups() -> TestResult {
 
     let spec = test_result!(create_spec(cgroup_name, 50593792, 10));
 
-    test_outside_container(spec, &|data| {
-        test_result!(check_container_created(&data));
+    test_outside_container(spec.clone(), &|data| {
+        test_result!(validate_linux_resource_memory(&spec, data));
 
         TestResult::Passed
     })

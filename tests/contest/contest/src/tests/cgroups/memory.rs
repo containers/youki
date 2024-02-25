@@ -5,8 +5,9 @@ use oci_spec::runtime::{
     LinuxBuilder, LinuxMemoryBuilder, LinuxResourcesBuilder, Spec, SpecBuilder,
 };
 use test_framework::{test_result, ConditionalTest, TestGroup, TestResult};
+use utils::linux_resource_memory::validate_linux_resource_memory;
 
-use crate::utils::{test_outside_container, test_utils::check_container_created};
+use crate::utils::{self, test_outside_container};
 
 const CGROUP_MEMORY_LIMIT: &str = "/sys/fs/cgroup/memory/memory.limit_in_bytes";
 const CGROUP_MEMORY_SWAPPINESS: &str = "/sys/fs/cgroup/memory/memory.swappiness";
@@ -50,8 +51,8 @@ fn test_memory_cgroups() -> TestResult {
     ];
 
     for spec in cases.into_iter() {
-        let test_result = test_outside_container(spec, &|data| {
-            test_result!(check_container_created(&data));
+        let test_result = test_outside_container(spec.clone(), &|data| {
+            test_result!(validate_linux_resource_memory(&spec, data));
 
             TestResult::Passed
         });
