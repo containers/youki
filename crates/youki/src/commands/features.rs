@@ -116,7 +116,6 @@ pub fn features(_: Features) -> Result<()> {
         }
     };
 
-
     let features = HardFeatures {
         oci_version_min: Some(String::from("1.0.0")),
         oci_version_max: Some(String::from("1.0.2-dev")),
