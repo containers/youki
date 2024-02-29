@@ -78,6 +78,8 @@ pub enum UserNamespaceError {
     UnknownUnprivilegedUsernsClone(u8),
     #[error(transparent)]
     IDMapping(#[from] MappingError),
+    #[error(transparent)]
+    OtherIO(#[from] std::io::Error),
 }
 
 type Result<T> = std::result::Result<T, UserNamespaceError>;
@@ -108,6 +110,8 @@ pub enum ValidateSpecError {
     MountUidMapping(u32),
     #[error(transparent)]
     Namespaces(#[from] NamespaceError),
+    #[error(transparent)]
+    OtherIO(#[from] std::io::Error),
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -217,7 +221,7 @@ impl TryFrom<&Linux> for UserNamespaceConfig {
             uid_mappings: linux.uid_mappings().to_owned(),
             gid_mappings: linux.gid_mappings().to_owned(),
             user_namespace: user_namespace.cloned(),
-            privileged: !utils::rootless_required(),
+            privileged: !utils::rootless_required()?,
             id_mapper: UserNamespaceIDMapper::new(),
         })
     }
@@ -281,7 +285,7 @@ fn validate_spec_for_new_user_ns(spec: &Spec) -> std::result::Result<(), Validat
         .as_ref()
         .and_then(|process| process.user().additional_gids().as_ref())
     {
-        let privileged = !utils::rootless_required();
+        let privileged = !utils::rootless_required()?;
 
         match (privileged, additional_gids.is_empty()) {
             (true, false) => {
@@ -421,6 +425,9 @@ fn write_id_mapping(
                 })
                 .collect();
 
+            // we can be certain here that map_binary will not be None,
+            // as in the lookup_map_binaries function, we return error
+            // if there are mappings.len() > 1 and binaries are not present
             Command::new(map_binary.unwrap())
                 .arg(pid.to_string())
                 .args(args)

@@ -18,7 +18,7 @@ pub fn determine(root_path: Option<PathBuf>) -> Result<PathBuf> {
         return Ok(path);
     }
 
-    if !rootless_required() {
+    if !rootless_required()? {
         let path = get_default_not_rootless_path();
         create_dir_all_with_mode(&path, uid, Mode::S_IRWXU)?;
         return Ok(path);

@@ -46,16 +46,14 @@ fn parse_dbus_address(env_value: String) -> Result<String> {
     // as per spec, the env var can have multiple addresses separated by ;
     let addr_list: Vec<_> = env_value.split(';').collect();
     for addr in addr_list {
-        if addr.starts_with("unix:path=") {
-            let s = addr.strip_prefix("unix:path=").unwrap();
+        if let Some(s) = addr.strip_prefix("unix:path=") {
             if !std::path::PathBuf::from(s).exists() {
                 continue;
             }
             return Ok(s.to_owned());
         }
 
-        if addr.starts_with("unix:abstract=") {
-            let s = addr.strip_prefix("unix:abstract=").unwrap();
+        if let Some(s) = addr.strip_prefix("unix:abstract=") {
             return Ok(s.to_owned());
         }
     }
@@ -105,12 +103,19 @@ fn get_actual_uid() -> Result<u32> {
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
         .spawn()
-        .map_err(|e| DbusError::BusAddressError(format!("error in running busctl {:?}", e)))?
+        .map_err(|e| DbusError::BusctlError(format!("error in running busctl {:?}", e)))?
         .wait_with_output()
-        .map_err(|e| DbusError::BusAddressError(format!("error in busctl {:?}", e)))?;
+        .map_err(|e| DbusError::BusctlError(format!("error from busctl execution {:?}", e)))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let found = stdout.lines().find(|s| s.starts_with("OwnerUID=")).unwrap();
+    let found =
+        stdout
+            .lines()
+            .find(|s| s.starts_with("OwnerUID="))
+            .ok_or(DbusError::BusctlError(
+                "could not find OwnerUID from busctl".into(),
+            ))?;
+
     let uid = found
         .trim_start_matches("OwnerUID=")
         .parse::<u32>()

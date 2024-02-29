@@ -323,8 +323,8 @@ pub fn container_init_process(
             })?;
         }
 
-        let bind_service =
-            namespaces.get(LinuxNamespaceType::User)?.is_some() || utils::is_in_new_userns();
+        let in_user_ns = utils::is_in_new_userns().map_err(InitProcessError::Io)?;
+        let bind_service = namespaces.get(LinuxNamespaceType::User)?.is_some() || in_user_ns;
         let rootfs = RootFS::new();
         rootfs
             .prepare_rootfs(
@@ -354,6 +354,11 @@ pub fn container_init_process(
                 InitProcessError::SyscallOther(err)
             })?;
         }
+
+        // As we have changed the root mount, from here on
+        // logs are no longer visible in journalctl
+        // so make sure that you bubble up any errors
+        // and do not call unwrap() as any panics would not be correctly logged
 
         rootfs.adjust_root_mount_propagation(linux).map_err(|err| {
             tracing::error!(?err, "failed to adjust root mount propagation");
@@ -785,6 +790,8 @@ fn setup_scheduler(sc_op: &Option<Scheduler>) -> Result<()> {
             }
         }
         let mut a = nc::sched_attr_t {
+            // size of the structure should always be within u32 bounds,
+            // so this unwrap should never fail
             size: mem::size_of::<nc::sched_attr_t>().try_into().unwrap(),
             sched_policy: policy,
             sched_flags: flags_value,

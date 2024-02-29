@@ -13,6 +13,12 @@ use std::os::unix::io::AsRawFd;
 const CRIU_CHECKPOINT_LOG_FILE: &str = "dump.log";
 const DESCRIPTORS_JSON: &str = "descriptors.json";
 
+#[derive(thiserror::Error, Debug)]
+pub enum CheckpointError {
+    #[error("criu error: {0}")]
+    CriuError(String),
+}
+
 impl Container {
     pub fn checkpoint(&mut self, opts: &CheckpointOptions) -> Result<(), LibcontainerError> {
         self.refresh_status()?;
@@ -25,8 +31,12 @@ impl Container {
             return Err(LibcontainerError::IncorrectStatus);
         }
 
-        let mut criu = rust_criu::Criu::new().unwrap();
-
+        let mut criu = rust_criu::Criu::new().map_err(|e| {
+            LibcontainerError::Checkpoint(CheckpointError::CriuError(format!(
+                "error in creating criu struct: {}",
+                e
+            )))
+        })?;
         // We need to tell CRIU that all bind mounts are external. CRIU will fail checkpointing
         // if it does not know that these bind mounts are coming from the outside of the container.
         // This information is needed during restore again. The external location of the bind
@@ -35,7 +45,7 @@ impl Container {
         let source_spec_path = self.bundle().join("config.json");
         let spec = Spec::load(source_spec_path)?;
         let mounts = spec.mounts().clone();
-        for m in mounts.unwrap() {
+        for m in mounts.unwrap_or_default() {
             match m.typ().as_deref() {
                 Some("bind") => {
                     let dest = m
@@ -90,12 +100,19 @@ impl Container {
             criu.set_work_dir_fd(work_dir.as_raw_fd());
         }
 
-        let pid: i32 = self.pid().unwrap().into();
+        let pid: i32 = self
+            .pid()
+            .ok_or(LibcontainerError::Other(
+                "container process pid not found in state".into(),
+            ))?
+            .into();
 
         // Remember original stdin, stdout, stderr for container restore.
         let mut descriptors = Vec::new();
         for n in 0..3 {
             let link_path = match fs::read_link(format!("/proc/{pid}/fd/{n}")) {
+                // it should not have any non utf-8 or non os safe path,
+                // as we are reading from os , so ok to unwrap
                 Ok(lp) => lp.into_os_string().into_string().unwrap(),
                 Err(..) => "/dev/null".to_string(),
             };

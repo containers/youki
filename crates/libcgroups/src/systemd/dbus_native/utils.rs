@@ -40,6 +40,8 @@ pub enum DbusError {
     MethodCallErr(String),
     #[error("dbus bus address error: {0}")]
     BusAddressError(String),
+    #[error("dbus busctl error")]
+    BusctlError(String),
     #[error("could not parse uid from busctl: {0}")]
     UidError(ParseIntError),
 }

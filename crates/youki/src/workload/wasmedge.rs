@@ -104,6 +104,8 @@ fn get_args(spec: &Spec) -> &[String] {
 
 fn env_to_wasi(spec: &Spec) -> Vec<String> {
     let default = vec![];
+    // below we can be sure that process exists, as otherwise container init process
+    // function would have returned error at the very start
     let env = spec
         .process()
         .as_ref()

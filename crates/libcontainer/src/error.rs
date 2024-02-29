@@ -60,6 +60,8 @@ pub enum LibcontainerError {
     CgroupCreate(#[from] libcgroups::common::CreateCgroupSetupError),
     #[error(transparent)]
     CgroupGet(#[from] libcgroups::common::GetCgroupSetupError),
+    #[error[transparent]]
+    Checkpoint(#[from] crate::container::CheckpointError),
 
     // Catch all errors that are not covered by the above
     #[error("syscall error")]

@@ -127,10 +127,12 @@ impl Io {
     fn apply(root_path: &Path, blkio: &LinuxBlockIo) -> Result<(), V2IoControllerError> {
         if let Some(weight_device) = blkio.weight_device() {
             for wd in weight_device {
-                common::write_cgroup_file(
-                    root_path.join(CGROUP_BFQ_IO_WEIGHT),
-                    format!("{}:{} {}", wd.major(), wd.minor(), wd.weight().unwrap()),
-                )?;
+                if let Some(weight) = wd.weight() {
+                    common::write_cgroup_file(
+                        root_path.join(CGROUP_BFQ_IO_WEIGHT),
+                        format!("{}:{} {}", wd.major(), wd.minor(), weight),
+                    )?;
+                }
             }
         }
         if let Some(leaf_weight) = blkio.leaf_weight() {

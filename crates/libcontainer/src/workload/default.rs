@@ -34,7 +34,13 @@ impl Executor for DefaultExecutor {
             .collect();
         unistd::execvp(&cstring_path, &a).map_err(|err| {
             tracing::error!(?err, filename = ?cstring_path, args = ?a, "failed to execvp");
-            ExecutorError::Execution(err.into())
+            ExecutorError::Execution(
+                format!(
+                    "error '{}' executing '{:?}' with args '{:?}'",
+                    err, cstring_path, a
+                )
+                .into(),
+            )
         })?;
 
         // After execvp is called, the process is replaced with the container
@@ -46,14 +52,18 @@ impl Executor for DefaultExecutor {
         let proc = spec
             .process()
             .as_ref()
-            .ok_or(ExecutorValidationError::InvalidArg)?;
+            .ok_or(ExecutorValidationError::ArgValidationError(
+                "spec did not contain process".into(),
+            ))?;
 
         if let Some(args) = proc.args() {
             let envs: Vec<String> = proc.env().as_ref().unwrap_or(&vec![]).clone();
             let path_vars: Vec<&String> = envs.iter().filter(|&e| e.starts_with("PATH=")).collect();
             if path_vars.is_empty() {
                 tracing::error!("PATH environment variable is not set");
-                Err(ExecutorValidationError::InvalidArg)?;
+                Err(ExecutorValidationError::ArgValidationError(
+                    "PATH environment variable is not set".into(),
+                ))?;
             }
             let path_var = path_vars[0].trim_start_matches("PATH=");
             match get_executable_path(&args[0], path_var) {
@@ -62,7 +72,10 @@ impl Executor for DefaultExecutor {
                         executable = ?args[0],
                         "executable for container process not found in PATH",
                     );
-                    Err(ExecutorValidationError::InvalidArg)?;
+                    Err(ExecutorValidationError::ArgValidationError(format!(
+                        "executable '{}' not found in $PATH",
+                        args[0]
+                    )))?;
                 }
                 Some(path) => match is_executable(&path) {
                     Ok(true) => {
@@ -73,7 +86,10 @@ impl Executor for DefaultExecutor {
                             executable = ?path,
                             "executable does not have the correct permission set",
                         );
-                        Err(ExecutorValidationError::InvalidArg)?;
+                        Err(ExecutorValidationError::ArgValidationError(format!(
+                            "executable '{}' at path '{:?}' does not have correct permissions",
+                            args[0], path
+                        )))?;
                     }
                     Err(err) => {
                         tracing::error!(
@@ -81,7 +97,10 @@ impl Executor for DefaultExecutor {
                             ?err,
                             "failed to check permissions for executable",
                         );
-                        Err(ExecutorValidationError::InvalidArg)?;
+                        Err(ExecutorValidationError::ArgValidationError(format!(
+                            "failed to check permissions for executable '{}' at path '{:?}' : {}",
+                            args[0], path, err
+                        )))?;
                     }
                 },
             }
