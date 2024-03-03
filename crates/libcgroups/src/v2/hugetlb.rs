@@ -13,6 +13,7 @@ use crate::{
     },
 };
 
+use crate::common::read_cgroup_file;
 use oci_spec::runtime::LinuxHugepageLimit;
 
 #[derive(thiserror::Error, Debug)]
@@ -104,6 +105,12 @@ impl HugeTlb {
             root_path.join(format!("hugetlb.{}.max", hugetlb.page_size())),
             hugetlb.limit(),
         )?;
+
+        let rsvd_file_path = root_path.join(format!("hugetlb.{}.rsvd.max", hugetlb.page_size()));
+        if rsvd_file_path.exists() {
+            common::write_cgroup_file(rsvd_file_path, hugetlb.limit())?;
+        }
+
         Ok(())
     }
 
@@ -115,9 +122,14 @@ impl HugeTlb {
         cgroup_path: &Path,
         page_size: &str,
     ) -> Result<HugeTlbStats, V2HugeTlbStatsError> {
-        let events_file = format!("hugetlb.{page_size}.events");
-        let path = cgroup_path.join(events_file);
-        let events = common::read_cgroup_file(&path)?;
+        let mut file_prefix = format!("hugetlb.{page_size}.rsvd");
+        let mut path = cgroup_path.join(format!("{file_prefix}.events"));
+        let events = read_cgroup_file(&path).or_else(|_| {
+            file_prefix = format!("hugetlb.{page_size}");
+            path = cgroup_path.join(format!("{file_prefix}.events"));
+            read_cgroup_file(&path)
+        })?;
+
         let fail_count: u64 = events
             .lines()
             .find(|l| l.starts_with("max"))
@@ -130,7 +142,7 @@ impl HugeTlb {
             .unwrap_or_default();
 
         Ok(HugeTlbStats {
-            usage: parse_single_value(&cgroup_path.join(format!("hugetlb.{page_size}.current")))?,
+            usage: parse_single_value(&cgroup_path.join(format!("{file_prefix}.current")))?,
             fail_count,
             ..Default::default()
         })
@@ -178,6 +190,31 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_set_rsvd_hugetlb() {
+        let page_file_name = "hugetlb.2MB.max";
+        let rsvd_page_file_name = "hugetlb.2MB.rsvd.max";
+        let tmp = tempfile::tempdir().unwrap();
+        set_fixture(tmp.path(), page_file_name, "0").expect("Set fixture for 2 MB page size");
+        set_fixture(tmp.path(), rsvd_page_file_name, "0")
+            .expect("Set fixture for 2 MB rsvd page size");
+
+        let hugetlb = LinuxHugepageLimitBuilder::default()
+            .page_size("2MB")
+            .limit(16384)
+            .build()
+            .unwrap();
+        HugeTlb::apply(tmp.path(), &hugetlb).expect("apply hugetlb");
+
+        let content =
+            read_to_string(tmp.path().join(page_file_name)).expect("Read hugetlb file content");
+        let rsvd_content = read_to_string(tmp.path().join(rsvd_page_file_name))
+            .expect("Read hugetlb file content");
+
+        assert_eq!(hugetlb.limit().to_string(), content);
+        assert_eq!(hugetlb.limit().to_string(), rsvd_content);
+    }
+
     quickcheck! {
         fn property_test_set_hugetlb(hugetlb: LinuxHugepageLimit) -> bool {
             let page_file_name = format!("hugetlb.{:?}.max", hugetlb.page_size());
@@ -210,6 +247,27 @@ mod tests {
 
         let actual = HugeTlb::stats_for_page_size(tmp.path(), "2MB").expect("get cgroup stats");
 
+        let expected = HugeTlbStats {
+            usage: 1024,
+            max_usage: 0,
+            fail_count: 5,
+        };
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_stat_rsvd_hugetbl() {
+        let tmp = tempfile::tempdir().unwrap();
+        set_fixture(tmp.path(), "hugetlb.2MB.current", "2048\n").expect("set hugetlb current");
+        set_fixture(tmp.path(), "hugetlb.2MB.events", "max 5\n").expect("set hugetlb events");
+        set_fixture(tmp.path(), "hugetlb.2MB.rsvd.current", "1024\n")
+            .expect("set hugetlb rsvd current");
+        set_fixture(tmp.path(), "hugetlb.2MB.rsvd.events", "max 5\n")
+            .expect("set hugetlb rsvd events");
+
+        let actual = HugeTlb::stats_for_page_size(tmp.path(), "2MB").expect("get cgroup stats");
+
+        // Should prefer rsvd stats over non-rsvd stats if available
         let expected = HugeTlbStats {
             usage: 1024,
             max_usage: 0,
