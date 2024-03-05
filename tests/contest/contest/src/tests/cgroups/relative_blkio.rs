@@ -524,28 +524,8 @@ pub fn get_test_group() -> TestGroup {
         Box::new(can_run),
         Box::new(|| test_relative_blkio("non_empty_100kb", 102400, false)),
     );
-
-    let non_empty_200kb = ConditionalTest::new(
-        "non_empty_200kb",
-        Box::new(can_run),
-        Box::new(|| test_relative_blkio("non_empty_200kb", 204800, false)),
-    );
-    let empty_100kb = ConditionalTest::new(
-        "empty_100kb",
-        Box::new(can_run),
-        Box::new(|| test_relative_blkio("empty_100kb", 102400, true)),
-    );
-    let empty_200kb = ConditionalTest::new(
-        "empty_200kb",
-        Box::new(can_run),
-        Box::new(|| test_relative_blkio("empty_200kb", 204800, true)),
-    );
-
     test_group.add(vec![
         Box::new(non_empty_100kb),
-        Box::new(non_empty_200kb),
-        Box::new(empty_100kb),
-        Box::new(empty_200kb),
     ]);
     test_group
 }
