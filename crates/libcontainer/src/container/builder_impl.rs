@@ -133,7 +133,7 @@ impl ContainerBuilderImpl {
             prctl::set_dumpable(false).map_err(|e| {
                 LibcontainerError::Other(format!(
                     "error in setting dumpable to false : {}",
-                    nix::errno::from_i32(e)
+                    nix::errno::Errno::from_raw(e)
                 ))
             })?;
         }

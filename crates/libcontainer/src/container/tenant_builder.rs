@@ -10,7 +10,7 @@ use std::str::FromStr;
 
 use caps::Capability;
 use nix::fcntl::OFlag;
-use nix::unistd::{close, pipe2, read, Pid};
+use nix::unistd::{self, pipe2, read, Pid};
 use oci_spec::runtime::{
     Capabilities as SpecCapabilities, Capability as SpecCapability, LinuxBuilder,
     LinuxCapabilities, LinuxCapabilitiesBuilder, LinuxNamespace, LinuxNamespaceBuilder,
@@ -22,6 +22,19 @@ use super::builder::ContainerBuilder;
 use super::Container;
 use crate::capabilities::CapabilityExt;
 use crate::container::builder_impl::ContainerBuilderImpl;
+use std::os::fd::AsRawFd;
+use std::rc::Rc;
+use std::{
+    collections::HashMap,
+    convert::TryFrom,
+    ffi::{OsStr, OsString},
+    fs,
+    io::BufReader,
+    os::unix::prelude::RawFd,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
+
 use crate::error::{ErrInvalidSpec, LibcontainerError, MissingSpecError};
 use crate::notify_socket::NotifySocket;
 use crate::process::args::ContainerType;
@@ -126,7 +139,7 @@ impl TenantContainerBuilder {
 
         let mut builder_impl = ContainerBuilderImpl {
             container_type: ContainerType::TenantContainer {
-                exec_notify_fd: write_end,
+                exec_notify_fd: write_end.as_raw_fd(),
             },
             syscall: self.base.syscall,
             container_id: self.base.container_id,
@@ -148,13 +161,16 @@ impl TenantContainerBuilder {
         let mut notify_socket = NotifySocket::new(notify_path);
         notify_socket.notify_container_start()?;
 
-        close(write_end).map_err(LibcontainerError::OtherSyscall)?;
+        // write_end is of type Owned_Fd and the fd is automatically closed when the variable is dropped(end of scope).
+        // Explicitly calling drop at the moment to make it clear the fd is indeed being closed.
+        // Info: https://github.com/containers/youki/pull/2728#issuecomment-2068639411
+        drop(write_end);
 
         let mut err_str_buf = Vec::new();
 
         loop {
             let mut buf = [0; 3];
-            match read(read_end, &mut buf).map_err(LibcontainerError::OtherSyscall)? {
+            match read(read_end.as_raw_fd(), &mut buf).map_err(LibcontainerError::OtherSyscall)? {
                 0 => {
                     if err_str_buf.is_empty() {
                         return Ok(pid);

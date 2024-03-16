@@ -38,7 +38,7 @@ pub fn validate_readonly_paths(spec: &Spec) {
     // change manual matching of i32 to e.kind() and match statement
     for path in ro_paths {
         if let std::io::Result::Err(e) = test_read_access(path) {
-            let errno = Errno::from_i32(e.raw_os_error().unwrap());
+            let errno = Errno::from_raw(e.raw_os_error().unwrap());
             // In the integration tests we test for both existing and non-existing readonly paths
             // to be specified in the spec, so we allow ENOENT here
             if errno == Errno::ENOENT {
@@ -54,7 +54,7 @@ pub fn validate_readonly_paths(spec: &Spec) {
         }
 
         if let std::io::Result::Err(e) = test_write_access(path) {
-            let errno = Errno::from_i32(e.raw_os_error().unwrap());
+            let errno = Errno::from_raw(e.raw_os_error().unwrap());
             // In the integration tests we test for both existing and non-existing readonly paths
             // being specified in the spec, so we allow ENOENT, and we expect EROFS as the paths
             // should be read-only

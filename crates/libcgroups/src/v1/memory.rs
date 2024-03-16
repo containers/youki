@@ -331,7 +331,7 @@ impl Memory {
             Err(e) => {
                 // we need to look into the raw OS error for an EBUSY status
                 match e.inner().raw_os_error() {
-                    Some(code) => match Errno::from_i32(code) {
+                    Some(code) => match Errno::from_raw(code) {
                         Errno::EBUSY => {
                             let usage = Self::get_memory_usage(cgroup_root)?;
                             let max_usage = Self::get_memory_max_usage(cgroup_root)?;
