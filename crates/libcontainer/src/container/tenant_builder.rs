@@ -8,6 +8,7 @@ use oci_spec::runtime::{
 };
 use procfs::process::Namespace;
 
+use std::os::fd::AsRawFd;
 use std::rc::Rc;
 use std::{
     collections::HashMap,
@@ -126,7 +127,7 @@ impl TenantContainerBuilder {
 
         let mut builder_impl = ContainerBuilderImpl {
             container_type: ContainerType::TenantContainer {
-                exec_notify_fd: write_end,
+                exec_notify_fd: write_end.as_raw_fd(),
             },
             syscall: self.base.syscall,
             container_id: self.base.container_id,
@@ -148,13 +149,13 @@ impl TenantContainerBuilder {
         let mut notify_socket = NotifySocket::new(notify_path);
         notify_socket.notify_container_start()?;
 
-        close(write_end).map_err(LibcontainerError::OtherSyscall)?;
+        close(write_end.as_raw_fd()).map_err(LibcontainerError::OtherSyscall)?;
 
         let mut err_str_buf = Vec::new();
 
         loop {
             let mut buf = [0; 3];
-            match read(read_end, &mut buf).map_err(LibcontainerError::OtherSyscall)? {
+            match read(read_end.as_raw_fd(), &mut buf).map_err(LibcontainerError::OtherSyscall)? {
                 0 => {
                     if err_str_buf.is_empty() {
                         return Ok(pid);

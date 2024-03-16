@@ -1,4 +1,4 @@
-use std::{ffi::c_int, fs::File, num::NonZeroUsize};
+use std::{ffi::c_int, num::NonZeroUsize};
 
 use libc::SIGCHLD;
 use nix::{
@@ -166,13 +166,11 @@ fn clone(cb: CloneCb, flags: u64, exit_signal: Option<u64>) -> Result<Pid, Clone
     let child_stack = unsafe {
         // Since nix = "0.27.1", `mmap()` requires a generic type `F: AsFd`.
         // `::<File>` doesn't have any meaning because we won't use it.
-        mman::mmap::<File>(
+        mman::mmap_anonymous(
             None,
             NonZeroUsize::new(default_stack_size).ok_or(CloneError::ZeroStackSize)?,
             mman::ProtFlags::PROT_READ | mman::ProtFlags::PROT_WRITE,
-            mman::MapFlags::MAP_PRIVATE | mman::MapFlags::MAP_ANONYMOUS | mman::MapFlags::MAP_STACK,
-            None,
-            0,
+            mman::MapFlags::MAP_PRIVATE | mman::MapFlags::MAP_STACK,
         )
         .map_err(CloneError::StackAllocation)?
     };
@@ -187,7 +185,7 @@ fn clone(cb: CloneCb, flags: u64, exit_signal: Option<u64>) -> Result<Pid, Clone
 
     // Since the child stack for clone grows downward, we need to pass in
     // the top of the stack address.
-    let child_stack_top = unsafe { child_stack.add(default_stack_size) };
+    let child_stack_top = unsafe { child_stack.as_ptr().add(default_stack_size) };
 
     // Combine the clone flags with exit signals.
     let combined_flags = (flags | exit_signal.unwrap_or(0)) as c_int;
