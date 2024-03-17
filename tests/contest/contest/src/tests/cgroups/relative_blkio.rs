@@ -524,8 +524,6 @@ pub fn get_test_group() -> TestGroup {
         Box::new(can_run),
         Box::new(|| test_relative_blkio("non_empty_100kb", 102400, false)),
     );
-    test_group.add(vec![
-        Box::new(non_empty_100kb),
-    ]);
+    test_group.add(vec![Box::new(non_empty_100kb)]);
     test_group
 }
