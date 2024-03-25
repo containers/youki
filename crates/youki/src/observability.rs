@@ -17,7 +17,7 @@ enum LogFormat {
 #[cfg(debug_assertions)]
 const DEFAULT_LOG_LEVEL: &str = "debug";
 
-/// If not in debug mode, default level is warn to get important logs
+/// If not in debug mode, default level is error to get important logs
 #[cfg(not(debug_assertions))]
 const DEFAULT_LOG_LEVEL: &str = "error";
 
