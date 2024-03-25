@@ -32,7 +32,7 @@ chrono = { version = "0.4", default-features = false, features = ["clock", "serd
 libcgroups = { path = "../libcgroups", default-features = false, version = "0.3.2" } # MARK: Version
 libcontainer = { path = "../libcontainer", default-features = false, version = "0.3.2" } # MARK: Version
 liboci-cli = { path = "../liboci-cli", version = "0.3.2" } # MARK: Version
-nix = "0.27.1"
+nix = "0.28.0"
 once_cell = "1.19.0"
 pentacle = "1.0.0"
 procfs = "0.16.0"
