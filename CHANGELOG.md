@@ -1,5 +1,23 @@
 # Changelog
 
+## [v0.3.3](https://github.com/containers/youki/compare/v0.3.2...v0.3.3) - 2024-03-26
+### 💥 Breaking Changes
+- Improve error reporting and logging by @YJDoc2 in https://github.com/containers/youki/pull/2705
+### 🧪 Test improvements and Misc Fixes
+- Rollup dep updates by @YJDoc2 in https://github.com/containers/youki/pull/2667
+- Fill in TODO by @utam0k in https://github.com/containers/youki/pull/2677
+- Fix the links of contest by @utam0k in https://github.com/containers/youki/pull/2680
+- Set '--test-threads' option to 1 in unit tests by @YJDoc2 in https://github.com/containers/youki/pull/2685
+- add io priority e2e test by @lengrongfu in https://github.com/containers/youki/pull/2646
+- (fix) podman e2e : Update workflow for new required deps, add vagrantfile by @YJDoc2 in https://github.com/containers/youki/pull/2687
+- Add missed test-threads=1 to coverage CI by @YJDoc2 in https://github.com/containers/youki/pull/2699
+- Fix integration test validation CI, make io_priority test conditional by @YJDoc2 in https://github.com/containers/youki/pull/2707
+- :memo: Remove GitPod and add link to GitHub codespaces by @homersimpsons in https://github.com/containers/youki/pull/2717
+- Limt dependabot updates to only direct dependencies by @utam0k in https://github.com/containers/youki/pull/2725
+- fix observability default log level comment by @zahash in https://github.com/containers/youki/pull/2737
+### Other Changes
+- Rollup dep update by @YJDoc2 in https://github.com/containers/youki/pull/2674
+
 ## [v0.3.2](https://github.com/containers/youki/compare/v0.3.1...v0.3.2) - 2024-01-31
 ### 💪 Improvements
 - (feat) add support for `musl` using `cross-rs` by @jprendes in https://github.com/containers/youki/pull/2536
