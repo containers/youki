@@ -8,6 +8,7 @@ use crate::tests::hostname::get_hostname_test;
 use crate::tests::intel_rdt::get_intel_rdt_test;
 use crate::tests::io_priority::get_io_priority_test;
 use crate::tests::lifecycle::{ContainerCreate, ContainerLifecycle};
+use crate::tests::linux_mount_label::get_linux_mount_label_test;
 use crate::tests::linux_ns_itype::get_ns_itype_tests;
 use crate::tests::mounts_recursive::get_mounts_recursive_test;
 use crate::tests::pidfile::get_pidfile_test;
@@ -109,6 +110,7 @@ fn main() -> Result<()> {
     let sysctl = get_sysctl_test();
     let scheduler = get_scheduler_test();
     let io_priority_test = get_io_priority_test();
+    let linux_mount_label = get_linux_mount_label_test();
 
     tm.add_test_group(Box::new(cl));
     tm.add_test_group(Box::new(cc));
@@ -126,6 +128,7 @@ fn main() -> Result<()> {
     tm.add_test_group(Box::new(seccomp_notify));
     tm.add_test_group(Box::new(ro_paths));
     tm.add_test_group(Box::new(hostname));
+    tm.add_test_group(Box::new(linux_mount_label));
     tm.add_test_group(Box::new(mounts_recursive));
     tm.add_test_group(Box::new(domainname));
     tm.add_test_group(Box::new(intel_rdt));

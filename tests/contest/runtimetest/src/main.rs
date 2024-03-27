@@ -34,6 +34,7 @@ fn main() {
         "readonly_paths" => tests::validate_readonly_paths(&spec),
         "set_host_name" => tests::validate_hostname(&spec),
         "mounts_recursive" => tests::validate_mounts_recursive(&spec),
+        "linux_mount_label" => tests::validate_linux_mount_label(&spec),
         "domainname_test" => tests::validate_domainname(&spec),
         "seccomp" => tests::validate_seccomp(&spec),
         "sysctl" => tests::validate_sysctl(&spec),

@@ -6,6 +6,7 @@ pub mod hostname;
 pub mod intel_rdt;
 pub mod io_priority;
 pub mod lifecycle;
+pub mod linux_mount_label;
 pub mod linux_ns_itype;
 pub mod mounts_recursive;
 pub mod pidfile;
