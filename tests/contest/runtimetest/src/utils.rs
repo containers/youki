@@ -340,6 +340,46 @@ pub fn test_mount_rnoatime_option(path: &str) -> Result<(), std::io::Error> {
     Ok(())
 }
 
+pub fn test_mount_ratime_option(path: &str) -> Result<(), std::io::Error> {
+    let test_file_path = PathBuf::from(path).join("ratime.txt");
+    Command::new("touch")
+        .arg(test_file_path.to_str().unwrap())
+        .output()?;
+    let one_metadata = fs::metadata(test_file_path.clone())?;
+    println!(
+        "{:?} file one atime is {:?},mtime is {:?}, current time is {:?}",
+        test_file_path,
+        one_metadata.atime(),
+        one_metadata.mtime(),
+        std::time::SystemTime::now()
+    );
+    std::thread::sleep(std::time::Duration::from_millis(1000));
+
+    // execute touch command to update access time
+    Command::new("touch")
+        .arg(test_file_path.to_str().unwrap())
+        .output()
+        .expect("execute touch command error");
+    let two_metadata = fs::metadata(test_file_path.clone())?;
+    println!(
+        "{:?} file two atime is {:?},mtime is {:?},current time is {:?}",
+        test_file_path,
+        two_metadata.atime(),
+        two_metadata.mtime(),
+        std::time::SystemTime::now()
+    );
+    if one_metadata.atime() == two_metadata.atime() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!(
+                "update access time for file {:?}, expected update",
+                test_file_path.to_str()
+            ),
+        ));
+    }
+    Ok(())
+}
+
 // Always update the last access time (atime) when files are accessed on this mount.
 pub fn test_mount_rstrictatime_option(path: &str) -> Result<(), std::io::Error> {
     let test_file_path = PathBuf::from(path).join("rstrictatime.txt");

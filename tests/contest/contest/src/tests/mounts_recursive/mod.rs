@@ -503,6 +503,29 @@ fn check_recursive_rnoatime() -> TestResult {
     result
 }
 
+fn check_recursive_ratime() -> TestResult {
+    let ratime_dir_path = PathBuf::from_str("/tmp/ratime_dir").unwrap();
+    let mount_dest_path = PathBuf::from_str("/ratime").unwrap();
+    fs::create_dir(ratime_dir_path.clone()).unwrap();
+
+    let mount_options = vec!["rbind".to_string(), "ratime".to_string()];
+    let mut mount_spec = Mount::default();
+    mount_spec
+        .set_destination(mount_dest_path)
+        .set_typ(None)
+        .set_source(Some(ratime_dir_path.clone()))
+        .set_options(Some(mount_options));
+    let spec = get_spec(
+        vec![mount_spec],
+        vec!["runtimetest".to_string(), "mounts_recursive".to_string()],
+    );
+
+    let result = test_inside_container(spec, &|_| Ok(()));
+
+    fs::remove_dir_all(ratime_dir_path).unwrap();
+    result
+}
+
 fn check_recursive_rstrictatime() -> TestResult {
     let rstrictatime_base_dir = PathBuf::from_str("/tmp").unwrap();
     let rstrictatime_dir_path = rstrictatime_base_dir.join("rstrictatime_dir");
@@ -622,6 +645,7 @@ pub fn get_mounts_recursive_test() -> TestGroup {
     let rrelatime_test = Test::new("rrelatime_test", Box::new(check_recursive_rrelatime));
     let rnorelatime_test = Test::new("rnorelatime_test", Box::new(check_recursive_rnorelatime));
     let rnoatime_test = Test::new("rnoatime_test", Box::new(check_recursive_rnoatime));
+    let ratime_test = Test::new("ratime_test", Box::new(check_recursive_ratime));
     let rstrictatime_test = Test::new("rstrictatime_test", Box::new(check_recursive_rstrictatime));
     let rnosymfollow_test = Test::new("rnosymfollow_test", Box::new(check_recursive_rnosymfollow));
     let rsymfollow_test = Test::new("rsymfollow_test", Box::new(check_recursive_rsymfollow));
@@ -641,6 +665,7 @@ pub fn get_mounts_recursive_test() -> TestGroup {
         Box::new(rrelatime_test),
         Box::new(rnorelatime_test),
         Box::new(rnoatime_test),
+        Box::new(ratime_test),
         Box::new(rstrictatime_test),
         Box::new(rnosymfollow_test),
         Box::new(rsymfollow_test),

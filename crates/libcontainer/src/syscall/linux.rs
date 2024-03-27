@@ -100,7 +100,7 @@ impl FromStr for MountAttrOption {
                 MOUNT_ATTR_RELATIME,
             )),
             "rnoatime" => Ok(MountAttrOption::MountAttrNoatime(false, MOUNT_ATTR_NOATIME)),
-            "ratime" => Ok(MountAttrOption::MountAttrNoatime(true, MOUNT_ATTR_NOATIME)),
+            "ratime" => Ok(MountAttrOption::MountAttrAtime(true, MOUNT_ATTR__ATIME)),
             "rstrictatime" => Ok(MountAttrOption::MountAttrStrictAtime(
                 false,
                 MOUNT_ATTR_STRICTATIME,
