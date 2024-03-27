@@ -1,4 +1,5 @@
 pub mod cgroups;
+pub mod devices;
 pub mod domainname;
 pub mod example;
 pub mod hooks;
