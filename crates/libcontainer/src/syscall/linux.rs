@@ -314,7 +314,7 @@ impl Syscall for LinuxSyscall {
     fn set_id(&self, uid: Uid, gid: Gid) -> Result<()> {
         prctl::set_keep_capabilities(true).map_err(|errno| {
             tracing::error!(?errno, "failed to set keep capabilities to true");
-            nix::errno::from_i32(errno)
+            nix::errno::Errno::from_raw(errno)
         })?;
         // args : real *id, effective *id, saved set *id respectively
 
@@ -350,7 +350,7 @@ impl Syscall for LinuxSyscall {
         }
         prctl::set_keep_capabilities(false).map_err(|errno| {
             tracing::error!(?errno, "failed to set keep capabilities to false");
-            nix::errno::from_i32(errno)
+            nix::errno::Errno::from_raw(errno)
         })?;
         Ok(())
     }

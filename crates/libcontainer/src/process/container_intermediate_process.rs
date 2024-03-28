@@ -1,3 +1,5 @@
+use std::os::fd::{AsRawFd, FromRawFd};
+
 use crate::error::MissingSpecError;
 use crate::{namespaces::Namespaces, process::channel, process::fork};
 use libcgroups::common::CgroupManager;
@@ -130,10 +132,11 @@ pub fn container_intermediate_process(
                     }
                     if let ContainerType::TenantContainer { exec_notify_fd } = args.container_type {
                         let buf = format!("{e}");
-                        if let Err(err) = write(exec_notify_fd, buf.as_bytes()) {
+                        let exec_notify_fd = unsafe { std::os::fd::OwnedFd::from_raw_fd(exec_notify_fd) };
+                        if let Err(err) = write(&exec_notify_fd, buf.as_bytes()) {
                             tracing::error!(?err, "failed to write to exec notify fd");
                         }
-                        if let Err(err) = close(exec_notify_fd) {
+                        if let Err(err) = close(exec_notify_fd.as_raw_fd()) {
                             tracing::error!(?err, "failed to close exec notify fd");
                         }
                     }
@@ -206,7 +209,7 @@ fn setup_userns(
     prctl::set_dumpable(true).map_err(|e| {
         IntermediateProcessError::Other(format!(
             "error in setting dumpable to true : {}",
-            nix::errno::from_i32(e)
+            nix::errno::Errno::from_raw(e)
         ))
     })?;
     sender.identifier_mapping_request().map_err(|err| {
@@ -220,7 +223,7 @@ fn setup_userns(
     prctl::set_dumpable(false).map_err(|e| {
         IntermediateProcessError::Other(format!(
             "error in setting dumplable to false : {}",
-            nix::errno::from_i32(e)
+            nix::errno::Errno::from_raw(e)
         ))
     })?;
     Ok(())
