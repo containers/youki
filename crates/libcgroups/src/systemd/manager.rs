@@ -21,7 +21,7 @@ use super::{
 use crate::{
     common::{
         self, AnyCgroupManager, CgroupManager, ControllerOpt, FreezerState, JoinSafelyError,
-        PathBufExt, WrapIoResult, WrappedIoError,
+        PathBufExt, WrapIoResult, WrappedIoError, CGROUP_PROCS,
     },
     systemd::{dbus_native::serialize::Variant, unified::Unified},
     v2::manager::V2ManagerError,
@@ -351,6 +351,11 @@ impl CgroupManager for Manager {
     fn add_task(&self, pid: Pid) -> Result<(), Self::Error> {
         // Dont attach any pid to the cgroup if -1 is specified as a pid
         if pid.as_raw() == -1 {
+            return Ok(());
+        }
+        if self.client.transient_unit_exists(&self.unit_name) {
+            tracing::debug!("Transient unit {:?} already exists", self.unit_name);
+            common::write_cgroup_file(self.full_path.join(CGROUP_PROCS), pid)?;
             return Ok(());
         }
 

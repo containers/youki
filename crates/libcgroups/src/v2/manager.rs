@@ -151,6 +151,10 @@ impl CgroupManager for Manager {
     type Error = V2ManagerError;
 
     fn add_task(&self, pid: Pid) -> Result<(), Self::Error> {
+        if self.full_path.exists() {
+            common::write_cgroup_file(self.full_path.join(CGROUP_PROCS), pid)?;
+            return Ok(());
+        }
         self.create_unified_cgroup(pid)?;
         Ok(())
     }

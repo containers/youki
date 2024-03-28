@@ -332,8 +332,7 @@ mod tests {
         let tmp_dir = tempfile::tempdir().unwrap();
         use oci_spec::runtime::Spec;
         let spec = Spec::default();
-        let config =
-            YoukiConfig::from_spec(&spec, "123", false).context("convert spec to config")?;
+        let config = YoukiConfig::from_spec(&spec, "123").context("convert spec to config")?;
         config.save(tmp_dir.path()).context("save config")?;
 
         let container = Container {

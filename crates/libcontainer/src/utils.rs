@@ -147,17 +147,10 @@ pub fn get_user_home(uid: u32) -> Option<PathBuf> {
 }
 
 /// If None, it will generate a default path for cgroups.
-pub fn get_cgroup_path(
-    cgroups_path: &Option<PathBuf>,
-    container_id: &str,
-    new_user_ns: bool,
-) -> PathBuf {
+pub fn get_cgroup_path(cgroups_path: &Option<PathBuf>, container_id: &str) -> PathBuf {
     match cgroups_path {
         Some(cpath) => cpath.clone(),
-        None => match new_user_ns {
-            false => PathBuf::from(container_id),
-            true => PathBuf::from(format!(":youki:{container_id}")),
-        },
+        None => PathBuf::from(format!(":youki:{container_id}")),
     }
 }
 
@@ -323,11 +316,11 @@ mod tests {
     fn test_get_cgroup_path() {
         let cid = "sample_container_id";
         assert_eq!(
-            get_cgroup_path(&None, cid, false),
-            PathBuf::from("sample_container_id")
+            get_cgroup_path(&None, cid),
+            PathBuf::from(":youki:sample_container_id")
         );
         assert_eq!(
-            get_cgroup_path(&Some(PathBuf::from("/youki")), cid, false),
+            get_cgroup_path(&Some(PathBuf::from("/youki")), cid),
             PathBuf::from("/youki")
         );
     }

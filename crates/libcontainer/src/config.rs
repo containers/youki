@@ -47,7 +47,7 @@ pub struct YoukiConfig {
 }
 
 impl<'a> YoukiConfig {
-    pub fn from_spec(spec: &'a Spec, container_id: &str, new_user_ns: bool) -> Result<Self> {
+    pub fn from_spec(spec: &'a Spec, container_id: &str) -> Result<Self> {
         Ok(YoukiConfig {
             hooks: spec.hooks().clone(),
             cgroup_path: utils::get_cgroup_path(
@@ -56,7 +56,6 @@ impl<'a> YoukiConfig {
                     .ok_or(ConfigError::MissingLinux)?
                     .cgroups_path(),
                 container_id,
-                new_user_ns,
             ),
         })
     }
@@ -106,10 +105,13 @@ mod tests {
     fn test_config_from_spec() -> Result<()> {
         let container_id = "sample";
         let spec = Spec::default();
-        let config = YoukiConfig::from_spec(&spec, container_id, false)?;
+        let config = YoukiConfig::from_spec(&spec, container_id)?;
         assert_eq!(&config.hooks, spec.hooks());
         dbg!(&config.cgroup_path);
-        assert_eq!(config.cgroup_path, PathBuf::from(container_id));
+        assert_eq!(
+            config.cgroup_path,
+            PathBuf::from(format!(":youki:{container_id}"))
+        );
         Ok(())
     }
 
@@ -118,7 +120,7 @@ mod tests {
         let container_id = "sample";
         let tmp = tempfile::tempdir().expect("create temp dir");
         let spec = Spec::default();
-        let config = YoukiConfig::from_spec(&spec, container_id, false)?;
+        let config = YoukiConfig::from_spec(&spec, container_id)?;
         config.save(&tmp)?;
         let act = YoukiConfig::load(&tmp)?;
         assert_eq!(act, config);

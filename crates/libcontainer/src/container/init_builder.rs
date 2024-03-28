@@ -88,7 +88,7 @@ impl InitContainerBuilder {
 
         let user_ns_config = UserNamespaceConfig::new(&spec)?;
 
-        let config = YoukiConfig::from_spec(&spec, container.id(), user_ns_config.is_some())?;
+        let config = YoukiConfig::from_spec(&spec, container.id())?;
         config.save(&container_dir).map_err(|err| {
             tracing::error!(?container_dir, "failed to save config: {}", err);
             err
