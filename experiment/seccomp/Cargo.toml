@@ -1,0 +1,24 @@
+[package]
+name = "seccomp"
+version = "0.0.0"
+description = "Library for seccomp"
+license-file = "../../LICENSE"
+repository = "https://github.com/containers/youki"
+homepage = "https://containers.github.io/youki"
+readme = "README.md"
+authors = ["youki team"]
+edition = "2021"
+autoexamples = true
+keywords = ["youki", "container", "seccomp"]
+
+[dependencies]
+nix = { version = "0.27.1", features = [
+    "ioctl",
+    "socket",
+    "sched",
+    "mount",
+    "dir",
+] }
+thiserror = "1.0.57"
+prctl = "1.0.0"
+anyhow = "1.0"
