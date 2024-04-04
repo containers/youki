@@ -1,6 +1,8 @@
 use nix::unistd::mkdir;
-use seccomp::instruction::*;
-use seccomp::seccomp::{NotifyFd, Seccomp};
+use seccomp::{
+    instruction::{self, *},
+    seccomp::{NotifyFd, Seccomp},
+};
 
 use std::io::{IoSlice, IoSliceMut};
 use std::os::fd::{IntoRawFd, OwnedFd};
@@ -66,15 +68,15 @@ fn main() -> Result<()> {
 
     let _ = prctl::set_no_new_privileges(true);
 
-    let mut bpf_prog = Arch::X86.gen_validate();
+    let mut bpf_prog = instruction::gen_validate(&Arch::X86);
     bpf_prog.append(&mut vec![
-        // A: Check if syscall is getpid
+        // A: Check if syscall is getcwd
         Instruction::stmt(BPF_LD | BPF_W | BPF_ABS, 0),
-        Instruction::jump(BPF_JMP | BPF_JEQ | BPF_K, libc::SYS_getcwd as u32, 0, 1), // If false, go to B
+        Instruction::jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 1, libc::SYS_getcwd as u32), // If false, go to B
         Instruction::stmt(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS),
         // B: Check if syscall is mkdir and if so, return seccomp notify
         Instruction::stmt(BPF_LD | BPF_W | BPF_ABS, 0),
-        Instruction::jump(BPF_JMP | BPF_JEQ | BPF_K, libc::SYS_mkdir as u32, 0, 1), // If false, go to C
+        Instruction::jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 1, libc::SYS_mkdir as u32), // If false, go to C
         Instruction::stmt(BPF_RET | BPF_K, SECCOMP_RET_USER_NOTIF),
         // C: Pass
         Instruction::stmt(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),

@@ -28,9 +28,9 @@ impl Instruction {
 
     pub fn jump(
         code: c_ushort,
-        multiuse_field: c_uint,
         jump_true: c_uchar,
         jump_false: c_uchar,
+        multiuse_field: c_uint,
     ) -> Self {
         Self::new(code, jump_true, jump_false, multiuse_field)
     }
