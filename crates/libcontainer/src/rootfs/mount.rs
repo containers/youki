@@ -78,10 +78,11 @@ impl Mount {
 
         match mount.typ().as_deref() {
             Some("cgroup") => {
-                match libcgroups::common::get_cgroup_setup().map_err(|err| {
+                let cgroup_setup = libcgroups::common::get_cgroup_setup().map_err(|err| {
                     tracing::error!("failed to determine cgroup setup: {}", err);
                     MountError::Other(err.into())
-                })? {
+                })?;
+                match cgroup_setup {
                     Legacy | Hybrid => {
                         #[cfg(not(feature = "v1"))]
                         panic!("libcontainer can't run in a Legacy or Hybrid cgroup setup without the v1 feature");
@@ -521,6 +522,7 @@ impl Mount {
             if src.is_file() && !dest.exists() {
                 OpenOptions::new()
                     .create(true)
+                    .truncate(true)
                     .write(true)
                     .open(dest)
                     .map_err(|err| {
@@ -686,6 +688,7 @@ mod tests {
             let mount_option_config = parse_mount(mount)?;
             OpenOptions::new()
                 .create(true)
+                .truncate(true)
                 .write(true)
                 .open(tmp_dir.path().join("null"))?;
 

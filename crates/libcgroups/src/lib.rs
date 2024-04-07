@@ -6,6 +6,7 @@
 extern crate quickcheck;
 
 #[cfg(test)]
+#[allow(unused_imports)]
 #[macro_use]
 extern crate mockall;
 

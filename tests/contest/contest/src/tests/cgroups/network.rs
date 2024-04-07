@@ -64,7 +64,7 @@ fn create_spec(
 // Gets the loopback interface and the first ethernet/wlan interface if it exists
 fn get_network_interfaces() -> Option<(String, String)> {
     let interfaces = interfaces();
-    let lo_if_name = interfaces.get(0).map(|iface| &iface.name)?;
+    let lo_if_name = interfaces.first().map(|iface| &iface.name)?;
     let eth_if_name = interfaces.get(1).map(|iface| &iface.name)?;
 
     Some((lo_if_name.to_string(), eth_if_name.to_string()))

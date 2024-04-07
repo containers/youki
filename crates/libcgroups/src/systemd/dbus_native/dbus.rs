@@ -227,7 +227,7 @@ impl DbusConnection {
             .filter(|m| m.preamble.mtype == MessageType::MethodReturn)
             .collect();
 
-        let res = res.get(0).ok_or(DbusError::MethodCallErr(
+        let res = res.first().ok_or(DbusError::MethodCallErr(
             "expected method call to have reply, found no reply message".into(),
         ))?;
         let mut ctr = 0;

@@ -455,7 +455,7 @@ pub fn get_all_pids(path: &Path) -> Result<Vec<Pid>, WrappedIoError> {
         let file_path = p.join(CGROUP_PROCS);
         if file_path.exists() {
             let file = File::open(&file_path).wrap_open(&file_path)?;
-            for line in BufReader::new(file).lines().flatten() {
+            for line in BufReader::new(file).lines().map_while(Result::ok) {
                 result.push(Pid::from_raw(
                     line.parse::<i32>()
                         .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err))
