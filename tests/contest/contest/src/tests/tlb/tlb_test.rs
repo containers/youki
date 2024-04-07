@@ -11,6 +11,20 @@ fn check_hugetlb() -> bool {
     PathBuf::from("/sys/fs/cgroup/hugetlb").exists()
 }
 
+fn check_hugetlb_rsvd() -> bool {
+    let sizes = get_tlb_sizes();
+    for size in sizes.iter() {
+        let rsvd_path = format!(
+            "/sys/fs/cgroup/hugetlb/hugetlb.{}.rsvd.limit_in_bytes",
+            size
+        );
+        if !PathBuf::from(rsvd_path).exists() {
+            return false;
+        }
+    }
+    true
+}
+
 fn make_hugetlb_spec(page_size: &str, limit: i64) -> Spec {
     SpecBuilder::default()
         .linux(
@@ -110,6 +124,23 @@ fn validate_tlb(id: &str, size: &str, limit: i64) -> TestResult {
     }
 }
 
+fn validate_rsvd_tlb(id: &str, size: &str, limit: i64) -> TestResult {
+    let root = "/sys/fs/cgroup/hugetlb";
+    let path = format!("{root}/{id}/hugetlb.{size}.rsvd.limit_in_bytes");
+    let val_str = std::fs::read_to_string(path).unwrap();
+    let val: i64 = val_str.trim().parse().unwrap();
+    if val == limit {
+        TestResult::Passed
+    } else {
+        TestResult::Failed(anyhow!(
+            "page limit not set correctly : for size {}, expected {}, got {}",
+            size,
+            limit,
+            val
+        ))
+    }
+}
+
 fn test_valid_tlb() -> TestResult {
     // When setting the limit just for checking if writing works, the amount of memory
     // requested does not matter, as all insigned integers will be accepted.
@@ -134,6 +165,30 @@ fn test_valid_tlb() -> TestResult {
     TestResult::Passed
 }
 
+fn test_valid_rsvd_tlb() -> TestResult {
+    let limit: i64 = 1 << 30;
+    let tlb_sizes = get_tlb_sizes();
+    for size in tlb_sizes.iter() {
+        let spec = make_hugetlb_spec(size, limit);
+        let res = test_outside_container(spec, &|data| {
+            test_result!(check_container_created(&data));
+            // Currentle, we write the same value to both limit_in_bytes and rsvd.limit_in_bytes
+            let non_rsvd = validate_tlb(&data.id, size, limit);
+            let rsvd = validate_rsvd_tlb(&data.id, size, limit);
+            if matches!(non_rsvd, TestResult::Failed(_)) {
+                return non_rsvd;
+            } else if matches!(rsvd, TestResult::Failed(_)) {
+                return rsvd;
+            }
+            TestResult::Passed
+        });
+        if matches!(res, TestResult::Failed(_)) {
+            return res;
+        }
+    }
+    TestResult::Passed
+}
+
 pub fn get_tlb_test() -> TestGroup {
     let wrong_tlb = ConditionalTest::new(
         "invalid_tlb",
@@ -145,7 +200,16 @@ pub fn get_tlb_test() -> TestGroup {
         Box::new(check_hugetlb),
         Box::new(test_valid_tlb),
     );
+    let valid_rsvd_tlb = ConditionalTest::new(
+        "valid_rsvd_tlb",
+        Box::new(check_hugetlb_rsvd),
+        Box::new(test_valid_rsvd_tlb),
+    );
     let mut tg = TestGroup::new("huge_tlb");
-    tg.add(vec![Box::new(wrong_tlb), Box::new(valid_tlb)]);
+    tg.add(vec![
+        Box::new(wrong_tlb),
+        Box::new(valid_tlb),
+        Box::new(valid_rsvd_tlb),
+    ]);
     tg
 }
