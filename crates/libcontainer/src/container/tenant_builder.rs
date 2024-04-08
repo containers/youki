@@ -25,6 +25,7 @@ use crate::process::args::ContainerType;
 use crate::{capabilities::CapabilityExt, container::builder_impl::ContainerBuilderImpl};
 use crate::{notify_socket::NotifySocket, tty, user_ns::UserNamespaceConfig, utils};
 
+use super::stdio::StdioFds;
 use super::{builder::ContainerBuilder, Container};
 
 const NAMESPACE_TYPES: &[&str] = &["ipc", "uts", "net", "pid", "mnt", "cgroup"];
@@ -100,7 +101,7 @@ impl TenantContainerBuilder {
     }
 
     /// Joins an existing container
-    pub fn build(self) -> Result<Pid, LibcontainerError> {
+    pub fn build(self) -> Result<(Pid, StdioFds), LibcontainerError> {
         let container_dir = self.lookup_container_dir()?;
         let container = self.load_container_state(container_dir.clone())?;
         let mut spec = self.load_init_spec(&container)?;
@@ -141,6 +142,7 @@ impl TenantContainerBuilder {
             preserve_fds: self.base.preserve_fds,
             detached: self.detached,
             executor: self.base.executor,
+            fds: self.base.fds,
         };
 
         let pid = builder_impl.create()?;

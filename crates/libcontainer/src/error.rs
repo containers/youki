@@ -37,6 +37,8 @@ pub enum LibcontainerError {
     #[error(transparent)]
     Tty(#[from] crate::tty::TTYError),
     #[error(transparent)]
+    Pipe(#[from] crate::pipe::PipeError),
+    #[error(transparent)]
     UserNamespace(#[from] crate::user_ns::UserNamespaceError),
     #[error(transparent)]
     NotifyListener(#[from] crate::notify_socket::NotifyListenerError),

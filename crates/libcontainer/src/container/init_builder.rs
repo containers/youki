@@ -17,7 +17,8 @@ use crate::{
 };
 
 use super::{
-    builder::ContainerBuilder, builder_impl::ContainerBuilderImpl, Container, ContainerStatus,
+    builder::ContainerBuilder, builder_impl::ContainerBuilderImpl, stdio::StdioFds, Container,
+    ContainerStatus,
 };
 
 // Builder that can be used to configure the properties of a new container
@@ -52,7 +53,7 @@ impl InitContainerBuilder {
     }
 
     /// Creates a new container
-    pub fn build(self) -> Result<Container, LibcontainerError> {
+    pub fn build(self) -> Result<(Container, StdioFds), LibcontainerError> {
         let spec = self.load_spec()?;
         let container_dir = self.create_container_dir()?;
 
@@ -109,13 +110,14 @@ impl InitContainerBuilder {
             preserve_fds: self.base.preserve_fds,
             detached: self.detached,
             executor: self.base.executor,
+            fds: self.base.fds,
         };
 
-        builder_impl.create()?;
+        let (_, stdio_fds) = builder_impl.create()?;
 
         container.refresh_state()?;
 
-        Ok(container)
+        Ok((container, stdio_fds))
     }
 
     fn create_container_dir(&self) -> Result<PathBuf, LibcontainerError> {

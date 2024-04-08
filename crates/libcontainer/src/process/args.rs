@@ -1,5 +1,6 @@
 use libcgroups::common::CgroupConfig;
 use oci_spec::runtime::Spec;
+use std::collections::HashMap;
 use std::os::unix::prelude::RawFd;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -41,4 +42,6 @@ pub struct ContainerArgs {
     pub detached: bool,
     /// Manage the functions that actually run on the container
     pub executor: Box<dyn Executor>,
+
+    pub fds: HashMap<RawFd, RawFd>,
 }

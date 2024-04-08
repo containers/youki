@@ -57,52 +57,55 @@ impl Executor for DefaultExecutor {
             ))?;
 
         if let Some(args) = proc.args() {
-            let envs: Vec<String> = proc.env().as_ref().unwrap_or(&vec![]).clone();
-            let path_vars: Vec<&String> = envs.iter().filter(|&e| e.starts_with("PATH=")).collect();
-            if path_vars.is_empty() {
-                tracing::error!("PATH environment variable is not set");
-                Err(ExecutorValidationError::ArgValidationError(
-                    "PATH environment variable is not set".into(),
-                ))?;
-            }
-            let path_var = path_vars[0].trim_start_matches("PATH=");
-            match get_executable_path(&args[0], path_var) {
-                None => {
-                    tracing::error!(
-                        executable = ?args[0],
-                        "executable for container process not found in PATH",
-                    );
-                    Err(ExecutorValidationError::ArgValidationError(format!(
-                        "executable '{}' not found in $PATH",
-                        args[0]
-                    )))?;
+            if !args[0].contains('/') {
+                let envs: Vec<String> = proc.env().as_ref().unwrap_or(&vec![]).clone();
+                let path_vars: Vec<&String> =
+                    envs.iter().filter(|&e| e.starts_with("PATH=")).collect();
+                if path_vars.is_empty() {
+                    tracing::error!("PATH environment variable is not set");
+                    Err(ExecutorValidationError::ArgValidationError(
+                        "PATH environment variable is not set".into(),
+                    ))?;
                 }
-                Some(path) => match is_executable(&path) {
-                    Ok(true) => {
-                        tracing::debug!(executable = ?path, "found executable in executor");
-                    }
-                    Ok(false) => {
+                let path_var = path_vars[0].trim_start_matches("PATH=");
+                match get_executable_path(&args[0], path_var) {
+                    None => {
                         tracing::error!(
-                            executable = ?path,
-                            "executable does not have the correct permission set",
+                            executable = ?args[0],
+                            "executable for container process not found in PATH",
                         );
                         Err(ExecutorValidationError::ArgValidationError(format!(
-                            "executable '{}' at path '{:?}' does not have correct permissions",
-                            args[0], path
+                            "executable '{}' not found in $PATH",
+                            args[0]
                         )))?;
                     }
-                    Err(err) => {
-                        tracing::error!(
-                            executable = ?path,
-                            ?err,
-                            "failed to check permissions for executable",
-                        );
-                        Err(ExecutorValidationError::ArgValidationError(format!(
+                    Some(path) => match is_executable(&path) {
+                        Ok(true) => {
+                            tracing::debug!(executable = ?path, "found executable in executor");
+                        }
+                        Ok(false) => {
+                            tracing::error!(
+                                executable = ?path,
+                                "executable does not have the correct permission set",
+                            );
+                            Err(ExecutorValidationError::ArgValidationError(format!(
+                                "executable '{}' at path '{:?}' does not have correct permissions",
+                                args[0], path
+                            )))?;
+                        }
+                        Err(err) => {
+                            tracing::error!(
+                                executable = ?path,
+                                ?err,
+                                "failed to check permissions for executable",
+                            );
+                            Err(ExecutorValidationError::ArgValidationError(format!(
                             "failed to check permissions for executable '{}' at path '{:?}' : {}",
                             args[0], path, err
                         )))?;
-                    }
-                },
+                        }
+                    },
+                }
             }
         }
 

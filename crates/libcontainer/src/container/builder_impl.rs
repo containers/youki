@@ -1,22 +1,35 @@
-use super::{Container, ContainerStatus};
+use super::{stdio::StdioFds, Container, ContainerStatus};
 use crate::{
     error::{LibcontainerError, MissingSpecError},
     hooks,
     notify_socket::NotifyListener,
+    pipe::{Pipe, PipeError, PipeHolder},
     process::{
         self,
         args::{ContainerArgs, ContainerType},
         intel_rdt::delete_resctrl_subdirectory,
     },
+    stdio::{Closing, Fd},
     syscall::syscall::SyscallType,
     user_ns::UserNamespaceConfig,
     utils,
     workload::Executor,
 };
 use libcgroups::common::CgroupManager;
-use nix::unistd::Pid;
+use nix::{
+    fcntl::{fcntl, FcntlArg, OFlag},
+    sys::stat::Mode,
+    unistd::Pid,
+};
 use oci_spec::runtime::Spec;
-use std::{fs, io::Write, os::unix::prelude::RawFd, path::PathBuf, rc::Rc};
+use std::{
+    collections::HashMap,
+    fs,
+    io::Write,
+    os::{fd::AsRawFd, unix::prelude::RawFd},
+    path::{Path, PathBuf},
+    rc::Rc,
+};
 
 pub(super) struct ContainerBuilderImpl {
     /// Flag indicating if an init or a tenant container should be created
@@ -48,12 +61,14 @@ pub(super) struct ContainerBuilderImpl {
     pub detached: bool,
     /// Default executes the specified execution of a generic command
     pub executor: Box<dyn Executor>,
+    /// Stdio file descriptors to dup inside the container's namespace
+    pub fds: [Fd; 3],
 }
 
 impl ContainerBuilderImpl {
-    pub(super) fn create(&mut self) -> Result<Pid, LibcontainerError> {
+    pub(super) fn create(&mut self) -> Result<(Pid, StdioFds), LibcontainerError> {
         match self.run_container() {
-            Ok(pid) => Ok(pid),
+            Ok(ret) => Ok(ret),
             Err(outer) => {
                 // Only the init container should be cleaned up in the case of
                 // an error.
@@ -66,7 +81,7 @@ impl ContainerBuilderImpl {
         }
     }
 
-    fn run_container(&mut self) -> Result<Pid, LibcontainerError> {
+    fn run_container(&mut self) -> Result<(Pid, StdioFds), LibcontainerError> {
         let linux = self.spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
         let cgroups_path = utils::get_cgroup_path(
             linux.cgroups_path(),
@@ -137,6 +152,12 @@ impl ContainerBuilderImpl {
             })?;
         }
 
+        // Prepare the stdio file descriptors for `dup`-ing inside the container
+        // namespace. Determines which ones needs closing on drop.
+        let mut stdio_descs = prepare_stdio_descriptors(&self.fds)?;
+        // Extract `StdioFds` from the prepared fds, for use by client
+        let stdio_fds = (&mut stdio_descs).into();
+
         // This container_args will be passed to the container processes,
         // therefore we will have to move all the variable by value. Since self
         // is a shared reference, we have to clone these variables here.
@@ -153,6 +174,7 @@ impl ContainerBuilderImpl {
             cgroup_config,
             detached: self.detached,
             executor: self.executor.clone(),
+            fds: stdio_descs.inner,
         };
 
         let (init_pid, need_to_clean_up_intel_rdt_dir) =
@@ -181,7 +203,7 @@ impl ContainerBuilderImpl {
                 .save()?;
         }
 
-        Ok(init_pid)
+        Ok((init_pid, stdio_fds))
     }
 
     fn cleanup_container(&self) -> Result<(), LibcontainerError> {
@@ -230,4 +252,90 @@ impl ContainerBuilderImpl {
 
         Ok(())
     }
+}
+
+struct StdioDescriptors {
+    inner: HashMap<RawFd, RawFd>,
+    outer: HashMap<RawFd, PipeHolder>,
+    _guards: Vec<Closing>,
+}
+
+impl From<&mut StdioDescriptors> for StdioFds {
+    fn from(value: &mut StdioDescriptors) -> Self {
+        StdioFds {
+            stdin: value.outer.remove(&0).and_then(|x| match x {
+                PipeHolder::Writer(x) => Some(x),
+                _ => None,
+            }),
+            stdout: value.outer.remove(&1).and_then(|x| match x {
+                PipeHolder::Reader(x) => Some(x),
+                _ => None,
+            }),
+            stderr: value.outer.remove(&2).and_then(|x| match x {
+                PipeHolder::Reader(x) => Some(x),
+                _ => None,
+            }),
+        }
+    }
+}
+
+fn prepare_stdio_descriptors(fds: &[Fd; 3]) -> Result<StdioDescriptors, LibcontainerError> {
+    let mut inner = HashMap::new();
+    let mut outer = HashMap::new();
+    let mut guards = Vec::new();
+    for (idx, fdkind) in fds.iter().enumerate() {
+        let dest_fd = idx as i32;
+        let mut fd = match fdkind {
+            Fd::ReadPipe => {
+                let (rd, wr) = Pipe::new()?.split();
+                let fd = rd.into_fd();
+                guards.push(Closing::new(fd));
+                outer.insert(dest_fd, PipeHolder::Writer(wr));
+                fd
+            }
+            Fd::WritePipe => {
+                let (rd, wr) = Pipe::new()?.split();
+                let fd = wr.into_fd();
+                guards.push(Closing::new(fd));
+                outer.insert(dest_fd, PipeHolder::Reader(rd));
+                fd
+            }
+            Fd::ReadNull => {
+                // Need to keep fd with cloexec, until we are in child
+                let fd = nix::fcntl::open(
+                    Path::new("/dev/null"),
+                    OFlag::O_CLOEXEC | OFlag::O_RDONLY,
+                    Mode::empty(),
+                )
+                .map_err(PipeError::Create)?;
+                guards.push(Closing::new(fd));
+                fd
+            }
+            Fd::WriteNull => {
+                // Need to keep fd with cloexec, until we are in child
+                let fd = nix::fcntl::open(
+                    Path::new("/dev/null"),
+                    OFlag::O_CLOEXEC | OFlag::O_WRONLY,
+                    Mode::empty(),
+                )
+                .map_err(PipeError::Create)?;
+                guards.push(Closing::new(fd));
+                fd
+            }
+            Fd::Inherit => dest_fd,
+            Fd::Fd(ref x) => x.as_raw_fd(),
+        };
+        // The descriptor must not clobber the descriptors that are passed to
+        // a child
+        while fd != dest_fd {
+            fd = fcntl(fd, FcntlArg::F_DUPFD_CLOEXEC(3)).map_err(PipeError::Create)?;
+            guards.push(Closing::new(fd));
+        }
+        inner.insert(dest_fd, fd);
+    }
+    Ok(StdioDescriptors {
+        inner,
+        outer,
+        _guards: guards,
+    })
 }

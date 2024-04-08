@@ -7,6 +7,7 @@ use crate::{
     capabilities, hooks, namespaces::Namespaces, process::channel, rootfs::RootFS, tty,
     user_ns::UserNamespaceConfig, utils,
 };
+use libc::{FD_CLOEXEC, F_GETFD, F_SETFD};
 use nc;
 use nix::mount::MsFlags;
 use nix::sched::CloneFlags;
@@ -50,6 +51,8 @@ pub enum InitProcessError {
     MissingSpec(#[from] crate::error::MissingSpecError),
     #[error("failed to setup tty")]
     Tty(#[source] tty::TTYError),
+    #[error("failed to setup stdio")]
+    Stdio(#[source] std::io::Error),
     #[error("failed to run hooks")]
     Hooks(#[from] hooks::HookError),
     #[error("failed to prepare rootfs")]
@@ -305,6 +308,32 @@ pub fn container_init_process(
             tracing::error!(?err, "failed to set up tty");
             InitProcessError::Tty(err)
         })?;
+    } else {
+        unsafe {
+            for (dest_fd, src_fd) in args.fds.iter() {
+                if src_fd == dest_fd {
+                    let flags = libc::fcntl(*src_fd, F_GETFD);
+                    if flags < 0 {
+                        return Err(InitProcessError::Stdio(std::io::Error::from_raw_os_error(
+                            flags,
+                        )));
+                    }
+                    let ret = libc::fcntl(*src_fd, F_SETFD, flags & !FD_CLOEXEC);
+                    if ret < 0 {
+                        return Err(InitProcessError::Stdio(std::io::Error::from_raw_os_error(
+                            ret,
+                        )));
+                    }
+                } else {
+                    let ret = libc::dup2(*src_fd, *dest_fd);
+                    if ret < 0 {
+                        return Err(InitProcessError::Stdio(std::io::Error::from_raw_os_error(
+                            ret,
+                        )));
+                    }
+                }
+            }
+        }
     }
 
     apply_rest_namespaces(&namespaces, spec, syscall.as_ref())?;

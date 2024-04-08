@@ -17,6 +17,7 @@ mod container_resume;
 mod container_start;
 pub mod init_builder;
 pub mod state;
+pub mod stdio;
 pub mod tenant_builder;
 pub use container::CheckpointOptions;
 pub use container::Container;
