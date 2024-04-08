@@ -29,6 +29,10 @@ pub enum PipeHolder {
 pub enum PipeError {
     #[error("failed to create pipe: {0}")]
     Create(nix::Error),
+    #[error("failed to open fd: {0}")]
+    Open(nix::Error),
+    #[error("failed to dup fd: {0}")]
+    Dup(nix::Error),
 }
 
 impl Pipe {

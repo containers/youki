@@ -307,7 +307,7 @@ fn prepare_stdio_descriptors(fds: &[Fd; 3]) -> Result<StdioDescriptors, Libconta
                     OFlag::O_CLOEXEC | OFlag::O_RDONLY,
                     Mode::empty(),
                 )
-                .map_err(PipeError::Create)?;
+                .map_err(PipeError::Open)?;
                 guards.push(Closing::new(fd));
                 fd
             }
@@ -318,7 +318,7 @@ fn prepare_stdio_descriptors(fds: &[Fd; 3]) -> Result<StdioDescriptors, Libconta
                     OFlag::O_CLOEXEC | OFlag::O_WRONLY,
                     Mode::empty(),
                 )
-                .map_err(PipeError::Create)?;
+                .map_err(PipeError::Open)?;
                 guards.push(Closing::new(fd));
                 fd
             }
@@ -327,8 +327,8 @@ fn prepare_stdio_descriptors(fds: &[Fd; 3]) -> Result<StdioDescriptors, Libconta
         };
         // The descriptor must not clobber the descriptors that are passed to
         // a child
-        while fd != dest_fd {
-            fd = fcntl(fd, FcntlArg::F_DUPFD_CLOEXEC(3)).map_err(PipeError::Create)?;
+        while fd != dest_fd && fd < 3 {
+            fd = fcntl(fd, FcntlArg::F_DUPFD_CLOEXEC(3)).map_err(PipeError::Dup)?;
             guards.push(Closing::new(fd));
         }
         inner.insert(dest_fd, fd);
