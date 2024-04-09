@@ -560,7 +560,7 @@ pub fn container_init_process(
         }
     }
     #[cfg(not(feature = "libseccomp"))]
-    if proc.no_new_privileges().is_none() {
+    if proc.no_new_privileges().unwrap_or_default() {
         tracing::warn!("seccomp not available, unable to enforce no_new_privileges!")
     }
 
@@ -621,7 +621,7 @@ pub fn container_init_process(
         }
     }
     #[cfg(not(feature = "libseccomp"))]
-    if proc.no_new_privileges().is_some() {
+    if proc.no_new_privileges().unwrap_or_default() {
         tracing::warn!("seccomp not available, unable to set seccomp privileges!")
     }
 
