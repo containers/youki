@@ -128,11 +128,13 @@ mod tests {
         let scmp_file = std::fs::OpenOptions::new()
             .write(true)
             .create(true)
+            .truncate(true)
             .open(tmp_dir.path().join("scmp_file"))?;
 
         std::fs::OpenOptions::new()
             .write(true)
             .create(true)
+            .truncate(true)
             .open(tmp_dir.path().join("socket_file.sock"))?;
 
         let (mut main_sender, mut main_receiver) = channel::main_channel()?;

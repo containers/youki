@@ -348,6 +348,7 @@ fn write_resctrl_schemata(
             // filesystem is pre-populated.
             let mut file = OpenOptions::new()
                 .create(true)
+                .truncate(true)
                 .write(true)
                 .open(schemata)
                 .map_err(IntelRdtError::OpenSchemata)?;
