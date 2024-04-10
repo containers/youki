@@ -1,6 +1,6 @@
 use libcontainer::oci_spec::runtime::Spec;
-use wasmtime::*;
-use wasmtime_wasi::WasiCtxBuilder;
+use wasi_common::sync::{add_to_linker, WasiCtxBuilder};
+use wasmtime::{Engine, Linker, Module, Store};
 
 use libcontainer::workload::{Executor, ExecutorError, ExecutorValidationError, EMPTY};
 
@@ -59,7 +59,7 @@ impl Executor for WasmtimeExecutor {
         })?;
 
         let mut linker = Linker::new(&engine);
-        wasmtime_wasi::add_to_linker(&mut linker, |s| s).map_err(|err| {
+        add_to_linker(&mut linker, |s| s).map_err(|err| {
             tracing::error!(err = ?err, "cannot add wasi context to linker");
             ExecutorError::Other("cannot add wasi context to linker".to_string())
         })?;
