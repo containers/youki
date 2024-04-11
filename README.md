@@ -12,7 +12,17 @@
 youki is an implementation of the [OCI runtime-spec](https://github.com/opencontainers/runtime-spec) in Rust, similar to [runc](https://github.com/opencontainers/runc).  
 Your ideas are welcome [here](https://github.com/containers/youki/issues/10).
 
-# Quick Install
+# Quick Start
+
+> [!TIP]
+> You can immediately your environment with youki on GitHub Codespaces and try it out.  
+>
+> [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/containers/youki?quickstart=1)
+> ```console
+> $ just build
+> $ docker run --runtime youki hello-world
+> $ sudo podman run --cgroup-manager=cgroupfs --runtime /workspaces/youki/youki hello-world
+> ```
 
 [User Documentation](https://containers.github.io/youki/user/basic_setup.html#quick-install)
 
