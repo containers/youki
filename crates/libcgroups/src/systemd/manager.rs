@@ -435,8 +435,11 @@ mod tests {
     use anyhow::{Context, Result};
 
     use super::*;
-    use crate::systemd::dbus_native::{
-        client::SystemdClient, serialize::Variant, utils::SystemdClientError,
+    use crate::{
+        common::DEFAULT_CGROUP_ROOT,
+        systemd::dbus_native::{
+            client::SystemdClient, serialize::Variant, utils::SystemdClientError,
+        },
     };
 
     struct TestSystemdClient {}
@@ -532,5 +535,38 @@ mod tests {
         );
 
         Ok(())
+    }
+    #[test]
+    fn test_task_addition() {
+        let manager = Manager::new(
+            DEFAULT_CGROUP_ROOT.into(),
+            ":youki:test".into(),
+            "youki_test_container".into(),
+            false,
+        )
+        .unwrap();
+        fs::create_dir_all(&manager.full_path).unwrap();
+        let mut p1 = std::process::Command::new("sleep")
+            .arg("1s")
+            .spawn()
+            .unwrap();
+        let p1_id = nix::unistd::Pid::from_raw(p1.id() as i32);
+        let mut p2 = std::process::Command::new("sleep")
+            .arg("1s")
+            .spawn()
+            .unwrap();
+        let p2_id = nix::unistd::Pid::from_raw(p2.id() as i32);
+        manager.add_task(p1_id).unwrap();
+        manager.add_task(p2_id).unwrap();
+        let all_pids = manager.get_all_pids().unwrap();
+        assert!(all_pids.contains(&p1_id));
+        assert!(all_pids.contains(&p2_id));
+        // wait till both processes are finished so we can cleanup the cgroup
+        let _ = p1.wait();
+        let _ = p2.wait();
+        manager.remove().unwrap();
+        // the remove call above should remove the dir, we just do this again
+        // for contingency, and thus ignore the result
+        let _ = fs::remove_dir(&manager.full_path);
     }
 }

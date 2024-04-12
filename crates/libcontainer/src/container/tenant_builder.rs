@@ -332,7 +332,7 @@ impl TenantContainerBuilder {
         let spec_linux = spec.linux().as_ref().unwrap();
         let mut linux_builder = LinuxBuilder::default().namespaces(ns);
 
-        if let Some(ref cgroup_path) = spec_linux.cgroups_path(){
+        if let Some(ref cgroup_path) = spec_linux.cgroups_path() {
             linux_builder = linux_builder.cgroups_path(cgroup_path.clone());
         }
         let linux = linux_builder.build()?;
