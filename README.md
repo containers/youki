@@ -15,7 +15,7 @@ Your ideas are welcome [here](https://github.com/containers/youki/issues/10).
 # Quick Start
 
 > [!TIP]
-> You can immediately your environment with youki on GitHub Codespaces and try it out.  
+> You can immediately set up your environment with youki on GitHub Codespaces and try it out.  
 >
 > [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/containers/youki?quickstart=1)
 > ```console
