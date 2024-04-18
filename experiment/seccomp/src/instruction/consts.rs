@@ -1,3 +1,5 @@
+use std::{mem::offset_of, os::raw::c_int};
+
 // BPF Instruction classes.
 // See /usr/include/linux/bpf_common.h .
 // Load operation.
@@ -56,8 +58,51 @@ pub const AUDIT_ARCH_AARCH64: u32 = 183 | 0x8000_0000 | 0x4000_0000;
 //     __u64 args[6];
 // };
 // ```
-pub const SECCOMP_DATA_ARCH_OFFSET: u8 = 4;
-pub const SECCOMP_DATA_ARGS_OFFSET: u8 = 16;
-pub const SECCOMP_DATA_ARG_SIZE: u8 = 8;
+
+#[repr(C)]
+struct SeccompData {
+    nr: c_int,
+    arch: u32,
+    instruction_pointer: u64,
+    args: [u64; 6],
+}
+
+pub const fn seccomp_data_arch_offset() -> u8 {
+    offset_of!(SeccompData, arch) as u8
+}
+
+pub const fn seccomp_data_arg_size() -> u8 {
+    8
+}
+
+pub const fn seccomp_data_args_offset() -> u8 {
+    offset_of!(SeccompData, args) as u8
+}
 
 pub const SECCOMP_IOC_MAGIC: u8 = b'!';
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_seccomp_data_arch_offset() {
+        if cfg!(target_arch = "x86_64") {
+            assert_eq!(seccomp_data_arch_offset(), 4);
+        }
+    }
+
+    #[test]
+    fn test_seccomp_data_arg_size_offset() {
+        if cfg!(target_arch = "x86_64") {
+            assert_eq!(seccomp_data_arg_size_offset(), 8);
+        }
+    }
+
+    #[test]
+    fn test_seccomp_data_args_offset() {
+        if cfg!(target_arch = "x86_64") {
+            assert_eq!(seccomp_data_args_offset(), 16);
+        }
+    }
+}

@@ -11,7 +11,7 @@ pub fn gen_validate(arc: &Arch) -> Vec<Instruction> {
     };
 
     vec![
-        Instruction::stmt(BPF_LD | BPF_W | BPF_ABS, SECCOMP_DATA_ARCH_OFFSET as u32),
+        Instruction::stmt(BPF_LD | BPF_W | BPF_ABS, seccomp_data_arch_offset() as u32),
         Instruction::jump(BPF_JMP | BPF_JEQ | BPF_K, 1, 0, arch),
         Instruction::stmt(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS),
     ]
