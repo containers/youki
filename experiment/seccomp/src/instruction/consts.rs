@@ -71,7 +71,7 @@ pub const fn seccomp_data_arch_offset() -> u8 {
     offset_of!(SeccompData, arch) as u8
 }
 
-pub const fn seccomp_data_arg_size_offset() -> u8 {
+pub const fn seccomp_data_arg_size() -> u8 {
     8
 }
 
