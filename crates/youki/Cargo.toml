@@ -51,7 +51,7 @@ tracing-subscriber = { version = "0.3.18", features = ["json", "env-filter"] }
 tracing-journald = "0.3.0"
 
 [dev-dependencies]
-serial_test = "3.0.0"
+serial_test = "3.1.0"
 tempfile = "3"
 scopeguard = "1.2.0"
 
