@@ -56,7 +56,11 @@ if [ "$CARGO" == "cross" ]; then
 
     # mount run to have access to dbus socket.
     # mount /tmp so as shared for test_make_parent_mount_private
-    export CROSS_CONTAINER_OPTS="--privileged -v/run:/run --mount=type=bind,source=/tmp,destination=/tmp,bind-propagation=shared"
+    # Then there are few "hacks" specificallt for test_task_addition
+    # run with user same as the invoking user, so that the dbus is connected with correct user
+    # we want pid ns of host, because we will be connecting to the host dbus, and it needs task pid from host
+    # finally we need to mount the cgroup as read-only, as we need that to check if the tasks are correctly added
+    export CROSS_CONTAINER_OPTS="--privileged --user `id -u`:`id -g` --pid=host -v /sys/fs/cgroup:/sys/fs/cgroup:ro -v/run:/run --mount=type=bind,source=/tmp,destination=/tmp,bind-propagation=shared"
 fi
 
 if [ "$1" == "--print-target-dir" ]; then

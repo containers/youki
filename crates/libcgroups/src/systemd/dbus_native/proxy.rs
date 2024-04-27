@@ -239,4 +239,11 @@ impl<'conn> Proxy<'conn> {
             v => panic!("control group expected string variant, got {:?} instead", v),
         }
     }
+    pub fn attach_process(&self, name: &str, cgroup: &str, pid: u32) -> Result<()> {
+        self.method_call::<_, ()>(
+            "org.freedesktop.systemd1.Manager",
+            "AttachProcessesToUnit",
+            Some((name, cgroup, vec![pid])),
+        )
+    }
 }

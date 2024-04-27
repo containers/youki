@@ -26,4 +26,11 @@ pub trait SystemdClient {
     fn systemd_version(&self) -> Result<u32, SystemdClientError>;
 
     fn control_cgroup_root(&self) -> Result<PathBuf, SystemdClientError>;
+
+    fn add_process_to_unit(
+        &self,
+        unit_name: &str,
+        subcgroup: &str,
+        pid: u32,
+    ) -> Result<(), SystemdClientError>;
 }

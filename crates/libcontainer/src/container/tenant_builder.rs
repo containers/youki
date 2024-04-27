@@ -327,9 +327,17 @@ impl TenantContainerBuilder {
 
         let init_process = procfs::process::Process::new(container_pid.as_raw())?;
         let ns = self.get_namespaces(init_process.namespaces()?.0)?;
-        let linux = LinuxBuilder::default().namespaces(ns).build()?;
 
+        // it should never be the case that linux is not present in spec
+        let spec_linux = spec.linux().as_ref().unwrap();
+        let mut linux_builder = LinuxBuilder::default().namespaces(ns);
+
+        if let Some(ref cgroup_path) = spec_linux.cgroups_path() {
+            linux_builder = linux_builder.cgroups_path(cgroup_path.clone());
+        }
+        let linux = linux_builder.build()?;
         spec.set_process(Some(process)).set_linux(Some(linux));
+
         Ok(())
     }
 
