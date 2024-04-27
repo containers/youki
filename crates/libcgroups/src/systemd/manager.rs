@@ -21,7 +21,7 @@ use super::{
 use crate::{
     common::{
         self, AnyCgroupManager, CgroupManager, ControllerOpt, FreezerState, JoinSafelyError,
-        PathBufExt, WrapIoResult, WrappedIoError, CGROUP_PROCS,
+        PathBufExt, WrapIoResult, WrappedIoError,
     },
     systemd::{dbus_native::serialize::Variant, unified::Unified},
     v2::manager::V2ManagerError,
@@ -355,7 +355,8 @@ impl CgroupManager for Manager {
         }
         if self.client.transient_unit_exists(&self.unit_name) {
             tracing::debug!("Transient unit {:?} already exists", self.unit_name);
-            common::write_cgroup_file(self.full_path.join(CGROUP_PROCS), pid)?;
+            self.client
+                .add_process_to_unit(&self.unit_name, "", pid.as_raw() as u32)?;
             return Ok(());
         }
 
@@ -482,6 +483,15 @@ mod tests {
         fn control_cgroup_root(&self) -> Result<PathBuf, SystemdClientError> {
             Ok(PathBuf::from("/"))
         }
+
+        fn add_process_to_unit(
+            &self,
+            _unit_name: &str,
+            _subcgroup: &str,
+            _pid: u32,
+        ) -> Result<(), SystemdClientError> {
+            Ok(())
+        }
     }
 
     #[test]
@@ -545,7 +555,6 @@ mod tests {
             false,
         )
         .unwrap();
-        fs::create_dir_all(&manager.full_path).unwrap();
         let mut p1 = std::process::Command::new("sleep")
             .arg("1s")
             .spawn()

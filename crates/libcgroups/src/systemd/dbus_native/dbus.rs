@@ -453,6 +453,10 @@ impl SystemdClient for DbusConnection {
         let cgroup_root = proxy.control_group()?;
         Ok(PathBuf::from(&cgroup_root))
     }
+    fn add_process_to_unit(&self, unit_name: &str, subcgroup: &str, pid: u32) -> Result<()> {
+        let proxy = self.create_proxy();
+        proxy.attach_process(unit_name, subcgroup, pid)
+    }
 }
 
 #[cfg(test)]
