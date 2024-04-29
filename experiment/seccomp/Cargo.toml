@@ -22,3 +22,5 @@ nix = { version = "0.27.1", features = [
 thiserror = "1.0.57"
 prctl = "1.0.0"
 anyhow = "1.0"
+tokio = { version = "1", features = ["full"] }
+syscall-numbers = "3.1.1"
