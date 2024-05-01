@@ -108,7 +108,6 @@ impl TenantContainerBuilder {
 
         tracing::debug!("{:#?}", spec);
 
-        unistd::chdir(&container_dir).map_err(LibcontainerError::OtherSyscall)?;
         let notify_path = Self::setup_notify_listener(&container_dir)?;
         // convert path of root file system of the container to absolute path
         let rootfs = fs::canonicalize(spec.root().as_ref().ok_or(MissingSpecError::Root)?.path())
