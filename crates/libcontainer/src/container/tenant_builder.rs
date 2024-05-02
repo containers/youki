@@ -1,6 +1,6 @@
 use caps::Capability;
 use nix::fcntl::OFlag;
-use nix::unistd::{self, close, pipe2, read, Pid};
+use nix::unistd::{close, pipe2, read, Pid};
 use oci_spec::runtime::{
     Capabilities as SpecCapabilities, Capability as SpecCapability, LinuxBuilder,
     LinuxCapabilities, LinuxCapabilitiesBuilder, LinuxNamespace, LinuxNamespaceBuilder,

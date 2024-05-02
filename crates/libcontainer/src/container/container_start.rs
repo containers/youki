@@ -6,7 +6,7 @@ use crate::{
 };
 
 use super::{Container, ContainerStatus};
-use nix::{sys::signal, unistd};
+use nix::sys::signal;
 
 impl Container {
     /// Starts a previously created container

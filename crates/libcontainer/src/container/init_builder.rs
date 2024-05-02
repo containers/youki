@@ -1,4 +1,3 @@
-use nix::unistd;
 use oci_spec::runtime::Spec;
 use std::{
     fs,
