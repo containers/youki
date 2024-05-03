@@ -44,8 +44,7 @@ Vagrant.configure("2") do |config|
         ./script/setup/install-cni
         ./script/setup/install-critools
         rm -rf /bin/runc /sbin/runc /usr/sbin/runc /usr/bin/runc
-
-        cp /vagrant/youki/youki /usr/bin/runc
+        ln -s /vagrant/youki/youki /usr/bin/runc
       SHELL
     end
 

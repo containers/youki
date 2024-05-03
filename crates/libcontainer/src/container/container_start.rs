@@ -6,7 +6,7 @@ use crate::{
 };
 
 use super::{Container, ContainerStatus};
-use nix::{sys::signal, unistd};
+use nix::sys::signal;
 
 impl Container {
     /// Starts a previously created container
@@ -58,11 +58,6 @@ impl Container {
                 err
             })?;
         }
-
-        unistd::chdir(self.root.as_os_str()).map_err(|err| {
-            tracing::error!("failed to change directory to container root: {}", err);
-            LibcontainerError::OtherSyscall(err)
-        })?;
 
         let mut notify_socket = NotifySocket::new(self.root.join(NOTIFY_FILE));
         notify_socket.notify_container_start()?;
