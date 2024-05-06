@@ -26,6 +26,12 @@ pub struct Seccomp {
     pub filters: Vec<Instruction>,
 }
 
+impl Default for Seccomp {
+    fn default() -> Self {
+        Seccomp::new()
+    }
+}
+
 impl Seccomp {
     pub fn new() -> Self {
         Seccomp {
@@ -81,6 +87,21 @@ impl IntoRawFd for NotifyFd {
 impl AsRawFd for NotifyFd {
     fn as_raw_fd(&self) -> RawFd {
         self.fd
+    }
+}
+
+impl NotifyFd {
+    pub fn success(&self, v: i64, notify_id: u64) -> nix::Result<()> {
+        let mut resp = SeccompNotifResp {
+            id: notify_id,
+            val: v,
+            error: 0,
+            flags: 0,
+        };
+
+        unsafe { seccomp_notif_ioctl_send(self.fd, &mut resp as *mut _)? };
+
+        Ok(())
     }
 }
 
@@ -164,7 +185,7 @@ impl NotifyFd {
             res.assume_init()
         };
 
-        Ok(Notification { notif, fd: &self })
+        Ok(Notification { notif, fd: self })
     }
 }
 
