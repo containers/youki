@@ -461,12 +461,12 @@ fn validate_device(device: &LinuxDevice, description: &str) {
     }
 
     let expected_permissions = device.file_mode();
-    if expected_permissions.is_none() {
-        return;
-    } else {
+    if let Some(expected) = expected_permissions {
         let actual_permissions = file_data.permissions().mode() & 0o777;
-        if actual_permissions != expected_permissions.unwrap() {
-            eprintln!("error due to device file mode want {expected_permissions:?}, got {actual_permissions:?}");
+        if actual_permissions != expected {
+            eprintln!(
+                "error due to device file mode want {expected:?}, got {actual_permissions:?}"
+            );
         }
     }
 
