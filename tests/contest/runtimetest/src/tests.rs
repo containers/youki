@@ -6,8 +6,11 @@ use oci_spec::runtime::{
     IOPriorityClass::{self, IoprioClassBe, IoprioClassIdle, IoprioClassRt},
     LinuxSchedulerPolicy, Spec,
 };
+use oci_spec::runtime::{LinuxDevice, LinuxDeviceType};
 use std::fs::{self, read_dir};
 use std::mem;
+use std::os::linux::fs::MetadataExt;
+use std::os::unix::fs::{FileTypeExt, PermissionsExt};
 use std::path::Path;
 
 ////////// ANCHOR: example_hello_world
@@ -378,6 +381,117 @@ pub fn validate_scheduler_policy(spec: &Spec) {
     let want_sn = sc.nice().unwrap();
     if sn != want_sn {
         eprintln!("error due to sched_nice want {want_sn}, got {sn}")
+    }
+}
+
+pub fn validate_devices(spec: &Spec) {
+    let linux = spec.linux().as_ref().unwrap();
+    if let Some(devices) = linux.devices() {
+        for (i, device) in devices.iter().enumerate() {
+            validate_device(
+                device,
+                &format!(
+                    "{} (linux.devices[{}])",
+                    device.path().as_path().to_str().unwrap(),
+                    i
+                ),
+            );
+        }
+    }
+}
+
+fn validate_device(device: &LinuxDevice, description: &str) {
+    let file_data = match fs::metadata(device.path()) {
+        Ok(data) => data,
+        Err(e) => {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                eprintln!(
+                    "error due to device not being present in path: {:?}",
+                    device.path()
+                );
+            } else {
+                eprintln!(
+                    "error due to fail to get metadata for device path {:?}, error: {}",
+                    device.path(),
+                    e
+                );
+            }
+            return;
+        }
+    };
+
+    let mut expected_type = device.typ();
+    if expected_type == LinuxDeviceType::U {
+        expected_type = LinuxDeviceType::C;
+    }
+
+    let file_type = file_data.file_type();
+    let actual_type = if file_type.is_char_device() {
+        LinuxDeviceType::C
+    } else if file_type.is_block_device() {
+        LinuxDeviceType::B
+    } else if file_type.is_fifo() {
+        LinuxDeviceType::P
+    } else {
+        LinuxDeviceType::U
+    };
+
+    if actual_type != expected_type {
+        eprintln!("error due to device type want {expected_type:?}, got {actual_type:?}");
+    }
+
+    if actual_type != LinuxDeviceType::P {
+        let dev = file_data.st_rdev();
+        let major = (dev >> 8) & 0xfff;
+        let minor = (dev & 0xff) | ((dev >> 12) & 0xfff00);
+        if major != device.major() as u64 {
+            eprintln!(
+                "error due to device major want {}, got {}",
+                device.major(),
+                major
+            );
+        }
+        if minor != device.minor() as u64 {
+            eprintln!(
+                "error due to device minor want {}, got {}",
+                device.minor(),
+                minor
+            );
+        }
+    }
+
+    let expected_permissions = device.file_mode();
+    if let Some(expected) = expected_permissions {
+        let actual_permissions = file_data.permissions().mode() & 0o777;
+        if actual_permissions != expected {
+            eprintln!(
+                "error due to device file mode want {expected:?}, got {actual_permissions:?}"
+            );
+        }
+    }
+
+    if description == "/dev/console (default device)" {
+        eprintln!("we need the major/minor from the controlling TTY");
+    }
+
+    if let Some(expected_uid) = device.uid() {
+        if file_data.st_uid() != expected_uid {
+            eprintln!(
+                "error due to device uid want {}, got {}",
+                expected_uid,
+                file_data.st_uid()
+            );
+        }
+    }
+
+    if let Some(expected_gid) = device.gid() {
+        if file_data.st_gid() != expected_gid {
+            eprintln!(
+                "error due to device gid want {}, got {}",
+                expected_gid,
+                file_data.st_gid()
+            );
+        }
     }
 }
 
