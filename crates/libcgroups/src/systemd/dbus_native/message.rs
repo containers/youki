@@ -188,7 +188,7 @@ impl Header {
                     .into());
                 }
                 let ret = HeaderValue::U32(u32::from_le_bytes(
-                    buf[*ctr..*ctr + 4].try_into().unwrap(), // we ca unwrap here as we know 4 byte buffer will satisfy [u8;4]
+                    buf[*ctr..*ctr + 4].try_into().unwrap(), // we can unwrap here as we know 4 byte buffer will satisfy [u8;4]
                 ));
                 *ctr += 4;
                 ret

@@ -68,11 +68,7 @@ impl ContainerBuilderImpl {
 
     fn run_container(&mut self) -> Result<Pid, LibcontainerError> {
         let linux = self.spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
-        let cgroups_path = utils::get_cgroup_path(
-            linux.cgroups_path(),
-            &self.container_id,
-            self.user_ns_config.is_some(),
-        );
+        let cgroups_path = utils::get_cgroup_path(linux.cgroups_path(), &self.container_id);
         let cgroup_config = libcgroups::common::CgroupConfig {
             cgroup_path: cgroups_path,
             systemd_cgroup: self.use_systemd || self.user_ns_config.is_some(),
@@ -129,7 +125,12 @@ impl ContainerBuilderImpl {
         // ourselves to be non-dumpable only breaks things (like rootless
         // containers), which is the recommendation from the kernel folks.
         if linux.namespaces().is_some() {
-            prctl::set_dumpable(false).unwrap();
+            prctl::set_dumpable(false).map_err(|e| {
+                LibcontainerError::Other(format!(
+                    "error in setting dumpable to false : {}",
+                    nix::errno::from_i32(e)
+                ))
+            })?;
         }
 
         // This container_args will be passed to the container processes,
@@ -181,11 +182,7 @@ impl ContainerBuilderImpl {
 
     fn cleanup_container(&self) -> Result<(), LibcontainerError> {
         let linux = self.spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
-        let cgroups_path = utils::get_cgroup_path(
-            linux.cgroups_path(),
-            &self.container_id,
-            self.user_ns_config.is_some(),
-        );
+        let cgroups_path = utils::get_cgroup_path(linux.cgroups_path(), &self.container_id);
         let cmanager =
             libcgroups::common::create_cgroup_manager(libcgroups::common::CgroupConfig {
                 cgroup_path: cgroups_path,

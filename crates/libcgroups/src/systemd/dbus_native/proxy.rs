@@ -114,7 +114,7 @@ impl<'conn> Proxy<'conn> {
         // we are only going to consider first reply, cause... so.
         // realistically there should only be at most one method return type of message
         // for a method call
-        let reply = reply.get(0).ok_or(DbusError::MethodCallErr(
+        let reply = reply.first().ok_or(DbusError::MethodCallErr(
             "expected to get a reply for method call, didn't get any".into(),
         ))?;
 
@@ -238,5 +238,12 @@ impl<'conn> Proxy<'conn> {
             Variant::String(s) => Ok(s),
             v => panic!("control group expected string variant, got {:?} instead", v),
         }
+    }
+    pub fn attach_process(&self, name: &str, cgroup: &str, pid: u32) -> Result<()> {
+        self.method_call::<_, ()>(
+            "org.freedesktop.systemd1.Manager",
+            "AttachProcessesToUnit",
+            Some((name, cgroup, vec![pid])),
+        )
     }
 }

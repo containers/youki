@@ -20,8 +20,8 @@ pub enum ExecutorError {
 pub enum ExecutorValidationError {
     #[error("{0} executor can't handle spec")]
     CantHandle(&'static str),
-    #[error("invalid argument")]
-    InvalidArg,
+    #[error("{0}")]
+    ArgValidationError(String),
 }
 
 // Here is an explanation about the complexity below regarding to

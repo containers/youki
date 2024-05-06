@@ -20,4 +20,5 @@ pub mod state;
 pub mod tenant_builder;
 pub use container::CheckpointOptions;
 pub use container::Container;
+pub use container_checkpoint::CheckpointError;
 pub use state::{ContainerProcessState, ContainerStatus, State};

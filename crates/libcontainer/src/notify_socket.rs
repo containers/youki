@@ -65,6 +65,7 @@ impl NotifyListener {
         })?;
         let stream = UnixListener::bind(socket_name).map_err(|e| NotifyListenerError::Bind {
             source: e,
+            // ok to unwrap here as OsStr should always be utf-8 compatible
             name: socket_name.to_str().unwrap().to_owned(),
         })?;
         unistd::chdir(&cwd).map_err(|e| NotifyListenerError::Chdir {
@@ -142,6 +143,7 @@ impl NotifySocket {
         let mut stream =
             UnixStream::connect(socket_name).map_err(|e| NotifyListenerError::Connect {
                 source: e,
+                // ok to unwrap as OsStr should always be utf-8 compatible
                 name: socket_name.to_str().unwrap().to_owned(),
             })?;
         stream

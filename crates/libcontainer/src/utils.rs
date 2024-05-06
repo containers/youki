@@ -147,17 +147,10 @@ pub fn get_user_home(uid: u32) -> Option<PathBuf> {
 }
 
 /// If None, it will generate a default path for cgroups.
-pub fn get_cgroup_path(
-    cgroups_path: &Option<PathBuf>,
-    container_id: &str,
-    new_user_ns: bool,
-) -> PathBuf {
+pub fn get_cgroup_path(cgroups_path: &Option<PathBuf>, container_id: &str) -> PathBuf {
     match cgroups_path {
         Some(cpath) => cpath.clone(),
-        None => match new_user_ns {
-            false => PathBuf::from(container_id),
-            true => PathBuf::from(format!(":youki:{container_id}")),
-        },
+        None => PathBuf::from(format!(":youki:{container_id}")),
     }
 }
 
@@ -261,17 +254,16 @@ pub fn ensure_procfs(path: &Path) -> Result<(), EnsureProcfsError> {
     Ok(())
 }
 
-pub fn is_in_new_userns() -> bool {
+pub fn is_in_new_userns() -> Result<bool, std::io::Error> {
     let uid_map_path = "/proc/self/uid_map";
-    let content = std::fs::read_to_string(uid_map_path)
-        .unwrap_or_else(|_| panic!("failed to read {}", uid_map_path));
-    !content.contains("4294967295")
+    let content = std::fs::read_to_string(uid_map_path)?;
+    Ok(!content.contains("4294967295"))
 }
 
 /// Checks if rootless mode needs to be used
-pub fn rootless_required() -> bool {
+pub fn rootless_required() -> Result<bool, std::io::Error> {
     if !nix::unistd::geteuid().is_root() {
-        return true;
+        return Ok(true);
     }
     is_in_new_userns()
 }
@@ -279,14 +271,15 @@ pub fn rootless_required() -> bool {
 /// checks if given spec is valid for current user namespace setup
 pub fn validate_spec_for_new_user_ns(spec: &Spec) -> Result<(), LibcontainerError> {
     let config = UserNamespaceConfig::new(spec)?;
-
+    let in_user_ns = is_in_new_userns().map_err(LibcontainerError::OtherIO)?;
+    let is_rootless_required = rootless_required().map_err(LibcontainerError::OtherIO)?;
     // In case of rootless, there are 2 possible cases :
     // we have a new user ns specified in the spec
     // or the youki is launched in a new user ns (this is how podman does it)
     // So here, we check if rootless is required,
     // but we are neither in a new user ns nor a new user ns is specified in spec
     // then it is an error
-    if rootless_required() && !is_in_new_userns() && config.is_none() {
+    if is_rootless_required && !in_user_ns && config.is_none() {
         return Err(LibcontainerError::NoUserNamespace);
     }
     Ok(())
@@ -323,11 +316,11 @@ mod tests {
     fn test_get_cgroup_path() {
         let cid = "sample_container_id";
         assert_eq!(
-            get_cgroup_path(&None, cid, false),
-            PathBuf::from("sample_container_id")
+            get_cgroup_path(&None, cid),
+            PathBuf::from(":youki:sample_container_id")
         );
         assert_eq!(
-            get_cgroup_path(&Some(PathBuf::from("/youki")), cid, false),
+            get_cgroup_path(&Some(PathBuf::from("/youki")), cid),
             PathBuf::from("/youki")
         );
     }

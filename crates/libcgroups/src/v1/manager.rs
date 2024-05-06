@@ -105,7 +105,7 @@ impl Manager {
             .cgroups()?
             .into_iter()
             .find(|c| c.controllers.contains(&subsystem.to_string()))
-            .unwrap();
+            .ok_or(V1ManagerError::SubsystemDoesNotExist)?;
 
         let p = if cgroup_path.as_os_str().is_empty() {
             mount_point.join_safely(Path::new(&cgroup.pathname))?
@@ -246,7 +246,9 @@ impl CgroupManager for Manager {
         };
         Ok(Freezer::apply(
             &controller_opt,
-            self.subsystems.get(&CtrlType::Freezer).unwrap(),
+            self.subsystems
+                .get(&CtrlType::Freezer)
+                .ok_or(V1ManagerError::SubsystemDoesNotExist)?,
         )?)
     }
 

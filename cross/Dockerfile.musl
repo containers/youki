@@ -22,6 +22,9 @@ ENV LIBSECCOMP_LIB_PATH="${CROSS_SYSROOT}/lib"
 ENV WASMEDGE_DEP_STDCXX_LINK_TYPE="static"
 ENV WASMEDGE_DEP_STDCXX_LIB_PATH="${CROSS_SYSROOT}/lib"
 
+COPY hack/busctl.sh /bin/busctl
+RUN chmod +x /bin/busctl
+
 # wasmedge-sys (through llvm) needs some symbols defined in libgcc
 RUN mkdir /.cargo && cat <<'EOF' > /.cargo/config.toml
 [target.'cfg(target_env = "musl")']

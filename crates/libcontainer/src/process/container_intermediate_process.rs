@@ -29,6 +29,8 @@ pub enum IntermediateProcessError {
     ExecNotify(#[source] nix::Error),
     #[error(transparent)]
     MissingSpec(#[from] crate::error::MissingSpecError),
+    #[error("other error")]
+    Other(String),
 }
 
 type Result<T> = std::result::Result<T, IntermediateProcessError>;
@@ -45,8 +47,8 @@ pub fn container_intermediate_process(
     let spec = &args.spec;
     let linux = spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
     let namespaces = Namespaces::try_from(linux.namespaces().as_ref())?;
-    let cgroup_manager =
-        libcgroups::common::create_cgroup_manager(args.cgroup_config.to_owned()).unwrap();
+    let cgroup_manager = libcgroups::common::create_cgroup_manager(args.cgroup_config.to_owned())
+        .map_err(|e| IntermediateProcessError::Cgroup(e.to_string()))?;
 
     // this needs to be done before we create the init process, so that the init
     // process will already be captured by the cgroup. It also needs to be done
@@ -122,19 +124,19 @@ pub fn container_intermediate_process(
             match container_init_process(&args, &mut main_sender, &mut init_receiver) {
                 Ok(_) => 0,
                 Err(e) => {
+                    tracing::error!("failed to initialize container process: {e}");
+                    if let Err(err) = main_sender.exec_failed(e.to_string()) {
+                        tracing::error!(?err, "failed sending error to main sender");
+                    }
                     if let ContainerType::TenantContainer { exec_notify_fd } = args.container_type {
                         let buf = format!("{e}");
                         if let Err(err) = write(exec_notify_fd, buf.as_bytes()) {
                             tracing::error!(?err, "failed to write to exec notify fd");
-                            return -1;
                         }
                         if let Err(err) = close(exec_notify_fd) {
                             tracing::error!(?err, "failed to close exec notify fd");
-                            return -1;
                         }
                     }
-
-                    tracing::error!("failed to initialize container process: {e}");
                     -1
                 }
             }
@@ -201,7 +203,12 @@ fn setup_userns(
     tracing::debug!("creating new user namespace");
     // child needs to be dumpable, otherwise the non root parent is not
     // allowed to write the uid/gid maps
-    prctl::set_dumpable(true).unwrap();
+    prctl::set_dumpable(true).map_err(|e| {
+        IntermediateProcessError::Other(format!(
+            "error in setting dumpable to true : {}",
+            nix::errno::from_i32(e)
+        ))
+    })?;
     sender.identifier_mapping_request().map_err(|err| {
         tracing::error!("failed to send id mapping request: {}", err);
         err
@@ -210,7 +217,12 @@ fn setup_userns(
         tracing::error!("failed to receive id mapping ack: {}", err);
         err
     })?;
-    prctl::set_dumpable(false).unwrap();
+    prctl::set_dumpable(false).map_err(|e| {
+        IntermediateProcessError::Other(format!(
+            "error in setting dumplable to false : {}",
+            nix::errno::from_i32(e)
+        ))
+    })?;
     Ok(())
 }
 

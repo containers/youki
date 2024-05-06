@@ -224,12 +224,25 @@ mod tests {
     #[serial]
     fn test_setup_console() {
         let init = setup();
+        // duplicate the existing std* fds
+        // we need to restore them later, and we cannot simply store them
+        // as they themselves get modified in setup_console
+        let old_stdin: RawFd = nix::unistd::dup(StdIO::Stdin.into()).unwrap();
+        let old_stdout: RawFd = nix::unistd::dup(StdIO::Stdout.into()).unwrap();
+        let old_stderr: RawFd = nix::unistd::dup(StdIO::Stderr.into()).unwrap();
+
         assert!(init.is_ok());
         let (testdir, rundir_path, socket_path) = init.unwrap();
         let lis = UnixListener::bind(Path::join(testdir.path(), "console-socket"));
         assert!(lis.is_ok());
         let fd = setup_console_socket(&rundir_path, &socket_path, CONSOLE_SOCKET);
         let status = setup_console(&fd.unwrap());
+
+        // restore the original std* before doing final assert
+        dup2(old_stdin, StdIO::Stdin.into()).unwrap();
+        dup2(old_stdout, StdIO::Stdout.into()).unwrap();
+        dup2(old_stderr, StdIO::Stderr.into()).unwrap();
+
         assert!(status.is_ok());
     }
 }

@@ -1,5 +1,6 @@
 [build]
 default-target = "x86_64-unknown-linux-gnu"
+env.passthrough = ["XDG_RUNTIME_DIR"]
 
 [target.aarch64-unknown-linux-gnu]
 dockerfile = "cross/Dockerfile.gnu"

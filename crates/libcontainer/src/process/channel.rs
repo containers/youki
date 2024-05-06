@@ -173,6 +173,10 @@ impl MainReceiver {
             })?;
         match msg {
             Message::InitReady => Ok(()),
+            // this case in unique and known enough to have a special error format
+            Message::ExecFailed(err) => Err(ChannelError::ExecError(format!(
+                "error in executing process : {err}"
+            ))),
             msg => Err(ChannelError::UnexpectedMessage {
                 expected: Message::InitReady,
                 received: msg,

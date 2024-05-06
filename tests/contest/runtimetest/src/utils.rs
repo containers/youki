@@ -55,6 +55,7 @@ fn test_file_write_access(path: &str) -> Result<(), std::io::Error> {
 fn test_dir_write_access(path: &str) -> Result<(), std::io::Error> {
     let _ = std::fs::OpenOptions::new()
         .create(true)
+        .truncate(true)
         .write(true)
         .open(PathBuf::from(path).join("test.txt"))?;
     Ok(())
@@ -144,6 +145,7 @@ pub fn test_device_access(path: &str) -> Result<(), std::io::Error> {
     println!("test_device_access path: {path:?}");
     let _ = std::fs::OpenOptions::new()
         .create(true)
+        .truncate(true)
         .write(true)
         .open(PathBuf::from(path).join("null"))?;
     Ok(())
@@ -153,6 +155,7 @@ pub fn test_device_unaccess(path: &str) -> Result<(), std::io::Error> {
     println!("test_device_unaccess path: {path:?}");
     let _ = std::fs::OpenOptions::new()
         .create(true)
+        .truncate(true)
         .write(true)
         .open(PathBuf::from(path).join("null"))?;
     Ok(())

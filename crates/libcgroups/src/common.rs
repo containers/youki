@@ -27,14 +27,16 @@ pub const DEFAULT_CGROUP_ROOT: &str = "/sys/fs/cgroup";
 
 #[cfg(feature = "systemd")]
 #[inline]
-fn is_true_root() -> bool {
+fn is_true_root() -> Result<bool, WrappedIoError> {
     if !nix::unistd::geteuid().is_root() {
-        return false;
+        return Ok(false);
     }
     let uid_map_path = "/proc/self/uid_map";
-    let content = std::fs::read_to_string(uid_map_path)
-        .unwrap_or_else(|_| panic!("failed to read {}", uid_map_path));
-    content.contains("4294967295")
+    let content = std::fs::read_to_string(uid_map_path).map_err(|e| WrappedIoError::Read {
+        err: e,
+        path: uid_map_path.into(),
+    })?;
+    Ok(content.contains("4294967295"))
 }
 pub trait CgroupManager {
     type Error;
@@ -423,7 +425,7 @@ fn create_systemd_cgroup_manager(
         );
     }
 
-    let use_system = is_true_root();
+    let use_system = is_true_root().map_err(systemd::manager::SystemdManagerError::WrappedIo)?;
 
     tracing::info!(
         "systemd cgroup manager with system bus {} will be used",
@@ -453,7 +455,7 @@ pub fn get_all_pids(path: &Path) -> Result<Vec<Pid>, WrappedIoError> {
         let file_path = p.join(CGROUP_PROCS);
         if file_path.exists() {
             let file = File::open(&file_path).wrap_open(&file_path)?;
-            for line in BufReader::new(file).lines().flatten() {
+            for line in BufReader::new(file).lines().map_while(Result::ok) {
                 result.push(Pid::from_raw(
                     line.parse::<i32>()
                         .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err))

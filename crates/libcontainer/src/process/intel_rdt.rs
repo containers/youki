@@ -161,27 +161,27 @@ fn combine_l3_cache_and_mem_bw_schemas(
     l3_cache_schema: &Option<String>,
     mem_bw_schema: &Option<String>,
 ) -> Option<String> {
-    if l3_cache_schema.is_some() && mem_bw_schema.is_some() {
-        // Combine the results. Filter out "MB:"-lines from l3_cache_schema
-        let real_l3_cache_schema = l3_cache_schema.as_ref().unwrap();
-        let real_mem_bw_schema = mem_bw_schema.as_ref().unwrap();
-        let mut output: Vec<&str> = vec![];
+    match (l3_cache_schema, mem_bw_schema) {
+        (Some(ref real_l3_cache_schema), Some(ref real_mem_bw_schema)) => {
+            // Combine the results. Filter out "MB:"-lines from l3_cache_schema
+            let mut output: Vec<&str> = vec![];
 
-        for line in real_l3_cache_schema.lines() {
-            if line.starts_with("MB:") {
-                continue;
+            for line in real_l3_cache_schema.lines() {
+                if line.starts_with("MB:") {
+                    continue;
+                }
+                output.push(line);
             }
-            output.push(line);
+            output.push(real_mem_bw_schema);
+            Some(output.join("\n"))
         }
-        output.push(real_mem_bw_schema);
-        return Some(output.join("\n"));
-    } else if l3_cache_schema.is_some() {
-        // Apprarently the "MB:"-lines don't need to be removed in this case?
-        return l3_cache_schema.to_owned();
-    } else if mem_bw_schema.is_some() {
-        return mem_bw_schema.to_owned();
+        (Some(_), None) => {
+            // Apprarently the "MB:"-lines don't need to be removed in this case?
+            l3_cache_schema.to_owned()
+        }
+        (None, Some(_)) => mem_bw_schema.to_owned(),
+        (None, None) => None,
     }
-    None
 }
 
 #[derive(PartialEq)]
@@ -348,6 +348,7 @@ fn write_resctrl_schemata(
             // filesystem is pre-populated.
             let mut file = OpenOptions::new()
                 .create(true)
+                .truncate(true)
                 .write(true)
                 .open(schemata)
                 .map_err(IntelRdtError::OpenSchemata)?;

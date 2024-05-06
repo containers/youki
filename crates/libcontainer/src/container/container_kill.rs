@@ -57,7 +57,9 @@ impl Container {
 
     fn kill_one_process<S: Into<Signal>>(&self, signal: S) -> Result<(), LibcontainerError> {
         let signal = signal.into().into_raw();
-        let pid = self.pid().unwrap();
+        let pid = self.pid().ok_or(LibcontainerError::Other(
+            "container process pid not found in state".into(),
+        ))?;
 
         tracing::debug!("kill signal {} to {}", signal, pid);
 
