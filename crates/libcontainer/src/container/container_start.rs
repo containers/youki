@@ -6,7 +6,7 @@ use crate::{
 };
 
 use super::{Container, ContainerStatus};
-use nix::sys::signal;
+use nix::{sys::signal, unistd};
 
 impl Container {
     /// Starts a previously created container
@@ -46,6 +46,10 @@ impl Container {
             err
         })?;
         if let Some(hooks) = config.hooks.as_ref() {
+            unistd::chdir(self.root.as_os_str()).map_err(|err| {
+                tracing::error!("failed to change directory to container root: {}", err);
+                LibcontainerError::OtherSyscall(err)
+            })?;
             // While prestart is marked as deprecated in the OCI spec, the docker and integration test still
             // uses it.
             #[allow(deprecated)]
