@@ -48,16 +48,6 @@ impl Container {
             err
         })?;
         if let Some(hooks) = config.hooks.as_ref() {
-            let original_dir = env::current_dir().map_err(|err| {
-                tracing::error!("failed to get current directory: {}", err);
-                LibcontainerError::Other(format!("failed to get current directory: {}", err))
-            })?;
-
-            unistd::chdir(self.root.as_os_str()).map_err(|err| {
-                tracing::error!("failed to change directory to container root: {}", err);
-                LibcontainerError::OtherSyscall(err)
-            })?;
-
             // While prestart is marked as deprecated in the OCI spec, the docker and integration test still
             // uses it.
             #[allow(deprecated)]
@@ -68,11 +58,6 @@ impl Container {
                 let _ = self.kill(signal::Signal::SIGKILL, true);
 
                 err
-            })?;
-
-            unistd::chdir(original_dir.as_path()).map_err(|err| {
-                tracing::error!("failed to change directory to container root: {}", err);
-                LibcontainerError::OtherSyscall(err)
             })?;
         }
 
@@ -88,9 +73,24 @@ impl Container {
         // Run post start hooks. It runs after the container process is started.
         // It is called in the runtime namespace.
         if let Some(hooks) = config.hooks.as_ref() {
+            let original_dir = env::current_dir().map_err(|err| {
+                tracing::error!("failed to get current directory: {}", err);
+                LibcontainerError::Other(format!("failed to get current directory: {}", err))
+            })?;
+
+            unistd::chdir(self.root.as_os_str()).map_err(|err| {
+                tracing::error!("failed to change directory to container root: {}", err);
+                LibcontainerError::OtherSyscall(err)
+            })?;
+
             hooks::run_hooks(hooks.poststart().as_ref(), Some(self)).map_err(|err| {
                 tracing::error!("failed to run post start hooks: {}", err);
                 err
+            })?;
+
+            unistd::chdir(original_dir.as_path()).map_err(|err| {
+                tracing::error!("failed to change directory to container root: {}", err);
+                LibcontainerError::OtherSyscall(err)
             })?;
         }
 
