@@ -7,11 +7,13 @@ pub mod error;
 pub mod hooks;
 pub mod namespaces;
 pub mod notify_socket;
+pub mod pipe;
 pub mod process;
 pub mod rootfs;
 #[cfg(feature = "libseccomp")]
 pub mod seccomp;
 pub mod signal;
+pub mod stdio;
 pub mod syscall;
 pub mod test_utils;
 pub mod tty;

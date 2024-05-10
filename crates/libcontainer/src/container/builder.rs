@@ -1,4 +1,5 @@
 use crate::error::{ErrInvalidID, LibcontainerError};
+use crate::stdio::{Fd, Stdio};
 use crate::syscall::syscall::SyscallType;
 use crate::utils::PathBufExt;
 use crate::workload::{self, Executor};
@@ -23,6 +24,8 @@ pub struct ContainerBuilder {
     /// The function that actually runs on the container init process. Default
     /// is to execute the specified command in the oci spec.
     pub(super) executor: Box<dyn Executor>,
+    /// Stdio file descriptors to dup inside the container's namespace
+    pub(super) fds: [Fd; 3],
 }
 
 /// Builder that can be used to configure the common properties of
@@ -69,6 +72,8 @@ impl ContainerBuilder {
             console_socket: None,
             preserve_fds: 0,
             executor: workload::default::get_executor(),
+            // by default, inherit stdio
+            fds: [Fd::Inherit, Fd::Inherit, Fd::Inherit],
         }
     }
 
@@ -237,6 +242,25 @@ impl ContainerBuilder {
         self.preserve_fds = preserved_fds;
         self
     }
+
+    /// Sets STDIN within the container
+    pub fn with_stdin(mut self, stdio: Stdio) -> Self {
+        self.fds[0] = stdio.to_fd(false);
+        self
+    }
+
+    /// Sets STDOUT within the container
+    pub fn with_stdout(mut self, stdio: Stdio) -> Self {
+        self.fds[1] = stdio.to_fd(true);
+        self
+    }
+
+    /// Sets STDERR within the container
+    pub fn with_stderr(mut self, stdio: Stdio) -> Self {
+        self.fds[2] = stdio.to_fd(true);
+        self
+    }
+
     /// Sets the number of additional file descriptors which will be passed into
     /// the container process.
     /// # Example
