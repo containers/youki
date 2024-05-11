@@ -1,14 +1,12 @@
-use std::env;
+use nix::sys::signal;
 
+use super::{Container, ContainerStatus};
 use crate::{
     config::YoukiConfig,
     error::LibcontainerError,
     hooks,
     notify_socket::{NotifySocket, NOTIFY_FILE},
 };
-
-use super::{Container, ContainerStatus};
-use nix::{sys::signal, unistd};
 
 impl Container {
     /// Starts a previously created container
@@ -51,7 +49,7 @@ impl Container {
             // While prestart is marked as deprecated in the OCI spec, the docker and integration test still
             // uses it.
             #[allow(deprecated)]
-            hooks::run_hooks(hooks.prestart().as_ref(), Some(self)).map_err(|err| {
+            hooks::run_hooks(hooks.prestart().as_ref(), Some(self), None).map_err(|err| {
                 tracing::error!("failed to run pre start hooks: {}", err);
                 // In the case where prestart hook fails, the runtime must
                 // stop the container before generating an error and exiting.
@@ -73,25 +71,12 @@ impl Container {
         // Run post start hooks. It runs after the container process is started.
         // It is called in the runtime namespace.
         if let Some(hooks) = config.hooks.as_ref() {
-            let original_dir = env::current_dir().map_err(|err| {
-                tracing::error!("failed to get current directory: {}", err);
-                LibcontainerError::Other(format!("failed to get current directory: {}", err))
-            })?;
-
-            unistd::chdir(self.root.as_os_str()).map_err(|err| {
-                tracing::error!("failed to change directory to container root: {}", err);
-                LibcontainerError::OtherSyscall(err)
-            })?;
-
-            hooks::run_hooks(hooks.poststart().as_ref(), Some(self)).map_err(|err| {
-                tracing::error!("failed to run post start hooks: {}", err);
-                err
-            })?;
-
-            unistd::chdir(original_dir.as_path()).map_err(|err| {
-                tracing::error!("failed to change directory to container root: {}", err);
-                LibcontainerError::OtherSyscall(err)
-            })?;
+            hooks::run_hooks(hooks.poststart().as_ref(), Some(self), Some(&self.root)).map_err(
+                |err| {
+                    tracing::error!("failed to run post start hooks: {}", err);
+                    err
+                },
+            )?;
         }
 
         Ok(())
