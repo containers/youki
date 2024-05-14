@@ -1,6 +1,5 @@
 use std::{
     collections::HashMap,
-    env,
     io::{ErrorKind, Write},
     os::unix::prelude::CommandExt,
     path::Path,
@@ -43,20 +42,12 @@ pub fn run_hooks(
 
     if let Some(hooks) = hooks {
         for hook in hooks {
-            let mut cmd = process::Command::new(hook.path());
+            let mut hook_command = process::Command::new(hook.path());
 
-            let hook_command = if let Some(cwd) = cwd {
-                cmd.current_dir(cwd)
-            } else {
-                cmd.current_dir(
-                    env::current_dir()
-                        .map_err(|err| {
-                            tracing::error!("failed to get current directory: {}", err);
-                            HookError::OtherIO(err)
-                        })?
-                        .as_path(),
-                )
-            };
+            if let Some(cwd) = cwd {
+                hook_command.current_dir(cwd);
+            }
+
             // Based on OCI spec, the first argument of the args vector is the
             // arg0, which can be different from the path.  For example, path
             // may be "/usr/bin/true" and arg0 is set to "true". However, rust
