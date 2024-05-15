@@ -1,13 +1,13 @@
-use nix::{sys::signal, unistd::Pid};
-use oci_spec::runtime::Hook;
 use std::{
     collections::HashMap,
-    io::ErrorKind,
-    io::Write,
+    io::{ErrorKind, Write},
     os::unix::prelude::CommandExt,
-    process::{self},
-    thread, time,
+    path::Path,
+    process, thread, time,
 };
+
+use nix::{sys::signal, unistd::Pid};
+use oci_spec::runtime::Hook;
 
 use crate::{container::Container, utils};
 
@@ -31,12 +31,21 @@ pub enum HookError {
 
 type Result<T> = std::result::Result<T, HookError>;
 
-pub fn run_hooks(hooks: Option<&Vec<Hook>>, container: Option<&Container>) -> Result<()> {
+pub fn run_hooks(
+    hooks: Option<&Vec<Hook>>,
+    container: Option<&Container>,
+    cwd: Option<&Path>,
+) -> Result<()> {
     let state = &(container.ok_or(HookError::MissingContainerState)?.state);
 
     if let Some(hooks) = hooks {
         for hook in hooks {
             let mut hook_command = process::Command::new(hook.path());
+
+            if let Some(cwd) = cwd {
+                hook_command.current_dir(cwd);
+            }
+
             // Based on OCI spec, the first argument of the args vector is the
             // arg0, which can be different from the path.  For example, path
             // may be "/usr/bin/true" and arg0 is set to "true". However, rust
@@ -165,7 +174,7 @@ mod test {
     fn test_run_hook() -> Result<()> {
         {
             let default_container: Container = Default::default();
-            run_hooks(None, Some(&default_container)).context("Failed simple test")?;
+            run_hooks(None, Some(&default_container), None).context("Failed simple test")?;
         }
 
         {
@@ -174,7 +183,7 @@ mod test {
 
             let hook = HookBuilder::default().path("true").build()?;
             let hooks = Some(vec![hook]);
-            run_hooks(hooks.as_ref(), Some(&default_container)).context("Failed true")?;
+            run_hooks(hooks.as_ref(), Some(&default_container), None).context("Failed true")?;
         }
 
         {
@@ -194,7 +203,27 @@ mod test {
                 .env(vec![String::from("key=value")])
                 .build()?;
             let hooks = Some(vec![hook]);
-            run_hooks(hooks.as_ref(), Some(&default_container)).context("Failed printenv test")?;
+            run_hooks(hooks.as_ref(), Some(&default_container), None)
+                .context("Failed printenv test")?;
+        }
+
+        {
+            assert!(is_command_in_path("pwd"), "The pwd was not found.");
+
+            let tmp = tempfile::tempdir()?;
+
+            let default_container: Container = Default::default();
+            let hook = HookBuilder::default()
+                .path("bash")
+                .args(vec![
+                    String::from("bash"),
+                    String::from("-c"),
+                    format!("test $(pwd) = {:?}", tmp.path()),
+                ])
+                .build()?;
+            let hooks = Some(vec![hook]);
+            run_hooks(hooks.as_ref(), Some(&default_container), Some(tmp.path()))
+                .context("Failed pwd test")?;
         }
 
         Ok(())
@@ -217,7 +246,7 @@ mod test {
             .timeout(1)
             .build()?;
         let hooks = Some(vec![hook]);
-        match run_hooks(hooks.as_ref(), Some(&default_container)) {
+        match run_hooks(hooks.as_ref(), Some(&default_container), None) {
             Ok(_) => {
                 bail!("The test expects the hook to error out with timeout. Should not execute cleanly");
             }

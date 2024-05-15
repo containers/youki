@@ -1,3 +1,9 @@
+use std::{fs, io::Write, os::unix::prelude::RawFd, path::PathBuf, rc::Rc};
+
+use libcgroups::common::CgroupManager;
+use nix::unistd::Pid;
+use oci_spec::runtime::Spec;
+
 use super::{Container, ContainerStatus};
 use crate::{
     error::{LibcontainerError, MissingSpecError},
@@ -13,10 +19,6 @@ use crate::{
     utils,
     workload::Executor,
 };
-use libcgroups::common::CgroupManager;
-use nix::unistd::Pid;
-use oci_spec::runtime::Spec;
-use std::{fs, io::Write, os::unix::prelude::RawFd, path::PathBuf, rc::Rc};
 
 pub(super) struct ContainerBuilderImpl {
     /// Flag indicating if an init or a tenant container should be created
@@ -82,7 +84,11 @@ impl ContainerBuilderImpl {
 
         if matches!(self.container_type, ContainerType::InitContainer) {
             if let Some(hooks) = self.spec.hooks() {
-                hooks::run_hooks(hooks.create_runtime().as_ref(), self.container.as_ref())?
+                hooks::run_hooks(
+                    hooks.create_runtime().as_ref(),
+                    self.container.as_ref(),
+                    None,
+                )?
             }
         }
 

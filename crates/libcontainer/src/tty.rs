@@ -93,7 +93,7 @@ pub fn setup_console_socket(
     );
     let csocketfd = match socket::connect(
         csocketfd.as_raw_fd(),
-        &socket::UnixAddr::new(socket_name).map_err(|err| TTYError::InvalidSocketName {
+        &socket::UnixAddr::new(linked.as_path()).map_err(|err| TTYError::InvalidSocketName {
             source: err,
             socket_name: socket_name.to_string(),
         })?,
@@ -165,84 +165,72 @@ fn connect_stdio(stdin: &RawFd, stdout: &RawFd, stderr: &RawFd) -> Result<()> {
 mod tests {
     use super::*;
 
-    use anyhow::Result;
+    use anyhow::{Ok, Result};
     use serial_test::serial;
-    use std::env;
-    use std::fs::{self, File};
+    use std::fs::File;
     use std::os::unix::net::UnixListener;
-    use std::path::PathBuf;
 
     const CONSOLE_SOCKET: &str = "console-socket";
 
-    fn setup() -> Result<(tempfile::TempDir, PathBuf, PathBuf)> {
+    #[test]
+    #[serial]
+    fn test_setup_console_socket() -> Result<()> {
         let testdir = tempfile::tempdir()?;
-        let rundir_path = Path::join(testdir.path(), "run");
-        fs::create_dir(&rundir_path)?;
-        let socket_path = Path::new(&rundir_path).join("socket");
-        let _ = File::create(&socket_path);
-        env::set_current_dir(&testdir)?;
-        Ok((testdir, rundir_path, socket_path))
-    }
-
-    #[test]
-    #[serial]
-    fn test_setup_console_socket() {
-        let init = setup();
-        assert!(init.is_ok());
-        let (testdir, rundir_path, socket_path) = init.unwrap();
-        let lis = UnixListener::bind(Path::join(testdir.path(), "console-socket"));
+        let socket_path = Path::join(testdir.path(), "test-socket");
+        let lis = UnixListener::bind(&socket_path);
         assert!(lis.is_ok());
-        let fd = setup_console_socket(&rundir_path, &socket_path, CONSOLE_SOCKET);
-        assert!(fd.is_ok());
-        assert_ne!(fd.unwrap().as_raw_fd(), -1);
+        let fd = setup_console_socket(testdir.path(), &socket_path, CONSOLE_SOCKET)?;
+        assert_ne!(fd.as_raw_fd(), -1);
+        Ok(())
     }
 
     #[test]
     #[serial]
-    fn test_setup_console_socket_empty() {
-        let init = setup();
-        assert!(init.is_ok());
-        let (_testdir, rundir_path, socket_path) = init.unwrap();
-        let fd = setup_console_socket(&rundir_path, &socket_path, CONSOLE_SOCKET);
-        assert!(fd.is_ok());
-        assert_eq!(fd.unwrap().as_raw_fd(), -1);
+    fn test_setup_console_socket_empty() -> Result<()> {
+        let testdir = tempfile::tempdir()?;
+        let socket_path = Path::join(testdir.path(), "test-socket");
+        let fd = setup_console_socket(testdir.path(), &socket_path, CONSOLE_SOCKET)?;
+        assert_eq!(fd.as_raw_fd(), -1);
+        Ok(())
     }
 
     #[test]
     #[serial]
-    fn test_setup_console_socket_invalid() {
-        let init = setup();
-        assert!(init.is_ok());
-        let (testdir, rundir_path, socket_path) = init.unwrap();
+    fn test_setup_console_socket_invalid() -> Result<()> {
+        let testdir = tempfile::tempdir()?;
+        let socket_path = Path::join(testdir.path(), "test-socket");
         let _socket = File::create(Path::join(testdir.path(), "console-socket"));
         assert!(_socket.is_ok());
-        let fd = setup_console_socket(&rundir_path, &socket_path, CONSOLE_SOCKET);
+        let fd = setup_console_socket(testdir.path(), &socket_path, CONSOLE_SOCKET);
         assert!(fd.is_err());
+
+        Ok(())
     }
 
     #[test]
     #[serial]
-    fn test_setup_console() {
-        let init = setup();
+    fn test_setup_console() -> Result<()> {
+        let testdir = tempfile::tempdir()?;
+        let socket_path = Path::join(testdir.path(), "test-socket");
         // duplicate the existing std* fds
         // we need to restore them later, and we cannot simply store them
         // as they themselves get modified in setup_console
-        let old_stdin: RawFd = nix::unistd::dup(StdIO::Stdin.into()).unwrap();
-        let old_stdout: RawFd = nix::unistd::dup(StdIO::Stdout.into()).unwrap();
-        let old_stderr: RawFd = nix::unistd::dup(StdIO::Stderr.into()).unwrap();
+        let old_stdin: RawFd = nix::unistd::dup(StdIO::Stdin.into())?;
+        let old_stdout: RawFd = nix::unistd::dup(StdIO::Stdout.into())?;
+        let old_stderr: RawFd = nix::unistd::dup(StdIO::Stderr.into())?;
 
-        assert!(init.is_ok());
-        let (testdir, rundir_path, socket_path) = init.unwrap();
-        let lis = UnixListener::bind(Path::join(testdir.path(), "console-socket"));
+        let lis = UnixListener::bind(&socket_path);
         assert!(lis.is_ok());
-        let fd = setup_console_socket(&rundir_path, &socket_path, CONSOLE_SOCKET);
+        let fd = setup_console_socket(testdir.path(), &socket_path, CONSOLE_SOCKET);
         let status = setup_console(&fd.unwrap());
 
         // restore the original std* before doing final assert
-        dup2(old_stdin, StdIO::Stdin.into()).unwrap();
-        dup2(old_stdout, StdIO::Stdout.into()).unwrap();
-        dup2(old_stderr, StdIO::Stderr.into()).unwrap();
+        dup2(old_stdin, StdIO::Stdin.into())?;
+        dup2(old_stdout, StdIO::Stdout.into())?;
+        dup2(old_stderr, StdIO::Stderr.into())?;
 
         assert!(status.is_ok());
+
+        Ok(())
     }
 }

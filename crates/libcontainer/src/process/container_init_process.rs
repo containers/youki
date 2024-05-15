@@ -1,32 +1,40 @@
-use super::args::{ContainerArgs, ContainerType};
-use crate::error::MissingSpecError;
-use crate::namespaces::NamespaceError;
-use crate::syscall::{Syscall, SyscallError};
-use crate::{apparmor, notify_socket, rootfs, workload};
-use crate::{
-    capabilities, hooks, namespaces::Namespaces, process::channel, rootfs::RootFS, tty,
-    user_ns::UserNamespaceConfig, utils,
+use std::{
+    collections::HashMap,
+    env, fs, mem,
+    os::unix::io::AsRawFd,
+    path::{Path, PathBuf},
 };
+
+use super::args::{ContainerArgs, ContainerType};
+#[cfg(feature = "libseccomp")]
+use crate::seccomp;
+use crate::{
+    apparmor, capabilities,
+    error::MissingSpecError,
+    hooks,
+    namespaces::{NamespaceError, Namespaces},
+    notify_socket,
+    process::channel,
+    rootfs,
+    rootfs::RootFS,
+    syscall::{Syscall, SyscallError},
+    tty,
+    user_ns::UserNamespaceConfig,
+    utils, workload,
+};
+
 use nc;
-use nix::mount::MsFlags;
-use nix::sched::CloneFlags;
-use nix::sys::stat::Mode;
-use nix::unistd::setsid;
-use nix::unistd::{self, Gid, Uid};
+use nix::{
+    mount::MsFlags,
+    sched::CloneFlags,
+    sys::stat::Mode,
+    unistd::setsid,
+    unistd::{self, Gid, Uid},
+};
 use oci_spec::runtime::{
     IOPriorityClass, LinuxIOPriority, LinuxNamespaceType, LinuxSchedulerFlag, LinuxSchedulerPolicy,
     Scheduler, Spec, User,
 };
-use std::collections::HashMap;
-use std::mem;
-use std::os::unix::io::AsRawFd;
-use std::{
-    env, fs,
-    path::{Path, PathBuf},
-};
-
-#[cfg(feature = "libseccomp")]
-use crate::seccomp;
 
 #[derive(Debug, thiserror::Error)]
 pub enum InitProcessError {
@@ -317,10 +325,12 @@ pub fn container_init_process(
         // create_container hook needs to be called after the namespace setup, but
         // before pivot_root is called. This runs in the container namespaces.
         if let Some(hooks) = hooks {
-            hooks::run_hooks(hooks.create_container().as_ref(), container).map_err(|err| {
-                tracing::error!(?err, "failed to run create container hooks");
-                InitProcessError::Hooks(err)
-            })?;
+            hooks::run_hooks(hooks.create_container().as_ref(), container, None).map_err(
+                |err| {
+                    tracing::error!(?err, "failed to run create container hooks");
+                    InitProcessError::Hooks(err)
+                },
+            )?;
         }
 
         let in_user_ns = utils::is_in_new_userns().map_err(InitProcessError::Io)?;
@@ -628,7 +638,7 @@ pub fn container_init_process(
     // before pivot_root is called. This runs in the container namespaces.
     if matches!(args.container_type, ContainerType::InitContainer) {
         if let Some(hooks) = hooks {
-            hooks::run_hooks(hooks.start_container().as_ref(), container).map_err(|err| {
+            hooks::run_hooks(hooks.start_container().as_ref(), container, None).map_err(|err| {
                 tracing::error!(?err, "failed to run start container hooks");
                 err
             })?;

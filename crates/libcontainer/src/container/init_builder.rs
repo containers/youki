@@ -1,4 +1,3 @@
-use nix::unistd;
 use oci_spec::runtime::Spec;
 use std::{
     fs,
@@ -61,14 +60,6 @@ impl InitContainerBuilder {
             .set_systemd(self.use_systemd)
             .set_annotations(spec.annotations().clone());
 
-        unistd::chdir(&container_dir).map_err(|err| {
-            tracing::error!(
-                ?container_dir,
-                ?err,
-                "failed to chdir into the container directory"
-            );
-            LibcontainerError::OtherSyscall(err)
-        })?;
         let notify_path = container_dir.join(NOTIFY_FILE);
         // convert path of root file system of the container to absolute path
         let rootfs = fs::canonicalize(spec.root().as_ref().ok_or(MissingSpecError::Root)?.path())
