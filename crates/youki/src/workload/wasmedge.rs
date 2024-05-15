@@ -1,10 +1,7 @@
 use libcontainer::oci_spec::runtime::Spec;
-use wasmedge_sdk::{
-    config::{CommonConfigOptions, ConfigBuilder, HostRegistrationConfigOptions},
-    params, VmBuilder,
-};
-
 use libcontainer::workload::{Executor, ExecutorError, ExecutorValidationError};
+use wasmedge_sdk::config::{CommonConfigOptions, ConfigBuilder, HostRegistrationConfigOptions};
+use wasmedge_sdk::{params, VmBuilder};
 
 const EXECUTOR_NAME: &str = "wasmedge";
 

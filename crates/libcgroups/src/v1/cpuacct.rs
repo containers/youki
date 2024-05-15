@@ -1,14 +1,9 @@
-use std::{
-    num::ParseIntError,
-    path::{Path, PathBuf},
-};
-
-use crate::{
-    common::{self, ControllerOpt, WrappedIoError},
-    stats::{parse_flat_keyed_data, CpuUsage, ParseFlatKeyedDataError, StatsProvider},
-};
+use std::num::ParseIntError;
+use std::path::{Path, PathBuf};
 
 use super::controller::Controller;
+use crate::common::{self, ControllerOpt, WrappedIoError};
+use crate::stats::{parse_flat_keyed_data, CpuUsage, ParseFlatKeyedDataError, StatsProvider};
 
 // Contains user mode and kernel mode cpu consumption
 const CGROUP_CPUACCT_STAT: &str = "cpuacct.stat";
@@ -151,10 +146,8 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
-    use crate::{
-        common::CGROUP_PROCS,
-        test::{set_fixture, setup},
-    };
+    use crate::common::CGROUP_PROCS;
+    use crate::test::{set_fixture, setup};
 
     fn setup_total_cpu(stat_content: &str, usage_content: &str) -> TempDir {
         let tmp = tempfile::tempdir().unwrap();

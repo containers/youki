@@ -1,23 +1,22 @@
 //! An interface trait so that rest of Youki can call
 //! necessary functions without having to worry about their
 //! implementation details
+use std::any::Any;
+use std::ffi::OsStr;
+use std::path::Path;
+use std::sync::Arc;
+
 use caps::{CapSet, CapsHashSet};
 use libc;
-use nix::{
-    mount::MsFlags,
-    sched::CloneFlags,
-    sys::stat::{Mode, SFlag},
-    unistd::{Gid, Uid},
-};
-use std::{any::Any, ffi::OsStr, path::Path, sync::Arc};
-
+use nix::mount::MsFlags;
+use nix::sched::CloneFlags;
+use nix::sys::stat::{Mode, SFlag};
+use nix::unistd::{Gid, Uid};
 use oci_spec::runtime::LinuxRlimit;
 
-use crate::syscall::{
-    linux::{LinuxSyscall, MountAttr},
-    test::TestHelperSyscall,
-    Result,
-};
+use crate::syscall::linux::{LinuxSyscall, MountAttr};
+use crate::syscall::test::TestHelperSyscall;
+use crate::syscall::Result;
 
 /// This specifies various kernel/other functionalities required for
 /// container management

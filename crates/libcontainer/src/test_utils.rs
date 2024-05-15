@@ -111,8 +111,9 @@ where
 mod tests {
     use core::panic;
 
-    use super::*;
     use anyhow::{bail, Result};
+
+    use super::*;
 
     #[test]
     fn test_child_process() -> Result<()> {

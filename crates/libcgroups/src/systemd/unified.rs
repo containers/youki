@@ -1,12 +1,11 @@
-use super::dbus_native::serialize::Variant;
-use std::{collections::HashMap, num::ParseIntError};
+use std::collections::HashMap;
+use std::num::ParseIntError;
 
-use super::{
-    controller::Controller,
-    cpu::{self, convert_shares_to_cgroup2},
-    cpuset::{self, to_bitmask, BitmaskError},
-    memory, pids,
-};
+use super::controller::Controller;
+use super::cpu::{self, convert_shares_to_cgroup2};
+use super::cpuset::{self, to_bitmask, BitmaskError};
+use super::dbus_native::serialize::Variant;
+use super::{memory, pids};
 use crate::common::ControllerOpt;
 
 #[derive(thiserror::Error, Debug)]
@@ -155,12 +154,11 @@ impl Unified {
 
 #[cfg(test)]
 mod tests {
-    use super::super::dbus_native::serialize::DbusSerialize;
     use anyhow::{Context, Result};
 
-    use crate::recast;
-
+    use super::super::dbus_native::serialize::DbusSerialize;
     use super::*;
+    use crate::recast;
 
     #[test]
     fn test_set() -> Result<()> {

@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
+use liboci_cli::State;
 
 use crate::commands::load_container;
-use liboci_cli::State;
 
 pub fn state(args: State, root_path: PathBuf) -> Result<()> {
     let container = load_container(root_path, &args.container_id)?;

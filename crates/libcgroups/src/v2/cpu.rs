@@ -1,16 +1,11 @@
-use std::{
-    borrow::Cow,
-    path::{Path, PathBuf},
-};
-
-use crate::{
-    common::{self, ControllerOpt, WrappedIoError},
-    stats::{self, CpuStats, ParseFlatKeyedDataError, StatsProvider},
-};
+use std::borrow::Cow;
+use std::path::{Path, PathBuf};
 
 use oci_spec::runtime::LinuxCpu;
 
 use super::controller::Controller;
+use crate::common::{self, ControllerOpt, WrappedIoError};
+use crate::stats::{self, CpuStats, ParseFlatKeyedDataError, StatsProvider};
 
 const CGROUP_CPU_WEIGHT: &str = "cpu.weight";
 const CGROUP_CPU_MAX: &str = "cpu.max";
@@ -168,13 +163,13 @@ impl Cpu {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{
-        stats::{CpuThrottling, CpuUsage},
-        test::{set_fixture, setup},
-    };
-    use oci_spec::runtime::LinuxCpuBuilder;
     use std::fs;
+
+    use oci_spec::runtime::LinuxCpuBuilder;
+
+    use super::*;
+    use crate::stats::{CpuThrottling, CpuUsage};
+    use crate::test::{set_fixture, setup};
 
     #[test]
     fn test_set_valid_shares() {

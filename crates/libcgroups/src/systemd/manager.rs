@@ -1,32 +1,30 @@
-use std::{
-    collections::HashMap,
-    convert::Infallible,
-    fmt::{Debug, Display},
-    fs::{self},
-    path::Component::RootDir,
-};
-
-use nix::{unistd::Pid, NixPath};
+use std::collections::HashMap;
+use std::convert::Infallible;
+use std::fmt::{Debug, Display};
+use std::fs::{self};
+use std::path::Component::RootDir;
 use std::path::{Path, PathBuf};
 
-use super::{
-    controller::Controller,
-    controller_type::{ControllerType, CONTROLLER_TYPES},
-    cpu::Cpu,
-    cpuset::CpuSet,
-    dbus_native::{client::SystemdClient, dbus::DbusConnection, utils::SystemdClientError},
-    memory::Memory,
-    pids::Pids,
+use nix::unistd::Pid;
+use nix::NixPath;
+
+use super::controller::Controller;
+use super::controller_type::{ControllerType, CONTROLLER_TYPES};
+use super::cpu::Cpu;
+use super::cpuset::CpuSet;
+use super::dbus_native::client::SystemdClient;
+use super::dbus_native::dbus::DbusConnection;
+use super::dbus_native::utils::SystemdClientError;
+use super::memory::Memory;
+use super::pids::Pids;
+use crate::common::{
+    self, AnyCgroupManager, CgroupManager, ControllerOpt, FreezerState, JoinSafelyError,
+    PathBufExt, WrapIoResult, WrappedIoError,
 };
-use crate::{
-    common::{
-        self, AnyCgroupManager, CgroupManager, ControllerOpt, FreezerState, JoinSafelyError,
-        PathBufExt, WrapIoResult, WrappedIoError,
-    },
-    systemd::{dbus_native::serialize::Variant, unified::Unified},
-    v2::manager::V2ManagerError,
-};
-use crate::{stats::Stats, v2::manager::Manager as FsManager};
+use crate::stats::Stats;
+use crate::systemd::dbus_native::serialize::Variant;
+use crate::systemd::unified::Unified;
+use crate::v2::manager::{Manager as FsManager, V2ManagerError};
 
 const CGROUP_CONTROLLERS: &str = "cgroup.controllers";
 const CGROUP_SUBTREE_CONTROL: &str = "cgroup.subtree_control";
@@ -436,12 +434,10 @@ mod tests {
     use anyhow::{Context, Result};
 
     use super::*;
-    use crate::{
-        common::DEFAULT_CGROUP_ROOT,
-        systemd::dbus_native::{
-            client::SystemdClient, serialize::Variant, utils::SystemdClientError,
-        },
-    };
+    use crate::common::DEFAULT_CGROUP_ROOT;
+    use crate::systemd::dbus_native::client::SystemdClient;
+    use crate::systemd::dbus_native::serialize::Variant;
+    use crate::systemd::dbus_native::utils::SystemdClientError;
 
     struct TestSystemdClient {}
 

@@ -1,15 +1,14 @@
+use std::fs::File;
+use std::io::{BufWriter, Write};
+use std::path::{Path, PathBuf};
+
 use anyhow::Result;
-use libcontainer::oci_spec::runtime::Mount;
 use libcontainer::oci_spec::runtime::{
     LinuxBuilder, LinuxIdMappingBuilder, LinuxNamespace, LinuxNamespaceBuilder, LinuxNamespaceType,
-    Spec,
+    Mount, Spec,
 };
 use nix;
 use serde_json::to_writer_pretty;
-use std::fs::File;
-use std::io::{BufWriter, Write};
-use std::path::Path;
-use std::path::PathBuf;
 
 pub fn get_default() -> Result<Spec> {
     Ok(Spec::default())
@@ -101,8 +100,9 @@ pub fn spec(args: liboci_cli::Spec) -> Result<()> {
 #[cfg(test)]
 // Tests become unstable if not serial. The cause is not known.
 mod tests {
-    use super::*;
     use serial_test::serial;
+
+    use super::*;
 
     #[test]
     #[serial]

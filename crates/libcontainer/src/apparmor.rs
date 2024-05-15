@@ -1,8 +1,7 @@
+use std::fs::{self};
+use std::path::Path;
+
 use crate::utils;
-use std::{
-    fs::{self},
-    path::Path,
-};
 
 #[derive(Debug, thiserror::Error)]
 pub enum AppArmorError {

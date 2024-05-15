@@ -1,6 +1,7 @@
-use crate::utils::{is_runtime_runc, test_inside_container};
 use oci_spec::runtime::{ProcessBuilder, Spec, SpecBuilder};
 use test_framework::{ConditionalTest, TestGroup, TestResult};
+
+use crate::utils::{is_runtime_runc, test_inside_container};
 
 fn get_spec(domainname: &str) -> Spec {
     SpecBuilder::default()

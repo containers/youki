@@ -1,36 +1,31 @@
-use std::{
-    fs::{self},
-    os::unix::fs::PermissionsExt,
-    path::{Component::RootDir, Path, PathBuf},
-    time::Duration,
-};
+use std::fs::{self};
+use std::os::unix::fs::PermissionsExt;
+use std::path::Component::RootDir;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use nix::unistd::Pid;
 
+use super::controller::Controller;
+use super::controller_type::{
+    ControllerType, PseudoControllerType, CONTROLLER_TYPES, PSEUDO_CONTROLLER_TYPES,
+};
+use super::cpu::{Cpu, V2CpuControllerError, V2CpuStatsError};
+use super::cpuset::CpuSet;
 #[cfg(feature = "cgroupsv2_devices")]
 use super::devices::Devices;
-use super::{
-    controller::Controller,
-    controller_type::{
-        ControllerType, PseudoControllerType, CONTROLLER_TYPES, PSEUDO_CONTROLLER_TYPES,
-    },
-    cpu::{Cpu, V2CpuControllerError, V2CpuStatsError},
-    cpuset::CpuSet,
-    freezer::{Freezer, V2FreezerError},
-    hugetlb::{HugeTlb, V2HugeTlbControllerError, V2HugeTlbStatsError},
-    io::{Io, V2IoControllerError, V2IoStatsError},
-    memory::{Memory, V2MemoryControllerError, V2MemoryStatsError},
-    pids::Pids,
-    unified::{Unified, V2UnifiedError},
-    util::{self, V2UtilError, CGROUP_SUBTREE_CONTROL},
+use super::freezer::{Freezer, V2FreezerError};
+use super::hugetlb::{HugeTlb, V2HugeTlbControllerError, V2HugeTlbStatsError};
+use super::io::{Io, V2IoControllerError, V2IoStatsError};
+use super::memory::{Memory, V2MemoryControllerError, V2MemoryStatsError};
+use super::pids::Pids;
+use super::unified::{Unified, V2UnifiedError};
+use super::util::{self, V2UtilError, CGROUP_SUBTREE_CONTROL};
+use crate::common::{
+    self, AnyCgroupManager, CgroupManager, ControllerOpt, FreezerState, JoinSafelyError,
+    PathBufExt, WrapIoResult, WrappedIoError, CGROUP_PROCS,
 };
-use crate::{
-    common::{
-        self, AnyCgroupManager, CgroupManager, ControllerOpt, FreezerState, JoinSafelyError,
-        PathBufExt, WrapIoResult, WrappedIoError, CGROUP_PROCS,
-    },
-    stats::{PidStatsError, Stats, StatsProvider},
-};
+use crate::stats::{PidStatsError, Stats, StatsProvider};
 
 pub const CGROUP_KILL: &str = "cgroup.kill";
 

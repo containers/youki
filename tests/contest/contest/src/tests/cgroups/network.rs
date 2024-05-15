@@ -1,15 +1,15 @@
 use std::path::Path;
 
 use anyhow::{anyhow, Context, Result};
-use pnet_datalink::interfaces;
-
 use oci_spec::runtime::{
     LinuxBuilder, LinuxInterfacePriorityBuilder, LinuxNamespace, LinuxNamespaceType,
     LinuxNetworkBuilder, LinuxResourcesBuilder, Spec, SpecBuilder,
 };
+use pnet_datalink::interfaces;
 use test_framework::{test_result, ConditionalTest, TestGroup, TestResult};
 
-use crate::utils::{test_outside_container, test_utils::check_container_created};
+use crate::utils::test_outside_container;
+use crate::utils::test_utils::check_container_created;
 
 fn create_spec(
     cgroup_name: &str,

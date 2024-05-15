@@ -1,9 +1,9 @@
 use std::path::Path;
 
-use crate::common::{self, ControllerOpt, WrappedIoError};
 use oci_spec::runtime::LinuxNetwork;
 
 use super::controller::Controller;
+use crate::common::{self, ControllerOpt, WrappedIoError};
 
 pub struct NetworkClassifier {}
 
@@ -38,9 +38,10 @@ impl NetworkClassifier {
 
 #[cfg(test)]
 mod tests {
+    use oci_spec::runtime::LinuxNetworkBuilder;
+
     use super::*;
     use crate::test::set_fixture;
-    use oci_spec::runtime::LinuxNetworkBuilder;
 
     #[test]
     fn test_apply_network_classifier() {

@@ -1,7 +1,7 @@
-use crate::common::{ControllerOpt, WrappedIoError};
 use std::path::Path;
 
 use super::controller::Controller;
+use crate::common::{ControllerOpt, WrappedIoError};
 
 pub struct PerfEvent {}
 
@@ -25,7 +25,8 @@ mod tests {
     use nix::unistd::Pid;
 
     use super::*;
-    use crate::{common::CGROUP_PROCS, test::setup};
+    use crate::common::CGROUP_PROCS;
+    use crate::test::setup;
 
     #[test]
     fn test_add_task() {

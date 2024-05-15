@@ -1,10 +1,10 @@
 //! Contains functionality of pause container command
-use crate::commands::load_container;
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
-
 use liboci_cli::Checkpoint;
+
+use crate::commands::load_container;
 
 pub fn checkpoint(args: Checkpoint, root_path: PathBuf) -> Result<()> {
     tracing::debug!("start checkpointing container {}", args.container_id);

@@ -1,6 +1,8 @@
-use crate::syscall::{syscall::create_syscall, Syscall};
 use std::fs::remove_file;
 use std::path::Path;
+
+use crate::syscall::syscall::create_syscall;
+use crate::syscall::Syscall;
 
 #[derive(Debug, thiserror::Error)]
 pub enum SymlinkError {
@@ -108,19 +110,19 @@ impl Symlink {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "v1")]
+    use std::fs;
+    use std::path::PathBuf;
+
+    #[cfg(feature = "v1")]
+    use anyhow::{Context, Result};
+    use nix::fcntl::{open, OFlag};
+    use nix::sys::stat::Mode;
+
     use super::*;
     #[cfg(feature = "v1")]
     use crate::syscall::linux::LinuxSyscall;
     use crate::syscall::test::TestHelperSyscall;
-    #[cfg(feature = "v1")]
-    use anyhow::{Context, Result};
-    use nix::{
-        fcntl::{open, OFlag},
-        sys::stat::Mode,
-    };
-    #[cfg(feature = "v1")]
-    use std::fs;
-    use std::path::PathBuf;
 
     #[test]
     fn test_setup_ptmx() {

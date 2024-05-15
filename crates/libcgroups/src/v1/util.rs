@@ -1,8 +1,11 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::collections::HashMap;
+use std::path::PathBuf;
 
-use procfs::{process::Process, ProcError};
+use procfs::process::Process;
+use procfs::ProcError;
 
-use super::{controller_type::CONTROLLERS, ControllerType};
+use super::controller_type::CONTROLLERS;
+use super::ControllerType;
 
 #[derive(thiserror::Error, Debug)]
 pub enum V1MountPointError {

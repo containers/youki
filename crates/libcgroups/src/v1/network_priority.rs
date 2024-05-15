@@ -1,9 +1,9 @@
 use std::path::Path;
 
-use crate::common::{self, ControllerOpt, WrappedIoError};
 use oci_spec::runtime::LinuxNetwork;
 
 use super::controller::Controller;
+use crate::common::{self, ControllerOpt, WrappedIoError};
 
 pub struct NetworkPriority {}
 
@@ -39,9 +39,10 @@ impl NetworkPriority {
 
 #[cfg(test)]
 mod tests {
+    use oci_spec::runtime::{LinuxInterfacePriorityBuilder, LinuxNetworkBuilder};
+
     use super::*;
     use crate::test::set_fixture;
-    use oci_spec::runtime::{LinuxInterfacePriorityBuilder, LinuxNetworkBuilder};
 
     #[test]
     fn test_apply_network_priorites() {

@@ -1,7 +1,8 @@
-use super::{create, delete, kill};
-use crate::utils::{generate_uuid, prepare_bundle};
 use tempfile::TempDir;
 use test_framework::{TestResult, TestableGroup};
+
+use super::{create, delete, kill};
+use crate::utils::{generate_uuid, prepare_bundle};
 
 pub struct ContainerCreate {
     project_path: TempDir,

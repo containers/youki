@@ -1,15 +1,13 @@
-use once_cell::sync::Lazy;
-use regex::Regex;
 use std::collections::HashMap;
+use std::fs::{self, OpenOptions};
 use std::io::Write;
-use std::{
-    fs::{self, OpenOptions},
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use nix::unistd::Pid;
 use oci_spec::runtime::LinuxIntelRdt;
+use once_cell::sync::Lazy;
 use procfs::process::Process;
+use regex::Regex;
 
 #[derive(Debug, thiserror::Error)]
 pub enum IntelRdtError {
@@ -410,8 +408,9 @@ pub fn setup_intel_rdt(
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use anyhow::Result;
+
+    use super::*;
 
     #[test]
     fn test_combine_schemas() -> Result<()> {

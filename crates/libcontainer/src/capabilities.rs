@@ -1,9 +1,8 @@
 //! Handles Management of Capabilities
-use crate::syscall::{Syscall, SyscallError};
-use caps::Capability as CapsCapability;
-use caps::*;
-
+use caps::{Capability as CapsCapability, *};
 use oci_spec::runtime::{Capabilities, Capability as SpecCapability, LinuxCapabilities};
+
+use crate::syscall::{Syscall, SyscallError};
 
 /// Converts a list of capability types to capabilities has set
 fn to_set(caps: &Capabilities) -> CapsHashSet {
@@ -165,8 +164,9 @@ pub fn drop_privileges<S: Syscall + ?Sized>(
 
 #[cfg(test)]
 mod tests {
-    use oci_spec::runtime::LinuxCapabilitiesBuilder;
     use std::collections::HashSet;
+
+    use oci_spec::runtime::LinuxCapabilitiesBuilder;
 
     use super::*;
     use crate::syscall::test::TestHelperSyscall;

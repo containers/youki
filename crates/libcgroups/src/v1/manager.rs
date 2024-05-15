@@ -1,28 +1,28 @@
+use std::collections::HashMap;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
-use std::{collections::HashMap, path::PathBuf};
 
 use nix::unistd::Pid;
-
 use procfs::process::Process;
 use procfs::ProcError;
 
-use super::blkio::V1BlkioStatsError;
-use super::cpu::V1CpuStatsError;
-use super::cpuacct::V1CpuAcctStatsError;
-use super::cpuset::V1CpuSetControllerError;
-use super::freezer::V1FreezerControllerError;
-use super::hugetlb::{V1HugeTlbControllerError, V1HugeTlbStatsError};
-use super::memory::{V1MemoryControllerError, V1MemoryStatsError};
+use super::blkio::{Blkio, V1BlkioStatsError};
+use super::controller::Controller;
+use super::controller_type::CONTROLLERS;
+use super::cpu::{Cpu, V1CpuStatsError};
+use super::cpuacct::{CpuAcct, V1CpuAcctStatsError};
+use super::cpuset::{CpuSet, V1CpuSetControllerError};
+use super::devices::Devices;
+use super::freezer::{Freezer, V1FreezerControllerError};
+use super::hugetlb::{HugeTlb, V1HugeTlbControllerError, V1HugeTlbStatsError};
+use super::memory::{Memory, V1MemoryControllerError, V1MemoryStatsError};
+use super::network_classifier::NetworkClassifier;
+use super::network_priority::NetworkPriority;
+use super::perf_event::PerfEvent;
+use super::pids::Pids;
 use super::util::V1MountPointError;
-use super::{
-    blkio::Blkio, controller::Controller, controller_type::CONTROLLERS, cpu::Cpu, cpuacct::CpuAcct,
-    cpuset::CpuSet, devices::Devices, freezer::Freezer, hugetlb::HugeTlb, memory::Memory,
-    network_classifier::NetworkClassifier, network_priority::NetworkPriority,
-    perf_event::PerfEvent, pids::Pids, util, ControllerType as CtrlType,
-};
-
+use super::{util, ControllerType as CtrlType};
 use crate::common::{
     self, AnyCgroupManager, CgroupManager, ControllerOpt, FreezerState, JoinSafelyError,
     PathBufExt, WrapIoResult, WrappedIoError, CGROUP_PROCS,

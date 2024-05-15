@@ -1,5 +1,6 @@
-use anyhow::{bail, Result};
 use std::{io, process};
+
+use anyhow::{bail, Result};
 
 pub fn get_result_from_output(res: io::Result<process::Output>) -> Result<()> {
     match res {

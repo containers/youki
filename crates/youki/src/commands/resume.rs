@@ -2,10 +2,9 @@
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
+use liboci_cli::Resume;
 
 use crate::commands::load_container;
-
-use liboci_cli::Resume;
 
 // Resuming a container indicates resuming all processes in given container from paused state
 // This uses Freezer cgroup to suspend and resume processes

@@ -3,10 +3,9 @@
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
+use liboci_cli::Start;
 
 use crate::commands::load_container;
-
-use liboci_cli::Start;
 
 pub fn start(args: Start, root_path: PathBuf) -> Result<()> {
     let mut container = load_container(root_path, &args.container_id)?;

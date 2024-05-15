@@ -1,10 +1,14 @@
+use std::fs;
+
+use libcgroups::common::CgroupManager;
+use libcgroups::{self};
+use nix::sys::signal;
+
 use super::{Container, ContainerStatus};
+use crate::config::YoukiConfig;
+use crate::error::LibcontainerError;
 use crate::hooks;
 use crate::process::intel_rdt::delete_resctrl_subdirectory;
-use crate::{config::YoukiConfig, error::LibcontainerError};
-use libcgroups::{self, common::CgroupManager};
-use nix::sys::signal;
-use std::fs;
 
 impl Container {
     /// Deletes the container

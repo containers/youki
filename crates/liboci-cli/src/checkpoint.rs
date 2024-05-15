@@ -1,5 +1,6 @@
-use clap::Parser;
 use std::path::PathBuf;
+
+use clap::Parser;
 
 /// Checkpoint a running container
 /// Reference: https://github.com/opencontainers/runc/blob/main/man/runc-checkpoint.8.md

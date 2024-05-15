@@ -1,8 +1,5 @@
-use crate::error::MissingSpecError;
-use crate::{namespaces::Namespaces, process::channel, process::fork};
 use libcgroups::common::CgroupManager;
-use nix::unistd::{close, write};
-use nix::unistd::{Gid, Pid, Uid};
+use nix::unistd::{close, write, Gid, Pid, Uid};
 use oci_spec::runtime::{LinuxNamespace, LinuxNamespaceType, LinuxResources};
 use procfs::process::Process;
 
@@ -10,6 +7,9 @@ use super::args::{ContainerArgs, ContainerType};
 use super::channel::{IntermediateReceiver, MainSender};
 use super::container_init_process::container_init_process;
 use super::fork::CloneCb;
+use crate::error::MissingSpecError;
+use crate::namespaces::Namespaces;
+use crate::process::{channel, fork};
 
 #[derive(Debug, thiserror::Error)]
 pub enum IntermediateProcessError {
@@ -261,12 +261,13 @@ fn apply_cgroups<
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use anyhow::Result;
     use libcgroups::test_manager::TestManager;
     use nix::unistd::Pid;
     use oci_spec::runtime::LinuxResources;
     use procfs::process::Process;
+
+    use super::*;
 
     #[test]
     fn apply_cgroup_init() -> Result<()> {

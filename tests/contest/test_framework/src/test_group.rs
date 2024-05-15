@@ -1,7 +1,9 @@
 //! Contains structure for a test group
-use crate::testable::{TestResult, Testable, TestableGroup};
-use crossbeam::thread;
 use std::collections::BTreeMap;
+
+use crossbeam::thread;
+
+use crate::testable::{TestResult, Testable, TestableGroup};
 
 /// Stores tests belonging to a group
 pub struct TestGroup {

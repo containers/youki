@@ -1,6 +1,7 @@
-use anyhow::{Context, Result};
 use std::borrow::Cow;
 use std::str::FromStr;
+
+use anyhow::{Context, Result};
 use tracing::metadata::LevelFilter;
 
 const LOG_LEVEL_ENV_NAME: &str = "YOUKI_INTEGRATION_LOG_LEVEL";

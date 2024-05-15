@@ -1,7 +1,9 @@
+use std::os::unix::prelude::{AsRawFd, RawFd};
+
+use nix::unistd::Pid;
+
 use crate::channel::{channel, Receiver, Sender};
 use crate::process::message::Message;
-use nix::unistd::Pid;
-use std::os::unix::prelude::{AsRawFd, RawFd};
 
 #[derive(Debug, thiserror::Error)]
 pub enum ChannelError {
@@ -308,11 +310,12 @@ impl InitReceiver {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use anyhow::{Context, Result};
     use nix::sys::wait;
     use nix::unistd;
     use serial_test::serial;
+
+    use super::*;
 
     // Note: due to cargo test by default runs tests in parallel using a single
     // process, these tests should not be running in parallel with other tests.

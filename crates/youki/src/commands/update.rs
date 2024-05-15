@@ -1,13 +1,13 @@
-use std::fs;
-use std::io;
 use std::path::PathBuf;
+use std::{fs, io};
 
-use crate::commands::create_cgroup_manager;
 use anyhow::Result;
-use libcgroups::common::CgroupManager;
-use libcgroups::{self, common::ControllerOpt};
+use libcgroups::common::{CgroupManager, ControllerOpt};
+use libcgroups::{self};
 use libcontainer::oci_spec::runtime::{LinuxPidsBuilder, LinuxResources, LinuxResourcesBuilder};
 use liboci_cli::Update;
+
+use crate::commands::create_cgroup_manager;
 
 pub fn update(args: Update, root_path: PathBuf) -> Result<()> {
     let cmanager = create_cgroup_manager(root_path, &args.container_id)?;

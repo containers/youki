@@ -1,11 +1,10 @@
-use nix::sys::stat::stat;
-use nix::sys::stat::SFlag;
 use std::fs;
-use std::fs::metadata;
-use std::fs::symlink_metadata;
+use std::fs::{metadata, symlink_metadata};
 use std::os::unix::prelude::MetadataExt;
 use std::path::PathBuf;
 use std::process::Command;
+
+use nix::sys::stat::{stat, SFlag};
 
 fn test_file_read_access(path: &str) -> Result<(), std::io::Error> {
     let _ = std::fs::OpenOptions::new()

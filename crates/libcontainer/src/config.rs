@@ -1,11 +1,11 @@
-use crate::utils;
+use std::fs;
+use std::io::{BufReader, BufWriter, Write};
+use std::path::{Path, PathBuf};
+
 use oci_spec::runtime::{Hooks, Spec};
 use serde::{Deserialize, Serialize};
-use std::{
-    fs,
-    io::{BufReader, BufWriter, Write},
-    path::{Path, PathBuf},
-};
+
+use crate::utils;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
@@ -98,8 +98,9 @@ impl<'a> YoukiConfig {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use anyhow::Result;
+
+    use super::*;
 
     #[test]
     fn test_config_from_spec() -> Result<()> {

@@ -1,9 +1,11 @@
-use crate::utils::{generate_uuid, prepare_bundle};
 use std::thread::sleep;
 use std::time::Duration;
+
 use test_framework::{TestResult, TestableGroup};
 
-use super::{checkpoint, create, delete, exec, kill, start, state, util::criu_installed};
+use super::util::criu_installed;
+use super::{checkpoint, create, delete, exec, kill, start, state};
+use crate::utils::{generate_uuid, prepare_bundle};
 
 // By experimenting, somewhere around 50 is enough for youki process
 // to get the kill signal and shut down

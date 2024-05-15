@@ -1,24 +1,23 @@
-use std::{fs, io::Write, os::unix::prelude::RawFd, path::PathBuf, rc::Rc};
+use std::fs;
+use std::io::Write;
+use std::os::unix::prelude::RawFd;
+use std::path::PathBuf;
+use std::rc::Rc;
 
 use libcgroups::common::CgroupManager;
 use nix::unistd::Pid;
 use oci_spec::runtime::Spec;
 
 use super::{Container, ContainerStatus};
-use crate::{
-    error::{LibcontainerError, MissingSpecError},
-    hooks,
-    notify_socket::NotifyListener,
-    process::{
-        self,
-        args::{ContainerArgs, ContainerType},
-        intel_rdt::delete_resctrl_subdirectory,
-    },
-    syscall::syscall::SyscallType,
-    user_ns::UserNamespaceConfig,
-    utils,
-    workload::Executor,
-};
+use crate::error::{LibcontainerError, MissingSpecError};
+use crate::notify_socket::NotifyListener;
+use crate::process::args::{ContainerArgs, ContainerType};
+use crate::process::intel_rdt::delete_resctrl_subdirectory;
+use crate::process::{self};
+use crate::syscall::syscall::SyscallType;
+use crate::user_ns::UserNamespaceConfig;
+use crate::workload::Executor;
+use crate::{hooks, utils};
 
 pub(super) struct ContainerBuilderImpl {
     /// Flag indicating if an init or a tenant container should be created

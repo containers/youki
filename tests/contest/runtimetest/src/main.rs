@@ -1,10 +1,11 @@
 mod tests;
 mod utils;
 
-use oci_spec::runtime::IOPriorityClass::{IoprioClassBe, IoprioClassIdle, IoprioClassRt};
-use oci_spec::runtime::Spec;
 use std::env;
 use std::path::PathBuf;
+
+use oci_spec::runtime::IOPriorityClass::{IoprioClassBe, IoprioClassIdle, IoprioClassRt};
+use oci_spec::runtime::Spec;
 
 const SPEC_PATH: &str = "/config.json";
 

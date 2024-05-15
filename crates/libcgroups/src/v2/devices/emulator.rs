@@ -53,8 +53,9 @@ impl Emulator {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use oci_spec::runtime::LinuxDeviceCgroupBuilder;
+
+    use super::*;
 
     #[test]
     fn test_with_default_allow() {

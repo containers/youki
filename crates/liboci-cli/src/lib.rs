@@ -11,7 +11,11 @@ mod kill;
 mod start;
 mod state;
 
-pub use {create::Create, delete::Delete, kill::Kill, start::Start, state::State};
+pub use create::Create;
+pub use delete::Delete;
+pub use kill::Kill;
+pub use start::Start;
+pub use state::State;
 
 // Other common subcommands that aren't specified in the document
 mod checkpoint;
@@ -26,10 +30,17 @@ mod run;
 mod spec;
 mod update;
 
-pub use {
-    checkpoint::Checkpoint, events::Events, exec::Exec, features::Features, list::List,
-    pause::Pause, ps::Ps, resume::Resume, run::Run, spec::Spec, update::Update,
-};
+pub use checkpoint::Checkpoint;
+pub use events::Events;
+pub use exec::Exec;
+pub use features::Features;
+pub use list::List;
+pub use pause::Pause;
+pub use ps::Ps;
+pub use resume::Resume;
+pub use run::Run;
+pub use spec::Spec;
+pub use update::Update;
 
 // Subcommands parsed by liboci-cli, based on the [OCI
 // runtime-spec](https://github.com/opencontainers/runtime-spec/blob/master/runtime.md)

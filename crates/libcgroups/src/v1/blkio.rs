@@ -1,16 +1,11 @@
-use std::{
-    num::ParseIntError,
-    path::{Path, PathBuf},
-};
-
-use crate::{
-    common::{self, ControllerOpt, WrappedIoError},
-    stats::{self, BlkioDeviceStat, BlkioStats, ParseDeviceNumberError, StatsProvider},
-};
+use std::num::ParseIntError;
+use std::path::{Path, PathBuf};
 
 use oci_spec::runtime::LinuxBlockIo;
 
 use super::controller::Controller;
+use crate::common::{self, ControllerOpt, WrappedIoError};
+use crate::stats::{self, BlkioDeviceStat, BlkioStats, ParseDeviceNumberError, StatsProvider};
 
 // Throttling/upper limit policy
 // ---------------------------------------
@@ -259,10 +254,10 @@ impl Blkio {
 mod tests {
     use std::fs;
 
+    use oci_spec::runtime::{LinuxBlockIoBuilder, LinuxThrottleDeviceBuilder};
+
     use super::*;
     use crate::test::{set_fixture, setup};
-
-    use oci_spec::runtime::{LinuxBlockIoBuilder, LinuxThrottleDeviceBuilder};
 
     #[test]
     fn test_set_blkio_weight() {

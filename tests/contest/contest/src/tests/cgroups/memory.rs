@@ -6,7 +6,8 @@ use oci_spec::runtime::{
 };
 use test_framework::{test_result, ConditionalTest, TestGroup, TestResult};
 
-use crate::utils::{test_outside_container, test_utils::check_container_created};
+use crate::utils::test_outside_container;
+use crate::utils::test_utils::check_container_created;
 
 const CGROUP_MEMORY_LIMIT: &str = "/sys/fs/cgroup/memory/memory.limit_in_bytes";
 const CGROUP_MEMORY_SWAPPINESS: &str = "/sys/fs/cgroup/memory/memory.swappiness";

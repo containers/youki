@@ -1,15 +1,12 @@
-use crate::{
-    process::{
-        args::ContainerArgs,
-        channel, container_intermediate_process,
-        fork::{self, CloneCb},
-        intel_rdt::setup_intel_rdt,
-    },
-    syscall::SyscallError,
-    user_ns::UserNamespaceConfig,
-};
 use nix::sys::wait::{waitpid, WaitStatus};
 use nix::unistd::Pid;
+
+use crate::process::args::ContainerArgs;
+use crate::process::fork::{self, CloneCb};
+use crate::process::intel_rdt::setup_intel_rdt;
+use crate::process::{channel, container_intermediate_process};
+use crate::syscall::SyscallError;
+use crate::user_ns::UserNamespaceConfig;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ProcessError {
@@ -231,17 +228,17 @@ fn setup_mapping(config: &UserNamespaceConfig, pid: Pid) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
+    use anyhow::Result;
+    use nix::sched::{unshare, CloneFlags};
+    use nix::unistd::{self, getgid, getuid};
+    use oci_spec::runtime::LinuxIdMappingBuilder;
+    use serial_test::serial;
+
     use super::*;
     use crate::process::channel::{intermediate_channel, main_channel};
     use crate::user_ns::UserNamespaceIDMapper;
-    use anyhow::Result;
-    use nix::{
-        sched::{unshare, CloneFlags},
-        unistd::{self, getgid, getuid},
-    };
-    use oci_spec::runtime::LinuxIdMappingBuilder;
-    use serial_test::serial;
-    use std::fs;
 
     #[test]
     #[serial]

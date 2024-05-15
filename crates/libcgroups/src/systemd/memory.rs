@@ -1,11 +1,10 @@
 use std::collections::HashMap;
 
-use super::dbus_native::serialize::Variant;
 use oci_spec::runtime::LinuxMemory;
 
-use crate::common::ControllerOpt;
-
 use super::controller::Controller;
+use super::dbus_native::serialize::Variant;
+use crate::common::ControllerOpt;
 
 pub const MEMORY_MIN: &str = "MemoryMin";
 pub const MEMORY_LOW: &str = "MemoryLow";
@@ -118,9 +117,8 @@ mod tests {
     use oci_spec::runtime::LinuxMemoryBuilder;
 
     use super::super::dbus_native::serialize::DbusSerialize;
-    use crate::recast;
-
     use super::*;
+    use crate::recast;
 
     #[test]
     fn test_set_valid_memory_low() -> Result<()> {

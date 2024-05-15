@@ -1,23 +1,18 @@
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::rc::Rc;
+
 use oci_spec::runtime::Spec;
-use std::{
-    fs,
-    path::{Path, PathBuf},
-    rc::Rc,
-};
 use user_ns::UserNamespaceConfig;
 
-use crate::{
-    apparmor,
-    config::YoukiConfig,
-    error::{ErrInvalidSpec, LibcontainerError, MissingSpecError},
-    notify_socket::NOTIFY_FILE,
-    process::args::ContainerType,
-    tty, user_ns, utils,
-};
-
-use super::{
-    builder::ContainerBuilder, builder_impl::ContainerBuilderImpl, Container, ContainerStatus,
-};
+use super::builder::ContainerBuilder;
+use super::builder_impl::ContainerBuilderImpl;
+use super::{Container, ContainerStatus};
+use crate::config::YoukiConfig;
+use crate::error::{ErrInvalidSpec, LibcontainerError, MissingSpecError};
+use crate::notify_socket::NOTIFY_FILE;
+use crate::process::args::ContainerType;
+use crate::{apparmor, tty, user_ns, utils};
 
 // Builder that can be used to configure the properties of a new container
 pub struct InitContainerBuilder {

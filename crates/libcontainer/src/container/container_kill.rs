@@ -1,7 +1,9 @@
-use super::{Container, ContainerStatus};
-use crate::{error::LibcontainerError, signal::Signal};
 use libcgroups::common::{get_cgroup_setup, CgroupManager};
 use nix::sys::signal::{self};
+
+use super::{Container, ContainerStatus};
+use crate::error::LibcontainerError;
+use crate::signal::Signal;
 
 impl Container {
     /// Sends the specified signal to the container init process

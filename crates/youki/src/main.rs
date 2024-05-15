@@ -6,14 +6,11 @@ mod observability;
 mod rootpath;
 mod workload;
 
-use anyhow::Context;
-use anyhow::Result;
-use clap::CommandFactory;
-use clap::{crate_version, Parser};
+use anyhow::{Context, Result};
+use clap::{crate_version, CommandFactory, Parser};
+use liboci_cli::{CommonCmd, GlobalOpts, StandardCmd};
 
 use crate::commands::info;
-
-use liboci_cli::{CommonCmd, GlobalOpts, StandardCmd};
 
 // Additional options that are not defined in OCI runtime-spec, but are used by Youki.
 #[derive(Parser, Debug)]

@@ -489,11 +489,9 @@ impl Message {
 
 #[cfg(test)]
 mod tests {
-    use crate::systemd::dbus_native::serialize::{Structure, Variant};
-
     use super::super::serialize::DbusSerialize;
-    use super::{Header, HeaderKind, HeaderValue, MessageType};
-    use super::{Message, Result};
+    use super::{Header, HeaderKind, HeaderValue, Message, MessageType, Result};
+    use crate::systemd::dbus_native::serialize::{Structure, Variant};
     // The hardcoded serialized values are captured from
     // original dbus library communication
     // and manually decoded.

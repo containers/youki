@@ -1,21 +1,19 @@
 use std::os::unix::io::AsRawFd;
 use std::path::Path;
 
-use super::bpf::BpfError;
-use super::program::ProgramError;
-use super::*;
+#[cfg(test)]
+use bpf::mock_prog as bpf_prog;
+#[cfg(not(test))]
+use bpf::prog as bpf_prog;
 use nix::fcntl::OFlag;
 use nix::sys::stat::Mode;
 use oci_spec::runtime::LinuxDeviceCgroup;
 
+use super::bpf::BpfError;
+use super::program::ProgramError;
+use super::*;
 use crate::common::{default_allow_devices, default_devices, ControllerOpt};
 use crate::v2::controller::Controller;
-
-#[cfg(test)]
-use bpf::mock_prog as bpf_prog;
-
-#[cfg(not(test))]
-use bpf::prog as bpf_prog;
 
 const LICENSE: &str = "Apache";
 
@@ -116,14 +114,14 @@ impl Devices {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::test::setup;
-    use serial_test::serial;
-
-    use oci_spec::runtime::{LinuxDeviceCgroupBuilder, LinuxDeviceType};
     use std::os::unix::io::RawFd;
 
     use bpf::mock_prog;
+    use oci_spec::runtime::{LinuxDeviceCgroupBuilder, LinuxDeviceType};
+    use serial_test::serial;
+
+    use super::*;
+    use crate::test::setup;
 
     #[test]
     #[serial(bpf)] // mock contexts are shared

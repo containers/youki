@@ -1,8 +1,10 @@
 //! This exposes the main control wrapper to control the tests
-use crate::testable::{TestResult, TestableGroup};
+use std::collections::BTreeMap;
+
 use anyhow::Result;
 use crossbeam::thread;
-use std::collections::BTreeMap;
+
+use crate::testable::{TestResult, TestableGroup};
 
 type TestableGroupType = dyn TestableGroup + Sync + Send;
 

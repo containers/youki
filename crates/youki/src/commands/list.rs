@@ -1,16 +1,15 @@
 //! Contains Functionality of list container command
 use std::fmt::Write as _;
-use std::fs;
-use std::io;
 use std::io::Write;
 use std::path::PathBuf;
+use std::{fs, io};
 
 use anyhow::Result;
 use chrono::{DateTime, Local};
-use tabwriter::TabWriter;
-
-use libcontainer::container::{state::State, Container};
+use libcontainer::container::state::State;
+use libcontainer::container::Container;
 use liboci_cli::List;
+use tabwriter::TabWriter;
 
 /// lists all existing containers
 pub fn list(_: List, root_path: PathBuf) -> Result<()> {

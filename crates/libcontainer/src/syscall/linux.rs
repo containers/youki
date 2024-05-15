@@ -1,24 +1,24 @@
 //! Implements Command trait for Linux systems
-use caps::{CapSet, CapsHashSet};
-use libc::{c_char, setdomainname, uid_t};
-use nix::fcntl;
-use nix::{
-    fcntl::{open, OFlag},
-    mount::{mount, umount2, MntFlags, MsFlags},
-    sched::{unshare, CloneFlags},
-    sys::stat::{mknod, Mode, SFlag},
-    unistd::{chown, chroot, fchdir, pivot_root, sethostname, Gid, Uid},
-};
-use oci_spec::runtime::LinuxRlimit;
+use std::any::Any;
 use std::ffi::{CStr, CString, OsStr};
-use std::fs;
 use std::os::fd::BorrowedFd;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::symlink;
 use std::os::unix::io::RawFd;
+use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::{any::Any, mem, path::Path, ptr};
+use std::{fs, mem, ptr};
+
+use caps::{CapSet, CapsHashSet};
+use libc::{c_char, setdomainname, uid_t};
+use nix::fcntl;
+use nix::fcntl::{open, OFlag};
+use nix::mount::{mount, umount2, MntFlags, MsFlags};
+use nix::sched::{unshare, CloneFlags};
+use nix::sys::stat::{mknod, Mode, SFlag};
+use nix::unistd::{chown, chroot, fchdir, pivot_root, sethostname, Gid, Uid};
+use oci_spec::runtime::LinuxRlimit;
 
 use super::{Result, Syscall, SyscallError};
 use crate::{capabilities, utils};
@@ -604,15 +604,15 @@ mod tests {
     // cleanup_file_descriptors test is especially evil when running with other
     // tests because it would ran around close down different fds.
 
-    use std::{fs, os::unix::prelude::AsRawFd};
+    use std::fs;
+    use std::os::unix::prelude::AsRawFd;
 
     use anyhow::{bail, Context, Result};
     use nix::{fcntl, sys, unistd};
     use serial_test::serial;
 
-    use crate::syscall::Syscall;
-
     use super::LinuxSyscall;
+    use crate::syscall::Syscall;
 
     #[test]
     #[serial]

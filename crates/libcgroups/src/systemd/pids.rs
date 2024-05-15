@@ -1,11 +1,11 @@
-use std::{collections::HashMap, convert::Infallible};
+use std::collections::HashMap;
+use std::convert::Infallible;
 
-use super::dbus_native::serialize::Variant;
 use oci_spec::runtime::LinuxPids;
 
-use crate::common::ControllerOpt;
-
 use super::controller::Controller;
+use super::dbus_native::serialize::Variant;
+use crate::common::ControllerOpt;
 
 pub const TASKS_MAX: &str = "TasksMax";
 
@@ -43,12 +43,12 @@ impl Pids {
 #[cfg(test)]
 mod tests {
 
-    use super::super::dbus_native::serialize::DbusSerialize;
-    use crate::recast;
-
-    use super::*;
     use anyhow::{anyhow, Context, Result};
     use oci_spec::runtime::{LinuxPidsBuilder, LinuxResources, LinuxResourcesBuilder};
+
+    use super::super::dbus_native::serialize::DbusSerialize;
+    use super::*;
+    use crate::recast;
 
     fn setup(resources: &LinuxResources) -> (ControllerOpt, HashMap<&str, Variant>) {
         let properties = HashMap::new();

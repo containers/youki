@@ -1,10 +1,10 @@
 use std::path::{Path, PathBuf};
 
-use procfs::{process::Process, ProcError};
-
-use crate::common::{self, WrappedIoError};
+use procfs::process::Process;
+use procfs::ProcError;
 
 use super::controller_type::ControllerType;
+use crate::common::{self, WrappedIoError};
 
 pub const CGROUP_CONTROLLERS: &str = "cgroup.controllers";
 pub const CGROUP_SUBTREE_CONTROL: &str = "cgroup.subtree_control";

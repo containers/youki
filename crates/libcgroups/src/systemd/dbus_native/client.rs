@@ -1,6 +1,8 @@
-use super::{serialize::Variant, utils::SystemdClientError};
 use std::collections::HashMap;
 use std::path::PathBuf;
+
+use super::serialize::Variant;
+use super::utils::SystemdClientError;
 
 pub trait SystemdClient {
     fn is_system(&self) -> bool;

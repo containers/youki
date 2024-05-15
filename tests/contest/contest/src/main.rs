@@ -1,6 +1,14 @@
 mod tests;
 mod utils;
 
+use std::path::{Path, PathBuf};
+
+use anyhow::{Context, Result};
+use clap::Parser;
+use contest::logger;
+use test_framework::TestManager;
+use tests::cgroups;
+
 use crate::tests::devices::get_devices_test;
 use crate::tests::domainname::get_domainname_tests;
 use crate::tests::example::get_example_test;
@@ -19,12 +27,6 @@ use crate::tests::seccomp_notify::get_seccomp_notify_test;
 use crate::tests::sysctl::get_sysctl_test;
 use crate::tests::tlb::get_tlb_test;
 use crate::utils::support::{set_runtime_path, set_runtimetest_path};
-use anyhow::{Context, Result};
-use clap::Parser;
-use contest::logger;
-use std::path::{Path, PathBuf};
-use test_framework::TestManager;
-use tests::cgroups;
 
 #[derive(Parser, Debug)]
 #[clap(version = "0.0.1", author = "youki team")]

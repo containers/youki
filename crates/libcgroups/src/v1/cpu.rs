@@ -2,12 +2,9 @@ use std::path::{Path, PathBuf};
 
 use oci_spec::runtime::LinuxCpu;
 
-use crate::{
-    common::{self, ControllerOpt, WrappedIoError},
-    stats::{parse_flat_keyed_data, CpuThrottling, ParseFlatKeyedDataError, StatsProvider},
-};
-
 use super::controller::Controller;
+use crate::common::{self, ControllerOpt, WrappedIoError};
+use crate::stats::{parse_flat_keyed_data, CpuThrottling, ParseFlatKeyedDataError, StatsProvider};
 
 const CGROUP_CPU_SHARES: &str = "cpu.shares";
 const CGROUP_CPU_QUOTA: &str = "cpu.cfs_quota_us";
@@ -135,10 +132,12 @@ impl Cpu {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
+    use oci_spec::runtime::LinuxCpuBuilder;
+
     use super::*;
     use crate::test::{set_fixture, setup};
-    use oci_spec::runtime::LinuxCpuBuilder;
-    use std::fs;
 
     #[test]
     fn test_set_shares() {

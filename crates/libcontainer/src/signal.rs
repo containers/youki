@@ -1,7 +1,8 @@
 //! Returns *nix signal enum value from passed string
 
-use nix::sys::signal::Signal as NixSignal;
 use std::convert::TryFrom;
+
+use nix::sys::signal::Signal as NixSignal;
 
 /// POSIX Signal
 #[derive(Debug)]
@@ -80,9 +81,11 @@ impl Signal {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use nix::sys::signal::Signal::*;
     use std::collections::HashMap;
+
+    use nix::sys::signal::Signal::*;
+
+    use super::*;
 
     #[test]
     fn test_conversion_from_string() {

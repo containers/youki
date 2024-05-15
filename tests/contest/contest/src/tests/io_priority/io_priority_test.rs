@@ -1,9 +1,10 @@
-use crate::utils::{is_runtime_runc, test_inside_container};
 use anyhow::{Context, Result};
 use oci_spec::runtime::{
     IOPriorityClass, LinuxIOPriorityBuilder, ProcessBuilder, Spec, SpecBuilder,
 };
 use test_framework::{test_result, ConditionalTest, TestGroup, TestResult};
+
+use crate::utils::{is_runtime_runc, test_inside_container};
 
 fn create_spec(
     io_priority_class: IOPriorityClass,

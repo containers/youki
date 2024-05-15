@@ -1,8 +1,9 @@
-use crate::commands::{container_exists, load_container};
-use anyhow::{Context, Result};
 use std::path::PathBuf;
 
+use anyhow::{Context, Result};
 use liboci_cli::Delete;
+
+use crate::commands::{container_exists, load_container};
 
 pub fn delete(args: Delete, root_path: PathBuf) -> Result<()> {
     tracing::debug!("start deleting {}", args.container_id);

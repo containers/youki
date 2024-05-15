@@ -1,8 +1,9 @@
-use libcgroups::common::CgroupConfig;
-use oci_spec::runtime::Spec;
 use std::os::unix::prelude::RawFd;
 use std::path::PathBuf;
 use std::rc::Rc;
+
+use libcgroups::common::CgroupConfig;
+use oci_spec::runtime::Spec;
 
 use crate::container::Container;
 use crate::notify_socket::NotifyListener;

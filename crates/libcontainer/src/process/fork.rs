@@ -1,10 +1,10 @@
-use std::{ffi::c_int, fs::File, num::NonZeroUsize};
+use std::ffi::c_int;
+use std::fs::File;
+use std::num::NonZeroUsize;
 
 use libc::SIGCHLD;
-use nix::{
-    sys::{mman, resource},
-    unistd::Pid,
-};
+use nix::sys::{mman, resource};
+use nix::unistd::Pid;
 
 #[derive(Debug, thiserror::Error)]
 pub enum CloneError {
@@ -243,12 +243,12 @@ fn clone(cb: CloneCb, flags: u64, exit_signal: Option<u64>) -> Result<Pid, Clone
 
 #[cfg(test)]
 mod test {
-    use crate::channel::channel;
-
-    use super::*;
     use anyhow::{bail, Context, Result};
     use nix::sys::wait::{waitpid, WaitStatus};
     use nix::unistd;
+
+    use super::*;
+    use crate::channel::channel;
 
     #[test]
     fn test_container_fork() -> Result<()> {
@@ -331,10 +331,11 @@ mod test {
     #[cfg(feature = "libseccomp")]
     #[test]
     fn test_clone_fallback() -> Result<()> {
-        use crate::test_utils::TestCallbackError;
         use oci_spec::runtime::{
             Arch, LinuxSeccompAction, LinuxSeccompBuilder, LinuxSyscallBuilder,
         };
+
+        use crate::test_utils::TestCallbackError;
 
         fn has_clone3() -> bool {
             // We use the probe syscall to check if the kernel supports clone3 or

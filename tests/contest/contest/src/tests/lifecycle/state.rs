@@ -1,6 +1,8 @@
-use crate::utils::get_state;
-use anyhow::{bail, Result};
 use std::path::Path;
+
+use anyhow::{bail, Result};
+
+use crate::utils::get_state;
 
 pub fn state(project_path: &Path, id: &str) -> Result<()> {
     match get_state(id, project_path) {
