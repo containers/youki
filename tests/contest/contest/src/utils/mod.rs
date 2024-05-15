@@ -1,3 +1,4 @@
+pub mod linux_resource_memory;
 pub mod support;
 pub mod test_utils;
 
