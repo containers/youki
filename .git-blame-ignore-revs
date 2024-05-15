@@ -1,0 +1,6 @@
+# Ignore commits in the blame view
+# see:
+#   https://docs.github.com/en/repositories/working-with-files/using-files/viewing-a-file#ignore-commits-in-the-blame-view
+
+# Bulk apply formatting
+13a3fd516e9904d5cd7ef20ead76dd70cd172fe7
