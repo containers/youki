@@ -1,0 +1,6 @@
+newline_style = "Native"
+unstable_features = true # Cargo fmt now needs to be called with `cargo +nightly fmt`
+group_imports = "StdExternalCrate" # create three groups for std, external and local crates
+# Merge imports from the same module
+# See: https://rust-lang.github.io/rustfmt/?version=v1.4.38&search=#imports_granularity
+imports_granularity = "Module"
