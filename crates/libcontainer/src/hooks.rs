@@ -27,8 +27,6 @@ pub enum HookError {
     MissingContainerState,
     #[error("failed to write container state to stdin")]
     WriteContainerState(#[source] std::io::Error),
-    #[error("io error")]
-    OtherIO(#[source] std::io::Error),
 }
 
 type Result<T> = std::result::Result<T, HookError>;
