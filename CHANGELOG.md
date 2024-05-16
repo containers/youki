@@ -1,5 +1,41 @@
 # Changelog
 
+## [v0.3.3](https://github.com/containers/youki/compare/v0.3.2...v0.3.3) - 2024-05-16
+### 💪 Improvements
+- Add support for rsvd hugetlb cgroup by @omprakaash in https://github.com/containers/youki/pull/2719
+### 💥 Breaking Changes
+- Improve error reporting and logging by @YJDoc2 in https://github.com/containers/youki/pull/2705
+### 🐛 Bug Fixes
+- Fix cgroups determination in exec implementation by @YJDoc2 in https://github.com/containers/youki/pull/2720
+- Remove unnecessary chdir by @utam0k in https://github.com/containers/youki/pull/2780
+### 🧪 Test improvements and Misc Fixes
+- Rollup dep updates by @YJDoc2 in https://github.com/containers/youki/pull/2667
+- Fill in TODO by @utam0k in https://github.com/containers/youki/pull/2677
+- Fix the links of contest by @utam0k in https://github.com/containers/youki/pull/2680
+- Set '--test-threads' option to 1 in unit tests by @YJDoc2 in https://github.com/containers/youki/pull/2685
+- add io priority e2e test by @lengrongfu in https://github.com/containers/youki/pull/2646
+- (fix) podman e2e : Update workflow for new required deps, add vagrantfile by @YJDoc2 in https://github.com/containers/youki/pull/2687
+- Add missed test-threads=1 to coverage CI by @YJDoc2 in https://github.com/containers/youki/pull/2699
+- Fix integration test validation CI, make io_priority test conditional by @YJDoc2 in https://github.com/containers/youki/pull/2707
+- :memo: Remove GitPod and add link to GitHub codespaces by @homersimpsons in https://github.com/containers/youki/pull/2717
+- Limt dependabot updates to only direct dependencies by @utam0k in https://github.com/containers/youki/pull/2725
+- fix observability default log level comment by @zahash in https://github.com/containers/youki/pull/2737
+- Update deps via cargo update by @YJDoc2 in https://github.com/containers/youki/pull/2747
+- Rust 1.77.1 by @utam0k in https://github.com/containers/youki/pull/2746
+- Make our codespaces more useful by @utam0k in https://github.com/containers/youki/pull/2753
+- Fix README.md by @utam0k in https://github.com/containers/youki/pull/2759
+- update wasmtime dep to 19.0.1, replace wasmtime-wasi with wasi-common by @YJDoc2 in https://github.com/containers/youki/pull/2752
+- Reset console sockets to original in setup_console test by @YJDoc2 in https://github.com/containers/youki/pull/2764
+- Update rust version to 1.77.2 by @YJDoc2 in https://github.com/containers/youki/pull/2779
+- Add linux_devices test by @omprakaash in https://github.com/containers/youki/pull/2708
+- deps: Disable unused/unnecessary regex features in libcontainer by @jirutka in https://github.com/containers/youki/pull/2781
+- Add `rustfmt.toml` to standardize formatting by @jprendes in https://github.com/containers/youki/pull/2787
+### Other Changes
+- Rollup dep update by @YJDoc2 in https://github.com/containers/youki/pull/2674
+- Init a seccomp project by @utam0k in https://github.com/containers/youki/pull/2729
+- seccomp: Use offset_of! by @utam0k in https://github.com/containers/youki/pull/2763
+- seccomp: Add a case for checking arguments by @utam0k in https://github.com/containers/youki/pull/2775
+
 ## [v0.3.2](https://github.com/containers/youki/compare/v0.3.1...v0.3.2) - 2024-01-31
 ### 💪 Improvements
 - (feat) add support for `musl` using `cross-rs` by @jprendes in https://github.com/containers/youki/pull/2536
