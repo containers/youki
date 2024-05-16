@@ -1,15 +1,13 @@
-use serde::Serialize;
-use std::{
-    collections::HashMap,
-    fmt::Display,
-    fs,
-    num::ParseIntError,
-    path::{Path, PathBuf},
-};
+use std::collections::HashMap;
+use std::fmt::Display;
+use std::fs;
+use std::num::ParseIntError;
+use std::path::{Path, PathBuf};
 
-use crate::common::{WrapIoResult, WrappedIoError};
+use serde::Serialize;
 
 use super::common;
+use crate::common::{WrapIoResult, WrappedIoError};
 
 pub(crate) trait StatsProvider {
     type Error;
@@ -475,9 +473,8 @@ fn parse_psi(stat_line: &str, path: &Path) -> Result<PSIData, WrappedIoError> {
 
 #[cfg(test)]
 mod tests {
-    use crate::test::set_fixture;
-
     use super::*;
+    use crate::test::set_fixture;
 
     #[test]
     fn test_supported_page_sizes_gigabyte() {

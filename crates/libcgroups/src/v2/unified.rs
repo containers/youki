@@ -1,4 +1,5 @@
-use std::{collections::HashMap, path::Path};
+use std::collections::HashMap;
+use std::path::Path;
 
 use super::controller_type::ControllerType;
 use crate::common::{self, ControllerOpt, WrappedIoError};
@@ -61,10 +62,9 @@ mod tests {
 
     use oci_spec::runtime::LinuxResourcesBuilder;
 
+    use super::*;
     use crate::test::set_fixture;
     use crate::v2::controller_type::ControllerType;
-
-    use super::*;
 
     #[test]
     fn test_set_unified() {

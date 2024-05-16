@@ -48,6 +48,9 @@ if [ "$1" == "fmt" ]; then
     # running cargo fmt fails when run through cross
     # also cargo fmt is platform independent
     CARGO="cargo"
+
+    # Use nightly for `cargo fmt` as `rustfmt.toml` uses unstable features.
+    set -- "+nightly" "$@"
 fi
 
 if [ "$CARGO" == "cross" ]; then

@@ -1,12 +1,13 @@
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::{env, fs};
+
+use nix::unistd::Pid;
+use oci_spec::runtime::{Linux, LinuxIdMapping, LinuxNamespace, LinuxNamespaceType, Mount, Spec};
+
 use crate::error::MissingSpecError;
 use crate::namespaces::{NamespaceError, Namespaces};
 use crate::utils;
-use nix::unistd::Pid;
-use oci_spec::runtime::{Linux, LinuxIdMapping, LinuxNamespace, LinuxNamespaceType, Mount, Spec};
-use std::fs;
-use std::path::Path;
-use std::process::Command;
-use std::{env, path::PathBuf};
 
 // Wrap the uid/gid path function into a struct for dependency injection. This
 // allows us to mock the id mapping logic in unit tests by using a different
@@ -446,7 +447,6 @@ fn write_id_mapping(
 mod tests {
     use std::fs;
 
-    use super::*;
     use anyhow::Result;
     use nix::unistd::getpid;
     use oci_spec::runtime::{
@@ -454,6 +454,8 @@ mod tests {
     };
     use rand::Rng;
     use serial_test::serial;
+
+    use super::*;
 
     fn gen_u32() -> u32 {
         rand::thread_rng().gen()

@@ -1,16 +1,13 @@
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
-use libcontainer::{container::builder::ContainerBuilder, syscall::syscall::SyscallType};
+use libcontainer::container::builder::ContainerBuilder;
+use libcontainer::syscall::syscall::SyscallType;
 use liboci_cli::Run;
-use nix::{
-    sys::{
-        signal::{self, kill},
-        signalfd::SigSet,
-        wait::{waitpid, WaitPidFlag, WaitStatus},
-    },
-    unistd::Pid,
-};
+use nix::sys::signal::{self, kill};
+use nix::sys::signalfd::SigSet;
+use nix::sys::wait::{waitpid, WaitPidFlag, WaitStatus};
+use nix::unistd::Pid;
 
 use crate::workload::executor::default_executor;
 
@@ -122,10 +119,9 @@ fn handle_foreground(init_pid: Pid) -> Result<i32> {
 mod tests {
     use std::time::Duration;
 
-    use nix::{
-        sys::{signal::Signal::SIGINT, wait},
-        unistd,
-    };
+    use nix::sys::signal::Signal::SIGINT;
+    use nix::sys::wait;
+    use nix::unistd;
 
     use super::*;
 

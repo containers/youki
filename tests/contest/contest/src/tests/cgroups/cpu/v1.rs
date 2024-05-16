@@ -4,9 +4,9 @@ use libcgroups::common;
 use num_cpus;
 use test_framework::{test_result, ConditionalTest, TestGroup, TestResult};
 
-use crate::utils::{test_outside_container, test_utils::check_container_created};
-
 use super::{create_cpu_spec, create_empty_spec, create_spec};
+use crate::utils::test_outside_container;
+use crate::utils::test_utils::check_container_created;
 
 const CPU_CGROUP_PREFIX: &str = "/sys/fs/cgroup/cpu,cpuacct";
 const DEFAULT_REALTIME_PERIOD: u64 = 1000000;

@@ -2,12 +2,9 @@ use std::path::Path;
 
 use oci_spec::runtime::LinuxMemory;
 
-use crate::{
-    common::{self, ControllerOpt, WrappedIoError},
-    stats::{self, MemoryData, MemoryStats, ParseFlatKeyedDataError, StatsProvider},
-};
-
 use super::controller::Controller;
+use crate::common::{self, ControllerOpt, WrappedIoError};
+use crate::stats::{self, MemoryData, MemoryStats, ParseFlatKeyedDataError, StatsProvider};
 
 const CGROUP_MEMORY_SWAP: &str = "memory.swap.max";
 const CGROUP_MEMORY_MAX: &str = "memory.max";
@@ -166,10 +163,12 @@ impl Memory {
 
 #[cfg(test)]
 mod tests {
+    use std::fs::read_to_string;
+
+    use oci_spec::runtime::LinuxMemoryBuilder;
+
     use super::*;
     use crate::test::set_fixture;
-    use oci_spec::runtime::LinuxMemoryBuilder;
-    use std::fs::read_to_string;
 
     #[test]
     fn test_set_memory() {

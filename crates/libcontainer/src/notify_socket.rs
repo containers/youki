@@ -1,10 +1,11 @@
-use nix::unistd::{self, close};
 use std::env;
 use std::io::prelude::*;
 use std::os::fd::FromRawFd;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
+
+use nix::unistd::{self, close};
 
 pub const NOTIFY_FILE: &str = "notify.sock";
 

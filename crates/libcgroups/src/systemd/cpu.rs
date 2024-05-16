@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
-use super::dbus_native::serialize::Variant;
 use oci_spec::runtime::LinuxCpu;
 
 use super::controller::Controller;
+use super::dbus_native::serialize::Variant;
 use crate::common::ControllerOpt;
 
 pub const CPU_WEIGHT: &str = "CPUWeight";
@@ -95,9 +95,8 @@ mod tests {
     use oci_spec::runtime::LinuxCpuBuilder;
 
     use super::super::dbus_native::serialize::DbusSerialize;
-    use crate::recast;
-
     use super::*;
+    use crate::recast;
 
     #[test]
     fn test_set_shares() -> Result<()> {

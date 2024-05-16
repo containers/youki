@@ -1,14 +1,14 @@
+use std::fs::File;
+use std::process::{Command, Stdio};
+
+use anyhow::anyhow;
+use test_framework::{Test, TestGroup, TestResult};
+use uuid::Uuid;
+
 use crate::utils::{
     delete_container, generate_uuid, get_runtime_path, get_state, kill_container, prepare_bundle,
     State,
 };
-use anyhow::anyhow;
-use std::{
-    fs::File,
-    process::{Command, Stdio},
-};
-use test_framework::{Test, TestGroup, TestResult};
-use uuid::Uuid;
 
 #[inline]
 fn cleanup(id: &Uuid, bundle: &tempfile::TempDir) {

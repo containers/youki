@@ -1,8 +1,7 @@
 use libcontainer::oci_spec::runtime::Spec;
+use libcontainer::workload::{Executor, ExecutorError, ExecutorValidationError, EMPTY};
 use wasmer::{Instance, Module, Store};
 use wasmer_wasix::WasiEnv;
-
-use libcontainer::workload::{Executor, ExecutorError, ExecutorValidationError, EMPTY};
 
 const EXECUTOR_NAME: &str = "wasmer";
 
@@ -110,10 +109,12 @@ fn can_handle(spec: &Spec) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::collections::HashMap;
+
     use anyhow::{Context, Result};
     use libcontainer::oci_spec::runtime::SpecBuilder;
-    use std::collections::HashMap;
+
+    use super::*;
 
     #[test]
     fn test_can_handle_oci_handler() -> Result<()> {

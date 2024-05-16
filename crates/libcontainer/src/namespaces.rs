@@ -7,10 +7,15 @@
 //! UTS (hostname and domain information, processes will think they're running on servers with different names),
 //! Cgroup (Resource limits, execution priority etc.)
 
-use crate::syscall::{syscall::create_syscall, Syscall};
-use nix::{fcntl, sched::CloneFlags, sys::stat, unistd};
-use oci_spec::runtime::{LinuxNamespace, LinuxNamespaceType};
 use std::collections;
+
+use nix::sched::CloneFlags;
+use nix::sys::stat;
+use nix::{fcntl, unistd};
+use oci_spec::runtime::{LinuxNamespace, LinuxNamespaceType};
+
+use crate::syscall::syscall::create_syscall;
+use crate::syscall::Syscall;
 
 type Result<T> = std::result::Result<T, NamespaceError>;
 
@@ -135,10 +140,11 @@ impl Namespaces {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::syscall::test::TestHelperSyscall;
     use oci_spec::runtime::{LinuxNamespaceBuilder, LinuxNamespaceType};
     use serial_test::serial;
+
+    use super::*;
+    use crate::syscall::test::TestHelperSyscall;
 
     fn gen_sample_linux_namespaces() -> Vec<LinuxNamespace> {
         vec![

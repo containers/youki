@@ -1,26 +1,18 @@
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::fs;
+use std::path::{Path, PathBuf};
 
-use crate::{
-    tests::cgroups::attach_controller,
-    utils::{
-        test_outside_container,
-        test_utils::{check_container_created, CGROUP_ROOT},
-    },
-};
 use anyhow::{bail, Context, Result};
-use libcgroups::{
-    common::{self, CgroupSetup, DEFAULT_CGROUP_ROOT},
-    v2::controller_type::ControllerType,
-};
+use libcgroups::common::{self, CgroupSetup, DEFAULT_CGROUP_ROOT};
+use libcgroups::v2::controller_type::ControllerType;
 use libcontainer::utils::PathBufExt;
 use oci_spec::runtime::{LinuxCpuBuilder, Spec};
 use test_framework::{assert_result_eq, test_result, ConditionalTest, TestGroup, TestResult};
 use tracing::debug;
 
 use super::create_spec;
+use crate::tests::cgroups::attach_controller;
+use crate::utils::test_outside_container;
+use crate::utils::test_utils::{check_container_created, CGROUP_ROOT};
 
 const DEFAULT_PERIOD: u64 = 100_000;
 const CPU: &str = "cpu";

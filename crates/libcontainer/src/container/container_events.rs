@@ -1,9 +1,10 @@
-use std::{thread, time::Duration};
+use std::thread;
+use std::time::Duration;
 
-use crate::error::LibcontainerError;
+use libcgroups::common::CgroupManager;
 
 use super::{Container, ContainerStatus};
-use libcgroups::common::CgroupManager;
+use crate::error::LibcontainerError;
 
 impl Container {
     /// Displays container events

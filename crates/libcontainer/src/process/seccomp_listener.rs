@@ -1,13 +1,14 @@
-use crate::container::ContainerProcessState;
-use crate::seccomp;
-use nix::{
-    sys::socket::{self, UnixAddr},
-    unistd,
-};
+use std::io::IoSlice;
+use std::os::fd::AsRawFd;
+use std::path::Path;
+
+use nix::sys::socket::{self, UnixAddr};
+use nix::unistd;
 use oci_spec::runtime;
-use std::{io::IoSlice, os::fd::AsRawFd, path::Path};
 
 use super::channel;
+use crate::container::ContainerProcessState;
+use crate::seccomp;
 
 #[derive(Debug, thiserror::Error)]
 pub enum SeccompListenerError {
@@ -109,12 +110,13 @@ fn sync_seccomp_send_msg(listener_path: &Path, msg: &[u8], fd: i32) -> Result<()
 
 #[cfg(test)]
 mod tests {
-    use crate::{container::ContainerProcessState, process::channel};
-
-    use super::*;
     use anyhow::Result;
     use oci_spec::runtime::{LinuxSeccompAction, LinuxSeccompBuilder, LinuxSyscallBuilder};
     use serial_test::serial;
+
+    use super::*;
+    use crate::container::ContainerProcessState;
+    use crate::process::channel;
 
     #[test]
     #[serial]

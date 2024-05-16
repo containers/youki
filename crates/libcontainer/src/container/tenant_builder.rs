@@ -1,3 +1,13 @@
+use std::collections::HashMap;
+use std::convert::TryFrom;
+use std::ffi::{OsStr, OsString};
+use std::fs;
+use std::io::BufReader;
+use std::os::unix::prelude::RawFd;
+use std::path::{Path, PathBuf};
+use std::rc::Rc;
+use std::str::FromStr;
+
 use caps::Capability;
 use nix::fcntl::OFlag;
 use nix::unistd::{close, pipe2, read, Pid};
@@ -8,24 +18,15 @@ use oci_spec::runtime::{
 };
 use procfs::process::Namespace;
 
-use std::rc::Rc;
-use std::{
-    collections::HashMap,
-    convert::TryFrom,
-    ffi::{OsStr, OsString},
-    fs,
-    io::BufReader,
-    os::unix::prelude::RawFd,
-    path::{Path, PathBuf},
-    str::FromStr,
-};
-
+use super::builder::ContainerBuilder;
+use super::Container;
+use crate::capabilities::CapabilityExt;
+use crate::container::builder_impl::ContainerBuilderImpl;
 use crate::error::{ErrInvalidSpec, LibcontainerError, MissingSpecError};
+use crate::notify_socket::NotifySocket;
 use crate::process::args::ContainerType;
-use crate::{capabilities::CapabilityExt, container::builder_impl::ContainerBuilderImpl};
-use crate::{notify_socket::NotifySocket, tty, user_ns::UserNamespaceConfig, utils};
-
-use super::{builder::ContainerBuilder, Container};
+use crate::user_ns::UserNamespaceConfig;
+use crate::{tty, utils};
 
 const NAMESPACE_TYPES: &[&str] = &["ipc", "uts", "net", "pid", "mnt", "cgroup"];
 const TENANT_NOTIFY: &str = "tenant-notify-";

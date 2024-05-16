@@ -1,10 +1,11 @@
-use crate::utils::test_inside_container;
+use std::path::PathBuf;
+
 use anyhow::{anyhow, bail};
 use nix::sys::stat::SFlag;
-use oci_spec::runtime::LinuxBuilder;
-use oci_spec::runtime::{ProcessBuilder, Spec, SpecBuilder};
-use std::path::PathBuf;
+use oci_spec::runtime::{LinuxBuilder, ProcessBuilder, Spec, SpecBuilder};
 use test_framework::{Test, TestGroup, TestResult};
+
+use crate::utils::test_inside_container;
 
 fn get_spec(readonly_paths: Vec<String>) -> Spec {
     SpecBuilder::default()

@@ -1,40 +1,28 @@
-use std::{
-    collections::HashMap,
-    env, fs, mem,
-    os::unix::io::AsRawFd,
-    path::{Path, PathBuf},
-};
-
-use super::args::{ContainerArgs, ContainerType};
-#[cfg(feature = "libseccomp")]
-use crate::seccomp;
-use crate::{
-    apparmor, capabilities,
-    error::MissingSpecError,
-    hooks,
-    namespaces::{NamespaceError, Namespaces},
-    notify_socket,
-    process::channel,
-    rootfs,
-    rootfs::RootFS,
-    syscall::{Syscall, SyscallError},
-    tty,
-    user_ns::UserNamespaceConfig,
-    utils, workload,
-};
+use std::collections::HashMap;
+use std::os::unix::io::AsRawFd;
+use std::path::{Path, PathBuf};
+use std::{env, fs, mem};
 
 use nc;
-use nix::{
-    mount::MsFlags,
-    sched::CloneFlags,
-    sys::stat::Mode,
-    unistd::setsid,
-    unistd::{self, Gid, Uid},
-};
+use nix::mount::MsFlags;
+use nix::sched::CloneFlags;
+use nix::sys::stat::Mode;
+use nix::unistd::{self, setsid, Gid, Uid};
 use oci_spec::runtime::{
     IOPriorityClass, LinuxIOPriority, LinuxNamespaceType, LinuxSchedulerFlag, LinuxSchedulerPolicy,
     Scheduler, Spec, User,
 };
+
+use super::args::{ContainerArgs, ContainerType};
+use crate::error::MissingSpecError;
+use crate::namespaces::{NamespaceError, Namespaces};
+use crate::process::channel;
+use crate::rootfs::RootFS;
+#[cfg(feature = "libseccomp")]
+use crate::seccomp;
+use crate::syscall::{Syscall, SyscallError};
+use crate::user_ns::UserNamespaceConfig;
+use crate::{apparmor, capabilities, hooks, notify_socket, rootfs, tty, utils, workload};
 
 #[derive(Debug, thiserror::Error)]
 pub enum InitProcessError {
@@ -879,18 +867,18 @@ fn verify_cwd() -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::syscall::{
-        syscall::create_syscall,
-        test::{ArgName, IoPriorityArgs, MountArgs, TestHelperSyscall},
-    };
+    use std::fs;
+
     use anyhow::Result;
     #[cfg(feature = "libseccomp")]
     use nix::unistd;
     use oci_spec::runtime::{LinuxNamespaceBuilder, SpecBuilder, UserBuilder};
     #[cfg(feature = "libseccomp")]
     use serial_test::serial;
-    use std::fs;
+
+    use super::*;
+    use crate::syscall::syscall::create_syscall;
+    use crate::syscall::test::{ArgName, IoPriorityArgs, MountArgs, TestHelperSyscall};
 
     #[test]
     fn test_readonly_path() -> Result<()> {

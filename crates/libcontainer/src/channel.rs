@@ -1,13 +1,11 @@
-use nix::{
-    sys::socket::{self, UnixAddr},
-    unistd::{self},
-};
+use std::io::{IoSlice, IoSliceMut};
+use std::marker::PhantomData;
+use std::os::fd::AsRawFd;
+use std::os::unix::prelude::RawFd;
+
+use nix::sys::socket::{self, UnixAddr};
+use nix::unistd::{self};
 use serde::{Deserialize, Serialize};
-use std::{
-    io::{IoSlice, IoSliceMut},
-    marker::PhantomData,
-    os::{fd::AsRawFd, unix::prelude::RawFd},
-};
 
 #[derive(Debug, thiserror::Error)]
 pub enum ChannelError {

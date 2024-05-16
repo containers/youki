@@ -1,4 +1,11 @@
-use crate::utils::test_inside_container;
+use std::collections::hash_set::HashSet;
+use std::fs;
+use std::fs::File;
+use std::os::unix::fs::symlink;
+use std::os::unix::prelude::PermissionsExt;
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
+
 use anyhow::Context;
 use nix::libc;
 use nix::mount::{mount, umount, MsFlags};
@@ -8,14 +15,9 @@ use oci_spec::runtime::{
     get_default_mounts, Capability, LinuxBuilder, LinuxCapabilitiesBuilder, Mount, ProcessBuilder,
     Spec, SpecBuilder,
 };
-use std::collections::hash_set::HashSet;
-use std::fs;
-use std::fs::File;
-use std::os::unix::fs::symlink;
-use std::os::unix::prelude::PermissionsExt;
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
 use test_framework::{Test, TestGroup, TestResult};
+
+use crate::utils::test_inside_container;
 
 fn get_spec(added_mounts: Vec<Mount>, process_args: Vec<String>) -> Spec {
     let mut mounts = get_default_mounts();

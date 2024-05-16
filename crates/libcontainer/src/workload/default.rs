@@ -1,7 +1,5 @@
-use std::{
-    ffi::CString,
-    path::{Path, PathBuf},
-};
+use std::ffi::CString;
+use std::path::{Path, PathBuf};
 
 use nix::unistd;
 use oci_spec::runtime::Spec;

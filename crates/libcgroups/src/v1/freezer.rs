@@ -1,10 +1,10 @@
+use std::fs::OpenOptions;
 use std::io::Read;
-use std::{fs::OpenOptions, path::Path, thread, time};
-
-use crate::common::{self, WrapIoResult, WrappedIoError};
-use crate::common::{ControllerOpt, FreezerState};
+use std::path::Path;
+use std::{thread, time};
 
 use super::controller::Controller;
+use crate::common::{self, ControllerOpt, FreezerState, WrapIoResult, WrappedIoError};
 
 const CGROUP_FREEZER_STATE: &str = "freezer.state";
 const FREEZER_STATE_THAWED: &str = "THAWED";
@@ -130,11 +130,12 @@ impl Freezer {
 
 #[cfg(test)]
 mod tests {
+    use nix::unistd::Pid;
+    use oci_spec::runtime::LinuxResourcesBuilder;
+
     use super::*;
     use crate::common::{FreezerState, CGROUP_PROCS};
     use crate::test::set_fixture;
-    use nix::unistd::Pid;
-    use oci_spec::runtime::LinuxResourcesBuilder;
 
     #[test]
     fn test_set_freezer_state() {

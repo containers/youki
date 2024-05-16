@@ -1,14 +1,15 @@
-use super::utils::to_sflag;
-use crate::syscall::{syscall::create_syscall, Syscall};
-use crate::utils::PathBufExt;
-use nix::{
-    fcntl::{open, OFlag},
-    mount::MsFlags,
-    sys::stat::{umask, Mode},
-    unistd::{close, Gid, Uid},
-};
-use oci_spec::runtime::LinuxDevice;
 use std::path::{Path, PathBuf};
+
+use nix::fcntl::{open, OFlag};
+use nix::mount::MsFlags;
+use nix::sys::stat::{umask, Mode};
+use nix::unistd::{close, Gid, Uid};
+use oci_spec::runtime::LinuxDevice;
+
+use super::utils::to_sflag;
+use crate::syscall::syscall::create_syscall;
+use crate::syscall::Syscall;
+use crate::utils::PathBufExt;
 
 #[derive(Debug, thiserror::Error)]
 pub enum DeviceError {
@@ -194,15 +195,15 @@ fn create_container_dev_path(rootfs: &Path, dev: &LinuxDevice) -> Result<PathBuf
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
+    use anyhow::Result;
+    use nix::sys::stat::SFlag;
+    use nix::unistd::{Gid, Uid};
+    use oci_spec::runtime::{LinuxDeviceBuilder, LinuxDeviceType};
+
     use super::*;
     use crate::syscall::test::{ChownArgs, MknodArgs, MountArgs, TestHelperSyscall};
-    use anyhow::Result;
-    use nix::{
-        sys::stat::SFlag,
-        unistd::{Gid, Uid},
-    };
-    use oci_spec::runtime::{LinuxDeviceBuilder, LinuxDeviceType};
-    use std::path::PathBuf;
 
     #[test]
     fn test_bind_dev() -> Result<()> {

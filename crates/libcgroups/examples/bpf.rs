@@ -2,19 +2,15 @@ use anyhow::Result;
 
 #[cfg(feature = "cgroupsv2_devices")]
 mod bpf {
-    use anyhow::{bail, Result};
-    use clap::Arg;
-    use clap::Command;
-    use oci_spec::runtime::LinuxDeviceCgroup;
     use std::os::unix::io::AsRawFd;
     use std::path::Path;
 
+    use anyhow::{bail, Result};
+    use clap::{Arg, Command};
+    use libcgroups::v2::devices::{bpf, emulator, program};
     use nix::fcntl::OFlag;
     use nix::sys::stat::Mode;
-
-    use libcgroups::v2::devices::bpf;
-    use libcgroups::v2::devices::emulator;
-    use libcgroups::v2::devices::program;
+    use oci_spec::runtime::LinuxDeviceCgroup;
 
     const LICENSE: &str = "Apache";
     fn cli() -> Command {

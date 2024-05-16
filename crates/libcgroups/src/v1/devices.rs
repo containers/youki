@@ -1,8 +1,9 @@
 use std::path::Path;
 
+use oci_spec::runtime::LinuxDeviceCgroup;
+
 use super::controller::Controller;
 use crate::common::{self, default_allow_devices, default_devices, ControllerOpt, WrappedIoError};
-use oci_spec::runtime::LinuxDeviceCgroup;
 
 pub struct Devices {}
 
@@ -52,10 +53,12 @@ impl Devices {
 
 #[cfg(test)]
 mod tests {
+    use std::fs::read_to_string;
+
+    use oci_spec::runtime::{LinuxDeviceCgroupBuilder, LinuxDeviceType};
+
     use super::*;
     use crate::test::set_fixture;
-    use oci_spec::runtime::{LinuxDeviceCgroupBuilder, LinuxDeviceType};
-    use std::fs::read_to_string;
 
     #[test]
     fn test_set_default_devices() {

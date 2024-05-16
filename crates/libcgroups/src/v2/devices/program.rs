@@ -1,8 +1,6 @@
 use oci_spec::runtime::*;
-
 use rbpf::disassembler::disassemble;
-use rbpf::insn_builder::Arch as RbpfArch;
-use rbpf::insn_builder::*;
+use rbpf::insn_builder::{Arch as RbpfArch, *};
 
 pub struct Program {
     prog: BpfCode,
@@ -259,9 +257,10 @@ fn bpf_cgroup_dev_ctx(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use anyhow::Result;
     use oci_spec::runtime::LinuxDeviceCgroupBuilder;
+
+    use super::*;
 
     fn build_bpf_program(rules: &Option<Vec<LinuxDeviceCgroup>>) -> Result<Program> {
         let mut em = crate::v2::devices::emulator::Emulator::with_default_allow(false);

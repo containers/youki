@@ -1,10 +1,12 @@
+use std::path::Path;
+use std::process::{Command, Stdio};
+
+use anyhow::anyhow;
+use test_framework::TestResult;
+
 use super::get_result_from_output;
 use crate::utils::get_runtime_path;
 use crate::utils::test_utils::State;
-use anyhow::anyhow;
-use std::path::Path;
-use std::process::{Command, Stdio};
-use test_framework::TestResult;
 
 // Simple function to figure out the PID of the first container process
 fn get_container_pid(project_path: &Path, id: &str) -> Result<i32, TestResult> {

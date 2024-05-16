@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
-
 use liboci_cli::Events;
 
 use crate::commands::load_container;

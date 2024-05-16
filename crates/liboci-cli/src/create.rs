@@ -1,6 +1,7 @@
 //! Handles the creation of a new container
-use clap::Parser;
 use std::path::PathBuf;
+
+use clap::Parser;
 
 /// Create a container
 /// Reference: https://github.com/opencontainers/runc/blob/main/man/runc-create.8.md

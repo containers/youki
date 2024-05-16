@@ -1,15 +1,15 @@
 //! Contains functions related to printing information about system running Youki
 #[cfg(feature = "v2")]
 use std::collections::HashSet;
-use std::{fs, path::Path};
+use std::fs;
+use std::path::Path;
 
 use anyhow::Result;
 use clap::Parser;
-use libcontainer::user_ns;
-use procfs::{CpuInfo, Current, Meminfo};
-
 #[cfg(feature = "v2")]
 use libcgroups::{common::CgroupSetup, v2::controller_type::ControllerType};
+use libcontainer::user_ns;
+use procfs::{CpuInfo, Current, Meminfo};
 /// Show information about the system
 #[derive(Parser, Debug)]
 pub struct Info {}

@@ -14,29 +14,28 @@ pub enum BpfError {
 
 #[cfg_attr(test, automock)]
 pub mod prog {
-    use super::ProgramInfo;
     use std::os::unix::io::RawFd;
     use std::ptr;
 
     use libbpf_sys::{bpf_insn, BPF_CGROUP_DEVICE, BPF_F_ALLOW_MULTI, BPF_PROG_TYPE_CGROUP_DEVICE};
-    use libc::{rlimit, ENOSPC, RLIMIT_MEMLOCK};
-
-    // mocks
-    // TODO: consider use of #[mockall_double]
-    #[cfg(test)]
-    use crate::v2::devices::mocks::mock_libc::setrlimit;
+    #[cfg(not(test))]
+    use libbpf_sys::{
+        bpf_prog_attach, bpf_prog_detach2, bpf_prog_get_fd_by_id, bpf_prog_load, bpf_prog_query,
+    };
     #[cfg(not(test))]
     use libc::setrlimit;
+    use libc::{rlimit, ENOSPC, RLIMIT_MEMLOCK};
 
+    use super::ProgramInfo;
     // TODO: consider use of #[mockall_double]
     #[cfg(test)]
     use crate::v2::devices::mocks::mock_libbpf_sys::{
         bpf_prog_attach, bpf_prog_detach2, bpf_prog_get_fd_by_id, bpf_prog_load, bpf_prog_query,
     };
-    #[cfg(not(test))]
-    use libbpf_sys::{
-        bpf_prog_attach, bpf_prog_detach2, bpf_prog_get_fd_by_id, bpf_prog_load, bpf_prog_query,
-    };
+    // mocks
+    // TODO: consider use of #[mockall_double]
+    #[cfg(test)]
+    use crate::v2::devices::mocks::mock_libc::setrlimit;
 
     pub fn load(license: &str, insns: &[u8]) -> Result<RawFd, super::BpfError> {
         let insns_cnt = insns.len() / std::mem::size_of::<bpf_insn>();
@@ -154,12 +153,12 @@ pub mod prog {
 
 #[cfg(test)]
 mod tests {
-    use super::prog;
-    use crate::v2::devices::mocks::{mock_libbpf_sys, mock_libc};
     use errno::{set_errno, Errno};
     use libc::{ENOSPC, ENOSYS};
-
     use serial_test::serial;
+
+    use super::prog;
+    use crate::v2::devices::mocks::{mock_libbpf_sys, mock_libc};
 
     #[test]
     #[serial(libbpf_sys)] // mock contexts are shared

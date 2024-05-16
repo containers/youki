@@ -1,9 +1,9 @@
-use crate::utils::test_outside_container;
 use anyhow::anyhow;
-use oci_spec::runtime::LinuxBuilder;
-use oci_spec::runtime::{Spec, SpecBuilder};
+use oci_spec::runtime::{LinuxBuilder, Spec, SpecBuilder};
 use procfs::process::Process;
 use test_framework::{Test, TestGroup, TestResult};
+
+use crate::utils::test_outside_container;
 
 // get spec for the test
 fn get_spec() -> Spec {

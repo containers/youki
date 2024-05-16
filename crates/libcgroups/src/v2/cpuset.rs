@@ -1,9 +1,9 @@
 use std::path::Path;
 
-use crate::common::{self, ControllerOpt, WrappedIoError};
 use oci_spec::runtime::LinuxCpu;
 
 use super::controller::Controller;
+use crate::common::{self, ControllerOpt, WrappedIoError};
 
 const CGROUP_CPUSET_CPUS: &str = "cpuset.cpus";
 const CGROUP_CPUSET_MEMS: &str = "cpuset.mems";
@@ -40,9 +40,10 @@ impl CpuSet {
 mod tests {
     use std::fs;
 
+    use oci_spec::runtime::LinuxCpuBuilder;
+
     use super::*;
     use crate::test::setup;
-    use oci_spec::runtime::LinuxCpuBuilder;
 
     #[test]
     fn test_set_cpus() {

@@ -1,12 +1,11 @@
 use std::collections::HashMap;
 
-use super::dbus_native::serialize::Variant;
 use fixedbitset::FixedBitSet;
 use oci_spec::runtime::LinuxCpu;
 
-use crate::common::ControllerOpt;
-
 use super::controller::Controller;
+use super::dbus_native::serialize::Variant;
+use crate::common::ControllerOpt;
 
 pub const ALLOWED_CPUS: &str = "AllowedCPUs";
 pub const ALLOWED_NODES: &str = "AllowedMemoryNodes";
@@ -139,9 +138,8 @@ mod tests {
     use oci_spec::runtime::LinuxCpuBuilder;
 
     use super::super::dbus_native::serialize::DbusSerialize;
-    use crate::recast;
-
     use super::*;
+    use crate::recast;
 
     #[test]
     fn to_bitmask_single_value() -> Result<()> {

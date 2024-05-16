@@ -1,10 +1,11 @@
+use std::path::PathBuf;
+
+use super::init_builder::InitContainerBuilder;
+use super::tenant_builder::TenantContainerBuilder;
 use crate::error::{ErrInvalidID, LibcontainerError};
 use crate::syscall::syscall::SyscallType;
 use crate::utils::PathBufExt;
 use crate::workload::{self, Executor};
-use std::path::PathBuf;
-
-use super::{init_builder::InitContainerBuilder, tenant_builder::TenantContainerBuilder};
 
 pub struct ContainerBuilder {
     /// Id of the container
@@ -260,9 +261,12 @@ impl ContainerBuilder {
 
 #[cfg(test)]
 mod tests {
-    use crate::{container::builder::ContainerBuilder, syscall::syscall::SyscallType};
-    use anyhow::{Context, Result};
     use std::path::PathBuf;
+
+    use anyhow::{Context, Result};
+
+    use crate::container::builder::ContainerBuilder;
+    use crate::syscall::syscall::SyscallType;
 
     #[test]
     fn test_failable_functions() -> Result<()> {

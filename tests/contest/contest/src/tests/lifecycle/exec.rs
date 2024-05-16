@@ -1,9 +1,11 @@
-use super::get_result_from_output;
-use crate::utils::get_runtime_path;
-use anyhow::Result;
 use std::path::Path;
 use std::process::{Command, Stdio};
+
+use anyhow::Result;
 use test_framework::assert_result_eq;
+
+use super::get_result_from_output;
+use crate::utils::get_runtime_path;
 
 pub fn exec(
     project_path: &Path,

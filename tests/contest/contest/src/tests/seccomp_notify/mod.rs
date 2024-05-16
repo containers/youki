@@ -1,14 +1,14 @@
-use crate::utils::{get_runtime_path, test_outside_container};
+use std::path::PathBuf;
+use std::sync::mpsc::{self, Receiver, Sender};
+use std::thread;
+
 use anyhow::{anyhow, bail, Result};
 use oci_spec::runtime::{
     Arch, LinuxBuilder, LinuxSeccompAction, LinuxSeccompBuilder, LinuxSyscallBuilder, SpecBuilder,
 };
-use std::{
-    path::PathBuf,
-    sync::mpsc::{self, Receiver, Sender},
-    thread,
-};
 use test_framework::{Test, TestGroup, TestResult};
+
+use crate::utils::{get_runtime_path, test_outside_container};
 
 mod seccomp_agent;
 

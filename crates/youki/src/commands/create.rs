@@ -1,8 +1,9 @@
 //! Handles the creation of a new container
-use anyhow::Result;
 use std::path::PathBuf;
 
-use libcontainer::{container::builder::ContainerBuilder, syscall::syscall::SyscallType};
+use anyhow::Result;
+use libcontainer::container::builder::ContainerBuilder;
+use libcontainer::syscall::syscall::SyscallType;
 use liboci_cli::Create;
 
 use crate::workload::executor::default_executor;

@@ -1,11 +1,10 @@
-use std::{cell::RefCell, convert::Infallible};
+use std::cell::RefCell;
+use std::convert::Infallible;
 
 use nix::unistd::Pid;
 
-use crate::{
-    common::{CgroupManager, ControllerOpt, FreezerState},
-    stats::Stats,
-};
+use crate::common::{CgroupManager, ControllerOpt, FreezerState};
+use crate::stats::Stats;
 
 #[derive(Debug)]
 pub struct TestManager {

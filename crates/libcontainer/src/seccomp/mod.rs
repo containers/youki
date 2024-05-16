@@ -1,16 +1,12 @@
-use libseccomp::ScmpAction;
-use libseccomp::ScmpArch;
-use libseccomp::ScmpArgCompare;
-use libseccomp::ScmpCompareOp;
-use libseccomp::ScmpFilterContext;
-use libseccomp::ScmpSyscall;
-use oci_spec::runtime::Arch;
-use oci_spec::runtime::LinuxSeccomp;
-use oci_spec::runtime::LinuxSeccompAction;
-use oci_spec::runtime::LinuxSeccompFilterFlag;
-use oci_spec::runtime::LinuxSeccompOperator;
 use std::num::TryFromIntError;
 use std::os::unix::io;
+
+use libseccomp::{
+    ScmpAction, ScmpArch, ScmpArgCompare, ScmpCompareOp, ScmpFilterContext, ScmpSyscall,
+};
+use oci_spec::runtime::{
+    Arch, LinuxSeccomp, LinuxSeccompAction, LinuxSeccompFilterFlag, LinuxSeccompOperator,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum SeccompError {
@@ -287,13 +283,14 @@ pub fn is_notify(seccomp: &LinuxSeccomp) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::path;
+
+    use anyhow::{Context, Result};
+    use oci_spec::runtime::{Arch, LinuxSeccompBuilder, LinuxSyscallBuilder};
+    use serial_test::serial;
+
     use super::*;
     use crate::test_utils::{self, TestCallbackError};
-    use anyhow::{Context, Result};
-    use oci_spec::runtime::Arch;
-    use oci_spec::runtime::{LinuxSeccompBuilder, LinuxSyscallBuilder};
-    use serial_test::serial;
-    use std::path;
 
     #[test]
     #[serial]

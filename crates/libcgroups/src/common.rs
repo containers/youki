@@ -1,26 +1,19 @@
-use std::{
-    fmt::{Debug, Display},
-    fs::{self, File},
-    io::{BufRead, BufReader, Write},
-    path::{Path, PathBuf, StripPrefixError},
-    time::Duration,
-};
+use std::fmt::{Debug, Display};
+use std::fs::{self, File};
+use std::io::{BufRead, BufReader, Write};
+use std::path::{Path, PathBuf, StripPrefixError};
+use std::time::Duration;
 
-use nix::{
-    sys::statfs::{statfs, CGROUP2_SUPER_MAGIC, TMPFS_MAGIC},
-    unistd::Pid,
-};
+use nix::sys::statfs::{statfs, CGROUP2_SUPER_MAGIC, TMPFS_MAGIC};
+use nix::unistd::Pid;
 use oci_spec::runtime::LinuxResources;
 #[cfg(any(feature = "cgroupsv2_devices", feature = "v1"))]
 use oci_spec::runtime::{
     LinuxDevice, LinuxDeviceBuilder, LinuxDeviceCgroup, LinuxDeviceCgroupBuilder, LinuxDeviceType,
 };
 
-use super::systemd;
-use super::v1;
-use super::v2;
-
 use super::stats::Stats;
+use super::{systemd, v1, v2};
 
 pub const CGROUP_PROCS: &str = "cgroup.procs";
 pub const DEFAULT_CGROUP_ROOT: &str = "/sys/fs/cgroup";

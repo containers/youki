@@ -1,10 +1,9 @@
 #![cfg(test)]
 
+use std::io::Write;
+use std::path::{Path, PathBuf};
+
 use anyhow::{Context, Result};
-use std::{
-    io::Write,
-    path::{Path, PathBuf},
-};
 
 pub fn setup(cgroup_file: &str) -> (tempfile::TempDir, PathBuf) {
     let tmp = tempfile::tempdir().expect("create temp directory for test");

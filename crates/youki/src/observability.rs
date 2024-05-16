@@ -1,8 +1,9 @@
-use anyhow::{bail, Context, Result};
 use std::borrow::Cow;
 use std::fs::OpenOptions;
 use std::path::PathBuf;
 use std::str::FromStr;
+
+use anyhow::{bail, Context, Result};
 use tracing::Level;
 use tracing_subscriber::prelude::*;
 
@@ -164,9 +165,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use libcontainer::test_utils::TestCallbackError;
     use std::path::Path;
+
+    use libcontainer::test_utils::TestCallbackError;
+
+    use super::*;
 
     #[test]
     fn test_detect_log_level() {

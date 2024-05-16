@@ -1,15 +1,15 @@
-use std::{
-    collections::HashMap,
-    io::{ErrorKind, Write},
-    os::unix::prelude::CommandExt,
-    path::Path,
-    process, thread, time,
-};
+use std::collections::HashMap;
+use std::io::{ErrorKind, Write};
+use std::os::unix::prelude::CommandExt;
+use std::path::Path;
+use std::{process, thread, time};
 
-use nix::{sys::signal, unistd::Pid};
+use nix::sys::signal;
+use nix::unistd::Pid;
 use oci_spec::runtime::Hook;
 
-use crate::{container::Container, utils};
+use crate::container::Container;
+use crate::utils;
 
 #[derive(Debug, thiserror::Error)]
 pub enum HookError {
@@ -144,11 +144,13 @@ pub fn run_hooks(
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use std::{env, fs};
+
     use anyhow::{bail, Context, Result};
     use oci_spec::runtime::HookBuilder;
     use serial_test::serial;
-    use std::{env, fs};
+
+    use super::*;
 
     fn is_command_in_path(program: &str) -> bool {
         if let Ok(path) = env::var("PATH") {

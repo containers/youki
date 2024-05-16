@@ -1,14 +1,14 @@
 //! tty (teletype) for user-system interaction
 
-use nix::errno::Errno;
-use nix::sys::socket::{self, UnixAddr};
-use nix::unistd::close;
-use nix::unistd::dup2;
 use std::io::IoSlice;
 use std::os::unix::fs::symlink;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::prelude::RawFd;
 use std::path::{Path, PathBuf};
+
+use nix::errno::Errno;
+use nix::sys::socket::{self, UnixAddr};
+use nix::unistd::{close, dup2};
 
 #[derive(Debug)]
 pub enum StdIO {
@@ -163,12 +163,13 @@ fn connect_stdio(stdin: &RawFd, stdout: &RawFd, stderr: &RawFd) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::fs::File;
+    use std::os::unix::net::UnixListener;
 
     use anyhow::{Ok, Result};
     use serial_test::serial;
-    use std::fs::File;
-    use std::os::unix::net::UnixListener;
+
+    use super::*;
 
     const CONSOLE_SOCKET: &str = "console-socket";
 

@@ -1,17 +1,16 @@
-use crate::config::YoukiConfig;
-use crate::container::{ContainerStatus, State};
-use crate::error::LibcontainerError;
-use crate::syscall::syscall::create_syscall;
-
-use chrono::DateTime;
-use chrono::Utc;
-use nix::unistd::Pid;
-use procfs::process::Process;
-
 use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
+
+use chrono::{DateTime, Utc};
+use nix::unistd::Pid;
+use procfs::process::Process;
+
+use crate::config::YoukiConfig;
+use crate::container::{ContainerStatus, State};
+use crate::error::LibcontainerError;
+use crate::syscall::syscall::create_syscall;
 
 /// Structure representing the container data
 #[derive(Debug, Clone)]
@@ -228,10 +227,10 @@ pub struct CheckpointOptions {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use anyhow::Context;
-    use anyhow::Result;
+    use anyhow::{Context, Result};
     use serial_test::serial;
+
+    use super::*;
 
     #[test]
     fn test_get_set_pid() {

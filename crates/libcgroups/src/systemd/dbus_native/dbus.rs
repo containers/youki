@@ -1,15 +1,16 @@
-use crate::systemd::dbus_native::serialize::{DbusSerialize, Structure, Variant};
-
-use super::client::SystemdClient;
-use super::message::*;
-use super::proxy::Proxy;
-use super::utils::{DbusError, Result, SystemdClientError};
-use nix::sys::socket;
 use std::collections::HashMap;
 use std::io::{IoSlice, IoSliceMut};
 use std::os::fd::AsRawFd;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
+
+use nix::sys::socket;
+
+use super::client::SystemdClient;
+use super::message::*;
+use super::proxy::Proxy;
+use super::utils::{DbusError, Result, SystemdClientError};
+use crate::systemd::dbus_native::serialize::{DbusSerialize, Structure, Variant};
 
 const REPLY_BUF_SIZE: usize = 128; // seems good enough tradeoff between extra size and repeated calls
 
@@ -461,9 +462,10 @@ impl SystemdClient for DbusConnection {
 
 #[cfg(test)]
 mod tests {
+    use nix::unistd::getuid;
+
     use super::super::utils::Result;
     use super::{uid_to_hex_str, DbusConnection, SystemdClientError};
-    use nix::unistd::getuid;
 
     #[test]
     fn test_uid_to_hex_str() {

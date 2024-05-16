@@ -2,9 +2,9 @@
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::fs;
+use std::fs::File;
 use std::io::{BufReader, BufWriter, Write};
-use std::path::PathBuf;
-use std::{fs::File, path::Path};
+use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

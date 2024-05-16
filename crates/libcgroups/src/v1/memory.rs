@@ -1,20 +1,19 @@
 use std::collections::HashMap;
 use std::fmt::Display;
-use std::io::{prelude::*, Write};
+use std::fs::OpenOptions;
+use std::io::prelude::*;
+use std::io::Write;
 use std::num::ParseIntError;
-use std::path::PathBuf;
-use std::{fs::OpenOptions, path::Path};
+use std::path::{Path, PathBuf};
 
 use nix::errno::Errno;
+use oci_spec::runtime::LinuxMemory;
 
+use super::controller::Controller;
 use crate::common::{self, ControllerOpt, WrapIoResult, WrappedIoError};
 use crate::stats::{
     self, parse_single_value, MemoryData, MemoryStats, ParseFlatKeyedDataError, StatsProvider,
 };
-
-use oci_spec::runtime::LinuxMemory;
-
-use super::controller::Controller;
 
 const CGROUP_MEMORY_SWAP_LIMIT: &str = "memory.memsw.limit_in_bytes";
 const CGROUP_MEMORY_LIMIT: &str = "memory.limit_in_bytes";
@@ -409,10 +408,11 @@ impl Memory {
 
 #[cfg(test)]
 mod tests {
+    use oci_spec::runtime::{LinuxMemoryBuilder, LinuxResourcesBuilder};
+
     use super::*;
     use crate::common::CGROUP_PROCS;
     use crate::test::set_fixture;
-    use oci_spec::runtime::{LinuxMemoryBuilder, LinuxResourcesBuilder};
 
     #[test]
     fn test_set_memory() {

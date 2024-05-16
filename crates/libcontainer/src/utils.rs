@@ -287,10 +287,11 @@ pub fn validate_spec_for_new_user_ns(spec: &Spec) -> Result<(), LibcontainerErro
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::test_utils;
     use anyhow::{bail, Result};
     use serial_test::serial;
+
+    use super::*;
+    use crate::test_utils;
 
     #[test]
     pub fn test_get_unix_user() {

@@ -1,17 +1,17 @@
-use super::{
-    device::Device,
-    mount::{Mount, MountOptions},
-    symlink::Symlink,
-    utils::default_devices,
-    Result, RootfsError,
-};
-use crate::{
-    error::MissingSpecError,
-    syscall::{syscall::create_syscall, Syscall},
-};
+use std::collections::HashSet;
+use std::path::Path;
+
 use nix::mount::MsFlags;
 use oci_spec::runtime::{Linux, Spec};
-use std::{collections::HashSet, path::Path};
+
+use super::device::Device;
+use super::mount::{Mount, MountOptions};
+use super::symlink::Symlink;
+use super::utils::default_devices;
+use super::{Result, RootfsError};
+use crate::error::MissingSpecError;
+use crate::syscall::syscall::create_syscall;
+use crate::syscall::Syscall;
 
 /// Holds information about rootfs
 pub struct RootFS {

@@ -1,10 +1,10 @@
 use anyhow::{Context, Result};
 use libcontainer::process::intel_rdt::find_resctrl_mount_point;
-
 use oci_spec::runtime::{LinuxBuilder, LinuxIntelRdt, Spec, SpecBuilder};
 use test_framework::{test_result, TestResult};
 
-use crate::utils::{test_outside_container, test_utils::check_container_created};
+use crate::utils::test_outside_container;
+use crate::utils::test_utils::check_container_created;
 
 fn create_spec(
     maybe_l3_cache: Option<&str>,

@@ -1,17 +1,12 @@
+use std::io::IoSliceMut;
+use std::os::fd::{AsFd, AsRawFd};
+use std::os::unix::prelude::RawFd;
+use std::path::Path;
+
 use anyhow::{bail, Context, Result};
 use libcontainer::container::ContainerProcessState;
-use nix::{
-    sys::socket::{self, UnixAddr},
-    unistd,
-};
-use std::{
-    io::IoSliceMut,
-    os::{
-        fd::{AsFd, AsRawFd},
-        unix::prelude::RawFd,
-    },
-    path::Path,
-};
+use nix::sys::socket::{self, UnixAddr};
+use nix::unistd;
 
 const DEFAULT_BUFFER_SIZE: usize = 4096;
 

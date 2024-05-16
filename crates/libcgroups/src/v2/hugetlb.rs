@@ -1,20 +1,16 @@
-use std::{
-    collections::HashMap,
-    num::ParseIntError,
-    path::{Path, PathBuf},
-};
+use std::collections::HashMap;
+use std::num::ParseIntError;
+use std::path::{Path, PathBuf};
+
+use oci_spec::runtime::LinuxHugepageLimit;
 
 use super::controller::Controller;
-use crate::{
-    common::{self, ControllerOpt, EitherError, MustBePowerOfTwo, WrappedIoError},
-    stats::{
-        parse_single_value, supported_page_sizes, HugeTlbStats, StatsProvider,
-        SupportedPageSizesError,
-    },
+use crate::common::{
+    self, read_cgroup_file, ControllerOpt, EitherError, MustBePowerOfTwo, WrappedIoError,
 };
-
-use crate::common::read_cgroup_file;
-use oci_spec::runtime::LinuxHugepageLimit;
+use crate::stats::{
+    parse_single_value, supported_page_sizes, HugeTlbStats, StatsProvider, SupportedPageSizesError,
+};
 
 #[derive(thiserror::Error, Debug)]
 pub enum V2HugeTlbControllerError {
@@ -151,10 +147,12 @@ impl HugeTlb {
 
 #[cfg(test)]
 mod tests {
+    use std::fs::read_to_string;
+
+    use oci_spec::runtime::LinuxHugepageLimitBuilder;
+
     use super::*;
     use crate::test::set_fixture;
-    use oci_spec::runtime::LinuxHugepageLimitBuilder;
-    use std::fs::read_to_string;
 
     #[test]
     fn test_set_hugetlb() {

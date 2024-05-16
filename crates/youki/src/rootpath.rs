@@ -1,11 +1,11 @@
+use std::fs;
+use std::path::{Path, PathBuf};
+
 use anyhow::{bail, Result};
-use libcontainer::utils::create_dir_all_with_mode;
-use libcontainer::utils::rootless_required;
+use libcontainer::utils::{create_dir_all_with_mode, rootless_required};
 use nix::libc;
 use nix::sys::stat::Mode;
 use nix::unistd::getuid;
-use std::fs;
-use std::path::{Path, PathBuf};
 
 pub fn determine(root_path: Option<PathBuf>) -> Result<PathBuf> {
     let uid = getuid().as_raw();
@@ -77,14 +77,16 @@ fn get_default_rootless_path(uid: libc::uid_t) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use anyhow::{Context, Result};
-    use nix::sys::stat::Mode;
-    use nix::unistd::getuid;
     use std::fs;
     use std::fs::Permissions;
     use std::os::unix::fs::PermissionsExt;
     use std::path::PathBuf;
+
+    use anyhow::{Context, Result};
+    use nix::sys::stat::Mode;
+    use nix::unistd::getuid;
+
+    use super::*;
 
     #[test]
     fn test_user_specified() -> Result<()> {

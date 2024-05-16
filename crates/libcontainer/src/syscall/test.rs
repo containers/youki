@@ -1,20 +1,15 @@
-use std::{
-    any::Any,
-    cell::{Ref, RefCell, RefMut},
-    collections::HashMap,
-    ffi::{OsStr, OsString},
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::any::Any;
+use std::cell::{Ref, RefCell, RefMut};
+use std::collections::HashMap;
+use std::ffi::{OsStr, OsString};
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use caps::{CapSet, CapsHashSet};
-use nix::{
-    mount::MsFlags,
-    sched::CloneFlags,
-    sys::stat::{Mode, SFlag},
-    unistd::{Gid, Uid},
-};
-
+use nix::mount::MsFlags;
+use nix::sched::CloneFlags;
+use nix::sys::stat::{Mode, SFlag};
+use nix::unistd::{Gid, Uid};
 use oci_spec::runtime::LinuxRlimit;
 
 use super::{linux, Result, Syscall};

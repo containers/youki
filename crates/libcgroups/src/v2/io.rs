@@ -1,18 +1,14 @@
-use std::{
-    num::ParseIntError,
-    path::{Path, PathBuf},
-};
+use std::num::ParseIntError;
+use std::path::{Path, PathBuf};
 
-use crate::{
-    common::{self, ControllerOpt, WrappedIoError},
-    stats::{
-        self, psi_stats, BlkioDeviceStat, BlkioStats, ParseDeviceNumberError,
-        ParseNestedKeyedDataError, StatsProvider,
-    },
-};
+use oci_spec::runtime::LinuxBlockIo;
 
 use super::controller::Controller;
-use oci_spec::runtime::LinuxBlockIo;
+use crate::common::{self, ControllerOpt, WrappedIoError};
+use crate::stats::{
+    self, psi_stats, BlkioDeviceStat, BlkioStats, ParseDeviceNumberError,
+    ParseNestedKeyedDataError, StatsProvider,
+};
 
 const CGROUP_BFQ_IO_WEIGHT: &str = "io.bfq.weight";
 const CGROUP_IO_WEIGHT: &str = "io.weight";
@@ -197,13 +193,14 @@ impl Io {
 }
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::test::{set_fixture, setup};
+    use std::fs;
 
     use oci_spec::runtime::{
         LinuxBlockIoBuilder, LinuxThrottleDeviceBuilder, LinuxWeightDeviceBuilder,
     };
-    use std::fs;
+
+    use super::*;
+    use crate::test::{set_fixture, setup};
 
     #[test]
     fn test_set_io_read_bps() {

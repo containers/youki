@@ -1,12 +1,10 @@
 use std::path::Path;
 
-use crate::{
-    common::{self, ControllerOpt, WrappedIoError},
-    stats::{self, PidStats, PidStatsError, StatsProvider},
-};
 use oci_spec::runtime::LinuxPids;
 
 use super::controller::Controller;
+use crate::common::{self, ControllerOpt, WrappedIoError};
+use crate::stats::{self, PidStats, PidStatsError, StatsProvider};
 
 // Contains the maximum allowed number of active pids
 const CGROUP_PIDS_MAX: &str = "pids.max";
@@ -56,9 +54,10 @@ impl Pids {
 
 #[cfg(test)]
 mod tests {
+    use oci_spec::runtime::LinuxPidsBuilder;
+
     use super::*;
     use crate::test::set_fixture;
-    use oci_spec::runtime::LinuxPidsBuilder;
 
     // Contains the current number of active pids
     const CGROUP_PIDS_CURRENT: &str = "pids.current";

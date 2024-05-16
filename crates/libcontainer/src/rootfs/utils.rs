@@ -1,9 +1,12 @@
-use crate::syscall::linux::{self, MountAttrOption};
-use nix::{mount::MsFlags, sys::stat::SFlag};
+use std::path::PathBuf;
+use std::str::FromStr;
+
+use nix::mount::MsFlags;
+use nix::sys::stat::SFlag;
 use oci_spec::runtime::{LinuxDevice, LinuxDeviceBuilder, LinuxDeviceType, Mount};
-use std::{path::PathBuf, str::FromStr};
 
 use super::mount::MountError;
+use crate::syscall::linux::{self, MountAttrOption};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MountOptionConfig {
@@ -186,12 +189,11 @@ pub fn parse_mount(m: &Mount) -> std::result::Result<MountOptionConfig, MountErr
 
 #[cfg(test)]
 mod tests {
-    use crate::syscall::linux::MountAttr;
-
-    use super::*;
-
     use anyhow::Result;
     use oci_spec::runtime::MountBuilder;
+
+    use super::*;
+    use crate::syscall::linux::MountAttr;
 
     #[test]
     fn test_to_sflag() {

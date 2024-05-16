@@ -1,8 +1,7 @@
-use crate::error::LibcontainerError;
+use libcgroups::common::{CgroupManager, FreezerState};
 
 use super::{Container, ContainerStatus};
-
-use libcgroups::common::{CgroupManager, FreezerState};
+use crate::error::LibcontainerError;
 
 impl Container {
     /// Resumes all processes within the container

@@ -1,15 +1,12 @@
-use std::{
-    fs::OpenOptions,
-    io::{BufRead, BufReader, Read, Seek, Write},
-    path::Path,
-    str::{self, Utf8Error},
-    thread,
-    time::Duration,
-};
-
-use crate::common::{ControllerOpt, FreezerState, WrapIoResult, WrappedIoError};
+use std::fs::OpenOptions;
+use std::io::{BufRead, BufReader, Read, Seek, Write};
+use std::path::Path;
+use std::str::{self, Utf8Error};
+use std::thread;
+use std::time::Duration;
 
 use super::controller::Controller;
+use crate::common::{ControllerOpt, FreezerState, WrapIoResult, WrappedIoError};
 
 const CGROUP_FREEZE: &str = "cgroup.freeze";
 const CGROUP_EVENTS: &str = "cgroup.events";
@@ -147,10 +144,11 @@ impl Freezer {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use super::*;
     use crate::common::FreezerState;
     use crate::test::set_fixture;
-    use std::sync::Arc;
 
     #[test]
     fn test_set_freezer_state() {

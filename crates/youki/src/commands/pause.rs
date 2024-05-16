@@ -1,10 +1,10 @@
 //! Contains functionality of pause container command
-use crate::commands::load_container;
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
-
 use liboci_cli::Pause;
+
+use crate::commands::load_container;
 
 // Pausing a container indicates suspending all processes in given container
 // This uses Freezer cgroup to suspend and resume processes

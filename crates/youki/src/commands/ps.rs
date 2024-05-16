@@ -1,8 +1,11 @@
-use crate::commands::create_cgroup_manager;
+use std::path::PathBuf;
+use std::process::Command;
+
 use anyhow::{bail, Result};
 use libcgroups::common::CgroupManager;
 use liboci_cli::Ps;
-use std::{path::PathBuf, process::Command};
+
+use crate::commands::create_cgroup_manager;
 
 pub fn ps(args: Ps, root_path: PathBuf) -> Result<()> {
     let cmanager = create_cgroup_manager(root_path, &args.container_id)?;
