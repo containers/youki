@@ -11,9 +11,6 @@ use super::args::{ContainerArgs, ContainerType};
 use super::channel::{IntermediateReceiver, MainSender};
 use super::container_init_process::container_init_process;
 use super::fork::CloneCb;
-use crate::error::MissingSpecError;
-use crate::namespaces::Namespaces;
-use crate::process::{channel, fork};
 
 #[derive(Debug, thiserror::Error)]
 pub enum IntermediateProcessError {

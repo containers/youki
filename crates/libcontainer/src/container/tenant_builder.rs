@@ -10,7 +10,7 @@ use std::str::FromStr;
 
 use caps::Capability;
 use nix::fcntl::OFlag;
-use nix::unistd::{self, pipe2, read, Pid};
+use nix::unistd::{pipe2, read, Pid};
 use oci_spec::runtime::{
     Capabilities as SpecCapabilities, Capability as SpecCapability, LinuxBuilder,
     LinuxCapabilities, LinuxCapabilitiesBuilder, LinuxNamespace, LinuxNamespaceBuilder,
@@ -23,17 +23,6 @@ use super::Container;
 use crate::capabilities::CapabilityExt;
 use crate::container::builder_impl::ContainerBuilderImpl;
 use std::os::fd::AsRawFd;
-use std::rc::Rc;
-use std::{
-    collections::HashMap,
-    convert::TryFrom,
-    ffi::{OsStr, OsString},
-    fs,
-    io::BufReader,
-    os::unix::prelude::RawFd,
-    path::{Path, PathBuf},
-    str::FromStr,
-};
 
 use crate::error::{ErrInvalidSpec, LibcontainerError, MissingSpecError};
 use crate::notify_socket::NotifySocket;

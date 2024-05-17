@@ -5,20 +5,8 @@ use std::path::Path;
 
 use anyhow::{bail, Context, Result};
 use libcontainer::container::ContainerProcessState;
-use nix::sys::socket::{self, UnixAddr};
+use nix::sys::socket::{self, Backlog, UnixAddr};
 use nix::unistd;
-use nix::{
-    sys::socket::{self, Backlog, UnixAddr},
-    unistd,
-};
-use std::{
-    io::IoSliceMut,
-    os::{
-        fd::{AsFd, AsRawFd},
-        unix::prelude::RawFd,
-    },
-    path::Path,
-};
 
 const DEFAULT_BUFFER_SIZE: usize = 4096;
 
