@@ -527,7 +527,7 @@ dependencies = [
  "flate2",
  "libcgroups",
  "libcontainer",
- "nix 0.27.1",
+ "nix 0.28.0",
  "num_cpus",
  "oci-spec",
  "once_cell",
@@ -1925,7 +1925,7 @@ dependencies = [
  "libbpf-sys",
  "libc",
  "mockall",
- "nix 0.27.1",
+ "nix 0.28.0",
  "oci-spec",
  "procfs",
  "quickcheck",
@@ -1952,7 +1952,7 @@ dependencies = [
  "libcgroups",
  "libseccomp",
  "nc",
- "nix 0.27.1",
+ "nix 0.28.0",
  "oci-spec",
  "once_cell",
  "prctl",
@@ -2238,7 +2238,6 @@ dependencies = [
  "bitflags 2.5.0",
  "cfg-if",
  "libc",
- "memoffset 0.9.1",
 ]
 
 [[package]]
@@ -2251,6 +2250,7 @@ dependencies = [
  "cfg-if",
  "cfg_aliases",
  "libc",
+ "memoffset 0.9.1",
 ]
 
 [[package]]
@@ -3123,7 +3123,7 @@ dependencies = [
  "anyhow",
  "libc",
  "nc",
- "nix 0.27.1",
+ "nix 0.28.0",
  "oci-spec",
 ]
 
@@ -5688,7 +5688,7 @@ dependencies = [
  "libcgroups",
  "libcontainer",
  "liboci-cli",
- "nix 0.27.1",
+ "nix 0.28.0",
  "once_cell",
  "pentacle",
  "procfs",

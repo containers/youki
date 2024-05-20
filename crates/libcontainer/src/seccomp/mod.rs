@@ -329,7 +329,7 @@ mod tests {
             }
 
             if let Some(errno) = ret.err() {
-                if errno != nix::errno::from_i32(expect_error) {
+                if errno != nix::errno::Errno::from_raw(expect_error) {
                     Err(TestCallbackError::Custom(format!(
                         "getcwd failed but we didn't get the expected error from seccomp profile: {}",
                         errno

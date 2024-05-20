@@ -1,3 +1,5 @@
+use std::os::fd::FromRawFd;
+
 use libcgroups::common::CgroupManager;
 use nix::unistd::{close, write, Gid, Pid, Uid};
 use oci_spec::runtime::{LinuxNamespace, LinuxNamespaceType, LinuxResources};
@@ -130,12 +132,15 @@ pub fn container_intermediate_process(
                     }
                     if let ContainerType::TenantContainer { exec_notify_fd } = args.container_type {
                         let buf = format!("{e}");
-                        if let Err(err) = write(exec_notify_fd, buf.as_bytes()) {
+                        let exec_notify_fd =
+                            unsafe { std::os::fd::OwnedFd::from_raw_fd(exec_notify_fd) };
+                        if let Err(err) = write(&exec_notify_fd, buf.as_bytes()) {
                             tracing::error!(?err, "failed to write to exec notify fd");
                         }
-                        if let Err(err) = close(exec_notify_fd) {
-                            tracing::error!(?err, "failed to close exec notify fd");
-                        }
+
+                        // After sending the error through the exec_notify_fd,
+                        // we need to explicitly close the pipe.
+                        drop(exec_notify_fd);
                     }
                     -1
                 }
@@ -206,7 +211,7 @@ fn setup_userns(
     prctl::set_dumpable(true).map_err(|e| {
         IntermediateProcessError::Other(format!(
             "error in setting dumpable to true : {}",
-            nix::errno::from_i32(e)
+            nix::errno::Errno::from_raw(e)
         ))
     })?;
     sender.identifier_mapping_request().map_err(|err| {
@@ -220,7 +225,7 @@ fn setup_userns(
     prctl::set_dumpable(false).map_err(|e| {
         IntermediateProcessError::Other(format!(
             "error in setting dumplable to false : {}",
-            nix::errno::from_i32(e)
+            nix::errno::Errno::from_raw(e)
         ))
     })?;
     Ok(())

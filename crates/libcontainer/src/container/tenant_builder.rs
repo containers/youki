@@ -3,6 +3,7 @@ use std::convert::TryFrom;
 use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::io::BufReader;
+use std::os::fd::AsRawFd;
 use std::os::unix::prelude::RawFd;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -10,7 +11,7 @@ use std::str::FromStr;
 
 use caps::Capability;
 use nix::fcntl::OFlag;
-use nix::unistd::{close, pipe2, read, Pid};
+use nix::unistd::{pipe2, read, Pid};
 use oci_spec::runtime::{
     Capabilities as SpecCapabilities, Capability as SpecCapability, LinuxBuilder,
     LinuxCapabilities, LinuxCapabilitiesBuilder, LinuxNamespace, LinuxNamespaceBuilder,
@@ -126,7 +127,7 @@ impl TenantContainerBuilder {
 
         let mut builder_impl = ContainerBuilderImpl {
             container_type: ContainerType::TenantContainer {
-                exec_notify_fd: write_end,
+                exec_notify_fd: write_end.as_raw_fd(),
             },
             syscall: self.base.syscall,
             container_id: self.base.container_id,
@@ -148,13 +149,19 @@ impl TenantContainerBuilder {
         let mut notify_socket = NotifySocket::new(notify_path);
         notify_socket.notify_container_start()?;
 
-        close(write_end).map_err(LibcontainerError::OtherSyscall)?;
+        // Explicitly close the write end of the pipe here to notify the
+        // `read_end` that the init process is able to move forward. Closing one
+        // end of the pipe will immediately signal the other end of the pipe,
+        // which we use in the init thread as a form of barrier.  `drop` is used
+        // here becuase `OwnedFd` supports it, so we don't have to use `close`
+        // here with `RawFd`.
+        drop(write_end);
 
         let mut err_str_buf = Vec::new();
 
         loop {
             let mut buf = [0; 3];
-            match read(read_end, &mut buf).map_err(LibcontainerError::OtherSyscall)? {
+            match read(read_end.as_raw_fd(), &mut buf).map_err(LibcontainerError::OtherSyscall)? {
                 0 => {
                     if err_str_buf.is_empty() {
                         return Ok(pid);
