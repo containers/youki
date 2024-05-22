@@ -1898,12 +1898,12 @@ dependencies = [
 
 [[package]]
 name = "libbpf-sys"
-version = "1.4.1+v1.4.0"
+version = "1.4.2+v1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d45233915cb9e961ddf073fc1e4a31b786d63180eed9b88dba823f688ce2df7"
+checksum = "800bccc21b216764f96334a241a072b842121843bf679f5a03b0c2c21cb339ed"
 dependencies = [
  "cc",
- "nix 0.27.1",
+ "nix 0.28.0",
  "pkg-config",
 ]
 
@@ -1915,7 +1915,7 @@ checksum = "97b3888a4aecf77e811145cadf6eef5901f4782c53886191b2f693f24761847c"
 
 [[package]]
 name = "libcgroups"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "anyhow",
  "clap",
@@ -1940,7 +1940,7 @@ dependencies = [
 
 [[package]]
 name = "libcontainer"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "anyhow",
  "bitflags 2.5.0",
@@ -1983,7 +1983,7 @@ dependencies = [
 
 [[package]]
 name = "liboci-cli"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "clap",
 ]
@@ -5678,7 +5678,7 @@ dependencies = [
 
 [[package]]
 name = "youki"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "anyhow",
  "caps",
