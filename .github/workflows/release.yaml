@@ -18,7 +18,7 @@ jobs:
 
   build:
     name: Build
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     needs:
         - parse
     strategy:
@@ -30,7 +30,7 @@ jobs:
         with:
           submodules: recursive
       - name: Setup Rust toolchain and cache
-        uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         env:
           RUST_CACHE_KEY_OS: rust-cache-${{ matrix.arch }}-${{ matrix.libc }}
       - name: Install just
@@ -62,7 +62,7 @@ jobs:
     name: Create Draft Release
     environment:
       name: release
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     permissions:
       contents: write
     needs:
@@ -93,14 +93,14 @@ jobs:
     needs: build
     environment:
       name: release
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     if: ${{ github.repository == 'containers/youki' }}
     env:
       CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
     steps:
       - uses: actions/checkout@v3
       - name: Setup Rust toolchain and cache
-        uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
+        uses: actions-rust-lang/setup-rust-toolchain@v1
       - name: Publish libcgroups
         run: cargo publish -p libcgroups --no-verify
       - name: Publish libcontainer
