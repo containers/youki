@@ -5,7 +5,7 @@ use std::path::Path;
 
 use anyhow::{bail, Context, Result};
 use libcontainer::container::ContainerProcessState;
-use nix::sys::socket::{self, UnixAddr};
+use nix::sys::socket::{self, Backlog, UnixAddr};
 use nix::unistd;
 
 const DEFAULT_BUFFER_SIZE: usize = 4096;
@@ -30,7 +30,8 @@ pub fn recv_seccomp_listener(seccomp_listener: &Path) -> SeccompAgentResult {
     socket::bind(socket.as_raw_fd(), &addr).context("failed to bind to seccomp listener socket")?;
     // Force the backlog to be 1 so in the case of an error, only one connection
     // from clients will be waiting.
-    socket::listen(&socket.as_fd(), 1).context("failed to listen on seccomp listener")?;
+    socket::listen(&socket.as_fd(), Backlog::new(1)?)
+        .context("failed to listen on seccomp listener")?;
     let conn = match socket::accept(socket.as_raw_fd()) {
         Ok(conn) => conn,
         Err(e) => {

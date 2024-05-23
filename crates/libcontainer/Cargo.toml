@@ -29,7 +29,7 @@ chrono = { version = "0.4", default-features = false, features = [
 fastrand = "^2.1.0"
 futures = { version = "0.3", features = ["thread-pool"] }
 libc = "0.2.155"
-nix = { version = "0.27.1", features = [
+nix = { version = "0.28.0", features = [
     "socket",
     "sched",
     "mount",
