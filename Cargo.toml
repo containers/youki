@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 members = ["crates/*", "tests/contest/*", "tools/*"]
-exclude = ["experiment/seccomp"]
+exclude = ["experiment/seccomp", "experiment/selinux"]
 
 [profile.release]
 lto = true
