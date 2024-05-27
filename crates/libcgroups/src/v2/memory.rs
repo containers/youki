@@ -77,6 +77,9 @@ impl Memory {
             stats::parse_single_value(&cgroup_path.join(format!("{}.{}", file_prefix, "current")))?;
         let limit =
             stats::parse_single_value(&cgroup_path.join(format!("{}.{}", file_prefix, "max")))?;
+        let max_usage =
+            stats::parse_single_value(&cgroup_path.join(format!("{}.{}", file_prefix, "peak")))
+                .unwrap_or(0);
 
         let events = stats::parse_flat_keyed_data(
             &cgroup_path.join(format!("{}.{}", file_prefix, "events")),
@@ -89,9 +92,9 @@ impl Memory {
 
         Ok(MemoryData {
             usage,
+            max_usage,
             fail_count,
             limit,
-            ..Default::default()
         })
     }
 
@@ -373,6 +376,27 @@ mod tests {
             limit: 25000,
             fail_count: 3,
             ..Default::default()
+        };
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_get_memory_data_with_peak() {
+        let tmp = tempfile::tempdir().unwrap();
+        set_fixture(tmp.path(), "memory.current", "12500\n").unwrap();
+        set_fixture(tmp.path(), "memory.max", "25000\n").unwrap();
+        set_fixture(tmp.path(), "memory.peak", "20000\n").unwrap();
+        let events = ["slab 5", "anon 13", "oom 3"].join("\n");
+        set_fixture(tmp.path(), "memory.events", &events).unwrap();
+
+        let actual =
+            Memory::get_memory_data(tmp.path(), "memory", "oom").expect("get cgroup stats");
+        let expected = MemoryData {
+            usage: 12500,
+            max_usage: 20000,
+            limit: 25000,
+            fail_count: 3,
         };
 
         assert_eq!(actual, expected);
