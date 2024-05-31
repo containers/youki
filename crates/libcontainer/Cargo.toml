@@ -53,7 +53,7 @@ regex = { version = "1.10.4", default-features = false, features = ["std", "unic
 thiserror = "1.0.61"
 tracing = { version = "0.1.40", features = ["attributes"] }
 safe-path = "0.1.0"
-nc = "0.8.20"
+nc = "0.8.21"
 
 [dev-dependencies]
 oci-spec = { version = "~0.6.4", features = ["proptests", "runtime"] }
