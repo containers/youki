@@ -13,7 +13,7 @@ nix = "0.28.0"
 num_cpus = "1.16"
 oci-spec = { version = "0.6.4", features = ["runtime"] }
 once_cell = "1.19.0"
-pnet_datalink = "0.34.0"
+pnet_datalink = "0.35.0"
 procfs = "0.16.0"
 rand = "0.8.5"
 serde = { version = "1.0", features = ["derive"] }
