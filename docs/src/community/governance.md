@@ -16,6 +16,10 @@ Maintainers are consist of the following roles:
     Committers have full write accesses to repos.
     Committers’ commits should still be made via GitHub pull requests (except for urgent security fixes), and should not be pushed directly to the default branch.
 
+- Reviewer (Limited maintainership)
+    Reviewers may moderate GitHub issues and pull requests (such as adding labels and cleaning up spams), but they do not have any access to merge pull requests nor push commits.
+    A Reviewer is considered as a candidate to become a Committer.
+
 ## Addition and promotion of Maintainers
 
 A contributor who have made significant contributions in quality and in quantity can be directly invited as a Committer.
