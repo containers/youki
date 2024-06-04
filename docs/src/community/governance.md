@@ -10,7 +10,7 @@ Maintainers are [here](./maintainer.md).
 
 ## Roles
 
-Maintainers are consist of the following roles:
+Maintainers consist of the following roles:
 
 - Committer (Full maintainership)  
     Committers have full write accesses to repos.

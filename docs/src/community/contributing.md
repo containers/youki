@@ -11,7 +11,7 @@ Youki is licensed under the terms of [Apache License 2.0](https://github.com/con
 
 ## Sending pull requests
 
-Pull requests can be submitted to [here](https://github.com/containers/youki/pull).
+Pull requests can be submitted using [the GitHub standard process](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request).
 
 ## Merging pull requests
 

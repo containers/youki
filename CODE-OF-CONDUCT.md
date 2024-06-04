@@ -1,1 +1,1 @@
-Move to containers.github.io/youki/community/goversance.html#code-of-conduct
+Move to containers.github.io/youki/community/governance.html#code-of-conduct
