@@ -18,7 +18,7 @@
 
 - [Community](./community/introduction.md)
     - [Maintainer](./community/maintainer.md)
-    - [Governance](./community/goversance.md)
+    - [Governance](./community/governance.md)
     - [Contributing](./community/contributing.md)
 
 ---
