@@ -101,12 +101,7 @@ pub fn container_intermediate_process(
     }
 
     let cb: CloneCb = {
-        let args = args.clone();
-        let init_sender = init_sender.clone();
-        let inter_sender = inter_sender.clone();
-        let mut main_sender = main_sender.clone();
-        let mut init_receiver = init_receiver.clone();
-        Box::new(move || {
+        Box::new(|| {
             if let Err(ret) = prctl::set_name("youki:[2:INIT]") {
                 tracing::error!(?ret, "failed to set name for child process");
                 return ret;
@@ -123,7 +118,7 @@ pub fn container_intermediate_process(
                 tracing::error!(?err, "failed to close sender in the intermediate process");
                 return -1;
             }
-            match container_init_process(&args, &mut main_sender, &mut init_receiver) {
+            match container_init_process(&args, main_sender, init_receiver) {
                 Ok(_) => 0,
                 Err(e) => {
                     tracing::error!("failed to initialize container process: {e}");
