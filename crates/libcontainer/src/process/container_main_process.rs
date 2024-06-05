@@ -51,7 +51,7 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, bo
             }
 
             match container_intermediate_process::container_intermediate_process(
-                &container_args,
+                container_args,
                 &mut inter_chan,
                 &mut init_chan,
                 &mut main_sender,
