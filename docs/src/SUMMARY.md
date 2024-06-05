@@ -16,6 +16,13 @@
 
 ---
 
+- [Community](./community/introduction.md)
+    - [Maintainer](./community/maintainer.md)
+    - [Governance](./community/governance.md)
+    - [Contributing](./community/contributing.md)
+
+---
+
 - [Developer Documentation](./developer/introduction.md)
   - [Basics](./developer/basics.md)
   - [Unwritten Rules](./developer/unwritten_rules.md)
