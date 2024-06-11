@@ -14,15 +14,15 @@ static ATTR_PATH_INIT: Once = Once::new();
 static mut HAVE_THREAD_SELF: bool = false;
 
 pub fn set_disabled() {
-    panic!("not implemented yet")
+    unimplemented!("not implemented yet")
 }
 
 pub fn get_enabled() -> bool {
-    panic!("not implemented yet")
+    unimplemented!("not implemented yet")
 }
 
 pub fn class_index(class: &str) -> Result<i64, String> {
-    panic!("not implemented yet")
+    unimplemented!("not implemented yet")
 }
 
 // set_file_label sets the SELinux label for this path, following symlinks, or returns an error.
@@ -126,23 +126,23 @@ pub fn exec_label() -> Result<String, std::io::Error> {
 }
 
 pub fn set_exec_label(label: &str) {
-    panic!("not implemented yet")
+    unimplemented!("not implemented yet")
 }
 
 pub fn set_task_label(label: &str) {
-    panic!("not implemented yet")
+    unimplemented!("not implemented yet")
 }
 
 pub fn set_socket_label(label: &str) {
-    panic!("not implemented yet")
+    unimplemented!("not implemented yet")
 }
 
 pub fn socket_label() {
-    panic!("not implemented yet")
+    unimplemented!("not implemented yet")
 }
 
 pub fn peer_label() {
-    panic!("not implemented yet")
+    unimplemented!("not implemented yet")
 }
 
 pub fn set_key_label(label: &str) -> Result<(), std::io::Error> {
@@ -154,35 +154,35 @@ pub fn set_key_label(label: &str) -> Result<(), std::io::Error> {
 }
 
 pub fn key_label() {
-    panic!("not implemented yet")
+    unimplemented!("not implemented yet")
 }
 
 pub fn clear_labels() {
-    panic!("not implemented yet")
+    unimplemented!("not implemented yet")
 }
 
 pub fn reserve_label(label: &str) {
-    panic!("not implemented yet")
+    unimplemented!("not implemented yet")
 }
 
 pub fn ro_file_label() {
-    panic!("not implemented yet")
+    unimplemented!("not implemented yet")
 }
 
 pub fn kvm_container_labels() {
-    panic!("not implemented yet")
+    unimplemented!("not implemented yet")
 }
 
 pub fn init_container_labels() {
-    panic!("not implemented yet")
+    unimplemented!("not implemented yet")
 }
 
 pub fn container_labels() {
-    panic!("not implemented yet")
+    unimplemented!("not implemented yet")
 }
 
 pub fn priv_container_mount_label() {
-    panic!("not implemented yet")
+    unimplemented!("not implemented yet")
 }
 
 pub fn format_mount_label(src: &str, mount_label: &str) -> String {
@@ -203,7 +203,7 @@ pub fn format_mount_label_by_type(src: &str, mount_label: &str, context_type: &s
 }
 
 pub fn write_con(fpath: &str, val: &str) -> Result<(), std::io::Error> {
-    panic!("not implemented yet");
+    unimplemented!("not implemented yet");
 }
 
 pub fn is_proc_handle(file: &File) -> Result<(), std::io::Error> {
