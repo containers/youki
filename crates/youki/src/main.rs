@@ -23,6 +23,23 @@ struct YoukiExtendOpts {
     pub log_level: Option<String>,
 }
 
+/// output Youki version in Moby compatible format
+#[macro_export]
+macro_rules! youki_version {
+    // For compatibility with Moby, match format here:
+    // https://github.com/moby/moby/blob/65cc84abc522a564699bb171ca54ea1857256d10/daemon/info_unix.go#L280
+    () => {
+        concat!(
+            "version ",
+            crate_version!(),
+            "\ncommit: ",
+            crate_version!(),
+            "-0-",
+            env!("VERGEN_GIT_SHA")
+        )
+    };
+}
+
 // High-level commandline option definition
 // This takes global options as well as individual commands as specified in [OCI runtime-spec](https://github.com/opencontainers/runtime-spec/blob/master/runtime.md)
 // Also check [runc commandline documentation](https://github.com/opencontainers/runc/blob/master/man/runc.8.md) for more explanation
@@ -54,23 +71,6 @@ enum SubCommand {
     Completion(commands::completion::Completion),
 }
 
-/// output Youki version in Moby compatible format
-#[macro_export]
-macro_rules! youki_version {
-    // For compatibility with Moby, match format here:
-    // https://github.com/moby/moby/blob/65cc84abc522a564699bb171ca54ea1857256d10/daemon/info_unix.go#L280
-    () => {
-        concat!(
-            "version ",
-            crate_version!(),
-            "\ncommit: ",
-            crate_version!(),
-            "-0-",
-            env!("VERGEN_GIT_SHA")
-        )
-    };
-}
-
 /// This is the entry point in the container runtime. The binary is run by a high-level container runtime,
 /// with various flags passed. This parses the flags, creates and manages appropriate resources.
 fn main() -> Result<()> {
@@ -89,7 +89,7 @@ fn main() -> Result<()> {
     let opts = Opts::parse();
     let mut app = Opts::command();
 
-    crate::observability::init(&opts).map_err(|err| {
+    observability::init(&opts).map_err(|err| {
         eprintln!("failed to initialize observability: {}", err);
         err
     })?;
