@@ -1,4 +1,3 @@
-use std::sync::Once;
 use crate::xattr::*;
 use nix::unistd::gettid;
 use nix::sys::statfs;
@@ -7,11 +6,12 @@ use std::path::PathBuf;
 use std::fs::File;
 use std::io::{self, Read};
 use std::os::fd::{AsFd, AsRawFd};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 const XATTR_NAME_SELINUX: &str = "security.selinux";
 const ERR_EMPTY_PATH: &str = "empty path";
-static ATTR_PATH_INIT: Once = Once::new();
-static mut HAVE_THREAD_SELF: bool = false;
+static HAVE_THREAD_SELF: AtomicBool = AtomicBool::new(false);
+static INIT_DONE: AtomicBool = AtomicBool::new(false);
 
 // function compatible with setDisabled in go-selinux repo.
 // set_disabled disables SELinux support for the package.
@@ -308,20 +308,20 @@ pub fn read_con(fpath: &str) -> Result<String, std::io::Error> {
 }
 
 // function compatible with attrPath in go-selinux repo.
+// attr_path determines the correct file path for accessing SELinux
+// attributes of a process or thread in a Linux environment.
 pub fn attr_path(attr: &str) -> String {
     // Linux >= 3.17 provides this
     const THREAD_SELF_PREFIX: &str = "/proc/thread-self/attr";
-    ATTR_PATH_INIT.call_once(|| {
+    // Avoiding code conflicts and ensuring thread-safe execution once only.
+    if !INIT_DONE.load(Ordering::SeqCst) {
         let path = PathBuf::from(THREAD_SELF_PREFIX);
-        unsafe {
-            HAVE_THREAD_SELF = path.is_dir();
-        }
-    });
-
-    unsafe {
-        if HAVE_THREAD_SELF {
-            return format!("{}/{}", THREAD_SELF_PREFIX, attr);
-        }
+        let is_dir = path.is_dir();
+        HAVE_THREAD_SELF.store(is_dir, Ordering::SeqCst);
+        INIT_DONE.store(true, Ordering::SeqCst);
+    }
+    if HAVE_THREAD_SELF.load(Ordering::SeqCst) {
+        return format!("{}/{}", THREAD_SELF_PREFIX, attr);
     }
 
     format!("/proc/self/task/{}/attr/{}", gettid(), attr)
@@ -344,12 +344,12 @@ mod tests {
 
     #[test]
     fn test_format_mount_label() {
-        let src_list = vec!["", "src", "src"];
-        let mount_label_list = vec!["foobar", "foobar", ""];
-        let expected_list = vec!["context=\"foobar\"", "src,context=\"foobar\"", "src"];
-        for (i, src) in src_list.iter().enumerate() {
-            let mount_label = mount_label_list[i];
-            let expected = expected_list[i];
+        let src_array = ["", "src", "src"];
+        let mount_label_array = ["foobar", "foobar", ""];
+        let expected_array = ["context=\"foobar\"", "src,context=\"foobar\"", "src"];
+        for (i, src) in src_array.iter().enumerate() {
+            let mount_label = mount_label_array[i];
+            let expected = expected_array[i];
             assert_eq!(
                 format_mount_label(src, mount_label),
                 expected
@@ -359,14 +359,14 @@ mod tests {
 
     #[test]
     fn test_format_mount_label_by_type() {
-        let src_list = vec!["", "src", "src"];
-        let mount_label_list = vec!["foobar", "foobar", ""];
-        let context_list = vec!["fscontext", "fscontext", "rootcontext"];
-        let expected_list = vec!["fscontext=\"foobar\"", "src,fscontext=\"foobar\"", "src"];
-        for (i, src) in src_list.iter().enumerate() {
-            let mount_label = mount_label_list[i];
-            let context = context_list[i];
-            let expected = expected_list[i];
+        let src_array = ["", "src", "src"];
+        let mount_label_array = ["foobar", "foobar", ""];
+        let context_array = ["fscontext", "fscontext", "rootcontext"];
+        let expected_array = ["fscontext=\"foobar\"", "src,fscontext=\"foobar\"", "src"];
+        for (i, src) in src_array.iter().enumerate() {
+            let mount_label = mount_label_array[i];
+            let context = context_array[i];
+            let expected = expected_array[i];
             assert_eq!(
                 format_mount_label_by_type(src, mount_label, context),
                 expected
@@ -376,11 +376,11 @@ mod tests {
 
     #[test]
     fn test_read_con_fd() {
-        let content_list: Vec<&[u8]> = vec![b"Hello, world\0", b"Hello, world\0\0\0", b"Hello,\0world"];
-        let expected_list = vec!["Hello, world", "Hello, world", "Hello,\0world"];
+        let content_array: Vec<&[u8]> = vec![b"Hello, world\0", b"Hello, world\0\0\0", b"Hello,\0world"];
+        let expected_array = ["Hello, world", "Hello, world", "Hello,\0world"];
         let file_name = "test.txt";
-        for (i, content) in content_list.iter().enumerate() {
-            let expected = expected_list[i];
+        for (i, content) in content_array.iter().enumerate() {
+            let expected = expected_array[i];
             create_temp_file(content, file_name);
             // Need to open again to get read permission.
             let mut file = File::open(file_name).expect("Failed to open file");
@@ -389,5 +389,45 @@ mod tests {
             fs::remove_file(file_name).expect("Failed to remove test file");
         }
     }
-}
 
+    #[test]
+    fn test_attr_path() {
+        // Test with "/proc/thread-self/attr" path (Linux >= 3.17)
+        let attr = "bar";
+        let expected_path = format!("/proc/thread-self/attr/{}", attr);
+        let actual_path = attr_path(attr);
+        assert_eq!(expected_path, actual_path);
+
+        // Test with not having "/proc/thread-self/attr" path by setting HAVE_THREAD_SELF as false
+        INIT_DONE.store(true, Ordering::SeqCst);
+        HAVE_THREAD_SELF.store(false, Ordering::SeqCst);        
+        let thread_id = gettid();
+        let expected_path = format!("/proc/self/task/{}/attr/{}", thread_id, attr);
+        let actual_path = attr_path(attr);
+        assert_eq!(expected_path, actual_path); 
+    }
+
+    #[test]
+    fn test_is_proc_handle() {
+        let filename_array = ["/proc/self/status", "/tmp/testfile"];
+        let expected_array = [true, false];
+
+        for (i, filename) in filename_array.iter().enumerate() {
+            let expected_ok = expected_array[i];
+            let path = Path::new(filename);
+            let file = match File::open(path) {
+                Ok(file) => file,
+                Err(_) => {
+                    create_temp_file(b"", filename);
+                    File::open(path).expect("failed to open file")
+                }
+            };
+            let result = is_proc_handle(&file);
+            if expected_ok {
+                assert!(result.is_ok(), "Expected Ok, but got Err: {:?}", result);
+            } else {
+                assert!(result.is_err(), "Expected Err, but got Ok");                
+            }
+        }
+    }
+}
