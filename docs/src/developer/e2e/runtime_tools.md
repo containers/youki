@@ -3,5 +3,6 @@
 ## local
 
 ```console
-just test-oci
+$ git submodule update --init --recursive
+$ just test-oci
 ```
