@@ -279,7 +279,8 @@ pub fn container_init_process(
     let spec = &args.spec;
     let linux = spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
     let proc = spec.process().as_ref().ok_or(MissingSpecError::Process)?;
-    let mut envs: Vec<String> = proc.env().as_ref().unwrap_or(&vec![]).clone();
+    let mut envs: HashMap<String, String> =
+        utils::parse_env(proc.env().as_ref().unwrap_or(&vec![]));
     let rootfs_path = &args.rootfs;
     let hooks = spec.hooks().as_ref();
     let container = args.container.as_ref();
@@ -482,10 +483,8 @@ pub fn container_init_process(
             // LISTEN_FDS is 0, the variable should be unset, so we just ignore
             // it here, if it is 0.
             if listen_fds > 0 {
-                envs.append(&mut vec![
-                    format!("LISTEN_FDS={listen_fds}"),
-                    "LISTEN_PID=1".to_string(),
-                ]);
+                envs.insert("LISTEN_FDS".to_owned(), listen_fds.to_string());
+                envs.insert("LISTEN_PID".to_owned(), 1.to_string());
             }
 
             args.preserve_fds + listen_fds
@@ -560,17 +559,15 @@ pub fn container_init_process(
     })?;
 
     // add HOME into envs if not exists
-    let home_in_envs = envs.iter().any(|x| x.starts_with("HOME="));
-    if !home_in_envs {
+    if !envs.contains_key("HOME") {
         if let Some(dir_home) = utils::get_user_home(proc.user().uid()) {
-            envs.push(format!("HOME={}", dir_home.to_string_lossy()));
+            envs.insert("HOME".to_owned(), dir_home.to_string_lossy().to_string());
         }
     }
 
     // Reset the process env based on oci spec.
     env::vars().for_each(|(key, _value)| env::remove_var(key));
-    utils::parse_env(&envs)
-        .iter()
+    envs.iter()
         .for_each(|(key, value)| env::set_var(key, value));
 
     // Initialize seccomp profile right before we are ready to execute the
