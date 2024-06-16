@@ -2,7 +2,7 @@ use crate::xattr::*;
 use nix::unistd::gettid;
 use nix::sys::statfs;
 use nix::errno::Errno;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::fs::File;
 use std::io::{self, Read};
 use std::os::fd::{AsFd, AsRawFd};
@@ -13,29 +13,29 @@ const ERR_EMPTY_PATH: &str = "empty path";
 static HAVE_THREAD_SELF: AtomicBool = AtomicBool::new(false);
 static INIT_DONE: AtomicBool = AtomicBool::new(false);
 
-// function compatible with setDisabled in go-selinux repo.
+// function similar with setDisabled in go-selinux repo.
 // set_disabled disables SELinux support for the package.
 pub fn set_disabled() {
     unimplemented!("not implemented yet")
 }
 
-// function compatible with getEnabled in go-selinux repo.
+// function similar with getEnabled in go-selinux repo.
 // get_enabled returns whether SELinux is enabled or not.
 pub fn get_enabled() -> bool {
     unimplemented!("not implemented yet")
 }
 
-// function compatible with classIndex in go-selinux repo.
+// function similar with classIndex in go-selinux repo.
 // classIndex returns the int index for an object class in the loaded policy,
 // or -1 and an error.
 pub fn class_index(class: &str) -> Result<i64, String> {
     unimplemented!("not implemented yet")
 }
 
-// function compatible with setFileLabel in go-selinux repo.
+// function similar with setFileLabel in go-selinux repo.
 // set_file_label sets the SELinux label for this path, following symlinks, or returns an error.
-pub fn set_file_label(fpath: &str, label: &str) -> Result<(), std::io::Error> {
-    if fpath.is_empty() {
+pub fn set_file_label(fpath: &Path, label: &str) -> Result<(), std::io::Error> {
+    if !fpath.exists() {
         return Err(std::io::Error::new(io::ErrorKind::InvalidInput, ERR_EMPTY_PATH));
     }
 
@@ -55,11 +55,11 @@ pub fn set_file_label(fpath: &str, label: &str) -> Result<(), std::io::Error> {
     Ok(())
 }
 
-// function compatible with lSetFileLabel in go-selinux repo.
+// function similar with lSetFileLabel in go-selinux repo.
 // lset_file_label sets the SELinux label for this path, not following symlinks,
 // or returns an error.
-pub fn lset_file_label(fpath: &str, label: &str) -> Result<(), std::io::Error> {
-    if fpath.is_empty() {
+pub fn lset_file_label(fpath: &Path, label: &str) -> Result<(), std::io::Error> {
+    if !fpath.exists() {
         return Err(std::io::Error::new(io::ErrorKind::InvalidInput, ERR_EMPTY_PATH));
     }
 
@@ -79,156 +79,157 @@ pub fn lset_file_label(fpath: &str, label: &str) -> Result<(), std::io::Error> {
     Ok(())
 }
 
-// function compatible with fileLabel in go-selinux repo.
+// function similar with fileLabel in go-selinux repo.
 // fileLabel returns the SELinux label for this path, following symlinks,
 // or returns an error.
-pub fn file_label(fpath: &str) -> Result<String, std::io::Error> {
-    if fpath.is_empty() {
+pub fn file_label(fpath: &Path) -> Result<String, std::io::Error> {
+    if !fpath.exists() {
         return Err(std::io::Error::new(io::ErrorKind::InvalidInput, ERR_EMPTY_PATH));
     }
     get_xattr(fpath, XATTR_NAME_SELINUX)
 }
 
-// function compatible with lFileLabel in go-selinux repo.
+// function similar with lFileLabel in go-selinux repo.
 // lfile_label returns the SELinux label for this path, not following symlinks,
 // or returns an error.
-pub fn lfile_label(fpath: &str) -> Result<String, std::io::Error> {
-    if fpath.is_empty() {
+pub fn lfile_label(fpath: &Path) -> Result<String, std::io::Error> {
+    if !fpath.exists() {
         return Err(std::io::Error::new(io::ErrorKind::InvalidInput, ERR_EMPTY_PATH));
     }
     lget_xattr(fpath, XATTR_NAME_SELINUX)
 }
 
-// function compatible with setFSCreateLabel in go-selinux repo.
+// function similar with setFSCreateLabel in go-selinux repo.
 // set_fscreate_label sets the default label the kernel which the kernel is using
 // for file system objects.
 pub fn set_fscreate_label(label: &str) -> Result<(), std::io::Error> {
-    return write_con(attr_path("fscreate").as_str(), label);
+    return write_con(attr_path("fscreate").as_path(), label);
 }
 
-// function compatible with fsCreateLabel in go-selinux repo.
+// function similar with fsCreateLabel in go-selinux repo.
 // fscreate_label returns the default label the kernel which the kernel is using
 // for file system objects created by this task. "" indicates default.
 pub fn fscreate_label() -> Result<String, std::io::Error> {
-    return read_con(attr_path("fscreate").as_str());
+    return read_con(attr_path("fscreate").as_path());
 }
 
-// function compatible with currentLabel in go-selinux repo.
+// function similar with currentLabel in go-selinux repo.
 // current_label returns the SELinux label of the current process thread, or an error.
 pub fn current_label() -> Result<String, std::io::Error> {
-    return read_con(attr_path("current").as_str());
+    return read_con(attr_path("current").as_path());
 }
 
-// function compatible with pidLabel in go-selinux repo.
+// function similar with pidLabel in go-selinux repo.
 // pid_label returns the SELinux label of the given pid, or an error.
 pub fn pid_label(pid: i64) -> Result<String, std::io::Error> {
-    let label = format!("/proc/{}/attr/current", pid);
-    return read_con(label.as_str());
+    let file_name = &format!("/proc/{}/attr/current", pid);
+    let label = Path::new(file_name);
+    return read_con(label);
 }
 
-// function compatible with execLabel in go-selinux repo.
+// function similar with execLabel in go-selinux repo.
 // exec_label returns the SELinux label that the kernel will use for any programs
 // that are executed by the current process thread, or an error.
 pub fn exec_label() -> Result<String, std::io::Error> {
-    return read_con(attr_path("exec").as_str());
+    return read_con(attr_path("exec").as_path());
 }
 
-// function compatible with SetExecLabel in go-selinux repo.
+// function similar with SetExecLabel in go-selinux repo.
 // set_exec_label sets the SELinux label that the kernel will use for any programs
 // that are executed by the current process thread, or an error.
 pub fn set_exec_label(label: &str) {
     unimplemented!("not implemented yet")
 }
 
-// function compatible with SetTaskLabel in go-selinux repo.
+// function similar with SetTaskLabel in go-selinux repo.
 // set_task_label sets the SELinux label for the current thread, or an error.
 // This requires the dyntransition permission.
 pub fn set_task_label(label: &str) {
     unimplemented!("not implemented yet")
 }
 
-// function compatible with SetSocketLabel in go-selinux repo.
+// function similar with SetSocketLabel in go-selinux repo.
 // set_socket_label takes a process label and tells the kernel to assign the
 // label to the next socket that gets created.
 pub fn set_socket_label(label: &str) {
     unimplemented!("not implemented yet")
 }
 
-// function compatible with SocketLabel in go-selinux repo.
+// function similar with SocketLabel in go-selinux repo.
 // socket_label retrieves the current socket label setting.
 pub fn socket_label() {
     unimplemented!("not implemented yet")
 }
 
-// function compatible with peerLabel in go-selinux repo.
+// function similar with peerLabel in go-selinux repo.
 // peer_label retrieves the label of the client on the other side of a socket.
 pub fn peer_label() {
     unimplemented!("not implemented yet")
 }
 
-// function compatible with setKeyLabel in go-selinux repo.
+// function similar with setKeyLabel in go-selinux repo.
 // set_key_label takes a process label and tells the kernel to assign the
 // label to the next kernel keyring that gets created.
 pub fn set_key_label(label: &str) -> Result<(), std::io::Error> {
-    match write_con("/proc/self/attr/keycreate", label) {
+    match write_con(Path::new("/proc/self/attr/keycreate"), label) {
         Ok(v) => Ok(v),
         // TODO: This line will be fixed after implementing write_con.
         Err(e) => Err(e),
     }
 }
 
-// function compatible with KeyLabel in go-selinux repo.
+// function similar with KeyLabel in go-selinux repo.
 // key_label retrieves the current kernel keyring label setting
 pub fn key_label() {
     unimplemented!("not implemented yet")
 }
 
-// function compatible with clearLabels in go-selinux repo.
+// function similar with clearLabels in go-selinux repo.
 // clear_labels clears all reserved labels. 
 pub fn clear_labels() {
     unimplemented!("not implemented yet")
 }
 
-// function compatible with reserveLabel in go-selinux repo.
+// function similar with reserveLabel in go-selinux repo.
 // reserve_label reserves the MLS/MCS level component of the specified label
 pub fn reserve_label(label: &str) {
     unimplemented!("not implemented yet")
 }
 
-// function compatible with roFileLabel in go-selinux repo.
+// function similar with roFileLabel in go-selinux repo.
 // ro_file_label returns the specified SELinux readonly file label
 pub fn ro_file_label() {
     unimplemented!("not implemented yet")
 }
 
-// function compatible with kvmContainerLabels in go-selinux repo.
+// function similar with kvmContainerLabels in go-selinux repo.
 // kvm_container_labels returns the default processLabel and mountLabel to be used
 // for kvm containers by the calling process.
 pub fn kvm_container_labels() {
     unimplemented!("not implemented yet")
 }
 
-// function compatible with initContainerLabels in go-selinux repo.
+// function similar with initContainerLabels in go-selinux repo.
 // init_container_labels returns the default processLabel and file labels to be
 // used for containers running an init system like systemd by the calling process.
 pub fn init_container_labels() {
     unimplemented!("not implemented yet")
 }
 
-// function compatible with containerLabels in go-selinux repo.
+// function similar with containerLabels in go-selinux repo.
 // container_labels returns an allocated processLabel and fileLabel to be used for
 // container labeling by the calling process.
 pub fn container_labels() {
     unimplemented!("not implemented yet")
 }
 
-// function compatible with PrivContainerMountLabel in go-selinux repo.
+// function similar with PrivContainerMountLabel in go-selinux repo.
 // priv_container_mount_label returns mount label for privileged containers.
 pub fn priv_container_mount_label() {
     unimplemented!("not implemented yet")
 }
 
-// function compatible with FormatMountLabel in go-selinux repo.
+// function similar with FormatMountLabel in go-selinux repo.
 // format_mount_label returns a string to be used by the mount command.
 // Using the SELinux `context` mount option.
 // Changing labels of files on mount points with this option can never be changed.
@@ -242,7 +243,7 @@ pub fn format_mount_label(src: &str, mount_label: &str) -> String {
     return format_mount_label_by_type(src, mount_label, "context")
 }
 
-// function compatible with FormatMountLabelByType in go-selinux repo.
+// function similar with FormatMountLabelByType in go-selinux repo.
 // format_mount_label_by_type returns a string to be used by the mount command.
 // Allow caller to specify the mount options. For example using the SELinux
 // `fscontext` mount option would allow certain container processes to change
@@ -260,12 +261,12 @@ pub fn format_mount_label_by_type(src: &str, mount_label: &str, context_type: &s
     formatted_src
 }
 
-// function compatible with writeCon in go-selinux repo.
-pub fn write_con(fpath: &str, val: &str) -> Result<(), std::io::Error> {
+// function similar with writeCon in go-selinux repo.
+pub fn write_con(fpath: &Path, val: &str) -> Result<(), std::io::Error> {
     unimplemented!("not implemented yet");
 }
 
-// function compatible with isProcHandle in go-selinux repo.
+// function similar with isProcHandle in go-selinux repo.
 pub fn is_proc_handle(file: &File) -> Result<(), std::io::Error> {
     loop {
         match statfs::fstatfs(file.as_fd()) {
@@ -286,7 +287,7 @@ pub fn is_proc_handle(file: &File) -> Result<(), std::io::Error> {
     Ok(())
 }
 
-// function compatible with readConFd in go-selinux repo.
+// function similar with readConFd in go-selinux repo.
 pub fn read_con_fd(file: &mut File) -> Result<String, std::io::Error> {
     let mut data = String::new();
     file.read_to_string(&mut data)?;
@@ -296,9 +297,9 @@ pub fn read_con_fd(file: &mut File) -> Result<String, std::io::Error> {
     Ok(trimmed_data.to_string())
 }
 
-// function compatible with readCon in go-selinux repo.
-pub fn read_con(fpath: &str) -> Result<String, std::io::Error> {
-    if fpath.is_empty() {
+// function similar with readCon in go-selinux repo.
+pub fn read_con(fpath: &Path) -> Result<String, std::io::Error> {
+    if fpath.as_os_str().is_empty() {
         return Err(std::io::Error::new(io::ErrorKind::InvalidInput, ERR_EMPTY_PATH));
     }
     let mut in_file = File::open(fpath)?;
@@ -307,10 +308,10 @@ pub fn read_con(fpath: &str) -> Result<String, std::io::Error> {
     read_con_fd(&mut in_file)
 }
 
-// function compatible with attrPath in go-selinux repo.
+// function similar with attrPath in go-selinux repo.
 // attr_path determines the correct file path for accessing SELinux
 // attributes of a process or thread in a Linux environment.
-pub fn attr_path(attr: &str) -> String {
+pub fn attr_path(attr: &str) -> PathBuf {
     // Linux >= 3.17 provides this
     const THREAD_SELF_PREFIX: &str = "/proc/thread-self/attr";
     // Avoiding code conflicts and ensuring thread-safe execution once only.
@@ -321,10 +322,10 @@ pub fn attr_path(attr: &str) -> String {
         INIT_DONE.store(true, Ordering::SeqCst);
     }
     if HAVE_THREAD_SELF.load(Ordering::SeqCst) {
-        return format!("{}/{}", THREAD_SELF_PREFIX, attr);
+        return PathBuf::from(&format!("{}/{}", THREAD_SELF_PREFIX, attr));
     }
 
-    format!("/proc/self/task/{}/attr/{}", gettid(), attr)
+    PathBuf::from(&format!("/proc/self/task/{}/attr/{}", gettid(), attr))
 }
 
 #[cfg(test)]
@@ -333,7 +334,6 @@ mod tests {
     use std::fs::{self, File};
     use std::path::Path;
     use std::io::Write;
-    use std::io::Seek;
 
     fn create_temp_file(content: &[u8], file_name: &str) {
         let path = Path::new(file_name);
@@ -394,7 +394,8 @@ mod tests {
     fn test_attr_path() {
         // Test with "/proc/thread-self/attr" path (Linux >= 3.17)
         let attr = "bar";
-        let expected_path = format!("/proc/thread-self/attr/{}", attr);
+        let expected_name = &format!("/proc/thread-self/attr/{}", attr);
+        let expected_path = Path::new(expected_name);
         let actual_path = attr_path(attr);
         assert_eq!(expected_path, actual_path);
 
@@ -402,7 +403,8 @@ mod tests {
         INIT_DONE.store(true, Ordering::SeqCst);
         HAVE_THREAD_SELF.store(false, Ordering::SeqCst);        
         let thread_id = gettid();
-        let expected_path = format!("/proc/self/task/{}/attr/{}", thread_id, attr);
+        let expected_name = &format!("/proc/self/task/{}/attr/{}", thread_id, attr);
+        let expected_path = Path::new(expected_name);
         let actual_path = attr_path(attr);
         assert_eq!(expected_path, actual_path); 
     }
