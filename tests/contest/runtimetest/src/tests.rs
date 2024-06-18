@@ -258,6 +258,16 @@ pub fn validate_mounts_recursive(spec: &Spec) {
                                 );
                             }
                         }
+                        "ratime" => {
+                            println!("ratime: {mount:?}");
+                            if let Err(e) = utils::test_mount_ratime_option(
+                                mount.destination().to_str().unwrap(),
+                            ) {
+                                eprintln!(
+                                    "path expected to be ratime, found not ratime, error: {e}"
+                                );
+                            }
+                        }
                         "rstrictatime" => {
                             println!("rstrictatime: {mount:?}");
                             if let Err(e) = utils::test_mount_rstrictatime_option(
