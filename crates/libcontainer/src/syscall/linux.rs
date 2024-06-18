@@ -26,6 +26,7 @@ use crate::{capabilities, utils};
 // Flags used in mount_setattr(2).
 // see https://man7.org/linux/man-pages/man2/mount_setattr.2.html.
 pub const AT_RECURSIVE: u32 = 0x00008000; // Change the mount properties of the entire mount tree.
+#[allow(non_upper_case_globals)]
 pub const MOUNT_ATTR__ATIME: u64 = 0x00000070; // Setting on how atime should be updated.
 const MOUNT_ATTR_RDONLY: u64 = 0x00000001;
 const MOUNT_ATTR_NOSUID: u64 = 0x00000002;
