@@ -4,7 +4,7 @@ use nix::sys::statfs;
 use nix::errno::Errno;
 use std::path::{Path, PathBuf};
 use std::fs::File;
-use std::io::{self, Read};
+use std::io::Read;
 use std::os::fd::{AsFd, AsRawFd};
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -12,6 +12,24 @@ const XATTR_NAME_SELINUX: &str = "security.selinux";
 const ERR_EMPTY_PATH: &str = "empty path";
 static HAVE_THREAD_SELF: AtomicBool = AtomicBool::new(false);
 static INIT_DONE: AtomicBool = AtomicBool::new(false);
+
+#[derive(Debug, thiserror::Error)]
+pub enum SELinuxError {
+    #[error("Failed to set file label for SELinux: {0}")]
+    SetFileLabel(String),
+    #[error("Failed to lset file label for SELinux: {0}")]
+    LSetFileLabel(String),
+    #[error("Failed to get file label for SELinux: {0}")]
+    FileLabel(String),
+    #[error("Failed to get lfile label for SELinux: {0}")]
+    LFileLabel(String),
+    #[error("Failed to call is_proc_handle for SELinux: {0}")]
+    IsProcHandle(String),
+    #[error("Failed to call read_con_fd for SELinux: {0}")]
+    ReadConFd(String),
+    #[error("Failed to call read_con for SELinux: {0}")]
+    ReadCon(String),    
+}
 
 // function similar with setDisabled in go-selinux repo.
 // set_disabled disables SELinux support for the package.
@@ -34,19 +52,18 @@ pub fn class_index(class: &str) -> Result<i64, String> {
 
 // function similar with setFileLabel in go-selinux repo.
 // set_file_label sets the SELinux label for this path, following symlinks, or returns an error.
-pub fn set_file_label(fpath: &Path, label: &str) -> Result<(), std::io::Error> {
+pub fn set_file_label(fpath: &Path, label: &str) -> Result<(), SELinuxError> {
     if !fpath.exists() {
-        return Err(std::io::Error::new(io::ErrorKind::InvalidInput, ERR_EMPTY_PATH));
+        return Err(SELinuxError::SetFileLabel(ERR_EMPTY_PATH.to_string()));
     }
 
     loop {
         match set_xattr(fpath, XATTR_NAME_SELINUX, label.as_bytes(), 0) {
             Ok(_) => break,
             // TODO: This line will be fixed after implementing set_xattr.
-            Err(EINTR) => continue,
+            // Err(EINTR) => continue,
             Err(e) => {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
+                return Err(SELinuxError::SetFileLabel(
                     format!("set_xattr failed: {}", e),
                 ));
             }
@@ -58,21 +75,18 @@ pub fn set_file_label(fpath: &Path, label: &str) -> Result<(), std::io::Error> {
 // function similar with lSetFileLabel in go-selinux repo.
 // lset_file_label sets the SELinux label for this path, not following symlinks,
 // or returns an error.
-pub fn lset_file_label(fpath: &Path, label: &str) -> Result<(), std::io::Error> {
+pub fn lset_file_label(fpath: &Path, label: &str) -> Result<(), SELinuxError> {
     if !fpath.exists() {
-        return Err(std::io::Error::new(io::ErrorKind::InvalidInput, ERR_EMPTY_PATH));
+        return Err(SELinuxError::LSetFileLabel(ERR_EMPTY_PATH.to_string()));
     }
 
     loop {
         match lset_xattr(fpath, XATTR_NAME_SELINUX, label.as_bytes(), 0) {
             Ok(_) => break,
             // TODO: This line will be fixed after implementing lset_xattr.
-            Err(EINTR) => continue,
+            // Err(EINTR) => continue,
             Err(e) => {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("lset_xattr failed: {}", e),
-                ));
+                return Err(SELinuxError::LSetFileLabel(format!("lset_xattr failed: {}", e)));
             }
         }
     }
@@ -82,46 +96,48 @@ pub fn lset_file_label(fpath: &Path, label: &str) -> Result<(), std::io::Error> 
 // function similar with fileLabel in go-selinux repo.
 // fileLabel returns the SELinux label for this path, following symlinks,
 // or returns an error.
-pub fn file_label(fpath: &Path) -> Result<String, std::io::Error> {
+pub fn file_label(fpath: &Path) -> Result<String, SELinuxError> {
     if !fpath.exists() {
-        return Err(std::io::Error::new(io::ErrorKind::InvalidInput, ERR_EMPTY_PATH));
+        return Err(SELinuxError::FileLabel(ERR_EMPTY_PATH.to_string()));
     }
     get_xattr(fpath, XATTR_NAME_SELINUX)
+        .map_err(|e| SELinuxError::FileLabel(e.to_string()))
 }
 
 // function similar with lFileLabel in go-selinux repo.
 // lfile_label returns the SELinux label for this path, not following symlinks,
 // or returns an error.
-pub fn lfile_label(fpath: &Path) -> Result<String, std::io::Error> {
+pub fn lfile_label(fpath: &Path) -> Result<String, SELinuxError> {
     if !fpath.exists() {
-        return Err(std::io::Error::new(io::ErrorKind::InvalidInput, ERR_EMPTY_PATH));
+        return Err(SELinuxError::LFileLabel(ERR_EMPTY_PATH.to_string()));
     }
     lget_xattr(fpath, XATTR_NAME_SELINUX)
+        .map_err(|e| SELinuxError::LFileLabel(e.to_string()))
 }
 
 // function similar with setFSCreateLabel in go-selinux repo.
 // set_fscreate_label sets the default label the kernel which the kernel is using
 // for file system objects.
-pub fn set_fscreate_label(label: &str) -> Result<(), std::io::Error> {
+pub fn set_fscreate_label(label: &str) -> Result<(), SELinuxError> {
     return write_con(attr_path("fscreate").as_path(), label);
 }
 
 // function similar with fsCreateLabel in go-selinux repo.
 // fscreate_label returns the default label the kernel which the kernel is using
 // for file system objects created by this task. "" indicates default.
-pub fn fscreate_label() -> Result<String, std::io::Error> {
+pub fn fscreate_label() -> Result<String, SELinuxError> {
     return read_con(attr_path("fscreate").as_path());
 }
 
 // function similar with currentLabel in go-selinux repo.
 // current_label returns the SELinux label of the current process thread, or an error.
-pub fn current_label() -> Result<String, std::io::Error> {
+pub fn current_label() -> Result<String, SELinuxError> {
     return read_con(attr_path("current").as_path());
 }
 
 // function similar with pidLabel in go-selinux repo.
 // pid_label returns the SELinux label of the given pid, or an error.
-pub fn pid_label(pid: i64) -> Result<String, std::io::Error> {
+pub fn pid_label(pid: i64) -> Result<String, SELinuxError> {
     let file_name = &format!("/proc/{}/attr/current", pid);
     let label = Path::new(file_name);
     return read_con(label);
@@ -130,7 +146,7 @@ pub fn pid_label(pid: i64) -> Result<String, std::io::Error> {
 // function similar with execLabel in go-selinux repo.
 // exec_label returns the SELinux label that the kernel will use for any programs
 // that are executed by the current process thread, or an error.
-pub fn exec_label() -> Result<String, std::io::Error> {
+pub fn exec_label() -> Result<String, SELinuxError> {
     return read_con(attr_path("exec").as_path());
 }
 
@@ -170,7 +186,7 @@ pub fn peer_label() {
 // function similar with setKeyLabel in go-selinux repo.
 // set_key_label takes a process label and tells the kernel to assign the
 // label to the next kernel keyring that gets created.
-pub fn set_key_label(label: &str) -> Result<(), std::io::Error> {
+pub fn set_key_label(label: &str) -> Result<(), SELinuxError> {
     match write_con(Path::new("/proc/self/attr/keycreate"), label) {
         Ok(v) => Ok(v),
         // TODO: This line will be fixed after implementing write_con.
@@ -262,25 +278,22 @@ pub fn format_mount_label_by_type(src: &str, mount_label: &str, context_type: &s
 }
 
 // function similar with writeCon in go-selinux repo.
-pub fn write_con(fpath: &Path, val: &str) -> Result<(), std::io::Error> {
+pub fn write_con(fpath: &Path, val: &str) -> Result<(), SELinuxError> {
     unimplemented!("not implemented yet");
 }
 
 // function similar with isProcHandle in go-selinux repo.
-pub fn is_proc_handle(file: &File) -> Result<(), std::io::Error> {
+pub fn is_proc_handle(file: &File) -> Result<(), SELinuxError> {
     loop {
         match statfs::fstatfs(file.as_fd()) {
             Ok(stat) if stat.filesystem_type() == statfs::PROC_SUPER_MAGIC => break,
             Ok(_) => {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::Other, format!("file {} is not on procfs", file.as_raw_fd())
+                return Err(SELinuxError::IsProcHandle(format!("file {} is not on procfs", file.as_raw_fd())
                 ));
             },
             Err(Errno::EINTR) => continue,
             Err(err) => {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("fstatfs failed: {}", err)))
+                return Err(SELinuxError::IsProcHandle(format!("fstatfs failed: {}", err)))
             }
         }
     }
@@ -288,9 +301,10 @@ pub fn is_proc_handle(file: &File) -> Result<(), std::io::Error> {
 }
 
 // function similar with readConFd in go-selinux repo.
-pub fn read_con_fd(file: &mut File) -> Result<String, std::io::Error> {
+pub fn read_con_fd(file: &mut File) -> Result<String, SELinuxError> {
     let mut data = String::new();
-    file.read_to_string(&mut data)?;
+    file.read_to_string(&mut data)
+        .map_err(|e| SELinuxError::ReadConFd(e.to_string()))?;
     
     // Remove null bytes on the end of a file.
     let trimmed_data = data.trim_end_matches(char::from(0));
@@ -298,11 +312,12 @@ pub fn read_con_fd(file: &mut File) -> Result<String, std::io::Error> {
 }
 
 // function similar with readCon in go-selinux repo.
-pub fn read_con(fpath: &Path) -> Result<String, std::io::Error> {
+pub fn read_con(fpath: &Path) -> Result<String, SELinuxError> {
     if fpath.as_os_str().is_empty() {
-        return Err(std::io::Error::new(io::ErrorKind::InvalidInput, ERR_EMPTY_PATH));
+        return Err(SELinuxError::ReadCon(ERR_EMPTY_PATH.to_string()));
     }
-    let mut in_file = File::open(fpath)?;
+    let mut in_file = File::open(fpath)
+        .map_err(|e| SELinuxError::ReadCon(format!("failed to open file: {}", e)))?;
 
     is_proc_handle(&in_file)?;
     read_con_fd(&mut in_file)
