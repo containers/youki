@@ -11,7 +11,7 @@ pub use syscall::Syscall;
 #[derive(Debug, thiserror::Error)]
 pub enum SyscallError {
     #[error("unexpected mount attr option: {0}")]
-    UnexpectedMountAttrOption(String),
+    UnexpectedMountRecursiveOption(String),
     #[error(transparent)]
     Nix(#[from] nix::Error),
     #[error(transparent)]

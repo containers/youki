@@ -6,7 +6,7 @@ use nix::sys::stat::SFlag;
 use oci_spec::runtime::{LinuxDevice, LinuxDeviceBuilder, LinuxDeviceType, Mount};
 
 use super::mount::MountError;
-use crate::syscall::linux::{self, MountAttrOption};
+use crate::syscall::linux::{self, MountRecursive};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MountOptionConfig {
@@ -89,18 +89,21 @@ pub fn parse_mount(m: &Mount) -> std::result::Result<MountOptionConfig, MountErr
 
     if let Some(options) = &m.options() {
         for option in options {
-            if let Ok(mount_attr_option) = linux::MountAttrOption::from_str(option.as_str()) {
+            if let Ok(mount_attr_option) = linux::MountRecursive::from_str(option.as_str()) {
+                // Some options aren't corresponding to the mount flags.
+                // These options need `AT_RECURSIVE` options.
+                // ref: https://github.com/opencontainers/runtime-spec/blob/main/config.md#linux-mount-options
                 let (is_clear, flag) = match mount_attr_option {
-                    MountAttrOption::MountArrtRdonly(is_clear, flag) => (is_clear, flag),
-                    MountAttrOption::MountAttrNosuid(is_clear, flag) => (is_clear, flag),
-                    MountAttrOption::MountAttrNodev(is_clear, flag) => (is_clear, flag),
-                    MountAttrOption::MountAttrNoexec(is_clear, flag) => (is_clear, flag),
-                    MountAttrOption::MountAttrAtime(is_clear, flag) => (is_clear, flag),
-                    MountAttrOption::MountAttrRelatime(is_clear, flag) => (is_clear, flag),
-                    MountAttrOption::MountAttrNoatime(is_clear, flag) => (is_clear, flag),
-                    MountAttrOption::MountAttrStrictAtime(is_clear, flag) => (is_clear, flag),
-                    MountAttrOption::MountAttrNoDiratime(is_clear, flag) => (is_clear, flag),
-                    MountAttrOption::MountAttrNosymfollow(is_clear, flag) => (is_clear, flag),
+                    MountRecursive::Rdonly(is_clear, flag) => (is_clear, flag),
+                    MountRecursive::Nosuid(is_clear, flag) => (is_clear, flag),
+                    MountRecursive::Nodev(is_clear, flag) => (is_clear, flag),
+                    MountRecursive::Noexec(is_clear, flag) => (is_clear, flag),
+                    MountRecursive::Atime(is_clear, flag) => (is_clear, flag),
+                    MountRecursive::Relatime(is_clear, flag) => (is_clear, flag),
+                    MountRecursive::Noatime(is_clear, flag) => (is_clear, flag),
+                    MountRecursive::StrictAtime(is_clear, flag) => (is_clear, flag),
+                    MountRecursive::NoDiratime(is_clear, flag) => (is_clear, flag),
+                    MountRecursive::Nosymfollow(is_clear, flag) => (is_clear, flag),
                 };
 
                 if mount_attr.is_none() {

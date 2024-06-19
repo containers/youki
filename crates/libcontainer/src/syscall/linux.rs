@@ -39,87 +39,65 @@ const MOUNT_ATTR_NODIRATIME: u64 = 0x00000080;
 const MOUNT_ATTR_NOSYMFOLLOW: u64 = 0x00200000;
 
 /// Constants used by mount_setattr(2).
-pub enum MountAttrOption {
+pub enum MountRecursive {
     /// Mount read-only.
-    MountArrtRdonly(bool, u64),
+    Rdonly(bool, u64),
 
     /// Ignore suid and sgid bits.
-    MountAttrNosuid(bool, u64),
+    Nosuid(bool, u64),
 
     /// Disallow access to device special files.
-    MountAttrNodev(bool, u64),
+    Nodev(bool, u64),
 
     /// Disallow program execution.
-    MountAttrNoexec(bool, u64),
+    Noexec(bool, u64),
 
     /// Setting on how atime should be updated.
-    MountAttrAtime(bool, u64),
+    Atime(bool, u64),
 
     /// Update atime relative to mtime/ctime.
-    MountAttrRelatime(bool, u64),
+    Relatime(bool, u64),
 
     /// Do not update access times.
-    MountAttrNoatime(bool, u64),
+    Noatime(bool, u64),
 
     /// Always perform atime updates.
-    MountAttrStrictAtime(bool, u64),
+    StrictAtime(bool, u64),
 
     /// Do not update directory access times.
-    MountAttrNoDiratime(bool, u64),
+    NoDiratime(bool, u64),
 
     /// Prevents following symbolic links.
-    MountAttrNosymfollow(bool, u64),
+    Nosymfollow(bool, u64),
 }
 
-impl FromStr for MountAttrOption {
+impl FromStr for MountRecursive {
     type Err = SyscallError;
 
     fn from_str(option: &str) -> std::result::Result<Self, Self::Err> {
         match option {
-            "rro" => Ok(MountAttrOption::MountArrtRdonly(false, MOUNT_ATTR_RDONLY)),
-            "rrw" => Ok(MountAttrOption::MountArrtRdonly(true, MOUNT_ATTR_RDONLY)),
-            "rnosuid" => Ok(MountAttrOption::MountAttrNosuid(false, MOUNT_ATTR_NOSUID)),
-            "rsuid" => Ok(MountAttrOption::MountAttrNosuid(true, MOUNT_ATTR_NOSUID)),
-            "rnodev" => Ok(MountAttrOption::MountAttrNodev(false, MOUNT_ATTR_NODEV)),
-            "rdev" => Ok(MountAttrOption::MountAttrNodev(true, MOUNT_ATTR_NODEV)),
-            "rnoexec" => Ok(MountAttrOption::MountAttrNoexec(false, MOUNT_ATTR_NOEXEC)),
-            "rexec" => Ok(MountAttrOption::MountAttrNoexec(true, MOUNT_ATTR_NOEXEC)),
-            "rnodiratime" => Ok(MountAttrOption::MountAttrNoDiratime(
-                false,
-                MOUNT_ATTR_NODIRATIME,
-            )),
-            "rdiratime" => Ok(MountAttrOption::MountAttrNoDiratime(
-                true,
-                MOUNT_ATTR_NODIRATIME,
-            )),
-            "rrelatime" => Ok(MountAttrOption::MountAttrRelatime(
-                false,
-                MOUNT_ATTR_RELATIME,
-            )),
-            "rnorelatime" => Ok(MountAttrOption::MountAttrRelatime(
-                true,
-                MOUNT_ATTR_RELATIME,
-            )),
-            "rnoatime" => Ok(MountAttrOption::MountAttrNoatime(false, MOUNT_ATTR_NOATIME)),
-            "ratime" => Ok(MountAttrOption::MountAttrNoatime(true, MOUNT_ATTR_NOATIME)),
-            "rstrictatime" => Ok(MountAttrOption::MountAttrStrictAtime(
-                false,
-                MOUNT_ATTR_STRICTATIME,
-            )),
-            "rnostrictatime" => Ok(MountAttrOption::MountAttrStrictAtime(
-                true,
-                MOUNT_ATTR_STRICTATIME,
-            )),
-            "rnosymfollow" => Ok(MountAttrOption::MountAttrNosymfollow(
-                false,
-                MOUNT_ATTR_NOSYMFOLLOW,
-            )),
-            "rsymfollow" => Ok(MountAttrOption::MountAttrNosymfollow(
-                true,
-                MOUNT_ATTR_NOSYMFOLLOW,
-            )),
+            "rro" => Ok(MountRecursive::Rdonly(false, MOUNT_ATTR_RDONLY)),
+            "rrw" => Ok(MountRecursive::Rdonly(true, MOUNT_ATTR_RDONLY)),
+            "rnosuid" => Ok(MountRecursive::Nosuid(false, MOUNT_ATTR_NOSUID)),
+            "rsuid" => Ok(MountRecursive::Nosuid(true, MOUNT_ATTR_NOSUID)),
+            "rnodev" => Ok(MountRecursive::Nodev(false, MOUNT_ATTR_NODEV)),
+            "rdev" => Ok(MountRecursive::Nodev(true, MOUNT_ATTR_NODEV)),
+            "rnoexec" => Ok(MountRecursive::Noexec(false, MOUNT_ATTR_NOEXEC)),
+            "rexec" => Ok(MountRecursive::Noexec(true, MOUNT_ATTR_NOEXEC)),
+            "rnodiratime" => Ok(MountRecursive::NoDiratime(false, MOUNT_ATTR_NODIRATIME)),
+            "rdiratime" => Ok(MountRecursive::NoDiratime(true, MOUNT_ATTR_NODIRATIME)),
+            "rrelatime" => Ok(MountRecursive::Relatime(false, MOUNT_ATTR_RELATIME)),
+            "rnorelatime" => Ok(MountRecursive::Relatime(true, MOUNT_ATTR_RELATIME)),
+            "rnoatime" => Ok(MountRecursive::Noatime(false, MOUNT_ATTR_NOATIME)),
+            "ratime" => Ok(MountRecursive::Noatime(true, MOUNT_ATTR_NOATIME)),
+            "rstrictatime" => Ok(MountRecursive::StrictAtime(false, MOUNT_ATTR_STRICTATIME)),
+            "rnostrictatime" => Ok(MountRecursive::StrictAtime(true, MOUNT_ATTR_STRICTATIME)),
+            "rnosymfollow" => Ok(MountRecursive::Nosymfollow(false, MOUNT_ATTR_NOSYMFOLLOW)),
+            "rsymfollow" => Ok(MountRecursive::Nosymfollow(true, MOUNT_ATTR_NOSYMFOLLOW)),
             // No support for MOUNT_ATTR_IDMAP yet (needs UserNS FD)
-            _ => Err(SyscallError::UnexpectedMountAttrOption(option.to_string())),
+            _ => Err(SyscallError::UnexpectedMountRecursiveOption(
+                option.to_string(),
+            )),
         }
     }
 }
