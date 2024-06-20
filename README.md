@@ -2,17 +2,17 @@
 
 [![Discord](https://img.shields.io/discord/849943000770412575.svg?logo=discord)](https://discord.gg/zHnyXKSQFD)
 [![GitHub contributors](https://img.shields.io/github/contributors/containers/youki)](https://github.com/containers/youki/graphs/contributors)
-[![Github CI](https://github.com/containers/youki/actions/workflows/main.yml/badge.svg?branch=main)](https://github.com/containers/youki/actions)
+[![Github CI](https://github.com/containers/youki/actions/workflows/basic.yml/badge.svg?branch=main)](https://github.com/containers/youki/actions)
 [![codecov](https://codecov.io/gh/containers/youki/branch/main/graph/badge.svg)](https://codecov.io/gh/containers/youki)
 
 <p align="center">
   <img src="docs/youki.png" width="450">
 </p>
 
-youki is an implementation of the [OCI runtime-spec](https://github.com/opencontainers/runtime-spec) in Rust, similar to [runc](https://github.com/opencontainers/runc).  
+**youki** is an implementation of the [OCI runtime-spec](https://github.com/opencontainers/runtime-spec) in Rust, similar to [runc](https://github.com/opencontainers/runc).  
 Your ideas are welcome [here](https://github.com/containers/youki/issues/10).
 
-# Quick Start
+# 🚀 Quick Start
 
 > [!TIP]
 > You can immediately set up your environment with youki on GitHub Codespaces and try it out.  
@@ -26,23 +26,18 @@ Your ideas are welcome [here](https://github.com/containers/youki/issues/10).
 
 [User Documentation](https://containers.github.io/youki/user/basic_setup.html#quick-install)
 
-# About the name
-
-youki is pronounced as /joʊki/ or yoh-key.
-youki is named after the Japanese word 'youki', which means 'a container'. In Japanese language, youki also means 'cheerful', 'merry', or 'hilarious'.
-
-# Motivation
+# 🎯 Motivation
 
 Here is why we are writing a new container runtime in Rust.
 
 - Rust is one of the best languages to implement the oci-runtime spec. Many very nice container tools are currently written in Go. However, the container runtime requires the use of system calls, which requires a bit of special handling when implemented in Go. This is too tricky (e.g. _namespaces(7)_, _fork(2)_); with Rust, it's not that tricky. And, unlike in C, Rust provides the benefit of memory safety. While Rust is not yet a major player in the container field, it has the potential to contribute a lot: something this project attempts to exemplify.
 - youki has the potential to be faster and use less memory than runc, and therefore work in environments with tight memory usage requirements. Here is a simple benchmark of a container from creation to deletion.
-  | Runtime | Time (mean ± σ) | Range (min … max) |
-  | :-----: | :-----------------: | :-----------------: |
-  | youki | 198.4 ms ± 52.1 ms | 97.2 ms … 296.1 ms |
-  | runc | 352.3 ms ± 53.3 ms | 248.3 ms … 772.2 ms |
-  | crun | 153.5 ms ± 21.6 ms | 80.9 ms … 196.6 ms |
-  <details>
+  |  Runtime | Time (mean ± σ) | 	Range (min … max) | vs youki(mean) | Version | 
+  | -------- | -------- | -------- | -------- | -------- |
+  | youki     | 111.5 ms ± 11.6 ms  | 84.0 ms ± 142.5 ms   | 100% | 0.3.3 |
+  | runc     | 224.6 ms ± 12.0 ms  | 190.5 ms ± 255.4 ms   | 200% | 1.1.7 |
+  | crun     | 47.3 ms ± 2.8 ms  | 42.4 ms ± 56.2 ms   | 42% | 1.15 |
+    <details>
   <summary>Details about the benchmark</summary>
 
   - A command used for the benchmark
@@ -55,36 +50,16 @@ Here is why we are writing a new container runtime in Rust.
 
     ```console
     $ ./youki info
-    Version           0.0.1
-    Kernel-Release    5.11.0-41-generic
-    Kernel-Version    #45-Ubuntu SMP Fri Nov 5 11:37:01 UTC 2021
+    Version           0.3.3
+    Commit            4f3c8307
+    Kernel-Release    6.5.0-35-generic
+    Kernel-Version    #35~22.04.1-Ubuntu SMP PREEMPT_DYNAMIC Tue May  7 09:00:52 UTC 2
     Architecture      x86_64
-    Operating System  Ubuntu 21.04
-    Cores             12
-    Total Memory      32025
-    Cgroup setup      hybrid
+    Operating System  Ubuntu 22.04.4 LTS
+    Cores             16
+    Total Memory      63870
+    Cgroup setup      unified
     Cgroup mounts
-      blkio           /sys/fs/cgroup/blkio
-      cpu             /sys/fs/cgroup/cpu,cpuacct
-      cpuacct         /sys/fs/cgroup/cpu,cpuacct
-      cpuset          /sys/fs/cgroup/cpuset
-      devices         /sys/fs/cgroup/devices
-      freezer         /sys/fs/cgroup/freezer
-      hugetlb         /sys/fs/cgroup/hugetlb
-      memory          /sys/fs/cgroup/memory
-      net_cls         /sys/fs/cgroup/net_cls,net_prio
-      net_prio        /sys/fs/cgroup/net_cls,net_prio
-      perf_event      /sys/fs/cgroup/perf_event
-      pids            /sys/fs/cgroup/pids
-      unified         /sys/fs/cgroup/unified
-    CGroup v2 controllers
-      cpu             detached
-      cpuset          detached
-      hugetlb         detached
-      io              detached
-      memory          detached
-      pids            detached
-      device          attached
     Namespaces        enabled
       mount           enabled
       uts             enabled
@@ -93,60 +68,34 @@ Here is why we are writing a new container runtime in Rust.
       pid             enabled
       network         enabled
       cgroup          enabled
-    $ ./youki --version
-    youki version 0.0.1
-    commit: 0.0.1-0-0be33bf
-    $ runc -v
-    runc version 1.0.0-rc93
-    commit: 12644e614e25b05da6fd08a38ffa0cfe1903fdec
-    spec: 1.0.2-dev
-    go: go1.13.15
-    libseccomp: 2.5.1
-    $ crun --version
-    crun version 0.19.1.45-4cc7
-    commit: 4cc7fa1124cce75dc26e12186d9cbeabded2b710
-    spec: 1.0.0
-    +SYSTEMD +SELINUX +APPARMOR +CAP +SECCOMP +EBPF +CRIU +YAJL
+    Capabilities
+    CAP_BPF           available
+    CAP_PERFMON       available
+    CAP_CHECKPOINT_RESTORE available
     ```
 
   </details>
 
 - I have fun implementing this. In fact, this may be the most important.
 
-# Related project
+# 📍 Status of youki
+
+youki has aced real-world use cases, including containerd's e2e test, and is now adopted several production environments.
+We have [our roadmap](https://github.com/orgs/containers/projects/15).
+
+![youki demo](docs/demo.gif)
+
+# 🔗 Related project
 
 - [containers/oci-spec-rs](https://github.com/containers/oci-spec-rs) - OCI Runtime and Image Spec in Rust
 
-# Status of youki
-
-youki is not at the practical stage yet. However, it is getting closer to practical use, running with docker and passing all the default tests provided by [opencontainers/runtime-tools](https://github.com/opencontainers/runtime-tools).
-![youki demo](docs/demo.gif)
-
-|        Feature        |                   Description                   |                                                State                                                |
-|:---------------------:|:-----------------------------------------------:| :-------------------------------------------------------------------------------------------------: |
-|      Containerd       |             Running via Containerd              |                                                 ✅                                                  |
-|        Docker         |               Running via Docker                |                                                 ✅                                                  |
-|        Podman         |               Running via Podman                |                                                 ✅                                                  |
-|      pivot_root       |            Change the root directory            |                                                 ✅                                                  |
-|        Mounts         |    Mount files and directories to container     |                                                 ✅                                                  |
-|      Namespaces       |         Isolation of various resources          |                                                 ✅                                                  |
-|     Capabilities      |            Limiting root privileges             |                                                 ✅                                                  |
-|      Cgroups v1       |            Resource limitations, etc            |                                                 ✅                                                  |
-|      Cgroups v2       |             Improved version of v1              | Support is complete except for devices. WIP on [#230](https://github.com/containers/youki/issues/230) |
-| Systemd cgroup driver |        Setting up a cgroup using systemd        |                                                 ✅                                                  |
-|        Seccomp        |             Filtering system calls              |                                                 ✅                                                  |
-|         Hooks         | Add custom processing during container creation |                                                 ✅                                                  |
-|       Rootless        |   Running a container without root privileges   |                                                 ✅                                                  |
-|    OCI Compliance     |        Compliance with OCI Runtime Spec         |                                 ✅ 50 out of 50 test cases passing                                  |
-|   CRIU Integration    | Functionality to checkpoint/restore containers  |                           Initial checkpoint support as described in [#641](https://github.com/containers/youki/pull/641)                           |
-
-# Design and implementation of youki
+# 🎨 Design and implementation of youki
 
 The User and Developer Documentation for youki is hosted at [https://containers.github.io/youki/](https://containers.github.io/youki/)
 
 ![Architecture](docs/.drawio.svg)
 
-# Getting Started
+# 🎬 Getting Started
 
 Local build is only supported on Linux.
 For other platforms, please use the [Vagrantfile](#setting-up-vagrant) that we have prepared. You can also spin up a fully preconfigured development environment in the cloud with [GitHub Codespaces](https://docs.github.com/en/codespaces/getting-started/quickstart).
@@ -322,15 +271,9 @@ cd youki
 just youki-dev # or youki-release
 ```
 
-# Community
+# 👥 Community and Contibuting
 
-We also have an active [Discord](https://discord.gg/h7R3HgWUct) if you'd like to come and chat with us.
-
-# Contribution
-
-This project welcomes your PR and issues.
-For example, refactoring, adding features, correcting English, etc.
-If you need any help, you can contact me on [Twitter](https://twitter.com/utam0k).
+Please refer to [our community page](https://containers.github.io/youki/community/introduction.html).
 
 Thanks to all the people who already contributed!
 
