@@ -138,6 +138,11 @@ fn is_executable(path: &Path) -> std::result::Result<bool, std::io::Error> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+    use std::env;
+
+    use serial_test::serial;
+
     use super::*;
 
     #[test]
@@ -176,5 +181,36 @@ mod tests {
         assert!(is_executable(&executable_path).unwrap());
         assert!(!is_executable(&non_executable_path).unwrap());
         assert!(!is_executable(directory_path).unwrap());
+    }
+
+    #[test]
+    #[serial]
+    fn test_executor_set_envs() {
+        // Store original environment variables to restore later
+        let original_envs: HashMap<String, String> = env::vars().collect();
+
+        // Test setting environment variables
+        {
+            let executor = get_executor();
+            let envs = HashMap::from([
+                ("FOO".to_owned(), "hoge".to_owned()),
+                ("BAR".to_owned(), "fuga".to_owned()),
+                ("BAZ".to_owned(), "piyo".to_owned()),
+            ]);
+            assert!(executor.set_envs(envs).is_ok());
+
+            // Check if the environment variables are set correctly
+            let current_envs = std::env::vars().collect::<HashMap<String, String>>();
+            assert_eq!(current_envs.get("FOO").unwrap(), "hoge");
+            assert_eq!(current_envs.get("BAR").unwrap(), "fuga");
+            assert_eq!(current_envs.get("BAZ").unwrap(), "piyo");
+            // No other environment variables should be set
+            assert_eq!(current_envs.len(), 3);
+        }
+
+        // Restore original environment variables
+        original_envs.iter().for_each(|(key, value)| {
+            env::set_var(key, value);
+        });
     }
 }
