@@ -73,6 +73,8 @@ pub enum InitProcessError {
     Workload(#[from] workload::ExecutorError),
     #[error(transparent)]
     WorkloadValidation(#[from] workload::ExecutorValidationError),
+    #[error(transparent)]
+    WorkloadSetEnvs(#[from] workload::ExecutorSetEnvsError),
     #[error("invalid io priority class: {0}")]
     IoPriorityClass(String),
     #[error("call exec sched_setattr error: {0}")]

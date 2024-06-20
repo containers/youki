@@ -27,6 +27,14 @@ pub enum ExecutorValidationError {
     ArgValidationError(String),
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum ExecutorSetEnvsError {
+    #[error("failed to set envs")]
+    SetEnvs(#[from] Box<dyn std::error::Error + Send + Sync>),
+    #[error("{0}")]
+    Other(String),
+}
+
 // Here is an explanation about the complexity below regarding to
 // CloneBoxExecutor and Executor traits. This is one of the places rust actually
 // makes our life harder. The usecase for the executor is to allow users of
@@ -65,7 +73,7 @@ pub trait Executor: CloneBoxExecutor {
     fn validate(&self, spec: &Spec) -> Result<(), ExecutorValidationError>;
 
     /// Set environment variables for the container process to be executed.
-    fn set_envs(&self, envs: HashMap<String, String>) -> Result<(), ExecutorError> {
+    fn set_envs(&self, envs: HashMap<String, String>) -> Result<(), ExecutorSetEnvsError> {
         // Reset the process env based on oci spec.
         env::vars().for_each(|(key, _value)| env::remove_var(key));
         envs.iter()
