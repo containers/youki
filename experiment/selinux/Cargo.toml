@@ -1,0 +1,16 @@
+[package]
+name = "selinux"
+version = "0.1.0"
+description = "Library for selinux"
+license-file = "../../LICENSE"
+repository = "https://github.com/containers/youki"
+homepage = "https://containers.github.io/youki"
+readme = "README.md"
+authors = ["youki team"]
+edition = "2021"
+autoexamples = true
+keywords = ["youki", "container", "selinux"]
+
+[dependencies]
+nix = { version = "0.29.0", features = ["process", "fs"] }
+thiserror = "1.0.61"
