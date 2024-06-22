@@ -1,2 +1,2 @@
 pub mod selinux;
-pub mod xattr;
+pub mod xattrs;
