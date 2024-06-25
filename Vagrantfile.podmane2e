@@ -1,7 +1,7 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-GO_VERSION = "1.20.12"
+GO_VERSION = "1.22.0"
 PODMAN_BRANCH = "main"
 SKOPEO_VERSION = "1.13.1"
 
