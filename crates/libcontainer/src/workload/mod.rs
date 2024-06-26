@@ -73,9 +73,17 @@ pub trait Executor: CloneBoxExecutor {
     fn validate(&self, spec: &Spec) -> Result<(), ExecutorValidationError>;
 
     /// Set environment variables for the container process to be executed.
+    /// This step runs after the container init process is created, entered
+    /// into the correct namespace and cgroups, and pivot_root into the rootfs.
+    /// But this step runs before waiting for the container start signal.
+    /// The host's environment variables are not cleared yet at this point.
+    /// They should be cleared explicitly if needed.
     fn setup_envs(&self, envs: HashMap<String, String>) -> Result<(), ExecutorSetEnvsError> {
-        // Reset the process env based on oci spec.
+        // The default implementation resets the process env based on the OCI spec.
+        // First, clear all host's envs.
         env::vars().for_each(|(key, _value)| env::remove_var(key));
+
+        // Next, set envs based on the spec
         envs.iter()
             .for_each(|(key, value)| env::set_var(key, value));
 
