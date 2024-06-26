@@ -197,7 +197,7 @@ mod tests {
                 ("BAR".to_owned(), "fuga".to_owned()),
                 ("BAZ".to_owned(), "piyo".to_owned()),
             ]);
-            assert!(executor.set_envs(envs).is_ok());
+            assert!(executor.setup_envs(envs).is_ok());
 
             // Check if the environment variables are set correctly
             let current_envs = std::env::vars().collect::<HashMap<String, String>>();

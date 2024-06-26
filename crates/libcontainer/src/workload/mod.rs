@@ -73,7 +73,7 @@ pub trait Executor: CloneBoxExecutor {
     fn validate(&self, spec: &Spec) -> Result<(), ExecutorValidationError>;
 
     /// Set environment variables for the container process to be executed.
-    fn set_envs(&self, envs: HashMap<String, String>) -> Result<(), ExecutorSetEnvsError> {
+    fn setup_envs(&self, envs: HashMap<String, String>) -> Result<(), ExecutorSetEnvsError> {
         // Reset the process env based on oci spec.
         env::vars().for_each(|(key, _value)| env::remove_var(key));
         envs.iter()

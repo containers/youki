@@ -589,7 +589,7 @@ pub fn container_init_process(
     }
 
     args.executor.validate(spec)?;
-    args.executor.set_envs(envs)?;
+    args.executor.setup_envs(envs)?;
 
     // Notify main process that the init process is ready to execute the
     // payload.  Note, because we are already inside the pid namespace, the pid
