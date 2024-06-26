@@ -12,6 +12,11 @@
 **youki** is an implementation of the [OCI runtime-spec](https://github.com/opencontainers/runtime-spec) in Rust, similar to [runc](https://github.com/opencontainers/runc).  
 Your ideas are welcome [here](https://github.com/containers/youki/issues/10).
 
+# 🏷️ About the name
+
+youki is pronounced as /joʊki/ or yoh-key.
+youki is named after the Japanese word 'youki', which means 'a container'. In Japanese language, youki also means 'cheerful', 'merry', or 'hilarious'.
+
 # 🚀 Quick Start
 
 > [!TIP]
@@ -80,7 +85,7 @@ Here is why we are writing a new container runtime in Rust.
 
 # 📍 Status of youki
 
-youki has aced real-world use cases, including containerd's e2e test, and is now adopted several production environments.
+**youki** has aced real-world use cases, including containerd's e2e test, and is now adopted by several production environments.
 We have [our roadmap](https://github.com/orgs/containers/projects/15).
 
 ![youki demo](docs/demo.gif)
