@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use std::env;
+
 use oci_spec::runtime::Spec;
 
 pub mod default;
@@ -22,6 +25,14 @@ pub enum ExecutorValidationError {
     CantHandle(&'static str),
     #[error("{0}")]
     ArgValidationError(String),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ExecutorSetEnvsError {
+    #[error("failed to set envs")]
+    SetEnvs(#[from] Box<dyn std::error::Error + Send + Sync>),
+    #[error("{0}")]
+    Other(String),
 }
 
 // Here is an explanation about the complexity below regarding to
@@ -60,6 +71,24 @@ pub trait Executor: CloneBoxExecutor {
     /// namespace and cgroups, and pivot_root into the rootfs. But this step
     /// runs before waiting for the container start signal.
     fn validate(&self, spec: &Spec) -> Result<(), ExecutorValidationError>;
+
+    /// Set environment variables for the container process to be executed.
+    /// This step runs after the container init process is created, entered
+    /// into the correct namespace and cgroups, and pivot_root into the rootfs.
+    /// But this step runs before waiting for the container start signal.
+    /// The host's environment variables are not cleared yet at this point.
+    /// They should be cleared explicitly if needed.
+    fn setup_envs(&self, envs: HashMap<String, String>) -> Result<(), ExecutorSetEnvsError> {
+        // The default implementation resets the process env based on the OCI spec.
+        // First, clear all host's envs.
+        env::vars().for_each(|(key, _value)| env::remove_var(key));
+
+        // Next, set envs based on the spec
+        envs.iter()
+            .for_each(|(key, value)| env::set_var(key, value));
+
+        Ok(())
+    }
 }
 
 impl<T> CloneBoxExecutor for T
