@@ -11,7 +11,8 @@ libcgroups = { path = "../../../crates/libcgroups" }
 libcontainer = { path = "../../../crates/libcontainer" }
 nix = "0.28.0"
 num_cpus = "1.16"
-oci-spec = { version = "0.6.4", features = ["runtime"] }
+#oci-spec = { version = "0.6.4", features = ["runtime"] }
+oci-spec={git="https://github.com/lengrongfu/oci-spec-rs",branch = "feat/add_idmapped_mount",features = ["runtime"] }
 once_cell = "1.19.0"
 pnet_datalink = "0.34.0"
 procfs = "0.16.0"

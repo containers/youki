@@ -1,6 +1,7 @@
 use core::fmt;
 
 use serde::{Deserialize, Serialize};
+use crate::rootfs::mount::{IdMountParam, IdMountSource};
 
 /// Used as a wrapper for messages to be sent between child and parent processes
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -12,6 +13,8 @@ pub enum Message {
     SeccompNotify,
     SeccompNotifyDone,
     ExecFailed(String),
+    SendConfigureMount(IdMountParam),
+    ReceiveMountFd(IdMountSource),
 }
 
 impl fmt::Display for Message {
@@ -24,6 +27,8 @@ impl fmt::Display for Message {
             Message::SeccompNotify => write!(f, "SeccompNotify"),
             Message::SeccompNotifyDone => write!(f, "SeccompNotifyDone"),
             Message::ExecFailed(s) => write!(f, "ExecFailed({})", s),
+            Message::SendConfigureMount(_) => write!(f,"SendConfigureMount"),
+            Message::ReceiveMountFd(_) => write!(f,"ReceiveMountFd"),
         }
     }
 }

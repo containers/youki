@@ -1,15 +1,16 @@
 use std::collections::HashSet;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use nix::mount::MsFlags;
 use oci_spec::runtime::{Linux, Spec};
 
 use super::device::Device;
-use super::mount::{Mount, MountOptions};
+use super::mount::{Mount, MountOptions, IdMountParam};
 use super::symlink::Symlink;
 use super::utils::default_devices;
 use super::{Result, RootfsError};
 use crate::error::MissingSpecError;
+use crate::process::channel;
 use crate::syscall::syscall::create_syscall;
 use crate::syscall::Syscall;
 
@@ -37,6 +38,9 @@ impl RootFS {
         rootfs: &Path,
         bind_devices: bool,
         cgroup_ns: bool,
+        ns_ptah: Option<PathBuf>,
+        main_sender: &mut channel::MainSender,
+        init_receiver: &mut channel::InitReceiver,
     ) -> Result<()> {
         tracing::debug!(?rootfs, "prepare rootfs");
         let mut flags = MsFlags::MS_REC;
@@ -89,9 +93,12 @@ impl RootFS {
 
         if let Some(mounts) = spec.mounts() {
             for mount in mounts {
-                mounter.setup_mount(mount, &global_options)?;
+                mounter.setup_mount(mount, &global_options,ns_ptah.clone(),Some(main_sender),Some(init_receiver))?;
             }
         }
+        let mut id_map_param= IdMountParam::default();
+        id_map_param.end = true;
+        main_sender.process_mount_place(id_map_param).unwrap();
 
         let symlinker = Symlink::new();
         symlinker.setup_kcore_symlink(rootfs)?;

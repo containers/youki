@@ -259,6 +259,10 @@ impl Syscall for TestHelperSyscall {
             Box::new(IoPriorityArgs { class, priority }),
         )
     }
+
+    fn move_mount(&self, _: i32, _: &str, _: i32, _: &str, _: i32) -> Result<()> {
+        todo!()
+    }
 }
 
 impl TestHelperSyscall {

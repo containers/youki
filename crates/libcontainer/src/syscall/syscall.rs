@@ -40,6 +40,8 @@ pub trait Syscall {
         flags: MsFlags,
         data: Option<&str>,
     ) -> Result<()>;
+    // fromDirfd int, fromPathName string, toDirfd int, toPathName string, flags int
+    fn move_mount(&self,from_dir_fd: i32, from_path_name: &str, to_dir_fd: i32, to_path_name: &str, flags: i32)-> Result<()>;
     fn symlink(&self, original: &Path, link: &Path) -> Result<()>;
     fn mknod(&self, path: &Path, kind: SFlag, perm: Mode, dev: u64) -> Result<()>;
     fn chown(&self, path: &Path, owner: Option<Uid>, group: Option<Gid>) -> Result<()>;

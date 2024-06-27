@@ -4,6 +4,7 @@ use nix::unistd::Pid;
 
 use crate::channel::{channel, Receiver, Sender};
 use crate::process::message::Message;
+use crate::rootfs::mount::{IdMountParam, IdMountSource};
 
 #[derive(Debug, thiserror::Error)]
 pub enum ChannelError {
@@ -54,6 +55,13 @@ impl MainSender {
         tracing::debug!("send identifier mapping request");
         self.sender.send(Message::WriteMapping)?;
 
+        Ok(())
+    }
+
+    // process mount place
+    pub fn process_mount_place(&mut self, m: IdMountParam) -> Result<(), ChannelError> {
+        tracing::debug!("send process mapping place request");
+        self.sender.send(Message::SendConfigureMount(m))?;
         Ok(())
     }
 
@@ -186,6 +194,23 @@ impl MainReceiver {
         }
     }
 
+    pub fn wait_process_mount_place(&mut self) -> Result<IdMountParam,ChannelError> {
+        let msg = self
+            .receiver
+            .recv()
+            .map_err(|err| ChannelError::ReceiveError {
+                msg: "waiting for process mount place".to_string(),
+                source: err,
+            })?;
+        match msg {
+            Message::SendConfigureMount(m) => Ok(m),
+            msg => Err(ChannelError::UnexpectedMessage {
+                expected: Message::SendConfigureMount(Default::default()),
+                received: msg,
+            })
+        }
+    }
+
     pub fn close(&self) -> Result<(), ChannelError> {
         self.receiver.close()?;
 
@@ -270,6 +295,12 @@ impl InitSender {
         Ok(())
     }
 
+    pub fn send_mount_source(&mut self, ms: &IdMountSource) -> Result<(),ChannelError> {
+        tracing::debug!("send mount source request");
+        self.sender.send(Message::ReceiveMountFd(ms.clone()))?;
+        Ok(())
+    }
+
     pub fn close(&self) -> Result<(), ChannelError> {
         self.sender.close()?;
 
@@ -298,6 +329,22 @@ impl InitReceiver {
                 expected: Message::SeccompNotifyDone,
                 received: msg,
             }),
+        }
+    }
+
+    pub fn wait_for_mount_source(&mut self) -> Result<IdMountSource,ChannelError> {
+        let msg = self.receiver.recv().map_err(|err| ChannelError::ReceiveError {
+            msg: "waiting for get mount source".to_string(),
+            source: err,
+        })?;
+        match msg {
+            Message::ReceiveMountFd(ms) => Ok(ms),
+            msg => Err(
+                ChannelError::UnexpectedMessage {
+                    expected: Message::ReceiveMountFd(IdMountSource { file: 0 }),
+                    received: msg,
+                }
+            )
         }
     }
 
