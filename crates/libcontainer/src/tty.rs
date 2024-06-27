@@ -52,7 +52,7 @@ pub enum TTYError {
         linked: Box<PathBuf>,
         console_socket_path: Box<PathBuf>,
     },
-    #[error("invalid socker name: {socket_name:?}")]
+    #[error("invalid socket name: {socket_name:?}")]
     InvalidSocketName {
         socket_name: String,
         source: nix::Error,
