@@ -276,7 +276,7 @@ cd youki
 just youki-dev # or youki-release
 ```
 
-# 👥 Community and Contibuting
+# 👥 Community and Contributing
 
 Please refer to [our community page](https://containers.github.io/youki/community/introduction.html).
 
