@@ -47,6 +47,7 @@ impl<'conn> Proxy<'conn> {
         member: &str,
         body: Option<Body>,
     ) -> Result<Output> {
+        tracing::trace!("dbus call at interface {} member {}", interface, member);
         let mut headers = Vec::with_capacity(4);
 
         // create necessary headers
@@ -114,9 +115,10 @@ impl<'conn> Proxy<'conn> {
         // we are only going to consider first reply, cause... so.
         // realistically there should only be at most one method return type of message
         // for a method call
-        let reply = reply.first().ok_or(DbusError::MethodCallErr(
-            "expected to get a reply for method call, didn't get any".into(),
-        ))?;
+        let reply = reply.first().ok_or(DbusError::MethodCallErr(format!(
+            "expected to get a reply for method call, got {:?} instead",
+            reply_messages
+        )))?;
 
         let headers = &reply.headers;
         let expected_signature = Output::get_signature();
