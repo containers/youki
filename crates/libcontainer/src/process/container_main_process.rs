@@ -62,7 +62,17 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, bo
             ) {
                 Ok(_) => 0,
                 Err(err) => {
-                    tracing::error!(?err, "failed to run intermediate process");
+                    tracing::error!("failed to run intermediate process {}", err);
+                    match main_sender.send_error(err.to_string()) {
+                        Ok(_) => {}
+                        Err(e) => {
+                            tracing::error!(
+                                "error in sending intermediate error message {} to main: {}",
+                                err,
+                                e
+                            )
+                        }
+                    }
                     -1
                 }
             }

@@ -24,6 +24,8 @@ pub enum ChannelError {
     MissingSeccompFds,
     #[error("exec process failed with error {0}")]
     ExecError(String),
+    #[error("intermediate process error {0}")]
+    OtherError(String),
 }
 
 /// Channel Design
@@ -83,6 +85,11 @@ impl MainSender {
         Ok(())
     }
 
+    pub fn send_error(&mut self, err: String) -> Result<(), ChannelError> {
+        self.sender.send(Message::OtherError(err))?;
+        Ok(())
+    }
+
     pub fn close(&self) -> Result<(), ChannelError> {
         self.sender.close()?;
 
@@ -110,6 +117,7 @@ impl MainReceiver {
         match msg {
             Message::IntermediateReady(pid) => Ok(Pid::from_raw(pid)),
             Message::ExecFailed(err) => Err(ChannelError::ExecError(err)),
+            Message::OtherError(err) => Err(ChannelError::OtherError(err)),
             msg => Err(ChannelError::UnexpectedMessage {
                 expected: Message::IntermediateReady(0),
                 received: msg,

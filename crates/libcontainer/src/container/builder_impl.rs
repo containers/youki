@@ -159,7 +159,7 @@ impl ContainerBuilderImpl {
         let (init_pid, need_to_clean_up_intel_rdt_dir) =
             process::container_main_process::container_main_process(&container_args).map_err(
                 |err| {
-                    tracing::error!(?err, "failed to run container process");
+                    tracing::error!("failed to run container process {}", err);
                     LibcontainerError::MainProcess(err)
                 },
             )?;
