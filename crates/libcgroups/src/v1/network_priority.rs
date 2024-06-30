@@ -45,7 +45,7 @@ mod tests {
     use crate::test::set_fixture;
 
     #[test]
-    fn test_apply_network_priorites() {
+    fn test_apply_network_priorities() {
         let tmp = tempfile::tempdir().unwrap();
         set_fixture(tmp.path(), "net_prio.ifpriomap", "").expect("set fixture for priority map");
         let priorities = vec![

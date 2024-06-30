@@ -339,7 +339,7 @@ pub fn validate_sysctl(spec: &Spec) {
 pub fn validate_scheduler_policy(spec: &Spec) {
     let proc = spec.process().as_ref().unwrap();
     let sc = proc.scheduler().as_ref().unwrap();
-    println!("schedul is {:?}", spec);
+    println!("schedule is {:?}", spec);
     let size = mem::size_of::<nc::sched_attr_t>().try_into().unwrap();
     let mut get_sched_attr = nc::sched_attr_t {
         size: 0,

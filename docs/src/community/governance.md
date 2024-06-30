@@ -5,7 +5,7 @@ Youki follows the [CNCF Code of Conduct](https://github.com/cncf/foundation/blob
 # Maintainership
 
 Youki is governed by Maintainers who are elected from active contributors.
-Youki will remain [vendor-nutral](https://contribute.cncf.io/maintainers/community/vendor-neutrality/).
+Youki will remain [vendor-neutral](https://contribute.cncf.io/maintainers/community/vendor-neutrality/).
 Maintainers are [here](./maintainer.md).
 
 ## Roles
