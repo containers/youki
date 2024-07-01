@@ -153,7 +153,7 @@ impl TenantContainerBuilder {
         // `read_end` that the init process is able to move forward. Closing one
         // end of the pipe will immediately signal the other end of the pipe,
         // which we use in the init thread as a form of barrier.  `drop` is used
-        // here becuase `OwnedFd` supports it, so we don't have to use `close`
+        // here because `OwnedFd` supports it, so we don't have to use `close`
         // here with `RawFd`.
         drop(write_end);
 

@@ -20,3 +20,7 @@ clos = "clos"
 Setted = "Setted"
 hve = "hve"
 
+[type.md.extend-words]
+# This is used as "yoh-key" in markdown files to describe the pronounciation 
+# for Youki
+"yoh" = "yoh"

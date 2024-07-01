@@ -346,7 +346,7 @@ mod tests {
             };
 
 
-            // check the resevation file is set as expected
+            // check the reservation file is set as expected
             let reservation_content = read_to_string(tmp.path().join(CGROUP_MEMORY_LOW)).expect("read memory reservation to string");
             let reservation_check = match linux_memory.reservation() {
                 Some(reservation) if reservation == -1 => reservation_content == "max",
