@@ -735,7 +735,7 @@ ENTRYPOINT ["wasm-module.wasm"]
 <p>Youki follows the <a href="https://github.com/cncf/foundation/blob/main/code-of-conduct.md">CNCF Code of Conduct</a>.</p>
 <h1 id="maintainership"><a class="header" href="#maintainership">Maintainership</a></h1>
 <p>Youki is governed by Maintainers who are elected from active contributors.
-Youki will remain <a href="https://contribute.cncf.io/maintainers/community/vendor-neutrality/">vendor-nutral</a>.
+Youki will remain <a href="https://contribute.cncf.io/maintainers/community/vendor-neutrality/">vendor-neutral</a>.
 Maintainers are <a href="community/./maintainer.html">here</a>.</p>
 <h2 id="roles"><a class="header" href="#roles">Roles</a></h2>
 <p>Maintainers consist of the following roles:</p>
@@ -1242,7 +1242,7 @@ For that, first whichever integration test needs to use it, must define the runt
 <p><strong>Note</strong> that these tests resides in /tests/test_framework at the time of writing.</p>
 <p>This crate contains the testing framework specifically developed for porting the OCI integration test to rust. This contains structs to represent the individual tests, group of tests and a test manager that has responsibility to run tests. This Also exposes traits which can be used to implement custom test structs or test group structs if needed.</p>
 <p>By default the test groups are run in parallel using the <a href="https://www.crates.io/crates/crossbeam">crossbeam crate</a>, and the default test_group implementation also runs individual tests parallelly.</p>
-<p>Sometimes you might need to run the tests in a test group serially or in certain order, for example in case of testing container lifecycle, a container must be created and started before stopping it. In such cases, you will need to implement the respective traits on your own structs, so that you can have fine control over thr running of tests. Check the readme of the test_framework crate to see the struct and trait documentation <a href="https://github.com/containers/youki/tree/main/crates/test_framework">here</a>.</p>
+<p>Sometimes you might need to run the tests in a test group serially or in certain order, for example in case of testing container lifecycle, a container must be created and started before stopping it. In such cases, you will need to implement the respective traits on your own structs, so that you can have fine control over the running of tests. Check the readme of the test_framework crate to see the struct and trait documentation <a href="https://github.com/containers/youki/tree/main/crates/test_framework">here</a>.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="runtime-test"><a class="header" href="#runtime-test">Runtime Test</a></h1>
 <p><strong>Note</strong> that these tests resides in /tests/runtimetest at the time of writing.</p>
 <p>This crate provides a binary which is used by integration tests to verify that the restrictions and constraints applied to the container are upheld by the container process, from inside the container process. This runs the tests one-by-one, and the failing test prints the error to the stderr.</p>
