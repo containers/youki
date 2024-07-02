@@ -238,8 +238,8 @@ impl ContainerBuilder {
         self.preserve_fds = preserved_fds;
         self
     }
-    /// Sets the number of additional file descriptors which will be passed into
-    /// the container process.
+
+    /// Sets the function that actually runs on the container init process.
     /// # Example
     ///
     /// ```no_run
