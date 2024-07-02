@@ -326,6 +326,10 @@ pub fn container_init_process(
 
         let in_user_ns = utils::is_in_new_userns().map_err(InitProcessError::Io)?;
         let bind_service = namespaces.get(LinuxNamespaceType::User)?.is_some() || in_user_ns;
+        let mut ns_path: Option<PathBuf> = None;
+        if let Some(user_namespace) = namespaces.get(LinuxNamespaceType::User)? {
+            ns_path = Some(user_namespace.path().clone().unwrap());
+        }
         let rootfs = RootFS::new();
         rootfs
             .prepare_rootfs(
@@ -333,6 +337,9 @@ pub fn container_init_process(
                 rootfs_path,
                 bind_service,
                 namespaces.get(LinuxNamespaceType::Cgroup)?.is_some(),
+                ns_path,
+                main_sender,
+                init_receiver,
             )
             .map_err(|err| {
                 tracing::error!(?err, "failed to prepare rootfs");

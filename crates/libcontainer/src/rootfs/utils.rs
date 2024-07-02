@@ -3,7 +3,8 @@ use std::str::FromStr;
 
 use nix::mount::MsFlags;
 use nix::sys::stat::SFlag;
-use oci_spec::runtime::{LinuxDevice, LinuxDeviceBuilder, LinuxDeviceType, Mount};
+use oci_spec::runtime::{LinuxDevice, LinuxDeviceBuilder, LinuxDeviceType, LinuxIdMapping, Mount};
+use crate::rootfs::mount::MountError::Custom;
 
 use super::mount::MountError;
 use crate::syscall::linux::{self, MountRecursive};
@@ -18,6 +19,37 @@ pub struct MountOptionConfig {
 
     /// RecAttr represents mount properties to be applied recursively.
     pub rec_attr: Option<linux::MountAttr>,
+
+    /// Mapping is the MOUNT_ATTR_IDMAP configuration for the mount. If non-nil,
+    /// the mount is configured to use MOUNT_ATTR_IDMAP-style id mappings.
+    pub id_mapping: Option<MountIDMapping>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MountIDMapping {
+    /// Recursive indicates if the mapping needs to be recursive.
+    pub recursive: bool,
+
+    /// UserNSPath is a path to a user namespace that indicates the necessary
+    /// id-mappings for MOUNT_ATTR_IDMAP. If set to non-"", UIDMappings and
+    /// GIDMappings must be set to nil.
+    pub user_ns_path: String,
+
+    /// UIDMappings is the uid mapping set for this mount, to be used with
+    /// MOUNT_ATTR_IDMAP.
+    pub uid_mappings: Option<Vec<IDMap>>,
+
+    /// GIDMappings is the gid mapping set for this mount, to be used with
+    /// MOUNT_ATTR_IDMAP.
+    pub gid_mappings: Option<Vec<IDMap>>,
+}
+
+/// IDMap represents UID/GID Mappings for User Namespaces.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IDMap {
+    pub container_id: u32,
+    pub host_id: u32,
+    pub size: u32,
 }
 
 pub fn default_devices() -> Vec<LinuxDevice> {
@@ -82,11 +114,16 @@ pub fn to_sflag(dev_type: LinuxDeviceType) -> SFlag {
     }
 }
 
-pub fn parse_mount(m: &Mount) -> std::result::Result<MountOptionConfig, MountError> {
+pub fn parse_mount(m: &Mount,ns_ptah: Option<PathBuf>) -> std::result::Result<MountOptionConfig, MountError> {
     let mut flags = MsFlags::empty();
     let mut data = Vec::new();
     let mut mount_attr: Option<linux::MountAttr> = None;
-
+    let mut id_mapping: MountIDMapping = MountIDMapping {
+        recursive: false,
+        user_ns_path: "".to_string(),
+        uid_mappings: None,
+        gid_mappings: None,
+    };
     if let Some(options) = &m.options() {
         for option in options {
             if let Ok(mount_attr_option) = linux::MountRecursive::from_str(option.as_str()) {
@@ -165,10 +202,7 @@ pub fn parse_mount(m: &Mount) -> std::result::Result<MountOptionConfig, MountErr
                 "norelatime" => Some((true, MsFlags::MS_RELATIME)),
                 "strictatime" => Some((true, MsFlags::MS_STRICTATIME)),
                 "nostrictatime" => Some((true, MsFlags::MS_STRICTATIME)),
-                unknown => {
-                    if unknown == "idmap" || unknown == "ridmap" {
-                        return Err(MountError::UnsupportedMountOption(unknown.to_string()));
-                    }
+                _unknown => {
                     None
                 }
             } {
@@ -180,14 +214,81 @@ pub fn parse_mount(m: &Mount) -> std::result::Result<MountOptionConfig, MountErr
                 continue;
             }
 
+            id_mapping = match option.as_str() {
+                "idmap" => MountIDMapping {
+                    recursive: false,
+                    user_ns_path: "".to_string(),
+                    uid_mappings: None,
+                    gid_mappings: None,
+                },
+                "ridmap" => MountIDMapping {
+                    recursive: true,
+                    user_ns_path: "".to_string(),
+                    uid_mappings: None,
+                    gid_mappings: None,
+                },
+                _ => id_mapping,
+            };
+
             data.push(option.as_str());
         }
+    }
+
+    if m.gid_mappings().is_some() || m.uid_mappings().is_some() {
+        id_mapping.uid_mappings = to_config_idmap(m.uid_mappings());
+        id_mapping.gid_mappings = to_config_idmap(m.gid_mappings());
+    }
+    if let Some(path) = ns_ptah {
+        id_mapping.user_ns_path = path.to_str().unwrap().to_string();
     }
     Ok(MountOptionConfig {
         flags,
         data: data.join(","),
         rec_attr: mount_attr,
+        id_mapping: Some(id_mapping),
     })
+}
+
+
+pub fn to_config_idmap(ids: &Option<Vec<LinuxIdMapping>>) -> Option<Vec<IDMap>> {
+    if ids.is_none() {
+        return None;
+    }
+    let mut idmaps = Vec::new();
+    if let Some(ids_tmp) = ids {
+        for id in ids_tmp {
+            let idmap = IDMap {
+                container_id: id.container_id(),
+                host_id: id.host_id(),
+                size: id.size(),
+            };
+            idmaps.push(idmap);
+        }
+    }
+    return Some(idmaps);
+}
+
+pub fn check_idmap_mounts(mo_cfg: MountOptionConfig) -> Result<(), MountError> {
+    if mo_cfg.id_mapping.is_none() {
+        return Ok(());
+    }
+    if let Some(rec) = mo_cfg.rec_attr {
+        if (rec.attr_set | rec.attr_clr) & linux::MOUNT_ATTR_IDMAP != 0 {
+            return Err(Custom("mount configuration cannot contain rec_attr for MOUNT_ATTR_IDMAP".to_string()));
+        }
+    }
+    if let Some(m) = mo_cfg.id_mapping {
+        if m.user_ns_path == "" {
+            if m.gid_mappings.is_none() || m.uid_mappings.is_none() {
+                return Err(Custom("id-mapped mounts must have both uid and gid mappings specified".to_string()));
+            }
+        } else {
+            if m.gid_mappings.is_some() || m.uid_mappings.is_some() {
+                return Err(Custom("[internal error] id-mapped mounts cannot have both userns_path and uid and gid mappings specified".to_string()));
+            }
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -218,12 +319,14 @@ mod tests {
                 .typ("proc")
                 .source(PathBuf::from("proc"))
                 .build()?,
+            None,
         )?;
         assert_eq!(
             MountOptionConfig {
                 flags: MsFlags::empty(),
                 data: "".to_string(),
                 rec_attr: None,
+                id_mapping: None,
             },
             mount_option_config
         );
@@ -240,12 +343,14 @@ mod tests {
                     "size=65536k".to_string(),
                 ])
                 .build()?,
+            None,
         )?;
         assert_eq!(
             MountOptionConfig {
                 flags: MsFlags::MS_NOSUID,
                 data: "mode=755,size=65536k".to_string(),
                 rec_attr: None,
+                id_mapping: None,
             },
             mount_option_config
         );
@@ -265,12 +370,14 @@ mod tests {
                 ])
                 .build()
                 .unwrap(),
+            None,
         )?;
         assert_eq!(
             MountOptionConfig {
                 flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC,
                 data: "newinstance,ptmxmode=0666,mode=0620,gid=5".to_string(),
-                rec_attr: None
+                rec_attr: None,
+                id_mapping: None,
             },
             mount_option_config
         );
@@ -288,12 +395,14 @@ mod tests {
                     "size=65536k".to_string(),
                 ])
                 .build()?,
+            None,
         )?;
         assert_eq!(
             MountOptionConfig {
                 flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
                 data: "mode=1777,size=65536k".to_string(),
-                rec_attr: None
+                rec_attr: None,
+                id_mapping: None,
             },
             mount_option_config
         );
@@ -310,12 +419,14 @@ mod tests {
                 ])
                 .build()
                 .unwrap(),
+            None,
         )?;
         assert_eq!(
             MountOptionConfig {
                 flags: MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
                 data: "".to_string(),
-                rec_attr: None
+                rec_attr: None,
+                id_mapping: None,
             },
             mount_option_config
         );
@@ -332,6 +443,7 @@ mod tests {
                     "ro".to_string(),
                 ])
                 .build()?,
+            None,
         )?;
         assert_eq!(
             MountOptionConfig {
@@ -341,6 +453,7 @@ mod tests {
                     | MsFlags::MS_RDONLY,
                 data: "".to_string(),
                 rec_attr: None,
+                id_mapping: None,
             },
             mount_option_config
         );
@@ -358,6 +471,7 @@ mod tests {
                     "ro".to_string(),
                 ])
                 .build()?,
+            None,
         )?;
         assert_eq!(
             MountOptionConfig {
@@ -366,7 +480,8 @@ mod tests {
                     | MsFlags::MS_NODEV
                     | MsFlags::MS_RDONLY,
                 data: "".to_string(),
-                rec_attr: None
+                rec_attr: None,
+                id_mapping: None,
             },
             mount_option_config,
         );
@@ -410,6 +525,7 @@ mod tests {
                     "nostrictatime".to_string(),
                 ])
                 .build()?,
+            None,
         )?;
         assert_eq!(
             MountOptionConfig {
@@ -424,6 +540,7 @@ mod tests {
                     | MsFlags::MS_UNBINDABLE,
                 data: "".to_string(),
                 rec_attr: None,
+                id_mapping: None,
             },
             mount_option_config
         );
@@ -452,12 +569,14 @@ mod tests {
                     "rsymfollow".to_string(),
                 ])
                 .build()?,
+            None,
         )?;
         assert_eq!(
             MountOptionConfig {
                 flags: MsFlags::empty(),
                 data: "".to_string(),
-                rec_attr: Some(MountAttr::all())
+                rec_attr: Some(MountAttr::all()),
+                id_mapping: None,
             },
             mount_option_config
         );

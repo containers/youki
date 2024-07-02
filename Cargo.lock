@@ -2378,8 +2378,7 @@ dependencies = [
 [[package]]
 name = "oci-spec"
 version = "0.6.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e423c4f827362c0d8d8da4b1f571270f389ebde73bcd3240a3d23c6d6f61d0f0"
+source = "git+https://github.com/lengrongfu/oci-spec-rs?branch=feat/add_idmapped_mount#da50e3817ae5ac1022ee396cfa81c64d11208198"
 dependencies = [
  "derive_builder 0.20.0",
  "getset",

@@ -19,6 +19,7 @@ use nix::sched::{unshare, CloneFlags};
 use nix::sys::stat::{mknod, Mode, SFlag};
 use nix::unistd::{chown, chroot, fchdir, pivot_root, sethostname, Gid, Uid};
 use oci_spec::runtime::LinuxRlimit;
+use serde::{Deserialize, Serialize};
 
 use super::{Result, Syscall, SyscallError};
 use crate::{capabilities, utils};
@@ -37,6 +38,7 @@ const MOUNT_ATTR_NOATIME: u64 = 0x00000010;
 const MOUNT_ATTR_STRICTATIME: u64 = 0x00000020;
 const MOUNT_ATTR_NODIRATIME: u64 = 0x00000080;
 const MOUNT_ATTR_NOSYMFOLLOW: u64 = 0x00200000;
+pub const MOUNT_ATTR_IDMAP: u64 = 0x00100000;
 
 /// Constants used by mount_setattr(2).
 pub enum MountRecursive {
@@ -103,7 +105,7 @@ impl FromStr for MountRecursive {
 }
 
 #[repr(C)]
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize,Deserialize)]
 /// A structure used as te third argument of mount_setattr(2).
 pub struct MountAttr {
     /// Mount properties to set.
@@ -456,6 +458,15 @@ impl Syscall for LinuxSyscall {
         data: Option<&str>,
     ) -> Result<()> {
         mount(source, target, fstype, flags, data)?;
+        Ok(())
+    }
+
+    fn move_mount(&self, from_dir_fd: i32, from_path_name: &str, to_dir_fd: i32, to_path_name: &str, flags: i32) -> Result<()> {
+        if unsafe { libc::syscall(libc::SYS_move_mount, from_dir_fd, from_path_name, to_dir_fd, to_path_name, flags, 0) } == -1 {
+            let err = nix::errno::Errno::last();
+            tracing::error!(?err, "failed to move_mount");
+            return Err(err.into());
+        }
         Ok(())
     }
 

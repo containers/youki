@@ -4,24 +4,27 @@ use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 #[cfg(feature = "v1")]
 use std::{borrow::Cow, collections::HashMap};
+use std::os::fd::RawFd;
 
 use libcgroups::common::CgroupSetup::{Hybrid, Legacy, Unified};
 #[cfg(feature = "v1")]
 use libcgroups::common::DEFAULT_CGROUP_ROOT;
 use nix::dir::Dir;
 use nix::errno::Errno;
-use nix::fcntl::OFlag;
+use nix::fcntl::{OFlag};
 use nix::mount::MsFlags;
 use nix::sys::stat::Mode;
 use nix::NixPath;
 use oci_spec::runtime::{Mount as SpecMount, MountBuilder as SpecMountBuilder};
 use procfs::process::{MountInfo, MountOptFields, Process};
 use safe_path;
+use serde::{Deserialize, Serialize};
+use crate::process::channel;
 
 #[cfg(feature = "v1")]
 use super::symlink::Symlink;
 use super::symlink::SymlinkError;
-use super::utils::{parse_mount, MountOptionConfig};
+use super::utils::{parse_mount, check_idmap_mounts, MountOptionConfig};
 use crate::syscall::syscall::create_syscall;
 use crate::syscall::{linux, Syscall, SyscallError};
 use crate::utils::PathBufExt;
@@ -59,6 +62,35 @@ pub struct MountOptions<'a> {
     pub cgroup_ns: bool,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize,Default)]
+pub struct IdMountParam {
+    /// Mount Flags.
+    pub flags: libc::c_ulong,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// RecAttr represents mount properties to be applied recursively.
+    pub rec_attr: Option<linux::MountAttr>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Source specifies the source path of the mount.
+    pub source: Option<PathBuf>,
+
+    /// Recursive indicates if the mapping needs to be recursive.
+    pub recursive: bool,
+    /// UserNSPath is a path to a user namespace that indicates the necessary
+    /// id-mappings for MOUNT_ATTR_IDMAP. If set to non-"", UIDMappings and
+    /// GIDMappings must be set to nil.
+    pub user_ns_path: String,
+
+    /// send flag to main process end mount search
+    pub end: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq,Deserialize,Serialize,Default)]
+pub struct IdMountSource {
+    pub file: RawFd,
+}
+
 pub struct Mount {
     syscall: Box<dyn Syscall>,
 }
@@ -76,10 +108,38 @@ impl Mount {
         }
     }
 
-    pub fn setup_mount(&self, mount: &SpecMount, options: &MountOptions) -> Result<()> {
+    pub fn setup_mount(&self, mount: &SpecMount, options: &MountOptions,
+                       ns_ptah: Option<PathBuf>,
+                       main_sender: Option<&mut channel::MainSender>,
+                       init_receiver: Option<&mut channel::InitReceiver>) -> Result<()> {
         tracing::debug!("mounting {:?}", mount);
-        let mut mount_option_config = parse_mount(mount)?;
+        let mut mount_option_config = parse_mount(mount,ns_ptah)?;
+        // check idmap mount config
+        check_idmap_mounts(mount_option_config.clone())?;
 
+        let mut ms_option: Option<IdMountSource>=None;
+        let mc = mount_option_config.clone();
+        if self.is_id_mapped(mc.clone()).is_ok() && init_receiver.is_some() && main_sender.is_some(){
+            let id_map_param = IdMountParam {
+                flags: mc.flags.bits(),
+                rec_attr: mc.rec_attr.clone(),
+                source: mount.source().clone(),
+                recursive: mc.id_mapping.clone().unwrap().recursive,
+                user_ns_path:mc.id_mapping.clone().unwrap().user_ns_path,
+                end:false,
+            };
+            main_sender.unwrap().process_mount_place(id_map_param).map_err(|err| {
+                tracing::error!(?err, "failed to send mount to get host file");
+                MountError::Custom("failed to send mount to get host file".to_string())
+            })?;
+            let ms: IdMountSource = init_receiver.unwrap().wait_for_mount_source().map_err(|err| {
+                tracing::error!(?err, "failed to get mount source");
+                MountError::Custom("failed to get mount source".to_string())
+            })?;
+            ms_option = Some(ms);
+        }
+
+        // cgroup is not support idmap, proc、sysfs、mqueue、tmpfs、bind and other type support idmap
         match mount.typ().as_deref() {
             Some("cgroup") => {
                 let cgroup_setup = libcgroups::common::get_cgroup_setup().map_err(|err| {
@@ -116,22 +176,24 @@ impl Mount {
                         options.root,
                         &mount_option_config,
                         options.label,
+                        ms_option,
                     )
-                    .map_err(|err| {
-                        tracing::error!("failed to mount /dev: {}", err);
-                        err
-                    })?;
+                        .map_err(|err| {
+                            tracing::error!("failed to mount /dev: {}", err);
+                            err
+                        })?;
                 } else {
                     self.mount_into_container(
                         mount,
                         options.root,
                         &mount_option_config,
                         options.label,
+                        ms_option,
                     )
-                    .map_err(|err| {
-                        tracing::error!("failed to mount {:?}: {}", mount, err);
-                        err
-                    })?;
+                        .map_err(|err| {
+                            tracing::error!("failed to mount {:?}: {}", mount, err);
+                            err
+                        })?;
                 }
             }
         }
@@ -159,7 +221,7 @@ impl Mount {
                 err
             })?;
 
-        self.setup_mount(&tmpfs, options).map_err(|err| {
+        self.setup_mount(&tmpfs, options,None, None,None).map_err(|err| {
             tracing::error!("failed to mount tmpfs for cgroup: {}", err);
             err
         })?;
@@ -286,6 +348,7 @@ impl Mount {
             flags: MsFlags::MS_NOEXEC | MsFlags::MS_NOSUID | MsFlags::MS_NODEV,
             data: data.to_string(),
             rec_attr: None,
+            id_mapping: None,
         };
 
         self.mount_into_container(
@@ -293,11 +356,12 @@ impl Mount {
             options.root,
             &mount_options_config,
             options.label,
+            None,
         )
-        .map_err(|err| {
-            tracing::error!("failed to mount {subsystem_mount:?}: {err}");
-            err
-        })
+            .map_err(|err| {
+                tracing::error!("failed to mount {subsystem_mount:?}: {err}");
+                err
+            })
     }
 
     #[cfg(feature = "v1")]
@@ -352,7 +416,7 @@ impl Mount {
                 .build()?;
             tracing::debug!("Mounting emulated cgroup subsystem: {:?}", emulated);
 
-            self.setup_mount(&emulated, options).map_err(|err| {
+            self.setup_mount(&emulated, options,None, None,None).map_err(|err| {
                 tracing::error!("failed to mount {subsystem_name} cgroup hierarchy: {}", err);
                 err
             })?;
@@ -386,6 +450,7 @@ impl Mount {
                 options.root,
                 mount_option_config,
                 options.label,
+                None,
             )
             .is_err()
         {
@@ -432,11 +497,12 @@ impl Mount {
                 options.root,
                 &mount_option_config,
                 options.label,
+                None,
             )
-            .map_err(|err| {
-                tracing::error!("failed to bind mount cgroup hierarchy: {}", err);
-                err
-            })?;
+                .map_err(|err| {
+                    tracing::error!("failed to bind mount cgroup hierarchy: {}", err);
+                    err
+                })?;
         }
 
         Ok(())
@@ -482,6 +548,7 @@ impl Mount {
         rootfs: &Path,
         mount_option_config: &MountOptionConfig,
         label: Option<&str>,
+        ms: Option<IdMountSource>,
     ) -> Result<()> {
         let typ = m.typ().as_deref();
         let mut d = mount_option_config.data.to_string();
@@ -545,33 +612,43 @@ impl Mount {
             PathBuf::from(source)
         };
 
-        if let Err(err) =
-            self.syscall
-                .mount(Some(&*src), dest, typ, mount_option_config.flags, Some(&*d))
-        {
-            if let SyscallError::Nix(errno) = err {
-                if !matches!(errno, Errno::EINVAL) {
-                    tracing::error!("mount of {:?} failed. {}", m.destination(), errno);
-                    return Err(err.into());
+        if self.is_id_mapped(mount_option_config.clone()).is_ok() && ms.is_some(){
+            let joined_path = rootfs.join(m.destination());
+            let path = joined_path.as_path();
+            // let path = Path::join(rootfs, m.destination()).as_path();
+            let fh =  Dir::open(path, OFlag::O_PATH | OFlag::O_CLOEXEC, Mode::empty())?;
+            let proc_fd = PathBuf::from(format!("/proc/self/fd/{}", fh.as_raw_fd()));
+            let src_file_fd: RawFd = ms.unwrap().file;
+            self.syscall.move_mount(src_file_fd, "", libc::AT_FDCWD, proc_fd.to_str().unwrap(), (libc::MOVE_MOUNT_F_EMPTY_PATH | libc::MOVE_MOUNT_T_SYMLINKS) as i32).unwrap();
+            return Ok(());
+        }else {
+            if let Err(err) =
+                self.syscall
+                    .mount(Some(&*src), dest, typ, mount_option_config.flags, Some(&*d))
+            {
+                if let SyscallError::Nix(errno) = err {
+                    if !matches!(errno, Errno::EINVAL) {
+                        tracing::error!("mount of {:?} failed. {}", m.destination(), errno);
+                        return Err(err.into());
+                    }
                 }
+
+                self.syscall
+                    .mount(
+                        Some(&*src),
+                        dest,
+                        typ,
+                        mount_option_config.flags,
+                        Some(&mount_option_config.data),
+                    )
+                    .map_err(|err| {
+                        tracing::error!("failed to mount {src:?} to {dest:?}");
+                        err
+                    })?;
             }
 
-            self.syscall
-                .mount(
-                    Some(&*src),
-                    dest,
-                    typ,
-                    mount_option_config.flags,
-                    Some(&mount_option_config.data),
-                )
-                .map_err(|err| {
-                    tracing::error!("failed to mount {src:?} to {dest:?}");
-                    err
-                })?;
-        }
-
-        if typ == Some("bind")
-            && mount_option_config.flags.intersects(
+            if typ == Some("bind")
+                && mount_option_config.flags.intersects(
                 !(MsFlags::MS_REC
                     | MsFlags::MS_REMOUNT
                     | MsFlags::MS_BIND
@@ -579,19 +656,20 @@ impl Mount {
                     | MsFlags::MS_SHARED
                     | MsFlags::MS_SLAVE),
             )
-        {
-            self.syscall
-                .mount(
-                    Some(dest),
-                    dest,
-                    None,
-                    mount_option_config.flags | MsFlags::MS_REMOUNT,
-                    None,
-                )
-                .map_err(|err| {
-                    tracing::error!("failed to remount {:?}: {}", dest, err);
-                    err
-                })?;
+            {
+                self.syscall
+                    .mount(
+                        Some(dest),
+                        dest,
+                        None,
+                        mount_option_config.flags | MsFlags::MS_REMOUNT,
+                        None,
+                    )
+                    .map_err(|err| {
+                        tracing::error!("failed to remount {:?}: {}", dest, err);
+                        err
+                    })?;
+            }
         }
 
         if let Some(mount_attr) = &mount_option_config.rec_attr {
@@ -607,6 +685,19 @@ impl Mount {
         }
 
         Ok(())
+    }
+
+    pub fn is_id_mapped(&self, m: MountOptionConfig) -> Result<bool> {
+        if m.id_mapping.is_none() {
+            Ok(false)
+        } else {
+            let id_mapping = m.id_mapping.clone().unwrap();
+            if id_mapping.gid_mappings.is_none() || id_mapping.uid_mappings.is_none(){
+                Ok(false)
+            }else {
+                Ok(true)
+            }
+        }
     }
 }
 
@@ -654,14 +745,15 @@ mod tests {
                     "gid=5".to_string(),
                 ])
                 .build()?;
-            let mount_option_config = parse_mount(mount)?;
+            let mount_option_config = parse_mount(mount,None)?;
 
             assert!(m
                 .mount_into_container(
                     mount,
                     tmp_dir.path(),
                     &mount_option_config,
-                    Some("defaults")
+                    Some("defaults"),
+                    None,
                 )
                 .is_ok());
 
@@ -691,7 +783,7 @@ mod tests {
                 .source(tmp_dir.path().join("null"))
                 .options(vec!["ro".to_string()])
                 .build()?;
-            let mount_option_config = parse_mount(mount)?;
+            let mount_option_config = parse_mount(mount,None)?;
             OpenOptions::new()
                 .create(true)
                 .truncate(true)
@@ -699,7 +791,7 @@ mod tests {
                 .open(tmp_dir.path().join("null"))?;
 
             assert!(m
-                .mount_into_container(mount, tmp_dir.path(), &mount_option_config, None)
+                .mount_into_container(mount, tmp_dir.path(), &mount_option_config, None, None)
                 .is_ok());
 
             let want = vec![
@@ -944,7 +1036,7 @@ mod tests {
                     } else {
                         subsystem_name.to_string()
                     }
-                    .to_owned(),
+                        .to_owned(),
                 ),
             };
             assert_eq!(expected, act);
@@ -981,6 +1073,7 @@ mod tests {
             flags,
             data: String::new(),
             rec_attr: None,
+            id_mapping: None,
         };
         mounter
             .mount_cgroup_v2(&spec_cgroup_mount, &mount_opts, &mount_option_config)

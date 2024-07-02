@@ -1,3 +1,6 @@
+use std::mem;
+use std::fs::File;
+use std::os::fd::{AsRawFd, RawFd};
 use nix::sys::wait::{waitpid, WaitStatus};
 use nix::unistd::Pid;
 
@@ -5,7 +8,7 @@ use crate::process::args::ContainerArgs;
 use crate::process::fork::{self, CloneCb};
 use crate::process::intel_rdt::setup_intel_rdt;
 use crate::process::{channel, container_intermediate_process};
-use crate::syscall::SyscallError;
+use crate::syscall::{linux, SyscallError};
 use crate::user_ns::UserNamespaceConfig;
 
 #[derive(Debug, thiserror::Error)]
@@ -115,6 +118,44 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, bo
     // The intermediate process will send the init pid once it forks the init
     // process.  The intermediate process should exit after this point.
     let init_pid = main_receiver.wait_for_intermediate_ready()?;
+
+    loop {
+        let id_map = main_receiver.wait_process_mount_place().unwrap();
+        if id_map.end {
+            break;
+        }
+        let mut flags = libc::OPEN_TREE_CLONE | libc::OPEN_TREE_CLOEXEC;
+        let id_map_flags = id_map.flags;
+        if id_map_flags&libc::MS_REC == libc::MS_REC {
+            flags |= libc::AT_RECURSIVE as std::os::raw::c_uint;
+        }
+        let mount_file = unsafe {
+            libc::syscall(libc::SYS_open_tree,libc::AT_FDCWD,id_map.source,flags)
+        };
+        let mut userns_file: RawFd = -1;
+        if id_map.user_ns_path != "" {
+            let file = File::open(id_map.user_ns_path).unwrap();
+            userns_file = file.as_raw_fd();
+        } else {
+            // TODO we need use uid and git go get fd
+        }
+
+        let mat = &linux::MountAttr{
+            attr_set: linux::MOUNT_ATTR_IDMAP,
+            attr_clr: 0,
+            propagation: 0,
+            userns_fd: userns_file as u64,
+        };
+        let mut set_attr_flags = libc::AT_EMPTY_PATH;
+        if id_map.recursive {
+            set_attr_flags |= libc::AT_RECURSIVE;
+        }
+        syscall.mount_setattr(mount_file as i32, "".as_ref(), set_attr_flags as u32, mat,mem::size_of::<linux::MountAttr>(),).map_err(|err| {
+            tracing::error!(?err, "failed to mount_setattr");
+            ProcessError::SyscallOther(err)
+        }).unwrap();
+    }
+
     let mut need_to_clean_up_intel_rdt_subdirectory = false;
 
     if let Some(linux) = container_args.spec.linux() {
