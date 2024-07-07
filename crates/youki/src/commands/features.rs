@@ -7,9 +7,7 @@ use caps::{all, CapSet};
 use liboci_cli::Features;
 use serde::{Deserialize, Serialize};
 
-pub const ANNOTATION_RUNC_VERSION: &str = "org.opencontainers.runc.version";
-pub const ANNOTATION_RUNC_COMMIT: &str = "org.opencontainers.runc.commit";
-pub const ANNOTATION_RUNC_CHECKPOINT_ENABLED: &str = "org.opencontainers.runc.checkpoint.enabled";
+// TODO: Add youki specific annotations such as version, commit hash etc.
 pub const ANNOTATION_LIBSECCOMP_VERSION: &str = "io.github.seccomp.libseccomp.version";
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -256,15 +254,6 @@ pub fn features(_: Features) -> Result<()> {
                 ANNOTATION_LIBSECCOMP_VERSION.to_string(),
                 String::from("2.5.3"),
             );
-            annotations_map.insert(
-                ANNOTATION_RUNC_CHECKPOINT_ENABLED.to_string(),
-                String::from("true"),
-            );
-            annotations_map.insert(
-                ANNOTATION_RUNC_COMMIT.to_string(),
-                String::from("v1.1.9-0-gccaecfc"),
-            );
-            annotations_map.insert(ANNOTATION_RUNC_VERSION.to_string(), String::from("1.1.9"));
             Some(annotations_map)
         },
     };
