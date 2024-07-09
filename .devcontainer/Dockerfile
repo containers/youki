@@ -34,6 +34,8 @@ COPY <<EOF /etc/docker/daemon.json
 EOF
 
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y 
+# nightly build is required for `cargo fmt` as `rustfmt.toml` uses unstable features.
+RUN rustup install nightly
 RUN rustup component add rustfmt
 RUN rustup component add clippy 
 
