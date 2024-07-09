@@ -18,7 +18,7 @@ use nix::mount::{mount, umount2, MntFlags, MsFlags};
 use nix::sched::{unshare, CloneFlags};
 use nix::sys::stat::{mknod, Mode, SFlag};
 use nix::unistd::{chown, chroot, fchdir, pivot_root, sethostname, Gid, Uid};
-use oci_spec::runtime::LinuxRlimit;
+use oci_spec::runtime::PosixRlimit;
 
 use super::{Result, Syscall, SyscallError};
 use crate::{capabilities, utils};
@@ -386,7 +386,7 @@ impl Syscall for LinuxSyscall {
     }
 
     /// Sets resource limit for process
-    fn set_rlimit(&self, rlimit: &LinuxRlimit) -> Result<()> {
+    fn set_rlimit(&self, rlimit: &PosixRlimit) -> Result<()> {
         let rlim = &libc::rlimit {
             rlim_cur: rlimit.soft(),
             rlim_max: rlimit.hard(),
