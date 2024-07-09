@@ -1,11 +1,11 @@
-use crate::xattr::*;
-use nix::unistd::gettid;
-use nix::sys::statfs;
+use crate::xattrs::*;
 use nix::errno::Errno;
-use std::path::{Path, PathBuf};
+use nix::sys::statfs;
+use nix::unistd::gettid;
 use std::fs::File;
 use std::io::Read;
 use std::os::fd::{AsFd, AsRawFd};
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 const XATTR_NAME_SELINUX: &str = "security.selinux";
@@ -26,7 +26,7 @@ pub enum SELinuxError {
     #[error("Failed to call read_con_fd for SELinux: {0}")]
     ReadConFd(String),
     #[error("Failed to call read_con for SELinux: {0}")]
-    ReadCon(String),    
+    ReadCon(String),
 }
 
 pub struct SELinux {
@@ -75,14 +75,15 @@ impl SELinux {
         }
 
         loop {
-            match set_xattr(fpath, XATTR_NAME_SELINUX, label.as_bytes(), 0) {
+            match fpath.set_xattr(XATTR_NAME_SELINUX, label.as_bytes()) {
                 Ok(_) => break,
-                // TODO: This line will be fixed after implementing set_xattr.
-                Err(EINTR) => continue,
+                // When a system call is interrupted by a signal, it needs to be retried.
+                Err(XattrError::EINTR(_)) => continue,
                 Err(e) => {
-                    return Err(SELinuxError::SetFileLabel(
-                        format!("set_xattr failed: {}", e),
-                    ));
+                    return Err(SELinuxError::SetFileLabel(format!(
+                        "set_xattr failed: {}",
+                        e
+                    )));
                 }
             }
         }
@@ -98,12 +99,15 @@ impl SELinux {
         }
 
         loop {
-            match lset_xattr(fpath, XATTR_NAME_SELINUX, label.as_bytes(), 0) {
+            match fpath.lset_xattr(XATTR_NAME_SELINUX, label.as_bytes()) {
                 Ok(_) => break,
-                // TODO: This line will be fixed after implementing lset_xattr.
-                Err(EINTR) => continue,
+                // When a system call is interrupted by a signal, it needs to be retried.
+                Err(XattrError::EINTR(_)) => continue,
                 Err(e) => {
-                    return Err(SELinuxError::LSetFileLabel(format!("lset_xattr failed: {}", e)));
+                    return Err(SELinuxError::LSetFileLabel(format!(
+                        "lset_xattr failed: {}",
+                        e
+                    )));
                 }
             }
         }
@@ -117,7 +121,8 @@ impl SELinux {
         if !fpath.exists() {
             return Err(SELinuxError::FileLabel(ERR_EMPTY_PATH.to_string()));
         }
-        get_xattr(fpath, XATTR_NAME_SELINUX)
+        fpath
+            .get_xattr(XATTR_NAME_SELINUX)
             .map_err(|e| SELinuxError::FileLabel(e.to_string()))
     }
 
@@ -128,7 +133,8 @@ impl SELinux {
         if !fpath.exists() {
             return Err(SELinuxError::LFileLabel(ERR_EMPTY_PATH.to_string()));
         }
-        lget_xattr(fpath, XATTR_NAME_SELINUX)
+        fpath
+            .lget_xattr(XATTR_NAME_SELINUX)
             .map_err(|e| SELinuxError::LFileLabel(e.to_string()))
     }
 
@@ -218,7 +224,7 @@ impl SELinux {
     }
 
     // function similar with clearLabels in go-selinux repo.
-    // clear_labels clears all reserved labels. 
+    // clear_labels clears all reserved labels.
     pub fn clear_labels() {
         unimplemented!("not implemented yet")
     }
@@ -305,12 +311,17 @@ impl SELinux {
             match statfs::fstatfs(file.as_fd()) {
                 Ok(stat) if stat.filesystem_type() == statfs::PROC_SUPER_MAGIC => break,
                 Ok(_) => {
-                    return Err(SELinuxError::IsProcHandle(format!("file {} is not on procfs", file.as_raw_fd())
-                    ));
-                },
+                    return Err(SELinuxError::IsProcHandle(format!(
+                        "file {} is not on procfs",
+                        file.as_raw_fd()
+                    )));
+                }
                 Err(Errno::EINTR) => continue,
                 Err(err) => {
-                    return Err(SELinuxError::IsProcHandle(format!("fstatfs failed: {}", err)))
+                    return Err(SELinuxError::IsProcHandle(format!(
+                        "fstatfs failed: {}",
+                        err
+                    )))
                 }
             }
         }
@@ -322,7 +333,7 @@ impl SELinux {
         let mut data = String::new();
         file.read_to_string(&mut data)
             .map_err(|e| SELinuxError::ReadConFd(e.to_string()))?;
-        
+
         // Remove null bytes on the end of a file.
         let trimmed_data = data.trim_end_matches(char::from(0));
         Ok(trimmed_data.to_string())
@@ -365,8 +376,8 @@ impl SELinux {
 mod tests {
     use crate::selinux::*;
     use std::fs::{self, File};
-    use std::path::Path;
     use std::io::Write;
+    use std::path::Path;
 
     fn create_temp_file(content: &[u8], file_name: &str) {
         let path = Path::new(file_name);
@@ -383,10 +394,7 @@ mod tests {
         for (i, src) in src_array.iter().enumerate() {
             let mount_label = mount_label_array[i];
             let expected = expected_array[i];
-            assert_eq!(
-                SELinux::format_mount_label(src, mount_label),
-                expected
-            );
+            assert_eq!(SELinux::format_mount_label(src, mount_label), expected);
         }
     }
 
@@ -405,11 +413,12 @@ mod tests {
                 expected
             );
         }
-    }    
+    }
 
     #[test]
     fn test_read_con_fd() {
-        let content_array: Vec<&[u8]> = vec![b"Hello, world\0", b"Hello, world\0\0\0", b"Hello,\0world"];
+        let content_array: Vec<&[u8]> =
+            vec![b"Hello, world\0", b"Hello, world\0\0\0", b"Hello,\0world"];
         let expected_array = ["Hello, world", "Hello, world", "Hello,\0world"];
         let file_name = "test.txt";
         for (i, content) in content_array.iter().enumerate() {
@@ -435,12 +444,12 @@ mod tests {
 
         // Test with not having "/proc/thread-self/attr" path by setting HAVE_THREAD_SELF as false
         selinux.init_done.store(true, Ordering::SeqCst);
-        selinux.have_thread_self.store(false, Ordering::SeqCst);        
+        selinux.have_thread_self.store(false, Ordering::SeqCst);
         let thread_id = gettid();
         let expected_name = &format!("/proc/self/task/{}/attr/{}", thread_id, attr);
         let expected_path = Path::new(expected_name);
         let actual_path = selinux.attr_path(attr);
-        assert_eq!(expected_path, actual_path); 
+        assert_eq!(expected_path, actual_path);
     }
 
     #[test]
@@ -462,7 +471,7 @@ mod tests {
             if expected_ok {
                 assert!(result.is_ok(), "Expected Ok, but got Err: {:?}", result);
             } else {
-                assert!(result.is_err(), "Expected Err, but got Ok");                
+                assert!(result.is_err(), "Expected Err, but got Ok");
             }
         }
     }
