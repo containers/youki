@@ -4,6 +4,7 @@ use std::os::fd::AsRawFd;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
 
+use nix::errno::Errno;
 use nix::sys::socket;
 
 use super::client::SystemdClient;
@@ -228,9 +229,10 @@ impl DbusConnection {
             .filter(|m| m.preamble.mtype == MessageType::MethodReturn)
             .collect();
 
-        let res = res.first().ok_or(DbusError::MethodCallErr(
-            "expected method call to have reply, found no reply message".into(),
-        ))?;
+        let res = res.first().ok_or(DbusError::AuthenticationErr(format!(
+            "expected Hello call to have reply, found no reply message, got {:?} instead",
+            res
+        )))?;
         let mut ctr = 0;
         let id = String::deserialize(&res.body, &mut ctr)?;
         self.id = Some(id);
@@ -247,13 +249,18 @@ impl DbusConnection {
             let mut reply: [u8; REPLY_BUF_SIZE] = [0_u8; REPLY_BUF_SIZE];
             let mut reply_buffer = [IoSliceMut::new(&mut reply[0..])];
 
-            let reply_rcvd = socket::recvmsg::<()>(
+            let reply_res = socket::recvmsg::<()>(
                 self.socket,
                 &mut reply_buffer,
                 None,
                 socket::MsgFlags::empty(),
-            )?;
+            );
 
+            let reply_rcvd = match reply_res {
+                Ok(msg) => msg,
+                Err(Errno::EAGAIN) => continue,
+                Err(e) => return Err(e.into()),
+            };
             let received_byte_count = reply_rcvd.bytes;
 
             ret.extend_from_slice(&reply[0..received_byte_count]);
@@ -296,20 +303,47 @@ impl DbusConnection {
             None,
         )?;
 
-        let reply = self.receive_complete_response()?;
-
-        // note that a single received response can contain multiple
-        // messages, so we must deserialize it piece by piece
         let mut ret = Vec::new();
-        let mut buf = &reply[..];
 
-        while !buf.is_empty() {
-            let mut ctr = 0;
-            let msg = Message::deserialize(&buf[ctr..], &mut ctr)?;
-            // we reset the buf, because I couldn't figure out how the adjust_counter function
-            // should should be changed to work correctly with non-zero start counter, and this solved that issue
-            buf = &buf[ctr..];
-            ret.push(msg);
+        // it is possible that while receiving messages, we get some extra/previous message
+        // for method calls, we need to have an error or method return type message, so
+        // we keep looping until we get either of these. see https://github.com/containers/youki/issues/2826
+        // for more detailed analysis.
+        loop {
+            let reply = self.receive_complete_response()?;
+
+            // note that a single received response can contain multiple
+            // messages, so we must deserialize it piece by piece
+            let mut buf = &reply[..];
+
+            while !buf.is_empty() {
+                let mut ctr = 0;
+                let msg = Message::deserialize(&buf[ctr..], &mut ctr)?;
+                // we reset the buf, because I couldn't figure out how the adjust_counter function
+                // should should be changed to work correctly with non-zero start counter, and this solved that issue
+                buf = &buf[ctr..];
+                ret.push(msg);
+            }
+
+            // in Youki, we only ever do method call apart from initial auth
+            // in case it is, we don't really have a specific message to look
+            // out of, so we take the buffer and break
+            if mtype != MessageType::MethodCall {
+                break;
+            }
+
+            // check if any of the received message is method return or error type
+            let return_message_count = ret
+                .iter()
+                .filter(|m| {
+                    m.preamble.mtype == MessageType::MethodReturn
+                        || m.preamble.mtype == MessageType::Error
+                })
+                .count();
+
+            if return_message_count > 0 {
+                break;
+            }
         }
         Ok(ret)
     }

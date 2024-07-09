@@ -12,6 +12,7 @@ pub enum Message {
     SeccompNotify,
     SeccompNotifyDone,
     ExecFailed(String),
+    OtherError(String),
 }
 
 impl fmt::Display for Message {
@@ -24,6 +25,7 @@ impl fmt::Display for Message {
             Message::SeccompNotify => write!(f, "SeccompNotify"),
             Message::SeccompNotifyDone => write!(f, "SeccompNotifyDone"),
             Message::ExecFailed(s) => write!(f, "ExecFailed({})", s),
+            Message::OtherError(s) => write!(f, "OtherError({})", s),
         }
     }
 }

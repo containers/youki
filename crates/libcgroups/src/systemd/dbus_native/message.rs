@@ -54,7 +54,7 @@ impl HeaderSignature {
 }
 
 /// Type of message
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum MessageType {
     MethodCall,
     MethodReturn,
