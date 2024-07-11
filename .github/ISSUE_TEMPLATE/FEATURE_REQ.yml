@@ -1,0 +1,44 @@
+name: Feature Request
+description: Suggest an idea for this project
+title: "[FEATURE]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: Thank you for creating a feature request!
+  - type: textarea
+    id: background
+    attributes:
+      label: Background
+      description: Please add required background information for this request
+      placeholder: I'm working on a project where...
+  - type: textarea
+    id: request
+    attributes:
+      label: Feature Request
+      description: Description of the feature you are requesting
+      placeholder: I'm proposing that youki should...
+    validations:
+      required: true
+  - type: textarea
+    id: problem-desc
+    attributes:
+      label: Is the request related to some problem running youki?
+      description: A clear and concise description of what the problem is.
+      placeholder: I'm always frustrated when [...]
+  - type: textarea
+    id: expectations
+    attributes:
+      label: Proposed Solution
+      description: A clear and concise description of what you want to happen.
+      placeholder: Youki should ....
+  - type: textarea
+    id: considerations
+    attributes:
+      label: Considerations
+      description: A clear and concise description of any alternative solutions, features and issues you've considered.
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Please add any additional context or screenshots here.
