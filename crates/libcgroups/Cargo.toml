@@ -22,19 +22,19 @@ cgroupsv2_devices = ["rbpf", "libbpf-sys", "errno", "libc", "nix/dir"]
 [dependencies]
 nix = { version = "0.28.0", features = ["signal", "user", "fs"] }
 procfs = "0.16.0"
-oci-spec = { version = "~0.6.4", features = ["runtime"] }
+oci-spec = { version = "~0.6.7", features = ["runtime"] }
 fixedbitset = "0.5.7"
 serde = { version = "1.0", features = ["derive"] }
 rbpf = { version = "0.2.0", optional = true }
 libbpf-sys = { version = "1.4.2", optional = true }
 errno = { version = "0.3.9", optional = true }
 libc = { version = "0.2.155", optional = true }
-thiserror = "1.0.61"
+thiserror = "1.0.62"
 tracing = { version = "0.1.40", features = ["attributes"] }
 
 [dev-dependencies]
 anyhow = "1.0"
-oci-spec = { version = "~0.6.4", features = ["proptests", "runtime"] }
+oci-spec = { version = "~0.6.7", features = ["proptests", "runtime"] }
 quickcheck = "1"
 mockall = { version = "0.12.1", features = [] }
 clap = "4.1.6"
