@@ -1,0 +1,47 @@
+name: Bug Report
+description: File a bug report.
+title: "[Bug]: "
+labels: ["kind/bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report!
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is 
+      placeholder: Youki crashes when running...
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction-steps
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce this, or how did you run into this?
+      placeholder: |
+        1. Create '...'
+        2. Run youki as '....'
+    validations:
+      required: true
+  - type: textarea
+    id: expectations
+    attributes:
+      label: Expectation
+      description: What did you expect to happen instead?
+      placeholder: Youki should have ran the container...
+  - type: textarea
+    id: info
+    attributes:
+      label: System and Setup Info
+      description: Give us more info about the environment and setup
+      placeholder: |
+        Add information about your system. If Youki is compiling and running on your system, please add o/p of `youki info` .
+        If you are experiencing issues in compiling Youki, or related deps, please add details regarding your setup, dependencies etc. 
+        Also if you are running Youki via something else (Docker, podman, k8s) add its info here.
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Please add any additional context about the issue
