@@ -10,7 +10,7 @@ use nix::mount::MsFlags;
 use nix::sched::CloneFlags;
 use nix::sys::stat::{Mode, SFlag};
 use nix::unistd::{Gid, Uid};
-use oci_spec::runtime::LinuxRlimit;
+use oci_spec::runtime::PosixRlimit;
 
 use super::{linux, Result, Syscall};
 
@@ -173,7 +173,7 @@ impl Syscall for TestHelperSyscall {
             .act(ArgName::Domainname, Box::new(domainname.to_owned()))
     }
 
-    fn set_rlimit(&self, _rlimit: &LinuxRlimit) -> Result<()> {
+    fn set_rlimit(&self, _rlimit: &PosixRlimit) -> Result<()> {
         todo!()
     }
 

@@ -73,7 +73,7 @@ mod tests {
             set_fixture(tmp.path(), "devices.deny", "").expect("create denied devices list");
 
             Devices::apply_device(d, tmp.path()).expect("Apply default device");
-            println!("Device: {}", d.to_string());
+            println!("Device: {}", d);
             if d.allow() {
                 let allowed_content =
                     read_to_string(tmp.path().join("devices.allow")).expect("read to string");
@@ -125,7 +125,7 @@ mod tests {
             set_fixture(tmp.path(), "devices.deny", "").expect("create denied devices list");
 
             Devices::apply_device(d, tmp.path()).expect("Apply default device");
-            println!("Device: {}", d.to_string());
+            println!("Device: {}", d);
             if d.allow() {
                 let allowed_content =
                     read_to_string(tmp.path().join("devices.allow")).expect("read to string");
