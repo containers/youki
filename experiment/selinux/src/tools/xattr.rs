@@ -111,7 +111,7 @@ impl PathXattr for Path {
 
 #[cfg(test)]
 mod tests {
-    use crate::xattrs::*;
+    use crate::tools::*;
     use tempfile::NamedTempFile;
 
     #[test]
