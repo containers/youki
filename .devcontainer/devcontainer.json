@@ -25,8 +25,10 @@
 			]
 		}
 	},
+	"privileged": true,
     "runArgs": [
-        "--privileged"
+        "--name",
+        "youki-devcontainer"
     ],
     "build": {
 		"dockerfile": "Dockerfile"
