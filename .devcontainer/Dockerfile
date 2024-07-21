@@ -1,27 +1,6 @@
 ARG VARIANT="bullseye"
 FROM mcr.microsoft.com/vscode/devcontainers/rust:1-${VARIANT}
 
-RUN apt-get update
-
-# For building
-RUN apt-get install -y \
-  git \
-  pkg-config \
-  libsystemd-dev \
-  build-essential \
-  libelf-dev \
-  libseccomp-dev \
-  libclang-dev \
-  libssl-dev
-
-# For debugging
-RUN apt install -y \
-  podman \
-  bpftrace
-
-# Install just
-RUN curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/bin
-
 # Install docker with youki
 COPY <<EOF /etc/docker/daemon.json
   {
@@ -33,9 +12,27 @@ COPY <<EOF /etc/docker/daemon.json
   }
 EOF
 
-RUN curl https://sh.rustup.rs -sSf | sh -s -- -y 
-# nightly build is required for `cargo fmt` as `rustfmt.toml` uses unstable features.
-RUN rustup install nightly
-RUN rustup component add rustfmt
-RUN rustup component add clippy 
+RUN <<EOF
+apt-get update
+apt-get install -y \
+  # For building
+  build-essential \
+  git \
+  libclang-dev \
+  libelf-dev \
+  libseccomp-dev \
+  libssl-dev \
+  libsystemd-dev \
+  pkg-config \
+  # For debugging
+  bpftrace \
+  podman
 
+curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/bin
+
+# nightly build is required for `cargo fmt` as `rustfmt.toml` uses unstable features.
+curl https://sh.rustup.rs -sSf | sh -s -- -y
+rustup install nightly
+rustup component add rustfmt
+rustup component add clippy 
+EOF
