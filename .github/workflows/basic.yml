@@ -102,9 +102,8 @@ jobs:
         uses: taiki-e/install-action@v1
         with:
           tool: cargo-llvm-cov@0.4.0
-      - uses: taiki-e/install-action@just
-      - name: Install requirements
-        run: sudo env PATH=$PATH just ci-prepare
+      - name: Setup
+        uses: ./.github/workflows/actions/setup
       - name: Run Test Coverage for youki
         run: |
           cargo llvm-cov clean --workspace

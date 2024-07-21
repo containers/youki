@@ -1,0 +1,10 @@
+name: Setup
+
+runs:
+  using: composite
+  steps:
+    - name: Install just
+      uses: taiki-e/install-action@just
+    - name: Install requirements
+      shell: bash
+      run: sudo env PATH=$PATH just ci-prepare
