@@ -1,0 +1,305 @@
+use crate::selinux::*;
+use crate::tools::PathXattr;
+use crate::tools::*;
+use nix::sys::socket::getsockopt;
+use std::io::{BufRead, BufReader};
+use std::os::fd::AsFd;
+use std::path::Path;
+use std::sync::atomic::Ordering;
+
+const XATTR_NAME_SELINUX: &str = "security.selinux";
+const KEY_LABEL_PATH: &str = "/proc/self/attr/keycreate";
+
+// This impl is for methods related to labels in SELinux struct.
+impl SELinux {
+    // set_file_label sets the SELinux label for this path, following symlinks, or returns an error.
+    pub fn set_file_label<P: AsRef<Path> + PathXattr>(
+        fpath: P,
+        label: &str,
+    ) -> Result<(), SELinuxError> {
+        let path = fpath.as_ref();
+        if !path.exists() {
+            return Err(SELinuxError::SetFileLabel(ERR_EMPTY_PATH.to_string()));
+        }
+
+        loop {
+            match fpath.set_xattr(XATTR_NAME_SELINUX, label.as_bytes()) {
+                Ok(_) => break,
+                // When a system call is interrupted by a signal, it needs to be retried.
+                Err(XattrError::EINTR(_)) => continue,
+                Err(e) => {
+                    return Err(SELinuxError::SetFileLabel(format!(
+                        "set_xattr failed: {}",
+                        e
+                    )));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    // lset_file_label sets the SELinux label for this path, not following symlinks,
+    // or returns an error.
+    pub fn lset_file_label<P: AsRef<Path> + PathXattr>(
+        fpath: P,
+        label: &str,
+    ) -> Result<(), SELinuxError> {
+        let path = fpath.as_ref();
+        if !path.exists() {
+            return Err(SELinuxError::LSetFileLabel(ERR_EMPTY_PATH.to_string()));
+        }
+
+        loop {
+            match fpath.lset_xattr(XATTR_NAME_SELINUX, label.as_bytes()) {
+                Ok(_) => break,
+                // When a system call is interrupted by a signal, it needs to be retried.
+                Err(XattrError::EINTR(_)) => continue,
+                Err(e) => {
+                    return Err(SELinuxError::LSetFileLabel(format!(
+                        "lset_xattr failed: {}",
+                        e
+                    )));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    // fileLabel returns the SELinux label for this path, following symlinks,
+    // or returns an error.
+    pub fn file_label<P: AsRef<Path> + PathXattr>(fpath: P) -> Result<String, SELinuxError> {
+        let path = fpath.as_ref();
+        if !path.exists() {
+            return Err(SELinuxError::FileLabel(ERR_EMPTY_PATH.to_string()));
+        }
+        fpath
+            .get_xattr(XATTR_NAME_SELINUX)
+            .map_err(|e| SELinuxError::FileLabel(e.to_string()))
+    }
+
+    // lfile_label returns the SELinux label for this path, not following symlinks,
+    // or returns an error.
+    pub fn lfile_label<P: AsRef<Path> + PathXattr>(fpath: P) -> Result<String, SELinuxError> {
+        let path = fpath.as_ref();
+        if !path.exists() {
+            return Err(SELinuxError::LFileLabel(ERR_EMPTY_PATH.to_string()));
+        }
+        fpath
+            .lget_xattr(XATTR_NAME_SELINUX)
+            .map_err(|e| SELinuxError::LFileLabel(e.to_string()))
+    }
+
+    // set_fscreate_label sets the default label the kernel which the kernel is using
+    // for file system objects.
+    pub fn set_fscreate_label(&mut self, label: &str) -> Result<usize, SELinuxError> {
+        return Self::write_con(self, self.attr_path("fscreate").as_path(), label);
+    }
+
+    // fscreate_label returns the default label the kernel which the kernel is using
+    // for file system objects created by this task. "" indicates default.
+    pub fn fscreate_label(&self) -> Result<String, SELinuxError> {
+        return Self::read_con(self.attr_path("fscreate").as_path());
+    }
+
+    // pid_label returns the SELinux label of the given pid, or an error.
+    pub fn pid_label(pid: i64) -> Result<String, SELinuxError> {
+        let file_name = &format!("/proc/{}/attr/current", pid);
+        let label = Path::new(file_name);
+        Self::read_con(label)
+    }
+
+    // exec_label returns the SELinux label that the kernel will use for any programs
+    // that are executed by the current process thread, or an error.
+    pub fn exec_label(&self) -> Result<String, SELinuxError> {
+        return Self::read_con(self.attr_path("exec").as_path());
+    }
+
+    // set_exec_label sets the SELinux label that the kernel will use for any programs
+    // that are executed by the current process thread, or an error.
+    pub fn set_exec_label(&mut self, label: &str) -> Result<usize, SELinuxError> {
+        Self::write_con(self, self.attr_path("exec").as_path(), label)
+    }
+
+    // set_task_label sets the SELinux label for the current thread, or an error.
+    // This requires the dyntransition permission because this changes the context of current thread.
+    pub fn set_task_label(&mut self, label: &str) -> Result<usize, SELinuxError> {
+        Self::write_con(self, self.attr_path("current").as_path(), label)
+    }
+
+    // set_socket_label takes a process label and tells the kernel to assign the
+    // label to the next socket that gets created.
+    pub fn set_socket_label(&mut self, label: &str) -> Result<usize, SELinuxError> {
+        Self::write_con(self, self.attr_path("sockcreate").as_path(), label)
+    }
+
+    // socket_label retrieves the current socket label setting.
+    pub fn socket_label(&self) -> Result<String, SELinuxError> {
+        return Self::read_con(self.attr_path("sockcreate").as_path());
+    }
+
+    // peer_label retrieves the label of the client on the other side of a socket.
+    pub fn peer_label<F: AsFd>(fd: F) -> Result<String, SELinuxError> {
+        // getsockopt manipulate options for the socket referred to by the file descriptor.
+        // https://man7.org/linux/man-pages/man2/getsockopt.2.html
+        match getsockopt(&fd, PeerSec) {
+            Ok(label) => match label.into_string() {
+                Ok(label_str) => Ok(label_str),
+                Err(e) => Err(SELinuxError::PeerLabel(e.to_string())),
+            },
+            Err(e) => Err(SELinuxError::PeerLabel(e.to_string())),
+        }
+    }
+
+    // set_key_label takes a process label and tells the kernel to assign the
+    // label to the next kernel keyring that gets created.
+    pub fn set_key_label(&mut self, label: &str) -> Result<usize, SELinuxError> {
+        Self::write_con(self, Path::new(KEY_LABEL_PATH), label)
+    }
+
+    // key_label retrieves the current kernel keyring label setting
+    pub fn key_label() -> Result<String, SELinuxError> {
+        Self::read_con(Path::new(KEY_LABEL_PATH))
+    }
+
+    // kvm_container_labels returns the default processLabel and mountLabel to be used
+    // for kvm containers by the calling process.
+    pub fn kvm_container_labels(&mut self) -> (String, String) {
+        let mut process_label = Self::label(self, "kvm_process");
+        if process_label.is_empty() {
+            process_label = Self::label(self, "process");
+        }
+        (process_label, Self::label(self, "file"))
+        // TODO: use addMcs
+    }
+
+    // init_container_labels returns the default processLabel and file labels to be
+    // used for containers running an init system like systemd by the calling process.
+    pub fn init_container_labels(&mut self) -> (String, String) {
+        let mut process_label = Self::label(self, "init_process");
+        if process_label.is_empty() {
+            process_label = Self::label(self, "process");
+        }
+        (process_label, Self::label(self, "file"))
+        // TODO: use addMcs
+    }
+
+    // container_labels returns an allocated processLabel and fileLabel to be used for
+    // container labeling by the calling process.
+    pub fn container_labels(&mut self) -> (String, String) {
+        if !Self::get_enabled(self) {
+            return (String::new(), String::new());
+        }
+        let process_label = Self::label(self, "process");
+        let file_label = Self::label(self, "file");
+        let mut read_only_file_label = Self::label(self, "ro_file");
+
+        if process_label.is_empty() || file_label.is_empty() {
+            return (String::new(), file_label);
+        }
+        if read_only_file_label.is_empty() {
+            read_only_file_label = file_label.clone();
+        }
+        self.read_only_file_label = Some(read_only_file_label);
+
+        (process_label, file_label)
+        // TODO: use addMcs
+    }
+
+    // This function returns the value of given key on selinux context
+    fn label(&mut self, key: &str) -> String {
+        if !self.load_labels_init_done.load(Ordering::SeqCst) {
+            Self::load_labels(self);
+            self.load_labels_init_done.store(true, Ordering::SeqCst);
+        }
+        self.labels.get(key).cloned().unwrap_or_default()
+    }
+
+    // This function loads context file and reads labels and stores it.
+    fn load_labels(&mut self) {
+        // The context file should have pairs of key and value like below.
+        // ----------
+        // SELINUXTYPE=targeted
+        // SELINUX=enforcing
+        // ----------
+        if let Ok(file) = Self::open_context_file(self) {
+            let reader = BufReader::new(file);
+            for line in reader.lines().map_while(Result::ok) {
+                let line = line.trim();
+                if line.is_empty() || line.starts_with(';') || line.starts_with('#') {
+                    continue;
+                }
+                let fields: Vec<&str> = line.splitn(2, '=').collect();
+                if fields.len() != 2 {
+                    continue;
+                }
+                let key = fields[0].trim().to_string();
+                let value = fields[1].trim().to_string();
+                self.labels.insert(key, value);
+            }
+        }
+    }
+
+    // format_mount_label returns a string to be used by the mount command.
+    // Using the SELinux `context` mount option.
+    // Changing labels of files on mount points with this option can never be changed.
+    // format_mount_label returns a string to be used by the mount command.
+    // The format of this string will be used to alter the labeling of the mountpoint.
+    // The string returned is suitable to be used as the options field of the mount command.
+    // If you need to have additional mount point options, you can pass them in as
+    // the first parameter. The second parameter is the label that you wish to apply
+    // to all content in the mount point.
+    pub fn format_mount_label(src: &str, mount_label: &str) -> String {
+        Self::format_mount_label_by_type(src, mount_label, "context")
+    }
+
+    // format_mount_label_by_type returns a string to be used by the mount command.
+    // Allow caller to specify the mount options. For example using the SELinux
+    // `fscontext` mount option would allow certain container processes to change
+    // labels of files created on the mount points, where as `context` option does not.
+    pub fn format_mount_label_by_type(src: &str, mount_label: &str, context_type: &str) -> String {
+        let mut formatted_src = src.to_owned();
+
+        if !mount_label.is_empty() {
+            if formatted_src.is_empty() {
+                formatted_src = format!("{}=\"{}\"", context_type, mount_label);
+            } else {
+                formatted_src = format!("{},{}=\"{}\"", formatted_src, context_type, mount_label);
+            }
+        }
+        formatted_src
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::selinux::*;
+
+    #[test]
+    fn test_format_mount_label() {
+        let src_array = ["", "src", "src"];
+        let mount_label_array = ["foobar", "foobar", ""];
+        let expected_array = ["context=\"foobar\"", "src,context=\"foobar\"", "src"];
+        for (i, src) in src_array.iter().enumerate() {
+            let mount_label = mount_label_array[i];
+            let expected = expected_array[i];
+            assert_eq!(SELinux::format_mount_label(src, mount_label), expected);
+        }
+    }
+
+    #[test]
+    fn test_format_mount_label_by_type() {
+        let src_array = ["", "src", "src"];
+        let mount_label_array = ["foobar", "foobar", ""];
+        let context_array = ["fscontext", "fscontext", "rootcontext"];
+        let expected_array = ["fscontext=\"foobar\"", "src,fscontext=\"foobar\"", "src"];
+        for (i, src) in src_array.iter().enumerate() {
+            let mount_label = mount_label_array[i];
+            let context = context_array[i];
+            let expected = expected_array[i];
+            assert_eq!(
+                SELinux::format_mount_label_by_type(src, mount_label, context),
+                expected
+            );
+        }
+    }
+}
