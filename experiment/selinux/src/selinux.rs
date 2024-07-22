@@ -5,6 +5,7 @@ use nix::sys::{statfs, statvfs};
 use nix::unistd::gettid;
 
 use std::collections::HashMap;
+use std::fmt;
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::os::fd::{AsFd, AsRawFd};
@@ -12,12 +13,21 @@ use std::os::fd::{AsFd, AsRawFd};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 
-// ENFORCING constant to indicate SELinux is in enforcing mode
-const ENFORCING: i32 = 1;
-// PERMISSIVE constant to indicate SELinux is in permissive mode
-const PERMISSIVE: i32 = 0;
-// DISABLED constant to indicate SELinux is disabled
-const DISABLED: i32 = -1;
+#[derive(Debug, Copy, Clone)]
+pub enum SELinuxMode {
+    // ENFORCING constant to indicate SELinux is in enforcing mode
+    ENFORCING = 1,
+    // PERMISSIVE constant to indicate SELinux is in permissive mode
+    PERMISSIVE = 0,
+    // DISABLED constant to indicate SELinux is disabled
+    DISABLED = -1,
+}
+
+impl fmt::Display for SELinuxMode {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", *self as i32)
+    }
+}
 
 const XATTR_NAME_SELINUX: &str = "security.selinux";
 const ERR_EMPTY_PATH: &str = "empty path";
@@ -55,6 +65,8 @@ pub enum SELinuxError {
     OpenContextFile(String),
     #[error("Failed to set enforce mode of SELinux: {0}")]
     SetEnforceMode(String),
+    #[error("Failed to read config file of SELinux: {0}")]
+    ReadConfig(String),
 }
 
 pub struct SELinux {
@@ -64,11 +76,11 @@ pub struct SELinux {
 
     // for selinuxfs
     selinuxfs_init_done: AtomicBool,
-    selinuxfs: Option<String>,
+    selinuxfs: Option<PathBuf>,
 
     // for policy_root()
     policy_root_init_done: AtomicBool,
-    policy_root: Option<String>,
+    policy_root: Option<PathBuf>,
 
     // for load_labels()
     load_labels_init_done: AtomicBool,
@@ -102,28 +114,22 @@ impl SELinux {
         }
     }
 
-    // function similar with policyRoot in go-selinux repo.
     // This function returns policy_root.
     // Directories under policy root has configuration files etc.
-    fn policy_root(&mut self) -> String {
+    fn policy_root(&mut self) -> Option<&PathBuf> {
         // Avoiding code conflicts and ensuring thread-safe execution once only.
         if !self.policy_root_init_done.load(Ordering::SeqCst) {
-            let policy_root_path = Self::read_config(SELINUX_TYPE_TAG);
-            self.policy_root = Some(policy_root_path.clone());
+            let policy_root_path = Self::read_config(SELINUX_TYPE_TAG).unwrap_or_default();
+            self.policy_root = Some(PathBuf::from(policy_root_path));
             self.policy_root_init_done.store(true, Ordering::SeqCst);
-            policy_root_path
-        } else {
-            self.policy_root
-                .as_ref()
-                .unwrap_or(&String::new())
-                .to_string()
         }
+        self.policy_root.as_ref()
     }
 
-    // function similar with readConfig in go-selinux repo.
     // This function reads SELinux config file and returns the value with a specified key.
-    fn read_config(target: &str) -> String {
-        match File::open(format!("{}{}", SELINUX_DIR, SELINUX_CONFIG)) {
+    fn read_config(target: &str) -> Result<String, SELinuxError> {
+        let config_path = Path::new(SELINUX_DIR).join(SELINUX_CONFIG);
+        match File::open(config_path) {
             Ok(file) => {
                 let reader = BufReader::new(file);
                 for line in reader.lines().map_while(Result::ok) {
@@ -135,40 +141,47 @@ impl SELinux {
                     }
                     let fields: Vec<&str> = line.splitn(2, '=').collect();
                     if fields.len() < 2 {
-                        return String::new();
+                        return Err(SELinuxError::ReadConfig(
+                            "config file is not formatted like key=value".to_string(),
+                        ));
                     }
                     if fields[0] == target {
-                        return fields[1].to_owned();
+                        return Ok(fields[1].to_owned());
                     }
                 }
-                String::new()
+                Err(SELinuxError::ReadConfig(format!(
+                    "can't find the target label in the config file: {}",
+                    target
+                )))
             }
-            Err(_) => String::new(),
+            Err(e) => Err(SELinuxError::ReadConfig(format!(
+                "can't open the config file: {}",
+                e
+            ))),
         }
     }
 
-    // function similar with getEnabled in go-selinux repo.
     // get_enabled returns whether SELinux is enabled or not.
     pub fn get_enabled(&mut self) -> bool {
-        let fs = Self::get_selinux_mountpoint(self);
-        if fs == String::new() {
-            return false;
-        }
-        match Self::current_label(self) {
-            Ok(con) => {
-                if con != "kernel" {
-                    return true;
+        match Self::get_selinux_mountpoint(self) {
+            // If there is no SELinux mountpoint, SELinux is not enabled.
+            None => false,
+            Some(_) => match Self::current_label(self) {
+                Ok(con) => {
+                    if con != "kernel" {
+                        return true;
+                    }
+                    false
                 }
-                false
-            }
-            Err(_) => false,
+                Err(_) => false,
+            },
         }
     }
 
-    // function similar with verifySELinuxfsMount in go-selinux repo.
     // verify_selinux_fs_mount verifies if the specified mount point is
     // properly mounted as a writable SELinux filesystem.
-    fn verify_selinux_fs_mount(mnt: &Path) -> bool {
+    fn verify_selinux_fs_mount<P: AsRef<Path>>(mnt: P) -> bool {
+        let mnt = mnt.as_ref();
         loop {
             match statfs::statfs(mnt) {
                 Ok(stat) => {
@@ -186,36 +199,35 @@ impl SELinux {
         }
     }
 
-    // function similar with findSELinuxfsMount in go-selinux repo.
     // find_selinux_fs_mount returns a next selinuxfs mount point found,
     // if there is one, or an empty string in case of EOF or error.
-    fn find_selinux_fs_mount(s: &str) -> String {
+    fn find_selinux_fs_mount(s: &str) -> Option<PathBuf> {
         if !s.contains(" - selinuxfs ") {
-            return String::new();
+            return None;
         }
         // Need to return the path like /sys/fs/selinux
         // example: 28 24 0:25 / /sys/fs/selinux rw,relatime - selinuxfs selinuxfs rw
         let m_pos = 5;
         let fields: Vec<&str> = s.splitn(m_pos + 1, ' ').collect();
         if fields.len() < m_pos + 1 {
-            return String::new();
+            return None;
         }
-        fields[m_pos - 1].to_string()
+        let mountpoint = fields[m_pos - 1].to_string();
+        Some(PathBuf::from(mountpoint))
     }
 
-    // function similar with findSELinuxfs in go-selinux repo.
     // find_selinux_fs finds the SELinux filesystem mount point.
-    fn find_selinux_fs() -> String {
+    fn find_selinux_fs() -> Option<PathBuf> {
         // fast path: check the default mount first
-        let selinux_fs_mount_path = Path::new(SELINUX_FS_MOUNT);
-        if Self::verify_selinux_fs_mount(selinux_fs_mount_path) {
-            return SELINUX_FS_MOUNT.to_string();
+        let selinux_fs_mount_path = PathBuf::from(SELINUX_FS_MOUNT);
+        if Self::verify_selinux_fs_mount(selinux_fs_mount_path.clone()) {
+            return Some(selinux_fs_mount_path);
         }
 
         // check if selinuxfs is available before going the slow path
         let fs = fs::read_to_string("/proc/filesystems").unwrap_or_default();
         if !fs.contains("\tselinuxfs\n") {
-            return String::new();
+            return None;
         }
 
         // continue reading until finding mount point
@@ -225,50 +237,40 @@ impl SELinux {
                 Ok(file) => {
                     let reader = BufReader::new(file);
                     for line in reader.lines().map_while(Result::ok) {
-                        let mnt = Self::find_selinux_fs_mount(&line);
-                        if mnt == String::new() {
-                            continue;
-                        }
-                        let mnt_path = Path::new(&mnt);
-                        if Self::verify_selinux_fs_mount(mnt_path) {
-                            return mnt;
+                        if let Some(mnt) = Self::find_selinux_fs_mount(&line) {
+                            if Self::verify_selinux_fs_mount(mnt.clone()) {
+                                return Some(mnt);
+                            }
                         }
                     }
                 }
-                Err(_) => return String::new(),
+                Err(_) => return None,
             }
         }
     }
 
-    // function similar with getSelinuxMountPoint in go-selinux repo.
     // This function returns the path to the mountpoint of an selinuxfs
     // filesystem or an empty string if no mountpoint is found. Selinuxfs is
     // a proc-like pseudo-filesystem that exposes the SELinux policy API to
     // processes. The existence of an seliuxfs mount is used to determine
     // whether SELinux is currently enabled or not.
-    pub fn get_selinux_mountpoint(&mut self) -> String {
+    pub fn get_selinux_mountpoint(&mut self) -> Option<&PathBuf> {
         // Avoiding code conflicts and ensuring thread-safe execution once only.
         if !self.selinuxfs_init_done.load(Ordering::SeqCst) {
-            let selinuxfs_path = Self::find_selinux_fs();
-            self.selinuxfs = Some(selinuxfs_path.clone());
+            self.selinuxfs = Self::find_selinux_fs();
             self.selinuxfs_init_done.store(true, Ordering::SeqCst);
-            selinuxfs_path
-        } else {
-            self.selinuxfs
-                .as_ref()
-                .unwrap_or(&String::new())
-                .to_string()
         }
+        self.selinuxfs.as_ref()
     }
 
-    // function similar with classIndex in go-selinux repo.
     // classIndex returns the int index for an object class in the loaded policy,
     // or -1 and an error.
     // If class is "file" or "dir", then return the corresponding index for selinux.
     pub fn class_index(&mut self, class: &str) -> Result<i64, SELinuxError> {
         let permpath = format!("class/{}/index", class);
-        let selinux_mountpoint = Self::get_selinux_mountpoint(self);
-        let indexpath = Path::new(&selinux_mountpoint).join(permpath);
+        let mountpoint = Self::get_selinux_mountpoint(self)
+            .ok_or_else(|| SELinuxError::ClassIndex("SELinux mount point not found".to_string()))?;
+        let indexpath = mountpoint.join(permpath);
 
         match fs::read_to_string(indexpath) {
             Ok(index_b) => match index_b.parse::<i64>() {
@@ -279,10 +281,13 @@ impl SELinux {
         }
     }
 
-    // function similar with setFileLabel in go-selinux repo.
     // set_file_label sets the SELinux label for this path, following symlinks, or returns an error.
-    pub fn set_file_label(fpath: &Path, label: &str) -> Result<(), SELinuxError> {
-        if !fpath.exists() {
+    pub fn set_file_label<P: AsRef<Path> + PathXattr>(
+        fpath: P,
+        label: &str,
+    ) -> Result<(), SELinuxError> {
+        let path = fpath.as_ref();
+        if !path.exists() {
             return Err(SELinuxError::SetFileLabel(ERR_EMPTY_PATH.to_string()));
         }
 
@@ -302,11 +307,14 @@ impl SELinux {
         Ok(())
     }
 
-    // function similar with lSetFileLabel in go-selinux repo.
     // lset_file_label sets the SELinux label for this path, not following symlinks,
     // or returns an error.
-    pub fn lset_file_label(fpath: &Path, label: &str) -> Result<(), SELinuxError> {
-        if !fpath.exists() {
+    pub fn lset_file_label<P: AsRef<Path> + PathXattr>(
+        fpath: P,
+        label: &str,
+    ) -> Result<(), SELinuxError> {
+        let path = fpath.as_ref();
+        if !path.exists() {
             return Err(SELinuxError::LSetFileLabel(ERR_EMPTY_PATH.to_string()));
         }
 
@@ -326,11 +334,11 @@ impl SELinux {
         Ok(())
     }
 
-    // function similar with fileLabel in go-selinux repo.
     // fileLabel returns the SELinux label for this path, following symlinks,
     // or returns an error.
-    pub fn file_label(fpath: &Path) -> Result<String, SELinuxError> {
-        if !fpath.exists() {
+    pub fn file_label<P: AsRef<Path> + PathXattr>(fpath: P) -> Result<String, SELinuxError> {
+        let path = fpath.as_ref();
+        if !path.exists() {
             return Err(SELinuxError::FileLabel(ERR_EMPTY_PATH.to_string()));
         }
         fpath
@@ -338,11 +346,11 @@ impl SELinux {
             .map_err(|e| SELinuxError::FileLabel(e.to_string()))
     }
 
-    // function similar with lFileLabel in go-selinux repo.
     // lfile_label returns the SELinux label for this path, not following symlinks,
     // or returns an error.
-    pub fn lfile_label(fpath: &Path) -> Result<String, SELinuxError> {
-        if !fpath.exists() {
+    pub fn lfile_label<P: AsRef<Path> + PathXattr>(fpath: P) -> Result<String, SELinuxError> {
+        let path = fpath.as_ref();
+        if !path.exists() {
             return Err(SELinuxError::LFileLabel(ERR_EMPTY_PATH.to_string()));
         }
         fpath
@@ -350,27 +358,23 @@ impl SELinux {
             .map_err(|e| SELinuxError::LFileLabel(e.to_string()))
     }
 
-    // function similar with setFSCreateLabel in go-selinux repo.
     // set_fscreate_label sets the default label the kernel which the kernel is using
     // for file system objects.
     pub fn set_fscreate_label(&mut self, label: &str) -> Result<usize, SELinuxError> {
         return Self::write_con(self, self.attr_path("fscreate").as_path(), label);
     }
 
-    // function similar with fsCreateLabel in go-selinux repo.
     // fscreate_label returns the default label the kernel which the kernel is using
     // for file system objects created by this task. "" indicates default.
     pub fn fscreate_label(&self) -> Result<String, SELinuxError> {
         return Self::read_con(self.attr_path("fscreate").as_path());
     }
 
-    // function similar with currentLabel in go-selinux repo.
     // current_label returns the SELinux label of the current process thread, or an error.
     pub fn current_label(&self) -> Result<String, SELinuxError> {
         return Self::read_con(self.attr_path("current").as_path());
     }
 
-    // function similar with pidLabel in go-selinux repo.
     // pid_label returns the SELinux label of the given pid, or an error.
     pub fn pid_label(pid: i64) -> Result<String, SELinuxError> {
         let file_name = &format!("/proc/{}/attr/current", pid);
@@ -378,41 +382,35 @@ impl SELinux {
         Self::read_con(label)
     }
 
-    // function similar with execLabel in go-selinux repo.
     // exec_label returns the SELinux label that the kernel will use for any programs
     // that are executed by the current process thread, or an error.
     pub fn exec_label(&self) -> Result<String, SELinuxError> {
         return Self::read_con(self.attr_path("exec").as_path());
     }
 
-    // function similar with SetExecLabel in go-selinux repo.
     // set_exec_label sets the SELinux label that the kernel will use for any programs
     // that are executed by the current process thread, or an error.
     pub fn set_exec_label(&mut self, label: &str) -> Result<usize, SELinuxError> {
         Self::write_con(self, self.attr_path("exec").as_path(), label)
     }
 
-    // function similar with SetTaskLabel in go-selinux repo.
     // set_task_label sets the SELinux label for the current thread, or an error.
     // This requires the dyntransition permission because this changes the context of current thread.
     pub fn set_task_label(&mut self, label: &str) -> Result<usize, SELinuxError> {
         Self::write_con(self, self.attr_path("current").as_path(), label)
     }
 
-    // function similar with SetSocketLabel in go-selinux repo.
     // set_socket_label takes a process label and tells the kernel to assign the
     // label to the next socket that gets created.
     pub fn set_socket_label(&mut self, label: &str) -> Result<usize, SELinuxError> {
         Self::write_con(self, self.attr_path("sockcreate").as_path(), label)
     }
 
-    // function similar with SocketLabel in go-selinux repo.
     // socket_label retrieves the current socket label setting.
     pub fn socket_label(&self) -> Result<String, SELinuxError> {
         return Self::read_con(self.attr_path("sockcreate").as_path());
     }
 
-    // function similar with peerLabel in go-selinux repo.
     // peer_label retrieves the label of the client on the other side of a socket.
     pub fn peer_label<F: AsFd>(fd: F) -> Result<String, SELinuxError> {
         // getsockopt manipulate options for the socket referred to by the file descriptor.
@@ -426,20 +424,17 @@ impl SELinux {
         }
     }
 
-    // function similar with setKeyLabel in go-selinux repo.
     // set_key_label takes a process label and tells the kernel to assign the
     // label to the next kernel keyring that gets created.
     pub fn set_key_label(&mut self, label: &str) -> Result<usize, SELinuxError> {
         Self::write_con(self, Path::new(KEY_LABEL_PATH), label)
     }
 
-    // function similar with KeyLabel in go-selinux repo.
     // key_label retrieves the current kernel keyring label setting
     pub fn key_label() -> Result<String, SELinuxError> {
         Self::read_con(Path::new(KEY_LABEL_PATH))
     }
 
-    // function similar with kvmContainerLabels in go-selinux repo.
     // kvm_container_labels returns the default processLabel and mountLabel to be used
     // for kvm containers by the calling process.
     pub fn kvm_container_labels(&mut self) -> (String, String) {
@@ -451,7 +446,6 @@ impl SELinux {
         // TODO: use addMcs
     }
 
-    // function similar with initContainerLabels in go-selinux repo.
     // init_container_labels returns the default processLabel and file labels to be
     // used for containers running an init system like systemd by the calling process.
     pub fn init_container_labels(&mut self) -> (String, String) {
@@ -463,7 +457,6 @@ impl SELinux {
         // TODO: use addMcs
     }
 
-    // function similar with containerLabels in go-selinux repo.
     // container_labels returns an allocated processLabel and fileLabel to be used for
     // container labeling by the calling process.
     pub fn container_labels(&mut self) -> (String, String) {
@@ -486,13 +479,6 @@ impl SELinux {
         // TODO: use addMcs
     }
 
-    // function similar with PrivContainerMountLabel in go-selinux repo.
-    // priv_container_mount_label returns mount label for privileged containers.
-    pub fn priv_container_mount_label() {
-        unimplemented!("not implemented yet")
-    }
-
-    // function similar with FormatMountLabel in go-selinux repo.
     // format_mount_label returns a string to be used by the mount command.
     // Using the SELinux `context` mount option.
     // Changing labels of files on mount points with this option can never be changed.
@@ -506,7 +492,6 @@ impl SELinux {
         Self::format_mount_label_by_type(src, mount_label, "context")
     }
 
-    // function similar with FormatMountLabelByType in go-selinux repo.
     // format_mount_label_by_type returns a string to be used by the mount command.
     // Allow caller to specify the mount options. For example using the SELinux
     // `fscontext` mount option would allow certain container processes to change
@@ -524,17 +509,16 @@ impl SELinux {
         formatted_src
     }
 
-    // function similar with openContextFile in go-selinux repo.
     // This function attempts to open a selinux context file, and if it fails, it tries to open another file
     // under policy root's directory.
     fn open_context_file(&mut self) -> Result<File, SELinuxError> {
         match File::open(CONTEXT_FILE) {
             Ok(file) => Ok(file),
             Err(_) => {
-                let policy_path = Self::policy_root(self);
-                let context_on_policy_root = Path::new(&policy_path)
-                    .join("contexts")
-                    .join("lxc_contexts");
+                let policy_path = Self::policy_root(self).ok_or_else(|| {
+                    SELinuxError::OpenContextFile("can't get policy root".to_string())
+                })?;
+                let context_on_policy_root = policy_path.join("contexts").join("lxc_contexts");
                 match File::open(context_on_policy_root) {
                     Ok(file) => Ok(file),
                     Err(e) => Err(SELinuxError::OpenContextFile(e.to_string())),
@@ -543,7 +527,6 @@ impl SELinux {
         }
     }
 
-    // function similar with label in go-selinux repo.
     // This function returns the value of given key on selinux context
     fn label(&mut self, key: &str) -> String {
         if !self.load_labels_init_done.load(Ordering::SeqCst) {
@@ -553,7 +536,6 @@ impl SELinux {
         self.labels.get(key).cloned().unwrap_or_default()
     }
 
-    // function similar with loadLabels in go-selinux repo.
     // This function loads context file and reads labels and stores it.
     fn load_labels(&mut self) {
         // The context file should have pairs of key and value like below.
@@ -579,62 +561,73 @@ impl SELinux {
         }
     }
 
-    // function similar with selinuxEnforcePath in go-selinux repo.
     // This returns selinux enforce path by using selinux mountpoint.
     // The enforce path dynamically changes SELinux mode at runtime,
     // while the config file need OS to reboot after changing the config file.
-    fn selinux_enforce_path(&mut self) -> PathBuf {
+    fn selinux_enforce_path(&mut self) -> Option<PathBuf> {
         let selinux_mountpoint = Self::get_selinux_mountpoint(self);
-        PathBuf::from(&selinux_mountpoint).join("enforce")
+        selinux_mountpoint.map(|m| m.join("enforce"))
     }
 
-    // function similar with enforceMode in go-selinux repo.
     // enforce_mode returns the current SELinux mode Enforcing, Permissive, Disabled
-    pub fn enforce_mode(&mut self) -> i32 {
-        let enforce_path = Self::selinux_enforce_path(self);
-        match fs::read_to_string(enforce_path) {
-            Ok(content) => content.trim().parse::<i32>().unwrap_or(-1),
-            Err(_) => -1,
+    pub fn enforce_mode(&mut self) -> SELinuxMode {
+        let mode = match Self::selinux_enforce_path(self) {
+            Some(enforce_path) => match fs::read_to_string(enforce_path) {
+                Ok(content) => content.trim().parse::<i32>().unwrap_or(-1),
+                Err(_) => -1,
+            },
+            None => -1,
+        };
+
+        match mode {
+            1 => SELinuxMode::ENFORCING,
+            0 => SELinuxMode::PERMISSIVE,
+            -1 => SELinuxMode::DISABLED,
+            _ => SELinuxMode::DISABLED,
         }
     }
 
-    // function similar with isMLSEnabled in go-selinux repo.
     // is_mls_enabled checks if MLS is enabled.
     pub fn is_mls_enabled(&mut self) -> bool {
-        let mountpoint = Self::get_selinux_mountpoint(self);
-        let mls_path = Path::new(&mountpoint).join("mls");
-
-        match fs::read(mls_path) {
-            Ok(enabled_b) => enabled_b == vec![b'1'],
-            Err(_) => false,
+        if let Some(mountpoint) = Self::get_selinux_mountpoint(self) {
+            let mls_path = Path::new(&mountpoint).join("mls");
+            match fs::read(mls_path) {
+                Ok(enabled_b) => return enabled_b == vec![b'1'],
+                Err(_) => return false,
+            }
         }
+        false
     }
 
-    // function similar with setEnforceMode in go-selinux repo.
     // This function updates the enforce mode of selinux.
     // Disabled is not valid, since this needs to be set at boot time.
-    pub fn set_enforce_mode(&mut self, mode: i32) -> Result<(), SELinuxError> {
-        let enforce_path = Self::selinux_enforce_path(self);
+    pub fn set_enforce_mode(&mut self, mode: SELinuxMode) -> Result<(), SELinuxError> {
+        let enforce_path = Self::selinux_enforce_path(self).ok_or_else(|| {
+            SELinuxError::SetEnforceMode("can't get selinux enforce path".to_string())
+        })?;
         fs::write(enforce_path, mode.to_string().as_bytes())
             .map_err(|e| SELinuxError::SetEnforceMode(e.to_string()))
     }
 
-    // function similar with defaultEnforceMode in go-selinux repo.
     // This returns the systems default SELinux mode Enforcing, Permissive or Disabled.
     // note this is just the default at boot time.
     // enforce_mode function tells you the system current mode.
-    pub fn default_enforce_mode() -> i32 {
-        match Self::read_config(SELINUX_TAG).as_str() {
-            "enforcing" => ENFORCING,
-            "permissive" => PERMISSIVE,
-            _ => DISABLED,
+    pub fn default_enforce_mode() -> SELinuxMode {
+        match Self::read_config(SELINUX_TAG).unwrap_or_default().as_str() {
+            "enforcing" => SELinuxMode::ENFORCING,
+            "permissive" => SELinuxMode::PERMISSIVE,
+            _ => SELinuxMode::DISABLED,
         }
     }
 
-    // function similar with writeCon in go-selinux repo.
     // write_con writes a specified value to a given file path, handling SELinux context.
-    pub fn write_con(&mut self, fpath: &Path, val: &str) -> Result<usize, SELinuxError> {
-        if fpath.as_os_str().is_empty() {
+    pub fn write_con<P: AsRef<Path>>(
+        &mut self,
+        fpath: P,
+        val: &str,
+    ) -> Result<usize, SELinuxError> {
+        let path = fpath.as_ref();
+        if path.as_os_str().is_empty() {
             return Err(SELinuxError::WriteCon(ERR_EMPTY_PATH.to_string()));
         }
         if val.is_empty() && !Self::get_enabled(self) {
@@ -657,7 +650,7 @@ impl SELinux {
         }
     }
 
-    // function similar with isProcHandle in go-selinux repo.
+    // This function checks whether this file is on the procfs filesystem.
     pub fn is_proc_handle(file: &File) -> Result<(), SELinuxError> {
         loop {
             match statfs::fstatfs(file.as_fd()) {
@@ -680,8 +673,8 @@ impl SELinux {
         Ok(())
     }
 
-    // function similar with readConFd in go-selinux repo.
-    pub fn read_con_fd(file: &mut File) -> Result<String, SELinuxError> {
+    // This function reads a given file descriptor into a string.
+    pub fn read_con_fd<F: AsFd + Read>(file: &mut F) -> Result<String, SELinuxError> {
         let mut data = String::new();
         file.read_to_string(&mut data)
             .map_err(|e| SELinuxError::ReadConFd(e.to_string()))?;
@@ -691,10 +684,10 @@ impl SELinux {
         Ok(trimmed_data.to_string())
     }
 
-    // function similar with readCon in go-selinux repo.
     // read_con reads a label to a given file path, handling SELinux context.
-    pub fn read_con(fpath: &Path) -> Result<String, SELinuxError> {
-        if fpath.as_os_str().is_empty() {
+    pub fn read_con<P: AsRef<Path>>(fpath: P) -> Result<String, SELinuxError> {
+        let path = fpath.as_ref();
+        if path.as_os_str().is_empty() {
             return Err(SELinuxError::ReadCon(ERR_EMPTY_PATH.to_string()));
         }
         let mut in_file = File::open(fpath)
@@ -704,7 +697,6 @@ impl SELinux {
         Self::read_con_fd(&mut in_file)
     }
 
-    // function similar with attrPath in go-selinux repo.
     // attr_path determines the correct file path for accessing SELinux
     // attributes of a process or thread in a Linux environment.
     pub fn attr_path(&self, attr: &str) -> PathBuf {
@@ -840,11 +832,14 @@ mod tests {
             "28 24 0:25 / /sys/fs/selinux rw,relatime selinuxfs rw",
         ];
         let expected_array = ["/sys/fs/selinux", "", ""];
+        let succeeded_array = [true, false, false];
 
         for (i, input) in input_array.iter().enumerate() {
-            let expected = expected_array[i];
-            let output = SELinux::find_selinux_fs_mount(input);
-            assert_eq!(expected, output);
+            let expected = PathBuf::from(expected_array[i]);
+            match SELinux::find_selinux_fs_mount(input) {
+                Some(output) => assert_eq!(expected, output),
+                None => assert_eq!(succeeded_array[i], false),
+            }
         }
     }
 }
