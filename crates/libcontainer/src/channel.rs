@@ -16,13 +16,11 @@ pub enum ChannelError {
     #[error("channel connection broken")]
     BrokenChannel,
 }
-#[derive(Clone)]
 pub struct Receiver<T> {
     receiver: RawFd,
     phantom: PhantomData<T>,
 }
 
-#[derive(Clone)]
 pub struct Sender<T> {
     sender: RawFd,
     phantom: PhantomData<T>,

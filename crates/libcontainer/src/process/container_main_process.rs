@@ -39,23 +39,19 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, bo
     // cloned process, we have to be deligent about closing any unused channel.
     // At minimum, we have to close down any unused senders. The corresponding
     // receivers will be cleaned up once the senders are closed down.
-    let (main_sender, mut main_receiver) = channel::main_channel()?;
-    let inter_chan = channel::intermediate_channel()?;
-    let init_chan = channel::init_channel()?;
+    let (mut main_sender, mut main_receiver) = channel::main_channel()?;
+    let mut inter_chan = channel::intermediate_channel()?;
+    let mut init_chan = channel::init_channel()?;
 
     let cb: CloneCb = {
-        let container_args = container_args.clone();
-        let mut main_sender = main_sender.clone();
-        let mut inter_chan = inter_chan.clone();
-        let mut init_chan = init_chan.clone();
-        Box::new(move || {
+        Box::new(|| {
             if let Err(ret) = prctl::set_name("youki:[1:INTER]") {
                 tracing::error!(?ret, "failed to set name for child process");
                 return ret;
             }
 
             match container_intermediate_process::container_intermediate_process(
-                &container_args,
+                container_args,
                 &mut inter_chan,
                 &mut init_chan,
                 &mut main_sender,

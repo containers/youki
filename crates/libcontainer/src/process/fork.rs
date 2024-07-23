@@ -32,7 +32,7 @@ pub enum CloneError {
 /// pass in a child stack, which is empty. By storing the closure in heap, we
 /// can then in the new process to re-box the heap memory back to a closure
 /// correctly.
-pub type CloneCb = Box<dyn FnMut() -> i32>;
+pub type CloneCb<'a> = Box<dyn FnMut() -> i32 + 'a>;
 
 // Clone a sibling process that shares the same parent as the calling
 // process. This is used to launch the container init process so the parent
