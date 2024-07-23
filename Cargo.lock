@@ -383,9 +383,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.0.91"
+version = "1.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1fd97381a8cc6493395a5afc4c691c1084b3768db713b73aa215217aa245d153"
+checksum = "2aba8f4e9906c7ce3c73463f62a7f0c65183ada1a2d47e397cc8810827f9694f"
 dependencies = [
  "jobserver",
  "libc",
@@ -1867,9 +1867,9 @@ dependencies = [
 
 [[package]]
 name = "jobserver"
-version = "0.1.28"
+version = "0.1.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab46a6e9526ddef3ae7f787c06f0f2600639ba80ea3eade3d8e670a2230f51d6"
+checksum = "d2b099aaa34a9751c5bf0878add70444e1ed2dd73f347be99003d4577277de6e"
 dependencies = [
  "libc",
 ]
@@ -2241,9 +2241,9 @@ dependencies = [
 
 [[package]]
 name = "nc"
-version = "0.8.21"
+version = "0.8.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "388827c54cacb7f6604751c05dc9adf9ec9c1b35a6f50948e3d11049502481f3"
+checksum = "e01605ec4e42a3d2165e3fb9c1afbb12449f88a04ceb6335e1b4b8bdd69c5058"
 dependencies = [
  "cc",
 ]
