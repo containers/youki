@@ -1200,9 +1200,9 @@ dependencies = [
 
 [[package]]
 name = "env_logger"
-version = "0.11.3"
+version = "0.11.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38b35839ba51819680ba087cd351788c9a3c476841207e0b8cee0b04722343b9"
+checksum = "06676b12debf7bba6903559720abca942d3a66b8acb88815fd2c7c6537e9ade1"
 dependencies = [
  "anstream",
  "anstyle",
@@ -1933,7 +1933,7 @@ version = "0.3.3"
 dependencies = [
  "anyhow",
  "clap",
- "env_logger 0.11.3",
+ "env_logger 0.11.4",
  "errno",
  "fixedbitset 0.5.7",
  "libbpf-sys",
@@ -2241,9 +2241,9 @@ dependencies = [
 
 [[package]]
 name = "nc"
-version = "0.8.22"
+version = "0.8.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e01605ec4e42a3d2165e3fb9c1afbb12449f88a04ceb6335e1b4b8bdd69c5058"
+checksum = "44b24115ea9683b6fd45d99c7e83002a739601faea67908edb02737497fabdd3"
 dependencies = [
  "cc",
 ]
