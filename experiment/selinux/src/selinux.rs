@@ -143,7 +143,7 @@ impl SELinux {
     }
 
     // This function reads SELinux config file and returns the value with a specified key.
-    fn read_config(target: &str) -> Result<String, SELinuxError> {
+    fn read_config(key: &str) -> Result<String, SELinuxError> {
         let config_path = Path::new(SELINUX_DIR).join(SELINUX_CONFIG);
         match File::open(config_path) {
             Ok(file) => {
@@ -161,13 +161,13 @@ impl SELinux {
                             "config file is not formatted like key=value".to_string(),
                         ));
                     }
-                    if fields[0] == target {
+                    if fields[0] == key {
                         return Ok(fields[1].to_owned());
                     }
                 }
                 Err(SELinuxError::ReadConfig(format!(
                     "can't find the target label in the config file: {}",
-                    target
+                    key
                 )))
             }
             Err(e) => Err(SELinuxError::ReadConfig(format!(
