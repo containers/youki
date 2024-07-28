@@ -1,13 +1,12 @@
 use nix::errno::Errno;
 use nix::sys::{statfs, statvfs};
 use nix::unistd::gettid;
-
 use std::collections::HashMap;
+use std::convert::From;
 use std::fmt;
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::os::fd::{AsFd, AsRawFd};
-
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -19,6 +18,27 @@ pub enum SELinuxMode {
     PERMISSIVE = 0,
     // DISABLED constant to indicate SELinux is disabled
     DISABLED = -1,
+}
+
+impl From<i32> for SELinuxMode {
+    fn from(mode: i32) -> Self {
+        match mode {
+            1 => SELinuxMode::ENFORCING,
+            0 => SELinuxMode::PERMISSIVE,
+            -1 => SELinuxMode::DISABLED,
+            _ => SELinuxMode::DISABLED,
+        }
+    }
+}
+
+impl From<&str> for SELinuxMode {
+    fn from(mode: &str) -> Self {
+        match mode {
+            "enforcing" => SELinuxMode::ENFORCING,
+            "permissive" => SELinuxMode::PERMISSIVE,
+            _ => SELinuxMode::DISABLED,
+        }
+    }
 }
 
 impl fmt::Display for SELinuxMode {
@@ -53,7 +73,7 @@ pub enum SELinuxError {
     ReadCon(String),
     #[error("Failed to call write_con for SELinux: {0}")]
     WriteCon(String),
-    #[error("Failed to call class_index for SELinux: {0}")]
+    #[error("Failed to find the index for a given class: {0}")]
     ClassIndex(String),
     #[error("Failed to call peer_label for SELinux: {0}")]
     PeerLabel(String),
@@ -195,16 +215,16 @@ impl SELinux {
         }
     }
 
-    // find_selinux_fs_mount returns a next selinuxfs mount point found,
-    // if there is one, or an empty string in case of EOF or error.
-    fn find_selinux_fs_mount(s: &str) -> Option<PathBuf> {
-        if !s.contains(" - selinuxfs ") {
+    // extract_selinux_fs_mount_point returns a next selinuxfs mount point found,
+    // if there is one, or None in case of EOF or error.
+    fn extract_selinux_fs_mount_point(line: &str) -> Option<PathBuf> {
+        if !line.contains(" - selinuxfs ") {
             return None;
         }
         // Need to return the path like /sys/fs/selinux
         // example: 28 24 0:25 / /sys/fs/selinux rw,relatime - selinuxfs selinuxfs rw
         let m_pos = 5;
-        let fields: Vec<&str> = s.splitn(m_pos + 1, ' ').collect();
+        let fields: Vec<&str> = line.splitn(m_pos + 1, ' ').collect();
         if fields.len() < m_pos + 1 {
             return None;
         }
@@ -233,7 +253,7 @@ impl SELinux {
                 Ok(file) => {
                     let reader = BufReader::new(file);
                     for line in reader.lines().map_while(Result::ok) {
-                        if let Some(mnt) = Self::find_selinux_fs_mount(&line) {
+                        if let Some(mnt) = Self::extract_selinux_fs_mount_point(&line) {
                             if Self::verify_selinux_fs_mount(mnt.clone()) {
                                 return Some(mnt);
                             }
@@ -259,9 +279,8 @@ impl SELinux {
         self.selinuxfs.as_ref()
     }
 
-    // classIndex returns the int index for an object class in the loaded policy,
-    // or -1 and an error.
-    // If class is "file" or "dir", then return the corresponding index for selinux.
+    // classIndex returns the int index for an object class in the loaded policy, or an error.
+    // For example, if a class is "file" or "dir", return the corresponding index for selinux.
     pub fn class_index(&mut self, class: &str) -> Result<i64, SELinuxError> {
         let permpath = format!("class/{}/index", class);
         let mountpoint = Self::get_selinux_mountpoint(self)
@@ -317,13 +336,7 @@ impl SELinux {
             },
             None => -1,
         };
-
-        match mode {
-            1 => SELinuxMode::ENFORCING,
-            0 => SELinuxMode::PERMISSIVE,
-            -1 => SELinuxMode::DISABLED,
-            _ => SELinuxMode::DISABLED,
-        }
+        SELinuxMode::from(mode)
     }
 
     // is_mls_enabled checks if MLS is enabled.
@@ -352,11 +365,7 @@ impl SELinux {
     // note this is just the default at boot time.
     // enforce_mode function tells you the system current mode.
     pub fn default_enforce_mode() -> SELinuxMode {
-        match Self::read_config(SELINUX_TAG).unwrap_or_default().as_str() {
-            "enforcing" => SELinuxMode::ENFORCING,
-            "permissive" => SELinuxMode::PERMISSIVE,
-            _ => SELinuxMode::DISABLED,
-        }
+        SELinuxMode::from(Self::read_config(SELINUX_TAG).unwrap_or_default().as_str())
     }
 
     // write_con writes a specified value to a given file path, handling SELinux context.
@@ -535,7 +544,7 @@ mod tests {
     }
 
     #[test]
-    fn test_find_selinux_fs_mount() {
+    fn test_extract_selinux_fs_mount_point() {
         let input_array = [
             "28 24 0:25 / /sys/fs/selinux rw,relatime - selinuxfs selinuxfs rw",
             "28 24 0:25 /",
@@ -546,7 +555,7 @@ mod tests {
 
         for (i, input) in input_array.iter().enumerate() {
             let expected = PathBuf::from(expected_array[i]);
-            match SELinux::find_selinux_fs_mount(input) {
+            match SELinux::extract_selinux_fs_mount_point(input) {
                 Some(output) => assert_eq!(expected, output),
                 None => assert_eq!(succeeded_array[i], false),
             }
