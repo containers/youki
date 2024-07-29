@@ -82,7 +82,7 @@ pub enum SELinuxError {
     #[error("Failed to set enforce mode of SELinux: {0}")]
     SetEnforceMode(String),
     #[error("Failed to read config file of SELinux: {0}")]
-    ReadConfig(String),
+    GetConfigKey(String),
 }
 
 pub struct SELinux {
@@ -101,6 +101,10 @@ pub struct SELinux {
     // for load_labels()
     pub(crate) load_labels_init_done: AtomicBool,
     pub(crate) labels: HashMap<String, String>,
+
+    // for read config and get config key
+    read_config_init_done: AtomicBool,
+    configs: HashMap<String, String>,
 
     pub(crate) read_only_file_label: Option<String>,
 }
@@ -126,6 +130,9 @@ impl SELinux {
             load_labels_init_done: AtomicBool::new(false),
             labels: HashMap::new(),
 
+            read_config_init_done: AtomicBool::new(false),
+            configs: HashMap::new(),
+
             read_only_file_label: None,
         }
     }
@@ -135,7 +142,7 @@ impl SELinux {
     fn policy_root(&mut self) -> Option<&PathBuf> {
         // Avoiding code conflicts and ensuring thread-safe execution once only.
         if !self.policy_root_init_done.load(Ordering::SeqCst) {
-            let policy_root_path = Self::read_config(SELINUX_TYPE_TAG).unwrap_or_default();
+            let policy_root_path = Self::get_config_key(self, SELINUX_TYPE_TAG).unwrap_or_default();
             self.policy_root = Some(PathBuf::from(policy_root_path));
             self.policy_root_init_done.store(true, Ordering::SeqCst);
         }
@@ -143,10 +150,10 @@ impl SELinux {
     }
 
     // This function reads SELinux config file and returns the value with a specified key.
-    fn read_config(key: &str) -> Result<String, SELinuxError> {
-        let config_path = Path::new(SELINUX_DIR).join(SELINUX_CONFIG);
-        match File::open(config_path) {
-            Ok(file) => {
+    fn get_config_key(&mut self, target_key: &str) -> Result<String, SELinuxError> {
+        if !self.read_config_init_done.load(Ordering::SeqCst) {
+            let config_path = Path::new(SELINUX_DIR).join(SELINUX_CONFIG);
+            if let Ok(file) = File::open(config_path) {
                 let reader = BufReader::new(file);
                 for line in reader.lines().map_while(Result::ok) {
                     if line.is_empty() {
@@ -157,24 +164,23 @@ impl SELinux {
                     }
                     let fields: Vec<&str> = line.splitn(2, '=').collect();
                     if fields.len() < 2 {
-                        return Err(SELinuxError::ReadConfig(
-                            "config file is not formatted like key=value".to_string(),
-                        ));
+                        continue;
                     }
-                    if fields[0] == key {
-                        return Ok(fields[1].to_owned());
-                    }
+                    let key = fields[0].trim().to_string();
+                    let value = fields[1].trim().to_string();
+                    self.configs.insert(key, value);
                 }
-                Err(SELinuxError::ReadConfig(format!(
-                    "can't find the target label in the config file: {}",
-                    key
-                )))
             }
-            Err(e) => Err(SELinuxError::ReadConfig(format!(
-                "can't open the config file: {}",
-                e
-            ))),
+            self.read_config_init_done.store(true, Ordering::SeqCst);
         }
+        self.configs
+            .get(target_key)
+            .cloned()
+            .filter(|s| !s.is_empty())
+            .ok_or(SELinuxError::GetConfigKey(format!(
+                "can't find the target label in the config file: {}",
+                target_key
+            )))
     }
 
     // get_enabled returns whether SELinux is enabled or not.
@@ -364,8 +370,12 @@ impl SELinux {
     // This returns the systems default SELinux mode Enforcing, Permissive or Disabled.
     // note this is just the default at boot time.
     // enforce_mode function tells you the system current mode.
-    pub fn default_enforce_mode() -> SELinuxMode {
-        SELinuxMode::from(Self::read_config(SELINUX_TAG).unwrap_or_default().as_str())
+    pub fn default_enforce_mode(&mut self) -> SELinuxMode {
+        SELinuxMode::from(
+            Self::get_config_key(self, SELINUX_TAG)
+                .unwrap_or_default()
+                .as_str(),
+        )
     }
 
     // write_con writes a specified value to a given file path, handling SELinux context.
