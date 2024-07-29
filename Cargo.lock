@@ -413,6 +413,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fd16c4719339c4530435d38e511904438d07cce7950afa3718a84ac36c10e89e"
 
 [[package]]
+name = "cfg_aliases"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
+
+[[package]]
 name = "chrono"
 version = "0.4.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -533,7 +539,7 @@ dependencies = [
  "flate2",
  "libcgroups",
  "libcontainer",
- "nix",
+ "nix 0.28.0",
  "num_cpus",
  "oci-spec",
  "once_cell",
@@ -1912,12 +1918,12 @@ dependencies = [
 
 [[package]]
 name = "libbpf-sys"
-version = "1.4.2+v1.4.2"
+version = "1.4.3+v1.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "800bccc21b216764f96334a241a072b842121843bf679f5a03b0c2c21cb339ed"
+checksum = "ef4996061dea5bd75d12b149b37d84ce7bfd0246997aa5ccc4fdd97ea8f72ee3"
 dependencies = [
  "cc",
- "nix",
+ "nix 0.29.0",
  "pkg-config",
 ]
 
@@ -1939,7 +1945,7 @@ dependencies = [
  "libbpf-sys",
  "libc",
  "mockall",
- "nix",
+ "nix 0.28.0",
  "oci-spec",
  "procfs",
  "quickcheck",
@@ -1966,7 +1972,7 @@ dependencies = [
  "libcgroups",
  "libseccomp",
  "nc",
- "nix",
+ "nix 0.28.0",
  "oci-spec",
  "once_cell",
  "prctl",
@@ -2256,9 +2262,21 @@ checksum = "ab2156c4fce2f8df6c499cc1c763e4394b7482525bf2a9701c9d79d215f519e4"
 dependencies = [
  "bitflags 2.6.0",
  "cfg-if",
- "cfg_aliases",
+ "cfg_aliases 0.1.1",
  "libc",
  "memoffset 0.9.1",
+]
+
+[[package]]
+name = "nix"
+version = "0.29.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "71e2746dc3a24dd78b3cfcb7be93368c6de9963d30f43a6a73998a9cf4b17b46"
+dependencies = [
+ "bitflags 2.6.0",
+ "cfg-if",
+ "cfg_aliases 0.2.1",
+ "libc",
 ]
 
 [[package]]
@@ -2651,7 +2669,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "059a34f111a9dee2ce1ac2826a68b24601c4298cfeb1a587c3cb493d5ab46f52"
 dependencies = [
  "libc",
- "nix",
+ "nix 0.29.0",
 ]
 
 [[package]]
@@ -3146,7 +3164,7 @@ dependencies = [
  "anyhow",
  "libc",
  "nc",
- "nix",
+ "nix 0.28.0",
  "oci-spec",
 ]
 
@@ -3410,11 +3428,12 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.120"
+version = "1.0.121"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e0d21c9a8cae1235ad58a00c11cb40d4b1e5c784f1ef2c537876ed6ffd8b7c5"
+checksum = "4ab380d7d9f22ef3f21ad3e6c1ebe8e4fc7a2000ccba2e4d71fc96f15b2cb609"
 dependencies = [
  "itoa",
+ "memchr",
  "ryu",
  "serde",
 ]
@@ -5725,7 +5744,7 @@ dependencies = [
  "libcgroups",
  "libcontainer",
  "liboci-cli",
- "nix",
+ "nix 0.28.0",
  "once_cell",
  "pentacle",
  "procfs",
