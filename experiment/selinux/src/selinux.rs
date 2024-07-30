@@ -1,3 +1,4 @@
+use crate::selinux_label::SELinuxLabel;
 use nix::errno::Errno;
 use nix::sys::{statfs, statvfs};
 use nix::unistd::gettid;
@@ -83,6 +84,8 @@ pub enum SELinuxError {
     SetEnforceMode(String),
     #[error("Failed to read config file of SELinux: {0}")]
     GetConfigKey(String),
+    #[error("Invalid format for SELinux label: {0}")]
+    InvalidSELinuxLabel(String),
 }
 
 pub struct SELinux {
@@ -100,13 +103,13 @@ pub struct SELinux {
 
     // for load_labels()
     pub(crate) load_labels_init_done: AtomicBool,
-    pub(crate) labels: HashMap<String, String>,
+    pub(crate) labels: HashMap<String, SELinuxLabel>,
 
     // for read config and get config key
     read_config_init_done: AtomicBool,
     configs: HashMap<String, String>,
 
-    pub(crate) read_only_file_label: Option<String>,
+    pub(crate) read_only_file_label: Option<SELinuxLabel>,
 }
 
 impl Default for SELinux {
@@ -190,7 +193,8 @@ impl SELinux {
             None => false,
             Some(_) => match Self::current_label(self) {
                 Ok(con) => {
-                    if con != "kernel" {
+                    // Check whether label is "kernel" or not.
+                    if con.user != "kernel" {
                         return true;
                     }
                     false
@@ -300,11 +304,6 @@ impl SELinux {
             },
             Err(e) => Err(SELinuxError::ClassIndex(e.to_string())),
         }
-    }
-
-    // current_label returns the SELinux label of the current process thread, or an error.
-    pub fn current_label(&self) -> Result<String, SELinuxError> {
-        return SELinux::read_con(self.attr_path("current").as_path());
     }
 
     // This function attempts to open a selinux context file, and if it fails, it tries to open another file
