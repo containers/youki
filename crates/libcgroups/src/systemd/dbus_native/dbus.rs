@@ -22,8 +22,6 @@ const REPLY_BUF_SIZE: usize = 128; // seems good enough tradeoff between extra s
 // Client is a wrapper providing higher level API and abatraction around dbus.
 // For more information see https://www.freedesktop.org/wiki/Software/systemd/dbus/
 pub struct DbusConnection {
-    /// Is the socket system level or session specific
-    system: bool,
     /// socket fd
     socket: i32,
     /// name id assigned by dbus for the connection
@@ -128,7 +126,7 @@ fn get_actual_uid() -> Result<u32> {
 impl DbusConnection {
     /// Open a new dbus connection to given address
     /// authenticating as user with given uid
-    pub fn new(addr: &str, uid: u32, system: bool) -> Result<Self> {
+    pub fn new(addr: &str, uid: u32) -> Result<Self> {
         // Use ManuallyDrop to keep the socket open.
         let socket = std::mem::ManuallyDrop::new(socket::socket(
             socket::AddressFamily::Unix,
@@ -143,7 +141,6 @@ impl DbusConnection {
             socket: socket.as_raw_fd(),
             msg_ctr: AtomicU32::new(0),
             id: None,
-            system,
         };
         dbus.authenticate(uid)?;
         Ok(dbus)
@@ -151,13 +148,13 @@ impl DbusConnection {
 
     pub fn new_system() -> Result<Self> {
         let addr = get_system_bus_address()?;
-        Self::new(&addr, 0, true)
+        Self::new(&addr, 0)
     }
 
     pub fn new_session() -> Result<Self> {
         let addr = get_session_bus_address()?;
         let uid = get_actual_uid()?;
-        Self::new(&addr, uid, false)
+        Self::new(&addr, uid)
     }
 
     /// Authenticates with dbus using given uid via external strategy
@@ -365,10 +362,6 @@ impl DbusConnection {
 }
 
 impl SystemdClient for DbusConnection {
-    fn is_system(&self) -> bool {
-        self.system
-    }
-
     fn transient_unit_exists(&self, unit_name: &str) -> bool {
         let mut proxy = self.create_proxy();
         proxy.get_unit(unit_name).is_ok()
@@ -516,10 +509,10 @@ mod tests {
 
         let dbus_pipe_path = format!("/run/user/{}/bus", uid);
 
-        let conn = DbusConnection::new(&dbus_pipe_path, uid, false);
+        let conn = DbusConnection::new(&dbus_pipe_path, uid);
         assert!(conn.is_ok());
 
-        let invalid_conn = DbusConnection::new(&dbus_pipe_path, uid.wrapping_add(1), false);
+        let invalid_conn = DbusConnection::new(&dbus_pipe_path, uid.wrapping_add(1));
         assert!(invalid_conn.is_err());
     }
 
@@ -532,7 +525,7 @@ mod tests {
 
         let dbus_pipe_path = format!("/run/user/{}/bus", uid);
 
-        let conn = DbusConnection::new(&dbus_pipe_path, uid, false)?;
+        let conn = DbusConnection::new(&dbus_pipe_path, uid)?;
 
         let proxy = conn.proxy("org.freedesktop.systemd1", "/org/freedesktop/systemd1");
 
@@ -570,7 +563,7 @@ mod tests {
 
         let dbus_pipe_path = format!("/run/user/{}/bus", uid);
 
-        let conn = DbusConnection::new(&dbus_pipe_path, uid, false).unwrap();
+        let conn = DbusConnection::new(&dbus_pipe_path, uid).unwrap();
 
         let proxy = conn.proxy("org.freedesktop.systemd1", "/org/freedesktop/systemd1");
         let body = (

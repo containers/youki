@@ -49,7 +49,6 @@ pub struct ObservabilityConfig {
     pub log_level: Option<String>,
     pub log_file: Option<PathBuf>,
     pub log_format: Option<String>,
-    pub systemd_log: bool,
 }
 
 impl From<&crate::Opts> for ObservabilityConfig {
@@ -59,7 +58,6 @@ impl From<&crate::Opts> for ObservabilityConfig {
             log_level: opts.youki_extend.log_level.to_owned(),
             log_file: opts.global.log.to_owned(),
             log_format: opts.global.log_format.to_owned(),
-            systemd_log: opts.youki_extend.systemd_log,
         }
     }
 }

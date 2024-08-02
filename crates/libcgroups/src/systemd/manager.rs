@@ -442,10 +442,6 @@ mod tests {
     struct TestSystemdClient {}
 
     impl SystemdClient for TestSystemdClient {
-        fn is_system(&self) -> bool {
-            true
-        }
-
         fn transient_unit_exists(&self, _: &str) -> bool {
             true
         }
