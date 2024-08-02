@@ -225,9 +225,9 @@ impl SELinux {
         }
     }
 
-    // extract_selinux_fs_mount_point returns a next selinuxfs mount point found,
+    // check_line_include_selinux_fs_mount_point returns a next selinuxfs mount point found,
     // if there is one, or None in case of EOF or error.
-    fn extract_selinux_fs_mount_point(line: &str) -> Option<PathBuf> {
+    fn check_line_include_selinux_fs_mount_point(line: &str) -> Option<PathBuf> {
         if !line.contains(" - selinuxfs ") {
             return None;
         }
@@ -256,23 +256,21 @@ impl SELinux {
             return None;
         }
 
-        // continue reading until finding mount point
-        loop {
-            // slow path: try to find among the mounts
-            match File::open("/proc/self/mountinfo") {
-                Ok(file) => {
-                    let reader = BufReader::new(file);
-                    for line in reader.lines().map_while(Result::ok) {
-                        if let Some(mnt) = Self::extract_selinux_fs_mount_point(&line) {
-                            if Self::verify_selinux_fs_mount(&mnt) {
-                                return Some(mnt);
-                            }
+        // slow path: try to find among the mounts
+        match File::open("/proc/self/mountinfo") {
+            Ok(file) => {
+                let reader = BufReader::new(file);
+                for line in reader.lines().map_while(Result::ok) {
+                    if let Some(mnt) = Self::check_line_include_selinux_fs_mount_point(&line) {
+                        if Self::verify_selinux_fs_mount(&mnt) {
+                            return Some(mnt);
                         }
                     }
                 }
-                Err(_) => return None,
             }
+            Err(_) => return None,
         }
+        None
     }
 
     // This function returns the path to the mountpoint of an selinuxfs
@@ -553,7 +551,7 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_selinux_fs_mount_point() {
+    fn test_check_line_include_selinux_fs_mount_point() {
         let input_array = [
             "28 24 0:25 / /sys/fs/selinux rw,relatime - selinuxfs selinuxfs rw",
             "28 24 0:25 /",
@@ -564,7 +562,7 @@ mod tests {
 
         for (i, input) in input_array.iter().enumerate() {
             let expected = PathBuf::from(expected_array[i]);
-            match SELinux::extract_selinux_fs_mount_point(input) {
+            match SELinux::check_line_include_selinux_fs_mount_point(input) {
                 Some(output) => assert_eq!(expected, output),
                 None => assert_eq!(succeeded_array[i], false),
             }
