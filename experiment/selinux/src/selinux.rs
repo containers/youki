@@ -246,7 +246,7 @@ impl SELinux {
     fn find_selinux_fs() -> Option<PathBuf> {
         // fast path: check the default mount first
         let selinux_fs_mount_path = PathBuf::from(SELINUX_FS_MOUNT);
-        if Self::verify_selinux_fs_mount(selinux_fs_mount_path.clone()) {
+        if Self::verify_selinux_fs_mount(&selinux_fs_mount_path) {
             return Some(selinux_fs_mount_path);
         }
 
@@ -264,7 +264,7 @@ impl SELinux {
                     let reader = BufReader::new(file);
                     for line in reader.lines().map_while(Result::ok) {
                         if let Some(mnt) = Self::extract_selinux_fs_mount_point(&line) {
-                            if Self::verify_selinux_fs_mount(mnt.clone()) {
+                            if Self::verify_selinux_fs_mount(&mnt) {
                                 return Some(mnt);
                             }
                         }
