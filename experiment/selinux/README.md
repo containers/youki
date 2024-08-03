@@ -6,3 +6,7 @@ Therefore, this PR will implement xattr in Rust.
 Referenced the implementation of xattr in [unix](golang.org/x/sys/unix) repo.  
 
 Please import and use this project.
+
+```console
+$ cargo run
+```

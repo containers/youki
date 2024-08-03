@@ -16,6 +16,7 @@ pub enum XattrError {
     EINTR(i32),
 }
 
+// SELinux label is not so big, so we allocate 1024 bytes for the buffer.
 const INITIAL_BUF_SIZE: usize = 1024;
 
 pub trait PathXattr {
@@ -25,11 +26,15 @@ pub trait PathXattr {
     fn lget_xattr(&self, attr: &str) -> Result<String, XattrError>;
 }
 
-impl PathXattr for Path {
+impl<P> PathXattr for P
+where
+    P: AsRef<Path>,
+{
     // function similar with setxattr in golang.org/x/sys/unix repo.
     // set_xattr sets extended attributes on a file specified by its path.
     fn set_xattr(&self, attr: &str, data: &[u8]) -> Result<(), XattrError> {
-        match rfs::setxattr(self, attr, data, rfs::XattrFlags::CREATE) {
+        let path = self.as_ref();
+        match rfs::setxattr(path, attr, data, rfs::XattrFlags::CREATE) {
             Ok(_) => Ok(()),
             Err(e) => {
                 let errno = e.raw_os_error();
@@ -44,7 +49,8 @@ impl PathXattr for Path {
     // function similar with lsetxattr in golang.org/x/sys/unix repo.
     // lset_xattr sets extended attributes on a symbolic link.
     fn lset_xattr(&self, attr: &str, data: &[u8]) -> Result<(), XattrError> {
-        match rfs::lsetxattr(self, attr, data, rfs::XattrFlags::CREATE) {
+        let path = self.as_ref();
+        match rfs::lsetxattr(path, attr, data, rfs::XattrFlags::CREATE) {
             Ok(_) => Ok(()),
             Err(e) => {
                 let errno = e.raw_os_error();
@@ -59,12 +65,12 @@ impl PathXattr for Path {
     // function similar with getattr in go-selinux repo.
     // get_xattr returns the value of an extended attribute attr set for path.
     fn get_xattr(&self, attr: &str) -> Result<String, XattrError> {
-        // SELinux label is not so big, so we allocate 1024 bytes for the buffer.
+        let path = self.as_ref();
         let mut buf_size = INITIAL_BUF_SIZE;
         let mut buf = vec![0u8; buf_size];
 
         loop {
-            match rfs::getxattr(self, attr, &mut buf) {
+            match rfs::getxattr(path, attr, &mut buf) {
                 Ok(size) => {
                     if size == buf_size {
                         buf_size *= 2;
@@ -85,12 +91,12 @@ impl PathXattr for Path {
     // function similar with lgetxattr in go-selinux repo.
     // lget_xattr returns the value of an extended attribute attr set for path.
     fn lget_xattr(&self, attr: &str) -> Result<String, XattrError> {
-        // SELinux label is not so big, so we allocate 1024 bytes for the buffer.
+        let path = self.as_ref();
         let mut buf_size = INITIAL_BUF_SIZE;
         let mut buf = vec![0u8; buf_size];
 
         loop {
-            match rfs::lgetxattr(self, attr, &mut buf) {
+            match rfs::lgetxattr(path, attr, &mut buf) {
                 Ok(size) => {
                     if size == buf_size {
                         buf_size *= 2;

@@ -77,10 +77,7 @@ impl SELinux {
                 // When a system call is interrupted by a signal, it needs to be retried.
                 Err(XattrError::EINTR(_)) => continue,
                 Err(e) => {
-                    return Err(SELinuxError::SetFileLabel(format!(
-                        "set_xattr failed: {}",
-                        e
-                    )));
+                    return Err(SELinuxError::SetFileLabel(e.to_string()));
                 }
             }
         }
@@ -104,10 +101,7 @@ impl SELinux {
                 // When a system call is interrupted by a signal, it needs to be retried.
                 Err(XattrError::EINTR(_)) => continue,
                 Err(e) => {
-                    return Err(SELinuxError::LSetFileLabel(format!(
-                        "lset_xattr failed: {}",
-                        e
-                    )));
+                    return Err(SELinuxError::LSetFileLabel(e.to_string()));
                 }
             }
         }

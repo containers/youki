@@ -1,6 +1,6 @@
 use crate::selinux_label::SELinuxLabel;
 use nix::errno::Errno;
-use nix::sys::{statfs, statvfs};
+use nix::sys::statfs;
 use nix::unistd::gettid;
 use std::collections::HashMap;
 use std::convert::From;
@@ -44,7 +44,12 @@ impl From<&str> for SELinuxMode {
 
 impl fmt::Display for SELinuxMode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", *self as i32)
+        let s = match self {
+            SELinuxMode::ENFORCING => "enforcing",
+            SELinuxMode::PERMISSIVE => "permissive",
+            SELinuxMode::DISABLED => "disabled",
+        };
+        write!(f, "{}", s)
     }
 }
 
@@ -211,10 +216,11 @@ impl SELinux {
         loop {
             match statfs::statfs(mnt) {
                 Ok(stat) => {
-                    // verify if the file is readonly or not
-                    if !stat.flags().contains(statvfs::FsFlags::ST_RDONLY) {
-                        return false;
-                    }
+                    // In go-selinux, return false if it is not read-only,
+                    // but selinux code in SELinuxProject return true even though it is read-only.
+                    // https://github.com/SELinuxProject/selinux/blob/1f080ffd7ab24b0ad2b46f79db63d62c2ae2747c/libselinux/src/init.c#L44
+                    // Therefore, this function doesn't check whether it is read-only or not.
+
                     // verify if the file is SELinux filesystem
                     return stat.filesystem_type() == statfs::SELINUX_MAGIC;
                 }
