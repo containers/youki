@@ -343,7 +343,7 @@ pub fn container_init_process(
         // we use pivot_root, but if we are on the host mount namespace, we will
         // use simple chroot. Scary things will happen if you try to pivot_root
         // in the host mount namespace...
-        if namespaces.get(LinuxNamespaceType::Mount)?.is_some() {
+        if namespaces.get(LinuxNamespaceType::Mount)?.is_some() && !args.no_pivot {
             // change the root of filesystem of the process to the rootfs
             syscall.pivot_rootfs(rootfs_path).map_err(|err| {
                 tracing::error!(?err, ?rootfs_path, "failed to pivot root");
