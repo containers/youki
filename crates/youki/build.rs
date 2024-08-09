@@ -1,10 +1,9 @@
 use anyhow::Result;
-use vergen::EmitBuilder;
+use vergen_gitcl::{Emitter, GitclBuilder};
 
-fn main() -> Result<()> {
-    if EmitBuilder::builder()
-        .fail_on_error()
-        .git_sha(true)
+pub fn main() -> Result<()> {
+    if Emitter::default()
+        .add_instructions(&GitclBuilder::all_git()?)?
         .emit()
         .is_err()
     {

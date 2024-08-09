@@ -11,10 +11,11 @@ use serde::{Deserialize, Serialize};
 use tracing::instrument;
 
 /// Indicates status of the container
-#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
 pub enum ContainerStatus {
     // The container is being created
+    #[default]
     Creating,
     // The runtime has finished the create operation
     Created,
@@ -24,12 +25,6 @@ pub enum ContainerStatus {
     Stopped,
     // The container process has paused
     Paused,
-}
-
-impl Default for ContainerStatus {
-    fn default() -> Self {
-        ContainerStatus::Creating
-    }
 }
 
 impl ContainerStatus {
