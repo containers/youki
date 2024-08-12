@@ -56,6 +56,7 @@ type Result<T> = std::result::Result<T, MountError>;
 pub struct MountOptions<'a> {
     pub root: &'a Path,
     pub label: Option<&'a str>,
+    #[allow(dead_code)]
     pub cgroup_ns: bool,
 }
 

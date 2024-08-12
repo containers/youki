@@ -57,4 +57,4 @@ scopeguard = "1.2.0"
 
 [build-dependencies]
 anyhow = "1.0.86"
-vergen = { version = "8.3.2", features = ["git", "gitcl"] }
+vergen-gitcl = { version = "1.0.0", features = ["build"] }

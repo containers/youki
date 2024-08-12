@@ -23,6 +23,7 @@ const REPLY_BUF_SIZE: usize = 128; // seems good enough tradeoff between extra s
 // For more information see https://www.freedesktop.org/wiki/Software/systemd/dbus/
 pub struct DbusConnection {
     /// Is the socket system level or session specific
+    #[allow(dead_code)]
     system: bool,
     /// socket fd
     socket: i32,

@@ -5,6 +5,7 @@ use super::serialize::Variant;
 use super::utils::SystemdClientError;
 
 pub trait SystemdClient {
+    #[allow(dead_code)]
     fn is_system(&self) -> bool;
 
     fn transient_unit_exists(&self, unit_name: &str) -> bool;
