@@ -49,6 +49,7 @@ pub struct ObservabilityConfig {
     pub log_level: Option<String>,
     pub log_file: Option<PathBuf>,
     pub log_format: Option<String>,
+    #[allow(dead_code)]
     pub systemd_log: bool,
 }
 

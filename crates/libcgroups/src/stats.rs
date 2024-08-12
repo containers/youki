@@ -183,7 +183,6 @@ pub struct PSIStats {
     pub full: PSIData,
 }
 
-///
 #[derive(Debug, Default, PartialEq, Serialize)]
 pub struct PSIData {
     /// Running average over the last 10 seconds

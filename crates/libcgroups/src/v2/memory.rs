@@ -317,7 +317,7 @@ mod tests {
             // check the limit file is set as expected
             let limit_content = read_to_string(tmp.path().join(CGROUP_MEMORY_MAX)).expect("read memory limit to string");
             let limit_check = match linux_memory.limit() {
-                Some(limit) if limit == -1 => limit_content == "max",
+                Some(-1) => limit_content == "max",
                 Some(limit) => limit_content == limit.to_string(),
                 None => limit_content == "0",
             };
@@ -325,7 +325,7 @@ mod tests {
             // check the swap file is set as expected
             let swap_content = read_to_string(tmp.path().join(CGROUP_MEMORY_SWAP)).expect("read swap limit to string");
             let swap_check = match linux_memory.swap() {
-                Some(swap) if swap == -1 => swap_content == "max",
+                Some(-1)=> swap_content == "max",
                 Some(swap) => {
                     if let Some(limit) = linux_memory.limit() {
                         if limit == -1 {
@@ -339,7 +339,7 @@ mod tests {
                 }
                 None => {
                     match linux_memory.limit() {
-                        Some(limit) if limit == -1 => swap_content == "max",
+                        Some(-1) => swap_content == "max",
                         _ => swap_content == "0",
                     }
                 }
@@ -349,7 +349,7 @@ mod tests {
             // check the reservation file is set as expected
             let reservation_content = read_to_string(tmp.path().join(CGROUP_MEMORY_LOW)).expect("read memory reservation to string");
             let reservation_check = match linux_memory.reservation() {
-                Some(reservation) if reservation == -1 => reservation_content == "max",
+                Some(-1) => reservation_content == "max",
                 Some(reservation) => reservation_content == reservation.to_string(),
                 None => reservation_content == "0",
             };

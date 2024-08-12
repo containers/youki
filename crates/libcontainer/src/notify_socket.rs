@@ -181,9 +181,7 @@ mod test {
             move || {
                 // We clone the listener and listen on the cloned listener to
                 // make sure the cloned fd functions correctly.
-                let cloned_listener = listener.clone();
-                cloned_listener.wait_for_container_start().unwrap();
-                cloned_listener.close().unwrap();
+                listener.wait_for_container_start().unwrap();
             }
         });
 

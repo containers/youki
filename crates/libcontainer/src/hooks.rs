@@ -56,7 +56,7 @@ pub fn run_hooks(
                 tracing::debug!("run_hooks arg0: {:?}, args: {:?}", arg0, args);
                 hook_command.arg0(arg0).args(args)
             } else {
-                hook_command.arg0(&hook.path().display().to_string())
+                hook_command.arg0(hook.path().display().to_string())
             };
 
             let envs: HashMap<String, String> = if let Some(env) = hook.env() {
