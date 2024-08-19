@@ -1,5 +1,4 @@
 use std::fs::{self, read_dir};
-use std::mem;
 use std::os::linux::fs::MetadataExt;
 use std::os::unix::fs::{FileTypeExt, PermissionsExt};
 use std::path::Path;
@@ -340,7 +339,6 @@ pub fn validate_scheduler_policy(spec: &Spec) {
     let proc = spec.process().as_ref().unwrap();
     let sc = proc.scheduler().as_ref().unwrap();
     println!("schedule is {:?}", spec);
-    let size = mem::size_of::<nc::sched_attr_t>().try_into().unwrap();
     let mut get_sched_attr = nc::sched_attr_t {
         size: 0,
         sched_policy: 0,
@@ -354,7 +352,7 @@ pub fn validate_scheduler_policy(spec: &Spec) {
         sched_util_max: 0,
     };
     unsafe {
-        match nc::sched_getattr(0, &mut get_sched_attr, size, 0) {
+        match nc::sched_getattr(0, &mut get_sched_attr, 0) {
             Ok(_) => {
                 println!("sched_getattr get success");
             }
