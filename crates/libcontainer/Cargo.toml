@@ -28,7 +28,7 @@ chrono = { version = "0.4", default-features = false, features = [
 ] }
 fastrand = "^2.1.0"
 futures = { version = "0.3", features = ["thread-pool"] }
-libc = "0.2.157"
+libc = "0.2.158"
 nix = { version = "0.28.0", features = [
     "socket",
     "sched",
