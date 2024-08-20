@@ -383,12 +383,13 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.1.6"
+version = "1.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2aba8f4e9906c7ce3c73463f62a7f0c65183ada1a2d47e397cc8810827f9694f"
+checksum = "72db2f7947ecee9b03b510377e8bb9077afa27176fdbff55c51027e976fdcc48"
 dependencies = [
  "jobserver",
  "libc",
+ "shlex",
 ]
 
 [[package]]
@@ -2259,9 +2260,9 @@ dependencies = [
 
 [[package]]
 name = "nc"
-version = "0.8.23"
+version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44b24115ea9683b6fd45d99c7e83002a739601faea67908edb02737497fabdd3"
+checksum = "34c069e5680f6e9c5cfbd428822fda91adf12fd6cf8dd84de00709efa50a84db"
 dependencies = [
  "cc",
 ]
