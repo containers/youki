@@ -782,7 +782,7 @@ fn setup_scheduler(sc_op: &Option<Scheduler>) -> Result<()> {
                 }
             }
         }
-        let mut a = nc::sched_attr_t {
+        let a = nc::sched_attr_t {
             // size of the structure should always be within u32 bounds,
             // so this unwrap should never fail
             size: mem::size_of::<nc::sched_attr_t>().try_into().unwrap(),
@@ -798,7 +798,7 @@ fn setup_scheduler(sc_op: &Option<Scheduler>) -> Result<()> {
         };
         // TODO when nix or libc support this function, replace nx crates.
         unsafe {
-            let result = nc::sched_setattr(0, &mut a, 0);
+            let result = nc::sched_setattr(0, &a, 0);
             match result {
                 Ok(_) => {}
                 Err(err) => {
