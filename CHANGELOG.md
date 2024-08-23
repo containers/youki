@@ -1,5 +1,43 @@
 # Changelog
 
+## [v0.4.0](https://github.com/containers/youki/compare/v0.3.3...v0.4.0) - 2024-08-23
+### 💪 Improvements
+- Export max_usage in cgroups v2 mode by @HeRaNO in https://github.com/containers/youki/pull/2802
+- Add new `setup_envs` method for the `Executor` trait by @musaprg in https://github.com/containers/youki/pull/2820
+### 💥 Breaking Changes
+- Rename to improve readability by @utam0k in https://github.com/containers/youki/pull/2818
+### 🐛 Bug Fixes
+- Fix/dbus call issue by @YJDoc2 in https://github.com/containers/youki/pull/2838
+### 📖 Documentation improvements
+- Add the governance by @utam0k in https://github.com/containers/youki/pull/2806
+- optimization runtime_tools.md doc by @lengrongfu in https://github.com/containers/youki/pull/2816
+- Update README.md by @utam0k in https://github.com/containers/youki/pull/2822
+- Fix typo by @utam0k in https://github.com/containers/youki/pull/2836
+- docs: fix `with_executor` method description by @Andreagit97 in https://github.com/containers/youki/pull/2834
+### 🧪 Test improvements and Misc Fixes
+- Update nix to 0.28.0 by @omprakaash in https://github.com/containers/youki/pull/2728
+- Fix word order in README sentence justifying Rust usage by @andrewimeson in https://github.com/containers/youki/pull/2805
+- move macro define youki_version to use before by @lengrongfu in https://github.com/containers/youki/pull/2813
+- Use HashMap for envs in container_init_process by @musaprg in https://github.com/containers/youki/pull/2817
+- Ignore linter for MOUNT_ATTR__ATIME by @yihuaf in https://github.com/containers/youki/pull/2819
+- Update go version in podman CI and vagrantfile by @YJDoc2 in https://github.com/containers/youki/pull/2828
+- Fix typos and bump version for typos ci by @Jerrypoi in https://github.com/containers/youki/pull/2839
+- Install nightly for running linter inside devcontainer by @musaprg in https://github.com/containers/youki/pull/2845
+- Add issue templates by @YJDoc2 in https://github.com/containers/youki/pull/2829
+- chore(deps): update oci-spec to v0.6.7 by @Mossaka in https://github.com/containers/youki/pull/2847
+- Bump oci-spec by @keisku in https://github.com/containers/youki/pull/2854
+- Update devcontainer.json by @keisku in https://github.com/containers/youki/pull/2857
+- Apply building best practices to `.devcontainer/Dockerfile` by @keisku in https://github.com/containers/youki/pull/2856
+- Fix markdown format in experiment/selinux/README.md by @keisku in https://github.com/containers/youki/pull/2855
+- initial progress on supporting OwnedFd by @zahash in https://github.com/containers/youki/pull/2809
+- Rust 1.80.0 by @utam0k in https://github.com/containers/youki/pull/2869
+- Update nc dependency to 0.9.2 by @posutsai in https://github.com/containers/youki/pull/2884
+- Prepare for v0.4.0 by @utam0k in https://github.com/containers/youki/pull/2880
+### Other Changes
+- Init a selinux project by @Gekko0114 in https://github.com/containers/youki/pull/2800
+- selinux: write xattr related codes. by @Gekko0114 in https://github.com/containers/youki/pull/2825
+- selinux: implemented remaining selinux functions by @Gekko0114 in https://github.com/containers/youki/pull/2850
+
 ## [v0.3.3](https://github.com/containers/youki/compare/v0.3.2...v0.3.3) - 2024-05-16
 ### 💪 Improvements
 - Add support for rsvd hugetlb cgroup by @omprakaash in https://github.com/containers/youki/pull/2719
