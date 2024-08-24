@@ -8,7 +8,7 @@ use libcgroups::common::CgroupManager;
 use nix::unistd::Pid;
 use oci_spec::runtime::Spec;
 
-use super::ContainerStatus;
+use super::{Container, ContainerStatus};
 use crate::error::{LibcontainerError, MissingSpecError};
 use crate::notify_socket::NotifyListener;
 use crate::process::args::{ContainerArgs, ContainerType};
@@ -54,8 +54,8 @@ impl ContainerBuilderImpl {
             Err(outer) => {
                 // Only the init container should be cleaned up in the case of
                 // an error.
-                if matches!(self.container_type, ContainerType::InitContainer { .. }) {
-                    self.cleanup_container()?;
+                if let ContainerType::InitContainer { container } = &self.container_type {
+                    cleanup_container(self.cgroup_config.clone(), container)?;
                 }
 
                 Err(outer)
@@ -173,41 +173,42 @@ impl ContainerBuilderImpl {
 
         Ok(init_pid)
     }
+}
 
-    fn cleanup_container(&self) -> Result<(), LibcontainerError> {
-        let mut errors = Vec::new();
+fn cleanup_container(
+    cgroup_config: Option<libcgroups::common::CgroupConfig>,
+    container: &Container,
+) -> Result<(), LibcontainerError> {
+    let mut errors = Vec::new();
 
-        if let Some(cc) = &self.cgroup_config {
-            let cmanager = libcgroups::common::create_cgroup_manager(cc.to_owned())?;
-            if let Err(e) = cmanager.remove() {
-                tracing::error!(error = ?e, "failed to remove cgroup manager");
-                errors.push(e.to_string());
-            }
+    if let Some(cc) = cgroup_config {
+        let cmanager = libcgroups::common::create_cgroup_manager(cc)?;
+        if let Err(e) = cmanager.remove() {
+            tracing::error!(error = ?e, "failed to remove cgroup manager");
+            errors.push(e.to_string());
         }
-
-        if let ContainerType::InitContainer { container } = &self.container_type {
-            if let Some(true) = container.clean_up_intel_rdt_subdirectory() {
-                if let Err(e) = delete_resctrl_subdirectory(container.id()) {
-                    tracing::error!(id = ?container.id(), error = ?e, "failed to delete resctrl subdirectory");
-                    errors.push(e.to_string());
-                }
-            }
-
-            if container.root.exists() {
-                if let Err(e) = fs::remove_dir_all(&container.root) {
-                    tracing::error!(container_root = ?container.root, error = ?e, "failed to delete container root");
-                    errors.push(e.to_string());
-                }
-            }
-        }
-
-        if !errors.is_empty() {
-            return Err(LibcontainerError::Other(format!(
-                "failed to cleanup container: {}",
-                errors.join(";")
-            )));
-        }
-
-        Ok(())
     }
+
+    if let Some(true) = container.clean_up_intel_rdt_subdirectory() {
+        if let Err(e) = delete_resctrl_subdirectory(container.id()) {
+            tracing::error!(id = ?container.id(), error = ?e, "failed to delete resctrl subdirectory");
+            errors.push(e.to_string());
+        }
+    }
+
+    if container.root.exists() {
+        if let Err(e) = fs::remove_dir_all(&container.root) {
+            tracing::error!(container_root = ?container.root, error = ?e, "failed to delete container root");
+            errors.push(e.to_string());
+        }
+    }
+
+    if !errors.is_empty() {
+        return Err(LibcontainerError::Other(format!(
+            "failed to cleanup container: {}",
+            errors.join(";")
+        )));
+    }
+
+    Ok(())
 }
