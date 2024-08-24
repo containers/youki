@@ -83,11 +83,7 @@ impl Container {
                 libcgroups::common::CgroupSetup::Legacy
                 | libcgroups::common::CgroupSetup::Hybrid => {
                     let cmanager = libcgroups::common::create_cgroup_manager(
-                        libcgroups::common::CgroupConfig {
-                            cgroup_path: self.spec()?.cgroup_path,
-                            systemd_cgroup: self.systemd(),
-                            container_name: self.id().to_string(),
-                        },
+                        self.spec()?.cgroup_config
                     )?;
                     cmanager.freeze(libcgroups::common::FreezerState::Thawed)?;
                 }
@@ -100,11 +96,7 @@ impl Container {
     fn kill_all_processes<S: Into<Signal>>(&self, signal: S) -> Result<(), LibcontainerError> {
         let signal = signal.into().into_raw();
         let cmanager =
-            libcgroups::common::create_cgroup_manager(libcgroups::common::CgroupConfig {
-                cgroup_path: self.spec()?.cgroup_path,
-                systemd_cgroup: self.systemd(),
-                container_name: self.id().to_string(),
-            })?;
+            libcgroups::common::create_cgroup_manager(self.spec()?.cgroup_config)?;
 
         if let Err(e) = cmanager.freeze(libcgroups::common::FreezerState::Frozen) {
             tracing::warn!(

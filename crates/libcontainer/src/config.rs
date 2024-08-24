@@ -5,8 +5,6 @@ use std::path::{Path, PathBuf};
 use oci_spec::runtime::{Hooks, Spec};
 use serde::{Deserialize, Serialize};
 
-use crate::utils;
-
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
     #[error("failed to save config")]
@@ -43,20 +41,14 @@ const YOUKI_CONFIG_NAME: &str = "youki_config.json";
 #[non_exhaustive]
 pub struct YoukiConfig {
     pub hooks: Option<Hooks>,
-    pub cgroup_path: PathBuf,
+    pub cgroup_config: libcgroups::common::CgroupConfig,
 }
 
 impl<'a> YoukiConfig {
-    pub fn from_spec(spec: &'a Spec, container_id: &str) -> Result<Self> {
+    pub fn from_spec(spec: &'a Spec, cgroup_config: libcgroups::common::CgroupConfig) -> Result<Self> {
         Ok(YoukiConfig {
             hooks: spec.hooks().clone(),
-            cgroup_path: utils::get_cgroup_path(
-                spec.linux()
-                    .as_ref()
-                    .ok_or(ConfigError::MissingLinux)?
-                    .cgroups_path(),
-                container_id,
-            ),
+            cgroup_config,
         })
     }
 
@@ -106,13 +98,15 @@ mod tests {
     fn test_config_from_spec() -> Result<()> {
         let container_id = "sample";
         let spec = Spec::default();
+        let cgroup_config = libcgroups::common::CgroupConfig {
+            cgroup_path: PathBuf::from(format!(":youki:{container_id}")),
+            systemd_cgroup: true,
+            container_name: container_id.to_owned(),
+        };
         let config = YoukiConfig::from_spec(&spec, container_id)?;
         assert_eq!(&config.hooks, spec.hooks());
-        dbg!(&config.cgroup_path);
-        assert_eq!(
-            config.cgroup_path,
-            PathBuf::from(format!(":youki:{container_id}"))
-        );
+        dbg!(&config.cgroup_config);
+        assert_eq!(config.cgroup_config, cgroup_config);
         Ok(())
     }
 

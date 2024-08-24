@@ -65,7 +65,7 @@ pub fn container_intermediate_process(
     apply_cgroups(
         &cgroup_manager,
         linux.resources().as_ref(),
-        matches!(args.container_type, ContainerType::InitContainer),
+        matches!(args.container_type, ContainerType::InitContainer { .. }),
     )?;
 
     // if new user is specified in specification, this will be true and new

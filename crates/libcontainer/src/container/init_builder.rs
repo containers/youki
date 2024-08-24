@@ -52,7 +52,6 @@ impl InitContainerBuilder {
 
         let mut container = self.create_container_state(&container_dir)?;
         container
-            .set_systemd(self.use_systemd)
             .set_annotations(spec.annotations().clone());
 
         let notify_path = container_dir.join(NOTIFY_FILE);
@@ -74,24 +73,32 @@ impl InitContainerBuilder {
 
         let user_ns_config = UserNamespaceConfig::new(&spec)?;
 
-        let config = YoukiConfig::from_spec(&spec, container.id())?;
+        let linux = spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
+        let cgroups_path = utils::get_cgroup_path(linux.cgroups_path(), &self.base.container_id);
+        let cgroup_config = libcgroups::common::CgroupConfig {
+            cgroup_path: cgroups_path,
+            systemd_cgroup: self.use_systemd || user_ns_config.is_some(),
+            container_name: self.base.container_id.to_owned(),
+        };
+
+        let config = YoukiConfig::from_spec(&spec, cgroup_config.clone())?;
         config.save(&container_dir).map_err(|err| {
             tracing::error!(?container_dir, "failed to save config: {}", err);
             err
         })?;
 
         let mut builder_impl = ContainerBuilderImpl {
-            container_type: ContainerType::InitContainer,
+            container_type: ContainerType::InitContainer {
+                container: container.clone(),
+            },
             syscall: self.base.syscall,
-            container_id: self.base.container_id,
             pid_file: self.base.pid_file,
             console_socket: csocketfd,
-            use_systemd: self.use_systemd,
+            cgroup_config,
             spec: Rc::new(spec),
             rootfs,
             user_ns_config,
             notify_path,
-            container: Some(container.clone()),
             preserve_fds: self.base.preserve_fds,
             detached: self.detached,
             executor: self.base.executor,

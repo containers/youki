@@ -23,8 +23,6 @@ pub enum HookError {
     Killed,
     #[error("failed to execute hook command due to a timeout")]
     Timeout,
-    #[error("container state is required to run hook")]
-    MissingContainerState,
     #[error("failed to write container state to stdin")]
     WriteContainerState(#[source] std::io::Error),
 }
@@ -33,10 +31,10 @@ type Result<T> = std::result::Result<T, HookError>;
 
 pub fn run_hooks(
     hooks: Option<&Vec<Hook>>,
-    container: Option<&Container>,
+    container: &Container,
     cwd: Option<&Path>,
 ) -> Result<()> {
-    let state = &(container.ok_or(HookError::MissingContainerState)?.state);
+    let state = &container.state;
 
     if let Some(hooks) = hooks {
         for hook in hooks {

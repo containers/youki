@@ -8,7 +8,7 @@ use libcgroups::common::CgroupManager;
 use nix::unistd::Pid;
 use oci_spec::runtime::Spec;
 
-use super::{Container, ContainerStatus};
+use super::ContainerStatus;
 use crate::error::{LibcontainerError, MissingSpecError};
 use crate::notify_socket::NotifyListener;
 use crate::process::args::{ContainerArgs, ContainerType};
@@ -17,17 +17,15 @@ use crate::process::{self};
 use crate::syscall::syscall::SyscallType;
 use crate::user_ns::UserNamespaceConfig;
 use crate::workload::Executor;
-use crate::{hooks, utils};
+use crate::hooks;
 
 pub(super) struct ContainerBuilderImpl {
     /// Flag indicating if an init or a tenant container should be created
     pub container_type: ContainerType,
     /// Interface to operating system primitives
     pub syscall: SyscallType,
-    /// Flag indicating if systemd should be used for cgroup management
-    pub use_systemd: bool,
-    /// Id of the container
-    pub container_id: String,
+    /// Interface to operating system primitives
+    pub cgroup_config: libcgroups::common::CgroupConfig,
     /// OCI compliant runtime spec
     pub spec: Rc<Spec>,
     /// Root filesystem of the container
@@ -41,8 +39,6 @@ pub(super) struct ContainerBuilderImpl {
     pub user_ns_config: Option<UserNamespaceConfig>,
     /// Path to the Unix Domain Socket to communicate container start
     pub notify_path: PathBuf,
-    /// Container state
-    pub container: Option<Container>,
     /// File descriptos preserved/passed to the container init process.
     pub preserve_fds: i32,
     /// If the container is to be run in detached mode
@@ -58,7 +54,7 @@ impl ContainerBuilderImpl {
             Err(outer) => {
                 // Only the init container should be cleaned up in the case of
                 // an error.
-                if matches!(self.container_type, ContainerType::InitContainer) {
+                if matches!(self.container_type, ContainerType::InitContainer { .. }) {
                     self.cleanup_container()?;
                 }
 
@@ -68,24 +64,17 @@ impl ContainerBuilderImpl {
     }
 
     fn run_container(&mut self) -> Result<Pid, LibcontainerError> {
-        let linux = self.spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
-        let cgroups_path = utils::get_cgroup_path(linux.cgroups_path(), &self.container_id);
-        let cgroup_config = libcgroups::common::CgroupConfig {
-            cgroup_path: cgroups_path,
-            systemd_cgroup: self.use_systemd || self.user_ns_config.is_some(),
-            container_name: self.container_id.to_owned(),
-        };
         let process = self
             .spec
             .process()
             .as_ref()
             .ok_or(MissingSpecError::Process)?;
 
-        if matches!(self.container_type, ContainerType::InitContainer) {
+        if let ContainerType::InitContainer { container } = &self.container_type {
             if let Some(hooks) = self.spec.hooks() {
                 hooks::run_hooks(
                     hooks.create_runtime().as_ref(),
-                    self.container.as_ref(),
+                    container,
                     None,
                 )?
             }
@@ -129,6 +118,7 @@ impl ContainerBuilderImpl {
         // going to be switching to a different security context. Thus setting
         // ourselves to be non-dumpable only breaks things (like rootless
         // containers), which is the recommendation from the kernel folks.
+        let linux = self.spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
         if linux.namespaces().is_some() {
             prctl::set_dumpable(false).map_err(|e| {
                 LibcontainerError::Other(format!(
@@ -142,16 +132,15 @@ impl ContainerBuilderImpl {
         // therefore we will have to move all the variable by value. Since self
         // is a shared reference, we have to clone these variables here.
         let container_args = ContainerArgs {
-            container_type: self.container_type,
+            container_type: self.container_type.clone(),
             syscall: self.syscall,
             spec: Rc::clone(&self.spec),
             rootfs: self.rootfs.to_owned(),
             console_socket: self.console_socket,
             notify_listener,
             preserve_fds: self.preserve_fds,
-            container: self.container.to_owned(),
             user_ns_config: self.user_ns_config.to_owned(),
-            cgroup_config,
+            cgroup_config: self.cgroup_config.clone(),
             detached: self.detached,
             executor: self.executor.clone(),
         };
@@ -172,7 +161,7 @@ impl ContainerBuilderImpl {
             })?;
         }
 
-        if let Some(container) = &mut self.container {
+        if let ContainerType::InitContainer { container } = &mut self.container_type {
             // update status and pid of the container process
             container
                 .set_status(ContainerStatus::Created)
@@ -186,23 +175,15 @@ impl ContainerBuilderImpl {
     }
 
     fn cleanup_container(&self) -> Result<(), LibcontainerError> {
-        let linux = self.spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
-        let cgroups_path = utils::get_cgroup_path(linux.cgroups_path(), &self.container_id);
-        let cmanager =
-            libcgroups::common::create_cgroup_manager(libcgroups::common::CgroupConfig {
-                cgroup_path: cgroups_path,
-                systemd_cgroup: self.use_systemd || self.user_ns_config.is_some(),
-                container_name: self.container_id.to_string(),
-            })?;
-
         let mut errors = Vec::new();
 
+        let cmanager = libcgroups::common::create_cgroup_manager(self.cgroup_config.clone())?;
         if let Err(e) = cmanager.remove() {
             tracing::error!(error = ?e, "failed to remove cgroup manager");
             errors.push(e.to_string());
         }
 
-        if let Some(container) = &self.container {
+        if let ContainerType::InitContainer { container } = &self.container_type {
             if let Some(true) = container.clean_up_intel_rdt_subdirectory() {
                 if let Err(e) = delete_resctrl_subdirectory(container.id()) {
                     tracing::error!(id = ?container.id(), error = ?e, "failed to delete resctrl subdirectory");

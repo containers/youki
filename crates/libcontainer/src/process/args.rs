@@ -10,9 +10,10 @@ use crate::notify_socket::NotifyListener;
 use crate::syscall::syscall::SyscallType;
 use crate::user_ns::UserNamespaceConfig;
 use crate::workload::Executor;
-#[derive(Debug, Copy, Clone)]
+
+#[derive(Debug, Clone)]
 pub enum ContainerType {
-    InitContainer,
+    InitContainer { container: Container },
     TenantContainer { exec_notify_fd: RawFd },
 }
 
@@ -32,8 +33,6 @@ pub struct ContainerArgs {
     pub notify_listener: NotifyListener,
     /// File descriptors preserved/passed to the container init process.
     pub preserve_fds: i32,
-    /// Container state
-    pub container: Option<Container>,
     /// Options for new namespace creation
     pub user_ns_config: Option<UserNamespaceConfig>,
     /// Cgroup Manager Config

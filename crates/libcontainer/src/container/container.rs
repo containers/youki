@@ -121,15 +121,6 @@ impl Container {
         self
     }
 
-    pub fn systemd(&self) -> bool {
-        self.state.use_systemd
-    }
-
-    pub fn set_systemd(&mut self, should_use: bool) -> &mut Self {
-        self.state.use_systemd = should_use;
-        self
-    }
-
     pub fn set_clean_up_intel_rdt_directory(&mut self, clean_up: bool) -> &mut Self {
         self.state.clean_up_intel_rdt_subdirectory = Some(clean_up);
         self
