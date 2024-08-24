@@ -36,7 +36,7 @@ pub struct ContainerArgs {
     /// Options for new namespace creation
     pub user_ns_config: Option<UserNamespaceConfig>,
     /// Cgroup Manager Config
-    pub cgroup_config: CgroupConfig,
+    pub cgroup_config: Option<CgroupConfig>,
     /// If the container is to be run in detached mode
     pub detached: bool,
     /// Manage the functions that actually run on the container

@@ -101,11 +101,12 @@ fn main() -> Result<()> {
     );
     let root_path = rootpath::determine(opts.global.root)?;
     let systemd_cgroup = opts.global.systemd_cgroup;
+    let use_cgroups = !opts.global.disable_cgroups;
 
     let cmd_result = match opts.subcmd {
         SubCommand::Standard(cmd) => match *cmd {
             StandardCmd::Create(create) => {
-                commands::create::create(create, root_path, systemd_cgroup)
+                commands::create::create(create, root_path, systemd_cgroup, use_cgroups)
             }
             StandardCmd::Start(start) => commands::start::start(start, root_path),
             StandardCmd::Kill(kill) => commands::kill::kill(kill, root_path),
@@ -130,7 +131,7 @@ fn main() -> Result<()> {
             CommonCmd::Pause(pause) => commands::pause::pause(pause, root_path),
             CommonCmd::Ps(ps) => commands::ps::ps(ps, root_path),
             CommonCmd::Resume(resume) => commands::resume::resume(resume, root_path),
-            CommonCmd::Run(run) => match commands::run::run(run, root_path, systemd_cgroup) {
+            CommonCmd::Run(run) => match commands::run::run(run, root_path, systemd_cgroup, use_cgroups) {
                 Ok(exit_code) => std::process::exit(exit_code),
                 Err(e) => {
                     tracing::error!("error in executing command: {:?}", e);

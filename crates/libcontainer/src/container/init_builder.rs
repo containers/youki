@@ -18,6 +18,7 @@ use crate::{apparmor, tty, user_ns, utils};
 pub struct InitContainerBuilder {
     base: ContainerBuilder,
     bundle: PathBuf,
+    use_cgroups: bool,
     use_systemd: bool,
     detached: bool,
 }
@@ -29,9 +30,16 @@ impl InitContainerBuilder {
         Self {
             base: builder,
             bundle,
+            use_cgroups: true,
             use_systemd: true,
             detached: true,
         }
+    }
+
+    /// Sets if cgroups should be used at all (overrides systemd if false)
+    pub fn with_cgroups(mut self, should_use: bool) -> Self {
+        self.use_cgroups = should_use;
+        self
     }
 
     /// Sets if systemd should be used for managing cgroups
@@ -73,13 +81,16 @@ impl InitContainerBuilder {
 
         let user_ns_config = UserNamespaceConfig::new(&spec)?;
 
-        let linux = spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
-        let cgroups_path = utils::get_cgroup_path(linux.cgroups_path(), &self.base.container_id);
-        let cgroup_config = libcgroups::common::CgroupConfig {
-            cgroup_path: cgroups_path,
-            systemd_cgroup: self.use_systemd || user_ns_config.is_some(),
-            container_name: self.base.container_id.to_owned(),
-        };
+        let mut cgroup_config = None;
+        if self.use_cgroups {
+            let linux = spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
+            let cgroups_path = utils::get_cgroup_path(linux.cgroups_path(), &self.base.container_id);
+            cgroup_config = Some(libcgroups::common::CgroupConfig {
+                cgroup_path: cgroups_path,
+                systemd_cgroup: self.use_systemd || user_ns_config.is_some(),
+                container_name: self.base.container_id.to_owned(),
+            });
+        }
 
         let config = YoukiConfig::from_spec(&spec, cgroup_config.clone())?;
         config.save(&container_dir).map_err(|err| {

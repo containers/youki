@@ -34,8 +34,13 @@ impl Container {
             return Err(LibcontainerError::IncorrectStatus);
         }
 
+        let cgroup_config = match self.spec()?.cgroup_config {
+            Some(cc) => cc,
+            None => return Err(LibcontainerError::CgroupsMissing),
+        };
+
         let cgroup_manager =
-            libcgroups::common::create_cgroup_manager(self.spec()?.cgroup_config)?;
+            libcgroups::common::create_cgroup_manager(cgroup_config)?;
         match stats {
             true => {
                 let stats = cgroup_manager.stats()?;

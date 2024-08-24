@@ -25,7 +25,7 @@ pub(super) struct ContainerBuilderImpl {
     /// Interface to operating system primitives
     pub syscall: SyscallType,
     /// Interface to operating system primitives
-    pub cgroup_config: libcgroups::common::CgroupConfig,
+    pub cgroup_config: Option<libcgroups::common::CgroupConfig>,
     /// OCI compliant runtime spec
     pub spec: Rc<Spec>,
     /// Root filesystem of the container
@@ -177,10 +177,12 @@ impl ContainerBuilderImpl {
     fn cleanup_container(&self) -> Result<(), LibcontainerError> {
         let mut errors = Vec::new();
 
-        let cmanager = libcgroups::common::create_cgroup_manager(self.cgroup_config.clone())?;
-        if let Err(e) = cmanager.remove() {
-            tracing::error!(error = ?e, "failed to remove cgroup manager");
-            errors.push(e.to_string());
+        if let Some(cc) = &self.cgroup_config {
+            let cmanager = libcgroups::common::create_cgroup_manager(cc.to_owned())?;
+            if let Err(e) = cmanager.remove() {
+                tracing::error!(error = ?e, "failed to remove cgroup manager");
+                errors.push(e.to_string());
+            }
         }
 
         if let ContainerType::InitContainer { container } = &self.container_type {

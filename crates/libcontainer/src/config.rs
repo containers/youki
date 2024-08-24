@@ -41,11 +41,11 @@ const YOUKI_CONFIG_NAME: &str = "youki_config.json";
 #[non_exhaustive]
 pub struct YoukiConfig {
     pub hooks: Option<Hooks>,
-    pub cgroup_config: libcgroups::common::CgroupConfig,
+    pub cgroup_config: Option<libcgroups::common::CgroupConfig>,
 }
 
 impl<'a> YoukiConfig {
-    pub fn from_spec(spec: &'a Spec, cgroup_config: libcgroups::common::CgroupConfig) -> Result<Self> {
+    pub fn from_spec(spec: &'a Spec, cgroup_config: Option<libcgroups::common::CgroupConfig>) -> Result<Self> {
         Ok(YoukiConfig {
             hooks: spec.hooks().clone(),
             cgroup_config,

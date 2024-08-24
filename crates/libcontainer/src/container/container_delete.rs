@@ -84,11 +84,13 @@ impl Container {
                     // remove the cgroup created for the container
                     // check https://man7.org/linux/man-pages/man7/cgroups.7.html
                     // creating and removing cgroups section for more information on cgroups
-                    let cmanager = libcgroups::common::create_cgroup_manager(config.cgroup_config.clone())?;
-                    cmanager.remove().map_err(|err| {
-                        tracing::error!(cgroup_config = ?config.cgroup_config, "failed to remove cgroup due to: {err:?}");
-                        err
-                    })?;
+                    if let Some(cc) = config.cgroup_config {
+                        let cmanager = libcgroups::common::create_cgroup_manager(cc.clone())?;
+                        cmanager.remove().map_err(|err| {
+                            tracing::error!(cgroup_config = ?cc, "failed to remove cgroup due to: {err:?}");
+                            err
+                        })?;
+                    }
 
                     if let Some(hooks) = config.hooks.as_ref() {
                         hooks::run_hooks(hooks.poststop().as_ref(), self, None).map_err(

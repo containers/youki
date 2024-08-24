@@ -57,5 +57,8 @@ fn create_cgroup_manager<P: AsRef<Path>>(
     container_id: &str,
 ) -> Result<AnyCgroupManager> {
     let container = load_container(root_path, container_id)?;
-    Ok(libcgroups::common::create_cgroup_manager(container.spec()?.cgroup_config)?)
+    match container.spec()?.cgroup_config {
+        Some(cc) => Ok(libcgroups::common::create_cgroup_manager(cc)?),
+        None => bail!("cannot use cgroups on container started without them"),
+    }
 }
