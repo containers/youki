@@ -40,8 +40,11 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, bo
     // At minimum, we have to close down any unused senders. The corresponding
     // receivers will be cleaned up once the senders are closed down.
     let (mut main_sender, mut main_receiver) = channel::main_channel()?;
-    let mut inter_chan = channel::intermediate_channel()?;
-    let mut init_chan = channel::init_channel()?;
+    let (mut inter_sender, mut inter_receiver) = channel::intermediate_channel()?;
+    #[cfg(feature = "libseccomp")]
+    let (mut init_sender, mut init_receiver) = channel::init_channel()?;
+    #[cfg(not(feature = "libseccomp"))]
+    let (init_sender, mut init_receiver) = channel::init_channel()?;
 
     let cb: CloneCb = {
         Box::new(|| {
@@ -50,10 +53,20 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, bo
                 return ret;
             }
 
+            // We are inside the forked process here - clean up FDs that don't need
+            // passing down
+            if let Err(err) = init_sender.close() {
+                tracing::error!(?err, "failed to close receiver in init process");
+                return -1;
+            }
+            if let Err(err) = inter_sender.close() {
+                tracing::error!(?err, "failed to close receiver in init process");
+                return -1;
+            }
             match container_intermediate_process::container_intermediate_process(
                 container_args,
-                &mut inter_chan,
-                &mut init_chan,
+                &mut inter_receiver,
+                &mut init_receiver,
                 &mut main_sender,
             ) {
                 Ok(_) => 0,
@@ -86,12 +99,6 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, bo
         tracing::error!("failed to close unused sender: {}", err);
         err
     })?;
-
-    let (mut inter_sender, inter_receiver) = inter_chan;
-    #[cfg(feature = "libseccomp")]
-    let (mut init_sender, init_receiver) = init_chan;
-    #[cfg(not(feature = "libseccomp"))]
-    let (init_sender, init_receiver) = init_chan;
 
     // If creating a container with new user namespace, the intermediate process will ask
     // the main process to set up uid and gid mapping, once the intermediate

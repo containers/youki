@@ -39,12 +39,10 @@ type Result<T> = std::result::Result<T, IntermediateProcessError>;
 
 pub fn container_intermediate_process(
     args: &ContainerArgs,
-    intermediate_chan: &mut (channel::IntermediateSender, channel::IntermediateReceiver),
-    init_chan: &mut (channel::InitSender, channel::InitReceiver),
+    inter_receiver: &mut channel::IntermediateReceiver,
+    init_receiver: &mut channel::InitReceiver,
     main_sender: &mut channel::MainSender,
 ) -> Result<()> {
-    let (inter_sender, inter_receiver) = intermediate_chan;
-    let (init_sender, init_receiver) = init_chan;
     let command = args.syscall.create_syscall();
     let spec = &args.spec;
     let linux = spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
@@ -86,6 +84,12 @@ pub fn container_intermediate_process(
         command.set_id(Uid::from_raw(0), Gid::from_raw(0))?;
     }
 
+    // We're done with inter_receiver here
+    inter_receiver.close().map_err(|err| {
+        tracing::error!("failed to close unused main sender: {}", err);
+        err
+    })?;
+
     // set limits and namespaces to the process
     let proc = spec.process().as_ref().ok_or(MissingSpecError::Process)?;
     if let Some(rlimits) = proc.rlimits() {
@@ -109,17 +113,8 @@ pub fn container_intermediate_process(
                 return ret;
             }
 
-            // We are inside the forked process here. The first thing we have to do
-            // is to close any unused senders, since fork will make a dup for all
-            // the socket.
-            if let Err(err) = init_sender.close() {
-                tracing::error!(?err, "failed to close receiver in init process");
-                return -1;
-            }
-            if let Err(err) = inter_sender.close() {
-                tracing::error!(?err, "failed to close sender in the intermediate process");
-                return -1;
-            }
+            // We are inside the forked process here - all FDs have been cleaned up
+            // already
             match container_init_process(args, main_sender, init_receiver) {
                 Ok(_) => 0,
                 Err(e) => {
@@ -171,22 +166,9 @@ pub fn container_intermediate_process(
         err
     })?;
 
-    // Close unused senders here so we don't have lingering socket around.
-    main_sender.close().map_err(|err| {
-        tracing::error!("failed to close unused main sender: {}", err);
-        err
-    })?;
-    inter_sender.close().map_err(|err| {
-        tracing::error!(
-            "failed to close sender in the intermediate process: {}",
-            err
-        );
-        err
-    })?;
-    init_sender.close().map_err(|err| {
-        tracing::error!("failed to close unused init sender: {}", err);
-        err
-    })?;
+    // Don't close main sender here - the intermediate process is about
+    // to exit successfully, closing gives an opportunity for a syscall
+    // to fail which then cannot be reported
 
     Ok(())
 }
