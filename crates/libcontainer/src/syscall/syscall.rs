@@ -3,6 +3,7 @@
 //! implementation details
 use std::any::Any;
 use std::ffi::OsStr;
+use std::os::fd::RawFd;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -24,7 +25,7 @@ pub trait Syscall {
     fn as_any(&self) -> &dyn Any;
     fn pivot_rootfs(&self, path: &Path) -> Result<()>;
     fn chroot(&self, path: &Path) -> Result<()>;
-    fn set_ns(&self, rawfd: i32, nstype: CloneFlags) -> Result<()>;
+    fn set_ns(&self, rawfd: RawFd, nstype: CloneFlags) -> Result<()>;
     fn set_id(&self, uid: Uid, gid: Gid) -> Result<()>;
     fn unshare(&self, flags: CloneFlags) -> Result<()>;
     fn set_capability(&self, cset: CapSet, value: &CapsHashSet) -> Result<()>;
@@ -45,6 +46,7 @@ pub trait Syscall {
     fn chown(&self, path: &Path, owner: Option<Uid>, group: Option<Gid>) -> Result<()>;
     fn set_groups(&self, groups: &[Gid]) -> Result<()>;
     fn close_range(&self, preserve_fds: i32) -> Result<()>;
+    fn remap_passed_fds(&self, remap_fds: &[(RawFd, RawFd)]) -> Result<()>;
     fn mount_setattr(
         &self,
         dirfd: i32,

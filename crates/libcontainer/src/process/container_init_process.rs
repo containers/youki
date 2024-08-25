@@ -662,6 +662,11 @@ pub fn container_init_process(
         }
     }
 
+    if proc.args().is_none() {
+        tracing::error!("on non-Windows, at least one process arg entry is required");
+        Err(MissingSpecError::Args)?;
+    }
+
     args.executor.validate(spec)?;
     args.executor.setup_envs(envs)?;
 
@@ -702,10 +707,15 @@ pub fn container_init_process(
         }
     }
 
-    if proc.args().is_none() {
-        tracing::error!("on non-Windows, at least one process arg entry is required");
-        Err(MissingSpecError::Args)?;
-    }
+    // Remap any FDs the user wants to pass to the container. This has to happen when
+    // no other FDs at all are open, otherwise the user could accidentally clobber
+    // an FD that's in use by youki. Unfortunately this can conflict with seccomp -
+    // the way to fix this would be to relocate in-use FDs out of the way of user
+    // requested ones, but that is quite hard.
+    syscall.remap_passed_fds(&args.remap_fds).map_err(|err| {
+        tracing::error!(?err, "failed to remap fds to be passed");
+        InitProcessError::SyscallOther(err)
+    })?;
 
     args.executor.exec(spec).map_err(|err| {
         tracing::error!(?err, "failed to execute payload");

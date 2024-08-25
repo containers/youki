@@ -118,6 +118,7 @@ impl InitContainerBuilder {
             user_ns_config,
             notify_path,
             preserve_fds: self.base.preserve_fds,
+            remap_fds: self.base.remap_fds,
             detached: self.detached,
             executor: self.base.executor,
             no_pivot: self.no_pivot,

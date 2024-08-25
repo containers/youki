@@ -1,10 +1,9 @@
 //! Implements Command trait for Linux systems
 use std::any::Any;
 use std::ffi::{CStr, CString, OsStr};
-use std::os::fd::BorrowedFd;
+use std::os::fd::{BorrowedFd, RawFd};
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::symlink;
-use std::os::unix::io::RawFd;
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -17,7 +16,7 @@ use nix::fcntl::{open, OFlag};
 use nix::mount::{mount, umount2, MntFlags, MsFlags};
 use nix::sched::{unshare, CloneFlags};
 use nix::sys::stat::{mknod, Mode, SFlag};
-use nix::unistd::{chown, chroot, close, fchdir, pivot_root, sethostname, Gid, Uid};
+use nix::unistd::{chown, chroot, close, dup2, fchdir, pivot_root, sethostname, Gid, Uid};
 use oci_spec::runtime::PosixRlimit;
 
 use super::{Result, Syscall, SyscallError};
@@ -179,7 +178,13 @@ impl LinuxSyscall {
         to_be_cleaned_up_fds.iter().for_each(|&fd| {
             // Intentionally ignore errors here -- the cases where this might fail
             // are basically file descriptors that have already been closed.
-            let _ = fcntl::fcntl(fd, fcntl::F_SETFD(fcntl::FdFlag::FD_CLOEXEC));
+            match fcntl::fcntl(fd, fcntl::F_GETFD) {
+                Ok(flags) => {
+                    let flags = fcntl::FdFlag::from_bits_retain(flags) & fcntl::FdFlag::FD_CLOEXEC;
+                    let _ = fcntl::fcntl(fd, fcntl::F_SETFD(flags));
+                },
+                Err(_) => (),
+            }
         });
 
         Ok(())
@@ -524,6 +529,35 @@ impl Syscall for LinuxSyscall {
             _ => Err(SyscallError::Nix(nix::errno::Errno::UnknownErrno)),
         }?;
 
+        Ok(())
+    }
+
+    // Remap FDs and clear the cloexec flag if set
+    fn remap_passed_fds(&self, remap_fds: &[(RawFd, RawFd)]) -> Result<()> {
+        for &(oldfd, newfd) in remap_fds {
+            if oldfd != newfd {
+                // dup2 clears cloexec
+                dup2(oldfd, newfd).map_err(|errno| {
+                    tracing::error!(?errno, ?oldfd, ?newfd, "failed to remap fd");
+                    errno
+                })?;
+                close(oldfd).map_err(|errno| {
+                    tracing::error!(?errno, ?oldfd, "failed to close fd");
+                    errno
+                })?;
+            } else {
+                // dup2 is a no-op if the FDs match, so just clear cloexec
+                let flags = fcntl::fcntl(oldfd, fcntl::F_GETFD).map_err(|errno| {
+                    tracing::error!(?errno, ?oldfd, "failed to get fd flags");
+                    errno
+                })?;
+                let flags = fcntl::FdFlag::from_bits_retain(flags) & !fcntl::FdFlag::FD_CLOEXEC;
+                fcntl::fcntl(oldfd, fcntl::F_SETFD(flags)).map_err(|errno| {
+                    tracing::error!(?errno, ?oldfd, "failed to clear cloexec");
+                    errno
+                })?;
+            }
+        }
         Ok(())
     }
 

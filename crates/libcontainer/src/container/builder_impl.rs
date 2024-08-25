@@ -39,8 +39,10 @@ pub(super) struct ContainerBuilderImpl {
     pub user_ns_config: Option<UserNamespaceConfig>,
     /// Path to the Unix Domain Socket to communicate container start
     pub notify_path: PathBuf,
-    /// File descriptos preserved/passed to the container init process.
+    /// Number of file descriptors preserved/passed to the container init process.
     pub preserve_fds: i32,
+    /// File descriptors remapped into the container process
+    pub remap_fds: Vec<(RawFd, RawFd)>,
     /// If the container is to be run in detached mode
     pub detached: bool,
     /// Default executes the specified execution of a generic command
@@ -146,6 +148,7 @@ impl ContainerBuilderImpl {
             console_socket: self.console_socket.as_ref().map(|c| c.as_raw_fd()),
             notify_listener,
             preserve_fds: self.preserve_fds,
+            remap_fds: self.remap_fds.clone(),
             user_ns_config: self.user_ns_config.to_owned(),
             cgroup_config: self.cgroup_config.clone(),
             detached: self.detached,

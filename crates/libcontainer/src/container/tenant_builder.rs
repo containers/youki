@@ -137,6 +137,7 @@ impl TenantContainerBuilder {
             user_ns_config,
             notify_path: notify_path.clone(),
             preserve_fds: self.base.preserve_fds,
+            remap_fds: self.base.remap_fds,
             detached: self.detached,
             executor: self.base.executor,
             no_pivot: false,
