@@ -6,6 +6,7 @@ use std::{
         unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd},
     },
 };
+
 use std::str::FromStr;
 use nix::{
     errno::Errno,
@@ -199,11 +200,19 @@ struct Filters {
     pub filter: *const Instruction,
 }
 
-fn get_syscall_number(_arc: &Arch, name: &str) -> Option<u64> {
-    match syscalls::x86_64::Sysno::from_str(name) {
-        Ok(syscall) => Some(syscall as u64),
-        Err(_) => None,
+fn get_syscall_number(arc: &Arch, name: &str) -> Option<u64> {
+    if arc == &Arch::X86 {
+        match syscalls::x86_64::Sysno::from_str(name) {
+            Ok(syscall) => Some(syscall as u64),
+            Err(_) => None,
+        }
+    } else {
+        match syscalls::aarch64::Sysno::from_str(name) {
+            Ok(syscall) => Some(syscall as u64),
+            Err(_) => None,
+        }
     }
+
 }
 
 pub fn set_instruction(arc: &Arch, def_action: u32, systemcall_arr: Vec<String>) -> Vec<Instruction> {
@@ -214,14 +223,14 @@ pub fn set_instruction(arc: &Arch, def_action: u32, systemcall_arr: Vec<String>)
         bpf_prog.append(&mut vec![Instruction::stmt(BPF_LD | BPF_W | BPF_ABS, 0)]);
         bpf_prog.append(&mut vec![Instruction::jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 1, get_syscall_number(arc, syscall).unwrap() as c_uint)]);
 
-        if (syscall == "write") {
+        if syscall == "write" {
             // Check if syscall is write and it is writing to stderr(fd=2)
             // Load the file descriptor
             bpf_prog.append(&mut vec![Instruction::stmt(BPF_LD | BPF_W | BPF_ABS, seccomp_data_args_offset().into())]);
             bpf_prog.append(&mut vec![Instruction::jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 1, libc::STDERR_FILENO as u32)]);
         }
 
-        if (syscall != "mkdir") {
+        if syscall != "mkdir" {
             bpf_prog.append(&mut vec![Instruction::stmt(BPF_RET | BPF_K, def_action)]);
         } else {
             bpf_prog.append(&mut vec![Instruction::stmt(BPF_RET | BPF_K, SECCOMP_RET_USER_NOTIF)]);
