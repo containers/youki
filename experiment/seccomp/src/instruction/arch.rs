@@ -1,6 +1,7 @@
 use crate::instruction::Instruction;
 use crate::instruction::*;
 
+#[derive(PartialEq)]
 pub enum Arch {
     X86,AArch64
 }
