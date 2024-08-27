@@ -21,7 +21,7 @@ use nix::{
     unistd::{close, mkdir},
 };
 use syscall_numbers::x86_64;
-use seccomp::seccomp::set_instruction;
+use seccomp::seccomp::{InstructionData};
 
 fn send_fd<F: AsRawFd>(sock: OwnedFd, fd: &F) -> nix::Result<()> {
     let fd = fd.as_raw_fd();
@@ -89,8 +89,12 @@ async fn main() -> Result<()> {
         SockFlag::empty(),
     )?;
 
-    let syscalls_arr : Vec<String> = vec!["getcwd".to_string(), "write".to_string(), "mkdir".to_string()];
-    let mut seccomp = Seccomp {filters: set_instruction(&Arch::X86, SECCOMP_RET_KILL_PROCESS, syscalls_arr)};
+    let inst_data = InstructionData{
+        arc: Arch::X86,
+        def_action: SECCOMP_RET_KILL_PROCESS,
+        syscall_arr: vec!["getcwd".to_string(), "write".to_string(), "mkdir".to_string()]
+    };
+    let mut seccomp = Seccomp {filters: Vec::from(inst_data)};
 
     tokio::spawn(async move {
         tokio::signal::ctrl_c()
