@@ -14,6 +14,7 @@ use nix::{
     libc::{SECCOMP_FILTER_FLAG_NEW_LISTENER, SECCOMP_SET_MODE_FILTER},
     unistd,
 };
+
 use crate::instruction::{*};
 use crate::instruction::{Arch, Instruction, SECCOMP_IOC_MAGIC};
 
@@ -215,51 +216,37 @@ fn get_syscall_number(arc: &Arch, name: &str) -> Option<u64> {
 
 }
 
-pub fn set_instruction(arc: &Arch, def_action: u32, systemcall_arr: Vec<String>) -> Vec<Instruction> {
-    let _ = prctl::set_no_new_privileges(true);
-    let mut bpf_prog = gen_validate(arc);
+#[derive(Debug)]
+pub struct InstructionData {
+    pub arc: Arch,
+    pub def_action: u32,
+    pub syscall_arr: Vec<String>
+}
+impl From<InstructionData> for Vec<Instruction> {
+    fn from(inst_data: InstructionData) -> Self {
+        let _ = prctl::set_no_new_privileges(true);
+        let mut bpf_prog = gen_validate(&inst_data.arc);
+        for syscall in &inst_data.syscall_arr {
+            bpf_prog.append(&mut vec![Instruction::stmt(BPF_LD | BPF_W | BPF_ABS, 0)]);
+            bpf_prog.append(&mut vec![Instruction::jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 1,
+                                                        get_syscall_number(&inst_data.arc, syscall).unwrap() as c_uint)]);
 
-    for syscall in &systemcall_arr {
-        bpf_prog.append(&mut vec![Instruction::stmt(BPF_LD | BPF_W | BPF_ABS, 0)]);
-        bpf_prog.append(&mut vec![Instruction::jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 1, get_syscall_number(arc, syscall).unwrap() as c_uint)]);
+            if syscall == "write" {
+                // Check if syscall is write and it is writing to stderr(fd=2)
+                // Load the file descriptor
+                bpf_prog.append(&mut vec![Instruction::stmt(BPF_LD | BPF_W | BPF_ABS, seccomp_data_args_offset().into())]);
+                bpf_prog.append(&mut vec![Instruction::jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 1, libc::STDERR_FILENO as u32)]);
+            }
 
-        if syscall == "write" {
-            // Check if syscall is write and it is writing to stderr(fd=2)
-            // Load the file descriptor
-            bpf_prog.append(&mut vec![Instruction::stmt(BPF_LD | BPF_W | BPF_ABS, seccomp_data_args_offset().into())]);
-            bpf_prog.append(&mut vec![Instruction::jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 1, libc::STDERR_FILENO as u32)]);
+            if syscall != "mkdir" {
+                bpf_prog.append(&mut vec![Instruction::stmt(BPF_RET | BPF_K, inst_data.def_action)]);
+            } else {
+                bpf_prog.append(&mut vec![Instruction::stmt(BPF_RET | BPF_K, SECCOMP_RET_USER_NOTIF)]);
+            }
+
         }
 
-        if syscall != "mkdir" {
-            bpf_prog.append(&mut vec![Instruction::stmt(BPF_RET | BPF_K, def_action)]);
-        } else {
-            bpf_prog.append(&mut vec![Instruction::stmt(BPF_RET | BPF_K, SECCOMP_RET_USER_NOTIF)]);
-        }
-
+        bpf_prog.append(&mut vec![Instruction::stmt(BPF_RET | BPF_K, SECCOMP_RET_ALLOW)]);
+        return bpf_prog;
     }
-
-    bpf_prog.append(&mut vec![Instruction::stmt(BPF_RET | BPF_K, SECCOMP_RET_ALLOW)]);
-
-    // bpf_prog.append(&mut vec![
-    //     // A: Check if syscall is getcwd
-    //     Instruction::stmt(BPF_LD | BPF_W | BPF_ABS, 0),
-    //     Instruction::jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 1, get_syscall_number(arc, "getcwd").unwrap() as c_uint), // If false, go to B
-    //     Instruction::stmt(BPF_RET | BPF_K, def_action),
-    //     // B: Check if syscall is write and it is writing to stderr(fd=2)
-    //     Instruction::stmt(BPF_LD | BPF_W | BPF_ABS, 0),
-    //     Instruction::jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 3, get_syscall_number(arc, "write").unwrap() as c_uint), // If false, go to C
-    //     // Load the file descriptor
-    //     Instruction::stmt(BPF_LD | BPF_W | BPF_ABS, seccomp_data_args_offset().into()),
-    //     // Check if args is stderr
-    //     Instruction::jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 1, libc::STDERR_FILENO as u32), // If false, go to C
-    //     Instruction::stmt(BPF_RET | BPF_K, def_action),
-    //     // C: Check if syscall is mkdir and if so, return seccomp notify
-    //     Instruction::stmt(BPF_LD | BPF_W | BPF_ABS, 0),
-    //     Instruction::jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 1, get_syscall_number(arc, "mkdir").unwrap() as c_uint), // If false, go to D
-    //     Instruction::stmt(BPF_RET | BPF_K, SECCOMP_RET_USER_NOTIF),
-    //     // D: Pass
-    //     Instruction::stmt(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
-    // ]);
-
-    return bpf_prog;
 }
