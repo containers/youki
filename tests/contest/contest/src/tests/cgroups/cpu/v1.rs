@@ -1,12 +1,20 @@
+use std::cmp::PartialEq;
+use std::error::Error;
+use std::fmt::Debug;
+use std::fs;
+use std::marker::{Send, Sync};
 use std::path::Path;
+use std::str::FromStr;
 
+use anyhow::{Context, Result};
 use libcgroups::common;
 use num_cpus;
-use test_framework::{test_result, ConditionalTest, TestGroup, TestResult};
+use test_framework::{assert_result_eq, test_result, ConditionalTest, TestGroup, TestResult};
+use tracing::debug;
 
 use super::{create_cpu_spec, create_empty_spec, create_spec};
 use crate::utils::test_outside_container;
-use crate::utils::test_utils::check_container_created;
+use crate::utils::test_utils::{check_container_created, CGROUP_ROOT};
 
 const CPU_CGROUP_PREFIX: &str = "/sys/fs/cgroup/cpu,cpuacct";
 const DEFAULT_REALTIME_PERIOD: u64 = 1000000;
@@ -219,6 +227,101 @@ fn test_cpu_cgroups() -> TestResult {
     TestResult::Passed
 }
 
+fn check_cgroup_numeric_subsystem<T: FromStr + Debug + PartialEq>(
+    cgroup_name: &str,
+    subsystem: &str,
+    filename: &str,
+    expected: T,
+) -> Result<()>
+where
+    <T as FromStr>::Err: Send + Sync + Error + 'static,
+{
+    let cgroup_path = Path::new(CGROUP_ROOT)
+        .join(subsystem)
+        .join("runtime-test")
+        .join(cgroup_name)
+        .join(filename);
+
+    debug!("reading value from {:?}", cgroup_path);
+    let content = fs::read_to_string(&cgroup_path)
+        .with_context(|| format!("failed to read {cgroup_path:?}"))?;
+    let observe = content.trim().to_owned().parse::<T>()?;
+    assert_result_eq!(observe, expected)
+}
+fn check_cgroup_string_subsystem(
+    cgroup_name: &str,
+    subsystem: &str,
+    filename: &str,
+    expected: &str,
+) -> Result<()> {
+    let cgroup_path = Path::new(CGROUP_ROOT)
+        .join(subsystem)
+        .join("runtime-test")
+        .join(cgroup_name)
+        .join(filename);
+
+    debug!("reading value from {:?}", cgroup_path);
+    let content = fs::read_to_string(&cgroup_path)
+        .with_context(|| format!("failed to read {cgroup_path:?}"))?;
+    let observe = content.trim().to_owned();
+    assert_result_eq!(observe, expected)
+}
+
+fn test_relative_cpus() -> TestResult {
+    let case = test_result!(create_cpu_spec(
+        1024,
+        100000,
+        50000,
+        None,
+        "0-1",
+        "0",
+        get_realtime_period(),
+        get_realtime_runtime(),
+    ));
+    let spec = test_result!(create_spec("test_relative_cpus", case.clone()));
+
+    test_outside_container(spec, &|data| {
+        test_result!(check_container_created(&data));
+        test_result!(check_cgroup_numeric_subsystem(
+            "test_relative_cpus",
+            "cpu,cpuacct",
+            "cpu.shares",
+            test_result!(case.shares().context("no shares value in cpu spec")),
+        ));
+        test_result!(check_cgroup_numeric_subsystem(
+            "test_relative_cpus",
+            "cpu,cpuacct",
+            "cpu.cfs_period_us",
+            test_result!(case.period().context("no period value in cpu spec")),
+        ));
+        test_result!(check_cgroup_numeric_subsystem(
+            "test_relative_cpus",
+            "cpu,cpuacct",
+            "cpu.cfs_quota_us",
+            test_result!(case.quota().context("no period value in cpu spec")),
+        ));
+        test_result!(check_cgroup_string_subsystem(
+            "test_relative_cpus",
+            "cpuset",
+            "cpuset.cpus",
+            &test_result!(case
+                .cpus()
+                .to_owned()
+                .context("no period value in cpu spec"))
+        ));
+        test_result!(check_cgroup_string_subsystem(
+            "test_relative_cpus",
+            "cpuset",
+            "cpuset.mems",
+            &test_result!(case
+                .mems()
+                .to_owned()
+                .context("no period value in cpu spec")),
+        ));
+        TestResult::Passed
+    })
+}
+
 fn test_empty_cpu() -> TestResult {
     let cgroup_name = "test_empty_cpu";
     let spec = test_result!(create_empty_spec(cgroup_name));
@@ -317,12 +420,18 @@ pub fn get_test_group() -> TestGroup {
         Box::new(can_run_idle),
         Box::new(test_cpu_idle_set),
     );
+    let relative_cpus = ConditionalTest::new(
+        "test_relative_cpus",
+        Box::new(can_run),
+        Box::new(test_relative_cpus),
+    );
 
     test_group.add(vec![
         Box::new(linux_cgroups_cpus),
         Box::new(empty_cpu),
         Box::new(cpu_idle_set),
         Box::new(cpu_idle_default),
+        Box::new(relative_cpus),
     ]);
 
     test_group
