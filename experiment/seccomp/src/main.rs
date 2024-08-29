@@ -88,7 +88,7 @@ async fn main() -> Result<()> {
         None,
         SockFlag::empty(),
     )?;
-
+    let _ = prctl::set_no_new_privileges(true);
     let inst_data = InstructionData{
         arc: Arch::X86,
         def_action: SECCOMP_RET_KILL_PROCESS,
