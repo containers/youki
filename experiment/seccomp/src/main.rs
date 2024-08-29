@@ -9,19 +9,18 @@ use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 use std::slice;
 
 use anyhow::Result;
-use nix::{
-    sys::{
-        signal::Signal,
-        socket::{
-            self, ControlMessage, ControlMessageOwned, MsgFlags, SockFlag, SockType, UnixAddr,
-        },
-        stat::Mode,
-        wait::{self, WaitStatus},
+use nix::{libc, sys::{
+    signal::Signal,
+    socket::{
+        self, ControlMessage, ControlMessageOwned, MsgFlags, SockFlag, SockType, UnixAddr,
     },
-    unistd::{close, mkdir},
-};
+    stat::Mode,
+    wait::{self, WaitStatus},
+}, unistd::{close, mkdir}};
+
 use syscall_numbers::x86_64;
-use seccomp::seccomp::{InstructionData};
+use syscalls::syscall_args;
+use seccomp::seccomp::{InstructionData, Rule};
 
 fn send_fd<F: AsRawFd>(sock: OwnedFd, fd: &F) -> nix::Result<()> {
     let fd = fd.as_raw_fd();
@@ -88,11 +87,16 @@ async fn main() -> Result<()> {
         None,
         SockFlag::empty(),
     )?;
+
     let _ = prctl::set_no_new_privileges(true);
     let inst_data = InstructionData{
         arc: Arch::X86,
         def_action: SECCOMP_RET_KILL_PROCESS,
-        syscall_arr: vec!["getcwd".to_string(), "write".to_string(), "mkdir".to_string()]
+        rule_arr: vec![
+            Rule::new("getcwd".parse()?, 0,  syscall_args!(),false),
+            Rule::new("write".parse()?,1, syscall_args!(libc::STDERR_FILENO as usize), false),
+            Rule::new("mkdir".parse()?,0, syscall_args!(), true)
+        ]
     };
     let mut seccomp = Seccomp {filters: Vec::from(inst_data)};
 
