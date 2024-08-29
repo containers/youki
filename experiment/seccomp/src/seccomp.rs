@@ -14,7 +14,7 @@ use nix::{
     libc::{SECCOMP_FILTER_FLAG_NEW_LISTENER, SECCOMP_SET_MODE_FILTER},
     unistd,
 };
-
+use syscalls::{SyscallArgs};
 use crate::instruction::{*};
 use crate::instruction::{Arch, Instruction, SECCOMP_IOC_MAGIC};
 
@@ -220,32 +220,49 @@ fn get_syscall_number(arc: &Arch, name: &str) -> Option<u64> {
 pub struct InstructionData {
     pub arc: Arch,
     pub def_action: u32,
-    pub syscall_arr: Vec<String>
+    pub rule_arr: Vec<Rule>
 }
 impl From<InstructionData> for Vec<Instruction> {
     fn from(inst_data: InstructionData) -> Self {
         let mut bpf_prog = gen_validate(&inst_data.arc);
-        for syscall in &inst_data.syscall_arr {
+        for rule in &inst_data.rule_arr {
             bpf_prog.append(&mut vec![Instruction::stmt(BPF_LD | BPF_W | BPF_ABS, 0)]);
             bpf_prog.append(&mut vec![Instruction::jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 1,
-                                                        get_syscall_number(&inst_data.arc, syscall).unwrap() as c_uint)]);
+                                                        get_syscall_number(&inst_data.arc, &rule.syscall).unwrap() as c_uint)]);
 
-            if syscall == "write" {
-                // Check if syscall is write and it is writing to stderr(fd=2)
-                // Load the file descriptor
+            // TODO: Checks for only one argument, but supports two or more arguments
+            if rule.arg_cnt != 0 {
                 bpf_prog.append(&mut vec![Instruction::stmt(BPF_LD | BPF_W | BPF_ABS, seccomp_data_args_offset().into())]);
-                bpf_prog.append(&mut vec![Instruction::jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 1, libc::STDERR_FILENO as u32)]);
+                bpf_prog.append(&mut vec![Instruction::jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 1, rule.args.arg0 as c_uint)]);
             }
 
-            if syscall != "mkdir" {
-                bpf_prog.append(&mut vec![Instruction::stmt(BPF_RET | BPF_K, inst_data.def_action)]);
-            } else {
+            if rule.is_notify {
                 bpf_prog.append(&mut vec![Instruction::stmt(BPF_RET | BPF_K, SECCOMP_RET_USER_NOTIF)]);
+            } else {
+                bpf_prog.append(&mut vec![Instruction::stmt(BPF_RET | BPF_K, inst_data.def_action)]);
             }
-
         }
 
         bpf_prog.append(&mut vec![Instruction::stmt(BPF_RET | BPF_K, SECCOMP_RET_ALLOW)]);
         return bpf_prog;
+    }
+}
+
+#[derive(Debug)]
+pub struct Rule {
+    pub syscall: String,
+    pub arg_cnt: u8,
+    pub args: SyscallArgs,
+    pub is_notify: bool
+}
+
+impl Rule {
+    pub fn new(syscall: String, arg_cnt: u8, args: SyscallArgs, is_notify: bool) -> Self {
+        Self {
+            syscall,
+            arg_cnt,
+            args,
+            is_notify,
+        }
     }
 }
