@@ -224,7 +224,6 @@ pub struct InstructionData {
 }
 impl From<InstructionData> for Vec<Instruction> {
     fn from(inst_data: InstructionData) -> Self {
-        let _ = prctl::set_no_new_privileges(true);
         let mut bpf_prog = gen_validate(&inst_data.arc);
         for syscall in &inst_data.syscall_arr {
             bpf_prog.append(&mut vec![Instruction::stmt(BPF_LD | BPF_W | BPF_ABS, 0)]);
