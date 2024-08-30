@@ -106,10 +106,10 @@ mod tests {
             systemd_cgroup: true,
             container_name: container_id.to_owned(),
         };
-        let config = YoukiConfig::from_spec(&spec, container_id)?;
+        let config = YoukiConfig::from_spec(&spec, Some(cgroup_config.clone()))?;
         assert_eq!(&config.hooks, spec.hooks());
         dbg!(&config.cgroup_config);
-        assert_eq!(config.cgroup_config, cgroup_config);
+        assert_eq!(config.cgroup_config, Some(cgroup_config));
         Ok(())
     }
 
@@ -118,7 +118,12 @@ mod tests {
         let container_id = "sample";
         let tmp = tempfile::tempdir().expect("create temp dir");
         let spec = Spec::default();
-        let config = YoukiConfig::from_spec(&spec, container_id)?;
+        let cgroup_config = libcgroups::common::CgroupConfig {
+            cgroup_path: PathBuf::from(format!(":youki:{container_id}")),
+            systemd_cgroup: true,
+            container_name: container_id.to_owned(),
+        };
+        let config = YoukiConfig::from_spec(&spec, Some(cgroup_config))?;
         config.save(&tmp)?;
         let act = YoukiConfig::load(&tmp)?;
         assert_eq!(act, config);

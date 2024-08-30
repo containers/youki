@@ -274,16 +274,6 @@ mod tests {
     }
 
     #[test]
-    fn test_get_set_systemd() {
-        let mut container = Container::default();
-        assert!(!container.systemd());
-        container.set_systemd(true);
-        assert!(container.systemd());
-        container.set_systemd(false);
-        assert!(!container.systemd());
-    }
-
-    #[test]
     fn test_get_set_creator() {
         let mut container = Container::default();
         assert_eq!(container.creator(), None);
@@ -322,7 +312,7 @@ mod tests {
         let tmp_dir = tempfile::tempdir().unwrap();
         use oci_spec::runtime::Spec;
         let spec = Spec::default();
-        let config = YoukiConfig::from_spec(&spec, "123").context("convert spec to config")?;
+        let config = YoukiConfig::from_spec(&spec, None).context("convert spec to config")?;
         config.save(tmp_dir.path()).context("save config")?;
 
         let container = Container {
