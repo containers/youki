@@ -10,6 +10,7 @@ use oci_spec::runtime::Spec;
 
 use super::{Container, ContainerStatus};
 use crate::error::{LibcontainerError, MissingSpecError};
+use crate::hooks;
 use crate::notify_socket::NotifyListener;
 use crate::process::args::{ContainerArgs, ContainerType};
 use crate::process::intel_rdt::delete_resctrl_subdirectory;
@@ -17,7 +18,6 @@ use crate::process::{self};
 use crate::syscall::syscall::SyscallType;
 use crate::user_ns::UserNamespaceConfig;
 use crate::workload::Executor;
-use crate::hooks;
 
 pub(super) struct ContainerBuilderImpl {
     /// Flag indicating if an init or a tenant container should be created
@@ -72,11 +72,7 @@ impl ContainerBuilderImpl {
 
         if let ContainerType::InitContainer { container } = &self.container_type {
             if let Some(hooks) = self.spec.hooks() {
-                hooks::run_hooks(
-                    hooks.create_runtime().as_ref(),
-                    container,
-                    None,
-                )?
+                hooks::run_hooks(hooks.create_runtime().as_ref(), container, None)?
             }
         }
 

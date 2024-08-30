@@ -59,8 +59,7 @@ impl InitContainerBuilder {
         let container_dir = self.create_container_dir()?;
 
         let mut container = self.create_container_state(&container_dir)?;
-        container
-            .set_annotations(spec.annotations().clone());
+        container.set_annotations(spec.annotations().clone());
 
         let notify_path = container_dir.join(NOTIFY_FILE);
         // convert path of root file system of the container to absolute path
@@ -84,7 +83,8 @@ impl InitContainerBuilder {
         let mut cgroup_config = None;
         if self.use_cgroups {
             let linux = spec.linux().as_ref().ok_or(MissingSpecError::Linux)?;
-            let cgroups_path = utils::get_cgroup_path(linux.cgroups_path(), &self.base.container_id);
+            let cgroups_path =
+                utils::get_cgroup_path(linux.cgroups_path(), &self.base.container_id);
             cgroup_config = Some(libcgroups::common::CgroupConfig {
                 cgroup_path: cgroups_path,
                 systemd_cgroup: self.use_systemd || user_ns_config.is_some(),

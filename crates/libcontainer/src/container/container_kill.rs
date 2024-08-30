@@ -83,15 +83,13 @@ impl Container {
                 match get_cgroup_setup()? {
                     libcgroups::common::CgroupSetup::Legacy
                     | libcgroups::common::CgroupSetup::Hybrid => {
-                        let cmanager = libcgroups::common::create_cgroup_manager(
-                            cgroup_config
-                        )?;
+                        let cmanager = libcgroups::common::create_cgroup_manager(cgroup_config)?;
                         cmanager.freeze(libcgroups::common::FreezerState::Thawed)?;
                     }
                     libcgroups::common::CgroupSetup::Unified => {}
                 }
             } else {
-                return Err(LibcontainerError::CgroupsMissing)
+                return Err(LibcontainerError::CgroupsMissing);
             }
         }
         Ok(())
@@ -104,8 +102,7 @@ impl Container {
         };
 
         let signal = signal.into().into_raw();
-        let cmanager =
-            libcgroups::common::create_cgroup_manager(cgroup_config)?;
+        let cmanager = libcgroups::common::create_cgroup_manager(cgroup_config)?;
 
         if let Err(e) = cmanager.freeze(libcgroups::common::FreezerState::Frozen) {
             tracing::warn!(

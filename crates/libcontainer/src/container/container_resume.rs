@@ -38,8 +38,7 @@ impl Container {
             None => return Err(LibcontainerError::CgroupsMissing),
         };
 
-        let cmanager =
-            libcgroups::common::create_cgroup_manager(cgroup_config)?;
+        let cmanager = libcgroups::common::create_cgroup_manager(cgroup_config)?;
         // resume the frozen container
         cmanager.freeze(FreezerState::Thawed)?;
 

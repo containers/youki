@@ -13,7 +13,12 @@ use crate::workload::executor::default_executor;
 // can be given impression that is is running on a complete system, but on the system which
 // it is running, it is just another process, and has attributes such as pid, file descriptors, etc.
 // associated with it like any other process.
-pub fn create(args: Create, root_path: PathBuf, systemd_cgroup: bool, use_cgroups: bool) -> Result<()> {
+pub fn create(
+    args: Create,
+    root_path: PathBuf,
+    systemd_cgroup: bool,
+    use_cgroups: bool,
+) -> Result<()> {
     ContainerBuilder::new(args.container_id.clone(), SyscallType::default())
         .with_executor(default_executor())
         .with_pid_file(args.pid_file.as_ref())?

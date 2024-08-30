@@ -127,8 +127,10 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, bo
         #[cfg(feature = "libseccomp")]
         if let Some(seccomp) = linux.seccomp() {
             let container_state = match &container_args.container_type {
-                 ContainerType::InitContainer { container } => &container.state,
-                 ContainerType::TenantContainer { .. } => return Err(ProcessError::ContainerStateRequired),
+                ContainerType::InitContainer { container } => &container.state,
+                ContainerType::TenantContainer { .. } => {
+                    return Err(ProcessError::ContainerStateRequired)
+                }
             };
             let state = crate::container::ContainerProcessState {
                 oci_version: container_args.spec.version().to_string(),
@@ -148,8 +150,8 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, bo
 
         if let Some(intel_rdt) = linux.intel_rdt() {
             let container_id = match &container_args.container_type {
-                 ContainerType::InitContainer { container } => Some(container.id()),
-                 ContainerType::TenantContainer { .. } => None,
+                ContainerType::InitContainer { container } => Some(container.id()),
+                ContainerType::TenantContainer { .. } => None,
             };
             need_to_clean_up_intel_rdt_subdirectory =
                 setup_intel_rdt(container_id, &init_pid, intel_rdt)?;

@@ -45,7 +45,10 @@ pub struct YoukiConfig {
 }
 
 impl<'a> YoukiConfig {
-    pub fn from_spec(spec: &'a Spec, cgroup_config: Option<libcgroups::common::CgroupConfig>) -> Result<Self> {
+    pub fn from_spec(
+        spec: &'a Spec,
+        cgroup_config: Option<libcgroups::common::CgroupConfig>,
+    ) -> Result<Self> {
         Ok(YoukiConfig {
             hooks: spec.hooks().clone(),
             cgroup_config,

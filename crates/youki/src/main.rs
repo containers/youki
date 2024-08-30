@@ -131,14 +131,16 @@ fn main() -> Result<()> {
             CommonCmd::Pause(pause) => commands::pause::pause(pause, root_path),
             CommonCmd::Ps(ps) => commands::ps::ps(ps, root_path),
             CommonCmd::Resume(resume) => commands::resume::resume(resume, root_path),
-            CommonCmd::Run(run) => match commands::run::run(run, root_path, systemd_cgroup, use_cgroups) {
-                Ok(exit_code) => std::process::exit(exit_code),
-                Err(e) => {
-                    tracing::error!("error in executing command: {:?}", e);
-                    eprintln!("run failed : {e}");
-                    std::process::exit(-1);
+            CommonCmd::Run(run) => {
+                match commands::run::run(run, root_path, systemd_cgroup, use_cgroups) {
+                    Ok(exit_code) => std::process::exit(exit_code),
+                    Err(e) => {
+                        tracing::error!("error in executing command: {:?}", e);
+                        eprintln!("run failed : {e}");
+                        std::process::exit(-1);
+                    }
                 }
-            },
+            }
             CommonCmd::Spec(spec) => commands::spec_json::spec(spec),
             CommonCmd::Update(update) => commands::update::update(update, root_path),
         },
