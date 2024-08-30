@@ -1,15 +1,11 @@
-use std::cmp::PartialEq;
-use std::error::Error;
-use std::fmt::Debug;
+use std::any::Any;
 use std::fs;
-use std::marker::{Send, Sync};
 use std::path::Path;
-use std::str::FromStr;
 
 use anyhow::{Context, Result};
 use libcgroups::common;
 use num_cpus;
-use test_framework::{assert_result_eq, test_result, ConditionalTest, TestGroup, TestResult};
+use test_framework::{test_result, ConditionalTest, TestGroup, TestResult};
 use tracing::debug;
 
 use super::{create_cpu_spec, create_empty_spec, create_spec};
@@ -227,32 +223,11 @@ fn test_cpu_cgroups() -> TestResult {
     TestResult::Passed
 }
 
-fn check_cgroup_numeric_subsystem<T: FromStr + Debug + PartialEq>(
+fn check_cgroup_subsystem(
     cgroup_name: &str,
     subsystem: &str,
     filename: &str,
-    expected: T,
-) -> Result<()>
-where
-    <T as FromStr>::Err: Send + Sync + Error + 'static,
-{
-    let cgroup_path = Path::new(CGROUP_ROOT)
-        .join(subsystem)
-        .join("runtime-test")
-        .join(cgroup_name)
-        .join(filename);
-
-    debug!("reading value from {:?}", cgroup_path);
-    let content = fs::read_to_string(&cgroup_path)
-        .with_context(|| format!("failed to read {cgroup_path:?}"))?;
-    let observe = content.trim().to_owned().parse::<T>()?;
-    assert_result_eq!(observe, expected)
-}
-fn check_cgroup_string_subsystem(
-    cgroup_name: &str,
-    subsystem: &str,
-    filename: &str,
-    expected: &str,
+    expected: &dyn Any,
 ) -> Result<()> {
     let cgroup_path = Path::new(CGROUP_ROOT)
         .join(subsystem)
@@ -263,8 +238,14 @@ fn check_cgroup_string_subsystem(
     debug!("reading value from {:?}", cgroup_path);
     let content = fs::read_to_string(&cgroup_path)
         .with_context(|| format!("failed to read {cgroup_path:?}"))?;
-    let observe = content.trim().to_owned();
-    assert_result_eq!(observe, expected)
+    if let Some(v) = expected.downcast_ref::<u64>() {
+        assert_eq!(&content.parse::<u64>()?, v);
+    } else if let Some(v) = expected.downcast_ref::<i64>() {
+        assert_eq!(&content.parse::<i64>()?, v);
+    } else if let Some(v) = expected.downcast_ref::<String>() {
+        assert_eq!(&content, v);
+    }
+    Ok(())
 }
 
 fn test_relative_cpus() -> TestResult {
@@ -282,25 +263,25 @@ fn test_relative_cpus() -> TestResult {
 
     test_outside_container(spec, &|data| {
         test_result!(check_container_created(&data));
-        test_result!(check_cgroup_numeric_subsystem(
+        test_result!(check_cgroup_subsystem(
             "test_relative_cpus",
             "cpu,cpuacct",
             "cpu.shares",
-            test_result!(case.shares().context("no shares value in cpu spec")),
+            &test_result!(case.shares().context("no shares value in cpu spec")),
         ));
-        test_result!(check_cgroup_numeric_subsystem(
+        test_result!(check_cgroup_subsystem(
             "test_relative_cpus",
             "cpu,cpuacct",
             "cpu.cfs_period_us",
-            test_result!(case.period().context("no period value in cpu spec")),
+            &test_result!(case.period().context("no period value in cpu spec")),
         ));
-        test_result!(check_cgroup_numeric_subsystem(
+        test_result!(check_cgroup_subsystem(
             "test_relative_cpus",
             "cpu,cpuacct",
             "cpu.cfs_quota_us",
-            test_result!(case.quota().context("no period value in cpu spec")),
+            &test_result!(case.quota().context("no period value in cpu spec")),
         ));
-        test_result!(check_cgroup_string_subsystem(
+        test_result!(check_cgroup_subsystem(
             "test_relative_cpus",
             "cpuset",
             "cpuset.cpus",
@@ -309,7 +290,7 @@ fn test_relative_cpus() -> TestResult {
                 .to_owned()
                 .context("no period value in cpu spec"))
         ));
-        test_result!(check_cgroup_string_subsystem(
+        test_result!(check_cgroup_subsystem(
             "test_relative_cpus",
             "cpuset",
             "cpuset.mems",
