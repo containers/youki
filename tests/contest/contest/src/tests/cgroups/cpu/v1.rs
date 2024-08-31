@@ -238,12 +238,13 @@ fn check_cgroup_subsystem(
     debug!("reading value from {:?}", cgroup_path);
     let content = fs::read_to_string(&cgroup_path)
         .with_context(|| format!("failed to read {cgroup_path:?}"))?;
+    let trimmed = content.trim();
     if let Some(v) = expected.downcast_ref::<u64>() {
-        assert_eq!(&content.parse::<u64>()?, v);
+        assert_eq!(&trimmed.parse::<u64>()?, v);
     } else if let Some(v) = expected.downcast_ref::<i64>() {
-        assert_eq!(&content.parse::<i64>()?, v);
+        assert_eq!(&trimmed.parse::<i64>()?, v);
     } else if let Some(v) = expected.downcast_ref::<String>() {
-        assert_eq!(&content, v);
+        assert_eq!(&trimmed, v);
     }
     Ok(())
 }
