@@ -34,7 +34,7 @@ where
     // set_xattr sets extended attributes on a file specified by its path.
     fn set_xattr(&self, attr: &str, data: &[u8]) -> Result<(), XattrError> {
         let path = self.as_ref();
-        match rfs::setxattr(path, attr, data, rfs::XattrFlags::CREATE) {
+        match rfs::setxattr(path, attr, data, rfs::XattrFlags::REPLACE) {
             Ok(_) => Ok(()),
             Err(e) => {
                 let errno = e.raw_os_error();
@@ -50,7 +50,7 @@ where
     // lset_xattr sets extended attributes on a symbolic link.
     fn lset_xattr(&self, attr: &str, data: &[u8]) -> Result<(), XattrError> {
         let path = self.as_ref();
-        match rfs::lsetxattr(path, attr, data, rfs::XattrFlags::CREATE) {
+        match rfs::lsetxattr(path, attr, data, rfs::XattrFlags::REPLACE) {
             Ok(_) => Ok(()),
             Err(e) => {
                 let errno = e.raw_os_error();

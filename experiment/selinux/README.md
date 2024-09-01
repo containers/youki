@@ -10,3 +10,9 @@ Please import and use this project.
 ```console
 $ cargo run
 ```
+
+You can create an selinux environment via the Vagrantfile.
+
+```console
+$ vagrant up
+```
