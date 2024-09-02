@@ -3,9 +3,9 @@ use std::os::fd::{AsRawFd, RawFd};
 
 use anyhow::{anyhow, Context, Result};
 use oci_spec::runtime::{ProcessBuilder, Spec, SpecBuilder};
-use test_framework::{test_result, Test, TestGroup, TestResult};
+use test_framework::{test_result, ConditionalTest, Test, TestGroup, TestResult};
 
-use crate::utils::{test_inside_container, CreateOptions};
+use crate::utils::{is_runtime_runc, test_inside_container, CreateOptions};
 
 fn create_spec() -> Result<Spec> {
     SpecBuilder::default()
@@ -94,11 +94,16 @@ fn pass_single_fd_test() -> TestResult {
 pub fn get_fd_control_test() -> TestGroup {
     let mut test_group = TestGroup::new("fd_control");
     test_group.set_nonparallel(); // fds are process-wide state
-    let test_only_stdio = Test::new("only_stdio", Box::new(only_stdio_test));
+    let test_only_stdio = ConditionalTest::new(
+        "only_stdio",
+        // runc errors if any of the N passed FDs via preserve-fd are not currently open
+        Box::new(|| !is_runtime_runc()),
+        Box::new(only_stdio_test),
+    );
     let test_closes_fd = Test::new("closes_fd", Box::new(closes_fd_test));
     let test_pass_single_fd = Test::new("pass_single_fd", Box::new(pass_single_fd_test));
+    test_group.add(vec![Box::new(test_only_stdio)]);
     test_group.add(vec![
-        Box::new(test_only_stdio),
         Box::new(test_closes_fd),
         Box::new(test_pass_single_fd),
     ]);
