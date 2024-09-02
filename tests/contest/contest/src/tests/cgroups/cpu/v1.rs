@@ -1,10 +1,10 @@
-use std::any::Any;
 use std::fs;
 use std::path::Path;
 
 use anyhow::{Context, Result};
 use libcgroups::common;
 use num_cpus;
+use std::string::ToString;
 use test_framework::{test_result, ConditionalTest, TestGroup, TestResult};
 use tracing::debug;
 
@@ -227,7 +227,7 @@ fn check_cgroup_subsystem(
     cgroup_name: &str,
     subsystem: &str,
     filename: &str,
-    expected: &dyn Any,
+    expected: &dyn ToString,
 ) -> Result<()> {
     let cgroup_path = Path::new(CGROUP_ROOT)
         .join(subsystem)
@@ -239,13 +239,7 @@ fn check_cgroup_subsystem(
     let content = fs::read_to_string(&cgroup_path)
         .with_context(|| format!("failed to read {cgroup_path:?}"))?;
     let trimmed = content.trim();
-    if let Some(v) = expected.downcast_ref::<u64>() {
-        assert_eq!(&trimmed.parse::<u64>()?, v);
-    } else if let Some(v) = expected.downcast_ref::<i64>() {
-        assert_eq!(&trimmed.parse::<i64>()?, v);
-    } else if let Some(v) = expected.downcast_ref::<String>() {
-        assert_eq!(&trimmed, v);
-    }
+    assert_eq!(trimmed, expected.to_string());
     Ok(())
 }
 
