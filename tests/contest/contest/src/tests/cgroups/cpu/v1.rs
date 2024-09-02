@@ -1,10 +1,10 @@
 use std::fs;
 use std::path::Path;
+use std::string::ToString;
 
 use anyhow::{Context, Result};
 use libcgroups::common;
 use num_cpus;
-use std::string::ToString;
 use test_framework::{test_result, ConditionalTest, TestGroup, TestResult};
 use tracing::debug;
 
