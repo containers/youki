@@ -66,7 +66,7 @@ jobs:
           ./script/setup/install-cni
           ./script/setup/install-critools
       - name: Download youki binary
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: youki-${{ matrix.arch }}-${{ matrix.libc }}
       - name: Replace runc to youki
@@ -89,7 +89,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Download youki binary
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: youki-${{ matrix.arch }}-${{ matrix.libc }}
       - name: Add the permission to run
@@ -121,7 +121,7 @@ jobs:
           cache: true
           cache-dependency-path: tests/oci-runtime-tests/src/github.com/opencontainers/runtime-tools/go.sum
       - name: Download youki binary
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: youki-${{ matrix.arch }}-${{ matrix.libc }}
       - name: Add the permission to run
@@ -148,7 +148,7 @@ jobs:
       - name: Install requirements
         run: sudo env PATH=$PATH just ci-prepare
       - name: Download youki binary
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: youki-${{ matrix.arch }}-${{ matrix.libc }}
       - name: Add the permission to run
@@ -175,7 +175,7 @@ jobs:
       - name: Install requirements
         run: sudo env PATH=$PATH just ci-prepare
       - name: Download youki binary
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: youki-${{ matrix.arch }}-${{ matrix.libc }}
       - name: Add the permission to run
@@ -197,7 +197,7 @@ jobs:
       - name: Install just
         uses: taiki-e/install-action@just
       - name: Download youki binary
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: youki-x86_64-musl
       - name: Add the permission to run

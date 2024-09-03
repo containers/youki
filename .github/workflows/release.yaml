@@ -73,7 +73,7 @@ jobs:
       - name: Create artifacts directory
         run: mkdir -p artifacts
       - name: Download artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           path: artifacts
       - name: Show artifacts

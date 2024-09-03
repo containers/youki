@@ -78,13 +78,13 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Downloading PR build from artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4.1.7
         with:
           name: pr-youki
           path: ./pr_youki
 
       - name: Downloading main build from artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4.1.7
         with:
           name: main-youki
           path: ./main_youki
