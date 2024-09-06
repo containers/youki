@@ -2,11 +2,10 @@ use std::fs;
 use std::path::Path;
 use std::string::ToString;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use libcgroups::common;
 use num_cpus;
 use test_framework::{test_result, ConditionalTest, TestGroup, TestResult};
-use tracing::debug;
 
 use super::{create_cpu_spec, create_empty_spec, create_spec};
 use crate::utils::test_outside_container;
@@ -235,9 +234,7 @@ fn check_cgroup_subsystem(
         .join(cgroup_name)
         .join(filename);
 
-    debug!("reading value from {:?}", cgroup_path);
-    let content = fs::read_to_string(&cgroup_path)
-        .with_context(|| format!("failed to read {cgroup_path:?}"))?;
+    let content = fs::read_to_string(&cgroup_path)?;
     let trimmed = content.trim();
     assert_eq!(trimmed, expected.to_string());
     Ok(())
@@ -262,37 +259,31 @@ fn test_relative_cpus() -> TestResult {
             "test_relative_cpus",
             "cpu,cpuacct",
             "cpu.shares",
-            &test_result!(case.shares().context("no shares value in cpu spec")),
+            &case.shares().unwrap(),
         ));
         test_result!(check_cgroup_subsystem(
             "test_relative_cpus",
             "cpu,cpuacct",
             "cpu.cfs_period_us",
-            &test_result!(case.period().context("no period value in cpu spec")),
+            &case.period().unwrap(),
         ));
         test_result!(check_cgroup_subsystem(
             "test_relative_cpus",
             "cpu,cpuacct",
             "cpu.cfs_quota_us",
-            &test_result!(case.quota().context("no period value in cpu spec")),
+            &case.quota().unwrap(),
         ));
         test_result!(check_cgroup_subsystem(
             "test_relative_cpus",
             "cpuset",
             "cpuset.cpus",
-            &test_result!(case
-                .cpus()
-                .to_owned()
-                .context("no period value in cpu spec"))
+            &case.cpus().to_owned().unwrap(),
         ));
         test_result!(check_cgroup_subsystem(
             "test_relative_cpus",
             "cpuset",
             "cpuset.mems",
-            &test_result!(case
-                .mems()
-                .to_owned()
-                .context("no period value in cpu spec")),
+            &case.mems().to_owned().unwrap()
         ));
         TestResult::Passed
     })
