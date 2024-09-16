@@ -1,5 +1,6 @@
 //! tty (teletype) for user-system interaction
 
+use std::env;
 use std::io::IoSlice;
 use std::os::unix::fs::symlink;
 use std::os::unix::io::AsRawFd;
@@ -75,7 +76,13 @@ pub fn setup_console_socket(
     console_socket_path: &Path,
     socket_name: &str,
 ) -> Result<RawFd> {
-    let linked = container_dir.join(socket_name);
+    // Move into the container directory to avoid sun family conflicts with long socket path names.
+
+    let prev_dir = env::current_dir().unwrap();
+    let _ = env::set_current_dir(container_dir);
+
+    let linked = PathBuf::from(socket_name);
+
     symlink(console_socket_path, &linked).map_err(|err| TTYError::Symlink {
         source: err,
         linked: linked.to_path_buf().into(),
@@ -105,6 +112,8 @@ pub fn setup_console_socket(
         })?,
         Ok(()) => csocketfd.as_raw_fd(),
     };
+
+    let _ = env::set_current_dir(prev_dir);
     Ok(csocketfd)
 }
 
