@@ -1,6 +1,7 @@
 //! Contains utility functions for testing
 //! Similar to https://github.com/opencontainers/runtime-tools/blob/master/validation/util/test.go
 use std::collections::HashMap;
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, ExitStatus, Stdio};
 use std::thread::sleep;
@@ -43,7 +44,7 @@ pub struct ContainerData {
 }
 
 /// Starts the runtime with given directory as root directory
-pub fn create_container<P: AsRef<Path>>(id: &str, dir: P) -> Result<Child> {
+pub fn create_container<P: AsRef<Path>>(id: &str, dir: P, extra_args: &[&OsStr]) -> Result<Child> {
     let res = Command::new(get_runtime_path())
         // set stdio so that we can get o/p of runtimetest
         // in test_inside_container function
@@ -55,6 +56,7 @@ pub fn create_container<P: AsRef<Path>>(id: &str, dir: P) -> Result<Child> {
         .arg(id)
         .arg("--bundle")
         .arg(dir.as_ref().join("bundle"))
+        .args(extra_args)
         .spawn()
         .context("could not create container")?;
     Ok(res)
@@ -121,7 +123,7 @@ pub fn test_outside_container(
     let id_str = id.to_string();
     let bundle = prepare_bundle().unwrap();
     set_config(&bundle, &spec).unwrap();
-    let create_result = create_container(&id_str, &bundle).unwrap().wait();
+    let create_result = create_container(&id_str, &bundle, &[]).unwrap().wait();
     let (out, err) = get_state(&id_str, &bundle).unwrap();
     let state: Option<State> = match serde_json::from_str(&out) {
         Ok(v) => Some(v),
@@ -143,6 +145,14 @@ pub fn test_outside_container(
 pub fn test_inside_container(
     spec: Spec,
     setup_for_test: &dyn Fn(&Path) -> Result<()>,
+) -> TestResult {
+    test_inside_container_create_args(spec, setup_for_test, &[])
+}
+
+pub fn test_inside_container_create_args(
+    spec: Spec,
+    setup_for_test: &dyn Fn(&Path) -> Result<()>,
+    create_args: &[&OsStr],
 ) -> TestResult {
     let id = generate_uuid();
     let id_str = id.to_string();
@@ -176,7 +186,7 @@ pub fn test_inside_container(
             .join("runtimetest"),
     )
     .unwrap();
-    let create_process = create_container(&id_str, &bundle).unwrap();
+    let create_process = create_container(&id_str, &bundle, create_args).unwrap();
     // here we do not wait for the process by calling wait() as in the test_outside_container
     // function because we need the output of the runtimetest. If we call wait, it will return
     // and we won't have an easy way of getting the stdio of the runtimetest.
