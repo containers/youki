@@ -15,6 +15,7 @@ use nix::{
     unistd,
 };
 use syscalls::{SyscallArgs};
+use syscalls::Sysno::bpf;
 use crate::instruction::{*};
 use crate::instruction::{Arch, Instruction, SECCOMP_IOC_MAGIC};
 
@@ -222,25 +223,13 @@ pub struct InstructionData {
     pub def_action: u32,
     pub rule_arr: Vec<Rule>
 }
+
 impl From<InstructionData> for Vec<Instruction> {
     fn from(inst_data: InstructionData) -> Self {
         let mut bpf_prog = gen_validate(&inst_data.arc);
+
         for rule in &inst_data.rule_arr {
-            bpf_prog.append(&mut vec![Instruction::stmt(BPF_LD | BPF_W | BPF_ABS, 0)]);
-            bpf_prog.append(&mut vec![Instruction::jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 1,
-                                                        get_syscall_number(&inst_data.arc, &rule.syscall).unwrap() as c_uint)]);
-
-            // TODO: Checks for only one argument, but supports two or more arguments
-            if rule.arg_cnt != 0 {
-                bpf_prog.append(&mut vec![Instruction::stmt(BPF_LD | BPF_W | BPF_ABS, seccomp_data_args_offset().into())]);
-                bpf_prog.append(&mut vec![Instruction::jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 1, rule.args.arg0 as c_uint)]);
-            }
-
-            if rule.is_notify {
-                bpf_prog.append(&mut vec![Instruction::stmt(BPF_RET | BPF_K, SECCOMP_RET_USER_NOTIF)]);
-            } else {
-                bpf_prog.append(&mut vec![Instruction::stmt(BPF_RET | BPF_K, inst_data.def_action)]);
-            }
+            bpf_prog.append(&mut Rule::to_instruction(&inst_data.arc, inst_data.def_action, rule));
         }
 
         bpf_prog.append(&mut vec![Instruction::stmt(BPF_RET | BPF_K, SECCOMP_RET_ALLOW)]);
@@ -264,5 +253,23 @@ impl Rule {
             args,
             is_notify,
         }
+    }
+
+    pub fn to_instruction(arch: &Arch, action: u32, rule: &Rule) -> Vec<Instruction> {
+        let mut bpf_prog = gen_validate(&arch);
+        bpf_prog.append(&mut vec![Instruction::stmt(BPF_LD | BPF_W | BPF_ABS, 0)]);
+        bpf_prog.append(&mut vec![Instruction::jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 1,
+                                                    get_syscall_number(arch, &rule.syscall).unwrap() as c_uint)]);
+        if rule.arg_cnt != 0 {
+            bpf_prog.append(&mut vec![Instruction::stmt(BPF_LD | BPF_W | BPF_ABS, seccomp_data_args_offset().into())]);
+            bpf_prog.append(&mut vec![Instruction::jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 1, rule.args.arg0 as c_uint)]);
+        }
+
+        if rule.is_notify {
+            bpf_prog.append(&mut vec![Instruction::stmt(BPF_RET | BPF_K, SECCOMP_RET_USER_NOTIF)]);
+        } else {
+            bpf_prog.append(&mut vec![Instruction::stmt(BPF_RET | BPF_K, action)]);
+        }
+        return bpf_prog
     }
 }
