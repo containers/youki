@@ -255,32 +255,33 @@ fn test_relative_cpus() -> TestResult {
 
     test_outside_container(spec, &|data| {
         test_result!(check_container_created(&data));
+        let cgroup_name = "test_relative_cpus";
         test_result!(check_cgroup_subsystem(
-            "test_relative_cpus",
+            cgroup_name,
             "cpu,cpuacct",
             "cpu.shares",
             &case.shares().unwrap(),
         ));
         test_result!(check_cgroup_subsystem(
-            "test_relative_cpus",
+            cgroup_name,
             "cpu,cpuacct",
             "cpu.cfs_period_us",
             &case.period().unwrap(),
         ));
         test_result!(check_cgroup_subsystem(
-            "test_relative_cpus",
+            cgroup_name,
             "cpu,cpuacct",
             "cpu.cfs_quota_us",
             &case.quota().unwrap(),
         ));
         test_result!(check_cgroup_subsystem(
-            "test_relative_cpus",
+            cgroup_name,
             "cpuset",
             "cpuset.cpus",
             &case.cpus().to_owned().unwrap(),
         ));
         test_result!(check_cgroup_subsystem(
-            "test_relative_cpus",
+            cgroup_name,
             "cpuset",
             "cpuset.mems",
             &case.mems().to_owned().unwrap()
