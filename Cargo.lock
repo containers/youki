@@ -158,12 +158,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96d30a06541fbafbc7f82ed10c06164cfbd2c401138f6addd8404629c4b16711"
 
 [[package]]
-name = "ascii"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ae7d751998c189c1d4468cf0a39bb2eae052a9c58d50ebb3b9591ee3813ad50"
-
-[[package]]
 name = "async-trait"
 version = "0.1.79"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -530,12 +524,12 @@ checksum = "acbf1af155f9b9ef647e42cdc158db4b64a1b61f743629225fde6f3e0be2a7c7"
 
 [[package]]
 name = "combine"
-version = "2.5.2"
+version = "4.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1645a65a99c7c8d345761f4b75a6ffe5be3b3b27a93ee731fccc5050ba6be97c"
+checksum = "ba5a308b75df32fe02788e748662718f03fde005016435c444eea572398219fd"
 dependencies = [
- "ascii",
- "byteorder",
+ "bytes",
+ "memchr",
 ]
 
 [[package]]
@@ -2985,13 +2979,14 @@ dependencies = [
 
 [[package]]
 name = "rbpf"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b536dc5c7e3a730d06c578a41df1fbcccd66240a7a9bd5f150a0826291f01c66"
+checksum = "463d0b79f93dd962cc115e33f11971bf025c85943d726322c812d98c9f8ecb5b"
 dependencies = [
  "byteorder",
  "combine",
  "libc",
+ "log",
  "time 0.2.27",
 ]
 
