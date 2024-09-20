@@ -25,7 +25,7 @@ procfs = "0.16.0"
 oci-spec = { version = "~0.6.8", features = ["runtime"] }
 fixedbitset = "0.5.7"
 serde = { version = "1.0", features = ["derive"] }
-rbpf = { version = "0.2.0", optional = true }
+rbpf = { version = "0.3.0", optional = true }
 libbpf-sys = { version = "1.4.5", optional = true }
 errno = { version = "0.3.9", optional = true }
 libc = { version = "0.2.158", optional = true }
