@@ -34,7 +34,7 @@ fn main() -> Result<()> {
     let file_path = Path::new("./test_file.txt");
     let _file = File::create(file_path)?;
     let selinux_label =
-        SELinuxLabel::try_from("unconfined_u:object_r:public_content_t:s1".to_string())?;
+        SELinuxLabel::try_from("system_u:object_r:public_content_t:s0".to_string())?;
     SELinux::set_file_label(file_path, selinux_label)?;
     let current_label = SELinux::file_label(file_path)?;
     println!("file label is {}", current_label);
