@@ -1,7 +1,9 @@
+use std::collections::HashMap;
+
 use libcontainer::oci_spec::runtime::Spec;
 use libcontainer::workload::{Executor, ExecutorError, ExecutorValidationError};
-use wasmedge_sdk::config::{CommonConfigOptions, ConfigBuilder, HostRegistrationConfigOptions};
-use wasmedge_sdk::{params, VmBuilder};
+use wasmedge_sdk::wasi::WasiModule;
+use wasmedge_sdk::{params, Module, Store, Vm};
 
 const EXECUTOR_NAME: &str = "wasmedge";
 
@@ -24,35 +26,25 @@ impl Executor for WasmedgeExecutor {
         }
         let envs = env_to_wasi(spec);
 
-        // create configuration with `wasi` option enabled
-        let config = ConfigBuilder::new(CommonConfigOptions::default())
-            .with_host_registration_config(HostRegistrationConfigOptions::default().wasi(true))
-            .build()
-            .map_err(|err| {
-                ExecutorError::Other(format!("failed to create wasmedge config: {}", err))
-            })?;
-
-        // create a vm with the config settings
-        let mut vm = VmBuilder::new()
-            .with_config(config)
-            .build()
-            .map_err(|err| ExecutorError::Other(format!("failed to create wasmedge vm: {}", err)))?
-            .register_module_from_file("main", cmd)
-            .map_err(|err| {
-                ExecutorError::Other(format!(
-                    "failed to register wasmedge module from the file: {}",
-                    err
-                ))
-            })?;
         // initialize the wasi module with the parsed parameters
-        let wasi_instance = vm
-            .wasi_module_mut()
-            .expect("config doesn't contain HostRegistrationConfigOptions");
-        wasi_instance.initialize(
+        let mut wasi_module = WasiModule::create(
             Some(args.iter().map(|s| s as &str).collect()),
             Some(envs.iter().map(|s| s as &str).collect()),
             None,
+        )
+        .map_err(|err| ExecutorError::Other(format!("failed to create wasi module: {:?}", err)))?;
+
+        let mut instances = HashMap::new();
+        instances.insert(wasi_module.name().to_string(), wasi_module.as_mut());
+
+        // create a vm
+        let mut vm = Vm::new(
+            Store::new(None, instances)
+                .map_err(|err| ExecutorError::Other(format!("failed to create store: {}", err)))?,
         );
+
+        let module = Module::from_file(None, cmd).unwrap();
+        vm.register_module(Some("main"), module).unwrap();
 
         vm.run_func(Some("main"), "_start", params!())
             .map_err(|err| ExecutorError::Execution(err))?;
