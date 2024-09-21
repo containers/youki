@@ -42,4 +42,6 @@ pub struct ContainerArgs {
     pub detached: bool,
     /// Manage the functions that actually run on the container
     pub executor: Box<dyn Executor>,
+    /// If the container is to be run with no pivot
+    pub no_pivot: bool,
 }
