@@ -20,14 +20,12 @@ v1 = ["libcgroups/v1"]
 cgroupsv2_devices = ["libcgroups/cgroupsv2_devices"]
 
 [dependencies]
-bitflags = "2.6.0"
 caps = "0.5.5"
 chrono = { version = "0.4", default-features = false, features = [
     "clock",
     "serde",
 ] }
 fastrand = "^2.1.1"
-futures = { version = "0.3", features = ["thread-pool"] }
 libc = "0.2.158"
 nix = { version = "0.28.0", features = [
     "socket",
@@ -48,7 +46,6 @@ libseccomp = { version = "0.3.0", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 rust-criu = "0.4.0"
-protobuf = "= 3.2.0" # https://github.com/checkpoint-restore/rust-criu/issues/19
 regex = { version = "1.10.6", default-features = false, features = ["std", "unicode-perl"] }
 thiserror = "1.0.63"
 tracing = { version = "0.1.40", features = ["attributes"] }

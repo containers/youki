@@ -543,9 +543,7 @@ name = "contest"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "chrono",
  "clap",
- "clap_derive",
  "flate2",
  "libcgroups",
  "libcontainer",
@@ -1417,7 +1415,6 @@ dependencies = [
  "futures-core",
  "futures-task",
  "futures-util",
- "num_cpus",
 ]
 
 [[package]]
@@ -1991,11 +1988,9 @@ name = "libcontainer"
 version = "0.4.1"
 dependencies = [
  "anyhow",
- "bitflags 2.6.0",
  "caps",
  "chrono",
  "fastrand",
- "futures",
  "libc",
  "libcgroups",
  "libseccomp",
@@ -2005,7 +2000,6 @@ dependencies = [
  "once_cell",
  "prctl",
  "procfs",
- "protobuf",
  "quickcheck",
  "rand",
  "regex",
@@ -5830,11 +5824,9 @@ dependencies = [
  "libcontainer",
  "liboci-cli",
  "nix 0.28.0",
- "once_cell",
  "pentacle",
  "procfs",
  "scopeguard",
- "serde",
  "serde_json",
  "serial_test",
  "tabwriter",
