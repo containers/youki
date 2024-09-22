@@ -13,6 +13,7 @@ test_package_features "libcontainer" "v2"
 test_package_features "libcontainer" "systemd"
 test_package_features "libcontainer" "v2 cgroupsv2_devices"
 test_package_features "libcontainer" "systemd cgroupsv2_devices"
+test_package_features "libcontainer" "libseccomp"
 
 test_package_features "libcgroups" "v1"
 test_package_features "libcgroups" "v2"
@@ -31,5 +32,6 @@ test_features "v2"
 test_features "systemd"
 test_features "v2 cgroupsv2_devices"
 test_features "systemd cgroupsv2_devices"
+test_features "seccomp"
 
 exit 0
