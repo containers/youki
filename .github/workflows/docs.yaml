@@ -12,7 +12,7 @@ jobs:
     outputs:
       dirs: ${{ steps.filter.outputs.changes }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v2
         id: filter
         with:
@@ -26,7 +26,7 @@ jobs:
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Setup mdBook
         uses: peaceiris/actions-mdbook@v1
         with:

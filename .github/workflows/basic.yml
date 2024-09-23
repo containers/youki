@@ -16,7 +16,7 @@ jobs:
     outputs:
       any_modified: ${{ steps.filter.outputs.any_modified }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: tj-actions/changed-files@v41
         id: filter
         with:
@@ -40,7 +40,7 @@ jobs:
         arch: [ "x86_64", "aarch64" ]
         libc: [ "gnu", "musl" ]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Setup Rust toolchain and cache
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -70,7 +70,7 @@ jobs:
         arch: [ "x86_64" ]
         libc: [ "gnu", "musl" ]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Setup Rust toolchain and cache
         uses: actions-rust-lang/setup-rust-toolchain@v1
       - name: Install just
@@ -86,31 +86,34 @@ jobs:
       - name: Run feature tests
         run: just test-features
 
-  coverage:
-    needs: [changes]
-    if: needs.changes.outputs.any_modified == 'true'
-    runs-on: ubuntu-22.04
-    timeout-minutes: 20
-    name: Run test coverage
-    steps:
-      - uses: actions/checkout@v3
-      - name: Setup Rust toolchain and cache
-        uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
-      - name: Install llvm-tools-preview
-        run: rustup component add llvm-tools-preview
-      - name: install cargo-llvm-cov
-        uses: taiki-e/install-action@v1
-        with:
-          tool: cargo-llvm-cov@0.4.0
-      - uses: taiki-e/install-action@just
-      - name: Install requirements
-        run: sudo env PATH=$PATH just ci-prepare
-      - name: Run Test Coverage for youki
-        run: |
-          cargo llvm-cov clean --workspace
-          cargo llvm-cov --no-report -- --test-threads=1
-          cargo llvm-cov --no-run --lcov --output-path ./coverage.lcov
-      - name: Upload Youki Code Coverage Results
-        uses: codecov/codecov-action@v3
-        with:
-          file: ./coverage.lcov
+  # We do not yet enforce some minimum coverage, and there were come codecov issues
+  # so commenting this out for now. When we are ready to enforce coverage, uncomment 
+  # and check this works or not.
+  # coverage:
+  #   needs: [changes]
+  #   if: needs.changes.outputs.any_modified == 'true'
+  #   runs-on: ubuntu-22.04
+  #   timeout-minutes: 20
+  #   name: Run test coverage
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Setup Rust toolchain and cache
+  #       uses: actions-rust-lang/setup-rust-toolchain@v1.3.7
+  #     - name: Install llvm-tools-preview
+  #       run: rustup component add llvm-tools-preview
+  #     - name: install cargo-llvm-cov
+  #       uses: taiki-e/install-action@v2
+  #       with:
+  #         tool: cargo-llvm-cov@0.4.0
+  #     - uses: taiki-e/install-action@just
+  #     - name: Install requirements
+  #       run: sudo env PATH=$PATH just ci-prepare
+  #     - name: Run Test Coverage for youki
+  #       run: |
+  #         cargo llvm-cov clean --workspace
+  #         cargo llvm-cov --no-report -- --test-threads=1
+  #         cargo llvm-cov --no-run --lcov --output-path ./coverage.lcov
+  #     - name: Upload Youki Code Coverage Results
+  #       uses: codecov/codecov-action@v4
+  #       with:
+  #         file: ./coverage.lcov

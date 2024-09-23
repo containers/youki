@@ -12,7 +12,7 @@ jobs:
 
     steps:
       - name: Checkout to PR branch
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install requirements
         run: sudo ./.github/scripts/dependency.sh
@@ -27,7 +27,7 @@ jobs:
         run: just youki-release
 
       - name: Uploading PR build to artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: pr-youki
           path: ./youki
@@ -39,7 +39,7 @@ jobs:
 
     steps:
       - name: Checkout to main branch
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: main
 
@@ -55,7 +55,7 @@ jobs:
         run: just youki-release
 
       - name: Uploading main build to artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: main-youki
           path: ./youki
@@ -75,16 +75,16 @@ jobs:
           sudo apt install jq podman
 
       - name: Checkout to PR branch
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Downloading PR build from artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: pr-youki
           path: ./pr_youki
 
       - name: Downloading main build from artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: main-youki
           path: ./main_youki
