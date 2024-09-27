@@ -70,6 +70,7 @@ fn translate_arch(arch: Arch) -> ScmpArch {
         Arch::ScmpArchPpc64le => ScmpArch::Ppc64Le,
         Arch::ScmpArchS390 => ScmpArch::S390,
         Arch::ScmpArchS390x => ScmpArch::S390X,
+        Arch::ScmpArchRiscv64 => ScmpArch::Riscv64,
     }
 }
 
@@ -89,6 +90,7 @@ fn translate_action(action: LinuxSeccompAction, errno: Option<u32>) -> Result<Sc
         LinuxSeccompAction::ScmpActKillProcess => ScmpAction::KillProcess,
         LinuxSeccompAction::ScmpActNotify => ScmpAction::Notify,
         LinuxSeccompAction::ScmpActLog => ScmpAction::Log,
+        LinuxSeccompAction::ScmpActKillThread => ScmpAction::KillThread,
     };
 
     tracing::trace!(?action, "translated action");
