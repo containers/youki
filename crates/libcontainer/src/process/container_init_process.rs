@@ -350,6 +350,14 @@ pub fn container_init_process(
                 InitProcessError::SyscallOther(err)
             })?;
         } else {
+            // Move the rootfs to the root of the host filesystem before chrooting
+            // This is equivalent to pivot_root
+            syscall
+                .mount(Some(rootfs_path), Path::new("/"), None, MsFlags::MS_MOVE, None)
+                .map_err(|err| {
+                    tracing::error!(?err, ?rootfs_path, "failed to move rootfs");
+                    InitProcessError::SyscallOther(err)
+                })?;
             syscall.chroot(rootfs_path).map_err(|err| {
                 tracing::error!(?err, ?rootfs_path, "failed to chroot");
                 InitProcessError::SyscallOther(err)
