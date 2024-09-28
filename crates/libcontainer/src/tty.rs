@@ -77,6 +77,7 @@ pub fn setup_console_socket(
     socket_name: &str,
 ) -> Result<RawFd> {
     // Move into the container directory to avoid sun family conflicts with long socket path names.
+    // ref: https://github.com/containers/youki/issues/2910
 
     let prev_dir = env::current_dir().unwrap();
     let _ = env::set_current_dir(container_dir);
