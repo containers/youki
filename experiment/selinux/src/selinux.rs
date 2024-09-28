@@ -91,6 +91,8 @@ pub enum SELinuxError {
     GetConfigKey(String),
     #[error("Invalid format for SELinux label: {0}")]
     InvalidSELinuxLabel(String),
+    #[error("Failed to run: {0}")]
+    Run(String),
 }
 
 pub struct SELinux {
@@ -489,7 +491,7 @@ mod tests {
 
     fn create_temp_file(content: &[u8], file_name: &str) {
         let path = Path::new(file_name);
-        let mut file = File::create(&path).expect("Failed to create file");
+        let mut file = File::create(path).expect("Failed to create file");
         file.write_all(content).expect("Failed to write to file");
         file.sync_all().expect("Failed to sync file");
     }
@@ -570,7 +572,7 @@ mod tests {
             let expected = PathBuf::from(expected_array[i]);
             match SELinux::check_line_include_selinux_fs_mount_point(input) {
                 Some(output) => assert_eq!(expected, output),
-                None => assert_eq!(succeeded_array[i], false),
+                None => assert!(!succeeded_array[i]),
             }
         }
     }
