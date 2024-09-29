@@ -34,27 +34,19 @@ where
     // set_xattr sets extended attributes on a file specified by its path.
     fn set_xattr(&self, attr: &str, data: &[u8]) -> Result<(), XattrError> {
         let path = self.as_ref();
-        match path.get_xattr(attr) {
-            Ok(_) => match rfs::setxattr(path, attr, data, rfs::XattrFlags::REPLACE) {
-                Ok(_) => Ok(()),
-                Err(e) => {
-                    let errno = e.raw_os_error();
-                    if errno == libc::EINTR {
-                        return Err(XattrError::EINTR(errno));
-                    }
-                    Err(XattrError::SetXattr(e.to_string()))
+        let op = match path.get_xattr(attr) {
+            Ok(_) => rfs::XattrFlags::REPLACE,
+            Err(_) => rfs::XattrFlags::CREATE,
+        };
+        match rfs::setxattr(path, attr, data, op) {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                let errno = e.raw_os_error();
+                if errno == libc::EINTR {
+                    return Err(XattrError::EINTR(errno));
                 }
-            },
-            Err(_) => match rfs::setxattr(path, attr, data, rfs::XattrFlags::CREATE) {
-                Ok(_) => Ok(()),
-                Err(e) => {
-                    let errno = e.raw_os_error();
-                    if errno == libc::EINTR {
-                        return Err(XattrError::EINTR(errno));
-                    }
-                    Err(XattrError::SetXattr(e.to_string()))
-                }
-            },
+                Err(XattrError::SetXattr(e.to_string()))
+            }
         }
     }
 
@@ -62,27 +54,19 @@ where
     // lset_xattr sets extended attributes on a symbolic link.
     fn lset_xattr(&self, attr: &str, data: &[u8]) -> Result<(), XattrError> {
         let path = self.as_ref();
-        match path.lget_xattr(attr) {
-            Ok(_) => match rfs::lsetxattr(path, attr, data, rfs::XattrFlags::REPLACE) {
-                Ok(_) => Ok(()),
-                Err(e) => {
-                    let errno = e.raw_os_error();
-                    if errno == libc::EINTR {
-                        return Err(XattrError::EINTR(errno));
-                    }
-                    Err(XattrError::LSetXattr(e.to_string()))
+        let op = match path.lget_xattr(attr) {
+            Ok(_) => rfs::XattrFlags::REPLACE,
+            Err(_) => rfs::XattrFlags::CREATE,
+        };
+        match rfs::lsetxattr(path, attr, data, op) {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                let errno = e.raw_os_error();
+                if errno == libc::EINTR {
+                    return Err(XattrError::EINTR(errno));
                 }
-            },
-            Err(_) => match rfs::lsetxattr(path, attr, data, rfs::XattrFlags::CREATE) {
-                Ok(_) => Ok(()),
-                Err(e) => {
-                    let errno = e.raw_os_error();
-                    if errno == libc::EINTR {
-                        return Err(XattrError::EINTR(errno));
-                    }
-                    Err(XattrError::LSetXattr(e.to_string()))
-                }
-            },
+                Err(XattrError::LSetXattr(e.to_string()))
+            }
         }
     }
 

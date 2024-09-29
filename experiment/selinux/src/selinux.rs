@@ -91,8 +91,6 @@ pub enum SELinuxError {
     GetConfigKey(String),
     #[error("Invalid format for SELinux label: {0}")]
     InvalidSELinuxLabel(String),
-    #[error("Failed to run: {0}")]
-    Run(String),
 }
 
 pub struct SELinux {
