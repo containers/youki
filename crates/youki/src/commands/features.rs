@@ -48,6 +48,7 @@ fn query_supported_namespaces() -> Result<Vec<LinuxNamespaceType>> {
     Ok(supported_namespaces)
 }
 
+// Return a list of known hooks supported by youki
 fn known_hooks() -> Vec<String> {
     [
         "prestart",
@@ -62,6 +63,7 @@ fn known_hooks() -> Vec<String> {
     .collect()
 }
 
+// Return a list of known mount options supported by youki
 fn known_mount_options() -> Vec<String> {
     [
         "async",
