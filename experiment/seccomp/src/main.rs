@@ -1,5 +1,5 @@
 use seccomp::{
-    instruction::{self, *},
+    instruction::{*},
     seccomp::{NotifyFd, Seccomp},
 };
 
@@ -98,7 +98,7 @@ async fn main() -> Result<()> {
             Rule::new("mkdir".parse()?,0, syscall_args!(), true)
         ]
     };
-    let mut seccomp = Seccomp {filters: Vec::from(inst_data)};
+    let seccomp = Seccomp {filters: Vec::from(inst_data)};
 
     tokio::spawn(async move {
         tokio::signal::ctrl_c()

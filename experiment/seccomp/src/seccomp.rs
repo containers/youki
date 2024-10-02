@@ -15,7 +15,6 @@ use nix::{
     unistd,
 };
 use syscalls::{SyscallArgs};
-use syscalls::Sysno::bpf;
 use crate::instruction::{*};
 use crate::instruction::{Arch, Instruction, SECCOMP_IOC_MAGIC};
 
@@ -204,13 +203,13 @@ struct Filters {
 
 fn get_syscall_number(arc: &Arch, name: &str) -> Option<u64> {
     match arc {
-        &Arch::X86 => {
+        Arch::X86 => {
             match syscalls::x86_64::Sysno::from_str(name) {
                 Ok(syscall) => Some(syscall as u64),
                 Err(_) => None,
             }
         },
-        &Arch::AArch64 => {
+        Arch::AArch64 => {
             match syscalls::aarch64::Sysno::from_str(name) {
                 Ok(syscall) => Some(syscall as u64),
                 Err(_) => None,
@@ -235,7 +234,7 @@ impl From<InstructionData> for Vec<Instruction> {
         }
 
         bpf_prog.append(&mut vec![Instruction::stmt(BPF_RET | BPF_K, SECCOMP_RET_ALLOW)]);
-        return bpf_prog;
+        bpf_prog
     }
 }
 
@@ -258,7 +257,7 @@ impl Rule {
     }
 
     pub fn to_instruction(arch: &Arch, action: u32, rule: &Rule) -> Vec<Instruction> {
-        let mut bpf_prog = gen_validate(&arch);
+        let mut bpf_prog = gen_validate(arch);
         bpf_prog.append(&mut vec![Instruction::stmt(BPF_LD | BPF_W | BPF_ABS, 0)]);
         bpf_prog.append(&mut vec![Instruction::jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 1,
                                                     get_syscall_number(arch, &rule.syscall).unwrap() as c_uint)]);
@@ -272,6 +271,6 @@ impl Rule {
         } else {
             bpf_prog.append(&mut vec![Instruction::stmt(BPF_RET | BPF_K, action)]);
         }
-        return bpf_prog
+        bpf_prog
     }
 }
