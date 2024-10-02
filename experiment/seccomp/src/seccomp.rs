@@ -203,18 +203,20 @@ struct Filters {
 }
 
 fn get_syscall_number(arc: &Arch, name: &str) -> Option<u64> {
-    if arc == &Arch::X86 {
-        match syscalls::x86_64::Sysno::from_str(name) {
-            Ok(syscall) => Some(syscall as u64),
-            Err(_) => None,
-        }
-    } else {
-        match syscalls::aarch64::Sysno::from_str(name) {
-            Ok(syscall) => Some(syscall as u64),
-            Err(_) => None,
+    match arc {
+        &Arch::X86 => {
+            match syscalls::x86_64::Sysno::from_str(name) {
+                Ok(syscall) => Some(syscall as u64),
+                Err(_) => None,
+            }
+        },
+        &Arch::AArch64 => {
+            match syscalls::aarch64::Sysno::from_str(name) {
+                Ok(syscall) => Some(syscall as u64),
+                Err(_) => None,
+            }
         }
     }
-
 }
 
 #[derive(Debug)]
