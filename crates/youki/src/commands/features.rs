@@ -1,6 +1,4 @@
 //! Contains Functionality of `features` container command
-use std::path::Path;
-
 use anyhow::Result;
 use libcontainer::oci_spec::runtime::{
     version, ApparmorBuilder, CgroupBuilder, FeaturesBuilder, IDMapBuilder, IntelRdtBuilder,
