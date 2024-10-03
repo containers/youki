@@ -2,7 +2,6 @@
 use std::path::Path;
 
 use anyhow::Result;
-use caps::CapSet;
 use libcontainer::oci_spec::runtime::{
     version, ApparmorBuilder, CgroupBuilder, FeaturesBuilder, IDMapBuilder, IntelRdtBuilder,
     LinuxFeatureBuilder, LinuxNamespaceType, MountExtensionsBuilder, SelinuxBuilder,
@@ -11,16 +10,7 @@ use liboci_cli::Features;
 
 // Function to query and return capabilities
 fn query_caps() -> Result<Vec<String>> {
-    let mut available_caps = Vec::new();
-
-    for cap in caps::all() {
-        // Check if the capability is in the permitted set
-        if caps::has_cap(None, CapSet::Permitted, cap).unwrap_or(false) {
-            available_caps.push(format!("{:?}", cap));
-        }
-    }
-
-    Ok(available_caps)
+    Ok(caps::all().iter().map(|cap| format!("{:?}", cap)).collect())
 }
 
 // Function to query and return namespaces
