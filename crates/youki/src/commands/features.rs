@@ -15,9 +15,7 @@ fn query_caps() -> Result<Vec<String>> {
 
 // Function to query and return namespaces
 fn query_supported_namespaces() -> Result<Vec<LinuxNamespaceType>> {
-    let mut supported_namespaces = Vec::new();
-
-    let ns_types = vec![
+    Ok(vec![
         LinuxNamespaceType::Pid,
         LinuxNamespaceType::Network,
         LinuxNamespaceType::Uts,
@@ -26,16 +24,7 @@ fn query_supported_namespaces() -> Result<Vec<LinuxNamespaceType>> {
         LinuxNamespaceType::User,
         LinuxNamespaceType::Cgroup,
         LinuxNamespaceType::Time,
-    ];
-
-    for ns in ns_types {
-        let ns_path = format!("/proc/self/ns/{}", ns);
-        if Path::new(&ns_path).exists() {
-            supported_namespaces.push(ns);
-        }
-    }
-
-    Ok(supported_namespaces)
+    ])
 }
 
 // Return a list of known hooks supported by youki
