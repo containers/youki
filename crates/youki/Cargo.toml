@@ -33,7 +33,7 @@ libcgroups = { path = "../libcgroups", default-features = false, version = "0.4.
 libcontainer = { path = "../libcontainer", default-features = false, version = "0.4.1" } # MARK: Version
 liboci-cli = { path = "../liboci-cli", version = "0.4.1" } # MARK: Version
 nix = "0.28.0"
-pentacle = "1.0.0"
+pentacle = "1.1.0"
 procfs = "0.16.0"
 serde_json = "1.0"
 tabwriter = "1"
