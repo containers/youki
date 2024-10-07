@@ -2576,9 +2576,9 @@ dependencies = [
 
 [[package]]
 name = "pentacle"
-version = "1.0.0"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e26ee4fbe38a973890ca68cace434e192d88f3703099fd64f799f3d6043ee7b6"
+checksum = "9e875807b4510e6847d4ef7674ab9b3efe30cc99b933f2e6e82f6ef38f7e5352"
 dependencies = [
  "libc",
  "log",
