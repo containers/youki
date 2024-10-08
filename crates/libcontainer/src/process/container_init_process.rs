@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::{env, fs, mem};
 
 use nc;
-use nix::mount::{MsFlags, MntFlags};
+use nix::mount::{MntFlags, MsFlags};
 use nix::sched::CloneFlags;
 use nix::sys::stat::Mode;
 use nix::unistd::{self, setsid, Gid, Uid};
@@ -288,7 +288,7 @@ fn unmount_or_hide(syscall: &dyn Syscall, target: impl AsRef<Path>) -> Result<()
 }
 
 fn move_root(syscall: &dyn Syscall, rootfs: &Path) -> Result<()> {
-    unistd::chdir(rootfs).map_err(|err| InitProcessError::NixOther(err))?;
+    unistd::chdir(rootfs).map_err(InitProcessError::NixOther)?;
     unmount_or_hide(syscall, "/sys")?;
     unmount_or_hide(syscall, "/proc")?;
     syscall
@@ -303,7 +303,7 @@ fn move_root(syscall: &dyn Syscall, rootfs: &Path) -> Result<()> {
         InitProcessError::SyscallOther(err)
     })?;
 
-    unistd::chdir("/").map_err(|err| InitProcessError::NixOther(err))?;
+    unistd::chdir("/").map_err(InitProcessError::NixOther)?;
 
     Ok(())
 }
