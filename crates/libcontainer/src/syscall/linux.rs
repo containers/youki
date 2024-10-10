@@ -574,6 +574,11 @@ impl Syscall for LinuxSyscall {
         }?;
         Ok(())
     }
+
+    fn umount2(&self, target: &Path, flags: MntFlags) -> Result<()> {
+        umount2(target, flags)?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]

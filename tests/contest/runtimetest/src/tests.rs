@@ -545,3 +545,30 @@ pub fn test_io_priority_class(spec: &Spec, io_priority_class: IOPriorityClass) {
         eprintln!("error ioprio_get expected priority {expected_priority:?}, got {priority}")
     }
 }
+
+pub fn validate_rootfs() {
+    let mut entries = fs::read_dir("/")
+        .unwrap()
+        .filter_map(|entry| {
+            entry.ok().and_then(|e| {
+                let path = e.path();
+                if path.is_dir() {
+                    path.file_name()
+                        .and_then(|name| name.to_str().map(|s| s.to_owned()))
+                } else {
+                    None
+                }
+            })
+        })
+        .collect::<Vec<String>>();
+    entries.sort();
+
+    let mut expected = vec![
+        "bin", "dev", "etc", "home", "proc", "root", "sys", "tmp", "usr", "var",
+    ];
+    expected.sort();
+
+    if entries != expected {
+        eprintln!("error due to rootfs want {expected:?}, got {entries:?}");
+    }
+}
