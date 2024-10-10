@@ -24,3 +24,4 @@ prctl = "1.0.0"
 anyhow = "1.0"
 tokio = { version = "1", features = ["full"] }
 syscall-numbers = "3.1.1"
+syscalls = { version = "0.6.18", features = ["std", "serde", "aarch64", "x86_64"]}
