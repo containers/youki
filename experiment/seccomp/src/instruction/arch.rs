@@ -1,13 +1,15 @@
 use crate::instruction::Instruction;
 use crate::instruction::*;
 
+#[derive(PartialEq, Debug)]
 pub enum Arch {
-    X86,
+    X86,AArch64
 }
 
 pub fn gen_validate(arc: &Arch) -> Vec<Instruction> {
     let arch = match arc {
         Arch::X86 => AUDIT_ARCH_X86_64,
+        Arch::AArch64 => AUDIT_ARCH_AARCH64
     };
 
     vec![
