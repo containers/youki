@@ -270,6 +270,9 @@ fn reopen_dev_null() -> Result<()> {
     Ok(())
 }
 
+// umount or hide the target path. If the target path is mounted
+// try to unmount it first if the unmount operation fails with EINVAL
+// then mount a tmpfs with size 0k to hide the target path.
 fn unmount_or_hide(syscall: &dyn Syscall, target: impl AsRef<Path>) -> Result<()> {
     let target_path = target.as_ref();
     match syscall.umount2(target_path, MntFlags::MNT_DETACH) {
@@ -289,6 +292,11 @@ fn unmount_or_hide(syscall: &dyn Syscall, target: impl AsRef<Path>) -> Result<()
 
 fn move_root(syscall: &dyn Syscall, rootfs: &Path) -> Result<()> {
     unistd::chdir(rootfs).map_err(InitProcessError::NixOther)?;
+    // umount /sys and /proc if they are mounted, the purpose is to 
+    // unmount or hide the /sys and /proc filesystems before the process changes its 
+    // root to the new rootfs. thus ensure that the /sys and /proc filesystems are not
+    // accessible in the new rootfs. the logic is borrowed from crun
+    // https://github.com/containers/crun/blob/53cd1c1c697d7351d0cad23708d29bf4a7980a3a/src/libcrun/linux.c#L2780
     unmount_or_hide(syscall, "/sys")?;
     unmount_or_hide(syscall, "/proc")?;
     syscall
