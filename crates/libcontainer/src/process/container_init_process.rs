@@ -292,8 +292,8 @@ fn unmount_or_hide(syscall: &dyn Syscall, target: impl AsRef<Path>) -> Result<()
 
 fn move_root(syscall: &dyn Syscall, rootfs: &Path) -> Result<()> {
     unistd::chdir(rootfs).map_err(InitProcessError::NixOther)?;
-    // umount /sys and /proc if they are mounted, the purpose is to 
-    // unmount or hide the /sys and /proc filesystems before the process changes its 
+    // umount /sys and /proc if they are mounted, the purpose is to
+    // unmount or hide the /sys and /proc filesystems before the process changes its
     // root to the new rootfs. thus ensure that the /sys and /proc filesystems are not
     // accessible in the new rootfs. the logic is borrowed from crun
     // https://github.com/containers/crun/blob/53cd1c1c697d7351d0cad23708d29bf4a7980a3a/src/libcrun/linux.c#L2780
