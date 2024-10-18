@@ -308,7 +308,6 @@ mod tests {
 
     #[test]
     fn test_to_instruction_aarch64() {
-
         let rule = Rule::new("getcwd".parse().unwrap(), 0, syscall_args!(), false);
         let inst = Rule::to_instruction(&Arch::AArch64, SECCOMP_RET_KILL_PROCESS, &rule);
         let bpf_prog = gen_validate(&Arch::AArch64);
