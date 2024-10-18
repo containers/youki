@@ -2,14 +2,14 @@ use std::fs;
 use std::path::Path;
 use std::string::ToString;
 
-use anyhow::Result;
-use libcgroups::common;
-use num_cpus;
-use test_framework::{test_result, ConditionalTest, TestGroup, TestResult};
-
 use super::{create_cpu_spec, create_empty_spec, create_spec};
 use crate::utils::test_outside_container;
-use crate::utils::test_utils::{check_container_created, CGROUP_ROOT};
+use crate::utils::test_utils::check_container_created;
+use anyhow::Result;
+use libcgroups::common;
+use libcgroups::v1::{util, ControllerType};
+use num_cpus;
+use test_framework::{test_result, ConditionalTest, TestGroup, TestResult};
 
 const CPU_CGROUP_PREFIX: &str = "/sys/fs/cgroup/cpu,cpuacct";
 const DEFAULT_REALTIME_PERIOD: u64 = 1000000;
@@ -224,12 +224,12 @@ fn test_cpu_cgroups() -> TestResult {
 
 fn check_cgroup_subsystem(
     cgroup_name: &str,
-    subsystem: &str,
+    subsystem: &ControllerType,
     filename: &str,
     expected: &dyn ToString,
 ) -> Result<()> {
-    let cgroup_path = Path::new(CGROUP_ROOT)
-        .join(subsystem)
+    let mount_point = util::get_subsystem_mount_point(subsystem)?;
+    let cgroup_path = mount_point
         .join("runtime-test")
         .join(cgroup_name)
         .join(filename);
@@ -258,31 +258,31 @@ fn test_relative_cpus() -> TestResult {
         let cgroup_name = "test_relative_cpus";
         test_result!(check_cgroup_subsystem(
             cgroup_name,
-            "cpu,cpuacct",
+            &ControllerType::CpuAcct,
             "cpu.shares",
             &case.shares().unwrap(),
         ));
         test_result!(check_cgroup_subsystem(
             cgroup_name,
-            "cpu,cpuacct",
+            &ControllerType::CpuAcct,
             "cpu.cfs_period_us",
             &case.period().unwrap(),
         ));
         test_result!(check_cgroup_subsystem(
             cgroup_name,
-            "cpu,cpuacct",
+            &ControllerType::CpuAcct,
             "cpu.cfs_quota_us",
             &case.quota().unwrap(),
         ));
         test_result!(check_cgroup_subsystem(
             cgroup_name,
-            "cpuset",
+            &ControllerType::CpuSet,
             "cpuset.cpus",
             &case.cpus().to_owned().unwrap(),
         ));
         test_result!(check_cgroup_subsystem(
             cgroup_name,
-            "cpuset",
+            &ControllerType::CpuSet,
             "cpuset.mems",
             &case.mems().to_owned().unwrap()
         ));
