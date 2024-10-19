@@ -12,6 +12,7 @@ use tests::cgroups;
 use crate::tests::devices::get_devices_test;
 use crate::tests::domainname::get_domainname_tests;
 use crate::tests::example::get_example_test;
+use crate::tests::fd_control::get_fd_control_test;
 use crate::tests::hooks::get_hooks_tests;
 use crate::tests::hostname::get_hostname_test;
 use crate::tests::intel_rdt::get_intel_rdt_test;
@@ -113,6 +114,7 @@ fn main() -> Result<()> {
     let scheduler = get_scheduler_test();
     let io_priority_test = get_io_priority_test();
     let devices = get_devices_test();
+    let fd_control = get_fd_control_test();
 
     tm.add_test_group(Box::new(cl));
     tm.add_test_group(Box::new(cc));
@@ -136,6 +138,7 @@ fn main() -> Result<()> {
     tm.add_test_group(Box::new(sysctl));
     tm.add_test_group(Box::new(scheduler));
     tm.add_test_group(Box::new(devices));
+    tm.add_test_group(Box::new(fd_control));
 
     tm.add_test_group(Box::new(io_priority_test));
     tm.add_cleanup(Box::new(cgroups::cleanup_v1));

@@ -71,7 +71,10 @@ fn get_test(test_name: &'static str) -> Test {
             let id_str = id.to_string();
             let bundle = prepare_bundle().unwrap();
             set_config(&bundle, &spec).unwrap();
-            create_container(&id_str, &bundle).unwrap().wait().unwrap();
+            create_container(&id_str, &bundle, &[])
+                .unwrap()
+                .wait()
+                .unwrap();
             start_container(&id_str, &bundle).unwrap().wait().unwrap();
             delete_container(&id_str, &bundle).unwrap().wait().unwrap();
             let log = {
