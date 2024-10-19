@@ -545,3 +545,44 @@ pub fn test_io_priority_class(spec: &Spec, io_priority_class: IOPriorityClass) {
         eprintln!("error ioprio_get expected priority {expected_priority:?}, got {priority}")
     }
 }
+
+pub fn validate_masked_paths(spec: &Spec) {
+    let linux = spec.linux().as_ref().unwrap();
+    let masked_paths = match linux.masked_paths() {
+        Some(p) => p,
+        None => {
+            eprintln!("in masked paths, expected some masked paths to be set, found none");
+            return;
+        }
+    };
+
+    if masked_paths.is_empty() {
+        eprintln!("in masked paths, expected some masked paths to be set, found none");
+        return;
+    }
+
+    // TODO when https://github.com/rust-lang/rust/issues/86442 stabilizes,
+    // change manual matching of i32 to e.kind() and match statement
+    for path in masked_paths {
+        match test_read_access(path) {
+            Ok(true) => {
+                eprintln!(
+                    "in masked paths, expected path {path} to be masked, but was found readable"
+                );
+                return;
+            }
+            Ok(false) => { /* This is expected */ }
+            Err(e) => {
+                let errno = Errno::from_raw(e.raw_os_error().unwrap());
+                if errno == Errno::ENOENT {
+                    /* This is expected */
+                } else {
+                    eprintln!(
+                        "in masked paths, error in testing read access for path {path} : {errno:?}"
+                    );
+                    return;
+                }
+            }
+        }
+    }
+}
