@@ -1,9 +1,11 @@
+use std::env;
 use std::fs::{self, read_dir};
 use std::os::linux::fs::MetadataExt;
 use std::os::unix::fs::{FileTypeExt, PermissionsExt};
 use std::path::Path;
 
 use anyhow::{bail, Result};
+
 use nix::errno::Errno;
 use nix::libc;
 use nix::sys::utsname;
@@ -543,5 +545,21 @@ pub fn test_io_priority_class(spec: &Spec, io_priority_class: IOPriorityClass) {
     };
     if priority != expected_priority {
         eprintln!("error ioprio_get expected priority {expected_priority:?}, got {priority}")
+    }
+}
+
+pub fn validate_process(spec: &Spec) {
+    let process = spec.process().as_ref().unwrap();
+
+    if process.cwd().ne(&getcwd().unwrap()) {
+        eprintln!("error due to spec cwd want {:?}, got {:?}", process.cwd(), getcwd().unwrap())
+    }
+
+    if env::var("testa").unwrap().to_string().ne("valuea") {
+        eprintln!("error due to spec environment value of testa want {:?}, got {:?}", "valuea", env::var("testa"))
+    }
+
+    if env::var("testb").unwrap().to_string().ne("123") {
+        eprintln!("error due to spec environment value of testb want {:?}, got {:?}", "123", env::var("testb"))
     }
 }
