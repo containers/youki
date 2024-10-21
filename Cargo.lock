@@ -141,9 +141,9 @@ checksum = "70033777eb8b5124a81a1889416543dddef2de240019b674c81285a2635a7e1e"
 
 [[package]]
 name = "anyhow"
-version = "1.0.89"
+version = "1.0.90"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86fdf8605db99b54d3cd748a44c6d04df638eb5dafb219b135d0149bd0db01f6"
+checksum = "37bf3594c4c988a53154954629820791dde498571819ae4ca50ca811e060cc95"
 
 [[package]]
 name = "arbitrary"
@@ -412,9 +412,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.1.28"
+version = "1.1.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e80e3b6a3ab07840e1cae9b0666a63970dc28e8ed5ffbcdacbfc760c281bfc1"
+checksum = "c2e7962b54006dcfcc61cb72735f4d89bb97061dd6a7ed882ec6b8ee53714c6f"
 dependencies = [
  "jobserver",
  "libc",
@@ -2303,9 +2303,9 @@ dependencies = [
 
 [[package]]
 name = "nc"
-version = "0.9.4"
+version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f935705a04a81674af7e3d8c44612d6d993d46ef4aedbe6dd6dce90a5e95758"
+checksum = "34566634a278b9af0f62b872339d884ea689982514825ba306705f264038144e"
 dependencies = [
  "cc",
 ]
@@ -3508,9 +3508,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.129"
+version = "1.0.132"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6dbcf9b78a125ee667ae19388837dd12294b858d101fdd393cb9d5501ef09eb2"
+checksum = "d726bfaff4b320266d395898905d0eba0345aae23b54aee3a737e260fd46db03"
 dependencies = [
  "itoa",
  "memchr",
