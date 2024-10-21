@@ -545,3 +545,37 @@ pub fn test_io_priority_class(spec: &Spec, io_priority_class: IOPriorityClass) {
         eprintln!("error ioprio_get expected priority {expected_priority:?}, got {priority}")
     }
 }
+
+// the validate_rootfs function is used to validate the rootfs of the container is
+// as expected. This function is used in the no_pivot test to validate the rootfs
+pub fn validate_rootfs() {
+    // list the first level directories in the rootfs
+    let mut entries = fs::read_dir("/")
+        .unwrap()
+        .filter_map(|entry| {
+            entry.ok().and_then(|e| {
+                let path = e.path();
+                if path.is_dir() {
+                    path.file_name()
+                        .and_then(|name| name.to_str().map(|s| s.to_owned()))
+                } else {
+                    None
+                }
+            })
+        })
+        .collect::<Vec<String>>();
+    // sort the entries to make the test deterministic
+    entries.sort();
+
+    // this is the list of directories that we expect to find in the rootfs
+    let mut expected = vec![
+        "bin", "dev", "etc", "home", "proc", "root", "sys", "tmp", "usr", "var",
+    ];
+    // sort the expected entries to make the test deterministic
+    expected.sort();
+
+    // compare the expected entries with the actual entries
+    if entries != expected {
+        eprintln!("error due to rootfs want {expected:?}, got {entries:?}");
+    }
+}

@@ -42,11 +42,9 @@ pub struct ContainerData {
     pub create_result: std::io::Result<ExitStatus>,
 }
 
-/// Starts the runtime with given directory as root directory
-pub fn create_container<P: AsRef<Path>>(id: &str, dir: P) -> Result<Child> {
-    let res = Command::new(get_runtime_path())
-        // set stdio so that we can get o/p of runtimetest
-        // in test_inside_container function
+fn create_container_command<P: AsRef<Path>>(id: &str, dir: P, with_pivot_root: bool) -> Command {
+    let mut command = Command::new(get_runtime_path());
+    command
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .arg("--root")
@@ -54,7 +52,23 @@ pub fn create_container<P: AsRef<Path>>(id: &str, dir: P) -> Result<Child> {
         .arg("create")
         .arg(id)
         .arg("--bundle")
-        .arg(dir.as_ref().join("bundle"))
+        .arg(dir.as_ref().join("bundle"));
+    if with_pivot_root {
+        command.arg("--no-pivot");
+    }
+    command
+}
+
+/// Starts the runtime with given directory as root directory
+pub fn create_container<P: AsRef<Path>>(id: &str, dir: P) -> Result<Child> {
+    let res = create_container_command(id, dir, false)
+        .spawn()
+        .context("could not create container")?;
+    Ok(res)
+}
+
+pub fn create_container_no_pivot<P: AsRef<Path>>(id: &str, dir: P) -> Result<Child> {
+    let res = create_container_command(id, dir, true)
         .spawn()
         .context("could not create container")?;
     Ok(res)
@@ -177,6 +191,100 @@ pub fn test_inside_container(
     )
     .unwrap();
     let create_process = create_container(&id_str, &bundle).unwrap();
+    // here we do not wait for the process by calling wait() as in the test_outside_container
+    // function because we need the output of the runtimetest. If we call wait, it will return
+    // and we won't have an easy way of getting the stdio of the runtimetest.
+    // Thus to make sure the container is created, we just wait for sometime, and
+    // assume that the create command was successful. If it wasn't we can catch that error
+    // in the start_container, as we can not start a non-created container anyways
+    std::thread::sleep(std::time::Duration::from_millis(1000));
+    match start_container(&id_str, &bundle)
+        .unwrap()
+        .wait_with_output()
+    {
+        Ok(c) => c,
+        Err(e) => return TestResult::Failed(anyhow!("container start failed : {:?}", e)),
+    };
+
+    let create_output = create_process
+        .wait_with_output()
+        .context("getting output after starting the container failed")
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&create_output.stdout);
+    if !stdout.is_empty() {
+        println!(
+            "{:?}",
+            anyhow!("container stdout was not empty, found : {}", stdout)
+        )
+    }
+    let stderr = String::from_utf8_lossy(&create_output.stderr);
+    if !stderr.is_empty() {
+        return TestResult::Failed(anyhow!(
+            "container stderr was not empty, found : {}",
+            stderr
+        ));
+    }
+
+    let (out, err) = get_state(&id_str, &bundle).unwrap();
+    if !err.is_empty() {
+        return TestResult::Failed(anyhow!(
+            "error in getting state after starting the container : {}",
+            err
+        ));
+    }
+
+    let state: State = match serde_json::from_str(&out) {
+        Ok(v) => v,
+        Err(e) => return TestResult::Failed(anyhow!("error in parsing state of container after start in test_inside_container : stdout : {}, parse error : {}",out,e)),
+    };
+    if state.status != "stopped" {
+        return TestResult::Failed(anyhow!("error : unexpected container status in test_inside_runtime : expected stopped, got {}, container state : {:?}",state.status,state));
+    }
+    kill_container(&id_str, &bundle).unwrap().wait().unwrap();
+    delete_container(&id_str, &bundle).unwrap().wait().unwrap();
+    TestResult::Passed
+}
+
+// just copy-pasted from test_inside_container for now, but with no pivot root
+// need to refactor this to avoid duplication
+pub fn test_inside_container_with_no_pivot(
+    spec: Spec,
+    setup_for_test: &dyn Fn(&Path) -> Result<()>,
+) -> TestResult {
+    let id = generate_uuid();
+    let id_str = id.to_string();
+    let bundle = prepare_bundle().unwrap();
+
+    // This will do the required setup for the test
+    test_result!(setup_for_test(
+        &bundle.as_ref().join("bundle").join("rootfs")
+    ));
+
+    set_config(&bundle, &spec).unwrap();
+    // as we have to run runtimetest inside the container, and is expects
+    // the config.json to be at path /config.json we save it there
+    let path = bundle
+        .as_ref()
+        .join("bundle")
+        .join("rootfs")
+        .join("config.json");
+    spec.save(path).unwrap();
+
+    let runtimetest_path = get_runtimetest_path();
+    // The config will directly use runtime as the command to be run, so we have to
+    // save the runtimetest binary at its /bin
+    std::fs::copy(
+        runtimetest_path,
+        bundle
+            .as_ref()
+            .join("bundle")
+            .join("rootfs")
+            .join("bin")
+            .join("runtimetest"),
+    )
+    .unwrap();
+    let create_process = create_container_no_pivot(&id_str, &bundle).unwrap();
     // here we do not wait for the process by calling wait() as in the test_outside_container
     // function because we need the output of the runtimetest. If we call wait, it will return
     // and we won't have an easy way of getting the stdio of the runtimetest.
