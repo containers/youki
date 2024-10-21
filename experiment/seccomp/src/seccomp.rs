@@ -274,3 +274,49 @@ impl Rule {
         bpf_prog
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use syscalls::syscall_args;
+    use super::*;
+
+    #[test]
+    fn test_get_syscall_number_x86() {
+        let sys_num = get_syscall_number(&Arch::X86, "read");
+        assert_eq!(sys_num.unwrap(), 0);
+    }
+
+    #[test]
+    fn test_get_syscall_number_aarch64() {
+        let sys_num = get_syscall_number(&Arch::AArch64, "read");
+        assert_eq!(sys_num.unwrap(), 63);
+    }
+
+    #[test]
+    fn test_to_instruction_x86() {
+        let rule = Rule::new("getcwd".parse().unwrap(), 0, syscall_args!(), false);
+        let inst = Rule::to_instruction(&Arch::X86, SECCOMP_RET_KILL_PROCESS, &rule);
+        let bpf_prog = gen_validate(&Arch::X86);
+        assert_eq!(inst[0], bpf_prog[0]);
+        assert_eq!(inst[1], bpf_prog[1]);
+        assert_eq!(inst[2], bpf_prog[2]);
+        assert_eq!(inst[3], Instruction::stmt(BPF_LD | BPF_W | BPF_ABS, 0));
+        assert_eq!(inst[4], Instruction::jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 1,
+                                              get_syscall_number(&Arch::X86, "getcwd").unwrap() as c_uint));
+        assert_eq!(inst[5], Instruction::stmt(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS));
+    }
+
+    #[test]
+    fn test_to_instruction_aarch64() {
+        let rule = Rule::new("getcwd".parse().unwrap(), 0, syscall_args!(), false);
+        let inst = Rule::to_instruction(&Arch::AArch64, SECCOMP_RET_KILL_PROCESS, &rule);
+        let bpf_prog = gen_validate(&Arch::AArch64);
+        assert_eq!(inst[0], bpf_prog[0]);
+        assert_eq!(inst[1], bpf_prog[1]);
+        assert_eq!(inst[2], bpf_prog[2]);
+        assert_eq!(inst[3], Instruction::stmt(BPF_LD | BPF_W | BPF_ABS, 0));
+        assert_eq!(inst[4], Instruction::jump(BPF_JMP | BPF_JEQ | BPF_K, 0, 1,
+                                              get_syscall_number(&Arch::AArch64, "getcwd").unwrap() as c_uint));
+        assert_eq!(inst[5], Instruction::stmt(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS));
+    }
+}
