@@ -9,7 +9,7 @@ fn create_spec() -> Result<Spec> {
     let spec = SpecBuilder::default().process(
         ProcessBuilder::default()
             .cwd("/test")
-            .env(vec!["testa", "valuea", "testb", "123"])
+            .env(vec!["testa".to_string(), "valuea".to_string(), "testb".to_string(), "123".to_string()])
             .build()
             .expect("error in creating process config"),
     ).build().context("failed to build spec")?;
