@@ -1,15 +1,17 @@
 use std::fs::{self, read_dir};
+use std::mem;
 use std::os::linux::fs::MetadataExt;
 use std::os::unix::fs::{FileTypeExt, PermissionsExt};
 use std::path::Path;
 
 use anyhow::{bail, Result};
+use libc::{__rlimit_resource_t, getrlimit, rlimit};
 use nix::errno::Errno;
 use nix::libc;
 use nix::sys::utsname;
 use nix::unistd::getcwd;
 use oci_spec::runtime::IOPriorityClass::{self, IoprioClassBe, IoprioClassIdle, IoprioClassRt};
-use oci_spec::runtime::{LinuxDevice, LinuxDeviceType, LinuxSchedulerPolicy, Spec};
+use oci_spec::runtime::{LinuxDevice, LinuxDeviceType, LinuxSchedulerPolicy, PosixRlimit, Spec};
 
 use crate::utils::{self, test_read_access, test_write_access};
 
@@ -543,5 +545,32 @@ pub fn test_io_priority_class(spec: &Spec, io_priority_class: IOPriorityClass) {
     };
     if priority != expected_priority {
         eprintln!("error ioprio_get expected priority {expected_priority:?}, got {priority}")
+    }
+}
+
+pub fn validate_process_rlimits(spec: &Spec) {
+    let process = spec.process().as_ref().unwrap();
+    let spec_rlimits :Vec<PosixRlimit> = Vec::from(process.rlimits());
+
+    for spec_rlimit in spec_rlimits.iter() {
+        let mut limit: rlimit = unsafe { mem::zeroed() };
+
+        let result = unsafe { getrlimit(spec_rlimit.typ() as __rlimit_resource_t, &mut limit) };
+        if result == 0 {
+
+            if spec_rlimit.hard() != limit.rlim_max {
+                eprintln!("error type of {:?} hard rlimit expected {:?} , got {:?}",
+                    spec_rlimit.typ(), spec_rlimit.hard(), limit.rlim_max
+                )
+            }
+
+            if spec_rlimit.soft() != limit.rlim_cur {
+                eprintln!("error type of {:?} soft rlimit expected {:?} , got {:?}",
+                          spec_rlimit.typ(), spec_rlimit.soft(), limit.rlim_cur
+                )
+            }
+        } else {
+            eprintln!("Failed to get rlimit");
+        }
     }
 }
