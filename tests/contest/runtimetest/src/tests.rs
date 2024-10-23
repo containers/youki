@@ -4,8 +4,10 @@ use std::os::unix::fs::{FileTypeExt, PermissionsExt};
 use std::path::Path;
 
 use anyhow::{bail, Result};
+use libc::{getgid, getuid};
 use nix::errno::Errno;
 use nix::libc;
+use nix::sys::stat::{Mode, umask};
 use nix::sys::utsname;
 use nix::unistd::getcwd;
 use oci_spec::runtime::IOPriorityClass::{self, IoprioClassBe, IoprioClassIdle, IoprioClassRt};
@@ -543,5 +545,32 @@ pub fn test_io_priority_class(spec: &Spec, io_priority_class: IOPriorityClass) {
     };
     if priority != expected_priority {
         eprintln!("error ioprio_get expected priority {expected_priority:?}, got {priority}")
+    }
+}
+
+pub fn validate_process_user(spec: &Spec) {
+    let process = spec.process().as_ref().unwrap();
+
+    let uid = unsafe { getuid()};
+    let gid = unsafe { getgid() };
+    let current_umask = unsafe { libc::umask(0) };
+    unsafe { libc::umask(current_umask) };
+
+    if process.user().uid().ne(&uid) {
+        eprintln!("error due to uid want {}, got {}", process.user().uid(), uid)
+    }
+
+    if process.user().gid().ne(&gid) {
+        eprintln!("error due to gid want {}, got {}", process.user().gid(), gid)
+    }
+
+    if let Err(e) = utils::test_additional_gids(
+        process.user().additional_gids().as_ref().unwrap(),
+    ) {
+        eprintln!("error additional gids {e}");
+    }
+
+    if process.user().umask().unwrap().ne(&current_umask) {
+        eprintln!("error due to gid want {}, got {}",process.user().umask().unwrap(), current_umask)
     }
 }
