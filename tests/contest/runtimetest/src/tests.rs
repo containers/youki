@@ -545,3 +545,19 @@ pub fn test_io_priority_class(spec: &Spec, io_priority_class: IOPriorityClass) {
         eprintln!("error ioprio_get expected priority {expected_priority:?}, got {priority}")
     }
 }
+
+pub fn test_validate_root_readonly() {
+    if let std::io::Result::Err(e) = test_read_access("/") {
+        let errno = Errno::from_raw(e.raw_os_error().unwrap());
+        if errno == Errno::ENOENT {
+            /* This is expected */
+        } else {
+            eprintln!(
+                "in readonly paths, error in testing read access for / : {e:?}"
+            );
+            return;
+        }
+    } else {
+        /* Expected */
+    }
+}
