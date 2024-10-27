@@ -128,6 +128,7 @@ fn main() -> Result<()> {
     let process_oom_score_adj = get_process_oom_score_adj_test();
     let kill = get_kill_test();
 
+
     tm.add_test_group(Box::new(cl));
     tm.add_test_group(Box::new(cc));
     tm.add_test_group(Box::new(huge_tlb));
