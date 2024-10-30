@@ -548,20 +548,31 @@ pub fn test_io_priority_class(spec: &Spec, io_priority_class: IOPriorityClass) {
     }
 }
 
-
 pub fn validate_process(spec: &Spec) {
     let process = spec.process().as_ref().unwrap();
 
     if process.cwd().ne(&getcwd().unwrap()) {
-        eprintln!("error due to spec cwd want {:?}, got {:?}", process.cwd(), getcwd().unwrap())
+        eprintln!(
+            "error due to spec cwd want {:?}, got {:?}",
+            process.cwd(),
+            getcwd().unwrap()
+        )
     }
 
     if env::var("testa").unwrap().to_string().ne("valuea") {
-        eprintln!("error due to spec environment value of testa want {:?}, got {:?}", "valuea", env::var("testa"))
+        eprintln!(
+            "error due to spec environment value of testa want {:?}, got {:?}",
+            "valuea",
+            env::var("testa")
+        )
     }
 
     if env::var("testb").unwrap().to_string().ne("123") {
-        eprintln!("error due to spec environment value of testb want {:?}, got {:?}", "123", env::var("testb"))
+        eprintln!(
+            "error due to spec environment value of testb want {:?}, got {:?}",
+            "123",
+            env::var("testb")
+        )
     }
 }
 

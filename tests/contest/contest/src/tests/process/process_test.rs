@@ -6,13 +6,19 @@ use oci_spec::runtime::{
 use test_framework::{test_result, Test, TestGroup, TestResult};
 
 fn create_spec() -> Result<Spec> {
-    let spec = SpecBuilder::default().process(
-        ProcessBuilder::default()
-            .cwd("/test")
-            .env(vec!["testa=valuea".into(), "testb=123".into()])
-            .build()
-            .expect("error in creating process config"),
-    ).build().context("failed to build spec")?;
+    let spec = SpecBuilder::default()
+        .process(
+            ProcessBuilder::default()
+                .cwd("/test")
+                .env(vec![
+                    "testa=valuea".into(),
+                    "testb=123".into()
+                ])
+                .build()
+                .expect("error in creating process config"),
+        )
+        .build()
+        .context("failed to build spec")?;
 
     Ok(spec)
 }
