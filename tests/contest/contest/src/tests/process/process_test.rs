@@ -1,8 +1,7 @@
 use crate::utils::test_inside_container;
-use anyhow::{Context, Ok, Result};
-use oci_spec::runtime::{
-    ProcessBuilder, Spec, SpecBuilder,
-};
+use anyhow::{bail, Context, Ok, Result};
+use oci_spec::runtime::{ProcessBuilder, Spec, SpecBuilder};
+use std::fs;
 use test_framework::{test_result, Test, TestGroup, TestResult};
 
 fn create_spec() -> Result<Spec> {
@@ -10,10 +9,7 @@ fn create_spec() -> Result<Spec> {
         .process(
             ProcessBuilder::default()
                 .cwd("/test")
-                .env(vec![
-                    "testa=valuea".into(),
-                    "testb=123".into()
-                ])
+                .env(vec!["testa=valuea".into(), "testb=123".into()])
                 .build()
                 .expect("error in creating process config"),
         )
@@ -25,7 +21,15 @@ fn create_spec() -> Result<Spec> {
 
 fn process_test() -> TestResult {
     let spec = test_result!(create_spec());
-    test_inside_container(spec, &|_| Ok(()))
+    test_inside_container(spec, &|_| {
+        match fs::create_dir("/test") {
+            Result::Ok(_) => { /*This is expected*/ }
+            Err(e) => {
+                bail!(e)
+            }
+        }
+        Ok(())
+    })
 }
 
 pub fn get_process_test() -> TestGroup {
