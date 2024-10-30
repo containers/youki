@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::{env, fs, mem};
 
 use nc;
-use nix::mount::MsFlags;
+use nix::mount::{MntFlags, MsFlags};
 use nix::sched::CloneFlags;
 use nix::sys::stat::Mode;
 use nix::unistd::{self, setsid, Gid, Uid};
@@ -270,6 +270,76 @@ fn reopen_dev_null() -> Result<()> {
     Ok(())
 }
 
+// umount or hide the target path. If the target path is mounted
+// try to unmount it first if the unmount operation fails with EINVAL
+// then mount a tmpfs with size 0k to hide the target path.
+fn unmount_or_hide(syscall: &dyn Syscall, target: impl AsRef<Path>) -> Result<()> {
+    let target_path = target.as_ref();
+    match syscall.umount2(target_path, MntFlags::MNT_DETACH) {
+        Ok(_) => Ok(()),
+        Err(SyscallError::Nix(nix::errno::Errno::EINVAL)) => syscall
+            .mount(
+                None,
+                target_path,
+                Some("tmpfs"),
+                MsFlags::MS_RDONLY,
+                Some("size=0k"),
+            )
+            .map_err(InitProcessError::SyscallOther),
+        Err(err) => Err(InitProcessError::SyscallOther(err)),
+    }
+}
+
+fn move_root(syscall: &dyn Syscall, rootfs: &Path) -> Result<()> {
+    unistd::chdir(rootfs).map_err(InitProcessError::NixOther)?;
+    // umount /sys and /proc if they are mounted, the purpose is to
+    // unmount or hide the /sys and /proc filesystems before the process changes its
+    // root to the new rootfs. thus ensure that the /sys and /proc filesystems are not
+    // accessible in the new rootfs. the logic is borrowed from crun
+    // https://github.com/containers/crun/blob/53cd1c1c697d7351d0cad23708d29bf4a7980a3a/src/libcrun/linux.c#L2780
+    unmount_or_hide(syscall, "/sys")?;
+    unmount_or_hide(syscall, "/proc")?;
+    syscall
+        .mount(Some(rootfs), Path::new("/"), None, MsFlags::MS_MOVE, None)
+        .map_err(|err| {
+            tracing::error!(?err, ?rootfs, "failed to mount ms_move");
+            InitProcessError::SyscallOther(err)
+        })?;
+
+    syscall.chroot(Path::new(".")).map_err(|err| {
+        tracing::error!(?err, ?rootfs, "failed to chroot");
+        InitProcessError::SyscallOther(err)
+    })?;
+
+    unistd::chdir("/").map_err(InitProcessError::NixOther)?;
+
+    Ok(())
+}
+
+fn do_pivot_root(
+    syscall: &dyn Syscall,
+    namespaces: &Namespaces,
+    no_pivot: bool,
+    rootfs: impl AsRef<Path>,
+) -> Result<()> {
+    let rootfs_path = rootfs.as_ref();
+
+    let handle_error = |err: SyscallError, msg: &str| -> InitProcessError {
+        tracing::error!(?err, ?rootfs_path, msg);
+        InitProcessError::SyscallOther(err)
+    };
+
+    match namespaces.get(LinuxNamespaceType::Mount)? {
+        Some(_) if no_pivot => move_root(syscall, rootfs_path),
+        Some(_) => syscall
+            .pivot_rootfs(rootfs.as_ref())
+            .map_err(|err| handle_error(err, "failed to pivot root")),
+        None => syscall
+            .chroot(rootfs_path)
+            .map_err(|err| handle_error(err, "failed to chroot")),
+    }
+}
+
 // Some variables are unused in the case where libseccomp feature is not enabled.
 #[allow(unused_variables)]
 pub fn container_init_process(
@@ -343,18 +413,7 @@ pub fn container_init_process(
         // we use pivot_root, but if we are on the host mount namespace, we will
         // use simple chroot. Scary things will happen if you try to pivot_root
         // in the host mount namespace...
-        if namespaces.get(LinuxNamespaceType::Mount)?.is_some() {
-            // change the root of filesystem of the process to the rootfs
-            syscall.pivot_rootfs(rootfs_path).map_err(|err| {
-                tracing::error!(?err, ?rootfs_path, "failed to pivot root");
-                InitProcessError::SyscallOther(err)
-            })?;
-        } else {
-            syscall.chroot(rootfs_path).map_err(|err| {
-                tracing::error!(?err, ?rootfs_path, "failed to chroot");
-                InitProcessError::SyscallOther(err)
-            })?;
-        }
+        do_pivot_root(syscall.as_ref(), &namespaces, args.no_pivot, rootfs_path)?;
 
         // As we have changed the root mount, from here on
         // logs are no longer visible in journalctl
