@@ -96,7 +96,7 @@ We have [our roadmap](https://github.com/orgs/containers/projects/15).
 
 # 🎨 Design and implementation of youki
 
-The User and Developer Documentation for youki is hosted at [https://youki-dev.github.io/youki//](https://youki-dev.github.io/youki//)
+The User and Developer Documentation for youki is hosted at [https://youki-dev.github.io/youki/](https://youki-dev.github.io/youki/)
 
 ![Architecture](docs/.drawio.svg)
 
