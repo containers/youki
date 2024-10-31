@@ -277,7 +277,7 @@ just youki-dev # or youki-release
 
 # 👥 Community and Contributing
 
-Please refer to [our community page](https://youki-dev.github.io/youki//community/introduction.html).
+Please refer to [our community page](https://youki-dev.github.io/youki/community/introduction.html).
 
 Thanks to all the people who already contributed!
 
