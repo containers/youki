@@ -2,6 +2,7 @@ use crate::utils::test_inside_container;
 use anyhow::{bail, Context, Ok, Result};
 use oci_spec::runtime::{ProcessBuilder, Spec, SpecBuilder};
 use std::fs;
+use std::os::unix::fs::PermissionsExt;
 use test_framework::{test_result, Test, TestGroup, TestResult};
 
 fn create_spec() -> Result<Spec> {
@@ -28,6 +29,10 @@ fn process_test() -> TestResult {
                 bail!(e)
             }
         }
+        let metadata = fs::metadata("/test")?;
+        let mut permissions = metadata.permissions();
+        permissions.set_mode(0o700);
+
         Ok(())
     })
 }
