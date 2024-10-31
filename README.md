@@ -29,7 +29,7 @@ youki is named after the Japanese word 'youki', which means 'a container'. In Ja
 > $ sudo podman run --cgroup-manager=cgroupfs --runtime /workspaces/youki/youki hello-world
 > ```
 
-[User Documentation](https://youki-dev.github.io/youki//user/basic_setup.html#quick-install)
+[User Documentation](https://youki-dev.github.io/youki/user/basic_setup.html#quick-install)
 
 # 🎯 Motivation
 
