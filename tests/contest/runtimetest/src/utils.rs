@@ -1,10 +1,10 @@
+use libc::getgroups;
+use nix::sys::stat::{stat, SFlag};
 use std::fs;
 use std::fs::{metadata, symlink_metadata};
 use std::os::unix::prelude::MetadataExt;
 use std::path::PathBuf;
 use std::process::Command;
-use libc::getgroups;
-use nix::sys::stat::{stat, SFlag};
 
 fn test_file_read_access(path: &str) -> Result<(), std::io::Error> {
     let _ = std::fs::OpenOptions::new()
@@ -476,24 +476,32 @@ pub fn test_additional_gids(gids: &Vec<u32>) -> Result<(), std::io::Error> {
     let ngroups = unsafe { getgroups(0, std::ptr::null_mut()) };
 
     if ngroups == -1 {
-        return Err(std::io::Error::new(std::io::ErrorKind::Other, "error retrieving group count"))
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "error retrieving group count",
+        ));
     }
 
     let mut groups: Vec<libc::gid_t> = vec![0; ngroups as usize];
     let result = unsafe { getgroups(ngroups, groups.as_mut_ptr()) };
 
     if result == -1 {
-        return Err(std::io::Error::new(std::io::ErrorKind::Other, "error retrieving group IDs"))
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "error retrieving group IDs",
+        ));
     }
 
     for group in &groups {
         for gid in gids {
             if group != gid {
-                return Err(std::io::Error::new(std::io::ErrorKind::Other,
-                                               format!("error additional gid want {}, got {}", gid, group)))
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("error additional gid want {}, got {}", gid, group),
+                ));
             }
         }
     }
 
-    return  Ok(())
+    return Ok(());
 }
