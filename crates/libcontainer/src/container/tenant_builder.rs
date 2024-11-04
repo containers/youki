@@ -142,6 +142,7 @@ impl TenantContainerBuilder {
             preserve_fds: self.base.preserve_fds,
             detached: self.detached,
             executor: self.base.executor,
+            no_pivot: false,
         };
 
         let pid = builder_impl.create()?;
