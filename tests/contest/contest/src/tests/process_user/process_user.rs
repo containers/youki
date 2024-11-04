@@ -4,16 +4,16 @@ use oci_spec::runtime::{ProcessBuilder, Spec, SpecBuilder, User};
 use test_framework::{test_result, Test, TestGroup, TestResult};
 
 fn create_spec() -> Result<Spec> {
-    let user = User::default()
-        .set_uid(10)
-        .set_gid(10)
-        .set_additional_gids(Option::from(vec![5]))
-        .set_umask(Option::from(u32::from(0o02)));
-
     let spec = SpecBuilder::default()
         .process(
             ProcessBuilder::default()
-                .user(user)
+                .user(
+                    User::default()
+                        .set_uid(10)
+                        .set_gid(10)
+                        .set_additional_gids(Option::from(vec![5]))
+                        .set_umask(Option::from(u32::from(0o02))),
+                )
                 .build()
                 .expect("error in creating process config"),
         )

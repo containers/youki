@@ -547,7 +547,6 @@ pub fn test_io_priority_class(spec: &Spec, io_priority_class: IOPriorityClass) {
     }
 }
 
-
 pub fn validate_process_user(spec: &Spec) {
     let process = spec.process().as_ref().unwrap();
 
