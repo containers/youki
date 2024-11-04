@@ -550,23 +550,28 @@ pub fn test_io_priority_class(spec: &Spec, io_priority_class: IOPriorityClass) {
 
 pub fn validate_process_rlimits(spec: &Spec) {
     let process = spec.process().as_ref().unwrap();
-    let spec_rlimits :Vec<PosixRlimit> = Vec::from(process.rlimits());
+    let spec_rlimits: &Vec<PosixRlimit> = process.rlimits().as_ref().unwrap();
 
     for spec_rlimit in spec_rlimits.iter() {
         let mut limit: rlimit = unsafe { mem::zeroed() };
 
         let result = unsafe { getrlimit(spec_rlimit.typ() as __rlimit_resource_t, &mut limit) };
         if result == 0 {
-
             if spec_rlimit.hard() != limit.rlim_max {
-                eprintln!("error type of {:?} hard rlimit expected {:?} , got {:?}",
-                    spec_rlimit.typ(), spec_rlimit.hard(), limit.rlim_max
+                eprintln!(
+                    "error type of {:?} hard rlimit expected {:?} , got {:?}",
+                    spec_rlimit.typ(),
+                    spec_rlimit.hard(),
+                    limit.rlim_max
                 )
             }
 
             if spec_rlimit.soft() != limit.rlim_cur {
-                eprintln!("error type of {:?} soft rlimit expected {:?} , got {:?}",
-                          spec_rlimit.typ(), spec_rlimit.soft(), limit.rlim_cur
+                eprintln!(
+                    "error type of {:?} soft rlimit expected {:?} , got {:?}",
+                    spec_rlimit.typ(),
+                    spec_rlimit.soft(),
+                    limit.rlim_cur
                 )
             }
         } else {
