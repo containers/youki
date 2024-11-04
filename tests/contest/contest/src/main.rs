@@ -6,7 +6,6 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use clap::Parser;
 use contest::logger;
-use contest::tests::process_user::get_process_user_test;
 use test_framework::TestManager;
 use tests::cgroups;
 
@@ -22,6 +21,7 @@ use crate::tests::linux_ns_itype::get_ns_itype_tests;
 use crate::tests::mounts_recursive::get_mounts_recursive_test;
 use crate::tests::no_pivot::get_no_pivot_test;
 use crate::tests::pidfile::get_pidfile_test;
+use crate::tests::process_user::get_process_user_test;
 use crate::tests::readonly_paths::get_ro_paths_test;
 use crate::tests::scheduler::get_scheduler_test;
 use crate::tests::seccomp::get_seccomp_test;

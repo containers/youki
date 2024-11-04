@@ -1,19 +1,20 @@
 use crate::utils::test_inside_container;
 use anyhow::{Context, Ok, Result};
-use oci_spec::runtime::{ProcessBuilder, Spec, SpecBuilder, User};
+use oci_spec::runtime::{ProcessBuilder, Spec, SpecBuilder, UserBuilder};
 use test_framework::{test_result, Test, TestGroup, TestResult};
 
 fn create_spec() -> Result<Spec> {
+    let user = UserBuilder::default()
+        .uid(10u32)
+        .gid(10u32)
+        .additional_gids(vec![5u32])
+        .umask(0o02u32)
+        .build()?;
+
     let spec = SpecBuilder::default()
         .process(
             ProcessBuilder::default()
-                .user(
-                    User::default()
-                        .set_uid(10)
-                        .set_gid(10)
-                        .set_additional_gids(Option::from(vec![5]))
-                        .set_umask(Option::from(u32::from(0o02))),
-                )
+                .user(user)
                 .build()
                 .expect("error in creating process config"),
         )
