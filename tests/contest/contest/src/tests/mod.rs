@@ -9,6 +9,7 @@ pub mod io_priority;
 pub mod lifecycle;
 pub mod linux_ns_itype;
 pub mod mounts_recursive;
+pub mod no_pivot;
 pub mod pidfile;
 pub mod process_rlimits;
 pub mod readonly_paths;
