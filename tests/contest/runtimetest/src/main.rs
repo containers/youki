@@ -45,6 +45,8 @@ fn main() {
         "io_priority_class_idle" => tests::test_io_priority_class(&spec, IoprioClassIdle),
         "devices" => tests::validate_devices(&spec),
         "root_readonly" => tests::test_validate_root_readonly(),
+        "no_pivot" => tests::validate_rootfs(),
+
         _ => eprintln!("error due to unexpected execute test name: {execute_test}"),
     }
 }
