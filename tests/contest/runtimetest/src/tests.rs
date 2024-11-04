@@ -552,9 +552,7 @@ pub fn test_validate_root_readonly() {
         if errno == Errno::ENOENT {
             /* This is expected */
         } else {
-            eprintln!(
-                "in readonly paths, error in testing read access for / : {e:?}"
-            );
+            eprintln!("in readonly paths, error in testing read access for / : {e:?}");
             return;
         }
     } else {

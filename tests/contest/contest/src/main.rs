@@ -140,7 +140,6 @@ fn main() -> Result<()> {
     tm.add_test_group(Box::new(devices));
     tm.add_test_group(Box::new(root_readonly));
 
-
     tm.add_test_group(Box::new(io_priority_test));
     tm.add_cleanup(Box::new(cgroups::cleanup_v1));
     tm.add_cleanup(Box::new(cgroups::cleanup_v2));
