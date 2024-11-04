@@ -504,5 +504,5 @@ pub fn test_additional_gids(gids: &Vec<u32>) -> Result<(), std::io::Error> {
         }
     }
 
-    return Ok(());
+    Ok(())
 }
