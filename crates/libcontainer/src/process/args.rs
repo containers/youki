@@ -42,4 +42,6 @@ pub struct ContainerArgs {
     pub detached: bool,
     /// Manage the functions that actually run on the container
     pub executor: Box<dyn Executor>,
+    /// If do not use pivot root to jail process inside rootfs
+    pub no_pivot: bool,
 }
