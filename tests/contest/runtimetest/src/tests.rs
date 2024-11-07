@@ -5,7 +5,6 @@ use std::os::unix::fs::{FileTypeExt, PermissionsExt};
 use std::path::Path;
 
 use anyhow::{bail, Result};
-
 use nix::errno::Errno;
 use nix::libc;
 use nix::sys::utsname;
@@ -559,20 +558,22 @@ pub fn validate_process(spec: &Spec) {
         )
     }
 
-    if env::var("testa").unwrap().to_string().ne("valuea") {
-        eprintln!(
-            "error due to spec environment value of testa want {:?}, got {:?}",
-            "valuea",
-            env::var("testa")
-        )
-    }
-
-    if env::var("testb").unwrap().to_string().ne("123") {
-        eprintln!(
-            "error due to spec environment value of testb want {:?}, got {:?}",
-            "123",
-            env::var("testb")
-        )
+    for env_str in process.env().as_ref().unwrap().iter() {
+        match env_str.split_once("=") {
+            Some((env_key, env_val)) => {
+                if env::var(env_key).unwrap() != env_val {
+                    eprintln!(
+                        "error due to spec environment value of {:?} want {:?}, got {:?}",
+                        env_key,
+                        env::var(env_key).unwrap(),
+                        env_val
+                    )
+                }
+            }
+            None => {
+                eprintln!("spec env value is not correct")
+            }
+        }
     }
 }
 
