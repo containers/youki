@@ -20,6 +20,7 @@ fn get_spec() -> Spec {
     }
 }
 
+////////// ANCHOR: example_runtimetest_main
 fn main() {
     let spec = get_spec();
     let args: Vec<String> = env::args().collect();
