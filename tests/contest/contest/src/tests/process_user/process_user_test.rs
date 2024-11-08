@@ -15,6 +15,7 @@ fn create_spec() -> Result<Spec> {
     let spec = SpecBuilder::default()
         .process(
             ProcessBuilder::default()
+                .args(vec!["runtimetest".to_string(), "process_user".to_string()])
                 .user(user)
                 .build()
                 .expect("error in creating process config"),
