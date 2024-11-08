@@ -21,10 +21,15 @@ fn create_rlimit(
     Ok(rlimit)
 }
 
+#[allow(clippy::identity_op)]
 fn create_spec() -> Result<Spec> {
     let spec = SpecBuilder::default()
         .process(
             ProcessBuilder::default()
+                .args(vec![
+                    "runtimetest".to_string(),
+                    "process_rlimits".to_string(),
+                ])
                 .rlimits(vec![
                     create_rlimit(PosixRlimitType::RlimitAs, 2 * GIGABYTES, 1 * GIGABYTES).unwrap(),
                     create_rlimit(PosixRlimitType::RlimitCore, 4 * GIGABYTES, 3 * GIGABYTES)
