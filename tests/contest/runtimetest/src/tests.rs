@@ -4,10 +4,9 @@ use std::os::unix::fs::{FileTypeExt, PermissionsExt};
 use std::path::Path;
 
 use anyhow::{bail, Result};
-
 use nix::errno::Errno;
 use nix::libc;
-use nix::sys::stat::umask;
+use nix::sys::stat::{Mode, umask};
 use nix::sys::utsname;
 use nix::unistd::{getcwd, getgid, getgroups, getuid, Gid, Uid};
 use oci_spec::runtime::IOPriorityClass::{self, IoprioClassBe, IoprioClassIdle, IoprioClassRt};
@@ -576,7 +575,7 @@ pub fn validate_process_user(spec: &Spec) {
         eprintln!("error additional gids {e}");
     }
 
-    if process.user().umask().unwrap().ne(&current_umask) {
+    if Mode::from_bits(process.user().umask().unwrap()).unwrap() != current_umask {
         eprintln!(
             "error due to gid want {}, got {:?}",
             process.user().umask().unwrap(),
@@ -591,7 +590,7 @@ fn validate_additional_gids(gids: &Vec<u32>) -> std::result::Result<(), std::io:
 
     for group in groups {
         for gid in gids {
-            if group != Gid::from(gid) {
+            if group != Gid::from(*gid) {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::Other,
                     format!("error additional gid want {}, got {}", gid, group),
