@@ -1,6 +1,4 @@
-use std::any::Any;
 use std::fs::{self, read_dir};
-use std::mem;
 use std::os::linux::fs::MetadataExt;
 use std::os::unix::fs::{FileTypeExt, PermissionsExt};
 use std::path::Path;
