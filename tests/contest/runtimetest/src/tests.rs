@@ -4,11 +4,12 @@ use std::os::unix::fs::{FileTypeExt, PermissionsExt};
 use std::path::Path;
 
 use anyhow::{bail, Result};
-use libc::{getgid, getuid};
+
 use nix::errno::Errno;
 use nix::libc;
+use nix::sys::stat::umask;
 use nix::sys::utsname;
-use nix::unistd::getcwd;
+use nix::unistd::{getcwd, getgid, getgroups, getuid, Gid, Uid};
 use oci_spec::runtime::IOPriorityClass::{self, IoprioClassBe, IoprioClassIdle, IoprioClassRt};
 use oci_spec::runtime::{LinuxDevice, LinuxDeviceType, LinuxSchedulerPolicy, Spec};
 
@@ -550,12 +551,12 @@ pub fn test_io_priority_class(spec: &Spec, io_priority_class: IOPriorityClass) {
 pub fn validate_process_user(spec: &Spec) {
     let process = spec.process().as_ref().unwrap();
 
-    let uid = unsafe { getuid() };
-    let gid = unsafe { getgid() };
-    let current_umask = unsafe { libc::umask(0) };
-    unsafe { libc::umask(current_umask) };
+    let uid = getuid();
+    let gid = getgid();
+    let current_umask = umask(nix::sys::stat::Mode::empty());
+    umask(current_umask);
 
-    if process.user().uid().ne(&uid) {
+    if Uid::from(process.user().uid()) != uid {
         eprintln!(
             "error due to uid want {}, got {}",
             process.user().uid(),
@@ -563,7 +564,7 @@ pub fn validate_process_user(spec: &Spec) {
         )
     }
 
-    if process.user().gid().ne(&gid) {
+    if Gid::from(process.user().gid()) != gid {
         eprintln!(
             "error due to gid want {}, got {}",
             process.user().gid(),
@@ -571,18 +572,35 @@ pub fn validate_process_user(spec: &Spec) {
         )
     }
 
-    if let Err(e) = utils::test_additional_gids(process.user().additional_gids().as_ref().unwrap())
-    {
+    if let Err(e) = validate_additional_gids(process.user().additional_gids().as_ref().unwrap()) {
         eprintln!("error additional gids {e}");
     }
 
     if process.user().umask().unwrap().ne(&current_umask) {
         eprintln!(
-            "error due to gid want {}, got {}",
+            "error due to gid want {}, got {:?}",
             process.user().umask().unwrap(),
             current_umask
         )
     }
+}
+
+// validate_additional_gids function is used to validate additional groups of user
+fn validate_additional_gids(gids: &Vec<u32>) -> std::result::Result<(), std::io::Error> {
+    let groups = getgroups().unwrap();
+
+    for group in groups {
+        for gid in gids {
+            if group != Gid::from(gid) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("error additional gid want {}, got {}", gid, group),
+                ));
+            }
+        }
+    }
+
+    Ok(())
 }
 
 // the validate_rootfs function is used to validate the rootfs of the container is
