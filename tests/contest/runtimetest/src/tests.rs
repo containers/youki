@@ -548,15 +548,16 @@ pub fn test_io_priority_class(spec: &Spec, io_priority_class: IOPriorityClass) {
 
 pub fn test_validate_root_readonly(spec: &Spec) {
     let root = spec.root().as_ref().unwrap();
-    if root.readonly().unwrap() == true {
-        if let Err(e) = test_write_access("/test.txt") {
+    let test_path = "/test.txt".to_string();
+    if root.readonly().unwrap() {
+        if let Err(e) = test_write_access(&test_path) {
             let errno = Errno::from_raw(e.raw_os_error().unwrap());
             if errno == Errno::ENOENT || errno == Errno::EROFS {
                 /* This is expected */
             } else {
                 eprintln!(
                     "readonly root filesystem, error in testing write access for path {}",
-                    "/test.txt"
+                    &test_path
                 );
             }
         }
@@ -565,7 +566,7 @@ pub fn test_validate_root_readonly(spec: &Spec) {
         if errno == Errno::ENOENT || errno == Errno::EROFS {
             eprintln!(
                 "readt only root filesystem is false but write access for path {} is err",
-                "/test.txt"
+                &test_path
             );
         } else {
             /* This is expected */
