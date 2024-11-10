@@ -554,17 +554,13 @@ pub fn test_validate_root_readonly(spec: &Spec) {
             if errno == Errno::EROFS {
                 /* This is expected */
             } else {
-                eprintln!(
-                    "readonly root filesystem, error in testing write access for path /"
-                );
+                eprintln!("readonly root filesystem, error in testing write access for path /");
             }
         }
     } else if let Err(e) = test_dir_write_access("/") {
         let errno = Errno::from_raw(e.raw_os_error().unwrap());
         if errno == Errno::EROFS {
-            eprintln!(
-                "readt only root filesystem is false but write access for path / is err"
-            );
+            eprintln!("readt only root filesystem is false but write access for path / is err");
         } else {
             /* This is expected */
         }
