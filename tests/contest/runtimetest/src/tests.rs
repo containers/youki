@@ -11,7 +11,7 @@ use nix::unistd::getcwd;
 use oci_spec::runtime::IOPriorityClass::{self, IoprioClassBe, IoprioClassIdle, IoprioClassRt};
 use oci_spec::runtime::{LinuxDevice, LinuxDeviceType, LinuxSchedulerPolicy, Spec};
 
-use crate::utils::{self, test_read_access, test_write_access};
+use crate::utils::{self, test_dir_write_access, test_read_access, test_write_access};
 
 ////////// ANCHOR: example_hello_world
 pub fn hello_world(_spec: &Spec) {
@@ -548,25 +548,24 @@ pub fn test_io_priority_class(spec: &Spec, io_priority_class: IOPriorityClass) {
 
 pub fn test_validate_root_readonly(spec: &Spec) {
     let root = spec.root().as_ref().unwrap();
-    let test_path = "/test.txt".to_string();
     if root.readonly().unwrap() {
-        if let Err(e) = test_write_access(&test_path) {
+        if let Err(e) = test_dir_write_access("/") {
             let errno = Errno::from_raw(e.raw_os_error().unwrap());
-            if errno == Errno::ENOENT || errno == Errno::EROFS {
+            if errno == Errno::EROFS {
                 /* This is expected */
             } else {
                 eprintln!(
                     "readonly root filesystem, error in testing write access for path {}",
-                    &test_path
+                    "/"
                 );
             }
         }
-    } else if let Err(e) = test_write_access("/test.txt") {
+    } else if let Err(e) = test_dir_write_access("/") {
         let errno = Errno::from_raw(e.raw_os_error().unwrap());
-        if errno == Errno::ENOENT || errno == Errno::EROFS {
+        if errno == Errno::EROFS {
             eprintln!(
                 "readt only root filesystem is false but write access for path {} is err",
-                &test_path
+                "/"
             );
         } else {
             /* This is expected */
