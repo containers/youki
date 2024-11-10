@@ -546,16 +546,30 @@ pub fn test_io_priority_class(spec: &Spec, io_priority_class: IOPriorityClass) {
     }
 }
 
-pub fn test_validate_root_readonly() {
-    if let std::io::Result::Err(e) = test_read_access("/") {
-        let errno = Errno::from_raw(e.raw_os_error().unwrap());
-        if errno == Errno::ENOENT {
-            /* This is expected */
-        } else {
-            eprintln!("in readonly paths, error in testing read access for / : {e:?}");
+pub fn test_validate_root_readonly(spec: &Spec) {
+    let root = spec.root().as_ref().unwrap();
+    if root.readonly().unwrap() == true {
+        if let Err(e) = test_write_access("/test.txt") {
+            let errno = Errno::from_raw(e.raw_os_error().unwrap());
+            if errno == Errno::ENOENT || errno == Errno::EROFS {
+                /* This is expected */
+            } else {
+                eprintln!(
+                    "readonly root filesystem, error in testing write access for path {}",
+                    "/test.txt"
+                );
+            }
         }
-    } else {
-        /* Expected */
+    } else if let Err(e) = test_write_access("/test.txt") {
+        let errno = Errno::from_raw(e.raw_os_error().unwrap());
+        if errno == Errno::ENOENT || errno == Errno::EROFS {
+            eprintln!(
+                "readt only root filesystem is false but write access for path {} is err",
+                "/test.txt"
+            );
+        } else {
+            /* This is expected */
+        }
     }
 }
 
