@@ -46,7 +46,6 @@ fn main() {
         "devices" => tests::validate_devices(&spec),
         "root_readonly" => tests::test_validate_root_readonly(&spec),
         "no_pivot" => tests::validate_rootfs(),
-
         _ => eprintln!("error due to unexpected execute test name: {execute_test}"),
     }
 }
