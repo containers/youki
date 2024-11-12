@@ -2,6 +2,7 @@ use std::fs::{self, read_dir};
 use std::os::linux::fs::MetadataExt;
 use std::os::unix::fs::{FileTypeExt, PermissionsExt};
 use std::path::Path;
+
 use anyhow::{bail, Result};
 use nix::errno::Errno;
 use nix::libc;
@@ -10,7 +11,9 @@ use nix::unistd::getcwd;
 use oci_spec::runtime::IOPriorityClass::{self, IoprioClassBe, IoprioClassIdle, IoprioClassRt};
 use oci_spec::runtime::{LinuxDevice, LinuxDeviceType, LinuxSchedulerPolicy, Spec};
 
-use crate::utils::{self, test_dir_read_access, test_dir_write_access, test_read_access, test_write_access};
+use crate::utils::{
+    self, test_dir_read_access, test_dir_write_access, test_read_access, test_write_access,
+};
 
 ////////// ANCHOR: example_hello_world
 pub fn hello_world(_spec: &Spec) {
@@ -553,7 +556,10 @@ pub fn test_validate_root_readonly(spec: &Spec) {
             if errno == Errno::EROFS {
                 /* This is expected */
             } else {
-                eprintln!("readonly root filesystem, error in testing write access for path /, {}", errno);
+                eprintln!(
+                    "readonly root filesystem, error in testing write access for path /, error: {}",
+                    errno
+                );
             }
         }
         if let Err(e) = test_dir_read_access("/") {
@@ -561,13 +567,19 @@ pub fn test_validate_root_readonly(spec: &Spec) {
             if errno == Errno::EROFS {
                 /* This is expected */
             } else {
-                eprintln!("readonly root filesystem, error in testing read access for path /, {}", errno);
+                eprintln!(
+                    "readonly root filesystem, error in testing read access for path /, error: {}",
+                    errno
+                );
             }
         }
     } else if let Err(e) = test_dir_write_access("/") {
         if e.raw_os_error().is_some() {
             let errno = Errno::from_raw(e.raw_os_error().unwrap());
-            eprintln!("readt only root filesystem is false but write access for path / is err, {}", errno);
+            eprintln!(
+                "readt only root filesystem is false but write access for path / is err, error: {}",
+                errno
+            );
         } else {
             /* This is expected */
         }

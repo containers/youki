@@ -33,7 +33,10 @@ pub fn get_root_readonly_test() -> TestGroup {
     let mut root_readonly_test_group = TestGroup::new("root_readonly");
 
     let test_true = Test::new("root_readonly_true_test", Box::new(root_readonly_true_test));
-    let test_false = Test::new("root_readonly_false_test", Box::new(root_readonly_false_test));
+    let test_false = Test::new(
+        "root_readonly_false_test",
+        Box::new(root_readonly_false_test),
+    );
     root_readonly_test_group.add(vec![Box::new(test_true), Box::new(test_false)]);
 
     root_readonly_test_group
