@@ -549,53 +549,61 @@ pub fn test_io_priority_class(spec: &Spec, io_priority_class: IOPriorityClass) {
 
 pub fn validate_process_user(spec: &Spec) {
     let process = spec.process().as_ref().unwrap();
+    let expected_uid = Uid::from(process.user().uid());
+    let expected_gid = Gid::from(process.user().gid());
+    let expected_umask = Mode::from_bits(process.user().umask().unwrap()).unwrap();
 
     let uid = getuid();
     let gid = getgid();
+    // The umask function not only gets the current mask, but also has the ability to set a new mask,
+    // so we need to set it back after getting the latest value.
     let current_umask = umask(nix::sys::stat::Mode::empty());
     umask(current_umask);
 
-    if Uid::from(process.user().uid()) != uid {
-        eprintln!(
-            "error due to uid want {}, got {}",
-            process.user().uid(),
-            uid
-        )
+    if expected_uid != uid {
+        eprintln!("error due to uid want {}, got {}", expected_uid, uid)
     }
 
-    if Gid::from(process.user().gid()) != gid {
-        eprintln!(
-            "error due to gid want {}, got {}",
-            process.user().gid(),
-            gid
-        )
+    if expected_gid != gid {
+        eprintln!("error due to gid want {}, got {}", expected_gid, gid)
     }
 
     if let Err(e) = validate_additional_gids(process.user().additional_gids().as_ref().unwrap()) {
         eprintln!("error additional gids {e}");
     }
 
-    if Mode::from_bits(process.user().umask().unwrap()).unwrap() != current_umask {
+    if expected_umask != current_umask {
         eprintln!(
-            "error due to gid want {}, got {:?}",
-            process.user().umask().unwrap(),
-            current_umask
+            "error due to umask want {:?}, got {:?}",
+            expected_umask, current_umask
         )
     }
 }
 
 // validate_additional_gids function is used to validate additional groups of user
-fn validate_additional_gids(gids: &Vec<u32>) -> std::result::Result<(), std::io::Error> {
-    let groups = getgroups().unwrap();
+fn validate_additional_gids(expected_gids: &Vec<u32>) -> std::result::Result<(), std::io::Error> {
+    let current_gids = getgroups().unwrap();
 
-    for group in groups {
-        for gid in gids {
-            if group != Gid::from(*gid) {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("error additional gid want {}, got {}", gid, group),
-                ));
-            }
+    if expected_gids.len() != current_gids.len() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!(
+                "error additional group num want {}, got {}",
+                expected_gids.len(),
+                current_gids.len()
+            ),
+        ));
+    }
+
+    for gid in expected_gids {
+        if !current_gids.contains(&Gid::from(gid)) {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!(
+                    "error additional gid {} is not belong to current groups",
+                    gid
+                ),
+            ));
         }
     }
 
