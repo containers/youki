@@ -19,18 +19,22 @@ fn create_spec(readonly: bool) -> Result<Spec> {
     Ok(spec)
 }
 
-fn root_readonly_test() -> TestResult {
+fn root_readonly_true_test() -> TestResult {
     let spec_true = test_result!(create_spec(true));
+    test_inside_container(spec_true, &|_| Ok(()))
+}
+
+fn root_readonly_false_test() -> TestResult {
     let spec_false = test_result!(create_spec(false));
-    test_inside_container(spec_true, &|_| Ok(()));
     test_inside_container(spec_false, &|_| Ok(()))
 }
 
 pub fn get_root_readonly_test() -> TestGroup {
     let mut root_readonly_test_group = TestGroup::new("root_readonly");
 
-    let test = Test::new("root_readonly_test", Box::new(root_readonly_test));
-    root_readonly_test_group.add(vec![Box::new(test)]);
+    let test_true = Test::new("root_readonly_true_test", Box::new(root_readonly_true_test));
+    let test_false = Test::new("root_readonly_false_test", Box::new(root_readonly_false_test));
+    root_readonly_test_group.add(vec![Box::new(test_true), Box::new(test_false)]);
 
     root_readonly_test_group
 }
