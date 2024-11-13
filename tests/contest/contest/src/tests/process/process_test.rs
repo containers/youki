@@ -25,16 +25,15 @@ fn create_spec() -> Result<Spec> {
 
 fn process_test() -> TestResult {
     let spec = test_result!(create_spec());
-    let binding = spec.process().clone().unwrap();
-    let cwd = binding.cwd();
-    test_inside_container(spec, &|_| {
-        match fs::create_dir(cwd) {
+
+    test_inside_container(spec, &|bundle| {
+        match fs::create_dir(bundle.join("test")) {
             Result::Ok(_) => { /*This is expected*/ }
             Err(e) => {
                 bail!(e)
             }
         }
-        let metadata = fs::metadata(cwd)?;
+        let metadata = fs::metadata(bundle.join("test"))?;
         let mut permissions = metadata.permissions();
         permissions.set_mode(0o700);
 
