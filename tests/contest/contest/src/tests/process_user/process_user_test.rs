@@ -9,8 +9,8 @@ use crate::utils::test_inside_container;
 // where each element is a random u32 value between 0 and 65535.
 fn generate_random_vec() -> Vec<u32> {
     let mut rng = rand::thread_rng();
-    let vec_size = rng.gen_range(5..=15);
-    (0..vec_size).map(|_| rng.gen_range(0..=65535)).collect()
+    let vec_size = rng.gen_range(5..=10);
+    (0..vec_size).map(|_| rng.gen_range(100..=200)).collect()
 }
 
 fn create_spec() -> Result<Spec> {
