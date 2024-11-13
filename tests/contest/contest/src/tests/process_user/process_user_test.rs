@@ -14,11 +14,12 @@ fn generate_random_vec() -> Vec<u32> {
 }
 
 fn create_spec() -> Result<Spec> {
+    let umask = 0o002;
     let user = UserBuilder::default()
         .uid(10u32)
         .gid(10u32)
         .additional_gids(generate_random_vec())
-        .umask(u32::from(0o002))
+        .umask(umask as u32)
         .build()?;
 
     let spec = SpecBuilder::default()
