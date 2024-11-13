@@ -6,8 +6,8 @@ use std::path::Path;
 use anyhow::{bail, Result};
 use nix::errno::Errno;
 use nix::libc;
-use nix::sys::stat::{umask, Mode};
 use nix::sys::resource::{getrlimit, Resource};
+use nix::sys::stat::{umask, Mode};
 use nix::sys::utsname;
 use nix::unistd::{getcwd, getgid, getgroups, getuid, Gid, Uid};
 use oci_spec::runtime::IOPriorityClass::{self, IoprioClassBe, IoprioClassIdle, IoprioClassRt};
@@ -599,7 +599,7 @@ fn validate_additional_gids(expected_gids: &Vec<u32>) -> std::result::Result<(),
     }
 
     for gid in expected_gids {
-        if !current_gids.contains(&Gid::from(gid)) {
+        if !current_gids.contains(&Gid::from_raw(*gid)) {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 format!(
