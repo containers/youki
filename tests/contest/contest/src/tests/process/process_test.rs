@@ -8,18 +8,18 @@ use test_framework::{test_result, Test, TestGroup, TestResult};
 use crate::utils::test_inside_container;
 
 fn create_spec() -> Result<Spec> {
-    let spec = SpecBuilder::default()
+    let mut spec = SpecBuilder::default()
         .process(
             ProcessBuilder::default()
                 .args(vec!["runtimetest".to_string(), "process".to_string()])
                 .cwd("/test")
-                .env(vec!["testa=valuea".into(), "testb=123".into()])
                 .build()
                 .expect("error in creating process config"),
         )
         .build()
         .context("failed to build spec")?;
-
+    spec.process()
+        .set_env(vec!["testa=valuea".into(), "testb=123".into()]);
     Ok(spec)
 }
 
