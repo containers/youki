@@ -584,29 +584,25 @@ pub fn validate_process_user(spec: &Spec) {
 }
 
 // validate_additional_gids function is used to validate additional groups of user
-fn validate_additional_gids(expected_gids: &Vec<u32>) -> std::result::Result<(), std::io::Error> {
+fn validate_additional_gids(expected_gids: &Vec<u32>) -> Result<()> {
     let current_gids = getgroups().unwrap();
 
     if expected_gids.len() != current_gids.len() {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!(
-                "error additional group num want {}, got {}",
-                expected_gids.len(),
-                current_gids.len()
-            ),
-        ));
+        bail!(
+            "error additional group num want {}, got {}",
+            expected_gids.len(),
+            current_gids.len()
+        );
     }
 
     for gid in expected_gids {
         if !current_gids.contains(&Gid::from_raw(*gid)) {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!(
-                    "error additional gid {} is not belong to current groups",
-                    gid
-                ),
-            ));
+            bail!(
+                "error additional gid {} is not in current groups, want is {:?}, got is {:?}",
+                gid,
+                expected_gids,
+                current_gids
+            );
         }
     }
 
