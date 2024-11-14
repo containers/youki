@@ -407,7 +407,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "190baaad529bcfbde9e1a19022c42781bdb6ff9de25721abdb8fd98c0807730b"
 dependencies = [
  "libc",
- "thiserror 1.0.66",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -1982,7 +1982,7 @@ dependencies = [
  "serde_json",
  "serial_test",
  "tempfile",
- "thiserror 1.0.66",
+ "thiserror 2.0.3",
  "tracing",
 ]
 
@@ -2012,7 +2012,7 @@ dependencies = [
  "serde_json",
  "serial_test",
  "tempfile",
- "thiserror 1.0.66",
+ "thiserror 2.0.3",
  "tracing",
 ]
 
@@ -2832,7 +2832,7 @@ checksum = "b55bad9126f378a853655831eb7363b7b01b81d19f8cb1218861086ca4a1a61e"
 dependencies = [
  "once_cell",
  "protobuf-support",
- "thiserror 1.0.66",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -2847,7 +2847,7 @@ dependencies = [
  "protobuf-parse",
  "regex",
  "tempfile",
- "thiserror 1.0.66",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -2862,7 +2862,7 @@ dependencies = [
  "protobuf",
  "protobuf-support",
  "tempfile",
- "thiserror 1.0.66",
+ "thiserror 1.0.69",
  "which 4.4.2",
 ]
 
@@ -2872,7 +2872,7 @@ version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a5d4d7b8601c814cfb36bcebb79f0e61e45e1e93640cf778837833bbed05c372"
 dependencies = [
- "thiserror 1.0.66",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -3032,7 +3032,7 @@ checksum = "bd283d9651eeda4b2a83a43c1c91b266c40fd76ecd39a50a8c630ae69dc72891"
 dependencies = [
  "getrandom",
  "libredox",
- "thiserror 1.0.66",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -3989,11 +3989,11 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "1.0.66"
+version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d171f59dbaa811dbbb1aee1e73db92ec2b122911a48e1390dfe327a821ddede"
+checksum = "b6aaf5339b578ea85b50e080feb250a3e8ae8cfcdff9a461c9ec2904bc923f52"
 dependencies = [
- "thiserror-impl 1.0.66",
+ "thiserror-impl 1.0.69",
 ]
 
 [[package]]
@@ -4007,9 +4007,9 @@ dependencies = [
 
 [[package]]
 name = "thiserror-impl"
-version = "1.0.66"
+version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b08be0f17bd307950653ce45db00cd31200d82b624b36e181337d9c7d92765b5"
+checksum = "4fee6c4efc90059e10f81e6d42c60a18f76588c3d74cb83a0b242a2b6c7504c1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4516,7 +4516,7 @@ dependencies = [
  "pin-project-lite",
  "replace_with",
  "slab",
- "thiserror 1.0.66",
+ "thiserror 1.0.69",
  "tokio",
  "tracing",
  "webc",
@@ -4531,7 +4531,7 @@ dependencies = [
  "async-trait",
  "bytes",
  "libc",
- "thiserror 1.0.66",
+ "thiserror 1.0.69",
  "tokio",
  "tracing",
 ]
@@ -4609,7 +4609,7 @@ dependencies = [
  "anyhow",
  "bitflags 1.3.2",
  "once_cell",
- "thiserror 1.0.66",
+ "thiserror 1.0.69",
  "tracing",
  "wai-bindgen-wasmer-impl",
  "wasmer",
@@ -4690,7 +4690,7 @@ dependencies = [
  "once_cell",
  "rustix",
  "system-interface",
- "thiserror 1.0.66",
+ "thiserror 1.0.69",
  "tracing",
  "wasmtime",
  "wiggle",
@@ -4831,7 +4831,7 @@ dependencies = [
  "cfg-if",
  "num-derive",
  "num-traits",
- "thiserror 1.0.66",
+ "thiserror 1.0.69",
  "wasmedge-macro",
  "wasmedge-sys",
  "wasmedge-types",
@@ -4861,7 +4861,7 @@ dependencies = [
  "setjmp",
  "sha256",
  "tar",
- "thiserror 1.0.66",
+ "thiserror 1.0.69",
  "wasmedge-macro",
  "wasmedge-types",
  "wat",
@@ -4873,7 +4873,7 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "17315f552d26bcfe01fc185b874177592d30aab86a10ed898cc8a3f29815c9c4"
 dependencies = [
- "thiserror 1.0.66",
+ "thiserror 1.0.69",
  "wat",
 ]
 
@@ -4893,7 +4893,7 @@ dependencies = [
  "serde",
  "serde-wasm-bindgen",
  "target-lexicon",
- "thiserror 1.0.66",
+ "thiserror 1.0.69",
  "wasm-bindgen",
  "wasm-bindgen-downcast",
  "wasmer-compiler",
@@ -4921,7 +4921,7 @@ dependencies = [
  "more-asserts",
  "region",
  "smallvec",
- "thiserror 1.0.66",
+ "thiserror 1.0.69",
  "wasmer-types",
  "wasmer-vm",
  "wasmparser 0.95.0",
@@ -4973,7 +4973,7 @@ dependencies = [
  "serde_cbor",
  "serde_json",
  "serde_yaml 0.9.34+deprecated",
- "thiserror 1.0.66",
+ "thiserror 1.0.69",
  "toml 0.8.12",
 ]
 
@@ -4991,7 +4991,7 @@ dependencies = [
  "rkyv",
  "serde",
  "target-lexicon",
- "thiserror 1.0.66",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -5016,7 +5016,7 @@ dependencies = [
  "more-asserts",
  "region",
  "scopeguard",
- "thiserror 1.0.66",
+ "thiserror 1.0.69",
  "wasmer-types",
  "winapi",
 ]
@@ -5059,7 +5059,7 @@ dependencies = [
  "tempfile",
  "term_size",
  "termios",
- "thiserror 1.0.66",
+ "thiserror 1.0.69",
  "tokio",
  "tracing",
  "url",
@@ -5280,7 +5280,7 @@ dependencies = [
  "object 0.36.0",
  "smallvec",
  "target-lexicon",
- "thiserror 1.0.66",
+ "thiserror 1.0.69",
  "wasmparser 0.218.0",
  "wasmtime-environ",
  "wasmtime-versioned-export-macros 26.0.1",
@@ -5475,7 +5475,7 @@ dependencies = [
  "shared-buffer",
  "tar",
  "tempfile",
- "thiserror 1.0.66",
+ "thiserror 1.0.69",
  "toml 0.7.8",
  "url",
  "walkdir",
@@ -5527,7 +5527,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bitflags 2.6.0",
- "thiserror 1.0.66",
+ "thiserror 1.0.69",
  "tracing",
  "wasmtime",
  "wiggle-macro",
@@ -5878,7 +5878,7 @@ checksum = "e366f27a5cabcddb2706a78296a40b8fcc451e1a6aba2fc1d94b4a01bdaaef4b"
 dependencies = [
  "anyhow",
  "log",
- "thiserror 1.0.66",
+ "thiserror 1.0.69",
  "wast 35.0.2",
 ]
 
