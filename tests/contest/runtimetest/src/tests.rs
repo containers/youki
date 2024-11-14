@@ -589,16 +589,16 @@ fn validate_additional_gids(expected_gids: &Vec<u32>) -> Result<()> {
 
     if expected_gids.len() != current_gids.len() {
         bail!(
-            "error additional group num want {}, got {}",
-            expected_gids.len(),
-            current_gids.len()
+            "error : additional group mismatch, want {:?}, got {:?}",
+            expected_gids,
+            current_gids
         );
     }
 
     for gid in expected_gids {
         if !current_gids.contains(&Gid::from_raw(*gid)) {
             bail!(
-                "error additional gid {} is not in current groups, want is {:?}, got is {:?}",
+                "error : additional gid {} is not in current groups, expected {:?}, got {:?}",
                 gid,
                 expected_gids,
                 current_gids
