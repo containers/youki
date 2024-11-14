@@ -13,6 +13,7 @@ pub mod no_pivot;
 pub mod pidfile;
 pub mod process;
 pub mod process_rlimits;
+pub mod process_user;
 pub mod readonly_paths;
 pub mod scheduler;
 pub mod seccomp;
