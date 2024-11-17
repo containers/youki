@@ -22,3 +22,4 @@ pub mod seccomp;
 pub mod seccomp_notify;
 pub mod sysctl;
 pub mod tlb;
+pub mod kill;
