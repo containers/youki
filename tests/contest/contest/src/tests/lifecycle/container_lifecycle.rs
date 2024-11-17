@@ -33,7 +33,7 @@ impl ContainerLifecycle {
         }
     }
 
-     pub fn set_id(&mut self, id: &str) {
+    pub fn set_id(&mut self, id: &str) {
         self.container_id = id.to_string();
     }
 

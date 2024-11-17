@@ -1,6 +1,7 @@
-use test_framework::{ConditionalTest, TestGroup, TestResult};
-use crate::tests::lifecycle::ContainerLifecycle;
 use anyhow::anyhow;
+use test_framework::{ConditionalTest, TestGroup, TestResult};
+
+use crate::tests::lifecycle::ContainerLifecycle;
 
 fn run_kill_test_cases() -> TestResult {
     let mut container = ContainerLifecycle::new();
@@ -39,7 +40,9 @@ fn run_kill_test_cases() -> TestResult {
         "kill created container",
         match container.kill() {
             TestResult::Passed => TestResult::Passed,
-            TestResult::Failed(_) => TestResult::Failed(anyhow!("Expected success but got failure")),
+            TestResult::Failed(_) => {
+                TestResult::Failed(anyhow!("Expected success but got failure"))
+            }
             _ => TestResult::Failed(anyhow!("Unexpected test result")),
         },
     ));
@@ -75,7 +78,9 @@ fn run_kill_test_cases() -> TestResult {
         "kill running container",
         match container.kill() {
             TestResult::Passed => TestResult::Passed,
-            TestResult::Failed(_) => TestResult::Failed(anyhow!("Expected success but got failure")),
+            TestResult::Failed(_) => {
+                TestResult::Failed(anyhow!("Expected success but got failure"))
+            }
             _ => TestResult::Failed(anyhow!("Unexpected test result")),
         },
     ));

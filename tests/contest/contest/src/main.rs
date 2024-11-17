@@ -16,6 +16,7 @@ use crate::tests::hooks::get_hooks_tests;
 use crate::tests::hostname::get_hostname_test;
 use crate::tests::intel_rdt::get_intel_rdt_test;
 use crate::tests::io_priority::get_io_priority_test;
+use crate::tests::kill::get_kill_test;
 use crate::tests::lifecycle::{ContainerCreate, ContainerLifecycle};
 use crate::tests::linux_ns_itype::get_ns_itype_tests;
 use crate::tests::mounts_recursive::get_mounts_recursive_test;
@@ -32,7 +33,6 @@ use crate::tests::seccomp::get_seccomp_test;
 use crate::tests::seccomp_notify::get_seccomp_notify_test;
 use crate::tests::sysctl::get_sysctl_test;
 use crate::tests::tlb::get_tlb_test;
-use crate::tests::kill::get_kill_test;
 use crate::utils::support::{set_runtime_path, set_runtimetest_path};
 
 #[derive(Parser, Debug)]
