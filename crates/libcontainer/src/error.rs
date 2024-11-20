@@ -127,8 +127,9 @@ impl From<Vec<LibcontainerError>> for MultiError {
 
 #[cfg(test)]
 mod tests {
-    use super::{LibcontainerError, MultiError};
     use libcgroups::common::CreateCgroupSetupError;
+
+    use super::{LibcontainerError, MultiError};
 
     #[test]
     fn test_multi_error() {
