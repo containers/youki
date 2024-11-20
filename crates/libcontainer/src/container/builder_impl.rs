@@ -60,11 +60,14 @@ impl ContainerBuilderImpl {
             Err(outer) => {
                 // Only the init container should be cleaned up in the case of
                 // an error.
+                let mut errors = vec![outer];
                 if matches!(self.container_type, ContainerType::InitContainer) {
-                    self.cleanup_container()?;
+                    if let Err(e) = self.cleanup_container() {
+                        errors.push(e);
+                    }
                 }
 
-                Err(outer)
+                Err(LibcontainerError::MultiError(errors.into()))
             }
         }
     }

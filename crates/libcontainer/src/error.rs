@@ -62,6 +62,8 @@ pub enum LibcontainerError {
     CgroupGet(#[from] libcgroups::common::GetCgroupSetupError),
     #[error[transparent]]
     Checkpoint(#[from] crate::container::CheckpointError),
+    #[error[transparent]]
+    MultiError(#[from] MultiError),
 
     // Catch all errors that are not covered by the above
     #[error("syscall error")]
@@ -96,4 +98,60 @@ pub enum ErrInvalidSpec {
     IoPriority,
     #[error("invalid scheduler config for process")]
     Scheduler,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub struct MultiError(Vec<LibcontainerError>);
+
+impl std::fmt::Display for MultiError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.0.len() {
+            0 => write!(f, ""),
+            1 => std::fmt::Display::fmt(&self.0[0], f),
+            _ => {
+                writeln!(f, "multiple errors occurred while processing the request:")?;
+                for (index, error) in self.0.iter().enumerate() {
+                    writeln!(f, "{}: {}", index + 1, error)?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
+impl From<Vec<LibcontainerError>> for MultiError {
+    fn from(value: Vec<LibcontainerError>) -> Self {
+        Self(value)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{LibcontainerError, MultiError};
+    use libcgroups::common::CreateCgroupSetupError;
+
+    #[test]
+    fn test_multi_error() {
+        let errs = Vec::<LibcontainerError>::new();
+        let multi_err: MultiError = errs.into();
+        let msg = format!("{}", multi_err);
+        assert_eq!("", msg);
+
+        let err1 = LibcontainerError::CgroupCreate(CreateCgroupSetupError::NonDefault);
+        let errs = vec![err1];
+        let multi_err: MultiError = errs.into();
+        let msg = format!("{:#}", multi_err);
+        assert_eq!("non default cgroup root not supported", msg);
+
+        let err1 = LibcontainerError::CgroupCreate(CreateCgroupSetupError::NonDefault);
+        let err2 = LibcontainerError::InvalidID(super::ErrInvalidID::Empty);
+        let errs = vec![err1, err2];
+        let multi_err: MultiError = errs.into();
+        let msg = format!("{:#}", multi_err);
+        let expect = r#"multiple errors occurred while processing the request:
+1: non default cgroup root not supported
+2: container id can't be empty
+"#;
+        assert_eq!(expect, msg);
+    }
 }
