@@ -552,29 +552,31 @@ pub fn test_io_priority_class(spec: &Spec, io_priority_class: IOPriorityClass) {
 
 pub fn validate_process(spec: &Spec) {
     let process = spec.process().as_ref().unwrap();
+    let expected_cwd = process.cwd();
+    let cwd = &getcwd().unwrap();
 
-    if process.cwd().ne(&getcwd().unwrap()) {
+    if expected_cwd != cwd {
         eprintln!(
             "error due to spec cwd want {:?}, got {:?}",
-            process.cwd(),
-            getcwd().unwrap()
+            expected_cwd, cwd
         )
     }
 
     for env_str in process.env().as_ref().unwrap().iter() {
         match env_str.split_once("=") {
-            Some((env_key, env_val)) => {
-                if env::var(env_key).unwrap() != env_val {
+            Some((env_key, expected_val)) => {
+                let actual_val = env::var(env_key).unwrap();
+                if actual_val != expected_val {
                     eprintln!(
                         "error due to spec environment value of {:?} want {:?}, got {:?}",
-                        env_key,
-                        env::var(env_key).unwrap(),
-                        env_val
+                        env_key, actual_val, expected_val
                     )
                 }
             }
             None => {
-                eprintln!("spec env value is not correct")
+                eprintln!(
+                    "spec env value is not correct : expected key=value format, got {env_str}"
+                )
             }
         }
     }
