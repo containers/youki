@@ -101,28 +101,21 @@ pub enum ErrInvalidSpec {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub struct CreateContainerError {
-    #[source]
-    run_error: Box<LibcontainerError>,
-    cleanup_error: Option<Box<LibcontainerError>>,
-}
+pub struct CreateContainerError(Box<LibcontainerError>, Option<Box<LibcontainerError>>);
 
 impl CreateContainerError {
     pub(crate) fn new(
         run_error: LibcontainerError,
         cleanup_error: Option<LibcontainerError>,
     ) -> Self {
-        Self {
-            run_error: Box::new(run_error),
-            cleanup_error: cleanup_error.map(Box::new),
-        }
+        Self(Box::new(run_error), cleanup_error.map(Box::new))
     }
 }
 
 impl std::fmt::Display for CreateContainerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "failed to create container: {}", self.run_error)?;
-        if let Some(cleanup_err) = &self.cleanup_error {
+        write!(f, "failed to create container: {}", self.0)?;
+        if let Some(cleanup_err) = &self.1 {
             write!(f, ". error during cleanup: {}", cleanup_err)?;
         }
         Ok(())
