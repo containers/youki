@@ -36,9 +36,6 @@ fn process_test() -> TestResult {
                 bail!(e)
             }
         }
-        let metadata = fs::metadata(bundle.join("test"))?;
-        let mut permissions = metadata.permissions();
-        permissions.set_mode(0o700);
 
         Ok(())
     })
