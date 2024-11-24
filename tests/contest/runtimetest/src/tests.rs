@@ -567,8 +567,8 @@ pub fn test_validate_root_readonly(spec: &Spec) {
             }
         }
         if let Err(e) = test_dir_read_access("/") {
-            let errno = Errno::from_raw(e.raw_os_error().unwrap());
-            if errno {
+            if let Some(errno_code) = e.raw_os_error() {
+                let errno = Errno::from_raw(errno_code);
                 eprintln!(
                     "readonly root filesystem, but error in testing read access for path /, error: {}",
                     errno
@@ -577,8 +577,8 @@ pub fn test_validate_root_readonly(spec: &Spec) {
         }
     } else {
         if let Err(e) = test_dir_write_access("/") {
-            let errno = Errno::from_raw(e.raw_os_error().unwrap());
-            if errno {
+            if let Some(errno_code) = e.raw_os_error() {
+                let errno = Errno::from_raw(errno_code);
                 eprintln!(
                     "readonly root filesystem is false, but error in testing write access for path /, error: {}",
                     errno
@@ -586,8 +586,8 @@ pub fn test_validate_root_readonly(spec: &Spec) {
             }
         }
         if let Err(e) = test_dir_read_access("/") {
-            let errno = Errno::from_raw(e.raw_os_error().unwrap());
-            if errno {
+            if let Some(errno_code) = e.raw_os_error() {
+                let errno = Errno::from_raw(errno_code);
                 eprintln!(
                     "readonly root filesystem is false, but error in testing read access for path /, error: {}",
                     errno
