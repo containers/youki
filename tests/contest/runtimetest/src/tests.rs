@@ -568,24 +568,31 @@ pub fn test_validate_root_readonly(spec: &Spec) {
         }
         if let Err(e) = test_dir_read_access("/") {
             let errno = Errno::from_raw(e.raw_os_error().unwrap());
-            if errno == Errno::EROFS {
-                /* This is expected */
-            } else {
+            if errno {
                 eprintln!(
-                    "readonly root filesystem, error in testing read access for path /, error: {}",
+                    "readonly root filesystem, but error in testing read access for path /, error: {}",
                     errno
                 );
             }
         }
-    } else if let Err(e) = test_dir_write_access("/") {
-        if e.raw_os_error().is_some() {
+    } else {
+        if let Err(e) = test_dir_write_access("/") {
             let errno = Errno::from_raw(e.raw_os_error().unwrap());
-            eprintln!(
-                "readt only root filesystem is false but write access for path / is err, error: {}",
-                errno
-            );
-        } else {
-            /* This is expected */
+            if errno {
+                eprintln!(
+                    "readonly root filesystem is false, but error in testing write access for path /, error: {}",
+                    errno
+                );
+            }
+        }
+        if let Err(e) = test_dir_read_access("/") {
+            let errno = Errno::from_raw(e.raw_os_error().unwrap());
+            if errno {
+                eprintln!(
+                    "readonly root filesystem is false, but error in testing read access for path /, error: {}",
+                    errno
+                );
+            }
         }
     }
 }
