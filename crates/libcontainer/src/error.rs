@@ -63,7 +63,7 @@ pub enum LibcontainerError {
     #[error[transparent]]
     Checkpoint(#[from] crate::container::CheckpointError),
     #[error[transparent]]
-    MultiError(#[from] MultiError),
+    CreateContainerError(#[from] CreateContainerError),
 
     // Catch all errors that are not covered by the above
     #[error("syscall error")]
@@ -101,27 +101,31 @@ pub enum ErrInvalidSpec {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub struct MultiError(Vec<LibcontainerError>);
+pub struct CreateContainerError {
+    #[source]
+    run_error: Box<LibcontainerError>,
+    cleanup_error: Option<Box<LibcontainerError>>,
+}
 
-impl std::fmt::Display for MultiError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.0.len() {
-            0 => write!(f, ""),
-            1 => std::fmt::Display::fmt(&self.0[0], f),
-            _ => {
-                writeln!(f, "multiple errors occurred while processing the request:")?;
-                for (index, error) in self.0.iter().enumerate() {
-                    writeln!(f, "{}: {}", index + 1, error)?;
-                }
-                Ok(())
-            }
+impl CreateContainerError {
+    pub(crate) fn new(
+        run_error: LibcontainerError,
+        cleanup_error: Option<LibcontainerError>,
+    ) -> Self {
+        Self {
+            run_error: Box::new(run_error),
+            cleanup_error: cleanup_error.map(Box::new),
         }
     }
 }
 
-impl From<Vec<LibcontainerError>> for MultiError {
-    fn from(value: Vec<LibcontainerError>) -> Self {
-        Self(value)
+impl std::fmt::Display for CreateContainerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "failed to create container: {}", self.run_error)?;
+        if let Some(cleanup_err) = &self.cleanup_error {
+            write!(f, ". error during cleanup: {}", cleanup_err)?;
+        }
+        Ok(())
     }
 }
 
@@ -129,30 +133,27 @@ impl From<Vec<LibcontainerError>> for MultiError {
 mod tests {
     use libcgroups::common::CreateCgroupSetupError;
 
-    use super::{LibcontainerError, MultiError};
+    use super::{CreateContainerError, ErrInvalidID};
 
     #[test]
-    fn test_multi_error() {
-        let errs = Vec::<LibcontainerError>::new();
-        let multi_err: MultiError = errs.into();
-        let msg = format!("{}", multi_err);
-        assert_eq!("", msg);
+    fn test_create_container() {
+        let create_container_err =
+            CreateContainerError::new(CreateCgroupSetupError::NonDefault.into(), None);
+        let msg = format!("{}", create_container_err);
+        assert_eq!(
+            "failed to create container: non default cgroup root not supported",
+            msg
+        );
 
-        let err1 = LibcontainerError::CgroupCreate(CreateCgroupSetupError::NonDefault);
-        let errs = vec![err1];
-        let multi_err: MultiError = errs.into();
-        let msg = format!("{:#}", multi_err);
-        assert_eq!("non default cgroup root not supported", msg);
-
-        let err1 = LibcontainerError::CgroupCreate(CreateCgroupSetupError::NonDefault);
-        let err2 = LibcontainerError::InvalidID(super::ErrInvalidID::Empty);
-        let errs = vec![err1, err2];
-        let multi_err: MultiError = errs.into();
-        let msg = format!("{:#}", multi_err);
-        let expect = r#"multiple errors occurred while processing the request:
-1: non default cgroup root not supported
-2: container id can't be empty
-"#;
-        assert_eq!(expect, msg);
+        let create_container_err = CreateContainerError::new(
+            CreateCgroupSetupError::NonDefault.into(),
+            Some(ErrInvalidID::Empty.into()),
+        );
+        let msg = format!("{}", create_container_err);
+        assert_eq!(
+            "failed to create container: non default cgroup root not supported. \
+         error during cleanup: container id can't be empty",
+            msg
+        );
     }
 }
