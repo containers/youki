@@ -1,5 +1,4 @@
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
 
 use anyhow::{bail, Context, Ok, Result};
 use oci_spec::runtime::{ProcessBuilder, Spec, SpecBuilder};
