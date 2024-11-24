@@ -729,3 +729,18 @@ pub fn validate_rootfs() {
         eprintln!("error due to rootfs want {expected:?}, got {entries:?}");
     }
 }
+
+pub fn validate_process_oom_score_adj(spec: &Spec) {
+    let process = spec.process().as_ref().unwrap();
+    let expected_value = process.oom_score_adj().unwrap();
+
+    let pid = std::process::id();
+    let oom_score_adj_path = format!("/proc/{}/oom_score_adj", pid);
+
+    let actual_value = fs::read_to_string(oom_score_adj_path)
+        .unwrap_or_else(|_| panic!("Failed to read file content"));
+
+    if actual_value.trim() != expected_value.to_string() {
+        eprintln!("Unexpected oom_score_adj, expected: {expected_value} found: {actual_value}");
+    }
+}
