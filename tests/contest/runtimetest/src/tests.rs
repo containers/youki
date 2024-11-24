@@ -8,8 +8,9 @@ use anyhow::{bail, Result};
 use nix::errno::Errno;
 use nix::libc;
 use nix::sys::resource::{getrlimit, Resource};
+use nix::sys::stat::{umask, Mode};
 use nix::sys::utsname;
-use nix::unistd::getcwd;
+use nix::unistd::{getcwd, getgid, getgroups, getuid, Gid, Uid};
 use oci_spec::runtime::IOPriorityClass::{self, IoprioClassBe, IoprioClassIdle, IoprioClassRt};
 use oci_spec::runtime::{
     LinuxDevice, LinuxDeviceType, LinuxSchedulerPolicy, PosixRlimit, PosixRlimitType, Spec,
@@ -582,6 +583,65 @@ pub fn validate_process(spec: &Spec) {
     }
 }
 
+pub fn validate_process_user(spec: &Spec) {
+    let process = spec.process().as_ref().unwrap();
+    let expected_uid = Uid::from(process.user().uid());
+    let expected_gid = Gid::from(process.user().gid());
+    let expected_umask = Mode::from_bits(process.user().umask().unwrap()).unwrap();
+
+    let uid = getuid();
+    let gid = getgid();
+    // The umask function not only gets the current mask, but also has the ability to set a new mask,
+    // so we need to set it back after getting the latest value.
+    let current_umask = umask(nix::sys::stat::Mode::empty());
+    umask(current_umask);
+
+    if expected_uid != uid {
+        eprintln!("error due to uid want {}, got {}", expected_uid, uid)
+    }
+
+    if expected_gid != gid {
+        eprintln!("error due to gid want {}, got {}", expected_gid, gid)
+    }
+
+    if let Err(e) = validate_additional_gids(process.user().additional_gids().as_ref().unwrap()) {
+        eprintln!("error additional gids {e}");
+    }
+
+    if expected_umask != current_umask {
+        eprintln!(
+            "error due to umask want {:?}, got {:?}",
+            expected_umask, current_umask
+        )
+    }
+}
+
+// validate_additional_gids function is used to validate additional groups of user
+fn validate_additional_gids(expected_gids: &Vec<u32>) -> Result<()> {
+    let current_gids = getgroups().unwrap();
+
+    if expected_gids.len() != current_gids.len() {
+        bail!(
+            "error : additional group mismatch, want {:?}, got {:?}",
+            expected_gids,
+            current_gids
+        );
+    }
+
+    for gid in expected_gids {
+        if !current_gids.contains(&Gid::from_raw(*gid)) {
+            bail!(
+                "error : additional gid {} is not in current groups, expected {:?}, got {:?}",
+                gid,
+                expected_gids,
+                current_gids
+            );
+        }
+    }
+
+    Ok(())
+}
+
 pub fn validate_process_rlimits(spec: &Spec) {
     let process = spec.process().as_ref().unwrap();
     let spec_rlimits: &Vec<PosixRlimit> = process.rlimits().as_ref().unwrap();
@@ -660,5 +720,20 @@ pub fn validate_rootfs() {
     // compare the expected entries with the actual entries
     if entries != expected {
         eprintln!("error due to rootfs want {expected:?}, got {entries:?}");
+    }
+}
+
+pub fn validate_process_oom_score_adj(spec: &Spec) {
+    let process = spec.process().as_ref().unwrap();
+    let expected_value = process.oom_score_adj().unwrap();
+
+    let pid = std::process::id();
+    let oom_score_adj_path = format!("/proc/{}/oom_score_adj", pid);
+
+    let actual_value = fs::read_to_string(oom_score_adj_path)
+        .unwrap_or_else(|_| panic!("Failed to read file content"));
+
+    if actual_value.trim() != expected_value.to_string() {
+        eprintln!("Unexpected oom_score_adj, expected: {expected_value} found: {actual_value}");
     }
 }
