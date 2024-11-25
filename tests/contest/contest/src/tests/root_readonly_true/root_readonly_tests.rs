@@ -3,6 +3,7 @@ use oci_spec::runtime::{ProcessBuilder, RootBuilder, Spec, SpecBuilder};
 use test_framework::{test_result, Test, TestGroup, TestResult};
 
 use crate::utils::test_inside_container;
+use crate::utils::test_utils::CreateOptions;
 
 fn create_spec(readonly: bool) -> Result<Spec> {
     let spec = SpecBuilder::default()
@@ -21,12 +22,12 @@ fn create_spec(readonly: bool) -> Result<Spec> {
 
 fn root_readonly_true_test() -> TestResult {
     let spec_true = test_result!(create_spec(true));
-    test_inside_container(spec_true, &|_| Ok(()))
+    test_inside_container(spec_true, &CreateOptions::default(), &|_| Ok(()))
 }
 
 fn root_readonly_false_test() -> TestResult {
     let spec_false = test_result!(create_spec(false));
-    test_inside_container(spec_false, &|_| Ok(()))
+    test_inside_container(spec_false, &CreateOptions::default(), &|_| Ok(()))
 }
 
 pub fn get_root_readonly_test() -> TestGroup {
