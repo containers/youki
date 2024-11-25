@@ -1,3 +1,4 @@
+use std::env;
 use std::fs::{self, read_dir};
 use std::os::linux::fs::MetadataExt;
 use std::os::unix::fs::{FileTypeExt, PermissionsExt};
@@ -547,6 +548,38 @@ pub fn test_io_priority_class(spec: &Spec, io_priority_class: IOPriorityClass) {
     };
     if priority != expected_priority {
         eprintln!("error ioprio_get expected priority {expected_priority:?}, got {priority}")
+    }
+}
+
+pub fn validate_process(spec: &Spec) {
+    let process = spec.process().as_ref().unwrap();
+    let expected_cwd = process.cwd();
+    let cwd = &getcwd().unwrap();
+
+    if expected_cwd != cwd {
+        eprintln!(
+            "error due to spec cwd want {:?}, got {:?}",
+            expected_cwd, cwd
+        )
+    }
+
+    for env_str in process.env().as_ref().unwrap().iter() {
+        match env_str.split_once("=") {
+            Some((env_key, expected_val)) => {
+                let actual_val = env::var(env_key).unwrap();
+                if actual_val != expected_val {
+                    eprintln!(
+                        "error due to spec environment value of {:?} want {:?}, got {:?}",
+                        env_key, expected_val, actual_val
+                    )
+                }
+            }
+            None => {
+                eprintln!(
+                    "spec env value is not correct : expected key=value format, got {env_str}"
+                )
+            }
+        }
     }
 }
 

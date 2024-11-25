@@ -21,6 +21,7 @@ use crate::tests::linux_ns_itype::get_ns_itype_tests;
 use crate::tests::mounts_recursive::get_mounts_recursive_test;
 use crate::tests::no_pivot::get_no_pivot_test;
 use crate::tests::pidfile::get_pidfile_test;
+use crate::tests::process::get_process_test;
 use crate::tests::process_oom_score_adj::get_process_oom_score_adj_test;
 use crate::tests::process_rlimits::get_process_rlimits_test;
 use crate::tests::process_user::get_process_user_test;
@@ -117,6 +118,7 @@ fn main() -> Result<()> {
     let scheduler = get_scheduler_test();
     let io_priority_test = get_io_priority_test();
     let devices = get_devices_test();
+    let process = get_process_test();
     let process_user = get_process_user_test();
     let process_rlimtis = get_process_rlimits_test();
     let no_pivot = get_no_pivot_test();
@@ -144,6 +146,7 @@ fn main() -> Result<()> {
     tm.add_test_group(Box::new(sysctl));
     tm.add_test_group(Box::new(scheduler));
     tm.add_test_group(Box::new(devices));
+    tm.add_test_group(Box::new(process));
     tm.add_test_group(Box::new(process_user));
     tm.add_test_group(Box::new(process_rlimtis));
     tm.add_test_group(Box::new(no_pivot));
