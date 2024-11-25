@@ -44,7 +44,11 @@ fn main() {
         "io_priority_class_be" => tests::test_io_priority_class(&spec, IoprioClassBe),
         "io_priority_class_idle" => tests::test_io_priority_class(&spec, IoprioClassIdle),
         "devices" => tests::validate_devices(&spec),
+        "process" => tests::validate_process(&spec),
+        "process_user" => tests::validate_process_user(&spec),
+        "process_rlimits" => tests::validate_process_rlimits(&spec),
         "no_pivot" => tests::validate_rootfs(),
+        "process_oom_score_adj" => tests::validate_process_oom_score_adj(&spec),
         _ => eprintln!("error due to unexpected execute test name: {execute_test}"),
     }
 }

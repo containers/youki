@@ -9,7 +9,7 @@ use nix::unistd::Pid;
 use oci_spec::runtime::Spec;
 
 use super::{Container, ContainerStatus};
-use crate::error::{LibcontainerError, MissingSpecError};
+use crate::error::{CreateContainerError, LibcontainerError, MissingSpecError};
 use crate::notify_socket::NotifyListener;
 use crate::process::args::{ContainerArgs, ContainerType};
 use crate::process::intel_rdt::delete_resctrl_subdirectory;
@@ -51,6 +51,12 @@ pub(super) struct ContainerBuilderImpl {
     pub executor: Box<dyn Executor>,
     /// If do not use pivot root to jail process inside rootfs
     pub no_pivot: bool,
+    // RawFd set to stdin of the container init process.
+    pub stdin: Option<OwnedFd>,
+    // RawFd set to stdout of the container init process.
+    pub stdout: Option<OwnedFd>,
+    // RawFd set to stderr of the container init process.
+    pub stderr: Option<OwnedFd>,
 }
 
 impl ContainerBuilderImpl {
@@ -60,13 +66,19 @@ impl ContainerBuilderImpl {
             Err(outer) => {
                 // Only the init container should be cleaned up in the case of
                 // an error.
-                if matches!(self.container_type, ContainerType::InitContainer) {
-                    self.cleanup_container()?;
-                }
+                let cleanup_err = if self.is_init_container() {
+                    self.cleanup_container().err()
+                } else {
+                    None
+                };
 
-                Err(outer)
+                Err(CreateContainerError::new(outer, cleanup_err).into())
             }
         }
+    }
+
+    fn is_init_container(&self) -> bool {
+        matches!(self.container_type, ContainerType::InitContainer)
     }
 
     fn run_container(&mut self) -> Result<Pid, LibcontainerError> {
@@ -157,6 +169,9 @@ impl ContainerBuilderImpl {
             detached: self.detached,
             executor: self.executor.clone(),
             no_pivot: self.no_pivot,
+            stdin: self.stdin.as_ref().map(|x| x.as_raw_fd()),
+            stdout: self.stdout.as_ref().map(|x| x.as_raw_fd()),
+            stderr: self.stderr.as_ref().map(|x| x.as_raw_fd()),
         };
 
         let (init_pid, need_to_clean_up_intel_rdt_dir) =
