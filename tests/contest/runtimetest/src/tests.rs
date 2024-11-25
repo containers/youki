@@ -570,7 +570,7 @@ pub fn validate_process(spec: &Spec) {
                 if actual_val != expected_val {
                     eprintln!(
                         "error due to spec environment value of {:?} want {:?}, got {:?}",
-                        env_key, actual_val, expected_val
+                        env_key, expected_val, actual_val
                     )
                 }
             }
