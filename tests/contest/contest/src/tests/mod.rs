@@ -16,6 +16,7 @@ pub mod process_oom_score_adj;
 pub mod process_rlimits;
 pub mod process_user;
 pub mod readonly_paths;
+pub mod root_readonly_true;
 pub mod scheduler;
 pub mod seccomp;
 pub mod seccomp_notify;
