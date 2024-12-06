@@ -2008,6 +2008,7 @@ dependencies = [
  "regex",
  "rust-criu",
  "safe-path",
+ "scopeguard",
  "serde",
  "serde_json",
  "serial_test",
