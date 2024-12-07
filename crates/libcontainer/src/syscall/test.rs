@@ -2,6 +2,7 @@ use std::any::Any;
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::HashMap;
 use std::ffi::{OsStr, OsString};
+use std::os::fd::RawFd;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -246,6 +247,10 @@ impl Syscall for TestHelperSyscall {
     }
 
     fn close_range(&self, _: i32) -> Result<()> {
+        todo!()
+    }
+
+    fn remap_passed_fds(&self, _: &[(RawFd, RawFd)]) -> Result<()> {
         todo!()
     }
 

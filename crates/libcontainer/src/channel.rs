@@ -1,6 +1,6 @@
 use std::io::{IoSlice, IoSliceMut};
 use std::marker::PhantomData;
-use std::os::fd::AsRawFd;
+use std::os::fd::IntoRawFd;
 use std::os::unix::prelude::RawFd;
 
 use nix::sys::socket::{self, UnixAddr};
@@ -213,9 +213,6 @@ fn unix_channel() -> Result<(RawFd, RawFd), ChannelError> {
         socket::SockFlag::SOCK_CLOEXEC,
     )?;
     // It is not straightforward to share the OwnedFd across forks, so we
-    // treat them as i32. We use ManuallyDrop to keep the connection open.
-    let f1 = std::mem::ManuallyDrop::new(f1);
-    let f2 = std::mem::ManuallyDrop::new(f2);
-
-    Ok((f1.as_raw_fd(), f2.as_raw_fd()))
+    // treat them as i32 - into_raw_fd ensures they're not dropped
+    Ok((f1.into_raw_fd(), f2.into_raw_fd()))
 }
