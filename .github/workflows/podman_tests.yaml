@@ -48,7 +48,7 @@ jobs:
 
       # build podman
       - name: Clone podman repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: containers/podman
       - name: Build podman

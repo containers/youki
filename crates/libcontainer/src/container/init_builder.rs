@@ -21,6 +21,7 @@ pub struct InitContainerBuilder {
     use_cgroups: bool,
     use_systemd: bool,
     detached: bool,
+    no_pivot: bool,
 }
 
 impl InitContainerBuilder {
@@ -33,6 +34,7 @@ impl InitContainerBuilder {
             use_cgroups: true,
             use_systemd: true,
             detached: true,
+            no_pivot: false,
         }
     }
 
@@ -50,6 +52,11 @@ impl InitContainerBuilder {
 
     pub fn with_detach(mut self, detached: bool) -> Self {
         self.detached = detached;
+        self
+    }
+
+    pub fn with_no_pivot(mut self, no_pivot: bool) -> Self {
+        self.no_pivot = no_pivot;
         self
     }
 
@@ -113,6 +120,10 @@ impl InitContainerBuilder {
             preserve_fds: self.base.preserve_fds,
             detached: self.detached,
             executor: self.base.executor,
+            no_pivot: self.no_pivot,
+            stdin: self.base.stdin,
+            stdout: self.base.stdout,
+            stderr: self.base.stderr,
         };
 
         builder_impl.create()?;

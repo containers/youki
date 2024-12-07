@@ -30,6 +30,7 @@ pub fn create(
         .with_systemd(systemd_cgroup)
         .with_cgroups(use_cgroups)
         .with_detach(true)
+        .with_no_pivot(args.no_pivot)
         .build()?;
 
     Ok(())

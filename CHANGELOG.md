@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.4.1](https://github.com/containers/youki/compare/v0.4.0...v0.4.1) - 2024-09-02
+### 🧪 Test improvements and Misc Fixes
+- prepare for version 0.4.1 by @YJDoc2 in https://github.com/containers/youki/pull/2897
+
 ## [v0.4.0](https://github.com/containers/youki/compare/v0.3.3...v0.4.0) - 2024-08-23
 ### 💪 Improvements
 - Export max_usage in cgroups v2 mode by @HeRaNO in https://github.com/containers/youki/pull/2802

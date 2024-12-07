@@ -1,10 +1,9 @@
-use anyhow::Result;
 use selinux::selinux::*;
 use selinux::selinux_label::*;
 use std::fs::File;
 use std::path::Path;
 
-fn main() -> Result<()> {
+fn main() -> Result<(), SELinuxError> {
     let mut selinux_instance: SELinux = SELinux::new();
 
     if selinux_instance.get_enabled() {
@@ -32,9 +31,9 @@ fn main() -> Result<()> {
     }
 
     let file_path = Path::new("./test_file.txt");
-    let _file = File::create(file_path)?;
+    let _file = File::create(file_path).unwrap();
     let selinux_label =
-        SELinuxLabel::try_from("unconfined_u:object_r:public_content_t:s1".to_string())?;
+        SELinuxLabel::try_from("system_u:object_r:public_content_t:s0".to_string())?;
     SELinux::set_file_label(file_path, selinux_label)?;
     let current_label = SELinux::file_label(file_path)?;
     println!("file label is {}", current_label);

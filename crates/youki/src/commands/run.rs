@@ -23,6 +23,7 @@ pub fn run(args: Run, root_path: PathBuf, systemd_cgroup: bool, use_cgroups: boo
         .with_systemd(systemd_cgroup)
         .with_cgroups(use_cgroups)
         .with_detach(args.detach)
+        .with_no_pivot(args.no_pivot)
         .build()?;
 
     container

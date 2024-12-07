@@ -4,7 +4,7 @@ version = "0.0.0"
 description = "Library for seccomp"
 license-file = "../../LICENSE"
 repository = "https://github.com/containers/youki"
-homepage = "https://containers.github.io/youki"
+homepage = "https://youki-dev.github.io/youki/"
 readme = "README.md"
 authors = ["youki team"]
 edition = "2021"
@@ -24,3 +24,4 @@ prctl = "1.0.0"
 anyhow = "1.0"
 tokio = { version = "1", features = ["full"] }
 syscall-numbers = "3.1.1"
+syscalls = { version = "0.6.18", features = ["std", "serde", "aarch64", "x86_64"]}

@@ -26,7 +26,7 @@ jobs:
         arch: [ "x86_64", "aarch64" ]
         libc: [ "gnu", "musl" ]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
       - name: Setup Rust toolchain and cache
@@ -53,7 +53,7 @@ jobs:
       - name: Create artifact
         run: tar -zcvf youki-${{ needs.parse.outputs.version }}-${{ matrix.arch }}-${{ matrix.libc }}.tar.gz youki README.md LICENSE
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: youki-${{ matrix.arch }}-${{ matrix.libc }}
           path: youki-${{ needs.parse.outputs.version }}-${{ matrix.arch }}-${{ matrix.libc }}.tar.gz
@@ -69,11 +69,11 @@ jobs:
       - parse
       - build
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Create artifacts directory
         run: mkdir -p artifacts
       - name: Download artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: artifacts
       - name: Show artifacts
@@ -98,7 +98,7 @@ jobs:
     env:
       CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Setup Rust toolchain and cache
         uses: actions-rust-lang/setup-rust-toolchain@v1
       - name: Publish libcgroups
