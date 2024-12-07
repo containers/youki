@@ -8,42 +8,55 @@ fn kill_with_empty_id_test() -> TestResult {
 
     // kill with empty id
     container.set_id("");
-    match container.kill() {
+    let result = match container.kill() {
         TestResult::Failed(_) => TestResult::Passed,
         TestResult::Passed => TestResult::Failed(anyhow!("Expected failure but got success")),
         _ => TestResult::Failed(anyhow!("Unexpected test result")),
-    }
+    };
+    container.delete();
+    result
 }
 
 fn kill_non_existed_container() -> TestResult {
     let mut container = ContainerLifecycle::new();
+
     // kill for non existed container
     container.set_id("non-existent-container-id");
-    match container.kill() {
+    let result = match container.kill() {
         TestResult::Failed(_) => TestResult::Passed,
         TestResult::Passed => TestResult::Failed(anyhow!("Expected failure but got success")),
         _ => TestResult::Failed(anyhow!("Unexpected test result")),
-    }
+    };
+    container.delete();
+    result
 }
 fn kill_created_container_test() -> TestResult {
     let container = ContainerLifecycle::new();
+
     // kill created container
     match container.create() {
         TestResult::Passed => {}
         _ => return TestResult::Failed(anyhow!("Failed to create container")),
     }
-    match container.kill() {
+    let result = match container.kill() {
         TestResult::Passed => TestResult::Passed,
         TestResult::Failed(_) => {
             TestResult::Failed(anyhow!("Expected success but got failure"))
         }
         _ => TestResult::Failed(anyhow!("Unexpected test result")),
-    }
+    };
+    container.delete();
+    result
 }
 
 fn kill_stopped_container_test() -> TestResult {
     let container = ContainerLifecycle::new();
+
     // kill stopped container
+    match container.create() {
+        TestResult::Passed => {}
+        _ => return TestResult::Failed(anyhow!("Failed to create container")),
+    }
     match container.delete() {
         TestResult::Passed => {}
         _ => return TestResult::Failed(anyhow!("Failed to delete container")),
@@ -58,6 +71,7 @@ fn kill_stopped_container_test() -> TestResult {
 
 fn kill_start_container_test() -> TestResult {
     let container = ContainerLifecycle::new();
+
     // kill start container
     match container.create() {
     TestResult::Passed => {}
@@ -65,29 +79,27 @@ fn kill_start_container_test() -> TestResult {
     }
 
     match container.start() {
-    TestResult::Passed => {}
-    TestResult::Failed(err) => {
-        return TestResult::Failed(anyhow!("Failed to start container: {:?}", err));
+        TestResult::Passed => {}
+        TestResult::Failed(err) => {
+            return TestResult::Failed(anyhow!("Failed to start container: {:?}", err));
+        }
+        _ => unreachable!(),
     }
-    _ => unreachable!(),
-    }
-    match container.kill() {
+    let result = match container.kill() {
         TestResult::Passed => TestResult::Passed,
         TestResult::Failed(_) => {
             TestResult::Failed(anyhow!("Expected success but got failure"))
         }
         _ => TestResult::Failed(anyhow!("Unexpected test result")),
-    }
-
-    // match container.delete() {
-    //     TestResult::Passed => {}
-    //     _ => return TestResult::Failed(anyhow!("Failed to delete container")),
-    // }
+    };
+    container.delete();
+    result
 }
 
 
 pub fn get_kill_test() -> TestGroup {
     let mut test_group = TestGroup::new("kill_container");
+
     let kill_with_empty_id_test = Test::new(
         "kill_with_empty_id_test",
         Box::new(kill_with_empty_id_test),
@@ -108,6 +120,12 @@ pub fn get_kill_test() -> TestGroup {
         "kill_start_container_test",
         Box::new(kill_start_container_test)
     );
-    test_group.add(vec![Box::new(kill_with_empty_id_test), Box::new(kill_non_existed_container), Box::new(kill_created_container_test), Box::new(kill_stopped_container_test), Box::new(kill_start_container_test)]);
+    test_group.add(vec![
+        Box::new(kill_with_empty_id_test),
+        Box::new(kill_non_existed_container),
+        Box::new(kill_created_container_test),
+        Box::new(kill_stopped_container_test),
+        Box::new(kill_start_container_test)
+    ]);
     test_group
 }
