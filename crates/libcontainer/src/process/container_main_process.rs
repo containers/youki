@@ -75,7 +75,13 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, bo
         })
     };
 
-    let intermediate_pid = fork::container_clone(cb).map_err(|err| {
+    let container_clone_fn = if container_args.as_sibling {
+        fork::container_clone_sibling
+    } else {
+        fork::container_clone
+    };
+
+    let intermediate_pid = container_clone_fn(cb).map_err(|err| {
         tracing::error!("failed to fork intermediate process: {}", err);
         ProcessError::IntermediateProcessFailed(err)
     })?;
