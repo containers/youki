@@ -16,9 +16,6 @@ fn cleanup(id: &Uuid, bundle: &tempfile::TempDir) {
     delete_container(&str_id, bundle).unwrap().wait().unwrap();
 }
 
-// here we have to manually create and manage the container
-// as the test_inside_container does not provide a way to set the pid file argument
-// TODO: this comment is now out of date, the test just needs updating
 fn test_pidfile() -> TestResult {
     // create id for the container and pidfile
     let container_id = generate_uuid();

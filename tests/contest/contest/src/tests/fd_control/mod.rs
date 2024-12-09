@@ -102,6 +102,7 @@ pub fn get_fd_control_test() -> TestGroup {
     );
     let test_closes_fd = Test::new("closes_fd", Box::new(closes_fd_test));
     let test_pass_single_fd = Test::new("pass_single_fd", Box::new(pass_single_fd_test));
+    // adding separately as one is conditional test and others are normal
     test_group.add(vec![Box::new(test_only_stdio)]);
     test_group.add(vec![
         Box::new(test_closes_fd),
