@@ -1,4 +1,4 @@
-use std::os::fd::OwnedFd;
+use std::os::fd::{OwnedFd, RawFd};
 use std::path::PathBuf;
 
 use super::init_builder::InitContainerBuilder;
@@ -20,8 +20,10 @@ pub struct ContainerBuilder {
     pub(super) pid_file: Option<PathBuf>,
     /// Socket to communicate the file descriptor of the ptty
     pub(super) console_socket: Option<PathBuf>,
-    /// File descriptors to be passed into the container process
+    /// Number of file descriptors to be passed into the container process
     pub(super) preserve_fds: i32,
+    /// File descriptors to be remapped into the container process
+    pub(super) remap_fds: Vec<(RawFd, RawFd)>,
     /// The function that actually runs on the container init process. Default
     /// is to execute the specified command in the oci spec.
     pub(super) executor: Box<dyn Executor>,
@@ -76,6 +78,7 @@ impl ContainerBuilder {
             pid_file: None,
             console_socket: None,
             preserve_fds: 0,
+            remap_fds: vec![],
             executor: workload::default::get_executor(),
             stdin: None,
             stdout: None,
@@ -231,7 +234,7 @@ impl ContainerBuilder {
     }
 
     /// Sets the number of additional file descriptors which will be passed into
-    /// the container process.
+    /// the container process, over and above stdio (0, 1, 2).
     /// # Example
     ///
     /// ```no_run
@@ -242,10 +245,31 @@ impl ContainerBuilder {
     ///     "74f1a4cb3801".to_owned(),
     ///     SyscallType::default(),
     /// )
+    /// // Will pass FDs <= 7
     /// .with_preserved_fds(5);
     /// ```
     pub fn with_preserved_fds(mut self, preserved_fds: i32) -> Self {
         self.preserve_fds = preserved_fds;
+        self
+    }
+
+    /// Sets a list of file descriptors that will be mapped and passed into
+    /// the container process (ignoring any limits on preserved fds)
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use libcontainer::container::builder::ContainerBuilder;
+    /// # use libcontainer::syscall::syscall::SyscallType;
+    ///
+    /// ContainerBuilder::new(
+    ///     "74f1a4cb3801".to_owned(),
+    ///     SyscallType::default(),
+    /// )
+    /// // Overwrites stderr with FD 15, and explicitly passes FD 10
+    /// .with_remapped_fds(vec![(15, 2), (10, 10)]);
+    /// ```
+    pub fn with_remapped_fds(mut self, remapped_fds: Vec<(RawFd, RawFd)>) -> Self {
+        self.remap_fds = remapped_fds;
         self
     }
 

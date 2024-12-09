@@ -1,7 +1,7 @@
 use nix::sys::wait::{waitpid, WaitStatus};
 use nix::unistd::Pid;
 
-use crate::process::args::ContainerArgs;
+use crate::process::args::{ContainerArgs, ContainerType};
 use crate::process::fork::{self, CloneCb};
 use crate::process::intel_rdt::setup_intel_rdt;
 use crate::process::{channel, container_intermediate_process};
@@ -40,8 +40,11 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, bo
     // At minimum, we have to close down any unused senders. The corresponding
     // receivers will be cleaned up once the senders are closed down.
     let (mut main_sender, mut main_receiver) = channel::main_channel()?;
-    let mut inter_chan = channel::intermediate_channel()?;
-    let mut init_chan = channel::init_channel()?;
+    let (mut inter_sender, mut inter_receiver) = channel::intermediate_channel()?;
+    #[cfg(feature = "libseccomp")]
+    let (mut init_sender, mut init_receiver) = channel::init_channel()?;
+    #[cfg(not(feature = "libseccomp"))]
+    let (init_sender, mut init_receiver) = channel::init_channel()?;
 
     let cb: CloneCb = {
         Box::new(|| {
@@ -50,10 +53,20 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, bo
                 return ret;
             }
 
+            // We are inside the forked process here - clean up FDs that don't need
+            // passing down
+            if let Err(err) = init_sender.close() {
+                tracing::error!(?err, "failed to close receiver in init process");
+                return -1;
+            }
+            if let Err(err) = inter_sender.close() {
+                tracing::error!(?err, "failed to close receiver in init process");
+                return -1;
+            }
             match container_intermediate_process::container_intermediate_process(
                 container_args,
-                &mut inter_chan,
-                &mut init_chan,
+                &mut inter_receiver,
+                &mut init_receiver,
                 &mut main_sender,
             ) {
                 Ok(_) => 0,
@@ -75,15 +88,6 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, bo
         })
     };
 
-    // Before starting the intermediate process, mark all non-stdio open files as O_CLOEXEC
-    // to ensure we don't leak any file descriptors to the intermediate process.
-    // Please refer to https://github.com/opencontainers/runc/security/advisories/GHSA-xr7r-f8xq-vfvv for more details.
-    let syscall = container_args.syscall.create_syscall();
-    syscall.close_range(0).map_err(|err| {
-        tracing::error!(?err, "failed to cleanup extra fds");
-        ProcessError::SyscallOther(err)
-    })?;
-
     let intermediate_pid = fork::container_clone(cb).map_err(|err| {
         tracing::error!("failed to fork intermediate process: {}", err);
         ProcessError::IntermediateProcessFailed(err)
@@ -95,12 +99,6 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, bo
         tracing::error!("failed to close unused sender: {}", err);
         err
     })?;
-
-    let (mut inter_sender, inter_receiver) = inter_chan;
-    #[cfg(feature = "libseccomp")]
-    let (mut init_sender, init_receiver) = init_chan;
-    #[cfg(not(feature = "libseccomp"))]
-    let (init_sender, init_receiver) = init_chan;
 
     // If creating a container with new user namespace, the intermediate process will ask
     // the main process to set up uid and gid mapping, once the intermediate
@@ -126,18 +124,19 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, bo
     if let Some(linux) = container_args.spec.linux() {
         #[cfg(feature = "libseccomp")]
         if let Some(seccomp) = linux.seccomp() {
+            let container_state = match &container_args.container_type {
+                ContainerType::InitContainer { container } => &container.state,
+                ContainerType::TenantContainer { .. } => {
+                    return Err(ProcessError::ContainerStateRequired)
+                }
+            };
             let state = crate::container::ContainerProcessState {
                 oci_version: container_args.spec.version().to_string(),
                 // runc hardcode the `seccompFd` name for fds.
                 fds: vec![String::from("seccompFd")],
                 pid: init_pid.as_raw(),
                 metadata: seccomp.listener_metadata().to_owned().unwrap_or_default(),
-                state: container_args
-                    .container
-                    .as_ref()
-                    .ok_or(ProcessError::ContainerStateRequired)?
-                    .state
-                    .clone(),
+                state: container_state.clone(),
             };
             crate::process::seccomp_listener::sync_seccomp(
                 seccomp,
@@ -148,10 +147,10 @@ pub fn container_main_process(container_args: &ContainerArgs) -> Result<(Pid, bo
         }
 
         if let Some(intel_rdt) = linux.intel_rdt() {
-            let container_id = container_args
-                .container
-                .as_ref()
-                .map(|container| container.id());
+            let container_id = match &container_args.container_type {
+                ContainerType::InitContainer { container } => Some(container.id()),
+                ContainerType::TenantContainer { .. } => None,
+            };
             need_to_clean_up_intel_rdt_subdirectory =
                 setup_intel_rdt(container_id, &init_pid, intel_rdt)?;
         }

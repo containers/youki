@@ -355,7 +355,6 @@ pub fn container_init_process(
         utils::parse_env(proc.env().as_ref().unwrap_or(&vec![]));
     let rootfs_path = &args.rootfs;
     let hooks = spec.hooks().as_ref();
-    let container = args.container.as_ref();
     let namespaces = Namespaces::try_from(linux.namespaces().as_ref())?;
     let notify_listener = &args.notify_listener;
 
@@ -395,7 +394,7 @@ pub fn container_init_process(
         let _ = prctl::set_no_new_privileges(true);
     }
 
-    if matches!(args.container_type, ContainerType::InitContainer) {
+    if let ContainerType::InitContainer { container } = &args.container_type {
         // create_container hook needs to be called after the namespace setup, but
         // before pivot_root is called. This runs in the container namespaces.
         if let Some(hooks) = hooks {
@@ -580,6 +579,9 @@ pub fn container_init_process(
     // will be closed after execve into the container payload. We can't close the
     // fds immediately since we at least still need it for the pipe used to wait on
     // starting the container.
+    //
+    // Note: this should happen very late, in order to avoid accidentally leaking FDs
+    // Please refer to https://github.com/opencontainers/runc/security/advisories/GHSA-xr7r-f8xq-vfvv for more details.
     syscall.close_range(preserve_fds).map_err(|err| {
         tracing::error!(?err, "failed to cleanup extra fds");
         InitProcessError::SyscallOther(err)
@@ -660,6 +662,11 @@ pub fn container_init_process(
         }
     }
 
+    if proc.args().is_none() {
+        tracing::error!("on non-Windows, at least one process arg entry is required");
+        Err(MissingSpecError::Args)?;
+    }
+
     args.executor.validate(spec)?;
     args.executor.setup_envs(envs)?;
 
@@ -691,7 +698,7 @@ pub fn container_init_process(
 
     // create_container hook needs to be called after the namespace setup, but
     // before pivot_root is called. This runs in the container namespaces.
-    if matches!(args.container_type, ContainerType::InitContainer) {
+    if let ContainerType::InitContainer { container } = &args.container_type {
         if let Some(hooks) = hooks {
             hooks::run_hooks(hooks.start_container().as_ref(), container, None).map_err(|err| {
                 tracing::error!(?err, "failed to run start container hooks");
@@ -700,10 +707,15 @@ pub fn container_init_process(
         }
     }
 
-    if proc.args().is_none() {
-        tracing::error!("on non-Windows, at least one process arg entry is required");
-        Err(MissingSpecError::Args)?;
-    }
+    // Remap any FDs the user wants to pass to the container. This has to happen when
+    // no other FDs at all are open, otherwise the user could accidentally clobber
+    // an FD that's in use by youki. Unfortunately this can conflict with seccomp -
+    // the way to fix this would be to relocate in-use FDs out of the way of user
+    // requested ones, but that is quite hard.
+    syscall.remap_passed_fds(&args.remap_fds).map_err(|err| {
+        tracing::error!(?err, "failed to remap fds to be passed");
+        InitProcessError::SyscallOther(err)
+    })?;
 
     args.executor.exec(spec).map_err(|err| {
         tracing::error!(?err, "failed to execute payload");
