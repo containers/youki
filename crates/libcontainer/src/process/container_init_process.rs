@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::{env, fs, mem};
@@ -761,6 +761,9 @@ fn set_supplementary_gids(
 
         let gids: Vec<Gid> = additional_gids
             .iter()
+            // this is to remove duplicate ids, so we behave similar to runc
+            .collect::<HashSet<_>>()
+            .into_iter()
             .map(|gid| Gid::from_raw(*gid))
             .collect();
 
