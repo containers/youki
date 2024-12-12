@@ -1,5 +1,5 @@
 use anyhow::anyhow;
-use test_framework::{test_result, Test, TestGroup, TestResult};
+use test_framework::{Test, TestGroup, TestResult};
 
 use crate::tests::lifecycle::ContainerLifecycle;
 
@@ -46,7 +46,7 @@ fn kill_created_container_test() -> TestResult {
         TestResult::Passed => {}
         _ => return TestResult::Failed(anyhow!("Failed to create container")),
     }
-    let result = test_result!(container.kill());
+    let result = container.kill();
     container.delete();
     result
 }
@@ -86,7 +86,7 @@ fn kill_start_container_test() -> TestResult {
         }
         _ => unreachable!(),
     }
-    let result = test_result!(container.kill());
+    let result = container.kill();
     container.delete();
     result
 }
