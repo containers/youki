@@ -106,7 +106,7 @@ impl ContainerLifecycle {
         &self,
         retry_timeout: Duration,
         poll_interval: Duration,
-        target_status: String,
+        target_status: &str,
     ) -> TestResult {
         let start = Instant::now();
         while start.elapsed() < retry_timeout {
@@ -124,7 +124,7 @@ impl ContainerLifecycle {
             }
             sleep(poll_interval);
         }
-        return TestResult::Failed(anyhow!("error pod status is not update"));
+        TestResult::Failed(anyhow!("error pod status is not update"))
     }
 }
 

@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use anyhow::{anyhow, Context, Result};
 use oci_spec::runtime::{ProcessBuilder, Spec, SpecBuilder};
 use test_framework::{Test, TestGroup, TestResult};
@@ -79,6 +81,7 @@ fn kill_stopped_container_test() -> TestResult {
         TestResult::Passed => {}
         _ => return TestResult::Failed(anyhow!("Failed to start container")),
     }
+    container.waiting_for_status(Duration::from_secs(10), Duration::from_secs(1), "stopped");
     let result = match container.kill() {
         TestResult::Failed(_) => TestResult::Passed,
         TestResult::Passed => TestResult::Failed(anyhow!("Expected failure but got success")),
@@ -105,6 +108,7 @@ fn kill_start_container_test() -> TestResult {
         }
         _ => unreachable!(),
     }
+    container.waiting_for_status(Duration::from_secs(10), Duration::from_secs(1), "running");
     let result = container.kill();
     container.delete();
     result
