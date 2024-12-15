@@ -1,16 +1,17 @@
-use anyhow::anyhow;
+use anyhow::{anyhow, Context, Result};
 use oci_spec::runtime::{ProcessBuilder, Spec, SpecBuilder};
 use test_framework::{Test, TestGroup, TestResult};
 
 use crate::tests::lifecycle::ContainerLifecycle;
 
 fn create_spec(args: &[&str]) -> Result<Spec> {
+    let args_vec: Vec<String> = args.iter().map(|&a| a.to_string()).collect();
     let spec = SpecBuilder::default()
         .process(
             ProcessBuilder::default()
-                .args(args.iter().map(|&a| a.to_string()).collect())
+                .args(args_vec)
                 .build()
-                .context("failed to build process spec")?
+                .context("failed to build process spec")?,
         )
         .build()
         .context("failed to build spec")?;

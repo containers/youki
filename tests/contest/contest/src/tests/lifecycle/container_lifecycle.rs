@@ -1,12 +1,13 @@
-use std::string;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
+use anyhow::anyhow;
+use oci_spec::runtime::Spec;
 use test_framework::{TestResult, TestableGroup};
 
 use super::util::criu_installed;
 use super::{checkpoint, create, delete, exec, kill, start, state};
-use crate::utils::{generate_uuid, prepare_bundle, get_state};
+use crate::utils::{generate_uuid, get_state, prepare_bundle, set_config, State};
 
 // By experimenting, somewhere around 50 is enough for youki process
 // to get the kill signal and shut down
@@ -101,20 +102,25 @@ impl ContainerLifecycle {
         )
     }
 
-    pub fn waiting_for_status(&self, retry_timeout: Duration, poll_interval: Duration, target_status: string) -> TestResult {
+    pub fn waiting_for_status(
+        &self,
+        retry_timeout: Duration,
+        poll_interval: Duration,
+        target_status: String,
+    ) -> TestResult {
         let start = Instant::now();
         while start.elapsed() < retry_timeout {
-            let (out, err) = get_state(&self.container_id, self.project_path).unwrap();
+            let (out, err) = get_state(&self.container_id, &self.project_path).unwrap();
             if !err.is_empty() {
                 self.kill();
                 self.delete();
                 return TestResult::Failed(anyhow!("error in state : {}", err));
             }
-        
+
             let state: State = serde_json::from_str(&out).unwrap();
-        
+
             if state.status == target_status {
-                return TestResult::Passed
+                return TestResult::Passed;
             }
             sleep(poll_interval);
         }
