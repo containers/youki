@@ -1,7 +1,21 @@
 use anyhow::anyhow;
+use oci_spec::runtime::{ProcessBuilder, Spec, SpecBuilder};
 use test_framework::{Test, TestGroup, TestResult};
 
 use crate::tests::lifecycle::ContainerLifecycle;
+
+fn create_spec(args: &[&str]) -> Result<Spec> {
+    let spec = SpecBuilder::default()
+        .process(
+            ProcessBuilder::default()
+                .args(args.iter().map(|&a| a.to_string()).collect())
+                .build()
+                .context("failed to build process spec")?
+        )
+        .build()
+        .context("failed to build spec")?;
+    Ok(spec)
+}
 
 fn kill_with_empty_id_test() -> TestResult {
     let mut container = ContainerLifecycle::new();
@@ -53,28 +67,32 @@ fn kill_created_container_test() -> TestResult {
 
 fn kill_stopped_container_test() -> TestResult {
     let container = ContainerLifecycle::new();
+    let spec = create_spec(&["true"]).unwrap();
 
     // kill stopped container
-    match container.create() {
+    match container.create_with_spec(spec) {
         TestResult::Passed => {}
         _ => return TestResult::Failed(anyhow!("Failed to create container")),
     }
-    match container.delete() {
+    match container.start() {
         TestResult::Passed => {}
-        _ => return TestResult::Failed(anyhow!("Failed to delete container")),
+        _ => return TestResult::Failed(anyhow!("Failed to start container")),
     }
-    match container.kill() {
+    let result = match container.kill() {
         TestResult::Failed(_) => TestResult::Passed,
         TestResult::Passed => TestResult::Failed(anyhow!("Expected failure but got success")),
         _ => TestResult::Failed(anyhow!("Unexpected test result")),
-    }
+    };
+    container.delete();
+    result
 }
 
 fn kill_start_container_test() -> TestResult {
     let container = ContainerLifecycle::new();
+    let spec = create_spec(&["sleep", "30"]).unwrap();
 
     // kill start container
-    match container.create() {
+    match container.create_with_spec(spec) {
         TestResult::Passed => {}
         _ => return TestResult::Failed(anyhow!("Failed to recreate container")),
     }
