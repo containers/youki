@@ -2,7 +2,7 @@
 name = "libcgroups"
 version = "0.4.1" # MARK: Version
 description = "Library for cgroup"
-license-file = "../../LICENSE"
+license = "Apache-2.0"
 repository = "https://github.com/containers/youki"
 homepage = "https://youki-dev.github.io/youki/"
 readme = "README.md"
