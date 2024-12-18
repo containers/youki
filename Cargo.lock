@@ -3230,6 +3230,7 @@ dependencies = [
  "nc",
  "nix 0.28.0",
  "oci-spec",
+ "tempfile",
 ]
 
 [[package]]
