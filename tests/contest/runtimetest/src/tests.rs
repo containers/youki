@@ -1728,3 +1728,43 @@ pub fn validate_tmpcopyup(spec: &Spec) {
         }
     }
 }
+
+/// Checks that the device cgroup denies access to a device the spec does not allow.
+///
+/// Runs under a deny-all rule set, where the runtime's defaults still allow mknod for block
+/// devices but no read access, so creating the node must work and opening it must not.
+pub fn validate_device_cgroup() {
+    let dev_path = "/dev/test";
+    let dev = libc::makedev(8, 0);
+
+    if let Err(e) = mknod(
+        dev_path,
+        SFlag::S_IFBLK,
+        Mode::from_bits_truncate(0o600),
+        dev,
+    ) {
+        eprintln!("error due to failing to mknod {dev_path}: {e}");
+        return;
+    }
+
+    match fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NONBLOCK)
+        .open(dev_path)
+    {
+        Ok(_) => {
+            eprintln!(
+                "error due to reading block device {dev_path} being allowed; the device cgroup \
+                 should deny it"
+            );
+        }
+        // Expected: the device cgroup rejected the open.
+        Err(e) if e.raw_os_error() == Some(libc::EPERM) => {}
+        Err(e) => {
+            eprintln!(
+                "error due to opening block device {dev_path} failing with {e}, expected EPERM \
+                 from the device cgroup"
+            );
+        }
+    }
+}
