@@ -9,7 +9,7 @@ pub mod hugetlb;
 pub mod io;
 pub mod memory;
 pub mod pids;
-pub mod systemd_devices;
+pub mod systemd;
 
 pub fn cleanup_v2() -> Result<()> {
     let runtime_test = Path::new("/sys/fs/cgroup/runtime-test");
