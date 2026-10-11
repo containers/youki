@@ -19,19 +19,30 @@ it as a runtime with the node's CRI implementation. It is composed of:
   location of the target runtime, copies the binary into place,
   registers youki, and restarts the runtime.
 
-There is one manifest per CRI implementation. They differ only in the
-DaemonSet - the Namespace, RuntimeClass and RBAC are identical, so a
-cluster with a mix of both can apply both files:
+There is one manifest per CRI implementation. Apply only the one that
+matches the runtime of your cluster:
 
 | Runtime | Manifest | Host path mounted | How youki is registered |
 | --- | --- | --- | --- |
 | containerd | `youki-deploy.yaml` | `/etc/containerd` | appends a `runtimes.youki` block to `config.toml` |
 | CRI-O | `youki-deploy-crio.yaml` | `/etc/crio` | writes a `crio.conf.d/99-youki.conf` drop-in |
 
+The manifests do not restrict which nodes the DaemonSet runs on, so a
+cluster that mixes containerd and CRI-O nodes is not supported yet.
+
+### containerd
+
 ```console
-$ kubectl apply -f tools/youki-deploy/youki-deploy.yaml       # containerd
-$ kubectl apply -f tools/youki-deploy/youki-deploy-crio.yaml  # CRI-O
+$ kubectl apply -f tools/youki-deploy/youki-deploy.yaml
 ```
+
+### CRI-O
+
+```console
+$ kubectl apply -f tools/youki-deploy/youki-deploy-crio.yaml
+```
+
+### How the installer picks the runtime
 
 The DaemonSet picks the runtime through the `CRI_RUNTIME` environment
 variable, which each manifest sets explicitly. Setting it to `auto`
@@ -52,17 +63,32 @@ resources, so they should apply to any cluster on the matching runtime.
 
 ## Try it locally on kind
 
+### containerd
+
 To stand up the cluster + DaemonSet:
 
 ```console
-$ just kind-deploy       # containerd nodes
-$ just kind-deploy-crio  # CRI-O nodes
+$ just kind-deploy
 ```
 
 To tear it down:
 
 ```console
 $ just clean-test-kind-deploy
+```
+
+### CRI-O
+
+To stand up a cluster whose nodes run CRI-O instead of containerd, plus
+the DaemonSet:
+
+```console
+$ just kind-deploy-crio
+```
+
+To tear it down:
+
+```console
 $ just clean-test-kind-deploy-crio
 ```
 

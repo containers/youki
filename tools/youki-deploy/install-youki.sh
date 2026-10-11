@@ -91,6 +91,17 @@ configure_crio() {
         return
     fi
 
+    # Stop before writing the drop-in. Without conmon, the node gets the
+    # ready label but cannot start a youki pod.
+    if [ -z "${CRIO_MONITOR_PATH}" ]; then
+        CRIO_MONITOR_PATH=$(detect_crio_monitor_path)
+    fi
+    if [ -z "${CRIO_MONITOR_PATH}" ]; then
+        echo "[youki-deploy] conmon not found in the usual locations." \
+             "Set CRIO_MONITOR_PATH to the path of conmon on the host." >&2
+        exit 1
+    fi
+
     echo "[youki-deploy] Writing ${dropin}"
     # Do not set cgroup_manager. It applies to the node, not to one runtime,
     # so youki uses the manager of CRI-O.
@@ -100,17 +111,8 @@ ${MARKER}
 runtime_path = "${REAL_BIN_DIR}/youki"
 runtime_type = "oci"
 runtime_root = "/run/youki"
+monitor_path = "${CRIO_MONITOR_PATH}"
 EOF
-
-    if [ -z "${CRIO_MONITOR_PATH}" ]; then
-        CRIO_MONITOR_PATH=$(detect_crio_monitor_path)
-    fi
-    if [ -n "${CRIO_MONITOR_PATH}" ]; then
-        echo "monitor_path = \"${CRIO_MONITOR_PATH}\"" >>"${dropin}"
-    else
-        echo "[youki-deploy] conmon not found in the usual locations, leaving" \
-             "monitor_path unset for CRI-O to resolve" >&2
-    fi
 
     # Correct the SELinux label. A file copied through a bind mount can get
     # the wrong one, and SELinux then stops CRI-O from starting youki.
