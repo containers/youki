@@ -83,7 +83,7 @@ impl Device {
         I: IntoIterator<Item = &'a LinuxDevice>,
     {
         let old_mode = umask(Mode::from_bits_truncate(0o000));
-        devices
+        let result = devices
             .into_iter()
             .map(|dev| {
                 if !dev.path().is_absolute() {
@@ -97,10 +97,9 @@ impl Device {
                     self.mknod_dev(rootfs, dev)
                 }
             })
-            .collect::<Result<Vec<_>>>()?;
+            .collect::<Result<Vec<_>>>();
         umask(old_mode);
-
-        Ok(())
+        result.map(|_| ())
     }
 
     fn bind_dev(&self, rootfs: &Path, dev: &LinuxDevice) -> Result<()> {
@@ -224,12 +223,14 @@ mod tests {
     use std::path::PathBuf;
 
     use anyhow::Result;
+    use nix::errno::Errno;
     use nix::sys::stat::SFlag;
     use nix::unistd::{Gid, Uid};
     use oci_spec::runtime::{LinuxDeviceBuilder, LinuxDeviceType};
 
     use super::*;
-    use crate::syscall::test::{ChownArgs, MknodArgs, TestHelperSyscall};
+    use crate::syscall::SyscallError;
+    use crate::syscall::test::{ArgName, ChownArgs, MknodArgs, TestHelperSyscall};
 
     #[test]
     fn test_bind_dev() -> Result<()> {
@@ -433,9 +434,6 @@ mod tests {
 
     #[test]
     fn test_create_devices_rejects_relative_path() -> Result<()> {
-        let _restore_umask = scopeguard::guard(umask(Mode::empty()), |mode| {
-            umask(mode);
-        });
         let tmp_dir = tempfile::tempdir()?;
         let device = Device::new_with_syscall(Box::<TestHelperSyscall>::default());
         let dev = LinuxDeviceBuilder::default()
@@ -461,5 +459,65 @@ mod tests {
         assert!(helper.get_mknod_args().is_empty());
         assert!(helper.get_chown_args().is_empty());
         Ok(())
+    }
+
+    #[test]
+    fn test_create_devices_restores_umask_on_error() {
+        crate::test_utils::test_in_child_process(|| {
+            let expected_mode = Mode::from_bits_truncate(0o027);
+            umask(expected_mode);
+            let device = Device::new_with_syscall(Box::<TestHelperSyscall>::default());
+            let dev = LinuxDeviceBuilder::default()
+                .path(PathBuf::from("data/custom-null"))
+                .major(1)
+                .minor(3)
+                .typ(LinuxDeviceType::C)
+                .build()
+                .unwrap();
+
+            for bind in [false, true] {
+                assert!(
+                    device
+                        .create_devices(Path::new("/rootfs"), [&dev], bind)
+                        .is_err()
+                );
+                assert_eq!(umask(expected_mode), expected_mode);
+            }
+            Ok(())
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn test_create_devices_restores_umask_on_syscall_error() {
+        crate::test_utils::test_in_child_process(|| {
+            let expected_mode = Mode::from_bits_truncate(0o027);
+            umask(expected_mode);
+            let tmp_dir = tempfile::tempdir().unwrap();
+            let dev = LinuxDeviceBuilder::default()
+                .path(PathBuf::from("/data/custom-null"))
+                .major(1)
+                .minor(3)
+                .typ(LinuxDeviceType::C)
+                .build()
+                .unwrap();
+
+            for (bind, syscall) in [
+                (false, ArgName::Mknod),
+                (false, ArgName::Chown),
+                (true, ArgName::Mount),
+            ] {
+                let helper = TestHelperSyscall::default();
+                helper.set_ret_err(syscall, || Err(SyscallError::Nix(Errno::EPERM)));
+                let device = Device::new_with_syscall(Box::new(helper));
+                assert!(matches!(
+                    device.create_devices(tmp_dir.path(), [&dev], bind),
+                    Err(DeviceError::Syscall(SyscallError::Nix(Errno::EPERM)))
+                ));
+                assert_eq!(umask(expected_mode), expected_mode);
+            }
+            Ok(())
+        })
+        .unwrap();
     }
 }
