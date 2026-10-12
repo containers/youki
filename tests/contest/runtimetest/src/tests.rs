@@ -27,6 +27,7 @@ use oci_spec::runtime::{
     Capability, LinuxDevice, LinuxDeviceType, LinuxIdMapping, LinuxSchedulerPolicy,
     MemoryPolicyModeType, PosixRlimit, PosixRlimitType, Spec,
 };
+use procfs::process::{MountInfo, MountOptFields, Process};
 use tempfile::Builder;
 
 use crate::utils::{
@@ -1246,7 +1247,7 @@ pub fn validate_rootfs_propagation(spec: &Spec) {
     let target_path = target_dir.path();
 
     match propagation.as_str() {
-        "shared" | "slave" | "private" => {
+        "shared" | "slave" | "private" | "rshared" | "rslave" | "rprivate" => {
             if let Err(e) = mount(
                 Some("/"),
                 target_dir.path(),
@@ -1291,7 +1292,7 @@ pub fn validate_rootfs_propagation(spec: &Spec) {
             let file_visible = target_file.exists();
 
             match propagation.as_str() {
-                "shared" => {
+                "shared" | "rshared" => {
                     if !file_visible {
                         eprintln!(
                             "Error: shared root propagation failed to expose {:?}",
@@ -1299,7 +1300,7 @@ pub fn validate_rootfs_propagation(spec: &Spec) {
                         );
                     }
                 }
-                "slave" | "private" => {
+                "slave" | "private" | "rslave" | "rprivate" => {
                     if file_visible {
                         eprintln!(
                             "Error: {} root propagation unexpectedly exposed {:?}",
@@ -1310,7 +1311,7 @@ pub fn validate_rootfs_propagation(spec: &Spec) {
                 _ => unreachable!(),
             }
         }
-        "unbindable" => {
+        "unbindable" | "runbindable" => {
             if let Err(e) = mount(
                 Some("/"),
                 target_dir.path(),
@@ -1529,6 +1530,201 @@ pub fn validate_time_offsets(spec: &Spec) {
             eprintln!(
                 "Unexpected {clock_type} time offset, expected: {expected_secs} {expected_nanosecs}, found: {actual_secs} {actual_nanosecs}"
             );
+        }
+    }
+}
+
+pub fn validate_mount_propagation(spec: &Spec) {
+    let Some(mounts) = spec.mounts() else {
+        eprintln!("Error: mounts are not set in spec");
+        return;
+    };
+
+    let mountinfo: Vec<MountInfo> = match Process::myself().and_then(|p| p.mountinfo()) {
+        std::result::Result::Ok(mi) => mi.into_iter().collect(),
+        Err(e) => {
+            eprintln!("Error: failed to read mountinfo: {e}");
+            return;
+        }
+    };
+    let find = |path: &Path| mountinfo.iter().find(|m| m.mount_point == path);
+    let has_shared = |m: &MountInfo| {
+        m.opt_fields
+            .iter()
+            .any(|f| matches!(f, MountOptFields::Shared(_)))
+    };
+    let has_master = |m: &MountInfo| {
+        m.opt_fields
+            .iter()
+            .any(|f| matches!(f, MountOptFields::Master(_)))
+    };
+    let has_unbindable = |m: &MountInfo| {
+        m.opt_fields
+            .iter()
+            .any(|f| matches!(f, MountOptFields::Unbindable))
+    };
+
+    for mount in mounts {
+        let Some(options) = mount.options() else {
+            continue;
+        };
+        let Some(propagation) = options.iter().find(|o| {
+            matches!(
+                o.as_str(),
+                "shared"
+                    | "rshared"
+                    | "slave"
+                    | "rslave"
+                    | "private"
+                    | "rprivate"
+                    | "unbindable"
+                    | "runbindable"
+            )
+        }) else {
+            continue;
+        };
+
+        let dest = mount.destination();
+        let Some(top) = find(dest) else {
+            eprintln!("Error: mount {dest:?} not found in mountinfo");
+            continue;
+        };
+        let sub = find(&dest.join("sub"));
+
+        match propagation.as_str() {
+            "shared" | "rshared" => {
+                if !has_shared(top) {
+                    eprintln!(
+                        "Error: expected {dest:?} to be shared, got optional fields {:?}",
+                        top.opt_fields
+                    );
+                }
+                if let Some(sub) = sub {
+                    let expect_sub_shared = propagation == "rshared";
+                    if has_shared(sub) != expect_sub_shared {
+                        eprintln!(
+                            "Error: expected submount shared to be {expect_sub_shared} for {propagation}, got optional fields {:?}",
+                            sub.opt_fields
+                        );
+                    }
+                }
+            }
+            "slave" | "rslave" => {
+                if !has_master(top) || has_shared(top) {
+                    eprintln!(
+                        "Error: expected {dest:?} to be a slave, got optional fields {:?}",
+                        top.opt_fields
+                    );
+                }
+                if propagation == "rslave"
+                    && let Some(sub) = sub
+                    && (!has_master(sub) || has_shared(sub))
+                {
+                    eprintln!(
+                        "Error: expected submount to be a slave for rslave, got optional fields {:?}",
+                        sub.opt_fields
+                    );
+                }
+            }
+            "private" | "rprivate" => {
+                if has_shared(top) || has_master(top) || has_unbindable(top) {
+                    eprintln!(
+                        "Error: expected {dest:?} to be private, got optional fields {:?}",
+                        top.opt_fields
+                    );
+                }
+                if let Some(sub) = sub {
+                    let sub_private = !has_shared(sub) && !has_master(sub) && !has_unbindable(sub);
+                    let expect_sub_private = propagation == "rprivate";
+                    if sub_private != expect_sub_private {
+                        eprintln!(
+                            "Error: expected submount private to be {expect_sub_private} for {propagation}, got optional fields {:?}",
+                            sub.opt_fields
+                        );
+                    }
+                }
+            }
+            "unbindable" | "runbindable" => {
+                if !has_unbindable(top) {
+                    eprintln!(
+                        "Error: expected {dest:?} to be unbindable, got optional fields {:?}",
+                        top.opt_fields
+                    );
+                }
+                if let Some(sub) = sub {
+                    let expect_sub_unbindable = propagation == "runbindable";
+                    if has_unbindable(sub) != expect_sub_unbindable {
+                        eprintln!(
+                            "Error: expected submount unbindable to be {expect_sub_unbindable} for {propagation}, got optional fields {:?}",
+                            sub.opt_fields
+                        );
+                    }
+                }
+            }
+            _ => unreachable!(),
+        }
+    }
+}
+
+pub fn validate_default_symlinks(_spec: &Spec) {
+    let default_symlinks = [
+        ("/dev/fd", "/proc/self/fd"),
+        ("/dev/ptmx", "pts/ptmx"),
+        ("/dev/stdin", "/proc/self/fd/0"),
+        ("/dev/stdout", "/proc/self/fd/1"),
+        ("/dev/stderr", "/proc/self/fd/2"),
+    ];
+
+    for (link, target) in default_symlinks.iter() {
+        match std::fs::read_link(link) {
+            Ok(target_path) => {
+                if target_path != Path::new(target) {
+                    eprintln!(
+                        "Error: expected symlink {} to point to {}, but it points to {}",
+                        link,
+                        target,
+                        target_path.display()
+                    );
+                }
+            }
+            Err(e) => {
+                eprintln!("Error: failed to read symlink {}: {:?}", link, e);
+            }
+        }
+    }
+}
+
+pub fn validate_tmpcopyup(spec: &Spec) {
+    for mount in spec.mounts().as_deref().unwrap_or_default() {
+        let options = mount.options().as_deref().unwrap_or_default();
+        if !options.iter().any(|o| o == "tmpcopyup") {
+            continue;
+        }
+        let dest = mount.destination();
+
+        match nix::sys::statfs::statfs(dest) {
+            Ok(fs) if fs.filesystem_type() == nix::sys::statfs::TMPFS_MAGIC => {}
+            Ok(_) => eprintln!("{dest:?} is not a tmpfs"),
+            Err(e) => eprintln!("statfs {dest:?}: {e}"),
+        }
+
+        // set up by the test: dir2 with mode 0777 in the image's directory under the tmpfs
+        let dir2 = dest.join("dir2");
+        match fs::metadata(&dir2) {
+            Ok(m) if m.is_dir() && m.permissions().mode() & 0o7777 == 0o777 => {}
+            Ok(m) => eprintln!(
+                "{dir2:?} was not copied up as a 0777 directory: mode {:o}",
+                m.permissions().mode()
+            ),
+            Err(e) => eprintln!("{dir2:?} was not copied up: {e}"),
+        }
+
+        let readonly = options.iter().any(|o| o == "ro");
+        match (test_dir_write_access(dest.to_str().unwrap()), readonly) {
+            (Ok(()), false) => {}
+            (Err(e), true) if e.raw_os_error() == Some(libc::EROFS) => {}
+            (Ok(()), true) => eprintln!("{dest:?} is writable but mounted ro"),
+            (Err(e), _) => eprintln!("write to {dest:?}: {e}"),
         }
     }
 }
