@@ -47,6 +47,7 @@ fn main() {
         "io_priority_class_idle" => tests::test_io_priority_class(&spec, IoprioClassIdle),
         "memory_policy" => tests::validate_memory_policy(&spec),
         "devices" => tests::validate_devices(&spec),
+        "device_cgroup" => tests::validate_device_cgroup(&spec),
         "root_readonly" => tests::test_validate_root_readonly(&spec),
         "process_capabilities_bounding_unset" => {
             tests::validate_process_capabilities_bounding_unset(&spec)
@@ -63,6 +64,8 @@ fn main() {
         "uid_mappings" => tests::validate_uid_mappings(&spec),
         "net_devices" => tests::validate_net_devices(&spec),
         "time_offsets" => tests::validate_time_offsets(&spec),
+        "default_symlinks" => tests::validate_default_symlinks(&spec),
+        "tmpcopyup" => tests::validate_tmpcopyup(&spec),
         _ => eprintln!("error due to unexpected execute test name: {execute_test}"),
     }
 }

@@ -86,6 +86,7 @@ impl Manager {
     /// of a cgroup v2 fs and cgroup path being a relative path from the root.
     /// For rootless environments call .with_rootless(true).
     pub fn new(root_path: PathBuf, cgroup_path: PathBuf) -> Result<Self, V2ManagerError> {
+        let cgroup_path = common::clean_cgroup_path(&cgroup_path);
         let full_path = root_path.join_safely(&cgroup_path)?;
 
         Ok(Self {
@@ -131,26 +132,28 @@ impl Manager {
             .peekable();
         while let Some(component) = components.next() {
             current_path = current_path.join(component);
-            if !current_path.exists() {
-                match fs::create_dir(&current_path).wrap_create_dir(&current_path) {
-                    Ok(()) => {
-                        fs::metadata(&current_path)
-                            .wrap_other(&current_path)?
-                            .permissions()
-                            .set_mode(0o755);
-                    }
-
-                    // in container-in-container environments these paths are often read-only
-                    // we do not error here—rather we continue in a best effort
-                    Err(err) if self.rootless && Self::is_permission_error(&err) => {
-                        tracing::debug!(
-                            "rootless cgroup: cannot create {current_path:?}: {err}; \
-                             leaving process in its parent cgroup"
-                        );
-                        return Ok(());
-                    }
-                    Err(err) => return Err(err.into()),
+            // an existing directory is success, including one another container has just
+            // created; checking exists() before create_dir would race with that container
+            match fs::create_dir(&current_path).wrap_create_dir(&current_path) {
+                Ok(()) => {
+                    fs::metadata(&current_path)
+                        .wrap_other(&current_path)?
+                        .permissions()
+                        .set_mode(0o755);
                 }
+
+                Err(err) if err.inner().kind() == std::io::ErrorKind::AlreadyExists => {}
+
+                // in container-in-container environments these paths are often read-only
+                // we do not error here—rather we continue in a best effort
+                Err(err) if self.rootless && Self::is_permission_error(&err) => {
+                    tracing::debug!(
+                        "rootless cgroup: cannot create {current_path:?}: {err}; \
+                         leaving process in its parent cgroup"
+                    );
+                    return Ok(());
+                }
+                Err(err) => return Err(err.into()),
             }
 
             // last component cannot have subtree_control enabled due to internal process constraint
@@ -297,5 +300,46 @@ impl CgroupManager for Manager {
 
     fn get_all_pids(&self) -> Result<Vec<Pid>, Self::Error> {
         Ok(common::get_all_pids(&self.full_path)?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test::set_fixture;
+
+    #[test]
+    fn test_new_keeps_cgroup_path_under_root() -> Result<(), V2ManagerError> {
+        let manager = Manager::new(
+            PathBuf::from("/sys/fs/cgroup"),
+            PathBuf::from("/../../../xx/yy"),
+        )?;
+
+        assert_eq!(manager.cgroup_path, PathBuf::from("/xx/yy"));
+        assert_eq!(manager.full_path, PathBuf::from("/sys/fs/cgroup/xx/yy"));
+        Ok(())
+    }
+
+    #[test]
+    fn test_add_task_with_existing_parent() {
+        // A temp dir is not a cgroupfs, so add_task fails at the missing cgroup.procs
+        // after creating the directories. Finding the parent already there, as when
+        // another container created it, must not fail the create.
+        let tmp = tempfile::tempdir().expect("create temp directory for test");
+        set_fixture(tmp.path(), util::CGROUP_CONTROLLERS, "").expect("set cgroup.controllers");
+        fs::create_dir(tmp.path().join("parent")).expect("create parent");
+
+        let manager = Manager::new(tmp.path().to_path_buf(), PathBuf::from("/parent/child"))
+            .expect("create manager");
+        let result = manager.add_task(Pid::from_raw(1));
+
+        assert!(
+            !matches!(
+                result,
+                Err(V2ManagerError::WrappedIo(WrappedIoError::CreateDir { .. }))
+            ),
+            "{result:?}"
+        );
+        assert!(tmp.path().join("parent/child").is_dir());
     }
 }

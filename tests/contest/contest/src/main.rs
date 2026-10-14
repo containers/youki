@@ -11,6 +11,7 @@ use tests::cgroups;
 
 use crate::tests::checkpoint_restore::get_checkpoint_restore_tests;
 use crate::tests::create_runtime::get_create_runtime_tests;
+use crate::tests::default::get_default_symlinks_test;
 use crate::tests::delete::get_delete_test;
 use crate::tests::devices::get_devices_test;
 use crate::tests::domainname::get_domainname_tests;
@@ -62,7 +63,7 @@ use crate::tests::state::get_state_test;
 use crate::tests::sysctl::get_sysctl_test;
 use crate::tests::terminal::get_terminal_test;
 use crate::tests::time_ns::get_time_ns_test;
-use crate::tests::tlb::get_tlb_test;
+use crate::tests::tmpcopyup::get_tmpcopyup_test;
 use crate::tests::uid_mappings::get_uid_mappings_test;
 use crate::tests::update::get_update_test;
 use crate::utils::support::{set_runtime_path, set_runtimetest_path};
@@ -131,7 +132,7 @@ fn main() -> Result<()> {
 
     let cl = ContainerLifecycle::new();
     let cc = ContainerCreate::new();
-    let huge_tlb = get_tlb_test();
+    let cgroup_v2_hugetlb = cgroups::hugetlb::get_hugetlb_test();
     let pidfile = get_pidfile_test();
     let ns_itype = get_ns_itype_tests();
     let hooks = get_hooks_tests();
@@ -144,7 +145,11 @@ fn main() -> Result<()> {
     let create_runtime = get_create_runtime_tests();
     let prestart_fail = get_prestart_fail_tests();
     let cgroup_v2_cpu = cgroups::cpu::v2::get_test_group();
+    let cgroup_v2_cpuset = cgroups::cpuset::get_test_group();
     let cgroup_v2_memory = cgroups::memory::get_test_group();
+    let cgroup_v2_pids = cgroups::pids::get_test_group();
+    let cgroup_v2_io = cgroups::io::get_test_group();
+    let cgroup_systemd_devices = cgroups::systemd::devices::get_test_group();
     let seccomp = get_seccomp_test();
     let seccomp_notify = get_seccomp_notify_test();
     let state = get_state_test();
@@ -161,6 +166,7 @@ fn main() -> Result<()> {
     let io_priority_test = get_io_priority_test();
     let delete = get_delete_test();
     let devices = get_devices_test();
+    let default_symlinks = get_default_symlinks_test();
     let root_readonly = get_root_readonly_test();
     let process = get_process_test();
     let process_capabilities = get_process_capabilities_test();
@@ -188,10 +194,11 @@ fn main() -> Result<()> {
     let checkpoint_restore = get_checkpoint_restore_tests();
     let update = get_update_test();
     let time_ns = get_time_ns_test();
+    let tmpcopyup = get_tmpcopyup_test();
 
     tm.add_test_group(Box::new(cl));
     tm.add_test_group(Box::new(cc));
-    tm.add_test_group(Box::new(huge_tlb));
+    tm.add_test_group(Box::new(cgroup_v2_hugetlb));
     tm.add_test_group(Box::new(pidfile));
     tm.add_test_group(Box::new(ns_itype));
     tm.add_test_group(Box::new(hooks));
@@ -204,7 +211,11 @@ fn main() -> Result<()> {
     tm.add_test_group(Box::new(create_runtime));
     tm.add_test_group(Box::new(prestart_fail));
     tm.add_test_group(Box::new(cgroup_v2_cpu));
+    tm.add_test_group(Box::new(cgroup_v2_cpuset));
     tm.add_test_group(Box::new(cgroup_v2_memory));
+    tm.add_test_group(Box::new(cgroup_v2_pids));
+    tm.add_test_group(Box::new(cgroup_v2_io));
+    tm.add_test_group(Box::new(cgroup_systemd_devices));
     tm.add_test_group(Box::new(seccomp));
     tm.add_test_group(Box::new(seccomp_notify));
     tm.add_test_group(Box::new(state));
@@ -220,6 +231,7 @@ fn main() -> Result<()> {
     tm.add_test_group(Box::new(memory_policy));
     tm.add_test_group(Box::new(delete));
     tm.add_test_group(Box::new(devices));
+    tm.add_test_group(Box::new(default_symlinks));
     tm.add_test_group(Box::new(root_readonly));
     tm.add_test_group(Box::new(process));
     tm.add_test_group(Box::new(process_capabilities));
@@ -248,6 +260,7 @@ fn main() -> Result<()> {
     tm.add_test_group(Box::new(checkpoint_restore));
     tm.add_test_group(Box::new(update));
     tm.add_test_group(Box::new(time_ns));
+    tm.add_test_group(Box::new(tmpcopyup));
     tm.add_cleanup(Box::new(cgroups::cleanup_v2));
 
     match opts.command {

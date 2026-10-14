@@ -3,7 +3,7 @@ use std::ffi::OsStr;
 use std::fs::{self, File, read_dir};
 use std::io::{self, BufRead};
 use std::os::linux::fs::MetadataExt;
-use std::os::unix::fs::{FileTypeExt, PermissionsExt};
+use std::os::unix::fs::{FileTypeExt, OpenOptionsExt, PermissionsExt};
 use std::path::Path;
 
 use anyhow::{Result, bail};
@@ -1247,7 +1247,7 @@ pub fn validate_rootfs_propagation(spec: &Spec) {
     let target_path = target_dir.path();
 
     match propagation.as_str() {
-        "shared" | "slave" | "private" => {
+        "shared" | "slave" | "private" | "rshared" | "rslave" | "rprivate" => {
             if let Err(e) = mount(
                 Some("/"),
                 target_dir.path(),
@@ -1292,7 +1292,7 @@ pub fn validate_rootfs_propagation(spec: &Spec) {
             let file_visible = target_file.exists();
 
             match propagation.as_str() {
-                "shared" => {
+                "shared" | "rshared" => {
                     if !file_visible {
                         eprintln!(
                             "Error: shared root propagation failed to expose {:?}",
@@ -1300,7 +1300,7 @@ pub fn validate_rootfs_propagation(spec: &Spec) {
                         );
                     }
                 }
-                "slave" | "private" => {
+                "slave" | "private" | "rslave" | "rprivate" => {
                     if file_visible {
                         eprintln!(
                             "Error: {} root propagation unexpectedly exposed {:?}",
@@ -1311,7 +1311,7 @@ pub fn validate_rootfs_propagation(spec: &Spec) {
                 _ => unreachable!(),
             }
         }
-        "unbindable" => {
+        "unbindable" | "runbindable" => {
             if let Err(e) = mount(
                 Some("/"),
                 target_dir.path(),
@@ -1662,6 +1662,139 @@ pub fn validate_mount_propagation(spec: &Spec) {
                 }
             }
             _ => unreachable!(),
+        }
+    }
+}
+
+pub fn validate_default_symlinks(_spec: &Spec) {
+    let default_symlinks = [
+        ("/dev/fd", "/proc/self/fd"),
+        ("/dev/ptmx", "pts/ptmx"),
+        ("/dev/stdin", "/proc/self/fd/0"),
+        ("/dev/stdout", "/proc/self/fd/1"),
+        ("/dev/stderr", "/proc/self/fd/2"),
+    ];
+
+    for (link, target) in default_symlinks.iter() {
+        match std::fs::read_link(link) {
+            Ok(target_path) => {
+                if target_path != Path::new(target) {
+                    eprintln!(
+                        "Error: expected symlink {} to point to {}, but it points to {}",
+                        link,
+                        target,
+                        target_path.display()
+                    );
+                }
+            }
+            Err(e) => {
+                eprintln!("Error: failed to read symlink {}: {:?}", link, e);
+            }
+        }
+    }
+}
+
+pub fn validate_tmpcopyup(spec: &Spec) {
+    for mount in spec.mounts().as_deref().unwrap_or_default() {
+        let options = mount.options().as_deref().unwrap_or_default();
+        if !options.iter().any(|o| o == "tmpcopyup") {
+            continue;
+        }
+        let dest = mount.destination();
+
+        match nix::sys::statfs::statfs(dest) {
+            Ok(fs) if fs.filesystem_type() == nix::sys::statfs::TMPFS_MAGIC => {}
+            Ok(_) => eprintln!("{dest:?} is not a tmpfs"),
+            Err(e) => eprintln!("statfs {dest:?}: {e}"),
+        }
+
+        // set up by the test: dir2 with mode 0777 in the image's directory under the tmpfs
+        let dir2 = dest.join("dir2");
+        match fs::metadata(&dir2) {
+            Ok(m) if m.is_dir() && m.permissions().mode() & 0o7777 == 0o777 => {}
+            Ok(m) => eprintln!(
+                "{dir2:?} was not copied up as a 0777 directory: mode {:o}",
+                m.permissions().mode()
+            ),
+            Err(e) => eprintln!("{dir2:?} was not copied up: {e}"),
+        }
+
+        let readonly = options.iter().any(|o| o == "ro");
+        match (test_dir_write_access(dest.to_str().unwrap()), readonly) {
+            (Ok(()), false) => {}
+            (Err(e), true) if e.raw_os_error() == Some(libc::EROFS) => {}
+            (Ok(()), true) => eprintln!("{dest:?} is writable but mounted ro"),
+            (Err(e), _) => eprintln!("write to {dest:?}: {e}"),
+        }
+    }
+}
+
+fn device_rules(spec: &Spec) -> impl Iterator<Item = &oci_spec::runtime::LinuxDeviceCgroup> {
+    spec.linux()
+        .as_ref()
+        .and_then(|linux| linux.resources().as_ref())
+        .and_then(|resources| resources.devices().as_ref())
+        .into_iter()
+        .flatten()
+}
+
+/// Whether the spec's device rules grant `access` on the `typ` device `major:minor`. The
+/// rules apply in order with a deny-all default, and a type "a" rule matches every device.
+fn spec_allows_device(
+    spec: &Spec,
+    typ: LinuxDeviceType,
+    major: i64,
+    minor: i64,
+    access: char,
+) -> bool {
+    device_rules(spec).fold(false, |allowed, rule| {
+        let rule_typ = rule.typ().unwrap_or_default();
+        let matches = rule_typ == LinuxDeviceType::A
+            || (rule_typ == typ
+                && rule.major().is_none_or(|m| m < 0 || m == major)
+                && rule.minor().is_none_or(|m| m < 0 || m == minor)
+                && rule.access().as_deref().is_some_and(|a| a.contains(access)));
+        if matches { rule.allow() } else { allowed }
+    })
+}
+
+/// Opens each block device node the spec has the runtime create (`linux.devices`) and checks
+/// that reading it is allowed or denied as the spec's device cgroup rules say. Only block
+/// devices: the runtime's default rules (the same list in runc and youki) allow a few char
+/// devices whatever the spec says, so a char node cannot be checked from the spec alone.
+pub fn validate_device_cgroup(spec: &Spec) {
+    let block_nodes: Vec<_> = spec
+        .linux()
+        .as_ref()
+        .and_then(|linux| linux.devices().as_ref())
+        .into_iter()
+        .flatten()
+        .filter(|node| node.typ() == LinuxDeviceType::B)
+        .collect();
+    if block_nodes.is_empty() {
+        eprintln!("error due to the spec creating no block device whose access could be checked");
+        return;
+    }
+
+    for node in block_nodes {
+        let path = node.path();
+        let (major, minor) = (node.major(), node.minor());
+        let expected = spec_allows_device(spec, LinuxDeviceType::B, major, minor, 'r');
+        let result = fs::OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_NONBLOCK)
+            .open(path);
+        // The device cgroup answers before the driver does, so EPERM is the only error it
+        // can give; whether a disk with that number exists on the host is not the question.
+        let denied = matches!(&result, Err(e) if e.raw_os_error() == Some(libc::EPERM));
+        if denied == expected {
+            eprintln!(
+                "error due to reading block device {} ({major}:{minor}) being {}, the spec's \
+                 device rules {} it: {result:?}",
+                path.display(),
+                if denied { "denied" } else { "allowed" },
+                if expected { "allow" } else { "deny" },
+            );
         }
     }
 }

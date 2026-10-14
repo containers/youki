@@ -1,6 +1,7 @@
 pub mod cgroups;
 pub mod checkpoint_restore;
 pub mod create_runtime;
+pub mod default;
 pub mod delete;
 pub mod devices;
 pub mod domainname;
@@ -52,6 +53,6 @@ pub mod state;
 pub mod sysctl;
 pub mod terminal;
 pub mod time_ns;
-pub mod tlb;
+pub mod tmpcopyup;
 pub mod uid_mappings;
 pub mod update;
