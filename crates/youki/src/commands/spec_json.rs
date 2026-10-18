@@ -6,13 +6,19 @@ use anyhow::{Result, anyhow};
 use libcgroups::common::{CgroupSetup, get_cgroup_setup};
 use libcontainer::oci_spec::runtime::{
     LinuxBuilder, LinuxDeviceCgroupBuilder, LinuxIdMappingBuilder, LinuxNamespace,
-    LinuxNamespaceBuilder, LinuxNamespaceType, Mount, Spec,
+    LinuxNamespaceBuilder, LinuxNamespaceType, Mount, ProcessBuilder, Spec,
 };
 use libcontainer::syscall::syscall::Syscall;
 use serde_json::to_writer_pretty;
 
 pub fn get_default() -> Result<Spec> {
-    let spec = Spec::default();
+    let mut spec = Spec::default();
+
+    // Match `runc spec`, which sets terminal to true. The OCI default is false,
+    // but runc's integration tests depend on this.
+    let process = ProcessBuilder::default().terminal(true).build()?;
+    spec.set_process(Some(process));
+
     normalize_spec(spec)
 }
 
@@ -160,6 +166,11 @@ mod tests {
         spec(args, syscall.as_ref()).expect("failed to run spec subcommand");
         let config_path = tmpdir.path().join("config.json");
         assert!(config_path.is_file());
+        let spec = Spec::load(&config_path)?;
+        assert_eq!(
+            spec.process().as_ref().and_then(|p| p.terminal()),
+            Some(true)
+        );
         Ok(())
     }
 
