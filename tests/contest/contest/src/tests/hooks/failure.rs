@@ -15,6 +15,7 @@ use oci_spec::runtime::{Hook, HookBuilder, HooksBuilder, ProcessBuilder, Spec, S
 use test_framework::{ConditionalTest, Test, TestGroup, TestResult};
 
 use super::invoke::{delete_hook_output_file, get_hook_output_path, write_log_hook};
+use crate::utils::test_utils::delete_container_force;
 use crate::utils::{
     CreateOptions, LifecycleStatus, WaitTarget, create_container, delete_container, generate_uuid,
     is_runtime_runc, prepare_bundle, set_config, start_container, wait_for_state,
@@ -22,6 +23,22 @@ use crate::utils::{
 
 const STATE_WAIT_TIMEOUT_SECS: u64 = 5;
 const STATE_POLL_INTERVAL_MILLIS: u64 = 100;
+
+/// A hook that records its invocation and the `status` of the OCI state it
+/// receives on stdin, as `<content> status=<status>`.
+fn status_log_hook(content: &str, host_output_file_path: &str) -> Hook {
+    HookBuilder::default()
+        .path("/bin/sh")
+        .args(vec![
+            "sh".to_string(),
+            "-c".to_string(),
+            format!(
+                r#"status=$(sed -n 's/.*"status"[[:space:]]*:[[:space:]]*"\([a-z]*\)".*/\1/p'); echo "{content} status=$status" >> {host_output_file_path}"#
+            ),
+        ])
+        .build()
+        .expect("could not build hook")
+}
 
 /// A hook that records its invocation and then fails with exit code 7.
 fn failing_log_hook(content: &str, host_output_file_path: &str) -> Hook {
@@ -82,7 +99,7 @@ fn create_runtime_failure_spec(host_output_file: &str) -> Spec {
                     "create-runtime-failed",
                     host_output_file,
                 )])
-                .poststop(vec![write_log_hook("post-stop called", host_output_file)])
+                .poststop(vec![status_log_hook("post-stop", host_output_file)])
                 .build()
                 .expect("could not build hooks"),
         )
@@ -111,7 +128,7 @@ fn poststart_failure_test() -> TestResult {
 
     let start = start_container(&id, &bundle).unwrap().wait().unwrap();
     if start.success() {
-        let _ = delete_container(&id, &bundle).and_then(|mut c| Ok(c.wait()?));
+        let _ = delete_container_force(&id, &bundle).and_then(|mut c| Ok(c.wait()?));
         return TestResult::Failed(anyhow!(
             "start must fail when a poststart hook fails, but it exited successfully"
         ));
@@ -123,7 +140,7 @@ fn poststart_failure_test() -> TestResult {
         bundle.path(),
         WaitTarget::Status(LifecycleStatus::Stopped),
     ) {
-        let _ = delete_container(&id, &bundle).and_then(|mut c| Ok(c.wait()?));
+        let _ = delete_container_force(&id, &bundle).and_then(|mut c| Ok(c.wait()?));
         return TestResult::Failed(anyhow!(
             "container must be stopped after a poststart hook failure: {e}"
         ));
@@ -157,7 +174,7 @@ fn create_runtime_failure_test() -> TestResult {
         .wait()
         .unwrap();
     if create.success() {
-        let _ = delete_container(&id, &bundle).and_then(|mut c| Ok(c.wait()?));
+        let _ = delete_container_force(&id, &bundle).and_then(|mut c| Ok(c.wait()?));
         return TestResult::Failed(anyhow!(
             "create must fail when a createRuntime hook fails, but it exited successfully"
         ));
@@ -166,7 +183,7 @@ fn create_runtime_failure_test() -> TestResult {
     // Steps 4, 12 and 13: the failed create destroyed the container and ran the poststop hooks.
     let log = fs::read_to_string(&host_output_file).expect("cannot read output file");
     delete_hook_output_file(&host_output_file).unwrap();
-    let expected = "create-runtime-failed\npost-stop called\n";
+    let expected = "create-runtime-failed\npost-stop status=stopped\n";
     if log != expected {
         return TestResult::Failed(anyhow!(
             "unexpected hook log after a createRuntime failure.\ngot:\n{log}\nexpected:\n{expected}"

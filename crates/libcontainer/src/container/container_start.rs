@@ -77,6 +77,20 @@ impl Container {
                         "failed to stop the container after a post start hook failure"
                     );
                 }
+                // The cgroup kill reaches the processes the cgroup lists; a
+                // rootless cgroup v2 setup can leave init outside it. Signal
+                // init by pid as well, so the container is stopped either way.
+                if let Some(pid) = self.pid() {
+                    match nix::sys::signal::kill(pid, Signal::SIGKILL) {
+                        Ok(()) | Err(nix::errno::Errno::ESRCH) => {}
+                        Err(kill_err) => tracing::error!(
+                            id = ?self.id(),
+                            ?kill_err,
+                            ?pid,
+                            "failed to kill the container process after a post start hook failure"
+                        ),
+                    }
+                }
                 return Err(err.into());
             }
         }

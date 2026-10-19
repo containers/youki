@@ -245,18 +245,23 @@ impl ContainerBuilderImpl {
         let Some(hooks) = self.spec.hooks().as_ref() else {
             return;
         };
-        if let Err(err) = hooks::run_hooks(
-            hooks.poststop().as_ref(),
-            Some(&container.state),
-            None,
-            None,
-            None,
-        ) {
-            tracing::warn!(
-                id = ?container.id(),
-                ?err,
-                "failed to run post stop hooks after a failed create"
-            );
+        // The container has been destroyed, so the hooks see a stopped state
+        // (the saved state still reads `creating`, and its directory is gone,
+        // so the snapshot is not written back). As in lifecycle step 13, a
+        // failing hook does not stop the hooks after it.
+        let mut state = container.state.clone();
+        state.status = ContainerStatus::Stopped;
+        for hook in hooks.poststop().iter().flatten() {
+            if let Err(err) =
+                hooks::run_hooks(Some(&vec![hook.clone()]), Some(&state), None, None, None)
+            {
+                tracing::warn!(
+                    id = ?container.id(),
+                    ?err,
+                    path = ?hook.path(),
+                    "a post stop hook failed after a failed create"
+                );
+            }
         }
     }
 
