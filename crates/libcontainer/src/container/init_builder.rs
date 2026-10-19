@@ -83,9 +83,15 @@ impl InitContainerBuilder {
 
         let container_dir = self.create_container_dir()?;
 
+        // The cgroup manager is systemd when asked for, and also under a user
+        // namespace (see ContainerBuilderImpl); record the manager actually
+        // selected, since kill, delete and exec read it back from the state.
+        let user_ns_config = UserNamespaceConfig::new(&spec)?;
+        let systemd_cgroup = self.use_systemd || user_ns_config.is_some();
+
         let mut container = self.create_container_state(&container_dir)?;
         container
-            .set_systemd(self.use_systemd)
+            .set_systemd(systemd_cgroup)
             .set_annotations(spec.annotations().clone());
 
         let notify_path = container_dir.join(NOTIFY_FILE);
@@ -104,9 +110,6 @@ impl InitContainerBuilder {
         } else {
             None
         };
-
-        let user_ns_config = UserNamespaceConfig::new(&spec)?;
-        let systemd_cgroup = self.use_systemd || user_ns_config.is_some();
 
         let config =
             YoukiConfig::from_spec_with_cgroup_manager(&spec, container.id(), systemd_cgroup)?;
