@@ -123,7 +123,7 @@ for case in "${test_cases[@]}"; do
   mkdir -p "$(dirname "$logfile")"
   sudo RUST_BACKTRACE=1 RUNTIME="${RUNTIME}" "${OCI_TEST_DIR}"/validation/"$case" >"$logfile" 2>&1 || (cat "$logfile" && exit 1)
   if grep -q "not ok" "$logfile"; then
-    if ! grep -q "# cgroupv2 is not supported yet " "$logfile"; then
+    if grep -q "# cgroupv2 is not supported yet " "$logfile"; then
       echo "Skip $case because oci-runtime-tools doesn't support cgroup v2"
       continue;
     fi
