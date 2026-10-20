@@ -22,7 +22,8 @@
 //!   opcode that the kernel doesn't know is skipped: it can't be submitted
 //!   anyway.
 //! - `socketFamilies`, when present, limits `IORING_OP_SOCKET` to these
-//!   address families.
+//!   address families. It can't be empty, and `ops` must allow
+//!   `IORING_OP_SOCKET`.
 //!
 //! The policy is built only from BPF filters, never from the one-shot opcode
 //! allowlist (`IORING_REGISTER_RESTRICTIONS`). That keeps the SQE flags
@@ -135,6 +136,8 @@ pub enum IoUringError {
     UnknownFamily(String),
     #[error("socketFamilies is empty; to deny all sockets, leave IORING_OP_SOCKET out of ops")]
     EmptyFamilies,
+    #[error("socketFamilies requires IORING_OP_SOCKET in ops")]
+    FamiliesWithoutSocket,
     #[error(
         "io_uring restrictions are not supported by this kernel (Linux 7.0 or newer is required)"
     )]
@@ -193,6 +196,9 @@ impl IoUringPolicy {
             .map(|families| {
                 if families.is_empty() {
                     return Err(IoUringError::EmptyFamilies);
+                }
+                if !ops.contains(&IORING_OP_SOCKET) {
+                    return Err(IoUringError::FamiliesWithoutSocket);
                 }
                 families
                     .iter()
@@ -470,9 +476,16 @@ mod tests {
     }
 
     #[test]
-    fn socket_families_are_ignored_when_socket_is_denied() {
-        let filters = policy(r#"{"ops":["IORING_OP_NOP"],"socketFamilies":["AF_INET"]}"#).filters();
-        assert!(filters.iter().all(|f| f.opcode != IORING_OP_SOCKET));
+    fn socket_families_require_socket() {
+        let families_without_socket = serde_json::from_str::<IoUringPolicy>(
+            r#"{"ops":["IORING_OP_NOP"],"socketFamilies":["AF_INET"]}"#,
+        )
+        .unwrap()
+        .compile();
+        assert!(matches!(
+            families_without_socket,
+            Err(IoUringError::FamiliesWithoutSocket)
+        ));
     }
 
     #[test]
@@ -493,10 +506,11 @@ mod tests {
             .unwrap()
             .compile();
         assert!(matches!(unknown_op, Err(IoUringError::UnknownOp(_))));
-        let unknown_family =
-            serde_json::from_str::<IoUringPolicy>(r#"{"ops":[],"socketFamilies":["AF_FOO"]}"#)
-                .unwrap()
-                .compile();
+        let unknown_family = serde_json::from_str::<IoUringPolicy>(
+            r#"{"ops":["IORING_OP_SOCKET"],"socketFamilies":["AF_FOO"]}"#,
+        )
+        .unwrap()
+        .compile();
         assert!(matches!(
             unknown_family,
             Err(IoUringError::UnknownFamily(_))
