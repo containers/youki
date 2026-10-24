@@ -239,7 +239,7 @@ fn check_io_max_entry(
         .with_context(|| format!("no io.max entry for {major}:{minor} in {content:?}"))?;
 
     for expected in [expected_read, expected_write] {
-        if !line.contains(expected) {
+        if !line.split_whitespace().any(|field| field == expected) {
             anyhow::bail!("io.max entry {line:?} does not contain {expected:?}");
         }
     }
