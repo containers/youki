@@ -6,7 +6,7 @@ use anyhow::{Result, anyhow};
 use libcgroups::common::{CgroupSetup, get_cgroup_setup};
 use libcontainer::oci_spec::runtime::{
     LinuxBuilder, LinuxDeviceCgroupBuilder, LinuxIdMappingBuilder, LinuxNamespace,
-    LinuxNamespaceBuilder, LinuxNamespaceType, Mount, ProcessBuilder, Spec,
+    LinuxNamespaceBuilder, LinuxNamespaceType, Mount, Spec,
 };
 use libcontainer::syscall::syscall::Syscall;
 use serde_json::to_writer_pretty;
@@ -16,8 +16,9 @@ pub fn get_default() -> Result<Spec> {
 
     // Match `runc spec`, which sets terminal to true. The OCI default is false,
     // but runc's integration tests depend on this.
-    let process = ProcessBuilder::default().terminal(true).build()?;
-    spec.set_process(Some(process));
+    if let Some(process) = spec.process_mut() {
+        process.set_terminal(Some(true));
+    }
 
     normalize_spec(spec)
 }
